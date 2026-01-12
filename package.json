@@ -77,7 +77,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "tsx": "^4.21.0",
-    "netlify-plugin-inline-functions-env": "^1.0.0"
+    "netlify-plugin-inline-functions-env": "^1.0.9",
+    "tsx": "^4.21.0"
   }
 }
