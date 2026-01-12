@@ -4,19 +4,30 @@ import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
+// Firebase configuration - MUST use environment variables (no hardcoded secrets!)
+// All values must be set via environment variables for security
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBXBK_jtB_grkJ_GwCXeHoM9ce0dEx2lrc",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "wildlife-exchange.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "wildlife-exchange",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "wildlife-exchange.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "997321283928",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:997321283928:web:75a1cb8fe4cfc0e5c76d2d",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-MEELFLSGMC",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Validate required config values
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  console.warn('Firebase configuration is incomplete. Please check your environment variables.');
+  if (typeof window !== 'undefined') {
+    console.error('❌ Firebase configuration is incomplete!');
+    console.error('Please set the following environment variables:');
+    console.error('  - NEXT_PUBLIC_FIREBASE_API_KEY');
+    console.error('  - NEXT_PUBLIC_FIREBASE_PROJECT_ID');
+    console.error('  - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN');
+    console.error('\nCreate a .env.local file in the project root with these values.');
+  } else {
+    console.warn('Firebase configuration is incomplete. Please check your environment variables.');
+  }
 }
 
 // Initialize Firebase
