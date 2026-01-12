@@ -3,6 +3,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: false, // Keep type checking enabled
+  },
   images: { 
     unoptimized: true,
     remotePatterns: [

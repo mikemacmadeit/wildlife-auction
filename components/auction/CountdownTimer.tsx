@@ -37,12 +37,9 @@ export function CountdownTimer({
   });
   const [isEnded, setIsEnded] = useState(false);
 
-  // Return null if no end time is provided (after hooks)
-  if (!endTime) {
-    return null;
-  }
-
   useEffect(() => {
+    // Early return inside useEffect if no endTime
+    if (!endTime) return;
     const calculateTime = () => {
       if (!endTime) return;
       
@@ -70,6 +67,11 @@ export function CountdownTimer({
 
     return () => clearInterval(interval);
   }, [endTime, onEnd]);
+
+  // Return null if no end time is provided (after all hooks)
+  if (!endTime) {
+    return null;
+  }
 
   const isEndingSoon = timeRemaining.total < 24 * 60 * 60 * 1000; // Less than 24 hours
   const isEndingVerySoon = timeRemaining.total < 60 * 60 * 1000; // Less than 1 hour
