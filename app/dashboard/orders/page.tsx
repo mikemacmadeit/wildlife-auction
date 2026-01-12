@@ -20,19 +20,6 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-5 w-5 text-accent" />; // Sage for success
-      case 'pending':
-        return <Clock className="h-5 w-5 text-muted-foreground" />; // Muted for pending
-      case 'cancelled':
-        return <XCircle className="h-5 w-5 text-destructive" />; // Brick red for cancelled
-      default:
-        return <Package className="h-5 w-5 text-muted-foreground" />;
-    }
-  };
-
   // Fetch orders when user is loaded
   useEffect(() => {
     const fetchOrders = async () => {
