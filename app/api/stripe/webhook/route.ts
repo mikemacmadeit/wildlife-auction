@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe/config';
 
 // Initialize Firebase Admin (if not already initialized)
