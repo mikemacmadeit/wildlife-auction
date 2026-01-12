@@ -239,10 +239,12 @@ export default function ListingDetailPage() {
           <ImageGallery images={listing.images} title={listing.title} />
         </motion.div>
 
-        {/* Main Content - Mobile Optimized Layout */}
-        <div className="space-y-6">
-          {/* Header Section - Title, Badges, Actions */}
-          <div className="space-y-4">
+        {/* Main Content Grid - Responsive Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column - Main Content (8 columns on desktop, full width on mobile) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Header Section - Title, Badges, Actions */}
+            <div className="space-y-4">
             {/* Title Row */}
             <div className="flex items-start justify-between gap-3 sm:gap-4">
               <div className="flex-1 min-w-0">
@@ -325,116 +327,118 @@ export default function ListingDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Bidding Section - Below Price (Mobile Optimized) */}
-            {listing.type === 'auction' && listing.endsAt && new Date(listing.endsAt) > new Date() && (
-              <Card className="border-2">
-                <CardHeader className="pb-4 border-b">
-                  <CardTitle className="text-lg font-bold">Place Your Bid</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                  {/* Countdown Timer - Prominent */}
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      ⏰ Time Remaining
+            {/* Bidding Section - Below Price (Mobile Only) */}
+            <div className="lg:hidden">
+              {listing.type === 'auction' && listing.endsAt && new Date(listing.endsAt) > new Date() && (
+                <Card className="border-2">
+                  <CardHeader className="pb-4 border-b">
+                    <CardTitle className="text-lg font-bold">Place Your Bid</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-6">
+                    {/* Countdown Timer - Prominent */}
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        ⏰ Time Remaining
+                      </div>
+                      <CountdownTimer endDate={listing.endsAt} variant="default" />
                     </div>
-                    <CountdownTimer endDate={listing.endsAt} variant="default" />
-                  </div>
 
-                  <Separator />
+                    <Separator />
 
-                  {/* Bid Calculator */}
-                  <div className="space-y-3">
-                    <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      Quick Bid Amounts
-                    </div>
-                    <BidIncrementCalculator
-                      currentBid={listing.currentBid || listing.startingBid || 0}
-                      onBidChange={(amount) => setBidAmount(amount.toString())}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Bid Input & Button */}
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="bid-amount-mobile" className="text-sm font-semibold mb-2 block">
-                        Enter Your Bid Amount
-                      </Label>
-                      <Input
-                        id="bid-amount-mobile"
-                        type="number"
-                        value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="text-lg h-12"
+                    {/* Bid Calculator */}
+                    <div className="space-y-3">
+                      <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        Quick Bid Amounts
+                      </div>
+                      <BidIncrementCalculator
+                        currentBid={listing.currentBid || listing.startingBid || 0}
+                        onBidChange={(amount) => setBidAmount(amount.toString())}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Minimum bid: ${((listing.currentBid || listing.startingBid || 0) + 100).toLocaleString()}
-                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="auto-bid-mobile"
-                        checked={includeVerification}
-                        onCheckedChange={(checked) => setIncludeVerification(checked as boolean)}
-                      />
-                      <Label htmlFor="auto-bid-mobile" className="text-sm cursor-pointer">
-                        Enable auto-bidding (max bid)
-                      </Label>
+
+                    <Separator />
+
+                    {/* Bid Input & Button */}
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="bid-amount-mobile" className="text-sm font-semibold mb-2 block">
+                          Enter Your Bid Amount
+                        </Label>
+                        <Input
+                          id="bid-amount-mobile"
+                          type="number"
+                          value={bidAmount}
+                          onChange={(e) => setBidAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="text-lg h-12"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Minimum bid: ${((listing.currentBid || listing.startingBid || 0) + 100).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="auto-bid-mobile"
+                          checked={includeVerification}
+                          onCheckedChange={(checked) => setIncludeVerification(checked as boolean)}
+                        />
+                        <Label htmlFor="auto-bid-mobile" className="text-sm cursor-pointer">
+                          Enable auto-bidding (max bid)
+                        </Label>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          setShowBidDialog(false);
+                          setShowConfirmDialog(true);
+                        }}
+                        className="w-full min-h-[52px] text-base font-bold shadow-lg"
+                        disabled={!bidAmount || isNaN(parseFloat(bidAmount))}
+                        size="lg"
+                      >
+                        <Gavel className="mr-2 h-5 w-5" />
+                        Place Bid
+                      </Button>
                     </div>
-                    <Button
-                      onClick={() => {
-                        setShowBidDialog(false);
-                        setShowConfirmDialog(true);
-                      }}
-                      className="w-full min-h-[52px] text-base font-bold shadow-lg"
-                      disabled={!bidAmount || isNaN(parseFloat(bidAmount))}
-                      size="lg"
-                    >
-                      <Gavel className="mr-2 h-5 w-5" />
-                      Place Bid
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  </CardContent>
+                </Card>
+              )}
 
-            {/* Buy Now / Contact Seller - For Fixed/Classified */}
-            {listing.type !== 'auction' && (
-              <Card className="border-2">
-                <CardContent className="pt-6">
-                  {listing.type === 'fixed' && (
-                    <Button 
-                      size="lg" 
-                      onClick={handleBuyNow} 
-                      className="w-full min-h-[52px] text-base font-bold shadow-lg"
-                    >
-                      <ShoppingCart className="mr-2 h-5 w-5" />
-                      Buy Now - ${listing.price?.toLocaleString()}
-                    </Button>
-                  )}
-                  {listing.type === 'classified' && (
-                    <Button 
-                      size="lg" 
-                      variant="outline" 
-                      className="w-full min-h-[52px] text-base font-bold border-2"
-                    >
-                      <MessageCircle className="mr-2 h-5 w-5" />
-                      Contact Seller
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+              {/* Buy Now / Contact Seller - For Fixed/Classified (Mobile Only) */}
+              {listing.type !== 'auction' && (
+                <Card className="border-2">
+                  <CardContent className="pt-6">
+                    {listing.type === 'fixed' && (
+                      <Button 
+                        size="lg" 
+                        onClick={handleBuyNow} 
+                        className="w-full min-h-[52px] text-base font-bold shadow-lg"
+                      >
+                        <ShoppingCart className="mr-2 h-5 w-5" />
+                        Buy Now - ${listing.price?.toLocaleString()}
+                      </Button>
+                    )}
+                    {listing.type === 'classified' && (
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        className="w-full min-h-[52px] text-base font-bold border-2"
+                      >
+                        <MessageCircle className="mr-2 h-5 w-5" />
+                        Contact Seller
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
-            {/* Bid History - For Auctions (Below Bidding Section) */}
-            {listing.type === 'auction' && (
-              <BidHistory
-                currentBid={listing.currentBid || listing.startingBid || 0}
-                startingBid={listing.startingBid || 0}
-              />
-            )}
+              {/* Bid History - For Auctions (Mobile Only, Below Bidding Section) */}
+              {listing.type === 'auction' && (
+                <BidHistory
+                  currentBid={listing.currentBid || listing.startingBid || 0}
+                  startingBid={listing.startingBid || 0}
+                />
+              )}
+            </div>
           </div>
 
           {/* Key Facts - Quick Reference */}
@@ -554,14 +558,9 @@ export default function ListingDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Desktop Sidebar - Only visible on large screens */}
-          <div className="hidden lg:block">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-8">
-                {/* Left column content already shown above */}
-              </div>
-              <div className="lg:col-span-4">
-                <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
+          {/* Right Sidebar - Desktop Only (4 columns, Sticky) */}
+          <div className="hidden lg:block lg:col-span-4">
+            <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
                   {/* Desktop Action Card */}
                   <Card className="border-2 shadow-xl bg-card">
                     <CardHeader className="pb-4 border-b">
@@ -691,7 +690,6 @@ export default function ListingDetailPage() {
                   </Card>
                 </div>
               </div>
-            </div>
           </div>
         </div>
 
