@@ -27,11 +27,7 @@ export function CountdownTimer({
   // Use endsAt or endDate (endDate is alias for backward compatibility)
   const endTime = endsAt || endDate;
 
-  // Return null if no end time is provided
-  if (!endTime) {
-    return null;
-  }
-
+  // Hooks must be called unconditionally - move before early return
   const [timeRemaining, setTimeRemaining] = useState({
     days: 0,
     hours: 0,
@@ -40,6 +36,11 @@ export function CountdownTimer({
     total: 0,
   });
   const [isEnded, setIsEnded] = useState(false);
+
+  // Return null if no end time is provided (after hooks)
+  if (!endTime) {
+    return null;
+  }
 
   useEffect(() => {
     const calculateTime = () => {
