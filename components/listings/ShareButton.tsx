@@ -59,10 +59,12 @@ export function ShareButton({
   };
 
   if (variant === 'button') {
+    // Map 'md' to 'default' since Button doesn't support 'md'
+    const buttonSize = size === 'md' ? 'default' : size;
     return (
       <Button
         variant="outline"
-        size={size}
+        size={buttonSize as 'sm' | 'default' | 'lg' | 'icon' | null | undefined}
         onClick={handleShare}
         className={cn('gap-2', className)}
       >
