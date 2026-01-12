@@ -316,7 +316,7 @@ export function Navbar() {
                         <Link
                           href={link.href}
                           className={cn(
-                            'px-4 py-3 rounded-lg text-base font-semibold transition-all',
+                            'px-4 py-3 rounded-lg text-base font-semibold transition-all min-h-[48px] flex items-center',
                             'hover:bg-muted active:bg-muted',
                             isActive && 'bg-primary/10 text-primary dark:text-[hsl(37,27%,70%)] border-l-4 border-primary dark:border-[hsl(37,27%,70%)]'
                           )}
@@ -328,7 +328,7 @@ export function Navbar() {
                   })}
                   <div className="pt-2 mt-2 border-t border-border/50 space-y-2">
                     <SheetClose asChild>
-                      <Button asChild className="w-full justify-start gap-2 font-semibold h-11 dark:bg-primary dark:text-primary-foreground" style={{
+                      <Button asChild className="w-full justify-start gap-2 font-semibold min-h-[48px] dark:bg-primary dark:text-primary-foreground" style={{
                         backgroundColor: 'hsl(90 12% 45%)',
                         color: 'hsl(40 30% 93%)',
                       }}>
@@ -339,7 +339,7 @@ export function Navbar() {
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold h-11">
+                      <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
                         <Link href="/register">
                           <User className="h-4 w-4" />
                           Sign Up
@@ -347,7 +347,7 @@ export function Navbar() {
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold h-11">
+                      <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
                         <Link href="/dashboard/account">
                           <LogIn className="h-4 w-4" />
                           Sign In
@@ -355,7 +355,7 @@ export function Navbar() {
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button asChild className="w-full justify-start gap-2 font-semibold h-11">
+                      <Button asChild className="w-full justify-start gap-2 font-semibold min-h-[48px]">
                         <Link href="/seller/overview">
                           <LayoutDashboard className="h-4 w-4" />
                           Dashboard

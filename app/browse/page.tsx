@@ -314,7 +314,7 @@ export default function BrowsePage() {
                   placeholder="Search listings, breeds, locations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 min-h-[48px] text-base"
+                  className="pl-10 min-h-[48px] text-base md:text-sm"
                 />
               </div>
             </div>
@@ -330,7 +330,7 @@ export default function BrowsePage() {
                 size="sm"
                 onClick={clearFilters}
                 disabled={activeFilterCount === 0}
-                className="min-h-[48px]"
+                className="min-h-[48px] px-4"
               >
                 Clear
               </Button>

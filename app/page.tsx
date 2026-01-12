@@ -107,8 +107,8 @@ export default function HomePage() {
             transition={{ duration: 0.8 }}
             className="max-w-4xl mx-auto"
           >
-            <div className="flex items-center justify-center gap-4 mb-6 flex-nowrap">
-              <div className="relative h-16 w-16 md:h-20 md:w-20 flex-shrink-0">
+            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
+              <div className="relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
                 <div
                   className="h-full w-full"
                   style={{
@@ -124,21 +124,21 @@ export default function HomePage() {
                   }}
                 />
               </div>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
                 Wildlife Exchange
               </h1>
             </div>
-            <p className="text-xl md:text-2xl mb-8 text-white/90 font-medium">
+            <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
               Texas Exotic & Breeder Animal Marketplace
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button asChild size="lg" className="min-h-[56px] min-w-[220px] text-lg font-semibold">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
+              <Button asChild size="lg" className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold">
                 <Link href="/browse">
                   Browse Listings
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="min-h-[56px] min-w-[220px] text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm">
+              <Button asChild variant="outline" size="lg" className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm">
                 <Link href="/dashboard/listings/new">
                   List an Animal
                 </Link>

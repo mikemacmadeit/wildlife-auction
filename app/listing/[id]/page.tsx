@@ -247,9 +247,9 @@ export default function ListingDetailPage() {
             {/* Header Section - Title, Price, Actions */}
             <div className="space-y-4">
               {/* Title Row */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <h1 className="text-3xl md:text-4xl font-bold mb-3 leading-tight">{listing.title}</h1>
+              <div className="flex items-start justify-between gap-3 sm:gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 leading-tight break-words">{listing.title}</h1>
                   <div className="flex flex-wrap items-center gap-2 mb-4">
                     <Badge variant="outline" className="text-sm font-medium">{listing.category}</Badge>
                     <Badge variant="outline" className="text-sm font-medium capitalize">{listing.type}</Badge>
@@ -302,8 +302,8 @@ export default function ListingDetailPage() {
                       <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                         {listing.type === 'auction' ? 'Current Bid' : 'Price'}
                       </div>
-                      <div className="flex items-baseline gap-3">
-                        <span className="text-5xl md:text-6xl font-extrabold">
+                      <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
+                        <span className="text-4xl sm:text-5xl md:text-6xl font-extrabold">
                           ${currentPrice.toLocaleString()}
                         </span>
                         {listing.type === 'auction' && listing.currentBid && (
@@ -366,7 +366,7 @@ export default function ListingDetailPage() {
 
           {/* Right Sidebar - Action & Info (4 columns, Sticky) */}
           <div className="lg:col-span-4">
-            <div className="lg:sticky lg:top-24 space-y-6">
+            <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
               {/* Primary Action Card - eBay Style */}
               <Card className="border-2 shadow-xl bg-card">
                 <CardHeader className="pb-4 border-b">
@@ -406,7 +406,7 @@ export default function ListingDetailPage() {
                       <DialogTrigger asChild>
                         <Button 
                           size="lg" 
-                          className="w-full min-h-[60px] text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
+                          className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >
                           <Gavel className="mr-2 h-5 w-5" />
                           Place a Bid
@@ -465,7 +465,7 @@ export default function ListingDetailPage() {
                     <Button 
                       size="lg" 
                       onClick={handleBuyNow} 
-                      className="w-full min-h-[60px] text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
+                      className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                     >
                       <ShoppingCart className="mr-2 h-5 w-5" />
                       Buy Now
@@ -476,7 +476,7 @@ export default function ListingDetailPage() {
                     <Button 
                       size="lg" 
                       variant="outline" 
-                      className="w-full min-h-[60px] text-lg font-bold border-2"
+                      className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold border-2"
                     >
                       <MessageCircle className="mr-2 h-5 w-5" />
                       Contact Seller
