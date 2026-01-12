@@ -149,8 +149,16 @@ export async function uploadListingImage(
       path: storagePath,
       imageId,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading listing image:', error);
+    
+    // Preserve Firebase error codes for better error handling
+    if (error.code) {
+      const enhancedError = new Error(error.message || 'Failed to upload image');
+      (enhancedError as any).code = error.code;
+      throw enhancedError;
+    }
+    
     throw error;
   }
 }

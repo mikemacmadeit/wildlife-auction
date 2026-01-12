@@ -242,22 +242,6 @@ function NewListingPageContent() {
             <div className="space-y-4 w-full">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
               <div>
-                <Label htmlFor="images" className="cursor-pointer">
-                  <Button 
-                    variant="outline" 
-                    className="min-h-[48px] min-w-[200px]"
-                    disabled={formData.images.length >= 8 || uploadingImages.size > 0}
-                  >
-                    {uploadingImages.size > 0 ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      'Upload Photos'
-                    )}
-                  </Button>
-                </Label>
                 <Input
                   id="images"
                   type="file"
@@ -317,7 +301,17 @@ function NewListingPageContent() {
 
                         currentListingId = await createListingDraft(user.uid, draftData);
                         setListingId(currentListingId);
+                        
+                        // Small delay to ensure Firestore has propagated the document
+                        // This helps with Storage security rules that read from Firestore
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        toast({
+                          title: 'Draft created',
+                          description: 'Listing draft created. You can now upload images.',
+                        });
                       } catch (error: any) {
+                        console.error('Error creating draft listing:', error);
                         toast({
                           title: 'Error creating draft',
                           description: error.message || 'Failed to create listing draft. Please try again.',
@@ -357,15 +351,38 @@ function NewListingPageContent() {
                           await updateListing(user.uid, currentListingId!, {
                             images: newImages,
                           } as any);
-                        } catch (updateError) {
+                        } catch (updateError: any) {
                           console.error('Error updating listing with image:', updateError);
                           // Don't fail the upload if update fails - images are already in formData
+                          toast({
+                            title: 'Image uploaded',
+                            description: 'Image uploaded successfully, but failed to update listing. Please try refreshing.',
+                            variant: 'default',
+                          });
                         }
+
+                        toast({
+                          title: 'Upload successful',
+                          description: `${file.name} uploaded successfully.`,
+                        });
                       } catch (error: any) {
                         console.error('Error uploading image:', error);
+                        
+                        // Provide more specific error messages
+                        let errorMessage = `Failed to upload ${file.name}.`;
+                        if (error.code === 'storage/unauthorized') {
+                          errorMessage = 'You are not authorized to upload images. Please ensure you are logged in and try again.';
+                        } else if (error.code === 'storage/quota-exceeded') {
+                          errorMessage = 'Storage quota exceeded. Please contact support.';
+                        } else if (error.code === 'storage/unauthenticated') {
+                          errorMessage = 'Please sign in to upload images.';
+                        } else if (error.message) {
+                          errorMessage = error.message;
+                        }
+                        
                         toast({
                           title: 'Upload failed',
-                          description: error.message || `Failed to upload ${file.name}. Please try again.`,
+                          description: errorMessage,
                           variant: 'destructive',
                         });
                       } finally {
@@ -386,6 +403,30 @@ function NewListingPageContent() {
                     e.target.value = '';
                   }}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[48px] min-w-[200px]"
+                  disabled={formData.images.length >= 8 || uploadingImages.size > 0}
+                  onClick={() => {
+                    const input = document.getElementById('images') as HTMLInputElement;
+                    if (input) {
+                      input.click();
+                    }
+                  }}
+                >
+                  {uploadingImages.size > 0 ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Photos
+                    </>
+                  )}
+                </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   Upload up to 8 photos (JPG, PNG, WebP)
                 </p>
