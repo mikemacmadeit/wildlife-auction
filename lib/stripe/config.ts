@@ -13,8 +13,8 @@ if (!process.env.STRIPE_SECRET_KEY) {
  * Use this for all Stripe API calls
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-12-18.acacia',
   typescript: true,
+  // Let Stripe use the account's default API version
 });
 
 /**
