@@ -103,7 +103,12 @@ export default function AccountPage() {
             phone: profile.phoneNumber || profile.profile?.location?.city || '',
             businessName: profile.profile?.businessName || '',
             bio: profile.profile?.bio || '',
-            location: profile.profile?.location || { city: '', state: '', zip: '', address: '' },
+            location: {
+              city: profile.profile?.location?.city || '',
+              state: profile.profile?.location?.state || '',
+              zip: profile.profile?.location?.zip || '',
+              address: profile.profile?.location?.address || '',
+            },
             notifications: profile.profile?.notifications || {
               email: true,
               sms: false,
@@ -200,7 +205,12 @@ export default function AccountPage() {
         phone: userProfile.phoneNumber || '',
         businessName: userProfile.profile?.businessName || '',
         bio: userProfile.profile?.bio || '',
-        location: userProfile.profile?.location || { city: '', state: '', zip: '', address: '' },
+        location: {
+          city: userProfile.profile?.location?.city || '',
+          state: userProfile.profile?.location?.state || '',
+          zip: userProfile.profile?.location?.zip || '',
+          address: userProfile.profile?.location?.address || '',
+        },
         notifications: userProfile.profile?.notifications || {
           email: true,
           sms: false,
