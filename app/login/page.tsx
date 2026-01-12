@@ -21,6 +21,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  
+  // Get redirect path from sessionStorage if available
+  const getRedirectPath = () => {
+    if (typeof window !== 'undefined') {
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        return redirectPath;
+      }
+    }
+    return '/dashboard';
+  };
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -59,7 +71,7 @@ export default function LoginPage() {
         title: 'Welcome back!',
         description: 'You have been successfully signed in.',
       });
-      router.push('/dashboard');
+      router.push(getRedirectPath());
     } catch (error: any) {
       let errorMessage = 'An error occurred while signing in. Please try again.';
       
@@ -148,7 +160,7 @@ export default function LoginPage() {
           description: 'You have been successfully signed in.',
         });
 
-        router.push('/dashboard');
+        router.push(getRedirectPath());
       }
     } catch (error: any) {
       let errorMessage = 'An error occurred while signing in with Google. Please try again.';

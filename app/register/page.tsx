@@ -33,6 +33,18 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [signUpMethod, setSignUpMethod] = useState<'select' | 'email' | 'google'>('select');
+  
+  // Get redirect path from sessionStorage if available
+  const getRedirectPath = () => {
+    if (typeof window !== 'undefined') {
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        return redirectPath;
+      }
+    }
+    return '/dashboard';
+  };
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -141,8 +153,8 @@ export default function RegisterPage() {
           description: 'Welcome to Wildlife Exchange! Please check your email to verify your account.',
         });
 
-        // Redirect to dashboard after successful registration
-        router.push('/dashboard');
+        // Redirect to saved path or dashboard after successful registration
+        router.push(getRedirectPath());
       }
     } catch (error: any) {
       let errorMessage = 'An error occurred while creating your account. Please try again.';
@@ -182,8 +194,8 @@ export default function RegisterPage() {
           description: 'Your account has been created successfully.',
         });
 
-        // Redirect to dashboard after successful registration
-        router.push('/dashboard');
+        // Redirect to saved path or dashboard after successful registration
+        router.push(getRedirectPath());
       }
     } catch (error: any) {
       let errorMessage = 'An error occurred while signing in with Google. Please try again.';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepperForm } from '@/components/forms/StepperForm';
 import { Input } from '@/components/ui/input';
@@ -14,16 +14,17 @@ import { Card } from '@/components/ui/card';
 import { Upload, X } from 'lucide-react';
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { RequireAuth } from '@/components/auth/RequireAuth';
 import { useAuth } from '@/hooks/use-auth';
 import { createListingDraft, publishListing } from '@/lib/firebase/listings';
 import { useToast } from '@/hooks/use-toast';
+import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
 
 function NewListingPageContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [formData, setFormData] = useState({
     type: '' as ListingType | '',
     category: '' as ListingCategory | '',
@@ -406,12 +407,13 @@ function NewListingPageContent() {
   ];
 
   const handleComplete = async (data: Record<string, unknown>) => {
+    // Check if user is authenticated - if not, save form data and show auth prompt modal
     if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'You must be signed in to create a listing.',
-        variant: 'destructive',
-      });
+      // Save form data to sessionStorage so we can restore it after authentication
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('listingFormData', JSON.stringify(formData));
+      }
+      setShowAuthModal(true);
       return;
     }
 
@@ -472,23 +474,74 @@ function NewListingPageContent() {
     }
   };
 
+  // Check if user just returned from authentication and restore form data
+  useEffect(() => {
+    if (user && typeof window !== 'undefined') {
+      // Check if we have form data in sessionStorage to restore
+      const savedFormData = sessionStorage.getItem('listingFormData');
+      if (savedFormData) {
+        try {
+          const parsed = JSON.parse(savedFormData);
+          setFormData(parsed);
+          sessionStorage.removeItem('listingFormData');
+          toast({
+            title: 'Welcome back!',
+            description: 'Your listing information has been restored. You can now publish it.',
+          });
+        } catch (e) {
+          console.error('Failed to restore form data:', e);
+        }
+      }
+    }
+  }, [user, toast]);
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-4">
       <div className="container mx-auto px-4 py-6 max-w-2xl">
+        {/* Show a subtle banner if not authenticated */}
+        {!user && (
+          <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <p className="text-sm text-foreground">
+              <span className="font-semibold">💡 Tip:</span> You can fill out the form now, but you'll need to sign in to publish your listing.
+            </p>
+          </div>
+        )}
+        
         <StepperForm 
           steps={steps} 
           onComplete={handleComplete}
         />
       </div>
       <BottomNav />
+      
+      {/* Authentication Prompt Modal */}
+      <AuthPromptModal
+        open={showAuthModal}
+        onOpenChange={setShowAuthModal}
+        title="Sign in to publish your listing"
+        description="You've filled out your listing! Sign in or create an account to publish it. Don't worry - your information will be saved."
+        onAuthSuccess={() => {
+          // After successful auth, the user will be redirected back
+          // and can submit again
+          setShowAuthModal(false);
+        }}
+      />
     </div>
   );
 }
 
 export default function NewListingPage() {
-  return (
-    <RequireAuth>
-      <NewListingPageContent />
-    </RequireAuth>
-  );
+  return <NewListingPageContent />;
 }
