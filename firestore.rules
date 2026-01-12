@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns a document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Allow read: if authenticated (any user can read any user profile)
+      allow read: if isAuthenticated();
+      
+      // Allow create: if authenticated and creating own document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow update: if authenticated and updating own document
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow delete: if authenticated and deleting own document
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // LISTINGS COLLECTION
+    // ============================================
+    match /listings/{listingId} {
+      // Allow read:
+      //   - If listing status is 'active' (anyone authenticated can see active listings)
+      //   - OR if user is the seller (seller can see their own listings regardless of status)
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'active' ||
+        resource.data.sellerId == request.auth.uid
+      );
+      
+      // Allow create: if authenticated and sellerId matches the authenticated user
+      // Validation: status must be 'draft', sellerId and createdBy must match auth.uid
+      allow create: if isAuthenticated() && 
+        request.resource.data.sellerId == request.auth.uid &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.status == 'draft' &&
+        // Validate required fields exist
+        request.resource.data.keys().hasAll(['title', 'description', 'type', 'category', 'status', 'sellerId', 'createdBy', 'createdAt', 'updatedAt']) &&
+        // Prevent setting sellerId to different value
+        request.resource.data.sellerId == request.auth.uid;
+      
+      // Allow update: if authenticated and user is the seller
+      // Validation: cannot change sellerId, status transitions are allowed
+      allow update: if isAuthenticated() && 
+        resource.data.sellerId == request.auth.uid &&
+        // Prevent changing sellerId after creation
+        request.resource.data.sellerId == resource.data.sellerId &&
+        // Prevent changing createdBy
+        request.resource.data.createdBy == resource.data.createdBy &&
+        // Ensure updatedAt is updated (client should use serverTimestamp, but validate it exists)
+        request.resource.data.keys().hasAll(['updatedAt']);
+      
+      // Allow delete: if authenticated and user is the seller
+      allow delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+    }
+    
+    // ============================================
+    // WATCHLIST COLLECTION (Subcollection under users)
+    // ============================================
+    // Using subcollection pattern: /users/{uid}/watchlist/{listingId}
+    match /users/{userId}/watchlist/{listingId} {
+      // Allow read: only the owner can read their watchlist
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow create: only the owner can add to their watchlist
+      allow create: if isAuthenticated() && 
+        request.auth.uid == userId &&
+        request.resource.data.listingId == listingId &&
+        request.resource.data.keys().hasAll(['listingId', 'createdAt']);
+      
+      // Allow delete: only the owner can remove from their watchlist
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+      
+      // No updates allowed - watchlist entries are immutable
+      allow update: if false;
+    }
+    
+    // ============================================
+    // FUTURE COLLECTIONS (Commented out - uncomment when implementing)
+    // ============================================
+    
+    // BIDS COLLECTION (Future - P1)
+    // match /bids/{bidId} {
+    //   allow read: if isAuthenticated() && (
+    //     resource.data.bidderId == request.auth.uid ||
+    //     get(/databases/$(database)/documents/listings/$(resource.data.listingId)).data.sellerId == request.auth.uid
+    //   );
+    //   allow create: if isAuthenticated() && request.resource.data.bidderId == request.auth.uid;
+    //   allow update: if false; // Bids should not be updated
+    //   allow delete: if false; // Bids should not be deleted (use retraction flag instead)
+    // }
+    
+    // ORDERS COLLECTION (Future - P1)
+    // match /orders/{orderId} {
+    //   allow read: if isAuthenticated() && (
+    //     resource.data.buyerId == request.auth.uid ||
+    //     resource.data.sellerId == request.auth.uid
+    //   );
+    //   allow create: if isAuthenticated();
+    //   allow update: if isAuthenticated() && (
+    //     resource.data.buyerId == request.auth.uid ||
+    //     resource.data.sellerId == request.auth.uid
+    //   );
+    // }
+    
+    // MESSAGES COLLECTION (Future - P1)
+    // match /messages/{messageId} {
+    //   allow read: if isAuthenticated() && (
+    //     resource.data.fromUserId == request.auth.uid ||
+    //     resource.data.toUserId == request.auth.uid
+    //   );
+    //   allow create: if isAuthenticated() && request.resource.data.fromUserId == request.auth.uid;
+    //   allow update: if isAuthenticated() && (
+    //     resource.data.fromUserId == request.auth.uid ||
+    //     resource.data.toUserId == request.auth.uid
+    //   );
+    // }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
