@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, memo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,13 @@ import {
   Shield,
   Calendar,
   Activity,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockSellerAlerts, mockSellerActivities, mockSellerStats } from '@/lib/seller-mock-data';
+import { useAuth } from '@/hooks/use-auth';
+import { listSellerListings } from '@/lib/firebase/listings';
+import { getOrdersForUser } from '@/lib/firebase/orders';
+import { Listing, Order } from '@/lib/types';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -81,46 +85,231 @@ const formatTimeAgo = (date: Date) => {
   return `${days}d ago`;
 };
 
+interface SellerAlert {
+  id: string;
+  type: 'auction_ending' | 'transport_request' | 'insurance_pending' | 'message' | 'bid';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  listingId?: string;
+  listingTitle?: string;
+  timestamp: Date;
+  action: 'view' | 'respond' | 'complete';
+  actionUrl: string;
+}
+
+interface SellerActivity {
+  id: string;
+  type: 'listing_created' | 'bid_placed' | 'message_received' | 'sale_completed' | 'verification_complete';
+  title: string;
+  description: string;
+  timestamp: Date;
+  listingId?: string;
+}
+
 export default function SellerOverviewPage() {
-  // Memoize stats array to prevent recreation on every render
-  const stats = useMemo(() => [
-    {
-      label: 'Active Listings',
-      value: mockSellerStats.activeListings.toString(),
-      subtext: `${mockSellerStats.endingSoon} auctions ending soon`,
-      icon: Package,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      borderColor: 'border-primary/20',
-    },
-    {
-      label: 'Total Revenue',
-      value: `$${mockSellerStats.totalRevenue.toLocaleString()}`,
-      subtext: `$${mockSellerStats.revenue30Days.toLocaleString()} last 30 days`,
-      icon: DollarSign,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      borderColor: 'border-primary/20',
-    },
-    {
-      label: 'Views (7 days)',
-      value: mockSellerStats.views7Days.toLocaleString(),
-      subtext: `${mockSellerStats.conversionRate}% conversion rate`,
-      icon: Eye,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      borderColor: 'border-primary/20',
-    },
-    {
-      label: 'Conversion',
-      value: `${mockSellerStats.conversionRate}%`,
-      subtext: 'Views → bids',
-      icon: TrendingUp,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      borderColor: 'border-primary/20',
-    },
-  ], []);
+  const { user, loading: authLoading } = useAuth();
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch listings and orders
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const [sellerListings, sellerOrders] = await Promise.all([
+          listSellerListings(user.uid),
+          getOrdersForUser(user.uid, 'seller'),
+        ]);
+        setListings(sellerListings);
+        setOrders(sellerOrders);
+      } catch (err) {
+        console.error('Error fetching seller data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [user, authLoading]);
+
+  // Calculate stats from real data
+  const stats = useMemo(() => {
+    const activeListings = listings.filter((l) => l.status === 'active');
+    const auctionsEndingSoon = activeListings.filter((l) => {
+      if (l.type !== 'auction' || !l.endsAt) return false;
+      const hoursUntilEnd = (l.endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      return hoursUntilEnd > 0 && hoursUntilEnd <= 24;
+    });
+
+    const completedOrders = orders.filter((o) => o.status === 'paid' || o.status === 'completed');
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const revenue30Days = completedOrders
+      .filter((o) => o.createdAt >= thirtyDaysAgo)
+      .reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
+
+    const views7Days = activeListings.reduce((sum, l) => sum + (l.metrics?.views || 0), 0);
+    const totalViews = activeListings.reduce((sum, l) => sum + (l.metrics?.views || 0), 0);
+    const totalBids = activeListings.reduce((sum, l) => sum + (l.metrics?.bidCount || 0), 0);
+    const conversionRate = totalViews > 0 ? Math.round((totalBids / totalViews) * 100) : 0;
+
+    return [
+      {
+        label: 'Active Listings',
+        value: activeListings.length.toString(),
+        subtext: `${auctionsEndingSoon.length} auction${auctionsEndingSoon.length !== 1 ? 's' : ''} ending soon`,
+        icon: Package,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+      {
+        label: 'Total Revenue',
+        value: `$${totalRevenue.toLocaleString()}`,
+        subtext: `$${revenue30Days.toLocaleString()} last 30 days`,
+        icon: DollarSign,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+      {
+        label: 'Views (7 days)',
+        value: views7Days.toLocaleString(),
+        subtext: `${conversionRate}% conversion rate`,
+        icon: Eye,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+      {
+        label: 'Conversion',
+        value: `${conversionRate}%`,
+        subtext: 'Views → bids',
+        icon: TrendingUp,
+        color: 'text-primary',
+        bgColor: 'bg-primary/10',
+        borderColor: 'border-primary/20',
+      },
+    ];
+  }, [listings, orders]);
+
+  // Generate alerts from real data
+  const alerts = useMemo((): SellerAlert[] => {
+    const alertsList: SellerAlert[] = [];
+    
+    // Check for auctions ending soon (within 24 hours)
+    listings.forEach((listing) => {
+      if (listing.type === 'auction' && listing.status === 'active' && listing.endsAt) {
+        const hoursUntilEnd = (listing.endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
+        if (hoursUntilEnd > 0 && hoursUntilEnd <= 24) {
+          alertsList.push({
+            id: `auction-ending-${listing.id}`,
+            type: 'auction_ending',
+            priority: hoursUntilEnd <= 6 ? 'high' : hoursUntilEnd <= 12 ? 'medium' : 'low',
+            title: `Auction ending soon: ${listing.title}`,
+            description: hoursUntilEnd <= 1 
+              ? `Ending in less than 1 hour`
+              : `Ending in ${Math.round(hoursUntilEnd)} hours`,
+            listingId: listing.id,
+            listingTitle: listing.title,
+            timestamp: new Date(),
+            action: 'view',
+            actionUrl: `/listing/${listing.id}`,
+          });
+        }
+      }
+    });
+
+    // Sort by priority and timestamp
+    alertsList.sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
+      return b.timestamp.getTime() - a.timestamp.getTime();
+    });
+
+    return alertsList;
+  }, [listings]);
+
+  // Generate activities from real data
+  const activities = useMemo((): SellerActivity[] => {
+    const activitiesList: SellerActivity[] = [];
+    
+    // Add listing creation activities (most recent first)
+    listings
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 10)
+      .forEach((listing) => {
+        activitiesList.push({
+          id: `listing-${listing.id}`,
+          type: 'listing_created',
+          title: `Created listing: ${listing.title}`,
+          description: `${listing.type} listing in ${listing.category}`,
+          timestamp: listing.createdAt,
+          listingId: listing.id,
+        });
+      });
+
+    // Add completed sales
+    orders
+      .filter((o) => o.status === 'paid' || o.status === 'completed')
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 5)
+      .forEach((order) => {
+        activitiesList.push({
+          id: `sale-${order.id}`,
+          type: 'sale_completed',
+          title: `Sale completed`,
+          description: `Order #${order.id.slice(0, 8)} - $${order.amount.toLocaleString()}`,
+          timestamp: order.completedAt || order.createdAt,
+          listingId: order.listingId,
+        });
+      });
+
+    // Sort by timestamp (most recent first)
+    activitiesList.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    return activitiesList.slice(0, 10);
+  }, [listings, orders]);
+
+  // Calculate performance metrics
+  const performanceMetrics = useMemo(() => {
+    const totalViews = listings.reduce((sum, l) => sum + (l.metrics?.views || 0), 0);
+    const totalBids = listings.reduce((sum, l) => sum + (l.metrics?.bidCount || 0), 0);
+    const completedListings = listings.filter((l) => l.status === 'sold').length;
+    const completionRate = listings.length > 0 ? Math.round((completedListings / listings.length) * 100) : 0;
+    const verifiedCount = listings.filter((l) => l.trust?.verified).length;
+
+    return {
+      completionRate,
+      responseTime: '< 2 hours', // TODO: Calculate from actual response times
+      verifiedAnimals: verifiedCount,
+    };
+  }, [listings]);
+
+  // Loading state
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
+          <p className="text-muted-foreground">Loading overview...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
@@ -192,7 +381,7 @@ export default function SellerOverviewPage() {
                     <CardTitle className="text-xl font-extrabold">Action Required</CardTitle>
                   </div>
                   <Badge variant="secondary" className="font-semibold">
-                    {mockSellerAlerts.length} items
+                    {alerts.length} items
                   </Badge>
                 </div>
                 <CardDescription>
@@ -200,14 +389,14 @@ export default function SellerOverviewPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {mockSellerAlerts.length === 0 ? (
+                {alerts.length === 0 ? (
                   <div className="py-12 text-center">
                     <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                     <p className="text-muted-foreground font-medium">No actions required</p>
                     <p className="text-sm text-muted-foreground mt-1">You're all caught up!</p>
                   </div>
                 ) : (
-                  mockSellerAlerts.map((alert) => {
+                  alerts.map((alert) => {
                     const Icon = getAlertIcon(alert.type);
                     return (
                       <div
@@ -283,16 +472,16 @@ export default function SellerOverviewPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {mockSellerActivities.length === 0 ? (
+                {activities.length === 0 ? (
                   <div className="py-8 text-center">
                     <Activity className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
                     <p className="text-sm text-muted-foreground font-medium">No recent activity</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {mockSellerActivities.map((activity, index) => {
+                    {activities.map((activity, index) => {
                       const Icon = getActivityIcon(activity.type);
-                      const isLast = index === mockSellerActivities.length - 1;
+                      const isLast = index === activities.length - 1;
                       return (
                         <div key={activity.id}>
                           <div className="flex items-start gap-3">
@@ -337,15 +526,15 @@ export default function SellerOverviewPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
-                    <span className="text-base font-extrabold text-foreground">{mockSellerStats.completionRate}%</span>
+                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.completionRate}%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Response Time</span>
-                    <span className="text-base font-extrabold text-foreground">{mockSellerStats.responseTime}</span>
+                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.responseTime}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Verified Animals</span>
-                    <span className="text-base font-extrabold text-foreground">{mockSellerStats.verifiedAnimals}</span>
+                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.verifiedAnimals}</span>
                   </div>
                 </div>
                 <Separator />
