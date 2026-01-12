@@ -1,53 +1,65 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, TrendingUp, User } from 'lucide-react';
+import { Clock, TrendingUp, User, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Bid } from '@/lib/types';
+import { subscribeBidsForListing } from '@/lib/firebase/bids';
 
 interface BidHistoryProps {
-  bids?: Bid[];
+  listingId: string;
   currentBid?: number;
   startingBid?: number;
   className?: string;
 }
 
-// Mock bid data - in real app, this would come from props or API
-const mockBids: Bid[] = [
-  {
-    id: '1',
-    listingId: '1',
-    amount: 12500,
-    bidderName: 'Ranch Co. Texas',
-    timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-  },
-  {
-    id: '2',
-    listingId: '1',
-    amount: 12000,
-    bidderName: 'Wildlife Pro',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-  },
-  {
-    id: '3',
-    listingId: '1',
-    amount: 11500,
-    bidderName: 'Breeder Select',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-  },
-  {
-    id: '4',
-    listingId: '1',
-    amount: 11000,
-    bidderName: 'Texas Exotics',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-  },
-];
+export function BidHistory({ listingId, currentBid, startingBid, className }: BidHistoryProps) {
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export function BidHistory({ bids = mockBids, currentBid, startingBid, className }: BidHistoryProps) {
+  // Subscribe to real-time bids
+  useEffect(() => {
+    if (!listingId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const unsubscribe = subscribeBidsForListing(listingId, (newBids) => {
+      setBids(newBids);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [listingId]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <Card className={cn('border-border/50', className)}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Bid History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
+            <p className="text-sm">Loading bid history...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Empty state
   if (bids.length === 0) {
     return (
       <Card className={cn('border-border/50', className)}>

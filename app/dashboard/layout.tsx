@@ -41,6 +41,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { signOutUser } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/RequireAuth';
 
 interface DashboardNavItem {
   href: string;
@@ -96,8 +97,14 @@ export default function DashboardLayout({
     }
   };
 
+  // Don't show dashboard layout for listing creation page
+  if (pathname === '/dashboard/listings/new') {
+    return <RequireAuth>{children}</RequireAuth>;
+  }
+
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+    <RequireAuth>
+      <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside
         className={cn(
@@ -425,5 +432,6 @@ export default function DashboardLayout({
         </nav>
       </div>
     </div>
+    </RequireAuth>
   );
 }

@@ -87,32 +87,61 @@ service cloud.firestore {
     }
     
     // ============================================
-    // FUTURE COLLECTIONS (Commented out - uncomment when implementing)
+    // BIDS COLLECTION
     // ============================================
+    match /bids/{bidId} {
+      // Allow read: authenticated users can read bids
+      // (Bid history is public for active listings, but we require auth for now)
+      allow read: if isAuthenticated();
+      
+      // Allow create: authenticated users can place bids
+      // Validation: bidderId must match authenticated user, amount must be positive
+      allow create: if isAuthenticated() && 
+                      request.resource.data.bidderId == request.auth.uid &&
+                      request.resource.data.amount is number &&
+                      request.resource.data.amount > 0 &&
+                      request.resource.data.listingId is string &&
+                      request.resource.data.createdAt is timestamp;
+      
+      // Bids are immutable - no updates or deletes allowed
+      allow update: if false;
+      allow delete: if false;
+    }
     
-    // BIDS COLLECTION (Future - P1)
-    // match /bids/{bidId} {
-    //   allow read: if isAuthenticated() && (
-    //     resource.data.bidderId == request.auth.uid ||
-    //     get(/databases/$(database)/documents/listings/$(resource.data.listingId)).data.sellerId == request.auth.uid
-    //   );
-    //   allow create: if isAuthenticated() && request.resource.data.bidderId == request.auth.uid;
-    //   allow update: if false; // Bids should not be updated
-    //   allow delete: if false; // Bids should not be deleted (use retraction flag instead)
-    // }
-    
-    // ORDERS COLLECTION (Future - P1)
-    // match /orders/{orderId} {
-    //   allow read: if isAuthenticated() && (
-    //     resource.data.buyerId == request.auth.uid ||
-    //     resource.data.sellerId == request.auth.uid
-    //   );
-    //   allow create: if isAuthenticated();
-    //   allow update: if isAuthenticated() && (
-    //     resource.data.buyerId == request.auth.uid ||
-    //     resource.data.sellerId == request.auth.uid
-    //   );
-    // }
+    // ============================================
+    // ORDERS COLLECTION
+    // ============================================
+    match /orders/{orderId} {
+      // Allow read: buyer or seller can read their orders
+      allow read: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid
+      );
+      
+      // Allow create: authenticated users (webhook will create via Admin SDK)
+      // For client-side, we allow authenticated users to create pending orders
+      allow create: if isAuthenticated() &&
+                      request.resource.data.buyerId == request.auth.uid &&
+                      request.resource.data.status == 'pending' &&
+                      request.resource.data.keys().hasAll(['listingId', 'buyerId', 'sellerId', 'amount', 'platformFee', 'sellerAmount', 'status', 'createdAt', 'updatedAt']);
+      
+      // Allow update: only buyer or seller can update (or webhook via Admin SDK)
+      // In practice, webhooks update via Admin SDK, but we allow limited client updates
+      allow update: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid
+      ) && (
+        // Prevent changing critical fields
+        request.resource.data.buyerId == resource.data.buyerId &&
+        request.resource.data.sellerId == resource.data.sellerId &&
+        request.resource.data.listingId == resource.data.listingId &&
+        request.resource.data.amount == resource.data.amount &&
+        request.resource.data.keys().hasAll(['updatedAt'])
+      );
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
     
     // MESSAGES COLLECTION (Future - P1)
     // match /messages/{messageId} {

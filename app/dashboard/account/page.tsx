@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -30,25 +30,43 @@ import {
   TrendingUp,
   Package,
   FileText,
-  Award
+  Award,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { getUserProfile, updateUserProfile } from '@/lib/firebase/users';
+import { listSellerListings } from '@/lib/firebase/listings';
+import { getOrdersForUser } from '@/lib/firebase/orders';
+import { UserProfile } from '@/lib/types';
 
 export default function AccountPage() {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState({
+    totalListings: 0,
+    activeSales: 0,
+    totalRevenue: 0,
+    responseRate: 0,
+  });
+
+  // Initialize form data from user profile
   const [formData, setFormData] = useState({
-    fullName: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '(512) 555-1234',
-    businessName: 'Hill Country Exotics',
-    bio: 'Experienced breeder specializing in whitetail deer and exotic game. Based in Central Texas.',
+    fullName: '',
+    email: '',
+    phone: '',
+    businessName: '',
+    bio: '',
     location: {
-      city: 'Kerrville',
-      state: 'TX',
-      zip: '78028',
-      address: '1234 Ranch Road'
+      city: '',
+      state: '',
+      zip: '',
+      address: ''
     },
     notifications: {
       email: true,
@@ -64,15 +82,139 @@ export default function AccountPage() {
     }
   });
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: 'Profile updated',
-      description: 'Your account information has been saved successfully.',
-    });
+  // Fetch user profile and stats
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const profile = await getUserProfile(user.uid);
+        setUserProfile(profile);
+
+        if (profile) {
+          // Initialize form data from profile
+          setFormData({
+            fullName: profile.profile?.fullName || profile.displayName || '',
+            email: profile.email || '',
+            phone: profile.phoneNumber || profile.profile?.location?.city || '',
+            businessName: profile.profile?.businessName || '',
+            bio: profile.profile?.bio || '',
+            location: profile.profile?.location || { city: '', state: '', zip: '', address: '' },
+            notifications: profile.profile?.notifications || {
+              email: true,
+              sms: false,
+              bids: true,
+              messages: true,
+              promotions: false,
+            },
+            preferences: profile.profile?.preferences || {
+              verification: true,
+              insurance: true,
+              transport: true,
+            },
+          });
+
+          // Calculate stats
+          const [listings, salesOrders] = await Promise.all([
+            listSellerListings(user.uid),
+            getOrdersForUser(user.uid, 'seller'),
+          ]);
+
+          const activeListings = listings.filter((l) => l.status === 'active').length;
+          const activeSales = salesOrders.filter((o) => o.status === 'paid' || o.status === 'completed').length;
+          const totalRevenue = salesOrders
+            .filter((o) => o.status === 'paid' || o.status === 'completed')
+            .reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
+
+          setStats({
+            totalListings: listings.length,
+            activeSales,
+            totalRevenue,
+            responseRate: 0, // TODO: Calculate from message response times
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        toast({
+          title: 'Error loading profile',
+          description: err instanceof Error ? err.message : 'Failed to load your profile data.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      fetchUserData();
+    }
+  }, [user, authLoading, toast]);
+
+  const handleSave = async () => {
+    if (!user || !userProfile) return;
+
+    try {
+      setSaving(true);
+      await updateUserProfile(user.uid, {
+        ...userProfile,
+        displayName: formData.fullName,
+        phoneNumber: formData.phone,
+        profile: {
+          ...userProfile.profile,
+          fullName: formData.fullName,
+          businessName: formData.businessName || undefined,
+          bio: formData.bio || undefined,
+          location: formData.location,
+          notifications: formData.notifications,
+          preferences: formData.preferences,
+        },
+      });
+
+      setIsEditing(false);
+      toast({
+        title: 'Profile updated',
+        description: 'Your account information has been saved successfully.',
+      });
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      toast({
+        title: 'Error saving profile',
+        description: err instanceof Error ? err.message : 'Failed to save your profile.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
+    // Reset form data to user profile
+    if (userProfile) {
+      setFormData({
+        fullName: userProfile.profile?.fullName || userProfile.displayName || '',
+        email: userProfile.email || '',
+        phone: userProfile.phoneNumber || '',
+        businessName: userProfile.profile?.businessName || '',
+        bio: userProfile.profile?.bio || '',
+        location: userProfile.profile?.location || { city: '', state: '', zip: '', address: '' },
+        notifications: userProfile.profile?.notifications || {
+          email: true,
+          sms: false,
+          bids: true,
+          messages: true,
+          promotions: false,
+        },
+        preferences: userProfile.profile?.preferences || {
+          verification: true,
+          insurance: true,
+          transport: true,
+        },
+      });
+    }
     setIsEditing(false);
     toast({
       title: 'Changes cancelled',
@@ -80,12 +222,41 @@ export default function AccountPage() {
     });
   };
 
-  const stats = [
-    { label: 'Total Listings', value: '12', icon: Package, color: 'text-primary' },
-    { label: 'Active Sales', value: '5', icon: TrendingUp, color: 'text-primary' },
-    { label: 'Total Revenue', value: '$45,000', icon: Award, color: 'text-primary' },
-    { label: 'Response Rate', value: '92%', icon: CheckCircle2, color: 'text-primary' },
+  const statsData = [
+    { label: 'Total Listings', value: stats.totalListings.toString(), icon: Package, color: 'text-primary' },
+    { label: 'Active Sales', value: stats.activeSales.toString(), icon: TrendingUp, color: 'text-primary' },
+    { label: 'Total Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: Award, color: 'text-primary' },
+    { label: 'Response Rate', value: `${stats.responseRate}%`, icon: CheckCircle2, color: 'text-primary' },
   ];
+
+  // Loading state
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background pb-24 md:pb-4 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background pb-24 md:pb-4">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl">
+          <Card>
+            <CardContent className="pt-12 pb-12 text-center">
+              <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Please sign in</h3>
+              <p className="text-sm text-muted-foreground">You must be signed in to view your account</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-4">
@@ -116,9 +287,17 @@ export default function AccountPage() {
                 </Button>
                 <Button
                   onClick={handleSave}
+                  disabled={saving}
                   className="min-h-[44px] font-semibold"
                 >
-                  Save Changes
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </>
             ) : (
@@ -141,7 +320,7 @@ export default function AccountPage() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4"
         >
-          {stats.map((stat, index) => {
+          {statsData.map((stat, index) => {
             const Icon = stat.icon;
             return (
               <Card key={stat.label} className={cn(
@@ -221,13 +400,17 @@ export default function AccountPage() {
                         </p>
                       )}
                       <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-                        <Badge variant="outline" className="font-semibold">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Verified Seller
-                        </Badge>
-                        <Badge variant="secondary" className="font-semibold">
-                          Member since 2024
-                        </Badge>
+                        {userProfile?.seller?.verified && (
+                          <Badge variant="outline" className="font-semibold">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Verified Seller
+                          </Badge>
+                        )}
+                        {userProfile?.createdAt && (
+                          <Badge variant="secondary" className="font-semibold">
+                            Member since {new Date(userProfile.createdAt).getFullYear()}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
@@ -289,9 +472,10 @@ export default function AccountPage() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      disabled={!isEditing}
+                      disabled={true}
                       className="min-h-[48px] text-base bg-background"
                     />
+                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-semibold flex items-center gap-2">

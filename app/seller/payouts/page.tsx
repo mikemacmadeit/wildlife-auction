@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, memo } from 'react';
+import { useMemo, memo, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CreditCard,
@@ -15,11 +17,116 @@ import {
   Calendar,
   ArrowRight,
   Info,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mockPayouts, Payout } from '@/lib/seller-mock-data';
+import { useAuth } from '@/hooks/use-auth';
+import { getUserProfile } from '@/lib/firebase/users';
+import { UserProfile } from '@/lib/types';
+import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SellerPayoutsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [isCreatingLink, setIsCreatingLink] = useState(false);
+
+  // Check for onboarding completion
+  useEffect(() => {
+    const onboardingComplete = searchParams?.get('onboarding');
+    if (onboardingComplete === 'complete') {
+      toast({
+        title: 'Onboarding Complete!',
+        description: 'Your Stripe account is now set up. You can receive payouts.',
+      });
+      // Refresh profile to get updated status
+      if (user) {
+        loadUserProfile();
+      }
+    }
+  }, [searchParams, toast, user]);
+
+  // Load user profile
+  useEffect(() => {
+    if (user && !authLoading) {
+      loadUserProfile();
+    }
+  }, [user, authLoading]);
+
+  const loadUserProfile = async () => {
+    if (!user) return;
+    try {
+      setLoadingProfile(true);
+      const profile = await getUserProfile(user.uid);
+      setUserProfile(profile);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load profile information.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const handleEnablePayouts = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to enable payouts.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingAccount(true);
+
+      // Create Stripe account if it doesn't exist
+      let stripeAccountId = userProfile?.stripeAccountId;
+      if (!stripeAccountId) {
+        const result = await createStripeAccount();
+        stripeAccountId = result.stripeAccountId;
+        // Reload profile to get updated stripeAccountId
+        await loadUserProfile();
+      }
+
+      // Create onboarding link
+      setIsCreatingAccount(false);
+      setIsCreatingLink(true);
+      const { url } = await createAccountLink();
+
+      // Redirect to Stripe onboarding
+      window.location.href = url;
+    } catch (error: any) {
+      console.error('Error enabling payouts:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to enable payouts. Please try again.',
+        variant: 'destructive',
+      });
+      setIsCreatingAccount(false);
+      setIsCreatingLink(false);
+    }
+  };
+
+  const getOnboardingStatus = () => {
+    if (!userProfile) return 'not_started';
+    return userProfile.stripeOnboardingStatus || 'not_started';
+  };
+
+  const isPayoutsEnabled = userProfile?.payoutsEnabled === true;
+  const onboardingStatus = getOnboardingStatus();
+
   const availablePayouts = useMemo(() => 
     mockPayouts.filter((p) => p.status === 'available'),
     []
@@ -159,6 +266,73 @@ export default function SellerPayoutsPage() {
             Manage your earnings and payout schedule
           </p>
         </div>
+
+        {/* Stripe Connect Onboarding Status */}
+        {!authLoading && !loadingProfile && (
+          <Card className={cn(
+            'border-2',
+            isPayoutsEnabled 
+              ? 'border-green-500/50 bg-green-500/5' 
+              : 'border-yellow-500/50 bg-yellow-500/5'
+          )}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isPayoutsEnabled ? (
+                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  ) : (
+                    <AlertCircle className="h-6 w-6 text-yellow-500" />
+                  )}
+                  <div>
+                    <CardTitle className="text-xl font-extrabold">
+                      {isPayoutsEnabled ? 'Payouts Enabled' : 'Enable Payouts'}
+                    </CardTitle>
+                    <CardDescription>
+                      {isPayoutsEnabled
+                        ? 'Your Stripe account is set up and ready to receive payouts.'
+                        : onboardingStatus === 'pending'
+                        ? 'Complete your Stripe onboarding to receive payouts.'
+                        : 'Set up Stripe Connect to receive payouts from your sales.'}
+                    </CardDescription>
+                  </div>
+                </div>
+                {!isPayoutsEnabled && (
+                  <Button
+                    onClick={handleEnablePayouts}
+                    disabled={isCreatingAccount || isCreatingLink}
+                    className="min-h-[48px] min-w-[180px]"
+                  >
+                    {isCreatingAccount || isCreatingLink ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {isCreatingAccount ? 'Creating Account...' : 'Redirecting...'}
+                      </>
+                    ) : onboardingStatus === 'pending' ? (
+                      'Complete Onboarding'
+                    ) : (
+                      'Enable Payouts'
+                    )}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            {!isPayoutsEnabled && (
+              <CardContent>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>To receive payouts, you need to:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Create a Stripe Connect Express account</li>
+                    <li>Complete the onboarding process (takes ~5 minutes)</li>
+                    <li>Provide business information and bank details</li>
+                  </ul>
+                  <p className="pt-2 text-xs">
+                    Wildlife Exchange takes a 5% platform fee on each transaction. The remaining amount is transferred directly to your bank account.
+                  </p>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
 
         {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">

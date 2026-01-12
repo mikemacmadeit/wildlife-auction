@@ -188,6 +188,13 @@ export interface UserProfile {
     };
   };
   
+  // Stripe Connect Fields
+  stripeAccountId?: string; // Stripe Connect Express account ID
+  stripeOnboardingStatus?: 'not_started' | 'pending' | 'complete'; // Onboarding status
+  chargesEnabled?: boolean; // Can accept payments
+  payoutsEnabled?: boolean; // Can receive payouts
+  stripeDetailsSubmitted?: boolean; // Has submitted required details
+  
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt?: Date;

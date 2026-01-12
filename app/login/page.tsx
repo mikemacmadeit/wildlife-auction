@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signIn, resetPassword, signInWithGoogle } from '@/lib/firebase/auth';
+import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
 import { createUserDocument } from '@/lib/firebase/users';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,47 @@ export default function LoginPage() {
     password: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Handle Google redirect result on page load
+  useEffect(() => {
+    getGoogleRedirectResult()
+      .then((result) => {
+        if (result?.user) {
+          createUserDocument(result.user)
+            .then(() => {
+              toast({
+                title: 'Welcome back!',
+                description: 'You have been successfully signed in with Google.',
+              });
+              router.push(getRedirectPath());
+            })
+            .catch((error) => {
+              console.error('Error creating user document after Google redirect:', error);
+              toast({
+                title: 'Google sign-in failed',
+                description: 'Failed to set up user account. Please try again.',
+                variant: 'destructive',
+              });
+            });
+        }
+      })
+      .catch((error: any) => {
+        console.error('Error during Google redirect result:', error);
+        let errorMessage = 'An error occurred during Google sign-in. Please try again.';
+        if (error.code === 'auth/unauthorized-domain') {
+          errorMessage = 'Google sign-in is not enabled for this domain. Please contact support.';
+        } else if (error.code === 'auth/operation-not-allowed') {
+          errorMessage = 'Google sign-in is not enabled for this project. Please contact support.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        toast({
+          title: 'Google sign-in failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      });
+  }, [router, toast]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -163,14 +204,24 @@ export default function LoginPage() {
         router.push(getRedirectPath());
       }
     } catch (error: any) {
+      // Don't show error if redirect was initiated (page will reload)
+      if (error.message === 'REDIRECT_INITIATED') {
+        return; // Page will reload after redirect
+      }
+
       let errorMessage = 'An error occurred while signing in with Google. Please try again.';
       
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = 'Sign-in popup was closed. Please try again.';
       } else if (error.code === 'auth/popup-blocked') {
-        errorMessage = 'Popup was blocked. Please allow popups for this site.';
+        errorMessage = 'Popup was blocked. Using redirect instead...';
+        // Will automatically fall back to redirect in signInWithGoogle
       } else if (error.code === 'auth/cancelled-popup-request') {
         errorMessage = 'Only one popup request is allowed at a time.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'This domain is not authorized. Please contact support.';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Google sign-in is not enabled. Please contact support.';
       } else if (error.message) {
         errorMessage = error.message;
       }

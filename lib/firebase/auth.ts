@@ -12,6 +12,8 @@ import {
   NextOrObserver,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from 'firebase/auth';
 import { auth } from './config';
 
@@ -99,14 +101,72 @@ export const getCurrentUser = (): User | null => {
 };
 
 /**
- * Sign in with Google
+ * Sign in with Google using popup
+ * Falls back to redirect if popup is blocked
  */
 export const signInWithGoogle = async (): Promise<UserCredential> => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
     prompt: 'select_account',
   });
-  return await signInWithPopup(auth, provider);
+  
+  try {
+    // Try popup first (better UX)
+    return await signInWithPopup(auth, provider);
+  } catch (error: any) {
+    console.error('Google sign-in popup error:', error);
+    
+    // If popup fails for any reason (blocked, unauthorized domain, illegal URL, etc.), fall back to redirect
+    if (
+      error.code === 'auth/popup-blocked' ||
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request' ||
+      error.code === 'auth/unauthorized-domain' ||
+      error.code === 'auth/operation-not-allowed' ||
+      error.message?.includes('illegal URL') ||
+      error.message?.includes('illegal') ||
+      error.message?.includes('iframe')
+    ) {
+      // Use redirect as fallback
+      console.log('Falling back to redirect for Google sign-in due to:', error.message || error.code);
+      await signInWithRedirect(auth, provider);
+      // Redirect will navigate away, so we throw a special error
+      // The page will reload after redirect completes
+      throw new Error('REDIRECT_INITIATED');
+    }
+    // Re-throw other errors with more context
+    console.error('Google sign-in error details:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Get the result of a Google sign-in redirect
+ * Call this on page load to handle redirect completion
+ */
+export const getGoogleRedirectResult = async (): Promise<UserCredential | null> => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      console.log('Google redirect sign-in successful:', result.user.email);
+    }
+    return result;
+  } catch (error: any) {
+    console.error('Error getting redirect result:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+    });
+    // Don't throw - return null so the page can still load
+    return null;
+  }
 };
 
 /**

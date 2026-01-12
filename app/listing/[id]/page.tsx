@@ -66,6 +66,8 @@ import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getListingById } from '@/lib/firebase/listings';
 import { Listing } from '@/lib/types';
+import { useAuth } from '@/hooks/use-auth';
+import { placeBidTx } from '@/lib/firebase/bids';
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -82,6 +84,7 @@ export default function ListingDetailPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToListing: addToRecentlyViewed } = useRecentlyViewed();
   const isFavorited = listing ? isFavorite(listing.id) : false;
@@ -160,6 +163,18 @@ export default function ListingDetailPage() {
   }
 
   const handlePlaceBid = async () => {
+    // Check authentication
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'You must be signed in to place a bid.',
+        variant: 'destructive',
+      });
+      setShowBidDialog(false);
+      return;
+    }
+
+    // Validate bid amount
     if (!bidAmount || isNaN(parseFloat(bidAmount))) {
       toast({
         title: 'Invalid bid amount',
@@ -169,26 +184,132 @@ export default function ListingDetailPage() {
       return;
     }
 
+    const amount = parseFloat(bidAmount);
+    if (amount <= 0) {
+      toast({
+        title: 'Invalid bid amount',
+        description: 'Bid amount must be greater than zero.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsPlacingBid(true);
-    // TODO: Implement bid placement in Phase 2
-    setTimeout(() => {
+
+    try {
+      // Place bid using transaction
+      const result = await placeBidTx({
+        listingId: listingId,
+        bidderId: user.uid,
+        amount: amount,
+      });
+
+      // Success - update local state optimistically
+      if (listing) {
+        setListing({
+          ...listing,
+          currentBid: result.newCurrentBid,
+          metrics: {
+            ...listing.metrics,
+            bidCount: (listing.metrics.bidCount || 0) + 1,
+          },
+        });
+      }
+
       toast({
         title: 'Bid placed successfully',
-        description: `Your bid of $${parseFloat(bidAmount).toLocaleString()} has been placed.`,
+        description: `Your bid of $${amount.toLocaleString()} has been placed.`,
       });
+
       setShowBidDialog(false);
       setShowConfirmDialog(false);
       setBidAmount('');
+    } catch (error: any) {
+      // Handle specific error messages
+      let errorMessage = 'Failed to place bid. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('must be higher')) {
+          errorMessage = error.message;
+        } else if (error.message.includes('ended')) {
+          errorMessage = 'This auction has ended.';
+        } else if (error.message.includes('active')) {
+          errorMessage = 'This listing is no longer active.';
+        } else if (error.message.includes('auction')) {
+          errorMessage = 'Bids can only be placed on auction listings.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      toast({
+        title: 'Bid failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
       setIsPlacingBid(false);
-    }, 1000);
+    }
   };
 
-  const handleBuyNow = () => {
-    // TODO: Implement buy now in Phase 2 (orders/payments)
-    toast({
-      title: 'Coming soon',
-      description: 'Buy now functionality will be available soon.',
-    });
+  const handleBuyNow = async () => {
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'You must be signed in to purchase this listing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!listing) {
+      toast({
+        title: 'Error',
+        description: 'Listing information not available.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if seller has payouts enabled
+    try {
+      const { getUserProfile } = await import('@/lib/firebase/users');
+      const sellerProfile = await getUserProfile(listing.sellerId);
+      
+      if (!sellerProfile?.stripeAccountId) {
+        toast({
+          title: 'Seller Not Ready',
+          description: 'This seller has not set up payment processing. Please contact them directly.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!sellerProfile.payoutsEnabled) {
+        toast({
+          title: 'Seller Not Ready',
+          description: 'This seller is still setting up payment processing. Please check back later or contact them directly.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Create checkout session
+      setIsPlacingBid(true); // Reuse loading state
+      const { createCheckoutSession } = await import('@/lib/stripe/api');
+      const { url } = await createCheckoutSession(listing.id);
+      
+      // Redirect to Stripe Checkout
+      window.location.href = url;
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error);
+      toast({
+        title: 'Checkout Failed',
+        description: error.message || 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+      setIsPlacingBid(false);
+    }
   };
 
   const handleAddToWatchlist = async () => {
@@ -422,11 +543,21 @@ export default function ListingDetailPage() {
                     {listing.type === 'fixed' && (
                       <Button 
                         size="lg" 
-                        onClick={handleBuyNow} 
+                        onClick={handleBuyNow}
+                        disabled={isPlacingBid || listing.status !== 'active'}
                         className="w-full min-h-[52px] text-base font-bold shadow-lg"
                       >
-                        <ShoppingCart className="mr-2 h-5 w-5" />
-                        Buy Now - ${listing.price?.toLocaleString()}
+                        {isPlacingBid ? (
+                          <>
+                            <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="mr-2 h-5 w-5" />
+                            Buy Now - ${listing.price?.toLocaleString()}
+                          </>
+                        )}
                       </Button>
                     )}
                     {listing.type === 'classified' && (
@@ -446,6 +577,7 @@ export default function ListingDetailPage() {
               {/* Bid History - For Auctions (Mobile Only, Below Bidding Section) */}
               {listing.type === 'auction' && (
                 <BidHistory
+                  listingId={listing.id}
                   currentBid={listing.currentBid || listing.startingBid || 0}
                   startingBid={listing.startingBid || 0}
                 />
@@ -670,11 +802,21 @@ export default function ListingDetailPage() {
                       {listing.type === 'fixed' && (
                         <Button 
                           size="lg" 
-                          onClick={handleBuyNow} 
+                          onClick={handleBuyNow}
+                          disabled={isPlacingBid || listing.status !== 'active'}
                           className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >
-                          <ShoppingCart className="mr-2 h-5 w-5" />
-                          Buy Now
+                          {isPlacingBid ? (
+                            <>
+                              <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="mr-2 h-5 w-5" />
+                              Buy Now
+                            </>
+                          )}
                         </Button>
                       )}
 
