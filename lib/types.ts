@@ -108,6 +108,25 @@ export interface Bid {
   timestamp: Date;
 }
 
+export type OrderStatus = 'pending' | 'paid' | 'completed' | 'refunded' | 'cancelled';
+
+export interface Order {
+  id: string;
+  listingId: string;
+  buyerId: string;
+  sellerId: string;
+  amount: number;
+  platformFee: number;
+  sellerAmount: number;
+  status: OrderStatus;
+  stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string;
+  stripeTransferId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+}
+
 export interface FilterState {
   category?: ListingCategory;
   type?: ListingType;
