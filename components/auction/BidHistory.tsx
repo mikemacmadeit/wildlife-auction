@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Bid } from '@/lib/types';
 
 interface BidHistoryProps {
-  bids: Bid[];
+  bids?: Bid[];
   currentBid?: number;
   startingBid?: number;
   className?: string;
