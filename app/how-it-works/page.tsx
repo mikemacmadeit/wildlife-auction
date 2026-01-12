@@ -51,34 +51,34 @@ export default function HowItWorksPage() {
     {
       number: 1,
       title: 'Create a listing',
-      description: 'Add photos, genetics/notes, location, and sale type.',
+      description: 'Add photos, genetics/notes, location, and sale type. Choose between auction, fixed price, or classified formats. Include health certificates, registration papers, and detailed descriptions to attract serious buyers.',
       icon: Upload,
-      gradient: 'from-primary to-primary/90',
-      features: ['Add photos', 'Genetics and notes', 'Location details', 'Sale type selection'],
+      gradient: 'from-accent to-accent/90',
+      features: ['Add multiple photos', 'Genetics and breeding notes', 'Location and pickup details', 'Auction, fixed price, or classified'],
     },
     {
       number: 2,
       title: 'Buyers inquire or bid',
-      description: 'Auctions and fixed-price listings, all in one place.',
+      description: 'Auctions feature real-time bidding with automatic increments. Fixed-price listings allow instant purchase. Classified listings enable direct negotiation. All formats support direct messaging with sellers.',
       icon: Gavel,
-      gradient: 'from-primary to-primary/90',
-      features: ['Real-time bidding', 'Fixed price option', 'Buyer inquiries', 'Clear communication'],
+      gradient: 'from-accent to-accent/90',
+      features: ['Real-time auction bidding', 'Fixed price instant buy', 'Classified negotiation', 'Direct seller messaging'],
     },
     {
       number: 3,
       title: 'Close with confidence',
-      description: 'Clear terms, clear communication, clear paper trail.',
+      description: 'Secure payment processing with clear terms. Complete documentation including health records, registration papers, and transfer documents. Full transaction history maintained for your records.',
       icon: CheckCircle2,
-      gradient: 'from-primary to-primary/90',
-      features: ['Clear terms', 'Documentation', 'Secure payments', 'Paper trail'],
+      gradient: 'from-accent to-accent/90',
+      features: ['Secure payment processing', 'Complete documentation', 'Health & registration papers', 'Full transaction history'],
     },
     {
       number: 4,
       title: 'Verification & transport (coming soon)',
-      description: 'Optional verification and coordinated transport for qualified listings.',
+      description: 'Optional seller verification confirms identity and eligibility. Transport coordination service will help arrange pickup and delivery. Insurance options available for qualified transactions.',
       icon: Shield,
-      gradient: 'from-secondary to-secondary/90',
-      features: ['Optional verification', 'Transport coordination (coming soon)', 'Insurance options (coming soon)', 'Trusted partners'],
+      gradient: 'from-accent to-accent/90',
+      features: ['Optional seller verification', 'Transport coordination (coming soon)', 'Insurance options (coming soon)', 'Trusted partner network'],
     },
   ];
 
@@ -86,7 +86,7 @@ export default function HowItWorksPage() {
     {
       icon: Shield,
       title: 'Verified Sellers',
-      description: 'Optional verification available. Seller identity confirmed and eligible to trade.',
+      description: 'Optional verification available. Seller identity confirmed and eligible to trade. Look for the verified badge on listings.',
       color: 'text-accent',
       bgColor: 'bg-accent/10',
       borderColor: 'border-accent/20',
@@ -94,23 +94,23 @@ export default function HowItWorksPage() {
     {
       icon: Upload,
       title: 'Clear Listings',
-      description: 'Include photos, genetics, registration, health notes, and pickup terms.',
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      borderColor: 'border-primary/20',
+      description: 'Include photos, genetics, registration, health notes, and pickup terms. Detailed listings attract serious buyers.',
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
+      borderColor: 'border-accent/20',
     },
     {
       icon: MessageCircle,
       title: 'Direct Communication',
-      description: 'Contact sellers directly. Ask questions before purchase.',
-      color: 'text-secondary',
-      bgColor: 'bg-secondary/10',
-      borderColor: 'border-secondary/20',
+      description: 'Contact sellers directly through the platform. Ask questions about genetics, health, transport, and terms before purchase.',
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
+      borderColor: 'border-accent/20',
     },
     {
       icon: FileText,
       title: 'Complete Documentation',
-      description: 'Paperwork, certificates, and health records included with listings.',
+      description: 'Paperwork, certificates, and health records included with listings. All documentation stored securely for your records.',
       color: 'text-accent',
       bgColor: 'bg-accent/10',
       borderColor: 'border-accent/20',
@@ -118,18 +118,18 @@ export default function HowItWorksPage() {
     {
       icon: Truck,
       title: 'Transport Planning',
-      description: 'Coordinate transport with sellers. Plan pickup and delivery in advance.',
-      color: 'text-secondary',
-      bgColor: 'bg-secondary/10',
-      borderColor: 'border-secondary/20',
+      description: 'Coordinate transport with sellers. Plan pickup and delivery in advance. Transport coordination service coming soon.',
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
+      borderColor: 'border-accent/20',
     },
     {
       icon: CreditCard,
       title: 'Secure Transactions',
-      description: 'Clear payment terms. Optional escrow for qualified transactions.',
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      borderColor: 'border-primary/20',
+      description: 'Clear payment terms. Secure payment processing. Optional escrow for qualified transactions. Full transaction history.',
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
+      borderColor: 'border-accent/20',
     },
   ];
 
@@ -169,6 +169,14 @@ export default function HowItWorksPage() {
             >
               Clear process. Clear terms. Clear communication.
             </motion.p>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="text-base md:text-lg text-muted-foreground max-w-3xl mx-auto pt-4"
+            >
+              Wildlife Exchange connects breeders, ranchers, and buyers across Texas. Whether you're selling trophy whitetail, exotic species, cattle, or equipment, our platform makes listing and buying straightforward and secure.
+            </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -182,8 +190,8 @@ export default function HowItWorksPage() {
                 className={cn(
                   'min-h-[56px] min-w-[220px] text-lg font-semibold',
                   'bg-accent text-accent-foreground',
-                  'hover:bg-primary/90',
-                  'shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30',
+                  'hover:bg-accent/90',
+                  'shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30',
                   'transition-all duration-300'
                 )}
               >
@@ -251,10 +259,7 @@ export default function HowItWorksPage() {
                   )}>
                           <div className={cn(
                             'absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500',
-                            step.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary/5 via-transparent to-secondary/5',
-                            step.gradient === 'from-accent to-accent/90' && 'bg-gradient-to-br from-accent/5 via-transparent to-accent/5',
-                            step.gradient === 'from-primary to-primary/90' && 'bg-card/50',
-                            step.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary/5 via-transparent to-secondary/5'
+                            'bg-gradient-to-br from-accent/5 via-transparent to-accent/5'
                           )} />
                     
                     <CardContent className="p-6 md:p-8 lg:p-10 relative z-10">
@@ -268,15 +273,12 @@ export default function HowItWorksPage() {
                           <div className={cn(
                             'relative w-32 h-32 md:w-40 md:h-40 rounded-3xl',
                             'flex items-center justify-center',
-                            'shadow-xl shadow-primary/20',
+                            'shadow-xl shadow-accent/20',
                             'group-hover:scale-110 transition-transform duration-300',
-                            step.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary to-secondary/90',
-                            step.gradient === 'from-accent to-accent/90' && 'bg-gradient-to-br from-accent to-accent/90',
-                            step.gradient === 'from-primary to-primary/90' && 'bg-primary text-primary-foreground',
-                            step.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary to-secondary/90'
+                            'bg-gradient-to-br from-accent to-accent/90'
                           )}>
-                            <div className="absolute -top-3 -right-3 w-12 h-12 rounded-full bg-background border-4 border-primary/20 flex items-center justify-center shadow-lg">
-                              <span className="text-2xl font-extrabold text-primary">{step.number}</span>
+                            <div className="absolute -top-3 -right-3 w-12 h-12 rounded-full bg-background border-4 border-accent/20 flex items-center justify-center shadow-lg">
+                              <span className="text-2xl font-extrabold text-accent">{step.number}</span>
                             </div>
                             <Icon className="h-16 w-16 md:h-20 md:w-20 text-white" />
                           </div>
@@ -285,7 +287,7 @@ export default function HowItWorksPage() {
                         {/* Content */}
                         <div className="flex-1 space-y-4">
                           <div className="space-y-2">
-                            <h3 className="text-2xl md:text-3xl lg:text-4xl font-extrabold group-hover:text-primary transition-colors font-founders">
+                            <h3 className="text-2xl md:text-3xl lg:text-4xl font-extrabold group-hover:text-accent transition-colors font-founders">
                               {step.title}
                             </h3>
                             <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
@@ -297,9 +299,9 @@ export default function HowItWorksPage() {
                             {step.features.map((feature, featureIndex) => (
                               <div
                                 key={featureIndex}
-                                className="flex items-center gap-2 p-3 rounded-lg bg-accent/12 border border-accent/25 hover:border-accent/40 transition-colors"
+                                className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20 hover:border-accent/40 hover:bg-accent/15 transition-colors"
                               >
-                                <CheckCircle2 className="h-4 w-4 text-ring flex-shrink-0" />
+                                <CheckCircle2 className="h-4 w-4 text-accent flex-shrink-0" />
                                 <span className="text-sm font-semibold">{feature}</span>
                               </div>
                             ))}
@@ -331,6 +333,9 @@ export default function HowItWorksPage() {
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               For sellers: photos, genetics, terms. For buyers: questions, transport planning.
             </p>
+            <p className="text-base text-muted-foreground max-w-3xl mx-auto pt-2">
+              Successful listings include multiple high-quality photos, detailed genetics and breeding history, current health certificates, registration papers (if applicable), and clear pickup or transport terms. Buyers should ask questions about genetics, health status, and transport arrangements before committing to purchase.
+            </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
@@ -354,7 +359,7 @@ export default function HowItWorksPage() {
                       )}>
                         <Icon className={cn('h-8 w-8', feature.color)} />
                       </div>
-                      <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors font-founders">
+                      <h3 className="text-xl font-bold text-foreground group-hover:text-accent transition-colors font-founders">
                         {feature.title}
                       </h3>
                       <p className="text-sm text-muted-foreground leading-relaxed">
@@ -391,8 +396,31 @@ export default function HowItWorksPage() {
                 Ready to list breeder stock or exotics?
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Reach serious buyers across Texas.
+                Reach serious buyers across Texas. List your breeder stock, exotics, cattle, horses, or equipment today.
               </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 max-w-4xl mx-auto">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-accent">
+                    <Users className="h-6 w-6" />
+                    <span className="text-2xl font-bold">500+</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Active Buyers</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-accent">
+                    <TrendingUp className="h-6 w-6" />
+                    <span className="text-2xl font-bold">$2M+</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Total Sales Volume</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-accent">
+                    <Star className="h-6 w-6" />
+                    <span className="text-2xl font-bold">4.8/5</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Average Rating</p>
+                </div>
+              </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                 <Button 
                   asChild 

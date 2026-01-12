@@ -51,9 +51,9 @@
     --primary: 90 12% 45%;               /* #7F8A73 - SAGE */
     --primary-foreground: 40 30% 93%;     /* #F4F0E6 - PARCHMENT (best contrast on Sage) */
     
-    /* Accent = Light sage tint */
-    --accent: 90 12% 65%;                /* Light sage tint for chips/hover */
-    --accent-foreground: 75 8% 13%;       /* #22251F - OLIVEWOOD */
+    /* Accent = Olive green */
+    --accent: 80 15% 55%;                /* Olive green for chips/hover/icons */
+    --accent-foreground: 40 30% 93%;     /* #F4F0E6 - PARCHMENT (best contrast on olive) */
     
     --destructive: 0 65% 55%;             /* Muted red */
     --destructive-foreground: 40 30% 93%; /* #F4F0E6 - PARCHMENT */
