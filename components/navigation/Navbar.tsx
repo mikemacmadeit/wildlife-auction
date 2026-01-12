@@ -327,41 +327,69 @@ export function Navbar() {
                     );
                   })}
                   <div className="pt-2 mt-2 border-t border-border/50 space-y-2">
-                    <SheetClose asChild>
-                      <Button asChild className="w-full justify-start gap-2 font-semibold min-h-[48px] dark:bg-primary dark:text-primary-foreground" style={{
-                        backgroundColor: 'hsl(90 12% 45%)',
-                        color: 'hsl(40 30% 93%)',
-                      }}>
-                        <Link href="/dashboard/listings/new">
-                          <PlusCircle className="h-4 w-4" />
-                          List an Animal
-                        </Link>
-                      </Button>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
-                        <Link href="/register">
-                          <User className="h-4 w-4" />
-                          Sign Up
-                        </Link>
-                      </Button>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
-                        <Link href="/dashboard/account">
-                          <LogIn className="h-4 w-4" />
-                          Sign In
-                        </Link>
-                      </Button>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Button asChild className="w-full justify-start gap-2 font-semibold min-h-[48px]">
-                        <Link href="/seller/overview">
-                          <LayoutDashboard className="h-4 w-4" />
-                          Dashboard
-                        </Link>
-                      </Button>
-                    </SheetClose>
+                    {user ? (
+                      <>
+                        <SheetClose asChild>
+                          <Button asChild className="w-full justify-start gap-2 font-semibold min-h-[48px] dark:bg-primary dark:text-primary-foreground" style={{
+                            backgroundColor: 'hsl(90 12% 45%)',
+                            color: 'hsl(40 30% 93%)',
+                          }}>
+                            <Link href="/dashboard/listings/new">
+                              <PlusCircle className="h-4 w-4" />
+                              List an Animal
+                            </Link>
+                          </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
+                            <Link href="/dashboard">
+                              <LayoutDashboard className="h-4 w-4" />
+                              Dashboard
+                            </Link>
+                          </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start gap-2 font-semibold min-h-[48px] text-destructive hover:text-destructive"
+                            onClick={handleSignOut}
+                          >
+                            <LogOut className="h-4 w-4" />
+                            Sign Out
+                          </Button>
+                        </SheetClose>
+                      </>
+                    ) : (
+                      <>
+                        <SheetClose asChild>
+                          <Button asChild className="w-full justify-start gap-2 font-semibold min-h-[48px] dark:bg-primary dark:text-primary-foreground" style={{
+                            backgroundColor: 'hsl(90 12% 45%)',
+                            color: 'hsl(40 30% 93%)',
+                          }}>
+                            <Link href="/dashboard/listings/new">
+                              <PlusCircle className="h-4 w-4" />
+                              List an Animal
+                            </Link>
+                          </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
+                            <Link href="/register">
+                              <User className="h-4 w-4" />
+                              Sign Up
+                            </Link>
+                          </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Button asChild variant="outline" className="w-full justify-start gap-2 font-semibold min-h-[48px]">
+                            <Link href="/login">
+                              <LogIn className="h-4 w-4" />
+                              Sign In
+                            </Link>
+                          </Button>
+                        </SheetClose>
+                      </>
+                    )}
                   </div>
                 </div>
               </SheetContent>
