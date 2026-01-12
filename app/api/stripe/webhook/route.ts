@@ -29,11 +29,10 @@ if (!getApps().length) {
       });
     } else {
       try {
-        adminApp = initializeApp({
-          credential: cert(require('../../../../serviceAccountKey.json')),
-        });
-      } catch {
+        // Try Application Default Credentials (for production)
         adminApp = initializeApp();
+      } catch {
+        throw new Error('Failed to initialize Firebase Admin SDK');
       }
     }
   } catch (error) {

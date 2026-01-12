@@ -28,13 +28,11 @@ if (!getApps().length) {
         credential: cert(serviceAccount as any),
       });
     } else {
-      // Try Application Default Credentials or serviceAccountKey.json
+      // Try Application Default Credentials (for production)
       try {
-        adminApp = initializeApp({
-          credential: cert(require('../../../../serviceAccountKey.json')),
-        });
-      } catch {
         adminApp = initializeApp();
+      } catch {
+        throw new Error('Failed to initialize Firebase Admin SDK');
       }
     }
   } catch (error) {
@@ -76,7 +74,7 @@ export async function POST(request: NextRequest) {
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
 
-    if (userDoc.exists()) {
+    if (userDoc.exists) {
       const userData = userDoc.data();
       if (userData?.stripeAccountId) {
         return NextResponse.json({
@@ -107,7 +105,7 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    if (userDoc.exists()) {
+    if (userDoc.exists) {
       await userRef.update(updateData);
     } else {
       // Create user document if it doesn't exist

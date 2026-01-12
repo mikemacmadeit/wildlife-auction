@@ -29,11 +29,10 @@ if (!getApps().length) {
       });
     } else {
       try {
-        adminApp = initializeApp({
-          credential: cert(require('../../../../serviceAccountKey.json')),
-        });
-      } catch {
+        // Try Application Default Credentials (for production)
         adminApp = initializeApp();
+      } catch {
+        throw new Error('Failed to initialize Firebase Admin SDK');
       }
     }
   } catch (error) {
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
