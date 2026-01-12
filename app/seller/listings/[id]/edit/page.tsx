@@ -600,9 +600,9 @@ export default function EditListingPage() {
         : undefined,
       location: formData.location,
       images: formData.images,
-      verificationStatus: formData.verification 
-        ? (existingListing.verificationStatus === 'verified' ? 'verified' : 'pending' as const)
-        : ('not_requested' as const),
+      verificationStatus: (formData.verification 
+        ? (existingListing.verificationStatus === 'verified' ? 'verified' : 'pending')
+        : 'not_requested') as 'verified' | 'pending' | 'not_requested' | 'eligible',
       insuranceStatus: formData.insurance 
         ? ('available' as const)
         : ('not_selected' as const),
