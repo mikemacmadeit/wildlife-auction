@@ -433,7 +433,7 @@ export default function ListingDetailPage() {
                           </div>
                           <BidIncrementCalculator
                             currentBid={listing.currentBid || listing.startingBid || 0}
-                            onBidSelect={(amount) => setBidAmount(amount.toString())}
+                            onBidChange={(amount) => setBidAmount(amount.toString())}
                           />
                           <div className="flex items-center gap-2">
                             <Checkbox
