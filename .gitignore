@@ -56,3 +56,11 @@ firebase-debug.log
 # OS files
 .DS_Store
 Thumbs.db
+
+# Environment variable files with secrets (NEVER commit these!)
+NETLIFY_ENV_EXACT_VALUES.txt
+NETLIFY_ENV_FINAL_CHECK.txt
+NETLIFY_ENV_COPY_PASTE.txt
+NETLIFY_FIX_MISSING_VARS.txt
+*_ENV_*.txt
+*_ENV_*.md

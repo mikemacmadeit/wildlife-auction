@@ -24,7 +24,7 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-MEELFLSGMC
 ```
 FIREBASE_PROJECT_ID=wildlife-exchange
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@wildlife-exchange.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n"
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n[REDACTED - Get from Firebase Console Service Account JSON]\n-----END PRIVATE KEY-----\n"
 ```
 
 **Option 2: Multi-line (if Netlify supports it)**
@@ -67,14 +67,14 @@ YOUR_PRIVATE_KEY_HERE
 
 The private key from the JSON file looks like:
 ```json
-"private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
+"private_key": "-----BEGIN PRIVATE KEY-----\n[YOUR_PRIVATE_KEY_FROM_JSON_FILE]\n-----END PRIVATE KEY-----\n"
 ```
 
 **For Netlify, use ONE of these formats:**
 
 **Format A (Single line with \n):**
 ```
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n[YOUR_PRIVATE_KEY_FROM_JSON_FILE]\n-----END PRIVATE KEY-----\n"
 ```
 
 **Format B (If Netlify supports multi-line):**
