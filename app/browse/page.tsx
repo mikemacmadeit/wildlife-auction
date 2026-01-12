@@ -323,7 +323,6 @@ export default function BrowsePage() {
               <FilterDialog
                 filters={filters}
                 onFiltersChange={handleFilterChange}
-                activeFilterCount={activeFilterCount}
               />
               <Button
                 variant="outline"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Calculator, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,46 +85,46 @@ export function BidIncrementCalculator({
 
   return (
     <Card className={cn('border-border/50', className)}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calculator className="h-5 w-5 text-primary" />
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-xl">
+          <Calculator className="h-6 w-6 text-primary" />
           Bid Calculator
         </CardTitle>
-        <p className="text-sm text-muted-foreground font-normal mt-2">
-          Current bid: <span className="font-bold text-foreground">${baseAmount.toLocaleString()}</span>
+        <p className="text-base text-muted-foreground font-normal mt-3">
+          Current bid: <span className="font-bold text-foreground text-lg">${baseAmount.toLocaleString()}</span>
           {' • '}
-          Minimum: <span className="font-bold text-foreground">${minBid.toLocaleString()}</span>
+          Minimum: <span className="font-bold text-foreground text-lg">${minBid.toLocaleString()}</span>
         </p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Quick Increment Buttons */}
         <div>
-          <Label className="text-sm font-semibold mb-2 block">Quick Increments</Label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <Label className="text-base font-semibold mb-3 block">Quick Increments</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {suggestedIncrements.slice(0, 6).map((item) => (
               <Button
                 key={item.preset}
                 variant="outline"
-                size="sm"
+                size="lg"
                 onClick={() => handlePresetClick(item.amount)}
                 className={cn(
-                  'h-auto py-2.5 flex flex-col items-center gap-0.5',
+                  'h-auto py-4 flex flex-col items-center gap-1 min-h-[80px]',
                   'hover:bg-primary hover:text-primary-foreground hover:border-primary',
                   'transition-all'
                 )}
               >
-                <span className="font-bold text-sm">{item.display}</span>
-                <span className="text-xs text-muted-foreground">{item.increment}</span>
+                <span className="font-bold text-base">{item.display}</span>
+                <span className="text-sm text-muted-foreground">{item.increment}</span>
               </Button>
             ))}
           </div>
         </div>
 
         {/* Custom Bid Input */}
-        <div className="space-y-2">
-          <Label htmlFor="custom-bid" className="text-sm font-semibold">Custom Bid Amount</Label>
+        <div className="space-y-3">
+          <Label htmlFor="custom-bid" className="text-base font-semibold">Custom Bid Amount</Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">$</span>
             <Input
               id="custom-bid"
               type="number"
@@ -131,7 +132,7 @@ export function BidIncrementCalculator({
               onChange={(e) => handleCustomBidChange(e.target.value)}
               placeholder={minBid.toLocaleString()}
               min={minBid}
-              className="pl-8 h-12 text-base font-bold"
+              className="pl-10 h-14 text-lg font-bold"
             />
           </div>
           {customBid && parseFloat(customBid) < minBid && (
@@ -142,16 +143,16 @@ export function BidIncrementCalculator({
         </div>
 
         {/* Auto-Bid / Maximum Bid */}
-        <div className="space-y-3 pt-2 border-t border-border/50">
-          <div className="flex items-center gap-2">
+        <div className="space-y-4 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
               id="use-max-bid"
               checked={useMaxBid}
               onChange={(e) => setUseMaxBid(e.target.checked)}
-              className="w-4 h-4 rounded border-border"
+              className="w-5 h-5 rounded border-border"
             />
-            <Label htmlFor="use-max-bid" className="text-sm font-semibold cursor-pointer">
+            <Label htmlFor="use-max-bid" className="text-base font-semibold cursor-pointer">
               Set Maximum Bid (Auto-Bid)
             </Label>
           </div>
@@ -160,27 +161,27 @@ export function BidIncrementCalculator({
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-2"
+              className="space-y-3"
             >
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">$</span>
                 <Input
                   type="number"
                   value={maxBid}
                   onChange={(e) => setMaxBid(e.target.value)}
                   placeholder="Enter maximum bid"
                   min={minBid}
-                  className="pl-8 h-12 text-base font-bold"
+                  className="pl-10 h-14 text-lg font-bold"
                 />
               </div>
               
               {autoBidStrategy && (
-                <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 space-y-1">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                    <TrendingUp className="h-4 w-4" />
+                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 space-y-2">
+                  <div className="flex items-center gap-2 text-base font-semibold text-primary">
+                    <TrendingUp className="h-5 w-5" />
                     <span>Auto-Bid Strategy</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     We'll bid ${autoBidStrategy.currentIncrement.toLocaleString()} increments up to your maximum of ${autoBidStrategy.max.toLocaleString()}.
                     {autoBidStrategy.numberOfBids > 0 && (
                       <> Estimated {autoBidStrategy.numberOfBids} automatic bids.</>
@@ -194,18 +195,18 @@ export function BidIncrementCalculator({
 
         {/* Bid Summary */}
         {customBid && parseFloat(customBid) >= minBid && (
-          <div className="pt-3 border-t border-border/50 space-y-2">
-            <div className="flex items-center justify-between text-sm">
+          <div className="pt-4 border-t border-border/50 space-y-3">
+            <div className="flex items-center justify-between text-base">
               <span className="text-muted-foreground">Your Bid</span>
-              <span className="font-bold text-lg">${parseFloat(customBid).toLocaleString()}</span>
+              <span className="font-bold text-xl">${parseFloat(customBid).toLocaleString()}</span>
             </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Platform Fee (3%)</span>
               <span>${(parseFloat(customBid) * 0.03).toFixed(2)}</span>
             </div>
-            <div className="flex items-center justify-between text-sm font-bold pt-1 border-t border-border/30">
+            <div className="flex items-center justify-between text-base font-bold pt-2 border-t border-border/30">
               <span>Total</span>
-              <span className="text-primary">${((parseFloat(customBid) * 1.03)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-primary text-xl">${((parseFloat(customBid) * 1.03)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         )}
