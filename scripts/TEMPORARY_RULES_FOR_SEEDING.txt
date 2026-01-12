@@ -1,0 +1,22 @@
+⚠️ TEMPORARY RULES - USE ONLY FOR SEEDING ⚠️
+Copy and paste these rules into Firebase Console > Firestore > Rules
+REMOVE THESE RULES IMMEDIATELY AFTER SEEDING!
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // TEMPORARY: Allow all reads and writes for seeding
+    // ⚠️ REMOVE AFTER SEEDING!
+    match /listings/{listingId} {
+      allow read, write: if true;
+    }
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

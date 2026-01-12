@@ -1,0 +1,16 @@
+[build]
+command = "npx next build"
+publish = ".next"
+
+# IMPORTANT: Plugin order matters! Inline plugin must run BEFORE Next.js plugin
+# Inline environment variables into function code to bypass 4KB Lambda limit
+[[plugins]]
+package = "netlify-plugin-inline-functions-env"
+  [plugins.inputs]
+  # Include all environment variables
+  include = "*"
+  # Exclude variables that shouldn't be inlined (sensitive ones that change frequently)
+  exclude = ""
+
+[[plugins]]
+package = "@netlify/plugin-nextjs"

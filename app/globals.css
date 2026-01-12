@@ -1,0 +1,252 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Barletta Stamp Shadow font face - for hero text */
+@font-face {
+  font-family: 'BarlettaStamp';
+  src: url('/fonts/Barletta Stamp Shadow.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  font-feature-settings: normal;
+  unicode-range: U+0000-10FFFF;
+}
+
+/* Barletta Inline font face - for navbar */
+@font-face {
+  font-family: 'BarlettaInline';
+  src: url('/fonts/Barletta Inline.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  font-feature-settings: normal;
+  unicode-range: U+0000-10FFFF;
+}
+
+@layer base {
+  /* Light Theme - Sand Tonal Ramp (Darker, Richer) */
+  :root {
+    /* Canonical Color Tokens - Exact Hex Values as HSL */
+    /* Sand-Base: #C7B79E, Sand-Surface: #E2D6C2, Sand-Subtle: #D6C8B0, Parchment: #F4F0E6 (highlight only), Olivewood: #22251F, Bark: #5B564A, Sage: #7F8A73 */
+    
+    /* Background = SAND-BASE (darker, uniform) */
+    --background: 37 27% 70%;             /* #C7B79E - SAND-BASE */
+    --foreground: 75 8% 13%;              /* #22251F - OLIVEWOOD (ink) */
+    
+    /* Surfaces = SAND-SURFACE (NOT parchment - lighter sand, still warm) */
+    --card: 38 36% 82%;                  /* #E2D6C2 - SAND-SURFACE */
+    --card-foreground: 75 8% 13%;         /* #22251F - OLIVEWOOD */
+    
+    --popover: 38 36% 82%;                /* #E2D6C2 - SAND-SURFACE */
+    --popover-foreground: 75 8% 13%;      /* #22251F - OLIVEWOOD */
+    
+    --secondary: 38 32% 77%;             /* #D6C8B0 - SAND-SUBTLE */
+    --secondary-foreground: 75 8% 13%;    /* #22251F - OLIVEWOOD */
+    
+    --muted: 38 30% 74%;                 /* Slightly lighter Sand-Subtle */
+    --muted-foreground: 40 8% 42%;        /* Bark/soft ink for metadata */
+    
+    /* PRIMARY = SAGE (brand/action) */
+    --primary: 90 12% 45%;               /* #7F8A73 - SAGE */
+    --primary-foreground: 40 30% 93%;     /* #F4F0E6 - PARCHMENT (best contrast on Sage) */
+    
+    /* Accent = Light sage tint */
+    --accent: 90 12% 65%;                /* Light sage tint for chips/hover */
+    --accent-foreground: 75 8% 13%;       /* #22251F - OLIVEWOOD */
+    
+    --destructive: 0 65% 55%;             /* Muted red */
+    --destructive-foreground: 40 30% 93%; /* #F4F0E6 - PARCHMENT */
+    
+    /* Border = Bark-derived, very subtle (low contrast) */
+    --border: 40 8% 50%;                 /* Bark-derived, very subtle, warm */
+    --input: 40 8% 50%;                  /* Same as border */
+    --ring: 90 12% 45%;                  /* SAGE (focus ring) */
+    
+    --radius: 0.5rem;
+    
+    /* Chart colors */
+    --chart-1: 90 12% 45%;               /* Sage */
+    --chart-2: 80 15% 70%;               /* Olive */
+    --chart-3: 40 8% 32%;                /* Bark */
+    --chart-4: 37 27% 70%;               /* Sand-Base */
+    --chart-5: 75 8% 25%;                /* Darker olivewood */
+    
+    /* Parchment utility (micro-highlight only) */
+    --parchment: 40 30% 93%;             /* #F4F0E6 - NOT for card backgrounds */
+  }
+  
+  /* Dark Theme - Olivewood Background, Olive Brand (unchanged - looks great) */
+  .dark {
+    /* Background = OLIVEWOOD (dark base) */
+    --background: 75 8% 13%;             /* #22251F - OLIVEWOOD */
+    --foreground: 40 30% 93%;            /* #F4F0E6 - PARCHMENT (light text) */
+    
+    /* Surfaces = Slightly lighter Olivewood-tint */
+    --card: 75 8% 18%;                   /* Dark olive surface */
+    --card-foreground: 40 30% 93%;       /* #F4F0E6 - PARCHMENT */
+    
+    --popover: 75 8% 18%;                /* Same as card */
+    --popover-foreground: 40 30% 93%;    /* #F4F0E6 - PARCHMENT */
+    
+    --secondary: 75 8% 20%;             /* Slightly lighter than card */
+    --secondary-foreground: 40 30% 93%; /* #F4F0E6 - PARCHMENT */
+    
+    --muted: 75 8% 16%;                 /* Deeper surface for subtle areas */
+    --muted-foreground: 33 25% 65%;     /* Sand-tint / soft warm gray */
+    
+    /* PRIMARY = OLIVE (dark mode brand/action) */
+    --primary: 80 15% 70%;              /* #B9C2A4 - OLIVE */
+    --primary-foreground: 75 8% 13%;    /* #22251F - OLIVEWOOD (dark text on olive) */
+    
+    /* Accent = Olive */
+    --accent: 80 15% 70%;               /* #B9C2A4 - OLIVE */
+    --accent-foreground: 40 30% 93%;     /* #F4F0E6 - PARCHMENT */
+    
+    --destructive: 0 70% 55%;           /* Muted red */
+    --destructive-foreground: 40 30% 93%; /* #F4F0E6 - PARCHMENT */
+    
+    /* Borders = Subtle dark (no bright outlines) */
+    --border: 75 6% 25%;                /* Subtle dark border */
+    --input: 75 6% 25%;                 /* Same as border */
+    --ring: 80 15% 70%;                 /* #B9C2A4 - OLIVE (focus ring) */
+    
+    /* Chart colors for dark mode */
+    --chart-1: 80 15% 70%;              /* Olive */
+    --chart-2: 90 12% 50%;               /* Sage */
+    --chart-3: 40 8% 40%;                /* Bark */
+    --chart-4: 75 8% 18%;                /* Dark surface */
+    --chart-5: 90 10% 45%;               /* Darker sage */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  button, a {
+    @apply min-h-[44px] min-w-[44px];
+    touch-action: manipulation;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold leading-tight text-foreground;
+  }
+  p {
+    @apply leading-relaxed text-foreground;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mb-bottom-nav {
+    margin-bottom: 4rem;
+  }
+  @media (min-width: 768px) {
+    .mb-bottom-nav {
+      margin-bottom: 0;
+    }
+  }
+
+  .gradient-text {
+    @apply text-foreground;
+  }
+
+  .gradient-text-muted {
+    @apply bg-gradient-to-r from-foreground via-foreground/80 to-foreground/60 bg-clip-text text-transparent;
+  }
+
+  .glass {
+    @apply bg-card/60 backdrop-blur-xl border border-border/50 shadow-warm;
+  }
+
+  /* Premium warm shadow - soft, long, atmospheric */
+  .shadow-premium {
+    box-shadow: 
+      0 4px 12px -2px rgba(0, 0, 0, 0.08),
+      0 2px 6px -2px rgba(0, 0, 0, 0.05),
+      0 0 0 1px hsl(var(--border) / 0.12),
+      0 24px 32px -8px rgba(0, 0, 0, 0.06),
+      0 12px 16px -6px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Warm shadow for cards - elevated sand surface */
+  .shadow-warm {
+    box-shadow: 
+      0 3px 10px -2px rgba(0, 0, 0, 0.08),
+      0 1px 4px -1px rgba(0, 0, 0, 0.05),
+      0 0 0 1px hsl(var(--border) / 0.1);
+  }
+
+  /* Hover shadow - lifted paper effect */
+  .shadow-lifted {
+    box-shadow: 
+      0 8px 20px -4px rgba(0, 0, 0, 0.1),
+      0 4px 10px -2px rgba(0, 0, 0, 0.06),
+      0 0 0 1px hsl(var(--border) / 0.15),
+      0 32px 48px -12px rgba(0, 0, 0, 0.08),
+      0 16px 24px -8px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Parchment micro-highlight utilities (hairlines, underlines, glows only) */
+  .parchment-hairline {
+    border-color: hsl(40, 30%, 93% / 0.15);
+  }
+  .parchment-underline {
+    border-bottom: 1px solid hsl(40, 30%, 93% / 0.2);
+  }
+  .parchment-glow {
+    box-shadow: inset 0 1px 0 hsl(40, 30%, 93% / 0.1);
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(255, 255, 255, 0.01) 50%,
+      transparent 100%
+    );
+    background-size: 1000px 100%;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  /* Force BarlettaStamp font to load and be used */
+  .font-barletta {
+    font-family: 'BarlettaStamp', serif !important;
+    font-synthesis: none;
+  }
+  
+  /* Force BarlettaInline font to load and be used */
+  .font-barletta-inline {
+    font-family: 'BarlettaInline', serif !important;
+    font-synthesis: none;
+  }
+}

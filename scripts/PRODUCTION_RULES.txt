@@ -1,0 +1,107 @@
+✅ PRODUCTION RULES - RESTORE AFTER SEEDING ✅
+Copy and paste these rules into Firebase Console > Firestore > Rules
+Use these after you've finished seeding your listings.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ===============================
+       Helper Functions
+    =============================== */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    /* ===============================
+       USERS COLLECTION
+       /users/{uid}
+    =============================== */
+    match /users/{userId} {
+      // Any authenticated user can read public profile data
+      allow read: if isAuthenticated();
+
+      // Users can create their own user doc only
+      allow create: if isAuthenticated()
+        && request.auth.uid == userId;
+
+      // Users can update ONLY their own doc
+      allow update: if isAuthenticated()
+        && request.auth.uid == userId;
+
+      // Deleting user docs should usually be disabled in prod
+      allow delete: if false;
+    }
+
+    /* ===============================
+       LISTINGS COLLECTION
+       /listings/{listingId}
+    =============================== */
+    match /listings/{listingId} {
+
+      // READ:
+      // - Active listings: any authenticated user
+      // - Non-active listings: seller only
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'active' ||
+        resource.data.sellerId == request.auth.uid
+      );
+
+      // CREATE:
+      // - Must be authenticated
+      // - sellerId must match auth uid
+      // - createdBy must match auth uid
+      // - status must start as 'draft'
+      allow create: if isAuthenticated()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'draft';
+
+      // UPDATE:
+      // - Only seller can update
+      // - sellerId & createdBy are IMMUTABLE
+      allow update: if isAuthenticated()
+        && resource.data.sellerId == request.auth.uid
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.createdBy == resource.data.createdBy;
+
+      // DELETE:
+      // ❗ Safer to soft-delete in app (status='removed')
+      allow delete: if false;
+    }
+
+    /* ===============================
+       FUTURE COLLECTIONS (LOCKED)
+       Uncomment only when implemented
+    =============================== */
+
+    // match /bids/{bidId} {
+    //   allow read: if isAuthenticated();
+    //   allow create: if isAuthenticated()
+    //     && request.resource.data.bidderId == request.auth.uid;
+    //   allow update, delete: if false;
+    // }
+
+    // match /watchlist/{watchId} {
+    //   allow read, write: if isAuthenticated()
+    //     && request.resource.data.userId == request.auth.uid;
+    // }
+
+    // match /conversations/{conversationId} {
+    //   allow read: if isAuthenticated()
+    //     && (resource.data.buyerId == request.auth.uid
+    //         || resource.data.sellerId == request.auth.uid);
+    // }
+
+    /* ===============================
+       DENY EVERYTHING ELSE
+    =============================== */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
