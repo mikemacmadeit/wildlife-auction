@@ -102,11 +102,18 @@ export default function ListingDetailPage() {
       } catch (err: any) {
         console.error('Error fetching listing:', err);
         // Handle permission denied gracefully
+        let errorMessage: string;
         if (err?.code === 'permission-denied' || err?.message?.includes('permission')) {
-          setError('This listing is not available. You may not have permission to view it.');
+          errorMessage = 'This listing is not available. You may not have permission to view it.';
         } else {
-          setError(err?.message || 'Failed to load listing');
+          errorMessage = err?.message || 'Failed to load listing';
         }
+        setError(errorMessage);
+        toast({
+          title: 'Failed to load listing',
+          description: errorMessage,
+          variant: 'destructive',
+        });
       } finally {
         setLoading(false);
       }
@@ -119,7 +126,8 @@ export default function ListingDetailPage() {
     if (listingId && listing) {
       addToRecentlyViewed(listingId);
     }
-  }, [listingId, listing, addToRecentlyViewed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingId, listing]);
 
   // Loading State
   if (loading) {
@@ -183,14 +191,18 @@ export default function ListingDetailPage() {
     });
   };
 
-  const handleAddToWatchlist = () => {
-    toggleFavorite(listing.id);
-    toast({
-      title: isFavorited ? 'Removed from watchlist' : 'Added to watchlist',
-      description: isFavorited 
-        ? 'This listing has been removed from your watchlist.'
-        : 'This listing has been added to your watchlist.',
-    });
+  const handleAddToWatchlist = async () => {
+    try {
+      const action = await toggleFavorite(listing.id);
+      toast({
+        title: action === 'added' ? 'Added to watchlist' : 'Removed from watchlist',
+        description: action === 'added'
+          ? 'This listing has been added to your watchlist.'
+          : 'This listing has been removed from your watchlist.',
+      });
+    } catch (error) {
+      // Error toast is handled in the hook
+    }
   };
 
   const handleShare = () => {

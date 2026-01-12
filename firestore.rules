@@ -34,12 +34,10 @@ service cloud.firestore {
     // ============================================
     match /listings/{listingId} {
       // Allow read:
-      //   - If listing status is 'active' (anyone authenticated can see active listings)
-      //   - OR if user is the seller (seller can see their own listings regardless of status)
-      allow read: if isAuthenticated() && (
-        resource.data.status == 'active' ||
-        resource.data.sellerId == request.auth.uid
-      );
+      //   - If listing status is 'active' (PUBLIC - anyone can see active listings)
+      //   - OR if user is authenticated and is the seller (seller can see their own listings regardless of status)
+      allow read: if resource.data.status == 'active' || 
+                    (isAuthenticated() && resource.data.sellerId == request.auth.uid);
       
       // Allow create: if authenticated and sellerId matches the authenticated user
       // Validation: status must be 'draft', sellerId and createdBy must match auth.uid

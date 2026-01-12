@@ -23,16 +23,21 @@ export function FavoriteButton({
   const { toast } = useToast();
   const isFavorited = isFavorite(listingId);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const action = toggleFavorite(listingId);
-    toast({
-      title: action === 'added' ? 'Added to Favorites' : 'Removed from Favorites',
-      description: action === 'added' 
-        ? 'You can find this listing in your favorites.'
-        : 'Listing removed from your favorites.',
-    });
+    try {
+      const action = await toggleFavorite(listingId);
+      toast({
+        title: action === 'added' ? 'Added to Favorites' : 'Removed from Favorites',
+        description: action === 'added' 
+          ? 'You can find this listing in your favorites.'
+          : 'Listing removed from your favorites.',
+      });
+    } catch (error) {
+      // Error toast is handled in the hook
+      // Just prevent default behavior
+    }
   };
 
   if (variant === 'button') {

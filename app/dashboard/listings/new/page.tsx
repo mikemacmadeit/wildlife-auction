@@ -11,13 +11,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Loader2 } from 'lucide-react';
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
-import { createListingDraft, publishListing } from '@/lib/firebase/listings';
+import { createListingDraft, publishListing, updateListing } from '@/lib/firebase/listings';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
+import { uploadListingImage } from '@/lib/firebase/storage';
+import Image from 'next/image';
 
 function NewListingPageContent() {
   const router = useRouter();
@@ -38,11 +40,14 @@ function NewListingPageContent() {
       state: 'TX',
       zip: '',
     },
-    images: [] as string[],
+    images: [] as string[], // Array of image URLs (Firebase Storage URLs or local paths)
     verification: false,
     insurance: false,
     transport: false,
   });
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
 
   const steps = [
     {
@@ -229,16 +234,28 @@ function NewListingPageContent() {
     {
       id: 'media',
       title: 'Photos',
-      description: 'Upload photos of your listing',
+      description: 'Upload photos of your listing (required)',
       content: (
         <div className="space-y-4">
+          {/* Upload Area */}
           <Card className="border-2 border-dashed p-8 text-center min-h-[200px] flex items-center justify-center">
-            <div className="space-y-4">
+            <div className="space-y-4 w-full">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
               <div>
                 <Label htmlFor="images" className="cursor-pointer">
-                  <Button variant="outline" className="min-h-[48px] min-w-[200px]">
-                    Upload Photos
+                  <Button 
+                    variant="outline" 
+                    className="min-h-[48px] min-w-[200px]"
+                    disabled={formData.images.length >= 8 || uploadingImages.size > 0}
+                  >
+                    {uploadingImages.size > 0 ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      'Upload Photos'
+                    )}
                   </Button>
                 </Label>
                 <Input
@@ -247,35 +264,156 @@ function NewListingPageContent() {
                   multiple
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
-                    // TODO: Upload to Firebase Storage and get URLs
-                    // For now, store placeholder URLs - image upload will be implemented later
+                  disabled={formData.images.length >= 8 || uploadingImages.size > 0}
+                  onChange={async (e) => {
                     const files = Array.from(e.target.files || []);
-                    setFormData({
-                      ...formData,
-                      images: files.map((f) => URL.createObjectURL(f)),
-                    });
+                    if (files.length === 0) return;
+
+                    // Check total count
+                    const totalImages = formData.images.length + files.length;
+                    if (totalImages > 8) {
+                      toast({
+                        title: 'Too many images',
+                        description: 'You can upload a maximum of 8 photos per listing.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+
+                    // Ensure user is authenticated
+                    if (!user) {
+                      toast({
+                        title: 'Authentication required',
+                        description: 'Please sign in to upload images.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+
+                    // Create draft listing if it doesn't exist yet
+                    let currentListingId = listingId;
+                    if (!currentListingId) {
+                      try {
+                        const draftData = {
+                          title: formData.title || 'Draft Listing',
+                          description: formData.description || '',
+                          type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
+                          category: (formData.category || 'other') as ListingCategory,
+                          location: formData.location,
+                          images: [],
+                          trust: {
+                            verified: formData.verification,
+                            insuranceAvailable: formData.insurance,
+                            transportReady: formData.transport,
+                          },
+                          metadata: {},
+                        } as any;
+
+                        if (formData.type === 'fixed' || formData.type === 'classified') {
+                          draftData.price = parseFloat(formData.price || '0');
+                        } else if (formData.type === 'auction') {
+                          draftData.startingBid = parseFloat(formData.startingBid || '0');
+                        }
+
+                        currentListingId = await createListingDraft(user.uid, draftData);
+                        setListingId(currentListingId);
+                      } catch (error: any) {
+                        toast({
+                          title: 'Error creating draft',
+                          description: error.message || 'Failed to create listing draft. Please try again.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                    }
+
+                    // Upload each file
+                    for (const file of files) {
+                      const fileId = `${Date.now()}-${Math.random()}`;
+                      setUploadingImages((prev) => new Set(prev).add(fileId));
+                      setUploadProgress((prev) => ({ ...prev, [fileId]: 0 }));
+
+                      try {
+                        const result = await uploadListingImage(
+                          currentListingId!,
+                          file,
+                          (progress) => {
+                            setUploadProgress((prev) => ({
+                              ...prev,
+                              [fileId]: progress.progress,
+                            }));
+                          }
+                        );
+
+                        // Add URL to images array
+                        const newImages = [...formData.images, result.url];
+                        setFormData((prev) => ({
+                          ...prev,
+                          images: newImages,
+                        }));
+
+                        // Update listing document with new image URL
+                        try {
+                          await updateListing(user.uid, currentListingId!, {
+                            images: newImages,
+                          } as any);
+                        } catch (updateError) {
+                          console.error('Error updating listing with image:', updateError);
+                          // Don't fail the upload if update fails - images are already in formData
+                        }
+                      } catch (error: any) {
+                        console.error('Error uploading image:', error);
+                        toast({
+                          title: 'Upload failed',
+                          description: error.message || `Failed to upload ${file.name}. Please try again.`,
+                          variant: 'destructive',
+                        });
+                      } finally {
+                        setUploadingImages((prev) => {
+                          const next = new Set(prev);
+                          next.delete(fileId);
+                          return next;
+                        });
+                        setUploadProgress((prev) => {
+                          const next = { ...prev };
+                          delete next[fileId];
+                          return next;
+                        });
+                      }
+                    }
+
+                    // Reset file input
+                    e.target.value = '';
                   }}
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Upload up to 10 photos (JPG, PNG)
+                  Upload up to 8 photos (JPG, PNG, WebP)
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Note: Image upload to Firebase Storage will be implemented in a future update
+                  Images are automatically compressed and optimized
                 </p>
               </div>
             </div>
           </Card>
 
-          {formData.images.length > 0 && (
+          {/* Image Grid */}
+          {(formData.images.length > 0 || uploadingImages.size > 0) && (
             <div className="grid grid-cols-3 gap-2">
+              {/* Uploaded Images */}
               {formData.images.map((img, idx) => (
-                <div key={idx} className="relative aspect-square rounded-md overflow-hidden border">
-                  <img src={img} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                <div key={idx} className="relative aspect-square rounded-md overflow-hidden border group">
+                  <Image
+                    src={img}
+                    alt={`Upload ${idx + 1}`}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 33vw, 200px"
+                    unoptimized
+                  />
                   <Button
                     variant="destructive"
                     size="icon"
-                    className="absolute top-1 right-1 h-6 w-6"
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => {
                       setFormData({
                         ...formData,
@@ -287,11 +425,24 @@ function NewListingPageContent() {
                   </Button>
                 </div>
               ))}
+
+              {/* Uploading Images (Placeholders) */}
+              {Array.from(uploadingImages).map((fileId) => (
+                <div key={fileId} className="relative aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
+                  <div className="text-center space-y-2 p-4">
+                    <Loader2 className="h-6 w-6 mx-auto animate-spin text-primary" />
+                    <p className="text-xs text-muted-foreground">
+                      {Math.round(uploadProgress[fileId] || 0)}%
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       ),
-      validate: () => true, // Images are optional
+      validate: () => formData.images.length > 0, // At least 1 image required
+      errorMessage: 'Please upload at least one photo',
     },
     {
       id: 'verification',
@@ -417,6 +568,35 @@ function NewListingPageContent() {
       return;
     }
 
+    // Validate images
+    if (formData.images.length === 0) {
+      toast({
+        title: 'Images required',
+        description: 'Please upload at least one photo before publishing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.images.length > 8) {
+      toast({
+        title: 'Too many images',
+        description: 'You can upload a maximum of 8 photos per listing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if images are still uploading
+    if (uploadingImages.size > 0) {
+      toast({
+        title: 'Upload in progress',
+        description: 'Please wait for all images to finish uploading.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -431,7 +611,7 @@ function NewListingPageContent() {
           state: formData.location.state,
           zip: formData.location.zip || undefined,
         },
-        images: formData.images, // TODO: Replace with Firebase Storage URLs when upload is implemented
+        images: formData.images, // Firebase Storage URLs
         trust: {
           verified: formData.verification,
           insuranceAvailable: formData.insurance,
@@ -450,11 +630,18 @@ function NewListingPageContent() {
         }
       }
 
-      // Create listing as draft
-      const listingId = await createListingDraft(user.uid, listingData);
+      // Use existing draft listing ID if available, otherwise create new
+      let finalListingId = listingId;
+      if (!finalListingId) {
+        finalListingId = await createListingDraft(user.uid, listingData);
+      } else {
+        // Update existing draft with final data
+        const { updateListing } = await import('@/lib/firebase/listings');
+        await updateListing(user.uid, finalListingId, listingData);
+      }
 
       // Publish immediately (user clicked "Publish" in the form)
-      await publishListing(user.uid, listingId);
+      await publishListing(user.uid, finalListingId);
 
       toast({
         title: 'Listing created successfully!',

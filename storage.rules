@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get listing document from Firestore
+    // This checks if the user is the owner of the listing
+    function isListingOwner(listingId) {
+      return isAuthenticated() && 
+        firestore.get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid;
+    }
+    
+    // ============================================
+    // LISTING IMAGES
+    // ============================================
+    // Path: listings/{listingId}/images/{imageId}.webp
+    match /listings/{listingId}/images/{imageId} {
+      // Allow read: Public read for active listings, or owner can always read
+      allow read: if true; // Public read - images are public for browsing
+      
+      // Allow write: Only the listing owner can upload/delete images
+      allow write: if isAuthenticated() && isListingOwner(listingId);
+      
+      // Allow delete: Only the listing owner can delete images
+      allow delete: if isAuthenticated() && isListingOwner(listingId);
+    }
+    
+    // ============================================
+    // USER PROFILE IMAGES (Future - P1)
+    // ============================================
+    // match /users/{userId}/profile/{imageId} {
+    //   allow read: if true; // Public read
+    //   allow write: if isAuthenticated() && request.auth.uid == userId;
+    //   allow delete: if isAuthenticated() && request.auth.uid == userId;
+    // }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

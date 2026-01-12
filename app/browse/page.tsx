@@ -23,9 +23,10 @@ import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Badge } from '@/components/ui/badge';
-import { listActiveListings } from '@/lib/firebase/listings';
+import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
 import { FilterState, ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
@@ -33,6 +34,7 @@ type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soo
 type ViewMode = 'card' | 'list';
 
 export default function BrowsePage() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
   const [filters, setFilters] = useState<FilterState>({});
@@ -40,16 +42,24 @@ export default function BrowsePage() {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<BrowseCursor | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   
   // View mode with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+  // Initialize to 'card' to ensure server/client consistency
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
+
+  // Load from localStorage after hydration (client-side only)
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('browse-view-mode');
-      return (saved === 'card' || saved === 'list') ? saved : 'card';
+      if (saved === 'card' || saved === 'list') {
+        setViewMode(saved);
+      }
     }
-    return 'card';
-  });
+  }, []);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -58,34 +68,139 @@ export default function BrowsePage() {
     }
   };
 
-  // Fetch listings from Firestore
-  useEffect(() => {
-    async function fetchListings() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await listActiveListings({ limitCount: 50 });
-        setListings(data);
-      } catch (err) {
-        console.error('Error fetching listings:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load listings');
-      } finally {
-        setLoading(false);
-      }
+  // Convert UI filters to Firestore query filters
+  const getBrowseFilters = (): BrowseFilters => {
+    const browseFilters: BrowseFilters = {
+      status: 'active',
+    };
+    
+    if (selectedType !== 'all') {
+      browseFilters.type = selectedType;
     }
-    fetchListings();
-  }, []);
+    
+    if (filters.category) {
+      browseFilters.category = filters.category;
+    }
+    
+    if (filters.location?.state) {
+      browseFilters.location = { state: filters.location.state };
+    }
+    
+    if (filters.featured) {
+      browseFilters.featured = true;
+    }
+    
+    // Price filters (Firestore limitation: can only use range on one field)
+    if (filters.maxPrice !== undefined) {
+      browseFilters.maxPrice = filters.maxPrice;
+    }
+    if (filters.minPrice !== undefined && (sortBy === 'price-low' || sortBy === 'price-high')) {
+      browseFilters.minPrice = filters.minPrice;
+    }
+    
+    return browseFilters;
+  };
+  
+  // Convert UI sort to Firestore sort
+  const getBrowseSort = (): BrowseSort => {
+    switch (sortBy) {
+      case 'newest':
+        return 'newest';
+      case 'oldest':
+        return 'oldest';
+      case 'price-low':
+        return 'priceAsc';
+      case 'price-high':
+        return 'priceDesc';
+      case 'ending-soon':
+        return 'endingSoon';
+      case 'featured':
+        // Featured is handled as a filter, sort by newest
+        return 'newest';
+      default:
+        return 'newest';
+    }
+  };
+  
+  // Load initial page (resets pagination)
+  const loadInitial = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setListings([]);
+      setNextCursor(null);
+      setHasMore(false);
+      
+      const browseFilters = getBrowseFilters();
+      const browseSort = getBrowseSort();
+      
+      const result = await queryListingsForBrowse({
+        limit: 20,
+        filters: browseFilters,
+        sort: browseSort,
+      });
+      
+      setListings(result.items);
+      setNextCursor(result.nextCursor);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      console.error('Error fetching listings:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load listings';
+      setError(errorMessage);
+      toast({
+        title: 'Failed to load listings',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Load more (pagination)
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    
+    try {
+      setLoadingMore(true);
+      
+      const browseFilters = getBrowseFilters();
+      const browseSort = getBrowseSort();
+      
+      const result = await queryListingsForBrowse({
+        limit: 20,
+        cursor: nextCursor,
+        filters: browseFilters,
+        sort: browseSort,
+      });
+      
+      setListings((prev) => [...prev, ...result.items]);
+      setNextCursor(result.nextCursor);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      console.error('Error loading more listings:', err);
+      toast({
+        title: 'Failed to load more listings',
+        description: err instanceof Error ? err.message : 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  
+  // Load initial page when filters/sort change
+  useEffect(() => {
+    loadInitial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType, filters, sortBy]);
 
-  // Filter listings based on search and filters (client-side filtering)
+  // Client-side filtering for fields not supported by Firestore
+  // (Full-text search, city-level location, metadata fields, etc.)
   const filteredListings = useMemo(() => {
     let result = [...listings];
 
-    // Type filter
-    if (selectedType !== 'all') {
-      result = result.filter((listing) => listing.type === selectedType);
-    }
-
-    // Search filter (using debounced query and enhanced metadata search)
+    // Full-text search (client-side only - Firestore doesn't support full-text search)
     if (debouncedSearchQuery) {
       const query = debouncedSearchQuery.toLowerCase();
       result = result.filter((listing) => {
@@ -109,39 +224,20 @@ export default function BrowsePage() {
       });
     }
 
-    // Category filter
-    if (filters.category) {
-      result = result.filter((listing) => listing.category === filters.category);
-    }
-
-    // Type filter (from filters)
-    if (filters.type) {
-      result = result.filter((listing) => listing.type === filters.type);
-    }
-
-    // Location filter
-    if (filters.location?.state) {
-      result = result.filter((listing) => listing.location?.state === filters.location?.state);
-    }
+    // City-level location filter (client-side - Firestore only supports state)
     if (filters.location?.city) {
       result = result.filter((listing) => listing.location?.city === filters.location?.city);
     }
 
-    // Price filter
-    if (filters.minPrice !== undefined) {
+    // Client-side minPrice filter (when not using price sort)
+    if (filters.minPrice !== undefined && sortBy !== 'price-low' && sortBy !== 'price-high') {
       result = result.filter((listing) => {
         const price = listing.price || listing.currentBid || listing.startingBid || 0;
         return price >= filters.minPrice!;
       });
     }
-    if (filters.maxPrice !== undefined) {
-      result = result.filter((listing) => {
-        const price = listing.price || listing.currentBid || listing.startingBid || 0;
-        return price <= filters.maxPrice!;
-      });
-    }
 
-    // Species/Breed filter
+    // Species/Breed filter (client-side - metadata not indexed)
     if (filters.species && filters.species.length > 0) {
       result = result.filter((listing) =>
         filters.species!.some((species) =>
@@ -150,7 +246,7 @@ export default function BrowsePage() {
       );
     }
 
-    // Quantity filter
+    // Quantity filter (client-side - metadata not indexed)
     if (filters.quantity) {
       result = result.filter((listing) => {
         const qty = listing.metadata?.quantity || 1;
@@ -171,7 +267,7 @@ export default function BrowsePage() {
       });
     }
 
-    // Health status filter
+    // Health status filter (client-side - metadata not indexed)
     if (filters.healthStatus && filters.healthStatus.length > 0) {
       result = result.filter((listing) =>
         filters.healthStatus!.some((status) =>
@@ -180,27 +276,27 @@ export default function BrowsePage() {
       );
     }
 
-    // Papers filter
+    // Papers filter (client-side - metadata not indexed)
     if (filters.papers !== undefined) {
       result = result.filter((listing) => listing.metadata?.papers === filters.papers);
     }
 
-    // Verified seller filter
+    // Verified seller filter (client-side - nested field not indexed)
     if (filters.verifiedSeller) {
       result = result.filter((listing) => listing.sellerSnapshot?.verified || listing.trust?.verified);
     }
 
-    // Transport ready filter
+    // Transport ready filter (client-side - nested field not indexed)
     if (filters.transportReady) {
       result = result.filter((listing) => listing.trust?.transportReady);
     }
 
-    // Insurance available filter
+    // Insurance available filter (client-side - nested field not indexed)
     if (filters.insuranceAvailable) {
       result = result.filter((listing) => listing.trust?.insuranceAvailable);
     }
 
-    // Ending soon filter (auctions ending within 24 hours)
+    // Ending soon filter (client-side - time-based calculation)
     if (filters.endingSoon) {
       const now = Date.now();
       const dayInMs = 24 * 60 * 60 * 1000;
@@ -211,7 +307,7 @@ export default function BrowsePage() {
       });
     }
 
-    // Newly listed filter (listed within 7 days)
+    // Newly listed filter (client-side - time-based calculation)
     if (filters.newlyListed) {
       const now = Date.now();
       const weekInMs = 7 * 24 * 60 * 60 * 1000;
@@ -222,50 +318,21 @@ export default function BrowsePage() {
       });
     }
 
-    // Featured filter
-    if (filters.featured) {
-      result = result.filter((listing) => listing.featured === true);
-    }
-
     return result;
-  }, [listings, selectedType, debouncedSearchQuery, filters]);
+  }, [listings, debouncedSearchQuery, filters, sortBy]);
 
-  // Sort listings
+  // Client-side sorting only for 'featured' (server handles others)
   const sortedListings = useMemo(() => {
-    const sorted = [...filteredListings];
-
-    switch (sortBy) {
-      case 'newest':
-        return sorted.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      case 'oldest':
-        return sorted.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      case 'price-low':
-        return sorted.sort((a, b) => {
-          const priceA = a.price || a.currentBid || a.startingBid || 0;
-          const priceB = b.price || b.currentBid || b.startingBid || 0;
-          return priceA - priceB;
-        });
-      case 'price-high':
-        return sorted.sort((a, b) => {
-          const priceA = a.price || a.currentBid || a.startingBid || 0;
-          const priceB = b.price || b.currentBid || b.startingBid || 0;
-          return priceB - priceA;
-        });
-      case 'ending-soon':
-        return sorted.sort((a, b) => {
-          if (a.type !== 'auction' || !a.endsAt) return 1;
-          if (b.type !== 'auction' || !b.endsAt) return -1;
-          return a.endsAt.getTime() - b.endsAt.getTime();
-        });
-      case 'featured':
-        return sorted.sort((a, b) => {
-          if (a.featured && !b.featured) return -1;
-          if (!a.featured && b.featured) return 1;
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        });
-      default:
-        return sorted;
+    if (sortBy === 'featured') {
+      const sorted = [...filteredListings];
+      return sorted.sort((a, b) => {
+        if (a.featured && !b.featured) return -1;
+        if (!a.featured && b.featured) return 1;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
     }
+    // All other sorts are handled server-side
+    return filteredListings;
   }, [filteredListings, sortBy]);
 
   const handleFilterChange = (newFilters: FilterState) => {
@@ -458,27 +525,51 @@ export default function BrowsePage() {
 
         {/* Listings Grid/List */}
         {!loading && !error && sortedListings.length > 0 && (
-          <div
-            className={cn(
-              viewMode === 'card'
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                : 'space-y-4'
-            )}
-          >
-            <AnimatePresence>
-              {sortedListings.map((listing) =>
-                viewMode === 'card' ? (
-                  listing.featured ? (
-                    <FeaturedListingCard key={listing.id} listing={listing} />
-                  ) : (
-                    <ListingCard key={listing.id} listing={listing} />
-                  )
-                ) : (
-                  <ListItem key={listing.id} listing={listing} />
-                )
+          <>
+            <div
+              className={cn(
+                viewMode === 'card'
+                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+                  : 'space-y-4'
               )}
-            </AnimatePresence>
-          </div>
+            >
+              <AnimatePresence>
+                {sortedListings.map((listing) =>
+                  viewMode === 'card' ? (
+                    listing.featured ? (
+                      <FeaturedListingCard key={listing.id} listing={listing} />
+                    ) : (
+                      <ListingCard key={listing.id} listing={listing} />
+                    )
+                  ) : (
+                    <ListItem key={listing.id} listing={listing} />
+                  )
+                )}
+              </AnimatePresence>
+            </div>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center mt-8">
+                <Button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[200px]"
+                >
+                  {loadingMore ? (
+                    <>
+                      <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

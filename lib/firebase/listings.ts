@@ -9,13 +9,16 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   serverTimestamp,
   Timestamp,
   QueryConstraint,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from 'firebase/firestore';
 import { db } from './config';
 import { getDocument } from './firestore';
-import { Listing, ListingStatus, UserProfile } from '@/lib/types';
+import { Listing, ListingStatus, ListingType, ListingCategory, UserProfile } from '@/lib/types';
 import { ListingDoc } from '@/lib/types/firestore';
 
 /**
@@ -321,8 +324,210 @@ export const getListingById = async (listingId: string): Promise<Listing | null>
 };
 
 /**
- * List active listings with optional filters
+ * Cursor for pagination
+ * Can be a document snapshot (in-memory) or serializable data (for persistence)
+ */
+export type BrowseCursor = QueryDocumentSnapshot<DocumentData> | {
+  createdAt: Timestamp;
+  docId: string;
+};
+
+/**
+ * Input filters for browse query
+ */
+export interface BrowseFilters {
+  status?: 'active' | 'draft' | 'sold' | 'expired' | 'removed';
+  type?: ListingType;
+  category?: ListingCategory;
+  location?: {
+    state?: string;
+  };
+  minPrice?: number;
+  maxPrice?: number;
+  featured?: boolean;
+}
+
+/**
+ * Sort options for browse query
+ */
+export type BrowseSort = 'newest' | 'oldest' | 'priceAsc' | 'priceDesc' | 'endingSoon';
+
+/**
+ * Result of browse query with pagination
+ */
+export interface BrowseQueryResult {
+  items: Listing[];
+  nextCursor: BrowseCursor | null;
+  hasMore: boolean;
+}
+
+/**
+ * Query listings for browse page with filtering, sorting, and cursor pagination
+ * 
+ * Firestore Limitations:
+ * - Price range: Can only use minPrice OR maxPrice, not both (unless orderBy is 'price')
+ * - Location: Only state-level filtering supported (city requires full-text search)
+ * - Full-text search: Not supported - must be done client-side on loaded results
+ * 
+ * @param options Query options
+ * @returns Paginated results with cursor
+ */
+export const queryListingsForBrowse = async (
+  options: {
+    limit: number;
+    cursor?: BrowseCursor | QueryDocumentSnapshot<DocumentData>;
+    filters?: BrowseFilters;
+    sort?: BrowseSort;
+  }
+): Promise<BrowseQueryResult> => {
+  try {
+    const { limit: limitCount, cursor, filters = {}, sort = 'newest' } = options;
+    
+    const constraints: QueryConstraint[] = [];
+    
+    // Status filter (default to active)
+    const status = filters.status || 'active';
+    constraints.push(where('status', '==', status));
+    
+    // Type filter
+    if (filters.type) {
+      constraints.push(where('type', '==', filters.type));
+    }
+    
+    // Category filter
+    if (filters.category) {
+      constraints.push(where('category', '==', filters.category));
+    }
+    
+    // Location filter (state only - city requires full-text search)
+    if (filters.location?.state) {
+      constraints.push(where('location.state', '==', filters.location.state));
+    }
+    
+    // Featured filter
+    if (filters.featured !== undefined) {
+      constraints.push(where('featured', '==', filters.featured));
+    }
+    
+    // Price filtering - Firestore limitation: can only use range on one field
+    // If both minPrice and maxPrice are provided, we'll use maxPrice only
+    // and filter minPrice client-side (or require orderBy price)
+    if (filters.maxPrice !== undefined) {
+      // For price range queries, we need to order by price
+      // This means we can't combine with other orderBy fields
+      // We'll handle this by using a separate query path
+      constraints.push(where('price', '<=', filters.maxPrice));
+    } else if (filters.minPrice !== undefined && sort !== 'priceAsc' && sort !== 'priceDesc') {
+      // minPrice without price sort - filter client-side after fetch
+      // For now, we'll note this limitation
+      console.warn('minPrice filter without price sort - will filter client-side');
+    }
+    
+    // Sorting and orderBy
+    // Firestore requires orderBy to match the sort direction
+    switch (sort) {
+      case 'newest':
+        constraints.push(orderBy('createdAt', 'desc'));
+        break;
+      case 'oldest':
+        constraints.push(orderBy('createdAt', 'asc'));
+        break;
+      case 'priceAsc':
+        // For price sorting, we need to handle listings without price
+        // Use a computed field or filter out nulls
+        constraints.push(orderBy('price', 'asc'));
+        // If minPrice is provided, add it as a where clause
+        if (filters.minPrice !== undefined) {
+          constraints.push(where('price', '>=', filters.minPrice));
+        }
+        break;
+      case 'priceDesc':
+        constraints.push(orderBy('price', 'desc'));
+        // If minPrice is provided, add it as a where clause
+        if (filters.minPrice !== undefined) {
+          constraints.push(where('price', '>=', filters.minPrice));
+        }
+        break;
+      case 'endingSoon':
+        // For ending soon, we need to order by endsAt (auctions only)
+        // This requires filtering by type='auction' first
+        if (filters.type !== 'auction') {
+          // If not filtering by auction type, we can't sort by endsAt
+          // Fall back to newest
+          constraints.push(orderBy('createdAt', 'desc'));
+        } else {
+          constraints.push(orderBy('endsAt', 'asc'));
+        }
+        break;
+    }
+    
+    // Cursor pagination
+    if (cursor) {
+      if (cursor instanceof QueryDocumentSnapshot || 'exists' in cursor) {
+        // Already a document snapshot
+        constraints.push(startAfter(cursor as QueryDocumentSnapshot<DocumentData>));
+      } else {
+        // Serializable cursor - fetch the document to use as cursor
+        const docRef = doc(db, 'listings', cursor.docId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          constraints.push(startAfter(docSnap));
+        }
+      }
+    }
+    
+    // Limit (fetch one extra to check if there are more)
+    constraints.push(limit(limitCount + 1));
+    
+    // Build and execute query
+    const listingsRef = collection(db, 'listings');
+    const q = query(listingsRef, ...constraints);
+    const querySnapshot = await getDocs(q);
+    
+    // Check if there are more results
+    const hasMore = querySnapshot.docs.length > limitCount;
+    const docs = hasMore ? querySnapshot.docs.slice(0, limitCount) : querySnapshot.docs;
+    
+    // Convert to Listing objects
+    const items = docs.map((doc) =>
+      toListing({
+        id: doc.id,
+        ...(doc.data() as ListingDoc),
+      })
+    );
+    
+    // Apply client-side minPrice filter if needed (when not using price sort)
+    let filteredItems = items;
+    if (filters.minPrice !== undefined && sort !== 'priceAsc' && sort !== 'priceDesc') {
+      filteredItems = items.filter((listing) => {
+        const price = listing.price || listing.currentBid || listing.startingBid || 0;
+        return price >= filters.minPrice!;
+      });
+    }
+    
+    // Get next cursor (last document snapshot - most efficient for Firestore)
+    let nextCursor: BrowseCursor | null = null;
+    if (hasMore && docs.length > 0) {
+      // Return the actual document snapshot (most efficient for Firestore queries)
+      nextCursor = docs[docs.length - 1];
+    }
+    
+    return {
+      items: filteredItems,
+      nextCursor,
+      hasMore,
+    };
+  } catch (error) {
+    console.error('Error querying listings for browse:', error);
+    throw error;
+  }
+};
+
+/**
+ * List active listings with optional filters (legacy - kept for backward compatibility)
  * Returns UI Listing[] (Date fields)
+ * 
+ * @deprecated Use queryListingsForBrowse() for new code
  */
 export const listActiveListings = async (
   filters?: {
@@ -332,33 +537,16 @@ export const listActiveListings = async (
   }
 ): Promise<Listing[]> => {
   try {
-    const constraints: QueryConstraint[] = [
-      where('status', '==', 'active'),
-      orderBy('createdAt', 'desc'),
-    ];
-
-    if (filters?.category) {
-      constraints.push(where('category', '==', filters.category));
-    }
-
-    if (filters?.type) {
-      constraints.push(where('type', '==', filters.type));
-    }
-
-    if (filters?.limitCount) {
-      constraints.push(limit(filters.limitCount));
-    }
-
-    const listingsRef = collection(db, 'listings');
-    const q = query(listingsRef, ...constraints);
-    const querySnapshot = await getDocs(q);
-
-    return querySnapshot.docs.map((doc) =>
-      toListing({
-        id: doc.id,
-        ...(doc.data() as ListingDoc),
-      })
-    );
+    const result = await queryListingsForBrowse({
+      limit: filters?.limitCount || 50,
+      filters: {
+        status: 'active',
+        category: filters?.category as ListingCategory | undefined,
+        type: filters?.type as ListingType | undefined,
+      },
+      sort: 'newest',
+    });
+    return result.items;
   } catch (error) {
     console.error('Error fetching active listings:', error);
     throw error;

@@ -22,13 +22,18 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   // View mode with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+  // Initialize to 'card' to ensure server/client consistency
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
+
+  // Load from localStorage after hydration (client-side only)
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('home-view-mode');
-      return (saved === 'card' || saved === 'list') ? saved : 'card';
+      if (saved === 'card' || saved === 'list') {
+        setViewMode(saved);
+      }
     }
-    return 'card';
-  });
+  }, []);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
