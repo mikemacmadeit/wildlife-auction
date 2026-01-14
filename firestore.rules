@@ -12,6 +12,20 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // Helper function to check if user is an admin
+    // Checks the auth token role claim first (fast, no get() call), then falls back to reading user document
+    function isAdmin() {
+      return isAuthenticated() && (
+        // Check token first (fast, no get() call)
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'super_admin' ||
+        // Fallback to user document (slower, but necessary if token doesn't have role)
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'))
+      );
+    }
+    
     // ============================================
     // USERS COLLECTION
     // ============================================
@@ -36,8 +50,12 @@ service cloud.firestore {
       // Allow read:
       //   - If listing status is 'active' (PUBLIC - anyone can see active listings)
       //   - OR if user is authenticated and is the seller (seller can see their own listings regardless of status)
+      //   - OR if user is an admin (admins can see all listings including draft/pending)
+      // Note: For queries, sellers can query their own listings (where sellerId == auth.uid)
+      //       and the rule evaluates per-document, so each document must pass this check
       allow read: if resource.data.status == 'active' || 
-                    (isAuthenticated() && resource.data.sellerId == request.auth.uid);
+                    (isAuthenticated() && resource.data.sellerId == request.auth.uid) ||
+                    isAdmin();
       
       // Allow create: if authenticated and sellerId matches the authenticated user
       // Validation: status must be 'draft', sellerId and createdBy must match auth.uid
@@ -48,21 +66,82 @@ service cloud.firestore {
         // Validate required fields exist
         request.resource.data.keys().hasAll(['title', 'description', 'type', 'category', 'status', 'sellerId', 'createdBy', 'createdAt', 'updatedAt']) &&
         // Prevent setting sellerId to different value
-        request.resource.data.sellerId == request.auth.uid;
+        request.resource.data.sellerId == request.auth.uid &&
+        // Whitetail breeder: require seller attestation + non-expired permit at creation time
+        (
+          request.resource.data.category != 'whitetail_breeder' ||
+          (
+            request.resource.data.sellerAttestationAccepted == true &&
+            request.resource.data.sellerAttestationAcceptedAt is timestamp &&
+            request.resource.data.attributes.tpwdPermitExpirationDate is timestamp &&
+            request.resource.data.attributes.tpwdPermitExpirationDate >= request.time
+          )
+        );
       
-      // Allow update: if authenticated and user is the seller
+      // Allow update: if authenticated and user is the seller OR if user is an admin
       // Validation: cannot change sellerId, status transitions are allowed
-      allow update: if isAuthenticated() && 
-        resource.data.sellerId == request.auth.uid &&
-        // Prevent changing sellerId after creation
-        request.resource.data.sellerId == resource.data.sellerId &&
-        // Prevent changing createdBy
-        request.resource.data.createdBy == resource.data.createdBy &&
-        // Ensure updatedAt is updated (client should use serverTimestamp, but validate it exists)
-        request.resource.data.keys().hasAll(['updatedAt']);
+      // Admins can update listings for approval/rejection purposes
+      // Compliance: Only admins can change complianceStatus to approved/rejected
+      allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid && 
+                       // Sellers cannot change complianceStatus to approved/rejected
+                       (request.resource.data.complianceStatus == null || 
+                        request.resource.data.complianceStatus == resource.data.complianceStatus ||
+                        request.resource.data.complianceStatus == 'pending_review') &&
+                       // Whitetail breeder: block status transitions to pending/active if attestation missing or permit expired
+                       (
+                         resource.data.category != 'whitetail_breeder' ||
+                         (
+                           // If status is not changing, don't block edits (do not auto-disable existing active listings)
+                           request.resource.data.status == resource.data.status ||
+                           (
+                             // If status is changing to pending/active, enforce current (non-expired) permit + attestation
+                             (request.resource.data.status == 'pending' || request.resource.data.status == 'active') &&
+                             request.resource.data.sellerAttestationAccepted == true &&
+                             request.resource.data.sellerAttestationAcceptedAt is timestamp &&
+                             request.resource.data.attributes.tpwdPermitExpirationDate is timestamp &&
+                             request.resource.data.attributes.tpwdPermitExpirationDate >= request.time
+                           )
+                         )
+                       )) ||
+                    (isAdmin() && 
+                     // Admins can change complianceStatus
+                     true);
       
       // Allow delete: if authenticated and user is the seller
       allow delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+      
+      // Documents subcollection
+      match /documents/{documentId} {
+        // Helper to check if user owns the parent listing
+        function isListingOwner() {
+          return isAuthenticated() && 
+                 get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid;
+        }
+        
+        // Allow read: admin OR seller (owner of parent listing)
+        // Check admin first (short-circuit evaluation)
+        allow read: if isAuthenticated() && (
+          isAdmin() || isListingOwner()
+        );
+        
+        // Allow create: authenticated user (app logic ensures ownership)
+        // Similar to storage rules - allows authenticated creates to handle:
+        // 1. Cross-service rules setup
+        // 2. Firestore propagation delays
+        // 3. Document upload flow
+        // The uploadedBy field ensures the document is linked to the correct user
+        allow create: if isAuthenticated() && 
+          request.resource.data.status == 'uploaded' &&
+          request.resource.data.uploadedBy == request.auth.uid;
+        
+        // Allow update: only admin (for verification)
+        allow update: if isAdmin() && 
+          (request.resource.data.status == 'verified' || request.resource.data.status == 'rejected') &&
+          request.resource.data.verifiedBy == request.auth.uid;
+        
+        // No delete allowed
+        allow delete: if false;
+      }
     }
     
     // ============================================
@@ -112,10 +191,11 @@ service cloud.firestore {
     // ORDERS COLLECTION
     // ============================================
     match /orders/{orderId} {
-      // Allow read: buyer or seller can read their orders
+      // Allow read: buyer or seller can read their orders, OR if user is an admin
       allow read: if isAuthenticated() && (
         resource.data.buyerId == request.auth.uid ||
-        resource.data.sellerId == request.auth.uid
+        resource.data.sellerId == request.auth.uid ||
+        isAdmin()
       );
       
       // Allow create: authenticated users (webhook will create via Admin SDK)
@@ -125,36 +205,159 @@ service cloud.firestore {
                       request.resource.data.status == 'pending' &&
                       request.resource.data.keys().hasAll(['listingId', 'buyerId', 'sellerId', 'amount', 'platformFee', 'sellerAmount', 'status', 'createdAt', 'updatedAt']);
       
-      // Allow update: only buyer or seller can update (or webhook via Admin SDK)
-      // In practice, webhooks update via Admin SDK, but we allow limited client updates
+      // Allow update: buyer or seller can update their own orders (for accept/dispute/delivered), OR admin
+      // Buyers can: accept, dispute
+      // Sellers can: mark delivered
+      // Admins can: release, refund, set adminHold
       allow update: if isAuthenticated() && (
-        resource.data.buyerId == request.auth.uid ||
-        resource.data.sellerId == request.auth.uid
-      ) && (
-        // Prevent changing critical fields
-        request.resource.data.buyerId == resource.data.buyerId &&
-        request.resource.data.sellerId == resource.data.sellerId &&
-        request.resource.data.listingId == resource.data.listingId &&
-        request.resource.data.amount == resource.data.amount &&
-        request.resource.data.keys().hasAll(['updatedAt'])
+        (resource.data.buyerId == request.auth.uid && 
+         // Buyer can only update status to accepted or disputed, and only allowed fields
+         (request.resource.data.status == 'accepted' || request.resource.data.status == 'disputed') &&
+         request.resource.data.buyerId == resource.data.buyerId &&
+         request.resource.data.sellerId == resource.data.sellerId &&
+         request.resource.data.listingId == resource.data.listingId &&
+         request.resource.data.amount == resource.data.amount) ||
+        (resource.data.sellerId == request.auth.uid &&
+         // Seller can only update status to in_transit or delivered
+         (request.resource.data.status == 'in_transit' || request.resource.data.status == 'delivered') &&
+         request.resource.data.buyerId == resource.data.buyerId &&
+         request.resource.data.sellerId == resource.data.sellerId &&
+         request.resource.data.listingId == resource.data.listingId &&
+         request.resource.data.amount == resource.data.amount) ||
+        isAdmin() // Admins can update orders (e.g., to complete payouts, set adminHold)
       );
       
       // No deletes allowed
       allow delete: if false;
+      
+      // Documents subcollection
+      match /documents/{documentId} {
+        // Allow read: buyer, seller, or admin
+        allow read: if isAuthenticated() && (
+          resource.data.buyerId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid ||
+          isAdmin()
+        );
+        
+        // Allow create: buyer or seller
+        allow create: if isAuthenticated() && (
+          resource.data.buyerId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid
+        ) && resource.data.status == 'uploaded';
+        
+        // Allow update: only admin (for verification)
+        allow update: if isAdmin() && 
+          (request.resource.data.status == 'verified' || request.resource.data.status == 'rejected') &&
+          request.resource.data.verifiedBy == request.auth.uid;
+        
+        // No delete allowed
+        allow delete: if false;
+      }
+    }
+
+    // ============================================
+    // OPS HEALTH (Admin-only read)
+    // ============================================
+    match /opsHealth/{docId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
     }
     
-    // MESSAGES COLLECTION (Future - P1)
-    // match /messages/{messageId} {
-    //   allow read: if isAuthenticated() && (
-    //     resource.data.fromUserId == request.auth.uid ||
-    //     resource.data.toUserId == request.auth.uid
-    //   );
-    //   allow create: if isAuthenticated() && request.resource.data.fromUserId == request.auth.uid;
-    //   allow update: if isAuthenticated() && (
-    //     resource.data.fromUserId == request.auth.uid ||
-    //     resource.data.toUserId == request.auth.uid
-    //   );
-    // }
+    // ============================================
+    // MESSAGE THREADS COLLECTION
+    // ============================================
+    match /messageThreads/{threadId} {
+      // Allow read: if user is buyer or seller in the thread, OR if admin
+      allow read: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Allow create: if authenticated and user is buyer or seller
+      allow create: if isAuthenticated() && (
+        request.resource.data.buyerId == request.auth.uid ||
+        request.resource.data.sellerId == request.auth.uid
+      );
+      
+      // Allow update: if user is buyer or seller, OR if admin (for flagging)
+      allow update: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Allow delete: only admin
+      allow delete: if isAdmin();
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Allow read: if user is sender or recipient, OR if admin
+        allow read: if isAuthenticated() && (
+          resource.data.senderId == request.auth.uid ||
+          resource.data.recipientId == request.auth.uid ||
+          isAdmin()
+        );
+        
+        // Allow create: if authenticated and user is sender
+        allow create: if isAuthenticated() && 
+          request.resource.data.senderId == request.auth.uid;
+        
+        // Allow update: only admin (for flagging)
+        allow update: if isAdmin();
+        
+        // No deletes allowed
+        allow delete: if false;
+      }
+    }
+    
+    // ============================================
+    // STRIPE EVENTS COLLECTION (Idempotency)
+    // ============================================
+    match /stripeEvents/{eventId} {
+      // Only server-side (Admin SDK) can write
+      // No client access needed
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // CHARGEBACKS COLLECTION
+    // ============================================
+    match /chargebacks/{disputeId} {
+      // Only server-side (Admin SDK) can write
+      // Admins can read for dashboard
+      allow read: if isAdmin();
+      allow write: if false; // Server-side only
+    }
+    
+    // ============================================
+    // AUDIT LOGS COLLECTION
+    // ============================================
+    match /auditLogs/{auditId} {
+      // Write-only (server-side only)
+      // Admins can read for accountability
+      allow read: if isAdmin();
+      allow write: if false; // Server-side only (Admin SDK)
+      allow delete: if false; // No deletions allowed
+    }
+
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    match /notifications/{notificationId} {
+      // Allow read: only the recipient can read their notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Allow create: authenticated users (system/client)
+      // NOTE: app logic controls who can create notifications; reads remain recipient-only.
+      allow create: if isAuthenticated();
+
+      // Allow update: only recipient (mark as read)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // No delete allowed
+      allow delete: if false;
+    }
     
     // Deny all other access
     match /{document=**} {

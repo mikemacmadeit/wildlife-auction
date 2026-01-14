@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,6 +22,9 @@ import {
   User,
   LogOut,
   ChevronDown,
+  Heart,
+  Shield,
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,12 +37,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/hooks/use-auth';
+import { useAdmin } from '@/hooks/use-admin';
 import { signOutUser } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
 
 interface SellerNavItem {
   href: string;
@@ -48,16 +54,24 @@ interface SellerNavItem {
   badge?: number;
 }
 
-const navItems: SellerNavItem[] = [
+// Base nav items (always visible)
+const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/seller/listings', label: 'Listings', icon: Package },
+  { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/seller/sales', label: 'Sales & Bids', icon: DollarSign },
   { href: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
   { href: '/seller/logistics', label: 'Logistics', icon: Truck },
-  { href: '/seller/messages', label: 'Messages', icon: MessageSquare, badge: 2 },
+  { href: '/seller/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
   { href: '/dashboard/account', label: 'Settings', icon: Settings },
+];
+
+// Admin nav items (only visible to admins)
+const adminNavItems: SellerNavItem[] = [
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
+  { href: '/dashboard/admin/payouts', label: 'Manage Payouts', icon: Shield },
 ];
 
 export default function SellerLayout({
@@ -68,8 +82,48 @@ export default function SellerLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+
+  // Real-time unread badge for Messages (same source of truth as notifications)
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadMessagesCount(0);
+      return;
+    }
+
+    try {
+      const unsub = subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
+        setUnreadMessagesCount(count || 0);
+      });
+      return () => unsub();
+    } catch (e) {
+      console.error('Failed to subscribe to unread message count:', e);
+      setUnreadMessagesCount(0);
+      return;
+    }
+  }, [user?.uid]);
+
+  // Combine nav items - add admin items if user is admin
+  const navItems = useMemo(() => {
+    if (adminLoading) {
+      return baseNavItems.map((item) =>
+        item.href === '/seller/messages'
+          ? { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined }
+          : item
+      ); // Show base items while loading
+    }
+
+    const withBadges = baseNavItems.map((item) =>
+      item.href === '/seller/messages'
+        ? { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined }
+        : item
+    );
+
+    return isAdmin ? [...withBadges, ...adminNavItems] : withBadges;
+  }, [isAdmin, adminLoading, unreadMessagesCount]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -163,7 +217,7 @@ export default function SellerLayout({
 
         {/* Navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-              {navItems.map((item) => {
+              {baseNavItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
@@ -192,6 +246,56 @@ export default function SellerLayout({
               </Link>
             );
           })}
+          
+          {/* Admin Section */}
+          {!adminLoading && isAdmin && adminNavItems.length > 0 && (
+            <>
+              {!sidebarCollapsed && (
+                <div className="px-3 py-2 mt-2">
+                  <Separator className="mb-2" />
+                  <div className="px-3 py-1.5">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Admin
+                    </span>
+                  </div>
+                </div>
+              )}
+              {sidebarCollapsed && (
+                <div className="px-3 py-2 mt-2">
+                  <Separator />
+                </div>
+              )}
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={true}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold',
+                      'hover:bg-background/50 hover:text-foreground',
+                      'min-h-[44px]',
+                      active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                    )}
+                  >
+                    <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                    {!sidebarCollapsed && (
+                      <span className="flex-1 flex items-center justify-between">
+                        <span>{item.label}</span>
+                        {item.badge && item.badge > 0 && (
+                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* Theme Toggle */}
@@ -332,7 +436,7 @@ export default function SellerLayout({
                   </Button>
                 </div>
                 <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-                  {navItems.map((item) => {
+                  {baseNavItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.href);
                     return (
@@ -357,6 +461,45 @@ export default function SellerLayout({
                       </Link>
                     );
                   })}
+                  
+                  {/* Admin Section in Mobile Menu */}
+                  {!adminLoading && isAdmin && adminNavItems.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 mt-2">
+                        <Separator className="mb-2" />
+                        <div className="px-3 py-1.5">
+                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                            Admin
+                          </span>
+                        </div>
+                      </div>
+                      {adminNavItems.map((item) => {
+                        const Icon = item.icon;
+                        const active = isActive(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                              'hover:bg-background/50',
+                              'min-h-[44px]',
+                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                            )}
+                          >
+                            <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                            <span className="flex-1">{item.label}</span>
+                            {item.badge && item.badge > 0 && (
+                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                {item.badge}
+                              </Badge>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </>
+                  )}
                 </nav>
               </div>
             </SheetContent>

@@ -23,10 +23,16 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { useAuth } from '@/hooks/use-auth';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
-import { Listing, Order } from '@/lib/types';
+import { Listing, Order, UserProfile } from '@/lib/types';
+import { getUserProfile } from '@/lib/firebase/users';
+import { getPlanConfig, canCreateListing, getRemainingListingSlots, hasUnlimitedListings } from '@/lib/pricing/plans';
+import { PlanSavingsCard } from '@/components/seller/PlanSavingsCard';
+import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
+import { Crown, Zap, CreditCard } from 'lucide-react';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -111,7 +117,9 @@ export default function SellerOverviewPage() {
   const { user, loading: authLoading } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch listings and orders
   useEffect(() => {
@@ -123,14 +131,44 @@ export default function SellerOverviewPage() {
 
       try {
         setLoading(true);
-        const [sellerListings, sellerOrders] = await Promise.all([
-          listSellerListings(user.uid),
-          getOrdersForUser(user.uid, 'seller'),
-        ]);
+        setError(null);
+        console.log('Fetching seller data for user:', user.uid);
+        
+        // Fetch listings, orders, and user profile separately to identify which one fails
+        let sellerListings: Listing[] = [];
+        let sellerOrders: Order[] = [];
+        let profile: UserProfile | null = null;
+        
+        try {
+          sellerListings = await listSellerListings(user.uid);
+          console.log('Fetched listings:', sellerListings.length, sellerListings);
+        } catch (listingsError: any) {
+          console.error('Error fetching listings:', listingsError);
+          throw new Error(`Failed to load listings: ${listingsError.message || listingsError.code || 'Unknown error'}`);
+        }
+        
+        try {
+          sellerOrders = await getOrdersForUser(user.uid, 'seller');
+          console.log('Fetched orders:', sellerOrders.length, sellerOrders);
+        } catch (ordersError: any) {
+          console.error('Error fetching orders:', ordersError);
+          // Don't fail completely if orders fail - just log it
+          console.warn('Continuing without orders due to error');
+        }
+        
+        try {
+          profile = await getUserProfile(user.uid);
+        } catch (profileError: any) {
+          console.error('Error fetching user profile:', profileError);
+          // Don't fail completely if profile fails
+        }
+        
         setListings(sellerListings);
         setOrders(sellerOrders);
-      } catch (err) {
+        setUserProfile(profile);
+      } catch (err: any) {
         console.error('Error fetching seller data:', err);
+        setError(err.message || 'Failed to load seller data');
       } finally {
         setLoading(false);
       }
@@ -311,6 +349,20 @@ export default function SellerOverviewPage() {
     );
   }
 
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">Error loading overview</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
@@ -324,13 +376,116 @@ export default function SellerOverviewPage() {
               Daily briefing and action items for your listings
             </p>
           </div>
-          <Button asChild className="min-h-[44px] font-semibold gap-2">
-            <Link href="/seller/listings/new">
-              <Package className="h-4 w-4" />
-              Create Listing
-            </Link>
-          </Button>
+          <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
+            <Package className="h-4 w-4" />
+            Create Listing
+          </CreateListingGateButton>
         </div>
+
+        {/* Subscription Plan Card */}
+        {userProfile && (() => {
+          // Determine effective plan (admin override takes precedence, then subscription status)
+          let planId = userProfile.adminPlanOverride || userProfile.subscriptionPlan || 'free';
+          
+          // If subscription is past_due or canceled, revert to free (unless admin override)
+          if (!userProfile.adminPlanOverride) {
+            const subscriptionStatus = userProfile.subscriptionStatus;
+            if (subscriptionStatus === 'past_due' || subscriptionStatus === 'canceled' || subscriptionStatus === 'unpaid') {
+              planId = 'free';
+            }
+          }
+          
+          const planConfig = getPlanConfig(planId);
+          const activeListings = listings.filter((l) => l.status === 'active');
+          const activeCount = activeListings.length;
+          const limit = planConfig.listingLimit;
+          const remainingSlots = getRemainingListingSlots(planId, activeCount);
+          const isUnlimited = hasUnlimitedListings(planId);
+          const feePercent = userProfile.adminFeeOverride ?? planConfig.takeRate;
+          const subscriptionStatus = userProfile.subscriptionStatus;
+          const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+          const showUpgrade = planId === 'free' || (planId === 'pro' && subscriptionStatus !== 'active');
+          const isPastDue = subscriptionStatus === 'past_due';
+          const hasAdminOverride = !!userProfile.adminPlanOverride || !!userProfile.adminFeeOverride;
+
+          return (
+            <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-background">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {planId === 'elite' ? <Crown className="h-6 w-6 text-primary" /> :
+                     planId === 'pro' ? <Zap className="h-6 w-6 text-primary" /> :
+                     <CreditCard className="h-6 w-6 text-muted-foreground" />}
+                    <div>
+                      <CardTitle className="text-xl font-extrabold">
+                        {planConfig.displayName} Plan
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {hasAdminOverride && (
+                          <Badge variant="outline" className="text-xs mb-1">Admin Override</Badge>
+                        )}
+                        {isActive ? 'Active subscription' : 
+                         planId === 'free' ? 'Free plan' : 
+                         isPastDue ? 'Payment past due - using Free plan rates' :
+                         `Status: ${subscriptionStatus || 'inactive'}`}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  {showUpgrade && (
+                    <Button asChild size="sm" className="font-semibold">
+                      <Link href="/pricing">Upgrade</Link>
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                      Transaction Fee
+                    </p>
+                    <p className="text-2xl font-extrabold text-foreground">
+                      {(feePercent * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                      Active Listings
+                    </p>
+                    <p className="text-2xl font-extrabold text-foreground">
+                      {activeCount} {isUnlimited ? '' : `/ ${limit}`}
+                    </p>
+                    {!isUnlimited && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {remainingSlots !== null && remainingSlots > 0
+                          ? `${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining`
+                          : remainingSlots === 0
+                          ? 'Limit reached'
+                          : ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {!isUnlimited && remainingSlots !== null && remainingSlots === 0 && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm font-semibold text-destructive mb-1">
+                      Listing limit reached
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Upgrade to {planId === 'free' ? 'Pro' : 'Elite'} to create more listings.
+                    </p>
+                    <Button asChild size="sm" variant="destructive" className="mt-2 w-full font-semibold">
+                      <Link href="/pricing">
+                        Upgrade Now
+                        <ArrowRight className="h-3 w-3 ml-1" />
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Status Snapshot Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -370,9 +525,23 @@ export default function SellerOverviewPage() {
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        {/* Payout Readiness and Plan Savings Cards */}
+        {user && userProfile && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <PayoutReadinessCard 
+              userProfile={userProfile} 
+              onRefresh={async () => {
+                const profile = await getUserProfile(user.uid);
+                setUserProfile(profile);
+              }} 
+            />
+            <PlanSavingsCard sellerId={user.uid} days={30} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           {/* Action Required Panel */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-4">
             <Card className="border-2 border-border/50 bg-card">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -402,7 +571,7 @@ export default function SellerOverviewPage() {
                       <div
                         key={alert.id}
                         className={cn(
-                          'flex items-start gap-4 p-4 rounded-lg border-2',
+                          'flex flex-col sm:flex-row items-start gap-4 p-4 rounded-lg border-2',
                           getAlertColor(alert.priority),
                           'hover:shadow-sm cursor-pointer group'
                         )}
@@ -442,7 +611,7 @@ export default function SellerOverviewPage() {
                           asChild
                           variant="outline"
                           size="sm"
-                          className="min-h-[36px] px-3 font-semibold flex-shrink-0"
+                          className="min-h-[36px] px-3 font-semibold flex-shrink-0 w-full sm:w-auto"
                         >
                           <Link href={alert.actionUrl}>
                             {alert.action === 'view' ? 'View' :
@@ -459,7 +628,7 @@ export default function SellerOverviewPage() {
             </Card>
           </div>
 
-          {/* Recent Activity */}
+          {/* Recent Activity & Performance */}
           <div className="space-y-4">
             <Card className="border-2 border-border/50 bg-card">
               <CardHeader>

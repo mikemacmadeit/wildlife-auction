@@ -382,7 +382,6 @@ export default function AccountPage() {
                   {/* Avatar */}
                   <div className="relative group">
                     <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-border/50">
-                      <AvatarImage src="/images/default-avatar.png" alt={formData.fullName} />
                       <AvatarFallback className="text-2xl md:text-3xl font-extrabold bg-primary/10 text-primary">
                         {formData.fullName.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>

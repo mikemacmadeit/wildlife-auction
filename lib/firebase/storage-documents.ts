@@ -1,0 +1,128 @@
+/**
+ * Firebase Storage utilities for compliance documents
+ * 
+ * Storage Path Convention:
+ * listings/{listingId}/documents/{docId}/{filename}
+ * orders/{orderId}/documents/{docId}/{filename}
+ */
+
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { storage } from './config';
+import { nanoid } from 'nanoid';
+
+export interface DocumentUploadProgress {
+  progress: number; // 0-100
+  state: 'running' | 'paused' | 'success' | 'error';
+}
+
+export interface DocumentUploadResult {
+  url: string;
+  path: string;
+  documentId: string;
+}
+
+/**
+ * Upload a compliance document to Firebase Storage
+ * 
+ * @param entityType - 'listing' or 'order'
+ * @param entityId - The listing/order ID
+ * @param file - The document file (PDF, image, etc.)
+ * @param onProgress - Optional progress callback
+ * @returns Promise with upload result
+ */
+export async function uploadComplianceDocument(
+  entityType: 'listing' | 'order',
+  entityId: string,
+  file: File,
+  onProgress?: (progress: DocumentUploadProgress) => void
+): Promise<DocumentUploadResult> {
+  try {
+    // Generate unique document ID
+    const documentId = nanoid();
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+    const fileName = `${documentId}.${fileExtension}`;
+
+    // Create storage reference
+    const storagePath = `${entityType}s/${entityId}/documents/${documentId}/${fileName}`;
+    const storageRef = ref(storage, storagePath);
+
+    // Determine content type
+    let contentType = 'application/pdf';
+    if (file.type.startsWith('image/')) {
+      contentType = file.type;
+    }
+
+    // Upload with progress tracking
+    const uploadTask = uploadBytesResumable(storageRef, file, {
+      contentType,
+    });
+
+    // Set up progress tracking
+    if (onProgress) {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          onProgress({
+            progress,
+            state: snapshot.state as 'running' | 'paused' | 'success' | 'error',
+          });
+        },
+        (error) => {
+          console.error('Document upload error:', error);
+          onProgress({
+            progress: 0,
+            state: 'error',
+          });
+        },
+        () => {
+          onProgress({
+            progress: 100,
+            state: 'success',
+          });
+        }
+      );
+    }
+
+    // Wait for upload to complete
+    await uploadTask;
+
+    // Get download URL
+    const url = await getDownloadURL(uploadTask.snapshot.ref);
+
+    return {
+      url,
+      path: storagePath,
+      documentId,
+    };
+  } catch (error: any) {
+    console.error('Error uploading compliance document:', error);
+    
+    if (error.code) {
+      const enhancedError = new Error(error.message || 'Failed to upload document');
+      (enhancedError as any).code = error.code;
+      throw enhancedError;
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Delete a compliance document from Firebase Storage
+ * 
+ * @param storagePath - The full storage path (e.g., "listings/{id}/documents/{docId}/{filename}")
+ */
+export async function deleteComplianceDocument(storagePath: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, storagePath);
+    await deleteObject(storageRef);
+    console.log('✅ Document deleted from Storage:', storagePath);
+  } catch (error: any) {
+    console.error('Error deleting document from Storage:', error);
+    // If file doesn't exist, that's okay - just log and continue
+    if (error.code !== 'storage/object-not-found') {
+      throw error;
+    }
+  }
+}

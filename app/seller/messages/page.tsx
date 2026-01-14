@@ -25,19 +25,40 @@ import {
 import { cn } from '@/lib/utils';
 import { mockConversations, Conversation, Message } from '@/lib/seller-mock-data';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/hooks/use-auth';
+import { subscribeToUnreadCountByType, markNotificationsAsReadByType } from '@/lib/firebase/notifications';
 
 type FilterType = 'all' | 'unread' | 'archived';
 
 export default function SellerMessagesPage() {
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const { user } = useAuth();
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+
+  // NOTE: This page still uses mock conversations for now; we keep UI stable but
+  // we source the unread badge from real notifications so it matches the sidebar.
+  const [conversations, setConversations] = useState<Conversation[]>(
+    mockConversations.map((c) => ({ ...c, unreadCount: 0 }))
+  );
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(
-    mockConversations[0] || null
+    mockConversations[0] ? { ...mockConversations[0], unreadCount: 0 } : null
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [messageInput, setMessageInput] = useState('');
   const [quickReplySelected, setQuickReplySelected] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Real unread count (message notifications) — this is what the sidebar badge uses too.
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadMessageCount(0);
+      return;
+    }
+    const unsub = subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
+      setUnreadMessageCount(count || 0);
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -121,11 +142,12 @@ export default function SellerMessagesPage() {
   };
 
   const markAsRead = (conversationId: string) => {
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-      )
-    );
+    // Persistently clear unread MESSAGE notifications so counts don't come back on navigation.
+    if (user?.uid) {
+      markNotificationsAsReadByType(user.uid, 'message_received').catch((e) => {
+        console.error('Failed to mark message notifications as read:', e);
+      });
+    }
   };
 
   // Group messages by date
@@ -160,10 +182,7 @@ export default function SellerMessagesPage() {
     "The auction ends soon—place your bid now!",
   ];
 
-  const totalUnread = useMemo(
-    () => conversations.reduce((sum, conv) => sum + conv.unreadCount, 0),
-    [conversations]
-  );
+  const totalUnread = unreadMessageCount;
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
@@ -276,14 +295,7 @@ export default function SellerMessagesPage() {
                                   {conversation.buyer.name}
                                 </p>
                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                  {conversation.unreadCount > 0 && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="h-5 min-w-[20px] px-1.5 text-xs font-semibold"
-                                    >
-                                      {conversation.unreadCount}
-                                    </Badge>
-                                  )}
+                                  {/* Per-conversation unread is not wired to Firestore yet; use the global unread badge in the header/sidebar */}
                                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                                     {formatDistanceToNow(conversation.lastMessageTime, { addSuffix: true })}
                                   </span>
@@ -295,9 +307,7 @@ export default function SellerMessagesPage() {
                               <p
                                 className={cn(
                                   'text-sm truncate',
-                                  conversation.unreadCount > 0
-                                    ? 'text-foreground font-medium'
-                                    : 'text-muted-foreground'
+                                  'text-muted-foreground'
                                 )}
                               >
                                 {conversation.lastMessage}

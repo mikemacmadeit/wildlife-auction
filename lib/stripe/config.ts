@@ -4,29 +4,61 @@
 
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set in environment variables');
+/**
+ * Get Stripe client instance (server-side only)
+ * Returns null if STRIPE_SECRET_KEY is not configured
+ * Use this for all Stripe API calls
+ */
+function getStripeClient(): Stripe | null {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return null;
+  }
+  
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    typescript: true,
+    // Let Stripe use the account's default API version
+  });
 }
 
 /**
  * Stripe client instance (server-side only)
+ * Will be null if STRIPE_SECRET_KEY is not set
  * Use this for all Stripe API calls
  */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  typescript: true,
-  // Let Stripe use the account's default API version
-});
+export const stripe = getStripeClient();
+
+/**
+ * Check if Stripe is configured
+ */
+export function isStripeConfigured(): boolean {
+  return stripe !== null;
+}
 
 /**
  * Platform commission percentage (5%)
+ * @deprecated Use getPlanTakeRate() and calculatePlatformFeeForPlan() instead
+ * This is kept for backward compatibility but will default to 5% if plan is not provided
  */
 export const PLATFORM_COMMISSION_PERCENT = 0.05;
 
 /**
  * Calculate platform fee (application fee) for a given amount
+ * @deprecated Use calculatePlatformFeeForPlan() instead to support plan-based fees
  */
 export function calculatePlatformFee(amount: number): number {
   return Math.round(amount * PLATFORM_COMMISSION_PERCENT);
+}
+
+/**
+ * Calculate platform fee based on seller's plan
+ * @param amount - Amount in cents
+ * @param planId - Seller's plan ID ('free' | 'pro' | 'elite')
+ * @returns Platform fee in cents
+ */
+export function calculatePlatformFeeForPlan(amount: number, planId: string | null | undefined): number {
+  const { getPlanTakeRate } = require('@/lib/pricing/plans');
+  const takeRate = getPlanTakeRate(planId);
+  return Math.round(amount * takeRate);
 }
 
 /**

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Edit, Pause, TrendingUp, Copy, CheckCircle2, MoreVertical, X } from 'lucide-react';
+import { Edit, Pause, TrendingUp, Copy, CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ListingRowActionsProps {
@@ -12,7 +12,7 @@ interface ListingRowActionsProps {
   onPause?: () => void;
   onPromote?: () => void;
   onDuplicate?: () => void;
-  onMarkSold?: () => void;
+  onDelete?: () => void;
 }
 
 const ListingRowActions = memo(function ListingRowActions({
@@ -21,7 +21,7 @@ const ListingRowActions = memo(function ListingRowActions({
   onPause,
   onPromote,
   onDuplicate,
-  onMarkSold,
+  onDelete,
 }: ListingRowActionsProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -118,16 +118,28 @@ const ListingRowActions = memo(function ListingRowActions({
             <Copy className="h-4 w-4" />
             Duplicate
           </button>
+          {status === 'draft' && (
+            <button
+              onClick={() => {
+                onPromote?.();
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer text-left"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Publish
+            </button>
+          )}
           <div className="h-px bg-border/50 my-1" />
           <button
             onClick={() => {
-              onMarkSold?.();
+              onDelete?.();
               setOpen(false);
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer text-left"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 cursor-pointer text-left"
           >
-            <CheckCircle2 className="h-4 w-4" />
-            Mark Sold
+            <Trash2 className="h-4 w-4" />
+            Delete
           </button>
         </div>
       )}

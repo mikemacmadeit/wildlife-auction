@@ -1,0 +1,216 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MessageSquare, Send, AlertTriangle, Flag } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { Message, MessageThread } from '@/lib/types';
+import { subscribeToThreadMessages, sendMessage, markThreadAsRead, flagThread } from '@/lib/firebase/messages';
+import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+interface MessageThreadProps {
+  thread: MessageThread;
+  listingTitle: string;
+  otherPartyName: string;
+  otherPartyAvatar?: string;
+  orderStatus?: 'pending' | 'paid' | 'completed';
+}
+
+export function MessageThreadComponent({
+  thread,
+  listingTitle,
+  otherPartyName,
+  otherPartyAvatar,
+  orderStatus,
+}: MessageThreadProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageInput, setMessageInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [isPaid, setIsPaid] = useState(orderStatus === 'paid' || orderStatus === 'completed');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to messages
+  useEffect(() => {
+    if (!thread.id) return;
+
+    const unsubscribe = subscribeToThreadMessages(thread.id, (newMessages) => {
+      setMessages(newMessages);
+      // Mark as read when viewing
+      if (user) {
+        markThreadAsRead(thread.id, user.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [thread.id, user]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Update paid status
+  useEffect(() => {
+    setIsPaid(orderStatus === 'paid' || orderStatus === 'completed');
+  }, [orderStatus]);
+
+  const handleSend = async () => {
+    if (!messageInput.trim() || !user || sending) return;
+
+    setSending(true);
+    try {
+      await sendMessage(
+        thread.id,
+        user.uid,
+        user.uid === thread.buyerId ? thread.sellerId : thread.buyerId,
+        thread.listingId,
+        messageInput.trim(),
+        orderStatus
+      );
+      setMessageInput('');
+    } catch (error: any) {
+      toast({
+        title: 'Error sending message',
+        description: error.message || 'Failed to send message',
+        variant: 'destructive',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleFlag = async () => {
+    if (!user) return;
+    try {
+      await flagThread(thread.id, user.uid);
+      toast({
+        title: 'Thread flagged',
+        description: 'This conversation has been flagged for admin review.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to flag thread',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="border-b p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Avatar>
+            <AvatarImage src={otherPartyAvatar} />
+            <AvatarFallback>{otherPartyName.substring(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="font-semibold">{otherPartyName}</p>
+            <p className="text-sm text-muted-foreground">{listingTitle}</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleFlag}>
+          <Flag className="h-4 w-4 mr-2" />
+          Report
+        </Button>
+      </div>
+
+      {/* Safety Notice */}
+      {!isPaid && (
+        <Alert className="m-4 border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-sm">
+            <strong>For your safety:</strong> Keep communication and payment on Wildlife Exchange. 
+            Contact info unlocks after payment is completed.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No messages yet. Start the conversation!</p>
+          </div>
+        ) : (
+          messages.map((message) => {
+            const isSender = message.senderId === user?.uid;
+            return (
+              <div
+                key={message.id}
+                className={cn('flex gap-2', isSender ? 'justify-end' : 'justify-start')}
+              >
+                {!isSender && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={otherPartyAvatar} />
+                    <AvatarFallback>{otherPartyName.substring(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                )}
+                <div
+                  className={cn(
+                    'max-w-[75%] rounded-lg p-3',
+                    isSender
+                      ? 'bg-primary/10 border border-primary/20'
+                      : 'bg-muted border border-border'
+                  )}
+                >
+                  <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                  {message.wasRedacted && (
+                    <Badge variant="outline" className="mt-2 text-xs">
+                      Contact details redacted
+                    </Badge>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDistanceToNow(message.createdAt, { addSuffix: true })}
+                  </p>
+                </div>
+                {isSender && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary/20">You</AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t p-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Type your message..."
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            disabled={sending}
+          />
+          <Button onClick={handleSend} disabled={!messageInput.trim() || sending}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+        {!isPaid && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Contact details are hidden until payment is completed.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

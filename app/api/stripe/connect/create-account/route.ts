@@ -9,45 +9,95 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { stripe } from '@/lib/stripe/config';
+import { stripe, isStripeConfigured } from '@/lib/stripe/config';
+import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 
 // Initialize Firebase Admin (if not already initialized)
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        }
-      : undefined;
+let adminApp: App | null = null;
+let auth: ReturnType<typeof getAuth> | null = null;
+let db: ReturnType<typeof getFirestore> | null = null;
 
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      // Try Application Default Credentials (for production)
-      try {
-        adminApp = initializeApp();
-      } catch {
-        throw new Error('Failed to initialize Firebase Admin SDK');
-      }
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
+function initializeFirebaseAdmin() {
+  if (adminApp) {
+    return { auth: auth!, db: db! };
   }
-} else {
-  adminApp = getApps()[0];
-}
 
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
+  if (!getApps().length) {
+    try {
+      const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
+        ? {
+            projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          }
+        : undefined;
+
+      if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
+        adminApp = initializeApp({
+          credential: cert(serviceAccount as any),
+        });
+      } else {
+        // Try Application Default Credentials (for production)
+        try {
+          adminApp = initializeApp();
+        } catch (error) {
+          console.error('Firebase Admin initialization error:', error);
+          throw new Error('Failed to initialize Firebase Admin SDK - missing credentials');
+        }
+      }
+    } catch (error) {
+      console.error('Firebase Admin initialization error:', error);
+      throw error;
+    }
+  } else {
+    adminApp = getApps()[0];
+  }
+
+  auth = getAuth(adminApp);
+  db = getFirestore(adminApp);
+  return { auth, db };
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Stripe is configured
+    if (!isStripeConfigured() || !stripe) {
+      return NextResponse.json(
+        { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.' },
+        { status: 503 }
+      );
+    }
+
+    // Rate limiting (Stripe operations)
+    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.stripe);
+    const rateLimitResult = await rateLimitCheck(request);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(rateLimitResult.body, { 
+        status: rateLimitResult.status,
+        headers: {
+          'Retry-After': rateLimitResult.body.retryAfter.toString(),
+        },
+      });
+    }
+
+    // Initialize Firebase Admin (inside handler to catch errors gracefully)
+    let firebaseAdmin;
+    try {
+      firebaseAdmin = initializeFirebaseAdmin();
+    } catch (error: any) {
+      console.error('Failed to initialize Firebase Admin:', error);
+      return NextResponse.json(
+        {
+          error: 'Server configuration error',
+          message: 'Failed to initialize Firebase Admin SDK. Please check server logs.',
+          details: error?.message || 'Unknown error',
+        },
+        { status: 500 }
+      );
+    }
+
+    const { auth, db } = firebaseAdmin;
+
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -61,9 +111,13 @@ export async function POST(request: NextRequest) {
     let decodedToken;
     try {
       decodedToken = await auth.verifyIdToken(token);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Token verification error:', error?.code || error?.message || error);
       return NextResponse.json(
-        { error: 'Unauthorized - Invalid token' },
+        { 
+          error: 'Unauthorized - Invalid token',
+          details: error?.code || error?.message || 'Token verification failed'
+        },
         { status: 401 }
       );
     }
@@ -85,15 +139,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Stripe Connect Express account
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'US', // Default to US, can be made configurable
-      email: decodedToken.email || undefined,
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-    });
+    let account;
+    try {
+      account = await stripe.accounts.create({
+        type: 'express',
+        country: 'US', // Default to US, can be made configurable
+        email: decodedToken.email || undefined,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+      });
+    } catch (stripeError: any) {
+      console.error('Stripe API error:', {
+        code: stripeError?.code,
+        type: stripeError?.type,
+        message: stripeError?.message,
+        raw: stripeError,
+      });
+      throw stripeError;
+    }
 
     // Save Stripe account ID to user document
     const updateData: any = {
@@ -123,11 +188,22 @@ export async function POST(request: NextRequest) {
       message: 'Stripe account created successfully',
     });
   } catch (error: any) {
-    console.error('Error creating Stripe account:', error);
+    console.error('=== ERROR CREATING STRIPE ACCOUNT ===');
+    console.error('Error type:', typeof error);
+    console.error('Error message:', error?.message);
+    console.error('Error code:', error?.code);
+    console.error('Error type (Stripe):', error?.type);
+    console.error('Full error:', JSON.stringify(error, null, 2));
+    console.error('Error stack:', error?.stack);
+    console.error('=====================================');
+    
     return NextResponse.json(
       {
         error: 'Failed to create Stripe account',
-        message: error.message || 'Unknown error',
+        message: error?.message || error?.toString() || 'Unknown error',
+        code: error?.code,
+        type: error?.type,
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
       },
       { status: 500 }
     );

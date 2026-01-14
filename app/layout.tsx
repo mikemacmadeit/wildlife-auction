@@ -3,10 +3,12 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import { ConditionalNavbar } from '@/components/navigation/ConditionalNavbar';
+import { ConditionalFooter } from '@/components/navigation/ConditionalFooter';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { Providers } from '@/components/providers';
+import { PublicEmailCaptureMount } from '@/components/marketing/PublicEmailCaptureMount';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -72,11 +74,12 @@ export const metadata: Metadata = {
     // Uncomment when Twitter image is added
     // images: ['/images/og-image.jpg'],
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -107,9 +110,11 @@ export default function RootLayout({
               />
             </div>
             <ConditionalNavbar />
+            <PublicEmailCaptureMount />
             <main className="flex-1 relative z-10">
               {children}
             </main>
+            <ConditionalFooter />
             <Toaster />
             <SonnerToaster />
           </div>

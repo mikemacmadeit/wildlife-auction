@@ -19,7 +19,9 @@ import {
   Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { PLAN_CONFIG, getPlanConfig, type PlanId } from '@/lib/pricing/plans';
 
 export default function PricingPage() {
   const containerVariants = {
@@ -45,36 +47,40 @@ export default function PricingPage() {
 
   const pricingTiers = [
     {
-      name: 'Starter',
+      id: 'free' as PlanId,
+      name: PLAN_CONFIG.free.displayName,
       description: 'Best for occasional listings',
-      price: 0,
-      priceLabel: 'Free',
-      period: '',
+      price: PLAN_CONFIG.free.monthlyPrice,
+      priceLabel: PLAN_CONFIG.free.monthlyPrice === 0 ? 'Free' : `$${PLAN_CONFIG.free.monthlyPrice}`,
+      period: PLAN_CONFIG.free.monthlyPrice === 0 ? '' : '/month',
       icon: Gavel,
       gradient: 'from-secondary to-secondary/90',
       borderColor: 'border-primary/20',
       badge: null,
       features: [
-        'X active listings',
+        `${PLAN_CONFIG.free.listingLimit} active listings`,
+        `${(PLAN_CONFIG.free.takeRate * 100).toFixed(0)}% transaction fee`,
         'Standard listing visibility',
         'Basic seller profile',
         'Standard support',
       ],
-      cta: 'Start Starter',
+      cta: 'Start Free',
       popular: false,
     },
     {
-      name: 'Pro',
+      id: 'pro' as PlanId,
+      name: PLAN_CONFIG.pro.displayName,
       description: 'Best for active breeders',
-      price: 49,
-      priceLabel: '$49',
+      price: PLAN_CONFIG.pro.monthlyPrice,
+      priceLabel: `$${PLAN_CONFIG.pro.monthlyPrice}`,
       period: '/month',
       icon: TrendingUp,
       gradient: 'from-primary to-primary/90',
       borderColor: 'border-primary/30',
       badge: 'Most Popular',
       features: [
-        'More active listings',
+        `${PLAN_CONFIG.pro.listingLimit} active listings`,
+        `${(PLAN_CONFIG.pro.takeRate * 100).toFixed(0)}% transaction fee`,
         'Featured placement options',
         'Basic analytics',
         'Priority support',
@@ -83,17 +89,19 @@ export default function PricingPage() {
       popular: true,
     },
     {
-      name: 'Ranch / Broker',
+      id: 'elite' as PlanId,
+      name: PLAN_CONFIG.elite.displayName,
       description: 'Best for ranches and high volume',
-      price: 199,
-      priceLabel: '$199',
+      price: PLAN_CONFIG.elite.monthlyPrice,
+      priceLabel: `$${PLAN_CONFIG.elite.monthlyPrice}`,
       period: '/month',
       icon: Crown,
       gradient: 'from-secondary to-secondary/90',
       borderColor: 'border-primary/20',
       badge: null,
       features: [
-        'Highest limits',
+        'Unlimited active listings',
+        `${(PLAN_CONFIG.elite.takeRate * 100).toFixed(0)}% transaction fee`,
         'Priority support',
         'Broker tools (coming soon)',
         'Custom pricing available',
@@ -107,7 +115,7 @@ export default function PricingPage() {
     {
       type: 'Auction Listing',
       description: 'Set starting bid and let buyers compete',
-      fee: '3% of final bid',
+      fee: '4-7% of final bid (varies by plan)',
       minimum: '$50 minimum',
       featured: '+$25',
       icon: Gavel,
@@ -118,7 +126,7 @@ export default function PricingPage() {
     {
       type: 'Fixed Price',
       description: 'Set your price and sell instantly',
-      fee: '3% of sale price',
+      fee: '4-7% of sale price (varies by plan)',
       minimum: '$50 minimum',
       featured: '+$25',
       icon: CheckCircle2,
@@ -339,8 +347,8 @@ export default function PricingPage() {
                         ))}
                       </div>
 
-                      <Button
-                        asChild
+                      <CreateListingGateButton
+                        href="/dashboard/listings/new"
                         className={cn(
                           'w-full min-h-[52px] font-bold text-base',
                           tier.popular
@@ -349,11 +357,9 @@ export default function PricingPage() {
                           'transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]'
                         )}
                       >
-                        <Link href="/dashboard/listings/new" className="flex items-center justify-center gap-2">
-                          {tier.cta}
-                          <ArrowRight className="h-5 w-5" />
-                        </Link>
-                      </Button>
+                        {tier.cta}
+                        <ArrowRight className="h-5 w-5" />
+                      </CreateListingGateButton>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -586,8 +592,8 @@ export default function PricingPage() {
                 Reach serious buyers across Texas.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                <Button 
-                  asChild 
+                <CreateListingGateButton
+                  href="/dashboard/listings/new"
                   size="lg"
                   className={cn(
                     'min-h-[56px] min-w-[220px] text-lg font-semibold',
@@ -596,11 +602,9 @@ export default function PricingPage() {
                     'transition-all duration-300'
                   )}
                 >
-                  <Link href="/dashboard/listings/new" className="flex items-center justify-center gap-2">
-                    <Zap className="h-5 w-5" />
-                    Create a Listing
-                  </Link>
-                </Button>
+                  <Zap className="h-5 w-5" />
+                  Create a Listing
+                </CreateListingGateButton>
                 <Button 
                   asChild 
                   variant="outline" 

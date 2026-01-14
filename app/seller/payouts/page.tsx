@@ -25,7 +25,7 @@ import { mockPayouts, Payout } from '@/lib/seller-mock-data';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
-import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
+import { createStripeAccount, createAccountLink, checkStripeAccountStatus } from '@/lib/stripe/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SellerPayoutsPage() {
@@ -41,15 +41,28 @@ export default function SellerPayoutsPage() {
   // Check for onboarding completion
   useEffect(() => {
     const onboardingComplete = searchParams?.get('onboarding');
-    if (onboardingComplete === 'complete') {
-      toast({
-        title: 'Onboarding Complete!',
-        description: 'Your Stripe account is now set up. You can receive payouts.',
-      });
-      // Refresh profile to get updated status
-      if (user) {
-        loadUserProfile();
-      }
+    if (onboardingComplete === 'complete' && user) {
+      // Check Stripe account status and update Firestore
+      const checkStatus = async () => {
+        try {
+          await checkStripeAccountStatus();
+          toast({
+            title: 'Onboarding Complete!',
+            description: 'Your Stripe account is now set up. You can receive payouts.',
+          });
+          // Refresh profile to get updated status
+          await loadUserProfile();
+        } catch (error: any) {
+          console.error('Error checking account status:', error);
+          // Still refresh profile in case status was updated
+          await loadUserProfile();
+          toast({
+            title: 'Onboarding Complete',
+            description: 'Please refresh the page to see your updated status.',
+          });
+        }
+      };
+      checkStatus();
     }
   }, [searchParams, toast, user]);
 
@@ -59,6 +72,25 @@ export default function SellerPayoutsPage() {
       loadUserProfile();
     }
   }, [user, authLoading]);
+
+  // Check Stripe account status after profile loads
+  useEffect(() => {
+    if (userProfile?.stripeAccountId && !userProfile?.payoutsEnabled) {
+      // Automatically check status if user has account but payouts aren't enabled
+      const checkStatus = async () => {
+        try {
+          await checkStripeAccountStatus();
+          await loadUserProfile(); // Reload to get updated status
+        } catch (error) {
+          // Silently fail - status check is optional
+          console.error('Error checking account status:', error);
+        }
+      };
+      // Small delay to avoid race conditions
+      const timer = setTimeout(checkStatus, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [userProfile?.stripeAccountId, userProfile?.payoutsEnabled]);
 
   const loadUserProfile = async () => {
     if (!user) return;
@@ -108,10 +140,26 @@ export default function SellerPayoutsPage() {
       // Redirect to Stripe onboarding
       window.location.href = url;
     } catch (error: any) {
-      console.error('Error enabling payouts:', error);
+      // Check if it's a Stripe configuration error
+      const errorMessage = error?.message || String(error) || 'Failed to enable payouts. Please try again.';
+      const isStripeNotConfigured = 
+        errorMessage.includes('Stripe is not configured') || 
+        errorMessage.includes('STRIPE_SECRET_KEY') ||
+        errorMessage.includes('stripe') && errorMessage.includes('not configured');
+      
+      // Only log unexpected errors, not configuration issues
+      if (!isStripeNotConfigured) {
+        console.error('Error enabling payouts:', error);
+      } else {
+        // Silently handle expected configuration errors
+        // No console logging for expected Stripe configuration issues
+      }
+      
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to enable payouts. Please try again.',
+        title: isStripeNotConfigured ? 'Stripe Not Configured' : 'Error',
+        description: isStripeNotConfigured 
+          ? 'Payment processing is currently unavailable. Please contact support or try again later.'
+          : errorMessage,
         variant: 'destructive',
       });
       setIsCreatingAccount(false);
@@ -297,35 +345,166 @@ export default function SellerPayoutsPage() {
                   </div>
                 </div>
                 {!isPayoutsEnabled && (
-                  <Button
-                    onClick={handleEnablePayouts}
-                    disabled={isCreatingAccount || isCreatingLink}
-                    className="min-h-[48px] min-w-[180px]"
-                  >
-                    {isCreatingAccount || isCreatingLink ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isCreatingAccount ? 'Creating Account...' : 'Redirecting...'}
-                      </>
-                    ) : onboardingStatus === 'pending' ? (
-                      'Complete Onboarding'
-                    ) : (
-                      'Enable Payouts'
+                  <div className="flex gap-2 flex-wrap">
+                    {userProfile?.stripeAccountId && (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            setIsCreatingLink(true);
+                            const result = await checkStripeAccountStatus();
+                            await loadUserProfile();
+                            
+                            // Show detailed status
+                            if (result.status.payoutsEnabled) {
+                              toast({
+                                title: 'Payouts Enabled!',
+                                description: 'Your Stripe account is ready to receive payouts.',
+                              });
+                            } else {
+                              let description = `Account status: ${result.status.onboardingStatus}. `;
+                              
+                              // Log full status for debugging
+                              console.log('Stripe Account Status:', {
+                                payoutsEnabled: result.status.payoutsEnabled,
+                                chargesEnabled: result.status.chargesEnabled,
+                                detailsSubmitted: result.status.detailsSubmitted,
+                                requirementsDue: result.status.requirementsDue,
+                                requirementsPending: result.status.requirementsPending,
+                                capabilities: result.status.capabilities,
+                                debug: result.debug,
+                              });
+                              
+                              if (result.status.hasPendingRequirements) {
+                                const requirements = result.status.requirementsDue || [];
+                                const pending = result.status.requirementsPending || [];
+                                if (requirements.length > 0) {
+                                  description += `Missing: ${requirements.slice(0, 3).join(', ')}. `;
+                                }
+                                if (pending.length > 0) {
+                                  description += `Pending verification: ${pending.slice(0, 2).join(', ')}. `;
+                                }
+                                description += 'Check Stripe Dashboard for details.';
+                              } else if (result.status.detailsSubmitted) {
+                                description += `Details submitted. Charges: ${result.status.chargesEnabled ? 'enabled' : 'disabled'}, Payouts: ${result.status.payoutsEnabled ? 'enabled' : 'disabled'}. `;
+                                if (!result.status.payoutsEnabled) {
+                                  description += 'Payouts may need manual activation in Stripe Dashboard.';
+                                }
+                              } else {
+                                description += 'Please complete all onboarding steps.';
+                              }
+                              
+                              toast({
+                                title: 'Status Checked',
+                                description,
+                                variant: result.status.detailsSubmitted ? 'default' : 'destructive',
+                                duration: 10000, // Show longer for important info
+                              });
+                            }
+                          } catch (error: any) {
+                            console.error('Error checking account status:', error);
+                            toast({
+                              title: 'Error',
+                              description: error.message || 'Failed to check account status. Please try again.',
+                              variant: 'destructive',
+                            });
+                          } finally {
+                            setIsCreatingLink(false);
+                          }
+                        }}
+                        variant="outline"
+                        disabled={isCreatingLink}
+                        className="min-h-[48px]"
+                      >
+                        {isCreatingLink ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Checking...
+                          </>
+                        ) : (
+                          'Refresh Status'
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      onClick={handleEnablePayouts}
+                      disabled={isCreatingAccount || isCreatingLink}
+                      className="min-h-[48px] min-w-[180px]"
+                    >
+                      {isCreatingAccount || isCreatingLink ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {isCreatingAccount ? 'Creating Account...' : 'Redirecting...'}
+                        </>
+                      ) : onboardingStatus === 'pending' ? (
+                        'Complete Onboarding'
+                      ) : (
+                        'Enable Payouts'
+                      )}
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardHeader>
             {!isPayoutsEnabled && (
               <CardContent>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>To receive payouts, you need to:</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Create a Stripe Connect Express account</li>
-                    <li>Complete the onboarding process (takes ~5 minutes)</li>
-                    <li>Provide business information and bank details</li>
-                  </ul>
-                  <p className="pt-2 text-xs">
+                <div className="space-y-4 text-sm">
+                  <div className="space-y-2 text-muted-foreground">
+                    <p>To receive payouts, you need to:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>Create a Stripe Connect Express account</li>
+                      <li>Complete the onboarding process (takes ~5 minutes)</li>
+                      <li>Provide business information and bank details</li>
+                    </ul>
+                  </div>
+                  
+                  {userProfile?.stripeAccountId && userProfile?.stripeDetailsSubmitted && !userProfile?.payoutsEnabled && (
+                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md">
+                      <p className="font-semibold text-foreground mb-2">Additional Information Required</p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Your account needs additional verification to enable payouts. Common missing items:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground ml-2 mb-3">
+                        <li>Individual ID Number (SSN in US, or equivalent)</li>
+                        <li>Bank account information</li>
+                        <li>Business verification (if applicable)</li>
+                      </ul>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleEnablePayouts}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                        >
+                          Complete Onboarding
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            try {
+                              setIsCreatingLink(true);
+                              const { url } = await createAccountLink();
+                              window.location.href = url;
+                            } catch (error: any) {
+                              toast({
+                                title: 'Error',
+                                description: error.message || 'Failed to create onboarding link.',
+                                variant: 'destructive',
+                              });
+                            } finally {
+                              setIsCreatingLink(false);
+                            }
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          disabled={isCreatingLink}
+                        >
+                          {isCreatingLink ? 'Loading...' : 'Continue Onboarding'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <p className="pt-2 text-xs text-muted-foreground">
                     Wildlife Exchange takes a 5% platform fee on each transaction. The remaining amount is transferred directly to your bank account.
                   </p>
                 </div>
@@ -390,8 +569,8 @@ export default function SellerPayoutsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
                 <p className="text-sm font-semibold text-foreground mb-1">Transaction Fee</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">5%</p>
-                <p className="text-xs text-muted-foreground">Applied to completed sales</p>
+                <p className="text-2xl font-extrabold text-primary mb-1">4-7%</p>
+                <p className="text-xs text-muted-foreground">Varies by plan (Free: 7%, Pro: 6%, Elite: 4%)</p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
                 <p className="text-sm font-semibold text-foreground mb-1">Subscription</p>

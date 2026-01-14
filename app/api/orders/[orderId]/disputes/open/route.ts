@@ -1,0 +1,294 @@
+/**
+ * POST /api/orders/[orderId]/disputes/open
+ * 
+ * Buyer opens a protected transaction dispute
+ * Requires evidence and validates time windows
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { DisputeReason, DisputeEvidence } from '@/lib/types';
+import { z } from 'zod';
+import { createAuditLog } from '@/lib/audit/logger';
+
+// Initialize Firebase Admin
+let adminApp: App | undefined;
+let auth: ReturnType<typeof getAuth>;
+let db: ReturnType<typeof getFirestore>;
+
+async function initializeFirebaseAdmin() {
+  if (!adminApp) {
+    if (!getApps().length) {
+      try {
+        const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
+          ? {
+              projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+              clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+              privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            }
+          : undefined;
+
+        if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
+          adminApp = initializeApp({
+            credential: cert(serviceAccount as any),
+          });
+        } else {
+          adminApp = initializeApp();
+        }
+      } catch (error) {
+        console.error('Firebase Admin initialization error:', error);
+        throw error;
+      }
+    } else {
+      adminApp = getApps()[0];
+    }
+  }
+  auth = getAuth(adminApp);
+  db = getFirestore(adminApp);
+  return { auth, db };
+}
+
+const disputeSchema = z.object({
+  reason: z.enum(['death', 'serious_illness', 'injury', 'escape', 'wrong_animal']),
+  notes: z.string().max(1000).optional(),
+  evidence: z.array(z.object({
+    type: z.enum(['photo', 'video', 'vet_report', 'delivery_doc', 'tag_microchip']),
+    url: z.string().url(),
+  })).min(1, 'At least one evidence item is required'),
+});
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { orderId: string } }
+) {
+  try {
+    const { auth, db } = await initializeFirebaseAdmin();
+
+    // Rate limiting
+    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
+    const rateLimitResult = await rateLimitCheck(request);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(rateLimitResult.body, {
+        status: rateLimitResult.status,
+        headers: {
+          'Retry-After': rateLimitResult.body.retryAfter.toString(),
+        },
+      });
+    }
+
+    // Get auth token
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
+    }
+
+    const buyerId = decodedToken.uid;
+    const orderId = params.orderId;
+
+    // Parse and validate request body
+    const body = await request.json();
+    const validation = disputeSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: validation.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { reason, notes, evidence } = validation.data;
+
+    // Get order
+    const orderRef = db.collection('orders').doc(orderId);
+    const orderDoc = await orderRef.get();
+
+    if (!orderDoc.exists) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    const orderData = orderDoc.data()!;
+
+    // Verify buyer owns this order
+    if (orderData.buyerId !== buyerId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - You can only dispute your own orders' },
+        { status: 403 }
+      );
+    }
+
+    // Check if protected transaction is enabled
+    if (!orderData.protectedTransactionDaysSnapshot) {
+      return NextResponse.json(
+        { error: 'Protected transaction not enabled for this order' },
+        { status: 400 }
+      );
+    }
+
+    // Check if delivery was confirmed
+    if (!orderData.deliveryConfirmedAt) {
+      return NextResponse.json(
+        { error: 'Delivery not confirmed yet' },
+        { status: 400 }
+      );
+    }
+
+    // Check if protection window has ended
+    if (orderData.protectionEndsAt) {
+      const protectionEnds = orderData.protectionEndsAt.toDate();
+      if (protectionEnds.getTime() < Date.now()) {
+        return NextResponse.json(
+          { error: 'Protection window has ended' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Check if dispute already exists
+    if (orderData.protectedDisputeStatus && orderData.protectedDisputeStatus !== 'none') {
+      return NextResponse.json(
+        { error: 'Dispute already exists for this order' },
+        { status: 400 }
+      );
+    }
+
+    // Check buyer protection eligibility
+    const buyerRef = db.collection('users').doc(buyerId);
+    const buyerDoc = await buyerRef.get();
+    const buyerData = buyerDoc.exists ? buyerDoc.data() : {};
+    
+    if (buyerData?.buyerProtectionEligible === false) {
+      return NextResponse.json(
+        { error: 'You are not eligible for protected transactions due to previous fraudulent claims' },
+        { status: 403 }
+      );
+    }
+
+    // Validate time windows based on reason
+    const deliveryConfirmedAt = orderData.deliveryConfirmedAt.toDate();
+    const hoursSinceDelivery = (Date.now() - deliveryConfirmedAt.getTime()) / (1000 * 60 * 60);
+    
+    if (reason === 'death' && hoursSinceDelivery > 48) {
+      return NextResponse.json(
+        { error: 'Death claims must be filed within 48 hours of delivery' },
+        { status: 400 }
+      );
+    }
+    
+    if (reason === 'wrong_animal' && hoursSinceDelivery > 24) {
+      return NextResponse.json(
+        { error: 'Wrong animal claims must be filed within 24 hours of delivery' },
+        { status: 400 }
+      );
+    }
+    
+    if ((reason === 'injury' || reason === 'escape') && hoursSinceDelivery > 72) {
+      return NextResponse.json(
+        { error: `${reason === 'injury' ? 'Injury' : 'Escape'} claims must be filed within 72 hours of delivery` },
+        { status: 400 }
+      );
+    }
+
+    // Check evidence requirements
+    const hasPhotoOrVideo = evidence.some(e => e.type === 'photo' || e.type === 'video');
+    if (!hasPhotoOrVideo) {
+      return NextResponse.json(
+        { error: 'At least one photo or video is required' },
+        { status: 400 }
+      );
+    }
+
+    // For death/serious_illness, require vet report (can be uploaded later)
+    const needsVetReport = (reason === 'death' || reason === 'serious_illness');
+    const hasVetReport = evidence.some(e => e.type === 'vet_report');
+    
+    const disputeStatus = needsVetReport && !hasVetReport ? 'needs_evidence' : 'open';
+
+    // Prepare evidence with timestamps
+    const evidenceWithTimestamps: DisputeEvidence[] = evidence.map(e => ({
+      type: e.type,
+      url: e.url,
+      uploadedAt: new Date(),
+    }));
+
+    // Capture before state for audit
+    const beforeState = {
+      protectedDisputeStatus: orderData.protectedDisputeStatus || 'none',
+      payoutHoldReason: orderData.payoutHoldReason,
+    };
+
+    // Update order
+    const now = new Date();
+    await orderRef.update({
+      protectedDisputeStatus: disputeStatus,
+      protectedDisputeReason: reason,
+      protectedDisputeNotes: notes || null,
+      protectedDisputeEvidence: evidenceWithTimestamps,
+      disputeOpenedAt: now,
+      payoutHoldReason: 'dispute_open',
+      updatedAt: now,
+      lastUpdatedByRole: 'buyer',
+    });
+
+    // Increment buyer claims count
+    const currentClaimsCount = buyerData?.buyerClaimsCount || 0;
+    await buyerRef.update({
+      buyerClaimsCount: currentClaimsCount + 1,
+      updatedAt: Timestamp.now(),
+    });
+
+    // Create audit log
+    await createAuditLog(db, {
+      actorUid: buyerId,
+      actorRole: 'buyer',
+      actionType: 'dispute_opened',
+      orderId: orderId,
+      listingId: orderData.listingId,
+      beforeState,
+      afterState: {
+        protectedDisputeStatus: disputeStatus,
+        payoutHoldReason: 'dispute_open',
+        disputeOpenedAt: now,
+      },
+      metadata: {
+        reason,
+        evidenceCount: evidence.length,
+        needsVetReport: needsVetReport && !hasVetReport,
+      },
+      source: 'buyer_ui',
+    });
+
+    return NextResponse.json({
+      success: true,
+      orderId,
+      disputeStatus,
+      message: disputeStatus === 'needs_evidence' 
+        ? 'Dispute opened. Please upload vet report within 48 hours.'
+        : 'Dispute opened successfully. Admin will review.',
+    });
+  } catch (error: any) {
+    console.error('Error opening dispute:', error);
+    return NextResponse.json(
+      { error: 'Failed to open dispute', message: error.message },
+      { status: 500 }
+    );
+  }
+}

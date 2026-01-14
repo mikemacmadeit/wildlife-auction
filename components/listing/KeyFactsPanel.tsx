@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Listing } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 
 interface KeyFactsPanelProps {
   listing: Listing;
@@ -47,30 +47,78 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         ? `${Math.floor((Date.now() - new Date(listing.createdAt).getTime()) / (1000 * 60 * 60 * 24))} days ago`
         : undefined,
     },
-    listing.metadata?.breed && {
+    // Category-specific attributes
+    listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).species && {
       icon: Package,
-      label: 'Breed/Species',
-      value: listing.metadata.breed,
-      detail: listing.metadata.age || undefined,
+      label: 'Species',
+      value: (listing.attributes as WildlifeAttributes).species,
+      detail: (listing.attributes as WildlifeAttributes).age || undefined,
     },
-    listing.metadata?.quantity && {
+    listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).sex && {
+      icon: Package,
+      label: 'Sex',
+      value: (listing.attributes as WildlifeAttributes).sex === 'male' ? 'Male' : (listing.attributes as WildlifeAttributes).sex === 'female' ? 'Female' : 'Unknown',
+    },
+    listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).quantity && {
       icon: Package,
       label: 'Quantity',
-      value: `${listing.metadata.quantity} ${listing.metadata.quantity === 1 ? 'item' : 'items'}`,
+      value: `${(listing.attributes as WildlifeAttributes).quantity} ${(listing.attributes as WildlifeAttributes).quantity === 1 ? 'item' : 'items'}`,
     },
-    listing.metadata?.healthStatus && {
-      icon: Heart,
-      label: 'Health Status',
-      value: listing.metadata.healthStatus,
-      badge: listing.metadata.healthStatus.toLowerCase().includes('excellent') 
-        ? { variant: 'default' as const, label: 'Excellent', color: 'bg-accent/20 text-accent border-accent/40' }
+    listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).breed && {
+      icon: Package,
+      label: 'Breed',
+      value: (listing.attributes as CattleAttributes).breed,
+      detail: (listing.attributes as CattleAttributes).age || undefined,
+    },
+    listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).sex && {
+      icon: Package,
+      label: 'Sex',
+      value: (listing.attributes as CattleAttributes).sex === 'bull' ? 'Bull' : 
+             (listing.attributes as CattleAttributes).sex === 'cow' ? 'Cow' : 
+             (listing.attributes as CattleAttributes).sex === 'heifer' ? 'Heifer' : 
+             (listing.attributes as CattleAttributes).sex === 'steer' ? 'Steer' : 'Unknown',
+    },
+    listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).registered !== undefined && {
+      icon: FileText,
+      label: 'Registered',
+      value: (listing.attributes as CattleAttributes).registered ? 'Yes' : 'No',
+      badge: (listing.attributes as CattleAttributes).registered 
+        ? { variant: 'default' as const, label: 'Certified', color: 'bg-primary/20 text-primary border-primary/40' }
         : undefined,
     },
-    listing.metadata?.papers && {
-      icon: FileText,
-      label: 'Papers',
-      value: 'Yes - Registered',
-      badge: { variant: 'default' as const, label: 'Certified', color: 'bg-primary/20 text-primary border-primary/40' },
+    listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as CattleAttributes).quantity} ${(listing.attributes as CattleAttributes).quantity === 1 ? 'head' : 'head'}`,
+    },
+    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).equipmentType && {
+      icon: Package,
+      label: 'Type',
+      value: (listing.attributes as EquipmentAttributes).equipmentType,
+      detail: (listing.attributes as EquipmentAttributes).make && (listing.attributes as EquipmentAttributes).model 
+        ? `${(listing.attributes as EquipmentAttributes).make} ${(listing.attributes as EquipmentAttributes).model}`
+        : undefined,
+    },
+    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).year && {
+      icon: Calendar,
+      label: 'Year',
+      value: `${(listing.attributes as EquipmentAttributes).year}`,
+    },
+    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).condition && {
+      icon: Package,
+      label: 'Condition',
+      value: (listing.attributes as EquipmentAttributes).condition === 'new' ? 'New' :
+             (listing.attributes as EquipmentAttributes).condition === 'excellent' ? 'Excellent' :
+             (listing.attributes as EquipmentAttributes).condition === 'good' ? 'Good' :
+             (listing.attributes as EquipmentAttributes).condition === 'fair' ? 'Fair' : 'For Parts',
+      badge: (listing.attributes as EquipmentAttributes).condition === 'new' || (listing.attributes as EquipmentAttributes).condition === 'excellent'
+        ? { variant: 'default' as const, label: (listing.attributes as EquipmentAttributes).condition === 'new' ? 'New' : 'Excellent', color: 'bg-accent/20 text-accent border-accent/40' }
+        : undefined,
+    },
+    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as EquipmentAttributes).quantity} ${(listing.attributes as EquipmentAttributes).quantity === 1 ? 'item' : 'items'}`,
     },
     listing.trust?.insuranceAvailable && {
       icon: Shield,

@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { stripe, getAppUrl } from '@/lib/stripe/config';
+import { stripe, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
 
 // Initialize Firebase Admin (if not already initialized)
 let adminApp: App;
@@ -48,6 +48,14 @@ const db = getFirestore(adminApp);
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Stripe is configured
+    if (!isStripeConfigured() || !stripe) {
+      return NextResponse.json(
+        { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.' },
+        { status: 503 }
+      );
+    }
+
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

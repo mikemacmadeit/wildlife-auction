@@ -6,8 +6,9 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, LayoutGrid, List } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, LayoutGrid, List, FileCheck } from 'lucide-react';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
+import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { listActiveListings } from '@/lib/firebase/listings';
@@ -94,8 +95,7 @@ export default function HomePage() {
             src="/images/Buck_1.webp"
             alt="Wildlife Exchange Hero Background"
             fill
-            className="object-cover"
-            style={{ objectPosition: '50% 20%' }}
+            className="object-cover object-[50%_20%]"
             priority
             quality={90}
             sizes="100vw"
@@ -114,20 +114,7 @@ export default function HomePage() {
           >
             <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
               <div className="relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
-                <div
-                  className="h-full w-full"
-                  style={{
-                    backgroundColor: 'hsl(37 27% 70%)',
-                    maskImage: 'url(/images/Kudu.png)',
-                    maskSize: 'contain',
-                    maskRepeat: 'no-repeat',
-                    maskPosition: 'center',
-                    WebkitMaskImage: 'url(/images/Kudu.png)',
-                    WebkitMaskSize: 'contain',
-                    WebkitMaskRepeat: 'no-repeat',
-                    WebkitMaskPosition: 'center',
-                  }}
-                />
+                <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
                 Wildlife Exchange
@@ -143,11 +130,14 @@ export default function HomePage() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm">
-                <Link href="/dashboard/listings/new">
-                  List an Animal
-                </Link>
-              </Button>
+              <CreateListingGateButton
+                href="/dashboard/listings/new"
+                variant="outline"
+                size="lg"
+                className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+              >
+                List an Animal
+              </CreateListingGateButton>
             </div>
           </motion.div>
         </div>
@@ -159,7 +149,7 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {[
               { icon: Shield, text: 'Verified Sellers', color: 'text-primary' },
-              { icon: TrendingUp, text: 'Market Insights', color: 'text-primary' },
+              { icon: FileCheck, text: 'TPWD Compliant', color: 'text-primary' },
               { icon: Users, text: 'Trusted Community', color: 'text-primary' },
               { icon: Gavel, text: 'Secure Auctions', color: 'text-primary' },
             ].map((item, idx) => (
@@ -178,6 +168,122 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Category Tiles */}
+      <section className="py-12 md:py-16 bg-background border-b border-border/50">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 text-center"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">
+              Browse by Category
+            </h2>
+            <p className="text-muted-foreground text-base md:text-lg">
+              Explore our marketplace by category
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            {/* Whitetail Breeder - First priority */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Link href="/browse?category=whitetail_breeder">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div className="w-24 h-24 icon-primary-color mask-icon-whitetail-breeder" />
+                    </div>
+                    <h3 className="text-xl font-bold">Whitetail Breeder</h3>
+                    <p className="text-sm text-muted-foreground">
+                      TPWD-permitted breeder deer with verified genetics and health records
+                    </p>
+                    <Button variant="outline" className="mt-4">
+                      Browse <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Wildlife & Exotics */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Link href="/browse?category=wildlife_exotics">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div className="w-24 h-24 icon-primary-color mask-icon-fallow" />
+                    </div>
+                    <h3 className="text-xl font-bold">Wildlife & Exotics</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Axis deer, blackbuck, fallow deer, and other exotic species
+                    </p>
+                    <Button variant="outline" className="mt-4">
+                      Browse <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Cattle & Livestock */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Link href="/browse?category=cattle_livestock">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div className="w-24 h-24 icon-primary-color mask-icon-bull" />
+                    </div>
+                    <h3 className="text-xl font-bold">Cattle & Livestock</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Cattle, bulls, cows, heifers, and registered livestock
+                    </p>
+                    <Button variant="outline" className="mt-4">
+                      Browse <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Ranch Equipment */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <Link href="/browse?category=ranch_equipment">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div className="w-24 h-24 icon-primary-color mask-icon-tractor" />
+                    </div>
+                    <h3 className="text-xl font-bold">Ranch Equipment</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Tractors, skid steers, UTVs, trailers, and ranch equipment
+                    </p>
+                    <Button variant="outline" className="mt-4">
+                      Browse <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Featured Listings */}
       {!loading && featuredListings.length > 0 && (
         <section className="py-12 md:py-16 bg-background">
@@ -187,7 +293,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               className="mb-8"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-founders), sans-serif' }}>
+              <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">
                 Featured Listings
               </h2>
               <p className="text-muted-foreground text-base md:text-lg">
@@ -216,7 +322,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-founders), sans-serif' }}>
+              <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">
                 Recent Listings
               </h2>
               <p className="text-muted-foreground text-base md:text-lg">
@@ -296,33 +402,63 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-12 md:py-16 bg-primary/5 border-t border-border/50">
-        <div className="container mx-auto px-4 text-center">
+      <section className="py-12 md:py-16 border-t border-border/50 bg-gradient-to-b from-primary/5 via-background to-background">
+        <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
+            className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-sm"
           >
-            <Zap className="h-12 w-12 mx-auto mb-4 text-primary" />
-            <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: 'var(--font-founders), sans-serif' }}>
-              Ready to Buy or Sell?
-            </h2>
-            <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-              Join Texas's premier marketplace for exotic animals and breeder stock. List your animals today or browse our curated selection.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button asChild size="lg" className="min-h-[56px] min-w-[220px] text-lg font-semibold">
-                <Link href="/browse">
-                  Browse Listings
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="min-h-[56px] min-w-[220px] text-lg font-semibold">
-                <Link href="/dashboard/listings/new">
+            {/* Decorative glows */}
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+              <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+            </div>
+
+            <div className="relative p-6 sm:p-10 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/15 mb-5">
+                <Zap className="h-7 w-7 text-primary" />
+              </div>
+
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 font-founders">
+                Ready to buy or sell?
+              </h2>
+              <p className="text-muted-foreground text-lg mb-6 max-w-2xl mx-auto">
+                List whitetail breeder stock, Texas exotics, cattle, and ranch equipment—built for trust and compliance.
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-7">
+                <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
+                  Texas-only for animal transactions
+                </span>
+                <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
+                  Escrow + payout gating
+                </span>
+                <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
+                  Equipment can be multi-state
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild size="lg" className="min-h-[56px] min-w-[220px] text-base font-semibold">
+                  <Link href="/browse">
+                    Browse Listings
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+
+                {/* IMPORTANT: Don't wrap CreateListingGateButton in another Button (it already renders a Button). */}
+                <CreateListingGateButton
+                  href="/dashboard/listings/new"
+                  variant="outline"
+                  size="lg"
+                  className="min-h-[56px] min-w-[220px] text-base font-semibold"
+                >
                   Create Listing
-                </Link>
-              </Button>
+                </CreateListingGateButton>
+              </div>
             </div>
           </motion.div>
         </div>

@@ -3,14 +3,105 @@
 export type ListingType = 'auction' | 'fixed' | 'classified';
 
 export type ListingCategory = 
-  | 'cattle' 
-  | 'horses' 
-  | 'wildlife' 
-  | 'equipment' 
-  | 'land' 
+  | 'whitetail_breeder'
+  | 'wildlife_exotics' 
+  | 'cattle_livestock' 
+  | 'ranch_equipment';
+
+export type ListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'removed';
+
+export type ComplianceStatus = 'none' | 'pending_review' | 'approved' | 'rejected';
+
+// Category-specific attribute types
+export interface WhitetailBreederAttributes {
+  speciesId: 'whitetail_deer'; // Fixed enum
+  sex: 'male' | 'female' | 'unknown'; // Required
+  age?: string; // Optional
+  quantity: number; // Required, default 1
+  tpwdBreederPermitNumber: string; // Required
+  breederFacilityId: string; // Required
+  /**
+   * Permit expiration date (required).
+   * Stored in Firestore as a Timestamp (or Date), converted to Date in UI mapping.
+   */
+  tpwdPermitExpirationDate: Date;
+  deerIdTag: string; // Required (or structured identifier)
+  cwdDisclosureChecklist: {
+    cwdAware: boolean; // Seller acknowledges CWD rules
+    cwdCompliant: boolean; // Seller confirms compliance
+  };
+  healthNotes?: string; // Optional
+}
+
+export interface WildlifeAttributes {
+  speciesId: string; // Controlled list: axis, fallow, blackbuck, aoudad, nilgai, etc. or 'other_exotic'
+  sex: 'male' | 'female' | 'unknown'; // Required
+  age?: string; // Optional
+  quantity: number; // Required, default 1
+  locationType?: 'seller_location' | 'facility'; // Optional
+  animalIdDisclosure: boolean; // Required: seller confirms animals are properly identified/tagged
+  healthDisclosure: boolean; // Required: health disclosure acknowledged
+  healthNotes?: string; // Optional
+  transportDisclosure: boolean; // Required: TX-only transfer unless otherwise permitted
+}
+
+export interface CattleAttributes {
+  breed: string; // Required
+  sex: 'bull' | 'cow' | 'heifer' | 'steer' | 'unknown'; // Required
+  age?: string; // Optional (one of age or weightRange required)
+  weightRange?: string; // Optional, ex "1100-1250 lbs" (one of age or weightRange required)
+  registered: boolean; // Required
+  registrationNumber?: string; // Required if registered=true
+  pregChecked?: boolean; // Optional
+  quantity: number; // Required, default 1
+  identificationDisclosure: boolean; // Required: ear tags/brand present
+  healthDisclosure: boolean; // Required: health disclosure acknowledged
+  healthNotes?: string; // Optional
+}
+
+export type EquipmentType = 
+  | 'tractor'
+  | 'trailer'
+  | 'utv'
+  | 'atv'
+  | 'skidsteer'
+  | 'implement'
+  | 'feeder'
+  | 'fencing'
   | 'other';
 
-export type ListingStatus = 'draft' | 'active' | 'sold' | 'expired' | 'removed';
+export interface EquipmentAttributes {
+  equipmentType: EquipmentType; // Required enum
+  make?: string;
+  model?: string;
+  year?: number;
+  hours?: number;
+  condition: 'new' | 'excellent' | 'good' | 'fair' | 'for_parts'; // Required
+  serialNumber?: string; // Optional
+  hasTitle?: boolean; // Required if equipmentType in [utv, atv, truck, trailer]
+  vinOrSerial?: string; // Required if equipmentType in [utv, atv, truck, trailer]
+  quantity: number; // Required, default 1
+}
+
+// Union type for category-specific attributes
+export type ListingAttributes = WhitetailBreederAttributes | WildlifeAttributes | CattleAttributes | EquipmentAttributes;
+
+// Exotic species controlled list
+export const EXOTIC_SPECIES = [
+  'axis',
+  'fallow',
+  'blackbuck',
+  'aoudad',
+  'nilgai',
+  'scimitar_horned_oryx',
+  'addax',
+  'greater_kudu',
+  'red_stag',
+  'sika',
+  'other_exotic' // Requires admin review
+] as const;
+
+export type ExoticSpecies = typeof EXOTIC_SPECIES[number];
 
 /**
  * Listing type for UI consumption
@@ -69,14 +160,9 @@ export interface Listing {
     transportReady: boolean;
   };
   
-  // Metadata (searchable fields)
-  metadata?: {
-    quantity?: number;
-    breed?: string;
-    age?: string;
-    healthStatus?: string;
-    papers?: boolean;
-  };
+  // Category-specific attributes (replaces old metadata)
+  subcategory?: string; // Optional subcategory within the 3 top categories
+  attributes: ListingAttributes; // Category-specific structured attributes
   
   // Auction-specific
   endsAt?: Date; // Auction end time
@@ -98,6 +184,33 @@ export interface Listing {
   createdBy: string; // Firebase Auth UID
   updatedBy?: string; // Firebase Auth UID
   publishedAt?: Date; // When status changed to 'active'
+  
+  // Protected Transaction (Seller-selected protection)
+  protectedTransactionEnabled?: boolean;
+  protectedTransactionDays?: 7 | 14 | null;
+  protectedTransactionBadge?: 'PROTECTED_7' | 'PROTECTED_14' | null;
+  protectedTermsVersion?: string; // e.g., "v1"
+  protectedEnabledAt?: Date; // When seller enabled protection
+  
+  // Compliance fields
+  complianceStatus?: ComplianceStatus; // Compliance review status
+  complianceRejectionReason?: string; // Reason if rejected
+  complianceReviewedBy?: string; // Admin UID who reviewed
+  complianceReviewedAt?: Date; // When reviewed
+
+  // Whitetail-only seller attestation (top-level; not shown as "TPWD approved")
+  sellerAttestationAccepted?: boolean;
+  sellerAttestationAcceptedAt?: Date;
+
+  // Admin-only internal guardrails (never show publicly)
+  internalFlags?: {
+    duplicatePermitNumber?: boolean;
+    duplicateFacilityId?: boolean;
+  };
+  internalFlagsNotes?: {
+    duplicatePermitNumber?: string;
+    duplicateFacilityId?: string;
+  };
 }
 
 export interface Bid {
@@ -108,7 +221,19 @@ export interface Bid {
   timestamp: Date;
 }
 
-export type OrderStatus = 'pending' | 'paid' | 'completed' | 'refunded' | 'cancelled';
+export type OrderStatus = 'pending' | 'paid' | 'in_transit' | 'delivered' | 'accepted' | 'disputed' | 'completed' | 'refunded' | 'cancelled' | 'ready_to_release';
+
+export type DisputeReason = 'death' | 'serious_illness' | 'injury' | 'escape' | 'wrong_animal';
+
+export type DisputeStatus = 'none' | 'open' | 'needs_evidence' | 'under_review' | 'resolved_refund' | 'resolved_partial_refund' | 'resolved_release' | 'cancelled';
+
+export type PayoutHoldReason = 'none' | 'protection_window' | 'dispute_open';
+
+export interface DisputeEvidence {
+  type: 'photo' | 'video' | 'vet_report' | 'delivery_doc' | 'tag_microchip';
+  url: string;
+  uploadedAt: Date;
+}
 
 export interface Order {
   id: string;
@@ -122,9 +247,53 @@ export interface Order {
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;
   stripeTransferId?: string;
+  stripeRefundId?: string; // Stripe refund ID
+  sellerStripeAccountId?: string; // Seller's Stripe Connect account ID (for escrow transfers)
+  releasedBy?: string; // Admin UID who released the payment
+  releasedAt?: Date; // When payment was released
+  refundedBy?: string; // Admin UID who processed the refund
+  refundedAt?: Date; // When refund was processed
+  refundReason?: string; // Reason for refund
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
+  
+  // Escrow workflow fields
+  paidAt?: Date; // When payment was captured
+  disputeDeadlineAt?: Date; // Deadline for buyer to dispute
+  deliveredAt?: Date; // When seller marked as delivered
+  acceptedAt?: Date; // When buyer accepted/received
+  disputedAt?: Date; // When buyer opened dispute
+  disputeReason?: string; // Reason for dispute (legacy, string-based)
+  disputeNotes?: string; // Additional dispute details (used for both regular and protected disputes)
+  deliveryProofUrls?: string[]; // Optional delivery proof images/links
+  adminHold?: boolean; // Admin flag to prevent auto-release
+  adminHoldReason?: string; // Reason for admin hold
+  adminActionNotes?: Array<{
+    reason: string;
+    notes?: string;
+    actorUid: string;
+    createdAt: Date;
+    action: string;
+  }>; // Audit trail of admin actions
+  lastUpdatedByRole?: 'buyer' | 'seller' | 'admin'; // Who last updated this order
+  
+  // Protected Transaction fields
+  deliveryConfirmedAt?: Date; // When delivery was confirmed (admin/ops)
+  protectionStartAt?: Date; // When protection window starts
+  protectionEndsAt?: Date; // When protection window ends
+  buyerAcceptedAt?: Date; // When buyer accepted early (releases funds)
+  disputeOpenedAt?: Date; // When buyer opened a protected transaction dispute
+  disputeReasonV2?: DisputeReason; // Protected transaction dispute reason (v2 enum-based)
+  disputeStatus?: DisputeStatus; // Protected transaction dispute status
+  disputeEvidence?: DisputeEvidence[]; // Evidence uploaded for dispute
+  payoutHoldReason?: PayoutHoldReason; // Why payout is held
+  protectedTransactionDaysSnapshot?: 7 | 14 | null; // Snapshot of listing protection days at purchase
+  protectedTermsVersion?: string; // Snapshot of terms version at purchase
+  
+  // Compliance fields for orders
+  transferPermitStatus?: 'none' | 'requested' | 'uploaded' | 'approved' | 'rejected'; // TPWD transfer approval status
+  transferPermitRequired?: boolean; // Whether transfer permit is required for this order
 }
 
 export interface FilterState {
@@ -157,6 +326,8 @@ export interface InsuranceTier {
 }
 
 // User Profile Types
+export type UserRole = 'user' | 'admin' | 'super_admin';
+
 export interface UserProfile {
   userId: string; // Firebase Auth UID
   email: string;
@@ -164,8 +335,20 @@ export interface UserProfile {
   photoURL?: string;
   phoneNumber?: string;
   emailVerified: boolean;
-  superAdmin?: boolean; // Super admin flag
+  role?: UserRole; // User role: 'user' (default), 'admin', 'super_admin'
+  superAdmin?: boolean; // Legacy super admin flag (deprecated - use role instead)
   profileComplete?: boolean; // Flag to track if profile completion modal was shown/completed
+  subscriptionPlan?: string; // Seller subscription plan: 'free' | 'pro' | 'elite' (defaults to 'free' if not set)
+  stripeCustomerId?: string; // Stripe Customer ID for subscriptions
+  stripeSubscriptionId?: string; // Active Stripe Subscription ID
+  subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'unpaid' | null; // Subscription status from Stripe
+  subscriptionCurrentPeriodEnd?: Date; // Current billing period end date
+  subscriptionCancelAtPeriodEnd?: boolean; // Whether subscription is set to cancel at period end
+  adminPlanOverride?: string; // Admin override plan (if set, takes precedence)
+  adminFeeOverride?: number; // Admin override fee percent (0.07 = 7%, if set, takes precedence)
+  adminOverrideReason?: string; // Reason for admin override
+  adminOverrideBy?: string; // Admin UID who set override
+  adminOverrideAt?: Date; // When override was set
   
   // Extended Profile Data
   profile?: {
@@ -174,7 +357,7 @@ export interface UserProfile {
     bio?: string;
     location: {
       city: string;
-      state: string;
+      state: string; // Required for TX-only animal transactions
       zip: string;
       address?: string;
     };
@@ -217,4 +400,113 @@ export interface UserProfile {
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt?: Date;
+  
+  // Seller Stats (tied to on-platform transactions)
+  completedSalesCount?: number; // Number of completed on-platform transactions
+  totalListingsCount?: number; // Total listings created
+  completionRate?: number; // completedSalesCount / totalListingsCount (percentage)
+  verifiedTransactionsCount?: number; // Same as completedSalesCount for now
+}
+
+// Message Thread Types
+export type NotificationType = 
+  | 'message_received'
+  | 'bid_received'
+  | 'bid_outbid'
+  | 'order_created'
+  | 'order_paid'
+  | 'order_completed'
+  | 'order_disputed'
+  | 'listing_approved'
+  | 'listing_rejected'
+  | 'payout_released'
+  | 'compliance_approved'
+  | 'compliance_rejected';
+
+export interface Notification {
+  id: string;
+  userId: string; // Recipient user ID
+  type: NotificationType;
+  title: string;
+  body: string;
+  read: boolean;
+  readAt?: Date;
+  createdAt: Date;
+  // Context data for navigation/actions
+  linkUrl?: string; // URL to navigate to when clicked
+  linkLabel?: string; // Label for the link
+  // Entity references
+  listingId?: string;
+  orderId?: string;
+  threadId?: string;
+  bidId?: string;
+  // Metadata
+  metadata?: Record<string, any>;
+}
+
+export interface MessageThread {
+  id: string;
+  listingId: string;
+  buyerId: string;
+  sellerId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastMessageAt?: Date;
+  lastMessagePreview?: string;
+  unreadCount?: number; // Per participant
+  buyerUnreadCount?: number;
+  sellerUnreadCount?: number;
+  flagged?: boolean; // Flagged for admin review
+  violationCount?: number; // Total violations detected
+  archived?: boolean;
+}
+
+export interface Message {
+  id: string;
+  threadId: string;
+  senderId: string;
+  recipientId: string;
+  listingId: string;
+  body: string; // Sanitized body (what user sees)
+  originalBody?: string; // Original body (stored only if needed for admin review)
+  createdAt: Date;
+  readAt?: Date;
+  flagged?: boolean; // Flagged for admin review
+  wasRedacted?: boolean; // Whether this message was sanitized
+  violationCount?: number; // Number of violations detected
+  detectedViolations?: {
+    phone: boolean;
+    email: boolean;
+    paymentKeywords: string[];
+  };
+}
+
+// Document Types (for permits, CVIs, etc.)
+export type DocumentType = 
+  | 'TPWD_BREEDER_PERMIT'
+  | 'TPWD_TRANSFER_APPROVAL'
+  | 'TAHC_CVI'
+  | 'BRAND_INSPECTION'
+  | 'TITLE'
+  | 'BILL_OF_SALE'
+  | 'HEALTH_CERTIFICATE'
+  | 'OTHER';
+
+export type DocumentStatus = 'uploaded' | 'verified' | 'rejected';
+
+export interface ComplianceDocument {
+  id: string;
+  type: DocumentType;
+  documentUrl: string; // Firebase Storage URL
+  permitNumber?: string; // Permit/license number if applicable
+  issuedBy?: string; // Issuing authority
+  issuedAt?: Date; // Issue date
+  expiresAt?: Date; // Expiration date if applicable
+  status: DocumentStatus;
+  verifiedBy?: string; // Admin UID who verified
+  verifiedAt?: Date; // When verified
+  rejectionReason?: string; // Reason if rejected
+  uploadedBy: string; // User UID who uploaded
+  uploadedAt: Date; // When uploaded
+  metadata?: Record<string, any>; // Additional metadata
 }

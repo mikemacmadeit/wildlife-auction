@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -24,6 +24,10 @@ import {
   ChevronDown,
   Search,
   Home,
+  Heart,
+  Shield,
+  CheckCircle,
+  HeartPulse,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,12 +40,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/hooks/use-auth';
+import { useAdmin } from '@/hooks/use-admin';
 import { signOutUser } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { db } from '@/lib/firebase/config';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
 
 interface DashboardNavItem {
   href: string;
@@ -50,16 +59,29 @@ interface DashboardNavItem {
   badge?: number;
 }
 
-const navItems: DashboardNavItem[] = [
+// Base nav items (always visible)
+const baseNavItems: DashboardNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/seller/listings', label: 'Listings', icon: Package },
+  { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/seller/sales', label: 'Sales & Bids', icon: DollarSign },
   { href: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
   { href: '/seller/logistics', label: 'Logistics', icon: Truck },
-  { href: '/seller/messages', label: 'Messages', icon: MessageSquare, badge: 2 },
+  { href: '/seller/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
   { href: '/dashboard/account', label: 'Settings', icon: Settings },
+];
+
+// Admin nav items (only visible to admins)
+const adminNavItems: DashboardNavItem[] = [
+  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
+  { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
+  { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
+  { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
+  { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
+  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
 ];
 
 export default function DashboardLayout({
@@ -70,8 +92,91 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { isAdmin, loading: adminLoading, role } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+
+  // IMPORTANT: Don't gate admin nav rendering on adminLoading/authLoading.
+  // We only show admin items once isAdmin flips true, and we keep them visible thereafter.
+  const showAdminNav = isAdmin === true;
+
+  // Real-time badges (unread messages/notifications + pending approvals)
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadCount(0);
+      setPendingApprovalsCount(0);
+      return;
+    }
+
+    const unsubs: Array<() => void> = [];
+
+    // 1) Messages badge: unread MESSAGE notifications only (keeps sidebar consistent with Messages page)
+    try {
+      unsubs.push(
+        subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
+          setUnreadCount(count || 0);
+        })
+      );
+    } catch (e) {
+      console.error('Failed to subscribe to unread notifications count:', e);
+    }
+
+    // 2) Admin badge: pending listing approvals (drops as listings are approved/rejected)
+    if (showAdminNav) {
+      try {
+        const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
+        unsubs.push(
+          onSnapshot(
+            qPending,
+            (snap) => setPendingApprovalsCount(snap.size || 0),
+            (err) => {
+              console.error('Failed to subscribe to pending listings:', err);
+              setPendingApprovalsCount(0);
+            }
+          )
+        );
+      } catch (e) {
+        console.error('Failed to subscribe to pending listings:', e);
+      }
+    }
+
+    return () => {
+      unsubs.forEach((fn) => {
+        try {
+          fn();
+        } catch {}
+      });
+    };
+  }, [user?.uid, showAdminNav]);
+
+  // Combine nav items - add admin items if user is admin
+  // Use useMemo to ensure it updates when isAdmin changes
+  const navItems = useMemo(() => {
+    // Always include base items
+    const items = baseNavItems.map((item) => {
+      if (item.href === '/seller/messages') {
+        return { ...item, badge: unreadCount > 0 ? unreadCount : undefined };
+      }
+      return item;
+    });
+    
+    // Add admin items as soon as we know the user is admin.
+    // Do NOT wait on adminLoading here; it can lag behind isAdmin due to authLoading.
+    if (showAdminNav) {
+      items.push(
+        ...adminNavItems.map((item) => {
+          if (item.href === '/dashboard/admin/listings') {
+            return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
+          }
+          return item;
+        })
+      );
+    }
+    
+    return items;
+  }, [showAdminNav, unreadCount, pendingApprovalsCount]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -172,7 +277,7 @@ export default function DashboardLayout({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {navItems.map((item) => {
+          {baseNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
@@ -201,6 +306,56 @@ export default function DashboardLayout({
               </Link>
             );
           })}
+          
+          {/* Admin Section */}
+          {showAdminNav && (
+            <>
+              {!sidebarCollapsed && (
+                <div className="px-3 py-2 mt-2">
+                  <Separator className="mb-2" />
+                  <div className="px-3 py-1.5">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Admin
+                    </span>
+                  </div>
+                </div>
+              )}
+              {sidebarCollapsed && (
+                <div className="px-3 py-2 mt-2">
+                  <Separator />
+                </div>
+              )}
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={true}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold',
+                      'hover:bg-background/50 hover:text-foreground',
+                      'min-h-[44px]',
+                      active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                    )}
+                  >
+                    <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                    {!sidebarCollapsed && (
+                      <span className="flex-1 flex items-center justify-between">
+                        <span>{item.label}</span>
+                        {item.badge && item.badge > 0 && (
+                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* Theme Toggle */}

@@ -44,7 +44,8 @@ export function reportError(
     timestamp: new Date().toISOString(),
   });
 
-  // TODO: Integrate with Sentry
+  // Sentry integration available in lib/monitoring/sentry.ts
+  // Import and use reportError from that file when Sentry is installed
   // if (typeof window !== 'undefined' && window.Sentry) {
   //   window.Sentry.captureException(errorObj, {
   //     level: severity === 'critical' ? 'error' : 'warning',

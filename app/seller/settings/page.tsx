@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,12 +21,72 @@ import {
   Shield,
   Mail,
   Phone,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { getUserProfile } from '@/lib/firebase/users';
+import { listSellerListings } from '@/lib/firebase/listings';
+import { UserProfile, Listing } from '@/lib/types';
+import { PlanCard } from '@/components/seller/PlanCard';
+import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 
 export default function SellerSettingsPage() {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [activeListings, setActiveListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch user profile and listings
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const [profile, listings] = await Promise.all([
+          getUserProfile(user.uid),
+          listSellerListings(user.uid),
+        ]);
+        setUserProfile(profile);
+        setActiveListings(listings.filter((l) => l.status === 'active'));
+      } catch (error: any) {
+        console.error('Error fetching seller data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load seller data',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [user, authLoading, toast]);
+
+  const handleRefresh = async () => {
+    if (user) {
+      try {
+        const [profile, listings] = await Promise.all([
+          getUserProfile(user.uid),
+          listSellerListings(user.uid),
+        ]);
+        setUserProfile(profile);
+        setActiveListings(listings.filter((l) => l.status === 'active'));
+      } catch (error: any) {
+        console.error('Error refreshing seller data:', error);
+      }
+    }
+  };
+
   const [formData, setFormData] = useState({
     businessName: 'Hill Country Exotics',
     ranchName: 'Hill Country Ranch',
@@ -43,10 +103,10 @@ export default function SellerSettingsPage() {
       promotions: false,
     },
     subscription: {
-      plan: 'Pro',
+      plan: 'Free',
       status: 'Active',
-      listingsLimit: 50,
-      featuredIncluded: true,
+      listingsLimit: 3,
+      featuredIncluded: false,
     },
     payout: {
       method: 'bank_account',
@@ -55,13 +115,6 @@ export default function SellerSettingsPage() {
       lastFour: '1234',
     },
   });
-
-  const handleSave = () => {
-    toast({
-      title: 'Settings saved',
-      description: 'Your seller settings have been updated successfully.',
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
@@ -76,13 +129,14 @@ export default function SellerSettingsPage() {
               Manage your business profile, locations, and preferences
             </p>
           </div>
-          <Button onClick={handleSave} className="min-h-[44px] font-semibold">
-            Save Changes
-          </Button>
         </div>
 
-        <Tabs defaultValue="business" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-auto bg-card border border-border/50 p-1">
+        <Tabs defaultValue="billing" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 h-auto bg-card border border-border/50 p-1">
+            <TabsTrigger value="billing" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Billing & Plan
+            </TabsTrigger>
             <TabsTrigger value="business" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
               <Building2 className="h-4 w-4 mr-2" />
               Business
@@ -100,6 +154,31 @@ export default function SellerSettingsPage() {
               Payouts
             </TabsTrigger>
           </TabsList>
+
+          {/* Billing & Plan Tab */}
+          <TabsContent value="billing" className="space-y-6 mt-6">
+            {loading ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : userProfile ? (
+              <PlanCard
+                userProfile={userProfile}
+                activeListingsCount={activeListings.length}
+                onUpdate={handleRefresh}
+              />
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-muted-foreground">Unable to load plan information</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
           {/* Business Profile Tab */}
           <TabsContent value="business" className="space-y-6 mt-6">
@@ -139,33 +218,6 @@ export default function SellerSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-border/50 bg-card">
-              <CardHeader>
-                <CardTitle className="text-xl">Subscription Plan</CardTitle>
-                <CardDescription>
-                  Current plan and features
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">{formData.subscription.plan} Plan</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formData.subscription.listingsLimit} active listings • Featured placement included
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="font-semibold">
-                    {formData.subscription.status}
-                  </Badge>
-                </div>
-                <Button variant="outline" className="w-full min-h-[44px] font-semibold gap-2" asChild>
-                  <Link href="/pricing">
-                    <CreditCard className="h-4 w-4" />
-                    Manage Subscription
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Locations Tab */}
@@ -302,36 +354,26 @@ export default function SellerSettingsPage() {
 
           {/* Payouts Tab */}
           <TabsContent value="payouts" className="space-y-6 mt-6">
-            <Card className="border-2 border-border/50 bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <CreditCard className="h-5 w-5" />
-                  Payout Preferences
-                </CardTitle>
-                <CardDescription>
-                  Manage how you receive payouts
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="font-semibold text-foreground">{formData.payout.bankName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formData.payout.accountType} • •••• {formData.payout.lastFour}
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm" className="min-h-[36px] font-semibold text-xs">
-                      Update
-                    </Button>
+            {loading ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                </div>
-                <Button variant="outline" className="w-full min-h-[44px] font-semibold gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Add Payment Method
-                </Button>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : userProfile ? (
+              <PayoutReadinessCard 
+                userProfile={userProfile} 
+                onRefresh={handleRefresh}
+              />
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-muted-foreground">Unable to load payout information</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

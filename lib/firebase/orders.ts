@@ -28,13 +28,47 @@ export interface OrderDoc {
   amount: number;
   platformFee: number;
   sellerAmount: number;
-  status: 'pending' | 'paid' | 'completed' | 'refunded' | 'cancelled';
+  status: 'pending' | 'paid' | 'in_transit' | 'delivered' | 'accepted' | 'disputed' | 'completed' | 'refunded' | 'cancelled';
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;
   stripeTransferId?: string;
+  stripeRefundId?: string;
+  sellerStripeAccountId?: string;
+  releasedBy?: string;
+  releasedAt?: Timestamp;
+  refundedBy?: string;
+  refundedAt?: Timestamp;
+  refundReason?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   completedAt?: Timestamp;
+  // Escrow workflow fields
+  paidAt?: Timestamp;
+  disputeDeadlineAt?: Timestamp;
+  deliveredAt?: Timestamp;
+  acceptedAt?: Timestamp;
+  disputedAt?: Timestamp;
+  disputeReason?: string;
+  disputeNotes?: string;
+  deliveryProofUrls?: string[];
+  adminHold?: boolean;
+  lastUpdatedByRole?: 'buyer' | 'seller' | 'admin';
+  // Protected Transaction fields
+  deliveryConfirmedAt?: Timestamp;
+  protectionStartAt?: Timestamp;
+  protectionEndsAt?: Timestamp;
+  buyerAcceptedAt?: Timestamp;
+  disputeOpenedAt?: Timestamp;
+  disputeReasonV2?: 'death' | 'serious_illness' | 'injury' | 'escape' | 'wrong_animal';
+  disputeStatus?: 'none' | 'open' | 'needs_evidence' | 'under_review' | 'resolved_refund' | 'resolved_partial_refund' | 'resolved_release' | 'cancelled';
+  disputeEvidence?: Array<{
+    type: 'photo' | 'video' | 'vet_report' | 'delivery_doc' | 'tag_microchip';
+    url: string;
+    uploadedAt: Timestamp;
+  }>;
+  payoutHoldReason?: 'none' | 'protection_window' | 'dispute_open';
+  protectedTransactionDaysSnapshot?: 7 | 14 | null;
+  protectedTermsVersion?: string;
 }
 
 /**
@@ -53,9 +87,43 @@ function toOrder(docId: string, data: OrderDoc): Order {
     stripeCheckoutSessionId: data.stripeCheckoutSessionId,
     stripePaymentIntentId: data.stripePaymentIntentId,
     stripeTransferId: data.stripeTransferId,
+    stripeRefundId: data.stripeRefundId,
+    sellerStripeAccountId: data.sellerStripeAccountId,
+    releasedBy: data.releasedBy,
+    releasedAt: data.releasedAt?.toDate(),
+    refundedBy: data.refundedBy,
+    refundedAt: data.refundedAt?.toDate(),
+    refundReason: data.refundReason,
     createdAt: data.createdAt.toDate(),
     updatedAt: data.updatedAt.toDate(),
     completedAt: data.completedAt?.toDate(),
+    // Escrow workflow fields
+    paidAt: data.paidAt?.toDate(),
+    disputeDeadlineAt: data.disputeDeadlineAt?.toDate(),
+    deliveredAt: data.deliveredAt?.toDate(),
+    acceptedAt: data.acceptedAt?.toDate(),
+    disputedAt: data.disputedAt?.toDate(),
+    disputeReason: data.disputeReason,
+    disputeNotes: data.disputeNotes,
+    deliveryProofUrls: data.deliveryProofUrls,
+    adminHold: data.adminHold,
+    lastUpdatedByRole: data.lastUpdatedByRole,
+    // Protected Transaction fields
+    deliveryConfirmedAt: data.deliveryConfirmedAt?.toDate(),
+    protectionStartAt: data.protectionStartAt?.toDate(),
+    protectionEndsAt: data.protectionEndsAt?.toDate(),
+    buyerAcceptedAt: data.buyerAcceptedAt?.toDate(),
+    disputeOpenedAt: data.disputeOpenedAt?.toDate(),
+    disputeReasonV2: data.disputeReasonV2,
+    disputeStatus: data.disputeStatus,
+    disputeEvidence: data.disputeEvidence?.map((e: any) => ({
+      type: e.type,
+      url: e.url,
+      uploadedAt: e.uploadedAt?.toDate() || new Date(),
+    })),
+    payoutHoldReason: data.payoutHoldReason,
+    protectedTransactionDaysSnapshot: data.protectedTransactionDaysSnapshot,
+    protectedTermsVersion: data.protectedTermsVersion,
   };
 }
 
@@ -164,6 +232,21 @@ export async function getOrdersForUser(
   const q = query(
     ordersRef,
     where(role === 'buyer' ? 'buyerId' : 'sellerId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => toOrder(doc.id, doc.data() as OrderDoc));
+}
+
+/**
+ * Get all orders for admin (no user filter)
+ * Used by admin dashboard
+ */
+export async function getOrdersForAdmin(): Promise<Order[]> {
+  const ordersRef = collection(db, 'orders');
+  const q = query(
+    ordersRef,
     orderBy('createdAt', 'desc')
   );
   const snapshot = await getDocs(q);

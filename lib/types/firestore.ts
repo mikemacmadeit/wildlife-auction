@@ -6,7 +6,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
-import { ListingType, ListingCategory, ListingStatus } from '../types';
+import { ListingType, ListingCategory, ListingStatus, ComplianceStatus } from '../types';
 
 /**
  * Listing document as stored in Firestore
@@ -51,14 +51,9 @@ export interface ListingDoc {
     transportReady: boolean;
   };
 
-  // Metadata (searchable fields)
-  metadata?: {
-    quantity?: number;
-    breed?: string;
-    age?: string;
-    healthStatus?: string;
-    papers?: boolean;
-  };
+  // Category-specific attributes (replaces old metadata)
+  subcategory?: string; // Optional subcategory within the 3 top categories
+  attributes: Record<string, any>; // Category-specific structured attributes (stored as plain object in Firestore)
 
   // Auction-specific
   endsAt?: Timestamp; // Auction end time
@@ -80,4 +75,30 @@ export interface ListingDoc {
   createdBy: string; // Firebase Auth UID
   updatedBy?: string; // Firebase Auth UID
   publishedAt?: Timestamp; // When status changed to 'active'
+  
+  // Protected Transaction (Seller-selected protection)
+  protectedTransactionEnabled?: boolean;
+  protectedTransactionDays?: 7 | 14 | null;
+  protectedTermsVersion?: string; // e.g., "v1"
+  protectedEnabledAt?: Timestamp; // When seller enabled protection
+  
+  // Compliance fields
+  complianceStatus?: ComplianceStatus;
+  complianceRejectionReason?: string;
+  complianceReviewedBy?: string; // Admin UID
+  complianceReviewedAt?: Timestamp;
+
+  // Whitetail-only seller attestation (top-level)
+  sellerAttestationAccepted?: boolean;
+  sellerAttestationAcceptedAt?: Timestamp;
+
+  // Admin-only internal guardrails
+  internalFlags?: {
+    duplicatePermitNumber?: boolean;
+    duplicateFacilityId?: boolean;
+  };
+  internalFlagsNotes?: {
+    duplicatePermitNumber?: string;
+    duplicateFacilityId?: string;
+  };
 }

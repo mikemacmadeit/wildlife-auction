@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Star } from 'lucide-react';
-import { Listing } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -29,6 +29,56 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
     : listing.type === 'fixed'
     ? `$${listing.price?.toLocaleString() || '0'}`
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
+
+  // Get category display name
+  const getCategoryName = (category: string) => {
+    switch (category) {
+      case 'wildlife_exotics':
+        return 'Wildlife & Exotics';
+      case 'cattle_livestock':
+        return 'Cattle & Livestock';
+      case 'ranch_equipment':
+        return 'Ranch Equipment';
+      default:
+        return category;
+    }
+  };
+
+  // Get key attributes to display on card
+  const getKeyAttributes = () => {
+    if (!listing.attributes) return null;
+    
+    if (listing.category === 'wildlife_exotics') {
+      const attrs = listing.attributes as WildlifeAttributes;
+      return [
+        attrs.species && `Species: ${attrs.species}`,
+        attrs.sex && `Sex: ${attrs.sex}`,
+        attrs.quantity && `Qty: ${attrs.quantity}`,
+      ].filter(Boolean).slice(0, 2);
+    }
+    
+    if (listing.category === 'cattle_livestock') {
+      const attrs = listing.attributes as CattleAttributes;
+      return [
+        attrs.breed && `Breed: ${attrs.breed}`,
+        attrs.sex && `Sex: ${attrs.sex}`,
+        attrs.registered && 'Registered',
+      ].filter(Boolean).slice(0, 2);
+    }
+    
+    if (listing.category === 'ranch_equipment') {
+      const attrs = listing.attributes as EquipmentAttributes;
+      return [
+        attrs.equipmentType && attrs.equipmentType,
+        attrs.year && `Year: ${attrs.year}`,
+        attrs.condition && attrs.condition,
+      ].filter(Boolean).slice(0, 2);
+    }
+    
+    return null;
+  };
+
+  const keyAttributes = getKeyAttributes();
 
   return (
     <motion.div
@@ -86,11 +136,24 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 />
               </div>
             )}
-            {/* Type badge */}
-            <div className="absolute bottom-2 right-2 z-20">
+            {/* Category and Type badges */}
+            <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
+              <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
+                {getCategoryName(listing.category)}
+              </Badge>
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
+              {/* Protected Transaction Badge */}
+              {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
+                <Badge 
+                  variant="default" 
+                  className="bg-green-600 text-white font-semibold text-xs shadow-warm"
+                  title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
+                >
+                  Protected {listing.protectedTransactionDays} Days
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -100,6 +163,17 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             <h3 className="font-bold text-base line-clamp-2 leading-snug group-hover:text-primary transition-colors duration-300">
               {listing.title}
             </h3>
+
+          {/* Key Attributes */}
+          {keyAttributes && keyAttributes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+              {keyAttributes.map((attr, idx) => (
+                <span key={idx} className="px-2 py-0.5 bg-muted rounded-md">
+                  {attr}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Location */}
           <div className="flex items-center gap-1 text-sm text-muted-foreground">

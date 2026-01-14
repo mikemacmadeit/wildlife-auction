@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Upload, X, Loader2, ArrowLeft, Save } from 'lucide-react';
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
@@ -20,6 +20,14 @@ import { useToast } from '@/hooks/use-toast';
 import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import Image from 'next/image';
+import Link from 'next/link';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ListingAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes } from '@/lib/types';
+import { AlertCircle } from 'lucide-react';
+import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { checkListingLimit, type ListingLimitResponse } from '@/lib/listings/listing-limit';
 
 function NewListingPageContent() {
   const router = useRouter();
@@ -27,23 +35,50 @@ function NewListingPageContent() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [formData, setFormData] = useState({
-    type: '' as ListingType | '',
-    category: '' as ListingCategory | '',
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [checkingLimit, setCheckingLimit] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<ListingLimitResponse | null>(null);
+  const [limitBlocked, setLimitBlocked] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [sellerAttestationAccepted, setSellerAttestationAccepted] = useState(false);
+  const [formData, setFormData] = useState<{
+    category: ListingCategory | '';
+    type: ListingType | '';
+    title: string;
+    description: string;
+    price: string;
+    startingBid: string;
+    reservePrice: string;
+    endsAt: string;
+    location: { city: string; state: string; zip: string };
+    images: string[];
+    verification: boolean;
+    insurance: boolean;
+    transport: boolean;
+    protectedTransactionEnabled: boolean;
+    protectedTransactionDays: 7 | 14 | null;
+    attributes: Partial<WildlifeAttributes & CattleAttributes & EquipmentAttributes>;
+  }>({
+    category: '',
+    type: '',
     title: '',
     description: '',
     price: '',
     startingBid: '',
     reservePrice: '',
+    endsAt: '',
     location: {
       city: '',
       state: 'TX',
       zip: '',
     },
-    images: [] as string[], // Array of image URLs (Firebase Storage URLs or local paths)
+    images: [],
     verification: false,
     insurance: false,
     transport: false,
+    protectedTransactionEnabled: false,
+    protectedTransactionDays: null,
+    attributes: {},
   });
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -51,16 +86,198 @@ function NewListingPageContent() {
 
   const steps = [
     {
-      id: 'type-category',
-      title: 'Listing Type & Category',
-      description: 'Choose what type of listing you want to create',
+      id: 'category',
+      title: 'Category',
+      description: 'Choose what you\'re listing',
       content: (
         <div className="space-y-6">
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle) are restricted to Texas residents only. Equipment listings can be multi-state.
+            </AlertDescription>
+          </Alert>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card
+              className={`cursor-pointer transition-all border-2 ${
+                formData.category === 'whitetail_breeder'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => {
+                setFormData({ 
+                  ...formData, 
+                  category: 'whitetail_breeder',
+                  location: { ...formData.location, state: 'TX' } // Force TX for animals
+                });
+              }}
+            >
+              <CardContent className="p-6 text-center space-y-3">
+                <div className="flex justify-center">
+                  <div 
+                    className="w-16 h-16"
+                    style={{
+                      WebkitMaskImage: `url('/images/whitetail breeder icon.png')`,
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: `url('/images/whitetail breeder icon.png')`,
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      backgroundColor: 'hsl(var(--primary))'
+                    }}
+                  />
+                </div>
+                <h3 className="text-lg font-bold">Whitetail Breeder</h3>
+                <p className="text-sm text-muted-foreground">
+                  TPWD-permitted whitetail deer breeding facilities
+                </p>
+                <Badge variant="outline" className="text-xs">TPWD Required</Badge>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all border-2 ${
+                formData.category === 'wildlife_exotics'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => {
+                setFormData({ 
+                  ...formData, 
+                  category: 'wildlife_exotics',
+                  location: { ...formData.location, state: 'TX' } // Force TX for animals
+                });
+              }}
+            >
+              <CardContent className="p-6 text-center space-y-3">
+                <div className="flex justify-center">
+                  <div 
+                    className="w-16 h-16"
+                    style={{
+                      WebkitMaskImage: `url('/images/Fallow Icon.png')`,
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: `url('/images/Fallow Icon.png')`,
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      backgroundColor: 'hsl(var(--primary))'
+                    }}
+                  />
+                </div>
+                <h3 className="text-lg font-bold">Wildlife & Exotics</h3>
+                <p className="text-sm text-muted-foreground">
+                  Axis deer, blackbuck, fallow deer, and other exotic species
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all border-2 ${
+                formData.category === 'cattle_livestock'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => {
+                setFormData({ 
+                  ...formData, 
+                  category: 'cattle_livestock',
+                  location: { ...formData.location, state: 'TX' } // Force TX for animals
+                });
+              }}
+            >
+              <CardContent className="p-6 text-center space-y-3">
+                <div className="flex justify-center">
+                  <div 
+                    className="w-16 h-16"
+                    style={{
+                      WebkitMaskImage: `url('/images/Bull Icon.png')`,
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: `url('/images/Bull Icon.png')`,
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      backgroundColor: 'hsl(var(--primary))'
+                    }}
+                  />
+                </div>
+                <h3 className="text-lg font-bold">Cattle & Livestock</h3>
+                <p className="text-sm text-muted-foreground">
+                  Cattle, bulls, cows, heifers, and registered livestock
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all border-2 ${
+                formData.category === 'ranch_equipment'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => setFormData({ ...formData, category: 'ranch_equipment' })}
+            >
+              <CardContent className="p-6 text-center space-y-3">
+                <div className="flex justify-center">
+                  <div 
+                    className="w-16 h-16"
+                    style={{
+                      WebkitMaskImage: `url('/images/Tractor Icon.png')`,
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: `url('/images/Tractor Icon.png')`,
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      backgroundColor: 'hsl(var(--primary))'
+                    }}
+                  />
+                </div>
+                <h3 className="text-lg font-bold">Ranch Equipment</h3>
+                <p className="text-sm text-muted-foreground">
+                  Tractors, skid steers, UTVs, trailers, and ranch equipment
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ),
+      validate: () => !!formData.category,
+    },
+    {
+      id: 'type',
+      title: 'Listing Type',
+      description: 'Choose how you want to sell',
+      content: (
+        <div className="space-y-6">
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Single Mode:</strong> Each listing must be either Auction, Fixed Price, or Classified. 
+              No hybrid "auction + buy now" listings are allowed.
+            </AlertDescription>
+          </Alert>
           <div className="space-y-3">
             <Label className="text-base font-semibold">Listing Type</Label>
             <RadioGroup
               value={formData.type}
-              onValueChange={(value) => setFormData({ ...formData, type: value as ListingType })}
+              onValueChange={(value) => {
+                // Clear conflicting pricing fields when switching types
+                const newData: any = { ...formData, type: value as ListingType };
+                if (value === 'auction') {
+                  newData.price = ''; // Clear fixed price
+                } else if (value === 'fixed' || value === 'classified') {
+                  newData.startingBid = ''; // Clear auction fields
+                  newData.reservePrice = '';
+                  newData.endsAt = '';
+                }
+                setFormData(newData);
+              }}
             >
               {[
                 { value: 'auction', label: 'Auction', desc: 'Bidders compete, highest bid wins' },
@@ -77,33 +294,155 @@ function NewListingPageContent() {
               ))}
             </RadioGroup>
           </div>
-
-          <div className="space-y-3">
-            <Label htmlFor="category" className="text-base font-semibold">Category</Label>
-            <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value as ListingCategory })}
-            >
-              <SelectTrigger id="category" className="min-h-[48px]">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cattle">Cattle</SelectItem>
-                <SelectItem value="horses">Horses</SelectItem>
-                <SelectItem value="wildlife">Wildlife</SelectItem>
-                <SelectItem value="equipment">Equipment</SelectItem>
-                <SelectItem value="land">Land</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
       ),
-      validate: () => !!formData.type && !!formData.category,
+      validate: () => !!formData.type,
+    },
+    {
+      id: 'attributes',
+      title: 'Specifications',
+      description: 'Provide category-specific details',
+      content: formData.category ? (
+        <div className="space-y-4">
+          <CategoryAttributeForm
+            category={formData.category}
+            attributes={formData.attributes}
+            onChange={(attrs) => setFormData({ ...formData, attributes: attrs })}
+            errors={(() => {
+              if (formData.category === 'whitetail_breeder') {
+                const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
+                const errs: string[] = [];
+                if (!attrs.tpwdBreederPermitNumber?.trim()) errs.push('TPWD Breeder Permit Number');
+                if (!attrs.breederFacilityId?.trim()) errs.push('Breeder Facility ID');
+                if (!attrs.deerIdTag?.trim()) errs.push('Deer ID Tag');
+                if (!(attrs as any).tpwdPermitExpirationDate) errs.push('Permit Expiration Date');
+                if (!attrs.sex) errs.push('Sex');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
+                if (!attrs.cwdDisclosureChecklist?.cwdAware) errs.push('CWD Awareness acknowledgment');
+                if (!attrs.cwdDisclosureChecklist?.cwdCompliant) errs.push('CWD Compliance confirmation');
+                return errs;
+              }
+              return [];
+            })()}
+          />
+
+          {formData.category === 'whitetail_breeder' && (
+            <div className={`space-y-3 p-4 border rounded-lg ${!sellerAttestationAccepted ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'}`}>
+              <Label className="text-base font-semibold">
+                Seller Attestation <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="seller-attestation"
+                  checked={sellerAttestationAccepted}
+                  onCheckedChange={(checked) => setSellerAttestationAccepted(checked === true)}
+                />
+                <Label htmlFor="seller-attestation" className="cursor-pointer flex-1">
+                  <div className="font-medium">
+                    I certify that all permit information entered is accurate and that the uploaded TPWD Deer Breeder Permit is valid and current.
+                  </div>
+                </Label>
+              </div>
+              {!sellerAttestationAccepted && (
+                <p className="text-sm text-destructive">
+                  You must accept the seller attestation to submit a whitetail breeder listing.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          Please select a category first
+        </div>
+      ),
+      validate: () => {
+        if (!formData.category) return false;
+        if (formData.category === 'whitetail_breeder') {
+          const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
+          const errors: string[] = [];
+          
+          if (!attrs.tpwdBreederPermitNumber?.trim()) errors.push('TPWD Breeder Permit Number');
+          if (!attrs.breederFacilityId?.trim()) errors.push('Breeder Facility ID');
+          if (!attrs.deerIdTag?.trim()) errors.push('Deer ID Tag');
+          if (!(attrs as any).tpwdPermitExpirationDate) errors.push('Permit Expiration Date');
+          if (!attrs.sex) errors.push('Sex');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (!attrs.cwdDisclosureChecklist?.cwdAware) errors.push('CWD Awareness acknowledgment');
+          if (!attrs.cwdDisclosureChecklist?.cwdCompliant) errors.push('CWD Compliance confirmation');
+
+          // Permit expiration hard block (seller-side UX; server enforces too)
+          const exp: any = (attrs as any).tpwdPermitExpirationDate;
+          const expDate: Date | null = exp?.toDate?.() || (exp instanceof Date ? exp : null);
+          if (expDate && expDate.getTime() < Date.now()) {
+            toast({
+              title: 'Permit expired',
+              description: 'Your TPWD Deer Breeder Permit is expired. Renew before submitting.',
+              variant: 'destructive',
+            });
+            return false;
+          }
+
+          if (!sellerAttestationAccepted) {
+            toast({
+              title: 'Seller attestation required',
+              description: 'Please accept the seller attestation to proceed.',
+              variant: 'destructive',
+            });
+            return false;
+          }
+          
+          if (errors.length > 0) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
+        }
+        if (formData.category === 'wildlife_exotics') {
+          const attrs = formData.attributes as Partial<WildlifeAttributes>;
+          return !!(
+            attrs.speciesId &&
+            attrs.sex &&
+            attrs.quantity &&
+            attrs.quantity >= 1 &&
+            attrs.animalIdDisclosure &&
+            attrs.healthDisclosure &&
+            attrs.transportDisclosure
+          );
+        }
+        if (formData.category === 'cattle_livestock') {
+          const attrs = formData.attributes as Partial<CattleAttributes>;
+          return !!(
+            attrs.breed &&
+            attrs.sex &&
+            attrs.registered !== undefined &&
+            attrs.quantity &&
+            attrs.quantity >= 1 &&
+            attrs.identificationDisclosure &&
+            attrs.healthDisclosure &&
+            (attrs.age || attrs.weightRange)
+          );
+        }
+        if (formData.category === 'ranch_equipment') {
+          const attrs = formData.attributes as Partial<EquipmentAttributes>;
+          const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
+          const requiresTitle = attrs.equipmentType && vehiclesRequiringTitle.includes(attrs.equipmentType.toLowerCase());
+          const baseValid = !!(attrs.equipmentType && attrs.condition && attrs.quantity && attrs.quantity >= 1);
+          if (requiresTitle) {
+            return baseValid && attrs.hasTitle !== undefined && !!attrs.vinOrSerial;
+          }
+          return baseValid;
+        }
+        return false;
+      },
     },
     {
       id: 'details',
-      title: 'Listing Details',
+      title: 'Details',
       description: 'Describe what you\'re selling',
       content: (
         <div className="space-y-6">
@@ -172,6 +511,22 @@ function NewListingPageContent() {
                   Minimum price you'll accept. Won't be shown to bidders.
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="auction-end" className="text-base font-semibold">
+                  Auction End Date & Time
+                </Label>
+                <Input
+                  id="auction-end"
+                  type="datetime-local"
+                  value={formData.endsAt}
+                  onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
+                  className="min-h-[48px] text-base"
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  When should this auction end? Must be in the future.
+                </p>
+              </div>
             </>
           )}
 
@@ -207,19 +562,52 @@ function NewListingPageContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="state" className="text-base font-semibold">State</Label>
-              <Input
-                id="state"
-                placeholder="TX"
-                value={formData.location.state}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    location: { ...formData.location, state: e.target.value },
-                  })
-                }
-                className="min-h-[48px] text-base"
-              />
+              {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) ? (
+                <>
+                  <Input
+                    id="state"
+                    value="TX"
+                    disabled
+                    className="min-h-[48px] text-base bg-muted"
+                  />
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800 text-xs">
+                      Animal listings must be located in Texas (TX) per compliance requirements.
+                    </AlertDescription>
+                  </Alert>
+                </>
+              ) : (
+                <Input
+                  id="state"
+                  placeholder="State"
+                  value={formData.location.state}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      location: { ...formData.location, state: e.target.value },
+                    })
+                  }
+                  className="min-h-[48px] text-base"
+                />
+              )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="zip" className="text-base font-semibold">ZIP Code (Optional)</Label>
+            <Input
+              id="zip"
+              placeholder="12345"
+              value={formData.location.zip}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  location: { ...formData.location, zip: e.target.value },
+                })
+              }
+              className="min-h-[48px] text-base"
+            />
           </div>
         </div>
       ),
@@ -228,7 +616,8 @@ function NewListingPageContent() {
           !!formData.description &&
           (formData.type === 'fixed' || formData.type === 'classified'
             ? !!formData.price
-            : !!formData.startingBid);
+            : !!formData.startingBid) &&
+          (formData.type !== 'auction' || !!formData.endsAt);
       },
     },
     {
@@ -278,7 +667,7 @@ function NewListingPageContent() {
                     let currentListingId = listingId;
                     if (!currentListingId) {
                       try {
-                        const draftData = {
+                        const draftData: any = {
                           title: formData.title || 'Draft Listing',
                           description: formData.description || '',
                           type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
@@ -290,21 +679,68 @@ function NewListingPageContent() {
                             insuranceAvailable: formData.insurance,
                             transportReady: formData.transport,
                           },
-                          metadata: {},
-                        } as any;
+                          protectedTransactionEnabled: formData.protectedTransactionEnabled,
+                          protectedTransactionDays: formData.protectedTransactionDays,
+                          attributes: formData.attributes as ListingAttributes,
+                        };
+
+                        // Whitetail-only seller attestation (required even for draft creation)
+                        if (formData.category === 'whitetail_breeder') {
+                          draftData.sellerAttestationAccepted = sellerAttestationAccepted === true;
+                          if (sellerAttestationAccepted) {
+                            draftData.sellerAttestationAcceptedAt = new Date();
+                          }
+                        }
+                        
+                        // Only include protectedTermsVersion if protectedTransactionEnabled is true
+                        if (formData.protectedTransactionEnabled) {
+                          draftData.protectedTermsVersion = 'v1';
+                        }
 
                         if (formData.type === 'fixed' || formData.type === 'classified') {
                           draftData.price = parseFloat(formData.price || '0');
                         } else if (formData.type === 'auction') {
-                          draftData.startingBid = parseFloat(formData.startingBid || '0');
+                          if (formData.startingBid) {
+                            draftData.startingBid = parseFloat(formData.startingBid || '0');
+                          }
+                          if (formData.reservePrice) {
+                            draftData.reservePrice = parseFloat(formData.reservePrice);
+                          }
+                          if (formData.endsAt) {
+                            draftData.endsAt = new Date(formData.endsAt);
+                          }
                         }
 
                         currentListingId = await createListingDraft(user.uid, draftData);
                         setListingId(currentListingId);
                         
-                        // Small delay to ensure Firestore has propagated the document
-                        // This helps with Storage security rules that read from Firestore
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // Wait longer and verify listing exists before allowing upload
+                        // Storage rules check Firestore, so we need to ensure propagation
+                        let retries = 0;
+                        let listingVerified = false;
+                        while (retries < 5 && !listingVerified) {
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                          try {
+                            // Verify listing exists by trying to read it
+                            const { getListingById } = await import('@/lib/firebase/listings');
+                            const listing = await getListingById(currentListingId);
+                            if (listing && listing.sellerId === user.uid) {
+                              listingVerified = true;
+                            }
+                          } catch (err) {
+                            console.log(`Verification attempt ${retries + 1} failed, retrying...`);
+                          }
+                          retries++;
+                        }
+                        
+                        if (!listingVerified) {
+                          toast({
+                            title: 'Verification failed',
+                            description: 'Listing created but could not verify. Please try uploading again.',
+                            variant: 'destructive',
+                          });
+                          // Still allow upload attempt - rules might work anyway
+                        }
                         
                         toast({
                           title: 'Draft created',
@@ -590,6 +1026,78 @@ function NewListingPageContent() {
                 <div className="text-sm text-muted-foreground">Photos</div>
                 <div className="font-medium">{formData.images.length} photos</div>
               </div>
+              {formData.location.zip && (
+                <div>
+                  <div className="text-sm text-muted-foreground">ZIP Code</div>
+                  <div className="font-medium">{formData.location.zip}</div>
+                </div>
+              )}
+              {formData.type === 'auction' && formData.endsAt && (
+                <div>
+                  <div className="text-sm text-muted-foreground">Auction Ends</div>
+                  <div className="font-medium">
+                    {new Date(formData.endsAt).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              )}
+              {formData.category && Object.keys(formData.attributes).length > 0 && (
+                <div>
+                  <div className="text-sm text-muted-foreground">Specifications</div>
+                  <div className="text-sm space-y-1 mt-1">
+                    {formData.category === 'wildlife_exotics' && (
+                      <>
+                        {(formData.attributes as Partial<WildlifeAttributes>).species && (
+                          <div>Species: {(formData.attributes as Partial<WildlifeAttributes>).species}</div>
+                        )}
+                        {(formData.attributes as Partial<WildlifeAttributes>).sex && (
+                          <div>Sex: {(formData.attributes as Partial<WildlifeAttributes>).sex}</div>
+                        )}
+                        {(formData.attributes as Partial<WildlifeAttributes>).quantity && (
+                          <div>Quantity: {(formData.attributes as Partial<WildlifeAttributes>).quantity}</div>
+                        )}
+                      </>
+                    )}
+                    {formData.category === 'cattle_livestock' && (
+                      <>
+                        {(formData.attributes as Partial<CattleAttributes>).breed && (
+                          <div>Breed: {(formData.attributes as Partial<CattleAttributes>).breed}</div>
+                        )}
+                        {(formData.attributes as Partial<CattleAttributes>).sex && (
+                          <div>Sex: {(formData.attributes as Partial<CattleAttributes>).sex}</div>
+                        )}
+                        {(formData.attributes as Partial<CattleAttributes>).registered !== undefined && (
+                          <div>Registered: {(formData.attributes as Partial<CattleAttributes>).registered ? 'Yes' : 'No'}</div>
+                        )}
+                        {(formData.attributes as Partial<CattleAttributes>).quantity && (
+                          <div>Quantity: {(formData.attributes as Partial<CattleAttributes>).quantity}</div>
+                        )}
+                      </>
+                    )}
+                    {formData.category === 'ranch_equipment' && (
+                      <>
+                        {(formData.attributes as Partial<EquipmentAttributes>).equipmentType && (
+                          <div>Type: {(formData.attributes as Partial<EquipmentAttributes>).equipmentType}</div>
+                        )}
+                        {(formData.attributes as Partial<EquipmentAttributes>).condition && (
+                          <div>Condition: {(formData.attributes as Partial<EquipmentAttributes>).condition}</div>
+                        )}
+                        {(formData.attributes as Partial<EquipmentAttributes>).year && (
+                          <div>Year: {(formData.attributes as Partial<EquipmentAttributes>).year}</div>
+                        )}
+                        {(formData.attributes as Partial<EquipmentAttributes>).quantity && (
+                          <div>Quantity: {(formData.attributes as Partial<EquipmentAttributes>).quantity}</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -642,23 +1150,36 @@ function NewListingPageContent() {
 
     try {
       // Prepare listing data
+      const locationData: any = {
+        city: formData.location.city,
+        state: formData.location.state,
+      };
+      // Only include zip if it has a value (Firestore doesn't allow undefined)
+      if (formData.location.zip && formData.location.zip.trim()) {
+        locationData.zip = formData.location.zip.trim();
+      }
+
       const listingData = {
         title: formData.title,
         description: formData.description,
         type: formData.type as 'auction' | 'fixed' | 'classified',
         category: formData.category as ListingCategory,
-        location: {
-          city: formData.location.city,
-          state: formData.location.state,
-          zip: formData.location.zip || undefined,
-        },
+        location: locationData,
         images: formData.images, // Firebase Storage URLs
         trust: {
           verified: formData.verification,
           insuranceAvailable: formData.insurance,
           transportReady: formData.transport,
         },
-        metadata: {},
+        protectedTransactionEnabled: formData.protectedTransactionEnabled,
+        protectedTransactionDays: formData.protectedTransactionDays,
+        ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
+        attributes: formData.attributes as ListingAttributes,
+        // Whitetail-only seller attestation
+        ...(formData.category === 'whitetail_breeder' && {
+          sellerAttestationAccepted: sellerAttestationAccepted === true,
+          sellerAttestationAcceptedAt: sellerAttestationAccepted ? new Date() : undefined,
+        }),
       } as any;
 
       // Add pricing based on type
@@ -668,6 +1189,10 @@ function NewListingPageContent() {
         listingData.startingBid = parseFloat(formData.startingBid || '0');
         if (formData.reservePrice) {
           listingData.reservePrice = parseFloat(formData.reservePrice);
+        }
+        // Add auction end date
+        if (formData.endsAt) {
+          listingData.endsAt = new Date(formData.endsAt);
         }
       }
 
@@ -682,14 +1207,22 @@ function NewListingPageContent() {
       }
 
       // Publish immediately (user clicked "Publish" in the form)
-      await publishListing(user.uid, finalListingId);
+      const publishResult = await publishListing(user.uid, finalListingId);
 
-      toast({
-        title: 'Listing created successfully!',
-        description: 'Your listing has been published and is now live.',
-      });
+      if (publishResult?.pendingReview) {
+        toast({
+          title: 'Listing submitted for review',
+          description: 'Your listing has been submitted and is pending admin compliance review. You will be notified once it\'s approved.',
+        });
+      } else {
+        toast({
+          title: 'Listing created successfully!',
+          description: 'Your listing has been published and is now live.',
+        });
+      }
 
-      router.push(`/listing/${listingId}`);
+      // Redirect to seller listings dashboard so they can see their new listing
+      router.push('/seller/listings');
     } catch (error: any) {
       console.error('Error creating listing:', error);
       toast({
@@ -723,6 +1256,35 @@ function NewListingPageContent() {
     }
   }, [user, toast]);
 
+  // Hard gate: prevent bypass by direct URL navigation if plan is at listing limit.
+  useEffect(() => {
+    const run = async () => {
+      if (authLoading) return;
+      if (!user) return;
+
+      setCheckingLimit(true);
+      try {
+        const token = await user.getIdToken();
+        const info = await checkListingLimit(token);
+        setLimitInfo(info);
+
+        if (!info.canCreate) {
+          setLimitBlocked(true);
+          setShowUpgradeModal(true);
+        } else {
+          setLimitBlocked(false);
+        }
+      } catch (e) {
+        // Fail open here; publish/create endpoints still enforce limits server-side.
+        setLimitBlocked(false);
+      } finally {
+        setCheckingLimit(false);
+      }
+    };
+
+    run();
+  }, [authLoading, user]);
+
   // Show loading state while checking authentication
   if (authLoading) {
     return (
@@ -735,9 +1297,215 @@ function NewListingPageContent() {
     );
   }
 
+  // Block the create flow entirely if plan is at limit.
+  if (user && limitBlocked) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center px-4">
+        <div className="w-full max-w-lg space-y-4">
+          <Card className="border-2 border-border/50 bg-card">
+            <CardContent className="pt-8 pb-8 px-6 text-center space-y-3">
+              <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
+              <h1 className="text-xl font-extrabold">Upgrade required</h1>
+              <p className="text-sm text-muted-foreground">
+                {limitInfo?.message ||
+                  'You’ve reached your plan’s active listing limit. Upgrade to create more listings.'}
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Badge variant="secondary">{limitInfo?.planDisplayName || 'Free'}</Badge>
+                {!limitInfo?.isUnlimited && (
+                  <Badge variant="outline">
+                    {limitInfo?.activeListingsCount ?? '—'}/{limitInfo?.listingLimit ?? '—'} active
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center pt-4">
+                <Button variant="outline" onClick={() => router.push('/seller/overview')}>
+                  Back to Dashboard
+                </Button>
+                <Button asChild>
+                  <Link href="/pricing">View Plans</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Dialog open={showUpgradeModal} onOpenChange={(open) => {
+            setShowUpgradeModal(open);
+            if (!open) {
+              // If user closes the modal, keep them from interacting with the form
+              // by routing them away.
+              router.push('/seller/overview');
+            }
+          }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Upgrade to create more listings</DialogTitle>
+                <DialogDescription>
+                  You’ve reached your {limitInfo?.planDisplayName || 'Free'} plan limit.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="rounded-lg border bg-card p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">Active listings</span>
+                    <Badge variant="outline">
+                      {limitInfo?.activeListingsCount ?? '—'}/{limitInfo?.listingLimit ?? '—'}
+                    </Badge>
+                  </div>
+                  {limitInfo?.message && (
+                    <p className="text-xs text-muted-foreground mt-2">{limitInfo.message}</p>
+                  )}
+                </div>
+              </div>
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between">
+                <Button variant="outline" onClick={() => router.push('/seller/overview')}>
+                  Close
+                </Button>
+                <Button asChild>
+                  <Link href="/pricing">Upgrade</Link>
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSaveDraft = async () => {
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'You must be signed in to save a draft.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const locationData: any = {
+        city: formData.location.city,
+        state: formData.location.state,
+      };
+      if (formData.location.zip && formData.location.zip.trim()) {
+        locationData.zip = formData.location.zip.trim();
+      }
+
+      const listingData = {
+        title: formData.title || 'Draft Listing',
+        description: formData.description || '',
+        type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
+        category: (formData.category || 'other') as ListingCategory,
+        location: locationData,
+        images: formData.images,
+        trust: {
+          verified: formData.verification,
+          insuranceAvailable: formData.insurance,
+          transportReady: formData.transport,
+        },
+        protectedTransactionEnabled: formData.protectedTransactionEnabled,
+        protectedTransactionDays: formData.protectedTransactionDays,
+        ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
+        attributes: formData.attributes as ListingAttributes,
+      } as any;
+
+      if (formData.type === 'fixed' || formData.type === 'classified') {
+        listingData.price = parseFloat(formData.price || '0');
+      } else if (formData.type === 'auction') {
+        listingData.startingBid = parseFloat(formData.startingBid || '0');
+        if (formData.reservePrice) {
+          listingData.reservePrice = parseFloat(formData.reservePrice);
+        }
+        if (formData.endsAt) {
+          listingData.endsAt = new Date(formData.endsAt);
+        }
+      }
+
+      let draftId = listingId;
+      if (!draftId) {
+        draftId = await createListingDraft(user.uid, listingData);
+        setListingId(draftId);
+      } else {
+        await updateListing(user.uid, draftId, listingData);
+      }
+
+      toast({
+        title: 'Draft saved',
+        description: 'Your listing has been saved as a draft. You can continue editing it later.',
+      });
+    } catch (error: any) {
+      console.error('Error saving draft:', error);
+      toast({
+        title: 'Failed to save draft',
+        description: error.message || 'An error occurred while saving your draft.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const hasFormData = formData.type || formData.category || formData.title || formData.description || formData.images.length > 0;
+
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-4">
-      <div className="container mx-auto px-4 py-6 max-w-2xl">
+    <div className="min-h-screen bg-background">
+      {/* Custom Header with Navigation */}
+      <div className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border/50 shadow-sm">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Back Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (hasFormData) {
+                  setShowExitDialog(true);
+                } else {
+                  router.back();
+                }
+              }}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back</span>
+            </Button>
+
+            {/* Center: Title */}
+            <div className="flex-1 text-center">
+              <h1 className="text-lg font-bold">Create New Listing</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                Step-by-step listing creation
+              </p>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2">
+              {user && hasFormData && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveDraft}
+                  className="gap-2 hidden sm:flex"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Draft
+                </Button>
+              )}
+              <Link href="/browse">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                  title="Exit to Browse"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl">
         {/* Show a subtle banner if not authenticated */}
         {!user && (
           <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
@@ -746,13 +1514,76 @@ function NewListingPageContent() {
             </p>
           </div>
         )}
+
+        {/* Mobile Save Draft Button */}
+        {user && hasFormData && (
+          <div className="mb-4 sm:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveDraft}
+              className="w-full gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Save Draft
+            </Button>
+          </div>
+        )}
         
-        <StepperForm 
-          steps={steps} 
-          onComplete={handleComplete}
-        />
+        <div className="bg-card rounded-lg border border-border/50 shadow-sm p-6 md:p-8">
+          <StepperForm 
+            steps={steps} 
+            onComplete={handleComplete}
+          />
+        </div>
       </div>
+
       <BottomNav />
+      
+      {/* Exit Confirmation Dialog */}
+      <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Exit Listing Creation?</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes. Do you want to save as a draft before leaving, or exit without saving?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {user && (
+              <Button
+                variant="default"
+                onClick={() => {
+                  handleSaveDraft();
+                  setShowExitDialog(false);
+                  setTimeout(() => router.back(), 500);
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Draft & Exit
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowExitDialog(false);
+                router.back();
+              }}
+              className="w-full sm:w-auto"
+            >
+              Exit Without Saving
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowExitDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Authentication Prompt Modal */}
       <AuthPromptModal
@@ -761,8 +1592,6 @@ function NewListingPageContent() {
         title="Sign in to publish your listing"
         description="You've filled out your listing! Sign in or create an account to publish it. Don't worry - your information will be saved."
         onAuthSuccess={() => {
-          // After successful auth, the user will be redirected back
-          // and can submit again
           setShowAuthModal(false);
         }}
       />

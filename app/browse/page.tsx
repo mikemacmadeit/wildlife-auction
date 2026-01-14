@@ -211,16 +211,19 @@ export default function BrowsePage() {
           listing.location?.city?.toLowerCase().includes(query) ||
           listing.location?.state?.toLowerCase().includes(query);
         
-        // Search in metadata (breed, age, species, category)
-        const metadataMatch = listing.metadata
+        // Search in attributes (species, breed, equipmentType, etc.)
+        const attributesMatch = listing.attributes
           ? (
-              listing.metadata.breed?.toLowerCase().includes(query) ||
-              listing.metadata.age?.toLowerCase().includes(query) ||
+              (listing.attributes as any).species?.toLowerCase().includes(query) ||
+              (listing.attributes as any).breed?.toLowerCase().includes(query) ||
+              (listing.attributes as any).equipmentType?.toLowerCase().includes(query) ||
+              (listing.attributes as any).make?.toLowerCase().includes(query) ||
+              (listing.attributes as any).model?.toLowerCase().includes(query) ||
               listing.category.toLowerCase().includes(query)
             )
           : false;
         
-        return basicMatch || metadataMatch;
+        return basicMatch || attributesMatch;
       });
     }
 
@@ -237,19 +240,26 @@ export default function BrowsePage() {
       });
     }
 
-    // Species/Breed filter (client-side - metadata not indexed)
+    // Species/Breed filter (client-side - attributes not indexed)
     if (filters.species && filters.species.length > 0) {
       result = result.filter((listing) =>
-        filters.species!.some((species) =>
-          listing.metadata?.breed?.toLowerCase().includes(species.toLowerCase())
-        )
+        filters.species!.some((species) => {
+          if (listing.attributes) {
+            const attrs = listing.attributes as any;
+            return attrs.species?.toLowerCase().includes(species.toLowerCase()) ||
+                   attrs.breed?.toLowerCase().includes(species.toLowerCase());
+          }
+          return false;
+        })
       );
     }
 
-    // Quantity filter (client-side - metadata not indexed)
+    // Quantity filter (client-side - attributes not indexed)
     if (filters.quantity) {
       result = result.filter((listing) => {
-        const qty = listing.metadata?.quantity || 1;
+        const qty = listing.attributes && 'quantity' in listing.attributes 
+          ? (listing.attributes as any).quantity || 1
+          : 1;
         switch (filters.quantity) {
           case 'single':
             return qty === 1;
@@ -267,18 +277,27 @@ export default function BrowsePage() {
       });
     }
 
-    // Health status filter (client-side - metadata not indexed)
+    // Health status filter (client-side - attributes not indexed)
     if (filters.healthStatus && filters.healthStatus.length > 0) {
       result = result.filter((listing) =>
-        filters.healthStatus!.some((status) =>
-          listing.metadata?.healthStatus?.toLowerCase().includes(status.toLowerCase())
-        )
+        filters.healthStatus!.some((status) => {
+          if (listing.attributes) {
+            const attrs = listing.attributes as any;
+            return attrs.healthNotes?.toLowerCase().includes(status.toLowerCase());
+          }
+          return false;
+        })
       );
     }
 
-    // Papers filter (client-side - metadata not indexed)
+    // Papers filter (client-side - attributes not indexed)
     if (filters.papers !== undefined) {
-      result = result.filter((listing) => listing.metadata?.papers === filters.papers);
+      result = result.filter((listing) => {
+        if (listing.attributes && 'registered' in listing.attributes) {
+          return (listing.attributes as any).registered === filters.papers;
+        }
+        return false;
+      });
     }
 
     // Verified seller filter (client-side - nested field not indexed)

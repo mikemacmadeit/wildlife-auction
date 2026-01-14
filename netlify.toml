@@ -14,3 +14,8 @@ package = "netlify-plugin-inline-functions-env"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
+
+# Scheduled Functions
+# Auto-release protected transactions every 10 minutes
+[functions]
+  included_files = ["netlify/functions/**"]

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Search, Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut } from 'lucide-react';
+import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -64,6 +64,7 @@ export function Navbar() {
     { href: '/browse', label: 'Browse' },
     { href: '/how-it-works', label: 'How It Works' },
     { href: '/pricing', label: 'Pricing' },
+    { href: '/trust', label: 'Trust & Compliance' },
   ];
 
   return (
@@ -74,12 +75,12 @@ export function Navbar() {
       className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-sm"
     >
       <div className="container mx-auto px-4 md:px-6">
-        <div className="relative flex h-20 items-center justify-between gap-6">
-          {/* Logo Section - Larger with better spacing */}
-          <Link href="/" className="flex items-center gap-3 group flex-shrink-0 z-10">
-            <div className="relative">
+        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] h-20 items-center gap-4">
+          {/* Logo Section - Left side */}
+          <Link href="/" className="flex items-center gap-2 md:gap-3 group flex-shrink-0 min-w-0 z-10">
+            <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-primary/10 blur-xl rounded-full group-hover:bg-primary/20 transition-colors" />
-              <div className="relative h-10 w-10 md:h-11 md:w-11 group-hover:scale-110 transition-transform">
+              <div className="relative h-9 w-9 md:h-10 md:w-10 lg:h-11 lg:w-11 group-hover:scale-110 transition-transform">
                 {/* Light mode: Olivewood color using mask */}
                 <div 
                   className="h-full w-full dark:hidden"
@@ -112,92 +113,105 @@ export function Navbar() {
                 />
               </div>
             </div>
-            <span className="text-xl md:text-2xl font-extrabold whitespace-nowrap tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)]">
+            <span className="text-lg md:text-xl lg:text-2xl font-extrabold whitespace-nowrap tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] hidden sm:inline">
               Wildlife Exchange
+            </span>
+            <span className="text-lg font-extrabold whitespace-nowrap tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] sm:hidden">
+              WE
             </span>
           </Link>
 
-          {/* Desktop Navigation - Centered */}
-          <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href || 
-                (link.href !== '/' && pathname?.startsWith(link.href + '/'));
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    'px-5 py-2.5 rounded-lg text-base font-semibold transition-all duration-200 relative',
-                    'hover:bg-muted/50 hover:text-foreground',
-                    isActive && 'text-primary dark:text-[hsl(37,27%,70%)]'
-                  )}
-                >
-                  <span className="relative z-10">{link.label}</span>
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-[hsl(37,27%,70%)] rounded-full"
-                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                    />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Right Side Actions - Better spacing */}
-          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-            {/* Search Icon - Links to browse page where full search is available */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="min-w-[44px] min-h-[44px] rounded-lg hover:bg-muted/50"
-              asChild
-            >
-              <Link href="/browse">
-                <Search className="h-5 w-5" />
-                <span className="sr-only">Search listings</span>
+          {/* Desktop Navigation - Centered (only on large screens) */}
+          <nav className="hidden lg:flex items-center justify-center gap-0.5 xl:gap-1 min-w-0 px-2 xl:px-4 overflow-hidden">
+            <div className="flex items-center gap-0.5 xl:gap-1 flex-wrap justify-center max-w-full">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href || 
+                  (link.href !== '/' && pathname?.startsWith(link.href + '/'));
+                // Hide "Trust & Compliance" on smaller desktop screens, show shorter version
+                const isLongLink = link.label === 'Trust & Compliance';
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      'px-2 xl:px-3 py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
+                      'hover:bg-muted/50 hover:text-foreground',
+                      isActive && 'text-primary dark:text-[hsl(37,27%,70%)]',
+                      isLongLink && 'hidden xl:inline-flex'
+                    )}
+                  >
+                    <span className="relative z-10">{link.label}</span>
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-[hsl(37,27%,70%)] rounded-full"
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      />
+                    )}
+                  </Link>
+                );
+              })}
+              {/* Shorter "Trust" link for medium desktop */}
+              <Link
+                href="/trust"
+                className={cn(
+                  'px-2 xl:px-3 py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
+                  'hover:bg-muted/50 hover:text-foreground xl:hidden',
+                  (pathname === '/trust' || pathname?.startsWith('/trust/')) && 'text-primary dark:text-[hsl(37,27%,70%)]'
+                )}
+              >
+                <span className="relative z-10">Trust</span>
+                {(pathname === '/trust' || pathname?.startsWith('/trust/')) && (
+                  <motion.div
+                    layoutId="activeTabTrust"
+                    className="absolute bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-[hsl(37,27%,70%)] rounded-full"
+                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  />
+                )}
               </Link>
-            </Button>
+            </div>
+          </nav>
 
-            {/* Divider */}
-            <div className="hidden md:block w-px h-6 bg-border/50" />
-
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0 min-w-0 justify-end">
             {/* Theme Toggle */}
             <ThemeToggle />
 
             {/* Desktop Actions - User Menu */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
               <Button
                 asChild
                 size="default"
-                className="h-10 px-4 gap-2 text-sm font-semibold dark:bg-primary dark:text-primary-foreground"
+                className="h-9 lg:h-10 px-2.5 lg:px-3 xl:px-4 gap-1.5 lg:gap-2 text-xs lg:text-sm font-semibold dark:bg-primary dark:text-primary-foreground whitespace-nowrap flex-shrink-0"
                 style={{
                   backgroundColor: 'hsl(90 12% 45%)',
                   color: 'hsl(40 30% 93%)',
                 }}
               >
                 <Link href="/dashboard/listings/new">
-                  <PlusCircle className="h-4 w-4" />
-                  <span className="hidden lg:inline">List an Animal</span>
-                  <span className="lg:hidden">Sell</span>
+                  <PlusCircle className="h-3.5 w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
+                  <span className="hidden xl:inline">List an Animal</span>
+                  <span className="xl:hidden">List</span>
                 </Link>
               </Button>
               
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="max-w-[180px] lg:max-w-[220px]">
+                    <div className="max-w-[120px] lg:max-w-[140px] xl:max-w-[180px] min-w-0 flex-shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="default"
-                            className="h-10 px-3 gap-2 text-sm font-semibold w-full"
+                            className="h-9 lg:h-10 px-2 lg:px-2.5 gap-1.5 lg:gap-2 text-xs lg:text-sm font-semibold w-full min-w-0"
                           >
-                            <User className="h-4 w-4 flex-shrink-0" />
-                            <span className="hidden lg:inline truncate">
+                            <User className="h-3.5 w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
+                            <span className="hidden xl:inline truncate min-w-0">
                               {user?.displayName || (user?.email ? user.email.split('@')[0] : 'Account')}
+                            </span>
+                            <span className="xl:hidden truncate min-w-0 text-xs">
+                              {user?.displayName?.split(' ')[0] || (user?.email ? user.email.split('@')[0].substring(0, 6) : 'Acct')}
                             </span>
                             <ChevronDown className="h-3 w-3 opacity-50 flex-shrink-0" />
                           </Button>
@@ -266,12 +280,12 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden min-w-[44px] min-h-[44px] rounded-lg"
+                  className="md:hidden min-w-[40px] min-h-[40px] rounded-lg flex-shrink-0"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2 font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)]">
                     {/* Light mode: Olivewood color using mask */}
@@ -307,7 +321,7 @@ export function Navbar() {
                     Wildlife Exchange
                   </SheetTitle>
                 </SheetHeader>
-                <div className="flex flex-col gap-2 mt-6">
+                <div className="flex flex-col gap-2 mt-6 pb-4">
                   {navLinks.map((link) => {
                     const isActive = pathname === link.href || 
                       (link.href !== '/' && pathname?.startsWith(link.href + '/'));
@@ -316,12 +330,12 @@ export function Navbar() {
                         <Link
                           href={link.href}
                           className={cn(
-                            'px-4 py-3 rounded-lg text-base font-semibold transition-all min-h-[48px] flex items-center',
+                            'px-4 py-3 rounded-lg text-base font-semibold transition-all min-h-[48px] flex items-center w-full',
                             'hover:bg-muted active:bg-muted',
                             isActive && 'bg-primary/10 text-primary dark:text-[hsl(37,27%,70%)] border-l-4 border-primary dark:border-[hsl(37,27%,70%)]'
                           )}
                         >
-                          {link.label}
+                          <span className="truncate">{link.label}</span>
                         </Link>
                       </SheetClose>
                     );

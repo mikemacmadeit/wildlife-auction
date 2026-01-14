@@ -1,0 +1,268 @@
+/**
+ * Message Thread and Message Management
+ * Handles buyer-seller communication with sanitization
+ */
+
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  serverTimestamp,
+  Timestamp,
+  onSnapshot,
+  Unsubscribe,
+} from 'firebase/firestore';
+import { db } from './config';
+import { MessageThread, Message } from '@/lib/types';
+import { sanitizeMessage, hasViolations } from '@/lib/safety/sanitizeMessage';
+import { createNotification } from './notifications';
+
+/**
+ * Get or create a message thread between buyer and seller for a listing
+ */
+export async function getOrCreateThread(
+  listingId: string,
+  buyerId: string,
+  sellerId: string
+): Promise<string> {
+  // Check if thread already exists
+  const threadsRef = collection(db, 'messageThreads');
+  const existingThreadQuery = query(
+    threadsRef,
+    where('listingId', '==', listingId),
+    where('buyerId', '==', buyerId),
+    where('sellerId', '==', sellerId),
+    limit(1)
+  );
+
+  const existingThreads = await getDocs(existingThreadQuery);
+  
+  if (!existingThreads.empty) {
+    return existingThreads.docs[0].id;
+  }
+
+  // Create new thread
+  const threadData = {
+    listingId,
+    buyerId,
+    sellerId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    buyerUnreadCount: 0,
+    sellerUnreadCount: 0,
+    flagged: false,
+    violationCount: 0,
+    archived: false,
+  };
+
+  const threadRef = await addDoc(threadsRef, threadData);
+  return threadRef.id;
+}
+
+/**
+ * Send a message in a thread
+ * Sanitizes the message based on payment status
+ */
+export async function sendMessage(
+  threadId: string,
+  senderId: string,
+  recipientId: string,
+  listingId: string,
+  body: string,
+  orderStatus?: 'pending' | 'paid' | 'completed'
+): Promise<string> {
+  // Check if order exists and get payment status
+  let isPaid = false;
+  if (orderStatus) {
+    isPaid = orderStatus === 'paid' || orderStatus === 'completed';
+  } else {
+    // Try to find order for this listing
+    const ordersRef = collection(db, 'orders');
+    const orderQuery = query(
+      ordersRef,
+      where('listingId', '==', listingId),
+      where('buyerId', '==', senderId === recipientId ? undefined : senderId), // Buyer is sender or recipient
+      limit(1)
+    );
+    const orders = await getDocs(orderQuery);
+    if (!orders.empty) {
+      const orderData = orders.docs[0].data();
+      isPaid = orderData.status === 'paid' || orderData.status === 'completed';
+    }
+  }
+
+  // Sanitize message
+  const sanitizeResult = sanitizeMessage(body, {
+    isPaid,
+    paymentStatus: orderStatus,
+  });
+
+  // Store message (only store sanitized version, not original)
+  const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
+  const messageData = {
+    threadId,
+    senderId,
+    recipientId,
+    listingId,
+    body: sanitizeResult.sanitizedText, // Store sanitized version
+    createdAt: serverTimestamp(),
+    wasRedacted: sanitizeResult.wasRedacted,
+    violationCount: sanitizeResult.violationCount,
+    detectedViolations: sanitizeResult.detected,
+    flagged: hasViolations(sanitizeResult) && sanitizeResult.violationCount >= 2, // Flag if 2+ violations
+  };
+
+  const messageRef = await addDoc(messagesRef, messageData);
+
+  // Update thread
+  const threadRef = doc(db, 'messageThreads', threadId);
+  const threadDoc = await getDoc(threadRef);
+  const threadData = threadDoc.data();
+
+  // Increment violation count if violations detected
+  const newViolationCount = (threadData?.violationCount || 0) + sanitizeResult.violationCount;
+  
+  await updateDoc(threadRef, {
+    updatedAt: serverTimestamp(),
+    lastMessageAt: serverTimestamp(),
+    lastMessagePreview: sanitizeResult.sanitizedText.substring(0, 100),
+    [`${senderId === threadData?.buyerId ? 'buyer' : 'seller'}UnreadCount`]: 0, // Sender's unread = 0
+    [`${senderId === threadData?.buyerId ? 'seller' : 'buyer'}UnreadCount`]: 
+      (threadData?.[`${senderId === threadData?.buyerId ? 'seller' : 'buyer'}UnreadCount`] || 0) + 1,
+    violationCount: newViolationCount,
+    flagged: newViolationCount >= 3 || threadData?.flagged || false, // Flag if 3+ total violations
+  });
+
+  // Create notification for recipient
+  try {
+    const listingRef = doc(db, 'listings', listingId);
+    const listingDoc = await getDoc(listingRef);
+    const listingData = listingDoc.exists() ? listingDoc.data() : null;
+    const listingTitle = listingData?.title || 'a listing';
+    const senderRole = senderId === threadData?.buyerId ? 'Buyer' : 'Seller';
+
+    await createNotification({
+      userId: recipientId,
+      type: 'message_received',
+      title: 'New Message',
+      body: `${senderRole} sent you a message about "${listingTitle}"`,
+      linkUrl: `/dashboard/messages?listingId=${listingId}&sellerId=${threadData?.sellerId}`,
+      linkLabel: 'View Message',
+      listingId,
+      threadId,
+      metadata: {
+        senderId,
+        preview: sanitizeResult.sanitizedText.substring(0, 100),
+      },
+    });
+  } catch (notifError) {
+    // Don't fail message send if notification fails
+    console.error('Error creating notification:', notifError);
+  }
+
+  return messageRef.id;
+}
+
+/**
+ * Get messages for a thread
+ */
+export async function getThreadMessages(threadId: string): Promise<Message[]> {
+  const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
+  const messagesQuery = query(messagesRef, orderBy('createdAt', 'asc'));
+  
+  const snapshot = await getDocs(messagesQuery);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      readAt: data.readAt?.toDate(),
+    } as Message;
+  });
+}
+
+/**
+ * Get threads for a user (buyer or seller)
+ */
+export async function getUserThreads(userId: string, role: 'buyer' | 'seller'): Promise<MessageThread[]> {
+  const threadsRef = collection(db, 'messageThreads');
+  const threadsQuery = query(
+    threadsRef,
+    where(role === 'buyer' ? 'buyerId' : 'sellerId', '==', userId),
+    orderBy('updatedAt', 'desc'),
+    limit(50)
+  );
+
+  const snapshot = await getDocs(threadsQuery);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date(),
+      lastMessageAt: data.lastMessageAt?.toDate(),
+    } as MessageThread;
+  });
+}
+
+/**
+ * Mark thread messages as read
+ */
+export async function markThreadAsRead(threadId: string, userId: string): Promise<void> {
+  const threadRef = doc(db, 'messageThreads', threadId);
+  const threadDoc = await getDoc(threadRef);
+  const threadData = threadDoc.data();
+
+  if (!threadData) return;
+
+  const fieldName = userId === threadData.buyerId ? 'buyerUnreadCount' : 'sellerUnreadCount';
+  
+  await updateDoc(threadRef, {
+    [fieldName]: 0,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Flag a thread for admin review
+ */
+export async function flagThread(threadId: string, userId: string): Promise<void> {
+  const threadRef = doc(db, 'messageThreads', threadId);
+  await updateDoc(threadRef, {
+    flagged: true,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Subscribe to thread messages (real-time)
+ */
+export function subscribeToThreadMessages(
+  threadId: string,
+  callback: (messages: Message[]) => void
+): Unsubscribe {
+  const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
+  const messagesQuery = query(messagesRef, orderBy('createdAt', 'asc'));
+
+  return onSnapshot(messagesQuery, (snapshot) => {
+    const messages = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        readAt: data.readAt?.toDate(),
+      } as Message;
+    });
+    callback(messages);
+  });
+}

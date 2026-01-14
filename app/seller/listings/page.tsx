@@ -27,9 +27,20 @@ import { cn } from '@/lib/utils';
 import { ListingRowActions } from '@/components/listings/ListingRowActions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/hooks/use-auth';
-import { listSellerListings } from '@/lib/firebase/listings';
+import { useToast } from '@/hooks/use-toast';
+import { listSellerListings, unpublishListing, deleteListing } from '@/lib/firebase/listings';
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 
 // Helper functions outside component to prevent recreation on every render
 const getStatusBadge = (status: string) => {
@@ -68,7 +79,15 @@ const formatTimeRemaining = (date?: Date) => {
 };
 
 // Memoized Listing Row component for performance
-const ListingRow = memo(({ listing }: { listing: Listing }) => (
+const ListingRow = memo(({ 
+  listing, 
+  onPause, 
+  onDelete 
+}: { 
+  listing: Listing;
+  onPause: (listing: Listing) => void;
+  onDelete: (listing: Listing) => void;
+}) => (
   <tr
     key={listing.id}
     className="border-b border-border/30 hover:bg-background/50 group"
@@ -132,6 +151,8 @@ const ListingRow = memo(({ listing }: { listing: Listing }) => (
       <ListingRowActions
         listingId={listing.id}
         status={listing.status}
+        onPause={() => onPause(listing)}
+        onDelete={() => onDelete(listing)}
       />
     </td>
   </tr>
@@ -139,7 +160,15 @@ const ListingRow = memo(({ listing }: { listing: Listing }) => (
 ListingRow.displayName = 'ListingRow';
 
 // Memoized Mobile Listing Card
-const MobileListingCard = memo(({ listing }: { listing: Listing }) => (
+const MobileListingCard = memo(({ 
+  listing, 
+  onPause, 
+  onDelete 
+}: { 
+  listing: Listing;
+  onPause: (listing: Listing) => void;
+  onDelete: (listing: Listing) => void;
+}) => (
   <div key={listing.id} className="p-4 space-y-3">
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
@@ -157,6 +186,8 @@ const MobileListingCard = memo(({ listing }: { listing: Listing }) => (
       <ListingRowActions
         listingId={listing.id}
         status={listing.status}
+        onPause={() => onPause(listing)}
+        onDelete={() => onDelete(listing)}
       />
     </div>
 
@@ -209,6 +240,7 @@ MobileListingCard.displayName = 'MobileListingCard';
 
 function SellerListingsPageContent() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
@@ -217,6 +249,12 @@ function SellerListingsPageContent() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Dialog states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Fetch listings from Firestore
   useEffect(() => {
@@ -269,6 +307,82 @@ function SellerListingsPageContent() {
     return Array.from(locations);
   }, [listings]);
 
+  // Refresh listings after actions
+  const refreshListings = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const status = statusFilter === 'all' ? undefined : statusFilter;
+      const data = await listSellerListings(user.uid, status);
+      setListings(data);
+    } catch (err) {
+      console.error('Error refreshing listings:', err);
+    }
+  }, [user?.uid, statusFilter]);
+
+  // Action handlers
+  const handlePause = useCallback(async (listing: Listing) => {
+    if (!user?.uid) return;
+    
+    setSelectedListing(listing);
+    setPauseDialogOpen(true);
+  }, [user?.uid]);
+
+  const confirmPause = useCallback(async () => {
+    if (!user?.uid || !selectedListing) return;
+
+    try {
+      setActionLoading(selectedListing.id);
+      await unpublishListing(user.uid, selectedListing.id);
+      toast({
+        title: 'Listing paused',
+        description: `${selectedListing.title} has been unpublished and moved to drafts.`,
+      });
+      setPauseDialogOpen(false);
+      setSelectedListing(null);
+      await refreshListings();
+    } catch (err: any) {
+      toast({
+        title: 'Error pausing listing',
+        description: err.message || 'Failed to pause listing. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }, [user?.uid, selectedListing, toast, refreshListings]);
+
+
+  const handleDelete = useCallback(async (listing: Listing) => {
+    if (!user?.uid) return;
+    
+    setSelectedListing(listing);
+    setDeleteDialogOpen(true);
+  }, [user?.uid]);
+
+  const confirmDelete = useCallback(async () => {
+    if (!user?.uid || !selectedListing) return;
+
+    try {
+      setActionLoading(selectedListing.id);
+      await deleteListing(user.uid, selectedListing.id);
+      toast({
+        title: 'Listing deleted',
+        description: `${selectedListing.title} has been permanently deleted.`,
+      });
+      setDeleteDialogOpen(false);
+      setSelectedListing(null);
+      await refreshListings();
+    } catch (err: any) {
+      toast({
+        title: 'Error deleting listing',
+        description: err.message || 'Failed to delete listing. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }, [user?.uid, selectedListing, toast, refreshListings]);
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
@@ -282,12 +396,10 @@ function SellerListingsPageContent() {
               Manage your listings and track performance
             </p>
           </div>
-          <Button asChild className="min-h-[44px] font-semibold gap-2">
-            <Link href="/dashboard/listings/new">
-              <PlusCircle className="h-4 w-4" />
-              Create Listing
-            </Link>
-          </Button>
+          <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
+            <PlusCircle className="h-4 w-4" />
+            Create Listing
+          </CreateListingGateButton>
         </div>
 
         {/* Filters */}
@@ -383,12 +495,10 @@ function SellerListingsPageContent() {
                   ? 'Try adjusting your filters'
                   : 'Create your first listing to get started'}
               </p>
-              <Button asChild className="min-h-[44px] font-semibold gap-2">
-                <Link href="/dashboard/listings/new">
-                  <PlusCircle className="h-4 w-4" />
-                  Create Listing
-                </Link>
-              </Button>
+              <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Create Listing
+              </CreateListingGateButton>
             </CardContent>
           </Card>
         )}
@@ -426,7 +536,12 @@ function SellerListingsPageContent() {
                   </thead>
                   <tbody>
                     {filteredListings.map((listing) => (
-                      <ListingRow key={listing.id} listing={listing} />
+                      <ListingRow 
+                        key={listing.id} 
+                        listing={listing}
+                        onPause={handlePause}
+                        onDelete={handleDelete}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -435,12 +550,99 @@ function SellerListingsPageContent() {
               {/* Mobile Card View */}
               <div className="md:hidden divide-y divide-border/30">
                 {filteredListings.map((listing) => (
-                  <MobileListingCard key={listing.id} listing={listing} />
+                  <MobileListingCard 
+                    key={listing.id} 
+                    listing={listing}
+                    onPause={handlePause}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Listing?
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete <strong>{selectedListing?.title}</strong>? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setSelectedListing(null);
+                }}
+                disabled={actionLoading === selectedListing?.id}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={actionLoading === selectedListing?.id}
+              >
+                {actionLoading === selectedListing?.id ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Permanently
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Pause Confirmation Dialog */}
+        <Dialog open={pauseDialogOpen} onOpenChange={setPauseDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Pause Listing?</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to unpublish <strong>{selectedListing?.title}</strong>? It will be moved to drafts and will no longer be visible to buyers.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPauseDialogOpen(false);
+                  setSelectedListing(null);
+                }}
+                disabled={actionLoading === selectedListing?.id}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmPause}
+                disabled={actionLoading === selectedListing?.id}
+              >
+                {actionLoading === selectedListing?.id ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Pausing...
+                  </>
+                ) : (
+                  'Pause Listing'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </div>
   );

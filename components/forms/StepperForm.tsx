@@ -3,7 +3,7 @@
 import { useState, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -21,6 +21,10 @@ interface StepperFormProps {
   onComplete: (data: Record<string, unknown>) => void;
   className?: string;
   showProgress?: boolean;
+  allowStepJump?: boolean; // Allow clicking on any step to jump to it
+  onSave?: () => void | Promise<void>; // Optional save handler for any step (uses parent's formData)
+  saving?: boolean; // Loading state for save operation
+  showSaveButton?: boolean; // Whether to show save button on each step
 }
 
 export function StepperForm({
@@ -28,6 +32,10 @@ export function StepperForm({
   onComplete,
   className,
   showProgress = true,
+  allowStepJump = false,
+  onSave,
+  saving = false,
+  showSaveButton = false,
 }: StepperFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -60,57 +68,144 @@ export function StepperForm({
     }
   };
 
+  const handleStepClick = (index: number) => {
+    if (allowStepJump && index !== currentStep) {
+      setCurrentStep(index);
+    }
+  };
+
   return (
     <div className={cn('space-y-6', className)}>
-      {/* Progress Bar */}
+      {/* Enhanced Progress Bar */}
       {showProgress && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">
+            <span className="font-semibold text-foreground">
               Step {currentStep + 1} of {steps.length}
             </span>
-            <span className="text-muted-foreground">
-              {Math.round(progress)}%
+            <span className="text-muted-foreground font-medium">
+              {Math.round(progress)}% Complete
             </span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-3" />
+          
+          {/* Step Indicators */}
+          <div className="flex items-center justify-between pt-2">
+            {steps.map((step, index) => (
+              <div
+                key={step.id}
+                className={cn(
+                  'flex flex-col items-center flex-1',
+                  index < steps.length - 1 && 'pr-2'
+                )}
+              >
+                <div
+                  onClick={() => handleStepClick(index)}
+                  className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
+                    index < currentStep
+                      ? 'bg-primary text-primary-foreground'
+                      : index === currentStep
+                      ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
+                      : 'bg-muted text-muted-foreground',
+                    allowStepJump && 'cursor-pointer hover:scale-110 hover:ring-2 hover:ring-primary/30'
+                  )}
+                >
+                  {index < currentStep ? '✓' : index + 1}
+                </div>
+                <span
+                  onClick={() => handleStepClick(index)}
+                  className={cn(
+                    'text-xs mt-1 text-center hidden sm:block truncate max-w-[80px]',
+                    index === currentStep
+                      ? 'font-semibold text-foreground'
+                      : 'text-muted-foreground',
+                    allowStepJump && 'cursor-pointer hover:text-foreground transition-colors'
+                  )}
+                >
+                  {step.title.split(' ')[0]}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Step Header */}
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold">{currentStepData.title}</h2>
+      {/* Enhanced Step Header */}
+      <div className="space-y-2 pb-4 border-b">
+        <h2 className="text-2xl md:text-3xl font-extrabold text-foreground">
+          {currentStepData.title}
+        </h2>
         {currentStepData.description && (
-          <p className="text-muted-foreground">{currentStepData.description}</p>
+          <p className="text-muted-foreground text-base">
+            {currentStepData.description}
+          </p>
         )}
       </div>
 
-      {/* Step Content */}
-      <div className="min-h-[300px] py-4">
+      {/* Step Content with Better Spacing */}
+      <div className="min-h-[400px] py-6">
         {currentStepData.content}
       </div>
 
-      {/* Navigation */}
+      {/* Enhanced Navigation */}
       <div className="flex items-center justify-between gap-4 pt-6 border-t">
         <Button
           type="button"
           variant="outline"
           onClick={handlePrevious}
-          disabled={isFirstStep}
+          disabled={isFirstStep || saving}
           className="min-h-[48px] min-w-[120px]"
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
           Previous
         </Button>
 
-        <Button
-          type="button"
-          onClick={handleNext}
-          className="min-h-[48px] min-w-[120px]"
-        >
-          {isLastStep ? 'Complete' : 'Next'}
-          {!isLastStep && <ChevronRight className="h-4 w-4 ml-2" />}
-        </Button>
+        <div className="flex items-center gap-3">
+          {showSaveButton && onSave && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onSave()}
+              disabled={saving}
+              className="min-h-[48px] min-w-[140px] font-semibold"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          )}
+
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={saving}
+            className={cn(
+              "min-h-[48px] min-w-[150px] font-semibold shadow-lg hover:shadow-xl transition-shadow",
+              isLastStep && "bg-gradient-to-r from-primary to-primary/90"
+            )}
+          >
+            {isLastStep ? (
+              <>
+                <span className="mr-2">✨</span>
+                Publish Listing
+              </>
+            ) : (
+              <>
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

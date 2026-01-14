@@ -7,10 +7,26 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import Stripe from 'stripe';
-import { stripe } from '@/lib/stripe/config';
+import { stripe, isStripeConfigured } from '@/lib/stripe/config';
+import { logInfo, logWarn, logError, getRequestId } from '@/lib/monitoring/logger';
+import { captureException } from '@/lib/monitoring/capture';
+import {
+  handleCheckoutSessionCompleted,
+  handleChargeDisputeCreated,
+  handleChargeDisputeClosed,
+  handleChargeDisputeFundsWithdrawn,
+  handleChargeDisputeFundsReinstated,
+} from './handlers';
+import {
+  handleSubscriptionCreated,
+  handleSubscriptionUpdated,
+  handleSubscriptionDeleted,
+  handleInvoicePaymentSucceeded,
+  handleInvoicePaymentFailed,
+} from './subscription-handlers';
 
 // Initialize Firebase Admin (if not already initialized)
 let adminApp: App;
@@ -66,13 +82,26 @@ async function getRawBody(request: NextRequest): Promise<Buffer> {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = getRequestId(request.headers);
+  const responseHeaders = new Headers();
+  responseHeaders.set('x-request-id', requestId);
+
+  // Check if Stripe is configured
+  if (!isStripeConfigured() || !stripe) {
+    logError('Stripe not configured for webhook', undefined, { requestId, route: '/api/stripe/webhook' });
+    return NextResponse.json(
+      { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.' },
+      { status: 503, headers: responseHeaders }
+    );
+  }
+
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET is not set');
+    logError('STRIPE_WEBHOOK_SECRET not set', undefined, { requestId, route: '/api/stripe/webhook' });
     return NextResponse.json(
       { error: 'Webhook secret not configured' },
-      { status: 500 }
+      { status: 500, headers: responseHeaders }
     );
   }
 
@@ -82,9 +111,10 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('stripe-signature');
 
     if (!signature) {
+      logWarn('Missing stripe-signature header', { requestId, route: '/api/stripe/webhook' });
       return NextResponse.json(
         { error: 'Missing stripe-signature header' },
-        { status: 400 }
+        { status: 400, headers: responseHeaders }
       );
     }
 
@@ -92,44 +122,242 @@ export async function POST(request: NextRequest) {
     let event;
     try {
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      logInfo('Webhook event received', {
+        requestId,
+        route: '/api/stripe/webhook',
+        eventType: event.type,
+        eventId: event.id,
+      });
     } catch (error: any) {
-      console.error('Webhook signature verification failed:', error.message);
+      logError('Webhook signature verification failed', error, {
+        requestId,
+        route: '/api/stripe/webhook',
+      });
+      captureException(error instanceof Error ? error : new Error(String(error)), {
+        requestId,
+        route: '/api/stripe/webhook',
+      });
       return NextResponse.json(
         { error: `Webhook signature verification failed: ${error.message}` },
-        { status: 400 }
+        { status: 400, headers: responseHeaders }
       );
     }
 
-    // Handle different event types
-    switch (event.type) {
-      case 'account.updated': {
-        const account = event.data.object as Stripe.Account;
-        await handleAccountUpdated(account);
-        break;
+    // IDEMPOTENCY: Check if event was already processed using Firestore transaction
+    const eventId = event.id;
+    const eventRef = adminDb.collection('stripeEvents').doc(eventId);
+    
+    // Use transaction to atomically check and set (prevents race conditions)
+    let eventWasAlreadyProcessed = false;
+    try {
+      await adminDb.runTransaction(async (transaction) => {
+        const eventDoc = await transaction.get(eventRef);
+        
+        if (eventDoc.exists) {
+          // Event already processed
+          const existingEvent = eventDoc.data()!;
+          logInfo('Webhook event already processed (idempotent)', {
+            requestId,
+            route: '/api/stripe/webhook',
+            eventId,
+            eventType: event.type,
+            processedAt: existingEvent.createdAt?.toDate()?.toISOString(),
+          });
+          eventWasAlreadyProcessed = true;
+          return; // Exit transaction early
+        }
+        
+        // Record event in Firestore
+        const eventData: any = {
+          type: event.type,
+          createdAt: Timestamp.now(),
+        };
+        
+        // Store relevant IDs based on event type
+        if (event.type === 'checkout.session.completed') {
+          const session = event.data.object as Stripe.Checkout.Session;
+          eventData.checkoutSessionId = session.id;
+          eventData.paymentIntentId = typeof session.payment_intent === 'string'
+            ? session.payment_intent
+            : session.payment_intent?.id;
+        } else if (event.type.startsWith('charge.dispute')) {
+          const dispute = event.data.object as Stripe.Dispute;
+          eventData.disputeId = dispute.id;
+          eventData.chargeId = dispute.charge;
+          eventData.paymentIntentId = dispute.payment_intent;
+        }
+        
+        transaction.set(eventRef, eventData);
+        logInfo('Webhook event recorded for idempotency', {
+          requestId,
+          route: '/api/stripe/webhook',
+          eventId,
+          eventType: event.type,
+        });
+      });
+    } catch (transactionError: any) {
+      // If transaction fails, check if event was already processed
+      const eventDoc = await eventRef.get();
+      if (eventDoc.exists) {
+        logInfo('Webhook event already processed (transaction failed but event exists)', {
+          requestId,
+          route: '/api/stripe/webhook',
+          eventId,
+          eventType: event.type,
+        });
+        return NextResponse.json({ received: true, idempotent: true }, { headers: responseHeaders });
       }
-
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutSessionCompleted(session);
-        break;
-      }
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`);
+      // If transaction failed for other reasons, log and continue (but this is risky)
+      logError('Webhook transaction error', transactionError, {
+        requestId,
+        route: '/api/stripe/webhook',
+        eventId,
+        eventType: event.type,
+      });
+      // Continue processing - transaction failure shouldn't block webhook
     }
 
-    return NextResponse.json({ received: true });
+    // If event was already processed, return early
+    if (eventWasAlreadyProcessed) {
+      return NextResponse.json({ received: true, idempotent: true }, { headers: responseHeaders });
+    }
+
+    // Handle different event types
+    try {
+      switch (event.type) {
+        case 'account.updated': {
+          const account = event.data.object as Stripe.Account;
+          await handleAccountUpdated(account);
+          break;
+        }
+
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          await handleCheckoutSessionCompleted(adminDb, session, requestId);
+          break;
+        }
+
+        case 'charge.dispute.created': {
+          const dispute = event.data.object as Stripe.Dispute;
+          await handleChargeDisputeCreated(adminDb, dispute, requestId);
+          break;
+        }
+
+        case 'charge.dispute.closed': {
+          const dispute = event.data.object as Stripe.Dispute;
+          await handleChargeDisputeClosed(adminDb, dispute, requestId);
+          break;
+        }
+
+        case 'charge.dispute.funds_withdrawn': {
+          const dispute = event.data.object as Stripe.Dispute;
+          await handleChargeDisputeFundsWithdrawn(adminDb, dispute, requestId);
+          break;
+        }
+
+        case 'charge.dispute.funds_reinstated': {
+          const dispute = event.data.object as Stripe.Dispute;
+          await handleChargeDisputeFundsReinstated(adminDb, dispute, requestId);
+          break;
+        }
+
+        case 'customer.subscription.created': {
+          const subscription = event.data.object as Stripe.Subscription;
+          await handleSubscriptionCreated(adminDb, subscription, requestId);
+          break;
+        }
+
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as Stripe.Subscription;
+          await handleSubscriptionUpdated(adminDb, subscription, requestId);
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          await handleSubscriptionDeleted(adminDb, subscription, requestId);
+          break;
+        }
+
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await handleInvoicePaymentSucceeded(adminDb, invoice, requestId);
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await handleInvoicePaymentFailed(adminDb, invoice, requestId);
+          break;
+        }
+
+        default:
+          logWarn('Unhandled webhook event type', {
+            requestId,
+            route: '/api/stripe/webhook',
+            eventId,
+            eventType: event.type,
+          });
+      }
+
+      // Update webhook health doc (non-blocking)
+      try {
+        await adminDb.collection('opsHealth').doc('stripeWebhook').set({
+          lastWebhookAt: Timestamp.now(),
+          lastEventType: event.type,
+          lastEventId: event.id,
+          updatedAt: Timestamp.now(),
+        }, { merge: true });
+      } catch (healthError) {
+        // Non-blocking, just log
+        logWarn('Failed to update webhook health', {
+          requestId,
+          route: '/api/stripe/webhook',
+          error: String(healthError),
+        });
+      }
+
+      logInfo('Webhook event processed successfully', {
+        requestId,
+        route: '/api/stripe/webhook',
+        eventId,
+        eventType: event.type,
+      });
+
+      return NextResponse.json({ received: true }, { headers: responseHeaders });
+    } catch (handlerError: any) {
+      logError('Webhook handler error', handlerError, {
+        requestId,
+        route: '/api/stripe/webhook',
+        eventId,
+        eventType: event.type,
+      });
+      captureException(handlerError instanceof Error ? handlerError : new Error(String(handlerError)), {
+        requestId,
+        route: '/api/stripe/webhook',
+        eventId,
+        eventType: event.type,
+      });
+      throw handlerError; // Re-throw to be caught by outer catch
+    }
   } catch (error: any) {
-    console.error('Webhook error:', error);
+    logError('Webhook error', error, {
+      requestId,
+      route: '/api/stripe/webhook',
+    });
+    captureException(error instanceof Error ? error : new Error(String(error)), {
+      requestId,
+      route: '/api/stripe/webhook',
+    });
     return NextResponse.json(
       { error: 'Webhook handler failed', message: error.message },
-      { status: 500 }
+      { status: 500, headers: responseHeaders }
     );
   }
 }
 
 /**
- * Handle account.updated event
+ * Handle account.updated event (not extracted for testing yet)
  * Updates user's Stripe Connect status based on account capabilities
  */
 async function handleAccountUpdated(account: Stripe.Account) {
@@ -168,88 +396,4 @@ async function handleAccountUpdated(account: Stripe.Account) {
   }
 }
 
-/**
- * Handle checkout.session.completed event
- * Creates order and marks listing as sold
- */
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  try {
-    const checkoutSessionId = session.id;
-    const listingId = session.metadata?.listingId;
-    const buyerId = session.metadata?.buyerId;
-    const sellerId = session.metadata?.sellerId;
-
-    if (!listingId || !buyerId || !sellerId) {
-      console.error('Missing required metadata in checkout session:', {
-        listingId,
-        buyerId,
-        sellerId,
-      });
-      return;
-    }
-
-    // Check if order already exists (idempotency) using Admin SDK
-    const ordersRef = adminDb.collection('orders');
-    const existingOrderQuery = await ordersRef
-      .where('stripeCheckoutSessionId', '==', checkoutSessionId)
-      .get();
-
-    if (!existingOrderQuery.empty) {
-      console.log(`Order already exists for checkout session: ${checkoutSessionId}`);
-      return;
-    }
-
-    // Get payment intent to get transfer details
-    const paymentIntentId = typeof session.payment_intent === 'string'
-      ? session.payment_intent
-      : session.payment_intent?.id;
-
-    if (!paymentIntentId) {
-      console.error('No payment intent ID in checkout session');
-      return;
-    }
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    const amount = paymentIntent.amount; // Total amount in cents
-    const applicationFeeAmount = paymentIntent.application_fee_amount || 0;
-    const sellerAmount = amount - applicationFeeAmount;
-
-    // Get listing to verify it exists using Admin SDK
-    const listingRef = adminDb.collection('listings').doc(listingId);
-    const listingDoc = await listingRef.get();
-    
-    if (!listingDoc.exists) {
-      console.error(`Listing not found: ${listingId}`);
-      return;
-    }
-
-    // Create order in Firestore using Admin SDK
-    const orderRef = adminDb.collection('orders').doc();
-    const orderData = {
-      listingId,
-      buyerId,
-      sellerId,
-      amount: amount / 100, // Convert cents to dollars
-      platformFee: applicationFeeAmount / 100,
-      sellerAmount: sellerAmount / 100,
-      status: 'paid',
-      stripeCheckoutSessionId: checkoutSessionId,
-      stripePaymentIntentId: paymentIntentId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      completedAt: new Date(),
-    };
-    await orderRef.set(orderData);
-
-    // Mark listing as sold using Admin SDK
-    await listingRef.update({
-      status: 'sold',
-      updatedAt: new Date(),
-    });
-
-    console.log(`Order created and listing marked as sold: ${orderRef.id}`);
-  } catch (error) {
-    console.error('Error handling checkout.session.completed:', error);
-    throw error;
-  }
-}
+// Handlers extracted to handlers.ts for testability

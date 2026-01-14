@@ -1,0 +1,215 @@
+/**
+ * POST /api/messages/send
+ * Send a message with server-side sanitization
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { sanitizeMessage } from '@/lib/safety/sanitizeMessage';
+import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+
+// Initialize Firebase Admin
+let adminApp: App | undefined;
+let auth: ReturnType<typeof getAuth>;
+let db: ReturnType<typeof getFirestore>;
+
+async function initializeFirebaseAdmin() {
+  if (!adminApp) {
+    if (!getApps().length) {
+      try {
+        const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
+          ? {
+              projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+              clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+              privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            }
+          : undefined;
+
+        if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
+          adminApp = initializeApp({
+            credential: cert(serviceAccount as any),
+          });
+        } else {
+          adminApp = initializeApp();
+        }
+      } catch (error) {
+        console.error('Firebase Admin initialization error:', error);
+        throw error;
+      }
+    } else {
+      adminApp = getApps()[0];
+    }
+  }
+  auth = getAuth(adminApp);
+  db = getFirestore(adminApp);
+  return { auth, db };
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { auth, db } = await initializeFirebaseAdmin();
+
+    // Rate limiting
+    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
+    const rateLimitResult = await rateLimitCheck(request);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(rateLimitResult.body, { 
+        status: rateLimitResult.status,
+        headers: {
+          'Retry-After': rateLimitResult.body.retryAfter?.toString() || '60',
+        },
+      });
+    }
+
+    // Get auth token
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
+    }
+
+    const senderId = decodedToken.uid;
+
+    // Parse request body
+    const body = await request.json();
+    const { threadId, recipientId, listingId, messageBody } = body;
+
+    if (!threadId || !recipientId || !listingId || !messageBody) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Verify thread exists and user is participant
+    const threadRef = db.collection('messageThreads').doc(threadId);
+    const threadDoc = await threadRef.get();
+    
+    if (!threadDoc.exists) {
+      return NextResponse.json(
+        { error: 'Thread not found' },
+        { status: 404 }
+      );
+    }
+
+    const threadData = threadDoc.data()!;
+    if (threadData.buyerId !== senderId && threadData.sellerId !== senderId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
+    }
+
+    // Check order status to determine if contact should be allowed
+    let orderStatus: 'pending' | 'paid' | 'completed' | undefined;
+    const ordersRef = db.collection('orders');
+    const orderQuery = await ordersRef
+      .where('listingId', '==', listingId)
+      .where('buyerId', '==', threadData.buyerId)
+      .limit(1)
+      .get();
+
+    if (!orderQuery.empty) {
+      const orderData = orderQuery.docs[0].data();
+      orderStatus = orderData.status as 'pending' | 'paid' | 'completed';
+    }
+
+    // Sanitize message on server
+    const isPaid = orderStatus === 'paid' || orderStatus === 'completed';
+    const sanitizeResult = sanitizeMessage(messageBody, {
+      isPaid,
+      paymentStatus: orderStatus,
+    });
+
+    // Store message
+    const messagesRef = threadRef.collection('messages');
+    const messageData = {
+      threadId,
+      senderId,
+      recipientId,
+      listingId,
+      body: sanitizeResult.sanitizedText,
+      createdAt: new Date(),
+      wasRedacted: sanitizeResult.wasRedacted,
+      violationCount: sanitizeResult.violationCount,
+      detectedViolations: sanitizeResult.detected,
+      flagged: sanitizeResult.violationCount >= 2,
+    };
+
+    const messageRef = await messagesRef.add(messageData);
+
+    // Update thread
+    const newViolationCount = (threadData.violationCount || 0) + sanitizeResult.violationCount;
+    const unreadField = senderId === threadData.buyerId ? 'sellerUnreadCount' : 'buyerUnreadCount';
+    
+    await threadRef.update({
+      updatedAt: new Date(),
+      lastMessageAt: new Date(),
+      lastMessagePreview: sanitizeResult.sanitizedText.substring(0, 100),
+      [`${senderId === threadData.buyerId ? 'buyer' : 'seller'}UnreadCount`]: 0,
+      [unreadField]: (threadData[unreadField] || 0) + 1,
+      violationCount: newViolationCount,
+      flagged: newViolationCount >= 3 || threadData.flagged || false,
+    });
+
+    // Create notification for recipient
+    try {
+      const { getDoc: getDocAdmin } = await import('firebase-admin/firestore');
+      const listingRef = db.collection('listings').doc(listingId);
+      const listingDoc = await listingRef.get();
+      const listingData = listingDoc.exists ? listingDoc.data() : null;
+      const listingTitle = listingData?.title || 'a listing';
+
+      const notificationsRef = db.collection('notifications');
+      await notificationsRef.add({
+        userId: recipientId,
+        type: 'message_received',
+        title: 'New Message',
+        body: `${senderId === threadData.buyerId ? 'Buyer' : 'Seller'} sent you a message about "${listingTitle}"`,
+        read: false,
+        createdAt: new Date(),
+        linkUrl: `/dashboard/messages?listingId=${listingId}&sellerId=${threadData.sellerId}`,
+        linkLabel: 'View Message',
+        listingId,
+        threadId,
+        metadata: {
+          senderId,
+          preview: sanitizeResult.sanitizedText.substring(0, 100),
+        },
+      });
+    } catch (notifError) {
+      // Don't fail message send if notification fails
+      console.error('Error creating notification:', notifError);
+    }
+
+    return NextResponse.json({
+      success: true,
+      messageId: messageRef.id,
+      wasRedacted: sanitizeResult.wasRedacted,
+      violationDescription: sanitizeResult.wasRedacted
+        ? `Contact details are hidden until payment is completed.`
+        : undefined,
+    });
+  } catch (error: any) {
+    console.error('Error sending message:', error);
+    return NextResponse.json(
+      { error: 'Failed to send message', message: error.message },
+      { status: 500 }
+    );
+  }
+}

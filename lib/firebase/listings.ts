@@ -5,6 +5,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -15,20 +16,26 @@ import {
   QueryConstraint,
   QueryDocumentSnapshot,
   DocumentData,
+  onSnapshot,
+  Unsubscribe,
+  FieldPath,
 } from 'firebase/firestore';
 import { db } from './config';
 import { getDocument } from './firestore';
-import { Listing, ListingStatus, ListingType, ListingCategory, UserProfile } from '@/lib/types';
+import { Listing, ListingStatus, ListingType, ListingCategory, ListingAttributes, UserProfile } from '@/lib/types';
 import { ListingDoc } from '@/lib/types/firestore';
+import { validateListingCompliance, requiresComplianceReview } from '@/lib/compliance/validation';
 
 /**
  * Input type for creating a listing (omits fields that are auto-generated)
  */
+
 export interface CreateListingInput {
   title: string;
   description: string;
   type: 'auction' | 'fixed' | 'classified';
-  category: 'cattle' | 'horses' | 'wildlife' | 'equipment' | 'land' | 'other';
+  category: ListingCategory; // 'wildlife_exotics' | 'cattle_livestock' | 'ranch_equipment'
+  subcategory?: string; // Optional subcategory
   price?: number;
   startingBid?: number;
   reservePrice?: number;
@@ -46,13 +53,15 @@ export interface CreateListingInput {
     insuranceAvailable: boolean;
     transportReady: boolean;
   };
-  metadata?: {
-    quantity?: number;
-    breed?: string;
-    age?: string;
-    healthStatus?: string;
-    papers?: boolean;
-  };
+  attributes: ListingAttributes; // Category-specific structured attributes
+  // Protected Transaction fields
+  protectedTransactionEnabled?: boolean;
+  protectedTransactionDays?: 7 | 14 | null;
+  protectedTermsVersion?: string;
+
+  // Whitetail-only seller attestation (top-level)
+  sellerAttestationAccepted?: boolean;
+  sellerAttestationAcceptedAt?: Date;
 }
 
 /**
@@ -64,6 +73,66 @@ const timestampToDate = (timestamp: Timestamp | Date | undefined): Date | undefi
   if (timestamp instanceof Timestamp) return timestamp.toDate();
   return undefined;
 };
+
+/**
+ * Migrate old metadata structure to new attributes structure for backward compatibility
+ * If doc has old metadata, convert it to appropriate attributes based on category
+ * If doc already has attributes, use them directly
+ */
+function migrateAttributes(doc: ListingDoc & { id: string }): ListingAttributes {
+  // If attributes already exist, use them
+  if (doc.attributes && typeof doc.attributes === 'object') {
+    return doc.attributes as ListingAttributes;
+  }
+
+  // Backward compatibility: migrate old metadata to new attributes
+  const oldMetadata = doc.metadata;
+  const category = doc.category;
+
+  // Default category for old listings without category
+  const effectiveCategory: ListingCategory = category || 'wildlife_exotics';
+
+  // Map old categories to new ones
+  let mappedCategory: ListingCategory = effectiveCategory;
+  if (category === 'wildlife' || category === 'horses' || !category) {
+    mappedCategory = 'wildlife_exotics';
+  } else if (category === 'cattle') {
+    mappedCategory = 'cattle_livestock';
+  } else if (category === 'equipment') {
+    mappedCategory = 'ranch_equipment';
+  } else {
+    // For 'land' or 'other', default to wildlife_exotics
+    mappedCategory = 'wildlife_exotics';
+  }
+
+  // Convert old metadata to new attributes based on category
+  if (mappedCategory === 'wildlife_exotics') {
+    return {
+      species: oldMetadata?.breed || 'Unknown',
+      sex: 'unknown',
+      age: oldMetadata?.age,
+      quantity: oldMetadata?.quantity || 1,
+      healthNotes: oldMetadata?.healthStatus,
+    } as ListingAttributes;
+  } else if (mappedCategory === 'cattle_livestock') {
+    return {
+      breed: oldMetadata?.breed || 'Unknown',
+      sex: 'unknown',
+      age: oldMetadata?.age,
+      registered: oldMetadata?.papers || false,
+      registrationNumber: oldMetadata?.papers ? undefined : undefined,
+      quantity: oldMetadata?.quantity || 1,
+      healthNotes: oldMetadata?.healthStatus,
+    } as ListingAttributes;
+  } else {
+    // ranch_equipment
+    return {
+      equipmentType: 'Equipment',
+      condition: 'good',
+      quantity: oldMetadata?.quantity || 1,
+    } as ListingAttributes;
+  }
+}
 
 /**
  * Convert Firestore ListingDoc to UI Listing type
@@ -80,6 +149,17 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
         verified: doc.sellerSnapshot.verified,
       }
     : undefined;
+
+  const attributes = migrateAttributes(doc);
+
+  // Normalize whitetail permit expiration Date from nested Timestamp (if present)
+  if (doc.category === 'whitetail_breeder') {
+    const raw: any = (attributes as any)?.tpwdPermitExpirationDate;
+    const d: Date | null = raw?.toDate?.() || (raw instanceof Date ? raw : null);
+    if (d) {
+      (attributes as any).tpwdPermitExpirationDate = d;
+    }
+  }
 
   return {
     id: doc.id,
@@ -98,7 +178,8 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     sellerSnapshot: doc.sellerSnapshot,
     seller: legacySeller, // @deprecated - for backward compatibility only
     trust: doc.trust || { verified: false, insuranceAvailable: false, transportReady: false },
-    metadata: doc.metadata,
+    subcategory: doc.subcategory,
+    attributes, // Migrate old metadata to new attributes if needed + normalize whitetail dates
     endsAt: timestampToDate(doc.endsAt),
     featured: doc.featured,
     featuredUntil: timestampToDate(doc.featuredUntil),
@@ -108,6 +189,18 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     createdBy: doc.createdBy,
     updatedBy: doc.updatedBy,
     publishedAt: timestampToDate(doc.publishedAt),
+    // Protected Transaction fields
+    protectedTransactionEnabled: doc.protectedTransactionEnabled,
+    protectedTransactionDays: doc.protectedTransactionDays,
+    protectedTransactionBadge: doc.protectedTransactionDays === 7 ? 'PROTECTED_7' : doc.protectedTransactionDays === 14 ? 'PROTECTED_14' : null,
+    protectedTermsVersion: doc.protectedTermsVersion,
+    protectedEnabledAt: timestampToDate(doc.protectedEnabledAt),
+
+    // Whitetail-only seller attestation + internal flags
+    sellerAttestationAccepted: doc.sellerAttestationAccepted,
+    sellerAttestationAcceptedAt: timestampToDate(doc.sellerAttestationAcceptedAt),
+    internalFlags: doc.internalFlags,
+    internalFlagsNotes: doc.internalFlagsNotes,
   };
 }
 
@@ -120,17 +213,27 @@ function toListingDocInput(
   sellerId: string,
   sellerSnapshot: { displayName: string; verified: boolean }
 ): Omit<ListingDoc, 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'publishedAt' | 'status'> {
+  // Clean location object - remove undefined zip
+  const location: any = {
+    city: listingInput.location.city,
+    state: listingInput.location.state,
+  };
+  if (listingInput.location.zip && listingInput.location.zip.trim()) {
+    location.zip = listingInput.location.zip.trim();
+  }
+
   return {
     title: listingInput.title.trim(),
     description: listingInput.description.trim(),
     type: listingInput.type,
     category: listingInput.category,
     images: listingInput.images || [],
-    location: listingInput.location,
+    location,
     sellerId,
     sellerSnapshot,
     trust: listingInput.trust,
-    metadata: listingInput.metadata || {},
+    ...(listingInput.subcategory !== undefined && { subcategory: listingInput.subcategory }),
+    attributes: listingInput.attributes as Record<string, any>, // Store as plain object in Firestore
     metrics: {
       views: 0,
       favorites: 0,
@@ -144,6 +247,21 @@ function toListingDocInput(
     ...(listingInput.endsAt && { endsAt: Timestamp.fromDate(listingInput.endsAt) }),
     ...(listingInput.featured && { featured: listingInput.featured }),
     ...(listingInput.featuredUntil && { featuredUntil: Timestamp.fromDate(listingInput.featuredUntil) }),
+    // Protected Transaction fields
+    ...(listingInput.protectedTransactionEnabled && {
+      protectedTransactionEnabled: listingInput.protectedTransactionEnabled,
+      protectedTransactionDays: listingInput.protectedTransactionDays || null,
+      protectedTermsVersion: listingInput.protectedTermsVersion || 'v1',
+      protectedEnabledAt: Timestamp.now(),
+    }),
+
+    // Whitetail-only seller attestation
+    ...(listingInput.sellerAttestationAccepted !== undefined && {
+      sellerAttestationAccepted: listingInput.sellerAttestationAccepted,
+    }),
+    ...(listingInput.sellerAttestationAcceptedAt && {
+      sellerAttestationAcceptedAt: Timestamp.fromDate(listingInput.sellerAttestationAcceptedAt),
+    }),
   };
 }
 
@@ -175,17 +293,44 @@ export const createListingDraft = async (
   listingInput: CreateListingInput
 ): Promise<string> => {
   try {
+    // Whitetail-only hard gates (attestation is required even for draft creation)
+    if (listingInput.category === 'whitetail_breeder' && listingInput.sellerAttestationAccepted !== true) {
+      throw new Error(
+        'Seller attestation is required for whitetail breeder listings. Please certify that permit information is accurate and permit is valid/current.'
+      );
+    }
+
+    // P0: Compliance validation
+    validateListingCompliance(
+      listingInput.category,
+      listingInput.attributes,
+      listingInput.location.state,
+      listingInput.title,
+      listingInput.description,
+      listingInput.type,
+      {
+        price: listingInput.price,
+        startingBid: listingInput.startingBid,
+        reservePrice: listingInput.reservePrice
+      }
+    );
+
     // Get seller snapshot
     const sellerSnapshot = await getSellerSnapshot(uid);
 
     // Convert input to Firestore document format
     const listingData = toListingDocInput(listingInput, uid, sellerSnapshot);
 
+    // Determine compliance status
+    const needsReview = requiresComplianceReview(listingInput.category, listingInput.attributes);
+    const complianceStatus = needsReview ? 'pending_review' : 'none';
+
     // Create listing document
     const listingRef = collection(db, 'listings');
     const docData: Omit<ListingDoc, 'id'> = {
       ...listingData,
       status: 'draft' as ListingStatus,
+      complianceStatus: complianceStatus as any,
       createdBy: uid,
       updatedBy: uid,
       createdAt: serverTimestamp() as unknown as Timestamp, // Firestore will replace with server timestamp
@@ -202,35 +347,38 @@ export const createListingDraft = async (
 
 /**
  * Publish a listing (change status from draft to active)
+ * Checks listing limit based on user's subscription plan
+ * Enforces compliance review requirements
  */
-export const publishListing = async (uid: string, listingId: string): Promise<void> => {
+export const publishListing = async (uid: string, listingId: string): Promise<{ success: boolean; pendingReview: boolean }> => {
   try {
-    const listingRef = doc(db, 'listings', listingId);
-    
-    // Verify ownership (client-side check - security rules will enforce server-side)
-    const listingDoc = await getDoc(listingRef);
-    if (!listingDoc.exists()) {
-      throw new Error('Listing not found');
-    }
-    
-    const listingData = listingDoc.data() as ListingDoc;
-    if (listingData.sellerId !== uid) {
-      throw new Error('Unauthorized: You can only publish your own listings');
+    // Use server-side publish endpoint as the source of truth.
+    // This ensures plan limits, compliance gates, and internal whitetail flags cannot be bypassed.
+    const { auth } = await import('./config');
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('Authentication required');
     }
 
-    // Only set publishedAt if it doesn't already exist (idempotent)
-    const updates: any = {
-      status: 'active' as ListingStatus,
-      updatedAt: serverTimestamp(),
-      updatedBy: uid,
-    };
+    const token = await user.getIdToken();
+    const res = await fetch('/api/listings/publish', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ listingId }),
+    });
 
-    // Only set publishedAt if not already set
-    if (!listingData.publishedAt) {
-      updates.publishedAt = serverTimestamp();
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json?.message || json?.error || 'Failed to publish listing');
     }
 
-    await updateDoc(listingRef, updates);
+    if (json?.pendingReview) {
+      return { success: true, pendingReview: true };
+    }
+    return { success: true, pendingReview: false };
   } catch (error) {
     console.error('Error publishing listing:', error);
     throw error;
@@ -285,16 +433,119 @@ export const updateListing = async (
       firestoreUpdates.featuredUntil = Timestamp.fromDate(updates.featuredUntil);
     }
 
-    // Remove undefined values
-    Object.keys(firestoreUpdates).forEach(key => {
-      if (firestoreUpdates[key] === undefined) {
-        delete firestoreUpdates[key];
+    // Recursively remove undefined values (handles nested objects like location)
+    const removeUndefined = (obj: any): any => {
+      if (obj === null || obj === undefined) {
+        return null;
       }
-    });
+      if (Array.isArray(obj)) {
+        return obj.map(removeUndefined);
+      }
+      if (typeof obj === 'object') {
+        const cleaned: any = {};
+        for (const key in obj) {
+          if (obj[key] !== undefined) {
+            cleaned[key] = removeUndefined(obj[key]);
+          }
+        }
+        return cleaned;
+      }
+      return obj;
+    };
 
-    await updateDoc(listingRef, firestoreUpdates);
+    // Remove undefined values recursively
+    const cleanedUpdates = removeUndefined(firestoreUpdates);
+
+    await updateDoc(listingRef, cleanedUpdates);
   } catch (error) {
     console.error('Error updating listing:', error);
+    throw error;
+  }
+};
+
+/**
+ * Unpublish/Pause a listing (change status from active to draft)
+ */
+export const unpublishListing = async (uid: string, listingId: string): Promise<void> => {
+  try {
+    const listingRef = doc(db, 'listings', listingId);
+    
+    // Verify ownership
+    const listingDoc = await getDoc(listingRef);
+    if (!listingDoc.exists()) {
+      throw new Error('Listing not found');
+    }
+    
+    const listingData = listingDoc.data() as ListingDoc;
+    if (listingData.sellerId !== uid) {
+      throw new Error('Unauthorized: You can only unpublish your own listings');
+    }
+
+    // Only allow unpublishing active listings
+    if (listingData.status !== 'active') {
+      throw new Error('Only active listings can be unpublished');
+    }
+
+    await updateDoc(listingRef, {
+      status: 'draft' as ListingStatus,
+      updatedAt: serverTimestamp(),
+      updatedBy: uid,
+    });
+  } catch (error) {
+    console.error('Error unpublishing listing:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark a listing as sold
+ */
+/**
+ * @deprecated Manual "mark as sold" has been removed.
+ * Listings are automatically marked as "sold" when payment completes via webhook.
+ * Sellers should use "Remove listing" or "Unpublish" for other cases.
+ * 
+ * This function is kept for reference but should not be used.
+ * Status transitions:
+ * - active → sold: Automatic (via webhook when payment completes)
+ * - active → removed: Manual (seller removes listing)
+ * - active → draft: Manual (seller unpublishes)
+ */
+// export const markListingSold = async (uid: string, listingId: string): Promise<void> => {
+//   // REMOVED: Manual "mark as sold" functionality
+//   // Listings are now only marked as "sold" automatically when payment completes
+//   throw new Error('Manual "mark as sold" has been removed. Listings are automatically marked as sold when payment completes.');
+// };
+
+/**
+ * Delete a listing
+ * Note: This permanently removes the listing from Firestore
+ * Consider using status: 'removed' instead if you want soft delete
+ */
+export const deleteListing = async (uid: string, listingId: string): Promise<void> => {
+  try {
+    const listingRef = doc(db, 'listings', listingId);
+    
+    // Verify ownership
+    const listingDoc = await getDoc(listingRef);
+    if (!listingDoc.exists()) {
+      throw new Error('Listing not found');
+    }
+    
+    const listingData = listingDoc.data() as ListingDoc;
+    if (listingData.sellerId !== uid) {
+      throw new Error('Unauthorized: You can only delete your own listings');
+    }
+
+    // For safety, prevent deleting listings that are sold or have active bids
+    // You may want to allow deleting sold listings, so this is optional
+    // if (listingData.status === 'sold') {
+    //   throw new Error('Cannot delete sold listings');
+    // }
+
+    await deleteDoc(listingRef);
+  } catch (error) {
+    console.error('Error deleting listing:', error);
     throw error;
   }
 };
@@ -585,4 +836,95 @@ export const listSellerListings = async (
     console.error('Error fetching seller listings:', error);
     throw error;
   }
+};
+
+/**
+ * Get listings by their IDs (for watchlist, etc.)
+ * Returns UI Listing[] (Date fields)
+ * Filters out null/not found listings
+ */
+export const getListingsByIds = async (listingIds: string[]): Promise<Listing[]> => {
+  if (listingIds.length === 0) {
+    return [];
+  }
+
+  try {
+    // Firestore has a limit of 10 items for 'in' queries, so we batch them
+    const batchSize = 10;
+    const batches: string[][] = [];
+    
+    for (let i = 0; i < listingIds.length; i += batchSize) {
+      batches.push(listingIds.slice(i, i + batchSize));
+    }
+
+    // Fetch all batches in parallel
+    const batchPromises = batches.map(async (batch) => {
+      if (batch.length === 0) return [];
+      
+      // For single item, use getDoc (more efficient)
+      if (batch.length === 1) {
+        try {
+          const listing = await getListingById(batch[0]);
+          return listing ? [listing] : [];
+        } catch (error) {
+          console.error(`Error fetching listing ${batch[0]}:`, error);
+          return [];
+        }
+      }
+
+      // For multiple items, fetch documents by ID
+      const listingsRef = collection(db, 'listings');
+      const batchDocs = await Promise.all(
+        batch.map((id) => getDoc(doc(listingsRef, id)))
+      );
+      const querySnapshot = batchDocs.filter((docSnap) => docSnap.exists());
+      
+      return querySnapshot.map((docSnap) => {
+        return toListing({
+          id: docSnap.id,
+          ...(docSnap.data() as ListingDoc),
+        });
+      });
+    });
+
+    const results = await Promise.all(batchPromises);
+    return results.flat();
+  } catch (error) {
+    console.error('Error fetching listings by IDs:', error);
+    throw error;
+  }
+};
+
+/**
+ * Subscribe to real-time updates for a single listing
+ * @param listingId The ID of the listing to subscribe to
+ * @param callback Function called with the listing data (or null if not found) whenever it changes
+ * @returns Unsubscribe function to stop listening
+ */
+export const subscribeToListing = (
+  listingId: string,
+  callback: (listing: Listing | null) => void
+): Unsubscribe => {
+  const listingRef = doc(db, 'listings', listingId);
+  
+  return onSnapshot(
+    listingRef,
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+
+      const data = snapshot.data() as ListingDoc;
+      const listing = toListing({
+        id: snapshot.id,
+        ...data,
+      });
+      callback(listing);
+    },
+    (error) => {
+      console.error('Error in listing subscription:', error);
+      callback(null);
+    }
+  );
 };

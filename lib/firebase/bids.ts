@@ -23,6 +23,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { Bid } from '@/lib/types';
+import { getUserProfile } from './users';
+import { createNotification } from './notifications';
 
 /**
  * Bid document as stored in Firestore
@@ -146,6 +148,23 @@ export async function placeBidTx(params: {
         }
       }
 
+      // P0: Texas-only enforcement for animal listings
+      const animalCategories = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
+      if (animalCategories.includes(listingData.category)) {
+        // Get bidder profile to check state
+        const bidderProfile = await getUserProfile(bidderId);
+        const bidderState = bidderProfile?.profile?.location?.state;
+        
+        if (!bidderState || bidderState !== 'TX') {
+          throw new Error('Only Texas residents can bid on animal listings. Please update your profile location.');
+        }
+        
+        // Also verify listing is in Texas
+        if (listingData.location?.state !== 'TX') {
+          throw new Error('Animal listings must be located in Texas.');
+        }
+      }
+
       // Determine current bid (use currentBid, fallback to startingBid, fallback to 0)
       const currentBid = listingData.currentBid ?? listingData.startingBid ?? 0;
 
@@ -166,17 +185,63 @@ export async function placeBidTx(params: {
 
       // Update listing document
       const metrics = listingData.metrics || { views: 0, favorites: 0, bidCount: 0 };
+      const previousBidderId = listingData.currentBidderId;
       transaction.update(listingRef, {
         currentBid: amount,
+        currentBidderId: bidderId,
         'metrics.bidCount': (metrics.bidCount || 0) + 1,
         updatedAt: serverTimestamp(),
         updatedBy: bidderId,
       });
 
-      return { newCurrentBid: amount };
+      return { 
+        newCurrentBid: amount, 
+        listingTitle: listingData.title,
+        sellerId: listingData.sellerId,
+        previousBidderId 
+      };
     });
 
-    return result;
+    // Create notifications after transaction succeeds
+    try {
+      // Notify seller about new bid
+      if (result.sellerId) {
+        await createNotification({
+          userId: result.sellerId,
+          type: 'bid_received',
+          title: 'New Bid Received',
+          body: `Someone placed a bid of $${amount.toLocaleString()} on "${result.listingTitle || 'your listing'}"`,
+          linkUrl: `/listing/${listingId}`,
+          linkLabel: 'View Listing',
+          listingId,
+          metadata: {
+            bidAmount: amount,
+            bidderId,
+          },
+        });
+      }
+
+      // Notify previous highest bidder if they were outbid
+      if (result.previousBidderId && result.previousBidderId !== bidderId) {
+        await createNotification({
+          userId: result.previousBidderId,
+          type: 'bid_outbid',
+          title: 'You Were Outbid',
+          body: `Someone placed a higher bid of $${amount.toLocaleString()} on "${result.listingTitle || 'a listing'}"`,
+          linkUrl: `/listing/${listingId}`,
+          linkLabel: 'Place New Bid',
+          listingId,
+          metadata: {
+            newBidAmount: amount,
+          },
+        });
+      }
+    } catch (notifError) {
+      // Don't fail bid placement if notification fails
+      console.error('Error creating notifications:', notifError);
+    }
+
+    return { newCurrentBid: result.newCurrentBid };
   } catch (error: any) {
     // Re-throw with user-friendly messages
     if (error.message) {
@@ -208,4 +273,32 @@ export async function getHighestBid(listingId: string): Promise<number | null> {
 
   const bidData = snapshot.docs[0].data() as BidDoc;
   return bidData.amount;
+}
+
+/**
+ * Get the winning bidder for an auction (highest bidder)
+ * 
+ * @param listingId - The listing ID
+ * @returns The winning bidder ID and amount, or null if no bids
+ */
+export async function getWinningBidder(listingId: string): Promise<{ bidderId: string; amount: number } | null> {
+  const bidsRef = collection(db, 'bids');
+  const q = query(
+    bidsRef,
+    where('listingId', '==', listingId),
+    orderBy('amount', 'desc'),
+    limit(1)
+  );
+
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const bidDoc = snapshot.docs[0];
+  const bidData = bidDoc.data() as BidDoc;
+  return {
+    bidderId: bidData.bidderId,
+    amount: bidData.amount,
+  };
 }

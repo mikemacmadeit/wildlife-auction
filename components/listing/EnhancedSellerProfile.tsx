@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Listing } from '@/lib/types';
+import { useEffect, useState } from 'react';
+import { getSellerStats } from '@/lib/firebase/sellerStats';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -32,9 +34,26 @@ export function EnhancedSellerProfile({
   const sellerVerified = listing.sellerSnapshot?.verified || listing.seller?.verified || false;
   const sellerId = listing.sellerId;
   
-  // TODO: Fetch seller profile data from Firestore users collection in Phase 2
-  // For now, use defaults or data from listing
-  const memberSince = 2020; // Placeholder
+  const [sellerStats, setSellerStats] = useState<{
+    completedSalesCount: number;
+    completionRate: number;
+  }>({
+    completedSalesCount: 0,
+    completionRate: 0,
+  });
+
+  useEffect(() => {
+    if (sellerId) {
+      getSellerStats(sellerId).then((stats) => {
+        setSellerStats({
+          completedSalesCount: stats.completedSalesCount,
+          completionRate: stats.completionRate,
+        });
+      }).catch((error) => {
+        console.error('Error fetching seller stats:', error);
+      });
+    }
+  }, [sellerId]);
 
   return (
     <Card className={cn(
@@ -77,12 +96,13 @@ export function EnhancedSellerProfile({
             </div>
             
             {/* Rating & Response Time - Compact Row */}
-            {/* TODO: Fetch seller rating, totalSales, location, responseTime from Firestore users collection in Phase 2 */}
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1">
                 <Star className="h-3.5 w-3.5 fill-primary text-primary" />
                 <span className="text-sm font-bold text-foreground">5.0</span>
-                <span className="text-[11px] text-muted-foreground">(0 sales)</span>
+                <span className="text-[11px] text-muted-foreground">
+                  ({sellerStats.completedSalesCount} completed {sellerStats.completedSalesCount === 1 ? 'sale' : 'sales'})
+                </span>
               </div>
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <MapPin className="h-3 w-3" />
@@ -134,12 +154,14 @@ export function EnhancedSellerProfile({
         
         {/* Member Since & Location - Compact Elegant Row */}
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-1.5 rounded-md bg-muted/30 border border-border/40">
-            <Calendar className="h-3 w-3 text-primary flex-shrink-0" />
-            <span className="leading-tight">
-              Member since <span className="font-semibold text-foreground">{memberSince}</span>
-            </span>
-          </div>
+          {sellerStats.completedSalesCount > 0 && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-1.5 rounded-md bg-muted/30 border border-border/40">
+              <TrendingUp className="h-3 w-3 text-primary flex-shrink-0" />
+              <span className="leading-tight">
+                <span className="font-semibold text-foreground">{sellerStats.completionRate}%</span> completion rate
+              </span>
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-1.5 rounded-md bg-muted/30 border border-border/40">
             <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
@@ -162,10 +184,12 @@ export function EnhancedSellerProfile({
                 <span>Identity verified</span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-3 w-3 text-accent flex-shrink-0" />
-              <span>Active since {memberSince}</span>
-            </div>
+            {sellerStats.completedSalesCount > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3 w-3 text-accent flex-shrink-0" />
+                <span>{sellerStats.completedSalesCount} verified {sellerStats.completedSalesCount === 1 ? 'transaction' : 'transactions'}</span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

@@ -23,6 +23,7 @@ import {
   Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { BottomNav } from '@/components/navigation/BottomNav';
 
 export default function HowItWorksPage() {
@@ -184,8 +185,8 @@ export default function HowItWorksPage() {
               transition={{ duration: 0.6, delay: 0.8 }}
               className="flex flex-col sm:flex-row gap-4 justify-center pt-6"
             >
-              <Button 
-                asChild 
+              <CreateListingGateButton
+                href="/dashboard/listings/new"
                 size="lg"
                 className={cn(
                   'min-h-[56px] min-w-[220px] text-lg font-semibold',
@@ -195,11 +196,9 @@ export default function HowItWorksPage() {
                   'transition-all duration-300'
                 )}
               >
-                <Link href="/dashboard/listings/new" className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  List Your Item
-                </Link>
-              </Button>
+                <Upload className="h-5 w-5" />
+                List Your Item
+              </CreateListingGateButton>
               <Button 
                 asChild 
                 variant="outline" 
@@ -422,8 +421,8 @@ export default function HowItWorksPage() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                <Button 
-                  asChild 
+                <CreateListingGateButton
+                  href="/dashboard/listings/new"
                   size="lg"
                   className={cn(
                     'min-h-[56px] min-w-[220px] text-lg font-semibold',
@@ -433,11 +432,9 @@ export default function HowItWorksPage() {
                     'transition-all duration-300'
                   )}
                 >
-                  <Link href="/dashboard/listings/new" className="flex items-center justify-center gap-2">
-                    <Upload className="h-5 w-5" />
-                    Create a Listing
-                  </Link>
-                </Button>
+                  <Upload className="h-5 w-5" />
+                  Create a Listing
+                </CreateListingGateButton>
                 <Button 
                   asChild 
                   variant="outline" 
