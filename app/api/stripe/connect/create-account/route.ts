@@ -5,7 +5,9 @@
  * Returns the Stripe account ID
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -58,11 +60,21 @@ function initializeFirebaseAdmin() {
   return { auth, db };
 }
 
-export async function POST(request: NextRequest) {
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function POST(request: Request) {
   try {
     // Check if Stripe is configured
     if (!isStripeConfigured() || !stripe) {
-      return NextResponse.json(
+      return json(
         { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.' },
         { status: 503 }
       );
@@ -70,9 +82,9 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting (Stripe operations)
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.stripe);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, { 
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: {
           'Retry-After': rateLimitResult.body.retryAfter.toString(),
@@ -86,7 +98,7 @@ export async function POST(request: NextRequest) {
       firebaseAdmin = initializeFirebaseAdmin();
     } catch (error: any) {
       console.error('Failed to initialize Firebase Admin:', error);
-      return NextResponse.json(
+      return json(
         {
           error: 'Server configuration error',
           message: 'Failed to initialize Firebase Admin SDK. Please check server logs.',
@@ -101,7 +113,7 @@ export async function POST(request: NextRequest) {
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
+      return json(
         { error: 'Unauthorized - Missing or invalid authorization header' },
         { status: 401 }
       );
@@ -113,7 +125,7 @@ export async function POST(request: NextRequest) {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error: any) {
       console.error('Token verification error:', error?.code || error?.message || error);
-      return NextResponse.json(
+      return json(
         { 
           error: 'Unauthorized - Invalid token',
           details: error?.code || error?.message || 'Token verification failed'
@@ -131,7 +143,7 @@ export async function POST(request: NextRequest) {
     if (userDoc.exists) {
       const userData = userDoc.data();
       if (userData?.stripeAccountId) {
-        return NextResponse.json({
+        return json({
           stripeAccountId: userData.stripeAccountId,
           message: 'Stripe account already exists',
         });
@@ -183,7 +195,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return json({
       stripeAccountId: account.id,
       message: 'Stripe account created successfully',
     });
@@ -197,7 +209,7 @@ export async function POST(request: NextRequest) {
     console.error('Error stack:', error?.stack);
     console.error('=====================================');
     
-    return NextResponse.json(
+    return json(
       {
         error: 'Failed to create Stripe account',
         message: error?.message || error?.toString() || 'Unknown error',

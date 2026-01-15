@@ -4,7 +4,9 @@
  * Admin resolves a dispute (release, refund, or partial refund)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -50,26 +52,32 @@ async function initializeFirebaseAdmin() {
   return { auth, db };
 }
 
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
 
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
     const { auth, db } = await initializeFirebaseAdmin();
 
     if (!isStripeConfigured() || !stripe) {
-      return NextResponse.json(
-        { error: 'Stripe is not configured' },
-        { status: 503 }
-      );
+      return json({ error: 'Stripe is not configured' }, { status: 503 });
     }
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, {
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: {
           'Retry-After': rateLimitResult.body.retryAfter.toString(),
@@ -80,10 +88,7 @@ export async function POST(
     // Get auth token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -91,10 +96,7 @@ export async function POST(
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const adminId = decodedToken.uid;
@@ -104,30 +106,21 @@ export async function POST(
     const adminUserDoc = await adminUserRef.get();
     
     if (!adminUserDoc.exists) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return json({ error: 'User not found' }, { status: 404 });
     }
 
     const adminUserData = adminUserDoc.data();
     const isAdmin = adminUserData?.role === 'admin' || adminUserData?.role === 'super_admin';
     
     if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
-        { status: 403 }
-      );
+      return json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Parse and validate request body
     const body = await request.json();
     const validation = validateRequest(resolveDisputeSchema, body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: validation.error, details: validation.details?.errors },
-        { status: 400 }
-      );
+      return json({ error: validation.error, details: validation.details?.errors }, { status: 400 });
     }
 
     const { resolution, refundAmount, refundReason, markFraudulent, adminNotes } = validation.data;
@@ -138,10 +131,7 @@ export async function POST(
     const orderDoc = await orderRef.get();
 
     if (!orderDoc.exists) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderData = orderDoc.data()!;
@@ -151,18 +141,12 @@ export async function POST(
         orderData.protectedDisputeStatus === 'none' ||
         orderData.protectedDisputeStatus === 'cancelled' ||
         orderData.protectedDisputeStatus.startsWith('resolved_')) {
-      return NextResponse.json(
-        { error: 'Dispute is not in a resolvable state' },
-        { status: 400 }
-      );
+      return json({ error: 'Dispute is not in a resolvable state' }, { status: 400 });
     }
 
     // Validate partial refund
     if (resolution === 'partial_refund' && (!refundAmount || refundAmount >= orderData.amount)) {
-      return NextResponse.json(
-        { error: 'Partial refund amount must be less than order amount' },
-        { status: 400 }
-      );
+      return json({ error: 'Partial refund amount must be less than order amount' }, { status: 400 });
     }
 
     // Capture before state for audit
@@ -184,10 +168,7 @@ export async function POST(
     if (resolution === 'release') {
       // Release funds to seller
       if (!orderData.sellerStripeAccountId || !orderData.sellerAmount) {
-        return NextResponse.json(
-          { error: 'Seller account or amount not found' },
-          { status: 400 }
-        );
+        return json({ error: 'Seller account or amount not found' }, { status: 400 });
       }
 
       // P0: TPWD Transfer Approval Gating for whitetail_breeder orders
@@ -207,7 +188,7 @@ export async function POST(
               .get();
             
             if (transferDocsQuery.empty) {
-              return NextResponse.json(
+              return json(
                 { 
                   error: 'TPWD Transfer Approval document must be uploaded and verified before payout can be released for whitetail breeder orders.',
                   code: 'TPWD_TRANSFER_APPROVAL_REQUIRED'
@@ -241,10 +222,7 @@ export async function POST(
     } else if (resolution === 'refund') {
       // Full refund
       if (!orderData.stripePaymentIntentId) {
-        return NextResponse.json(
-          { error: 'Payment intent not found' },
-          { status: 400 }
-        );
+        return json({ error: 'Payment intent not found' }, { status: 400 });
       }
 
       const refund = await stripe.refunds.create({
@@ -266,13 +244,11 @@ export async function POST(
     } else if (resolution === 'partial_refund') {
       // Partial refund
       if (!orderData.stripePaymentIntentId) {
-        return NextResponse.json(
-          { error: 'Payment intent not found' },
-          { status: 400 }
-        );
+        return json({ error: 'Payment intent not found' }, { status: 400 });
       }
 
-      const refundAmountCents = Math.round(refundAmount! * 100);
+      const refundAmountValue = refundAmount ?? 0;
+      const refundAmountCents = Math.round(refundAmountValue * 100);
       const refund = await stripe.refunds.create({
         payment_intent: orderData.stripePaymentIntentId,
         amount: refundAmountCents,
@@ -288,12 +264,12 @@ export async function POST(
       updateData.stripeRefundId = refund.id;
       updateData.refundedBy = adminId;
       updateData.refundedAt = now;
-      updateData.refundReason = `Dispute resolved - partial refund of $${refundAmount}`;
-      updateData.refundAmount = refundAmount;
+      updateData.refundReason = `Dispute resolved - partial refund of $${refundAmountValue}`;
+      updateData.refundAmount = refundAmountValue;
       updateData.isFullRefund = false;
       
       // Release remaining amount to seller
-      const remainingAmount = orderData.sellerAmount - refundAmount;
+      const remainingAmount = orderData.sellerAmount - refundAmountValue;
       if (remainingAmount > 0 && orderData.sellerStripeAccountId) {
         // P0: TPWD Transfer Approval Gating for whitetail_breeder orders (partial release)
         if (orderData.transferPermitRequired) {
@@ -312,7 +288,7 @@ export async function POST(
                 .get();
               
               if (transferDocsQuery.empty) {
-                return NextResponse.json(
+                return json(
                   { 
                     error: 'TPWD Transfer Approval document must be uploaded and verified before payout can be released for whitetail breeder orders.',
                     code: 'TPWD_TRANSFER_APPROVAL_REQUIRED'
@@ -409,7 +385,7 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({
+    return json({
       success: true,
       orderId,
       resolution,
@@ -417,9 +393,6 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('Error resolving dispute:', error);
-    return NextResponse.json(
-      { error: 'Failed to resolve dispute', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to resolve dispute', message: error.message }, { status: 500 });
   }
 }

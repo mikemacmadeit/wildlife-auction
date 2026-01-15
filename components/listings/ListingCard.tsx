@@ -51,7 +51,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
     if (listing.category === 'wildlife_exotics') {
       const attrs = listing.attributes as WildlifeAttributes;
       return [
-        attrs.species && `Species: ${attrs.species}`,
+        attrs.speciesId && `Species: ${attrs.speciesId}`,
         attrs.sex && `Sex: ${attrs.sex}`,
         attrs.quantity && `Qty: ${attrs.quantity}`,
       ].filter(Boolean).slice(0, 2);

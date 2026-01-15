@@ -5,7 +5,9 @@
  * Transitions: paid/in_transit/delivered → accepted
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -49,8 +51,18 @@ async function initializeFirebaseAdmin() {
   return { auth, db };
 }
 
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
@@ -58,9 +70,9 @@ export async function POST(
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, {
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: {
           'Retry-After': rateLimitResult.body.retryAfter.toString(),
@@ -71,10 +83,7 @@ export async function POST(
     // Get auth token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -82,10 +91,7 @@ export async function POST(
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const buyerId = decodedToken.uid;
@@ -96,20 +102,14 @@ export async function POST(
     const orderDoc = await orderRef.get();
 
     if (!orderDoc.exists) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderData = orderDoc.data()!;
 
     // Verify buyer owns this order
     if (orderData.buyerId !== buyerId) {
-      return NextResponse.json(
-        { error: 'Unauthorized - You can only accept your own orders' },
-        { status: 403 }
-      );
+      return json({ error: 'Unauthorized - You can only accept your own orders' }, { status: 403 });
     }
 
     // Validate status transition
@@ -117,7 +117,7 @@ export async function POST(
     const allowedStatuses: OrderStatus[] = ['paid', 'in_transit', 'delivered'];
     
     if (!allowedStatuses.includes(currentStatus)) {
-      return NextResponse.json(
+      return json(
         { 
           error: 'Invalid status transition',
           details: `Cannot accept order with status '${currentStatus}'. Order must be in one of: ${allowedStatuses.join(', ')}`
@@ -128,23 +128,17 @@ export async function POST(
 
     // Check if already disputed
     if (currentStatus === 'disputed') {
-      return NextResponse.json(
-        { error: 'Cannot accept a disputed order. Please wait for admin resolution.' },
-        { status: 400 }
-      );
+      return json({ error: 'Cannot accept a disputed order. Please wait for admin resolution.' }, { status: 400 });
     }
 
     // Check if already accepted
     if (currentStatus === 'accepted') {
-      return NextResponse.json(
-        { error: 'Order already accepted' },
-        { status: 400 }
-      );
+      return json({ error: 'Order already accepted' }, { status: 400 });
     }
 
     // Check if delivery was confirmed (required for protected transactions)
     if (!orderData.deliveryConfirmedAt) {
-      return NextResponse.json(
+      return json(
         { 
           error: 'Delivery not confirmed',
           details: 'Delivery must be confirmed before buyer can accept. Please wait for delivery confirmation.'
@@ -172,7 +166,7 @@ export async function POST(
 
     await orderRef.update(updateData);
 
-    return NextResponse.json({
+    return json({
       success: true,
       orderId,
       status: updateData.status,
@@ -183,9 +177,6 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('Error accepting order:', error);
-    return NextResponse.json(
-      { error: 'Failed to accept order', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to accept order', message: error.message }, { status: 500 });
   }
 }

@@ -5,11 +5,14 @@
  * Sets deliveryConfirmedAt, protectionStartAt, and protectionEndsAt
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { createAuditLog } from '@/lib/audit/logger';
 
 // Initialize Firebase Admin
 let adminApp: App | undefined;
@@ -48,8 +51,18 @@ async function initializeFirebaseAdmin() {
   return { auth, db };
 }
 
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
@@ -57,9 +70,9 @@ export async function POST(
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, {
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: {
           'Retry-After': rateLimitResult.body.retryAfter.toString(),
@@ -70,10 +83,7 @@ export async function POST(
     // Get auth token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -81,10 +91,7 @@ export async function POST(
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const adminId = decodedToken.uid;
@@ -94,20 +101,14 @@ export async function POST(
     const adminUserDoc = await adminUserRef.get();
     
     if (!adminUserDoc.exists) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return json({ error: 'User not found' }, { status: 404 });
     }
 
     const adminUserData = adminUserDoc.data();
     const isAdmin = adminUserData?.role === 'admin' || adminUserData?.role === 'super_admin';
     
     if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
-        { status: 403 }
-      );
+      return json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     const orderId = params.orderId;
@@ -117,17 +118,14 @@ export async function POST(
     const orderDoc = await orderRef.get();
 
     if (!orderDoc.exists) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderData = orderDoc.data()!;
 
     // Validate order status
     if (orderData.status !== 'paid' && orderData.status !== 'in_transit' && orderData.status !== 'delivered') {
-      return NextResponse.json(
+      return json(
         { 
           error: 'Invalid order status',
           details: `Cannot confirm delivery for order with status '${orderData.status}'`
@@ -138,10 +136,7 @@ export async function POST(
 
     // Check if already confirmed
     if (orderData.deliveryConfirmedAt) {
-      return NextResponse.json(
-        { error: 'Delivery already confirmed' },
-        { status: 400 }
-      );
+      return json({ error: 'Delivery already confirmed' }, { status: 400 });
     }
 
     const now = new Date();
@@ -240,7 +235,7 @@ export async function POST(
       console.error('Error sending delivery confirmation email:', emailError);
     }
 
-    return NextResponse.json({
+    return json({
       success: true,
       orderId,
       deliveryConfirmedAt: now,
@@ -250,9 +245,6 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('Error confirming delivery:', error);
-    return NextResponse.json(
-      { error: 'Failed to confirm delivery', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to confirm delivery', message: error.message }, { status: 500 });
   }
 }

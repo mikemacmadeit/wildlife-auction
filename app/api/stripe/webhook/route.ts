@@ -6,7 +6,9 @@
  * - checkout.session.completed: Creates order and marks listing as sold
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import Stripe from 'stripe';
@@ -62,26 +64,33 @@ if (!getApps().length) {
 
 const adminDb = getFirestore(adminApp);
 
+function json(body: any, init?: { status?: number; headers?: Headers | Record<string, string> }) {
+  const headers =
+    init?.headers instanceof Headers
+      ? Object.fromEntries(init.headers.entries())
+      : (init?.headers as Record<string, string> | undefined);
+
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(headers || {}),
+    },
+  });
+}
+
+// Small shim so we don't have to rewrite every `NextResponse.json(...)` call in this file.
+const NextResponse = { json };
+
 /**
  * Get raw body for webhook signature verification
  */
-async function getRawBody(request: NextRequest): Promise<Buffer> {
-  const chunks: Uint8Array[] = [];
-  const reader = request.body?.getReader();
-  if (!reader) {
-    throw new Error('No request body');
-  }
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) chunks.push(value);
-  }
-
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+async function getRawBody(request: Request): Promise<Buffer> {
+  const ab = await request.arrayBuffer();
+  return Buffer.from(ab);
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   const requestId = getRequestId(request.headers);
   const responseHeaders = new Headers();
   responseHeaders.set('x-request-id', requestId);
@@ -119,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify webhook signature
-    let event;
+    let event: Stripe.Event;
     try {
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
       logInfo('Webhook event received', {

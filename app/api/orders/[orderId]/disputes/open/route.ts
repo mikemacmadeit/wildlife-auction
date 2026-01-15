@@ -5,7 +5,9 @@
  * Requires evidence and validates time windows
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -60,8 +62,18 @@ const disputeSchema = z.object({
   })).min(1, 'At least one evidence item is required'),
 });
 
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
@@ -69,9 +81,9 @@ export async function POST(
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, {
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: {
           'Retry-After': rateLimitResult.body.retryAfter.toString(),
@@ -82,10 +94,7 @@ export async function POST(
     // Get auth token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -93,10 +102,7 @@ export async function POST(
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const buyerId = decodedToken.uid;
@@ -106,10 +112,7 @@ export async function POST(
     const body = await request.json();
     const validation = disputeSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: validation.error.flatten() },
-        { status: 400 }
-      );
+      return json({ error: 'Invalid request data', details: validation.error.flatten() }, { status: 400 });
     }
 
     const { reason, notes, evidence } = validation.data;
@@ -119,55 +122,37 @@ export async function POST(
     const orderDoc = await orderRef.get();
 
     if (!orderDoc.exists) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderData = orderDoc.data()!;
 
     // Verify buyer owns this order
     if (orderData.buyerId !== buyerId) {
-      return NextResponse.json(
-        { error: 'Unauthorized - You can only dispute your own orders' },
-        { status: 403 }
-      );
+      return json({ error: 'Unauthorized - You can only dispute your own orders' }, { status: 403 });
     }
 
     // Check if protected transaction is enabled
     if (!orderData.protectedTransactionDaysSnapshot) {
-      return NextResponse.json(
-        { error: 'Protected transaction not enabled for this order' },
-        { status: 400 }
-      );
+      return json({ error: 'Protected transaction not enabled for this order' }, { status: 400 });
     }
 
     // Check if delivery was confirmed
     if (!orderData.deliveryConfirmedAt) {
-      return NextResponse.json(
-        { error: 'Delivery not confirmed yet' },
-        { status: 400 }
-      );
+      return json({ error: 'Delivery not confirmed yet' }, { status: 400 });
     }
 
     // Check if protection window has ended
     if (orderData.protectionEndsAt) {
       const protectionEnds = orderData.protectionEndsAt.toDate();
       if (protectionEnds.getTime() < Date.now()) {
-        return NextResponse.json(
-          { error: 'Protection window has ended' },
-          { status: 400 }
-        );
+        return json({ error: 'Protection window has ended' }, { status: 400 });
       }
     }
 
     // Check if dispute already exists
     if (orderData.protectedDisputeStatus && orderData.protectedDisputeStatus !== 'none') {
-      return NextResponse.json(
-        { error: 'Dispute already exists for this order' },
-        { status: 400 }
-      );
+      return json({ error: 'Dispute already exists for this order' }, { status: 400 });
     }
 
     // Check buyer protection eligibility
@@ -176,10 +161,7 @@ export async function POST(
     const buyerData = buyerDoc.exists ? buyerDoc.data() : {};
     
     if (buyerData?.buyerProtectionEligible === false) {
-      return NextResponse.json(
-        { error: 'You are not eligible for protected transactions due to previous fraudulent claims' },
-        { status: 403 }
-      );
+      return json({ error: 'You are not eligible for protected transactions due to previous fraudulent claims' }, { status: 403 });
     }
 
     // Validate time windows based on reason
@@ -187,33 +169,21 @@ export async function POST(
     const hoursSinceDelivery = (Date.now() - deliveryConfirmedAt.getTime()) / (1000 * 60 * 60);
     
     if (reason === 'death' && hoursSinceDelivery > 48) {
-      return NextResponse.json(
-        { error: 'Death claims must be filed within 48 hours of delivery' },
-        { status: 400 }
-      );
+      return json({ error: 'Death claims must be filed within 48 hours of delivery' }, { status: 400 });
     }
     
     if (reason === 'wrong_animal' && hoursSinceDelivery > 24) {
-      return NextResponse.json(
-        { error: 'Wrong animal claims must be filed within 24 hours of delivery' },
-        { status: 400 }
-      );
+      return json({ error: 'Wrong animal claims must be filed within 24 hours of delivery' }, { status: 400 });
     }
     
     if ((reason === 'injury' || reason === 'escape') && hoursSinceDelivery > 72) {
-      return NextResponse.json(
-        { error: `${reason === 'injury' ? 'Injury' : 'Escape'} claims must be filed within 72 hours of delivery` },
-        { status: 400 }
-      );
+      return json({ error: `${reason === 'injury' ? 'Injury' : 'Escape'} claims must be filed within 72 hours of delivery` }, { status: 400 });
     }
 
     // Check evidence requirements
     const hasPhotoOrVideo = evidence.some(e => e.type === 'photo' || e.type === 'video');
     if (!hasPhotoOrVideo) {
-      return NextResponse.json(
-        { error: 'At least one photo or video is required' },
-        { status: 400 }
-      );
+      return json({ error: 'At least one photo or video is required' }, { status: 400 });
     }
 
     // For death/serious_illness, require vet report (can be uploaded later)
@@ -276,7 +246,7 @@ export async function POST(
       source: 'buyer_ui',
     });
 
-    return NextResponse.json({
+    return json({
       success: true,
       orderId,
       disputeStatus,
@@ -286,9 +256,6 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('Error opening dispute:', error);
-    return NextResponse.json(
-      { error: 'Failed to open dispute', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to open dispute', message: error.message }, { status: 500 });
   }
 }

@@ -4,7 +4,9 @@
  * Upload a compliance document for a listing
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -41,18 +43,22 @@ if (!getApps().length) {
 const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
+function json(body: any, init?: { status?: number }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -66,18 +72,12 @@ export async function POST(
     const listingDoc = await listingRef.get();
     
     if (!listingDoc.exists) {
-      return NextResponse.json(
-        { error: 'Listing not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Listing not found' }, { status: 404 });
     }
 
     const listingData = listingDoc.data()!;
     if (listingData.sellerId !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Parse body
@@ -85,10 +85,7 @@ export async function POST(
     const { documentUrl, type, permitNumber, issuedBy, issuedAt, expiresAt, metadata } = body;
 
     if (!documentUrl || !type) {
-      return NextResponse.json(
-        { error: 'documentUrl and type are required' },
-        { status: 400 }
-      );
+      return json({ error: 'documentUrl and type are required' }, { status: 400 });
     }
 
     // Upload document (using client SDK helper - will need to adapt for admin SDK)
@@ -107,15 +104,12 @@ export async function POST(
       metadata,
     });
 
-    return NextResponse.json({
+    return json({
       success: true,
       documentId: docRef.id,
     });
   } catch (error: any) {
     console.error('Error uploading document:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to upload document' },
-      { status: 500 }
-    );
+    return json({ error: error.message || 'Failed to upload document' }, { status: 500 });
   }
 }

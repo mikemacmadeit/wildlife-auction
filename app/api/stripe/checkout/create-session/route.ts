@@ -5,7 +5,9 @@
  * Uses destination charges with application fee (marketplace model)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -51,7 +53,25 @@ if (!getApps().length) {
 const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
-export async function POST(request: NextRequest) {
+function json(body: any, init?: { status?: number; headers?: Record<string, string> | Headers }) {
+  const headers =
+    init?.headers instanceof Headers
+      ? Object.fromEntries(init.headers.entries())
+      : (init?.headers as Record<string, string> | undefined);
+
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(headers || {}),
+    },
+  });
+}
+
+// Small shim so we don't have to rewrite every `NextResponse.json(...)` call in this file.
+const NextResponse = { json };
+
+export async function POST(request: Request) {
   try {
     // Check if Stripe is configured
     if (!isStripeConfigured() || !stripe) {
@@ -63,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting (before auth to prevent brute force)
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.checkout);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
       return NextResponse.json(rateLimitResult.body, { 
         status: rateLimitResult.status,
@@ -365,7 +385,6 @@ export async function POST(request: NextRequest) {
     const baseUrl = getAppUrl();
     
     // P0: Collect address for animal listings (TX-only enforcement)
-    const animalCategories = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
     const requiresAddress = animalCategories.includes(listingData.category);
     
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {

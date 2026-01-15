@@ -126,24 +126,24 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 )}
               </div>
 
-              {/* Middle: Metadata (if available) */}
-              {listing.metadata && (
+              {/* Middle: Attributes (if available) */}
+              {listing.attributes && (
                 <div className="flex-1 hidden lg:flex items-center gap-4 text-sm text-muted-foreground">
-                  {listing.metadata.breed && (
+                  {listing.category === 'cattle_livestock' && (listing.attributes as any).breed && (
                     <div>
                       <span className="font-semibold">Breed: </span>
-                      <span>{listing.metadata.breed}</span>
+                      <span>{(listing.attributes as any).breed}</span>
                     </div>
                   )}
-                  {listing.metadata.quantity && (
+                  {(listing.attributes as any).quantity && (
                     <div>
                       <span className="font-semibold">Qty: </span>
-                      <span>{listing.metadata.quantity}</span>
+                      <span>{(listing.attributes as any).quantity}</span>
                     </div>
                   )}
-                  {listing.metadata.papers && (
+                  {listing.category === 'cattle_livestock' && (listing.attributes as any).registered && (
                     <Badge variant="outline" className="text-xs">
-                      Papers
+                      Registered
                     </Badge>
                   )}
                 </div>

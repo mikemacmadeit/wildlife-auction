@@ -260,6 +260,7 @@ export function DocumentUpload({
     const labels: Record<DocumentType, string> = {
       TPWD_BREEDER_PERMIT: 'TPWD Breeder Permit',
       TPWD_TRANSFER_APPROVAL: 'TPWD Transfer Approval',
+      DELIVERY_PROOF: 'Delivery Proof',
       TAHC_CVI: 'TAHC CVI (Certificate of Veterinary Inspection)',
       BRAND_INSPECTION: 'Brand Inspection',
       TITLE: 'Title',

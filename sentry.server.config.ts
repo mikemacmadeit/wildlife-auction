@@ -20,11 +20,13 @@ if (SENTRY_DSN) {
     // Filter out sensitive data
     beforeSend(event, hint) {
       // Remove sensitive keys from event
-      if (event.request?.headers) {
+      const req = event.request;
+      if (req && req.headers) {
+        const headers = req.headers as Record<string, any>;
         const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'stripe-signature'];
         sensitiveHeaders.forEach(header => {
-          if (event.request.headers[header]) {
-            event.request.headers[header] = '[REDACTED]';
+          if (headers[header]) {
+            headers[header] = '[REDACTED]';
           }
         });
       }

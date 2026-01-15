@@ -103,6 +103,7 @@ export default function AdminOpsPage() {
   const [refundAmount, setRefundAmount] = useState('');
   const [resolutionType, setResolutionType] = useState<'release' | 'refund' | 'partial_refund'>('release');
   const [adminNotes, setAdminNotes] = useState('');
+  const [copiedExplanation, setCopiedExplanation] = useState(false);
 
   const handleViewOrder = useCallback((order: OrderWithDetails) => {
     setSelectedOrder(order);
@@ -289,7 +290,7 @@ export default function AdminOpsPage() {
         refundAmountNum, 
         refundReason || undefined,
         false, // markFraudulent - could be added to UI later
-        adminNotes || undefined
+        adminNotes
       );
       toast({
         title: 'Dispute Resolved',

@@ -57,7 +57,8 @@ function NewListingPageContent() {
     transport: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
-    attributes: Partial<WildlifeAttributes & CattleAttributes & EquipmentAttributes>;
+    // Union (not intersection): attributes vary by category.
+    attributes: Partial<WildlifeAttributes | CattleAttributes | EquipmentAttributes | WhitetailBreederAttributes>;
   }>({
     category: '',
     type: '',
@@ -1052,8 +1053,8 @@ function NewListingPageContent() {
                   <div className="text-sm space-y-1 mt-1">
                     {formData.category === 'wildlife_exotics' && (
                       <>
-                        {(formData.attributes as Partial<WildlifeAttributes>).species && (
-                          <div>Species: {(formData.attributes as Partial<WildlifeAttributes>).species}</div>
+                        {(formData.attributes as Partial<WildlifeAttributes>).speciesId && (
+                          <div>Species: {(formData.attributes as Partial<WildlifeAttributes>).speciesId}</div>
                         )}
                         {(formData.attributes as Partial<WildlifeAttributes>).sex && (
                           <div>Sex: {(formData.attributes as Partial<WildlifeAttributes>).sex}</div>

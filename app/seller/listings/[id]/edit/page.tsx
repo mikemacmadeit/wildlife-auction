@@ -53,7 +53,8 @@ function EditListingPageContent() {
     transport: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
-    attributes: Partial<WildlifeAttributes & CattleAttributes & EquipmentAttributes & WhitetailBreederAttributes>;
+    // Union (not intersection): attributes vary by category.
+    attributes: Partial<ListingAttributes>;
   }>({
     type: '',
     category: '',
@@ -130,14 +131,18 @@ function EditListingPageContent() {
           startingBid: listing.startingBid?.toString() || '',
           reservePrice: listing.reservePrice?.toString() || '',
           endsAt: listing.endsAt ? new Date(listing.endsAt).toISOString().slice(0, 16) : '',
-          location: listing.location || { city: '', state: 'TX', zip: '' },
+          location: {
+            city: listing.location?.city ?? '',
+            state: listing.location?.state ?? 'TX',
+            zip: listing.location?.zip ?? '',
+          },
           images: listing.images || [],
           verification: listing.trust?.verified || false,
           insurance: listing.trust?.insuranceAvailable || false,
           transport: listing.trust?.transportReady || false,
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
-          attributes: (listing.attributes || {}) as Partial<WildlifeAttributes & CattleAttributes & EquipmentAttributes & WhitetailBreederAttributes>,
+          attributes: (listing.attributes || {}) as Partial<ListingAttributes>,
         });
 
         // Load existing documents
@@ -766,10 +771,11 @@ function EditListingPageContent() {
             onPermitNumberChange={(value) => {
               setFormData({
                 ...formData,
+                // Cast to avoid excess-property checks against a non-discriminated union.
                 attributes: {
-                  ...formData.attributes,
+                  ...(formData.attributes as any),
                   tpwdBreederPermitNumber: value,
-                },
+                } as any,
               });
             }}
             required={formData.category === 'whitetail_breeder'}

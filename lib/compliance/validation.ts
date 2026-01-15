@@ -72,9 +72,9 @@ export function validateProhibitedContent(title: string, description: string, at
     throw new Error('Listing description contains prohibited keywords. Cannot list venison, meat, hunting tags, licenses, or wild whitetail.');
   }
   
-  // Check species field for wildlife/exotics
-  if ('speciesId' in attributes || 'species' in attributes) {
-    const species = ('speciesId' in attributes ? attributes.speciesId : attributes.species) || '';
+  // Check species field for wildlife/exotics (use `speciesId`)
+  if ('speciesId' in attributes) {
+    const species = String((attributes as any).speciesId || '');
     if (containsProhibitedKeywords(species)) {
       throw new Error('Species field contains prohibited keywords. Cannot list venison, meat, hunting tags, licenses, or wild whitetail.');
     }

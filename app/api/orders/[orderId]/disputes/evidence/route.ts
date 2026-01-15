@@ -4,7 +4,9 @@
  * Buyer adds evidence to an existing dispute
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -54,8 +56,18 @@ const evidenceSchema = z.object({
   url: z.string().url(),
 });
 
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
@@ -63,9 +75,9 @@ export async function POST(
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, {
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: {
           'Retry-After': rateLimitResult.body.retryAfter.toString(),
@@ -76,10 +88,7 @@ export async function POST(
     // Get auth token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -87,10 +96,7 @@ export async function POST(
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const buyerId = decodedToken.uid;
@@ -100,10 +106,7 @@ export async function POST(
     const body = await request.json();
     const validation = evidenceSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: validation.error.flatten() },
-        { status: 400 }
-      );
+      return json({ error: 'Invalid request data', details: validation.error.flatten() }, { status: 400 });
     }
 
     const { type, url } = validation.data;
@@ -113,28 +116,19 @@ export async function POST(
     const orderDoc = await orderRef.get();
 
     if (!orderDoc.exists) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderData = orderDoc.data()!;
 
     // Verify buyer owns this order
     if (orderData.buyerId !== buyerId) {
-      return NextResponse.json(
-        { error: 'Unauthorized - You can only add evidence to your own orders' },
-        { status: 403 }
-      );
+      return json({ error: 'Unauthorized - You can only add evidence to your own orders' }, { status: 403 });
     }
 
     // Check if dispute exists
     if (!orderData.protectedDisputeStatus || orderData.protectedDisputeStatus === 'none') {
-      return NextResponse.json(
-        { error: 'No open dispute for this order' },
-        { status: 400 }
-      );
+      return json({ error: 'No open dispute for this order' }, { status: 400 });
     }
 
     // Get existing evidence
@@ -166,7 +160,7 @@ export async function POST(
       lastUpdatedByRole: 'buyer',
     });
 
-    return NextResponse.json({
+    return json({
       success: true,
       orderId,
       evidenceCount: updatedEvidence.length,
@@ -175,9 +169,6 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('Error adding evidence:', error);
-    return NextResponse.json(
-      { error: 'Failed to add evidence', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to add evidence', message: error.message }, { status: 500 });
   }
 }

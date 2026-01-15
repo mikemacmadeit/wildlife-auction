@@ -206,7 +206,7 @@ export default function AdminPayoutsPage() {
       }
       
       // Process refund via Stripe API
-      const result = await processRefund(orderId, refundReason || undefined, amount);
+      const result = await processRefund(orderId, refundReason.trim() ? refundReason : '', amount);
       
       toast({
         title: '✅ Refund Processed',

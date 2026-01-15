@@ -3,7 +3,9 @@
  * Send a message with server-side sanitization
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -47,29 +49,34 @@ async function initializeFirebaseAdmin() {
   return { auth, db };
 }
 
-export async function POST(request: NextRequest) {
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function POST(request: Request) {
   try {
     const { auth, db } = await initializeFirebaseAdmin();
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, { 
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
-        headers: {
-          'Retry-After': rateLimitResult.body.retryAfter?.toString() || '60',
-        },
+        headers: { 'Retry-After': rateLimitResult.body.retryAfter?.toString() || '60' },
       });
     }
 
     // Get auth token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -77,10 +84,7 @@ export async function POST(request: NextRequest) {
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const senderId = decodedToken.uid;
@@ -90,10 +94,7 @@ export async function POST(request: NextRequest) {
     const { threadId, recipientId, listingId, messageBody } = body;
 
     if (!threadId || !recipientId || !listingId || !messageBody) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Verify thread exists and user is participant
@@ -101,18 +102,12 @@ export async function POST(request: NextRequest) {
     const threadDoc = await threadRef.get();
     
     if (!threadDoc.exists) {
-      return NextResponse.json(
-        { error: 'Thread not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Thread not found' }, { status: 404 });
     }
 
     const threadData = threadDoc.data()!;
     if (threadData.buyerId !== senderId && threadData.sellerId !== senderId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Check order status to determine if contact should be allowed
@@ -169,7 +164,6 @@ export async function POST(request: NextRequest) {
 
     // Create notification for recipient
     try {
-      const { getDoc: getDocAdmin } = await import('firebase-admin/firestore');
       const listingRef = db.collection('listings').doc(listingId);
       const listingDoc = await listingRef.get();
       const listingData = listingDoc.exists ? listingDoc.data() : null;
@@ -197,7 +191,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating notification:', notifError);
     }
 
-    return NextResponse.json({
+    return json({
       success: true,
       messageId: messageRef.id,
       wasRedacted: sanitizeResult.wasRedacted,
@@ -207,9 +201,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error sending message:', error);
-    return NextResponse.json(
-      { error: 'Failed to send message', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to send message', message: error.message }, { status: 500 });
   }
 }

@@ -254,6 +254,7 @@ export interface Order {
   refundedBy?: string; // Admin UID who processed the refund
   refundedAt?: Date; // When refund was processed
   refundReason?: string; // Reason for refund
+  refundAmount?: number; // Partial refund amount (if applicable)
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
@@ -286,6 +287,11 @@ export interface Order {
   disputeOpenedAt?: Date; // When buyer opened a protected transaction dispute
   disputeReasonV2?: DisputeReason; // Protected transaction dispute reason (v2 enum-based)
   disputeStatus?: DisputeStatus; // Protected transaction dispute status
+  /**
+   * Legacy/alternate protected dispute status field used by some UI helpers.
+   * Prefer `disputeStatus`.
+   */
+  protectedDisputeStatus?: DisputeStatus;
   disputeEvidence?: DisputeEvidence[]; // Evidence uploaded for dispute
   payoutHoldReason?: PayoutHoldReason; // Why payout is held
   protectedTransactionDaysSnapshot?: 7 | 14 | null; // Snapshot of listing protection days at purchase
@@ -294,6 +300,9 @@ export interface Order {
   // Compliance fields for orders
   transferPermitStatus?: 'none' | 'requested' | 'uploaded' | 'approved' | 'rejected'; // TPWD transfer approval status
   transferPermitRequired?: boolean; // Whether transfer permit is required for this order
+
+  // Chargeback tracking (optional; used for payout hold logic)
+  chargebackStatus?: 'active' | 'funds_withdrawn' | 'won' | 'lost' | 'warning_needs_response' | 'needs_response' | 'unknown';
 }
 
 export interface FilterState {
@@ -485,6 +494,7 @@ export interface Message {
 export type DocumentType = 
   | 'TPWD_BREEDER_PERMIT'
   | 'TPWD_TRANSFER_APPROVAL'
+  | 'DELIVERY_PROOF'
   | 'TAHC_CVI'
   | 'BRAND_INSPECTION'
   | 'TITLE'

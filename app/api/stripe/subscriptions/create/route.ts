@@ -164,7 +164,8 @@ export async function POST(request: Request) {
       payment_settings: { save_default_payment_method: 'on_subscription' },
       expand: ['latest_invoice.payment_intent'],
     });
-    const subscription = subscriptionResponse as Stripe.Subscription;
+    // Stripe typings can vary by version; treat as `any` to avoid build-time type mismatches.
+    const subscription = subscriptionResponse as any;
 
     // Update user with subscription info
     await userRef.set({
@@ -179,8 +180,9 @@ export async function POST(request: Request) {
     }, { merge: true });
 
     // Return subscription and client secret for payment
-    const invoice = subscription.latest_invoice as Stripe.Invoice;
-    const paymentIntent = invoice?.payment_intent as Stripe.PaymentIntent;
+    // Stripe invoice typings vary; treat as `any` for portability across versions.
+    const invoice = subscription.latest_invoice as any;
+    const paymentIntent = invoice?.payment_intent as any;
 
     // If subscription is incomplete, Stripe provides a hosted invoice payment page.
     // This is the simplest "Stripe-hosted checkout" UX without adding Stripe.js Elements.

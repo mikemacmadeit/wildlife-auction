@@ -151,7 +151,8 @@ export async function GET(request: Request) {
     }
 
     const ordersSnapshot = await ordersQuery.get();
-    const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Firestore Admin SDK returns loosely-typed document data; cast to `any` for reconciliation tooling.
+    const orders: any[] = ordersSnapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
 
     console.log(`[reconcile] Found ${orders.length} orders in Firestore`);
 

@@ -84,8 +84,11 @@ export async function checkStripeAccountStatus(): Promise<{
     detailsSubmitted: boolean;
     requirementsDue?: string[];
     requirementsErrors?: any[];
+    requirementsPending?: string[];
     hasPendingRequirements?: boolean;
+    capabilities?: any;
   };
+  debug?: any;
   message?: string;
 }> {
   const user = auth.currentUser;
@@ -385,7 +388,7 @@ export async function resolveDispute(
   refundAmount?: number,
   refundReason?: string,
   markFraudulent?: boolean,
-  adminNotes: string
+  adminNotes?: string
 ): Promise<{ success: boolean; message: string }> {
   const user = auth.currentUser;
   if (!user) {
@@ -403,7 +406,7 @@ export async function resolveDispute(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ resolution, refundAmount, refundReason, markFraudulent, adminNotes }),
+    body: JSON.stringify({ resolution, refundAmount, refundReason, markFraudulent, adminNotes: adminNotes || '' }),
   });
 
   if (!response.ok) {

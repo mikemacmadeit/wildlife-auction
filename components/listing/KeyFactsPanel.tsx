@@ -48,10 +48,10 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         : undefined,
     },
     // Category-specific attributes
-    listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).species && {
+    listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).speciesId && {
       icon: Package,
       label: 'Species',
-      value: (listing.attributes as WildlifeAttributes).species,
+      value: (listing.attributes as WildlifeAttributes).speciesId,
       detail: (listing.attributes as WildlifeAttributes).age || undefined,
     },
     listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).sex && {

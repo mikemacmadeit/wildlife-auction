@@ -11,6 +11,7 @@ export type AuditActionType =
   | 'payout_released_auto'
   | 'refund_full'
   | 'refund_partial'
+  | 'order_refunded_tx_violation'
   | 'dispute_opened'
   | 'dispute_resolved'
   | 'dispute_cancelled'

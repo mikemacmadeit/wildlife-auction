@@ -141,19 +141,21 @@ export async function handleCheckoutSessionCompleted(
         buyerState = session.customer_details.address.state.toUpperCase();
       }
       // Fallback to shipping_details
-      else if (session.shipping_details?.address?.state) {
-        buyerState = session.shipping_details.address.state.toUpperCase();
+      else if ((session as any).shipping_details?.address?.state) {
+        buyerState = (session as any).shipping_details.address.state.toUpperCase();
       }
       // Fallback: retrieve payment intent for customer details
       else if (paymentIntentId) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
-            expand: ['customer']
+            expand: ['customer'],
           });
-          if (paymentIntent.shipping?.address?.state) {
-            buyerState = paymentIntent.shipping.address.state.toUpperCase();
-          } else if (paymentIntent.charges?.data?.[0]?.billing_details?.address?.state) {
-            buyerState = paymentIntent.charges.data[0].billing_details.address.state.toUpperCase();
+          // Stripe typings can differ by version/expansion; treat as `any` for address extraction.
+          const pi: any = paymentIntent;
+          if (pi.shipping?.address?.state) {
+            buyerState = pi.shipping.address.state.toUpperCase();
+          } else if (pi.charges?.data?.[0]?.billing_details?.address?.state) {
+            buyerState = pi.charges.data[0].billing_details.address.state.toUpperCase();
           }
         } catch (piError) {
           logWarn('Could not retrieve payment intent for address verification', {
@@ -207,6 +209,7 @@ export async function handleCheckoutSessionCompleted(
               refundedBy: 'system',
             },
           });
+          const now = new Date();
           
           // Create order record with refunded status (for audit trail)
           const refundedOrderRef = db.collection('orders').doc();

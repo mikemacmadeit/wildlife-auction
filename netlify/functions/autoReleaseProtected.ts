@@ -119,7 +119,6 @@ const handler: Handler = async (event, context) => {
       const deliveryConfirmedAt = orderData.deliveryConfirmedAt;
       const protectionEndsAt = orderData.protectionEndsAt?.toDate();
       const protectedTransaction = orderData.protectedTransactionDaysSnapshot !== null && orderData.protectedTransactionDaysSnapshot !== undefined;
-      const disputeStatus = orderData.disputeStatus;
       const hasAdminHold = orderData.adminHold === true;
       const hasChargeback = orderData.chargebackStatus && ['active', 'funds_withdrawn'].includes(orderData.chargebackStatus);
 

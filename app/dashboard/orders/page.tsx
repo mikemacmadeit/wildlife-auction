@@ -35,6 +35,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderWithListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [disputeDialogOpen, setDisputeDialogOpen] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeNotes, setDisputeNotes] = useState('');

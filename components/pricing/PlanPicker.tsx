@@ -93,7 +93,7 @@ export function PlanPicker(props: {
                   className="w-full font-semibold"
                   variant={p.id === 'pro' ? 'secondary' : 'default'}
                   disabled={isCurrent || loadingPlanId === p.id}
-                  onClick={() => onSelectPaidPlan(p.id)}
+                  onClick={() => onSelectPaidPlan(p.id as 'pro' | 'elite')}
                 >
                   {isCurrent ? 'Current plan' : `Upgrade to ${p.displayName}`}
                 </Button>

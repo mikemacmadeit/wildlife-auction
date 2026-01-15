@@ -771,10 +771,10 @@ export default function ListingDetailPage() {
                 <CardContent>
                   {listing!.category === 'wildlife_exotics' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(listing!.attributes as WildlifeAttributes).species && (
+                      {(listing!.attributes as WildlifeAttributes).speciesId && (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Species</div>
-                          <div className="text-base font-semibold">{(listing!.attributes as WildlifeAttributes).species}</div>
+                          <div className="text-base font-semibold">{(listing!.attributes as WildlifeAttributes).speciesId}</div>
                         </div>
                       )}
                       {(listing!.attributes as WildlifeAttributes).sex && (

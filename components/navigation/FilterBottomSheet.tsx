@@ -24,12 +24,10 @@ interface FilterBottomSheetProps {
 }
 
 const categories: { value: ListingCategory; label: string }[] = [
-  { value: 'cattle', label: 'Cattle' },
-  { value: 'horses', label: 'Horses' },
-  { value: 'wildlife', label: 'Wildlife' },
-  { value: 'equipment', label: 'Equipment' },
-  { value: 'land', label: 'Land' },
-  { value: 'other', label: 'Other' },
+  { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
+  { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
+  { value: 'cattle_livestock', label: 'Cattle & Livestock' },
+  { value: 'ranch_equipment', label: 'Ranch Equipment' },
 ];
 
 const types: { value: ListingType; label: string }[] = [

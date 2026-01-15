@@ -15,10 +15,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 
+type ListingAttributes =
+  | WildlifeAttributes
+  | CattleAttributes
+  | EquipmentAttributes
+  | WhitetailBreederAttributes;
+
 interface CategoryAttributeFormProps {
   category: ListingCategory;
-  attributes: Partial<WildlifeAttributes & CattleAttributes & EquipmentAttributes & WhitetailBreederAttributes>;
-  onChange: (attributes: Partial<WildlifeAttributes & CattleAttributes & EquipmentAttributes & WhitetailBreederAttributes>) => void;
+  // Union (not intersection): each category has its own attribute shape.
+  attributes: Partial<ListingAttributes>;
+  onChange: (attributes: Partial<ListingAttributes>) => void;
   errors?: string[];
 }
 

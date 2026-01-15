@@ -4,7 +4,9 @@
  * Create a Stripe Billing Portal session for managing subscription
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -44,20 +46,27 @@ if (!getApps().length) {
 const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
-export async function POST(request: NextRequest) {
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function POST(request: Request) {
   try {
     if (!isStripeConfigured() || !stripe) {
-      return NextResponse.json(
-        { error: 'Stripe is not configured' },
-        { status: 503 }
-      );
+      return json({ error: 'Stripe is not configured' }, { status: 503 });
     }
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
-    const rateLimitResult = await rateLimitCheck(request);
+    const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, { 
+      return json(rateLimitResult.body, {
         status: rateLimitResult.status,
         headers: { 'Retry-After': rateLimitResult.body.retryAfter.toString() },
       });
@@ -66,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -74,7 +83,7 @@ export async function POST(request: NextRequest) {
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
+      return json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
     }
 
     const userId = decodedToken.uid;
@@ -90,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (!customerId) {
       // Create Stripe Customer if doesn't exist
       if (!userEmail) {
-        return NextResponse.json({ error: 'User email required' }, { status: 400 });
+        return json({ error: 'User email required' }, { status: 400 });
       }
 
       const customer = await stripe.customers.create({
@@ -133,7 +142,7 @@ export async function POST(request: NextRequest) {
       portalSessionId: portalSession.id,
     });
 
-    return NextResponse.json({
+    return json({
       url: portalSession.url,
     });
   } catch (error: any) {
@@ -143,9 +152,6 @@ export async function POST(request: NextRequest) {
     captureException(error instanceof Error ? error : new Error(String(error)), {
       route: '/api/stripe/billing-portal/create',
     });
-    return NextResponse.json(
-      { error: 'Failed to create billing portal session', message: error.message },
-      { status: 500 }
-    );
+    return json({ error: 'Failed to create billing portal session', message: error.message }, { status: 500 });
   }
 }

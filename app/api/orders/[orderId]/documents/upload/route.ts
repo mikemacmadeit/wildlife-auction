@@ -4,7 +4,9 @@
  * Upload a compliance document for an order (e.g., TPWD transfer approval)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -40,18 +42,22 @@ if (!getApps().length) {
 const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
+function json(body: any, init?: { status?: number }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -65,18 +71,12 @@ export async function POST(
     const orderDoc = await orderRef.get();
     
     if (!orderDoc.exists) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      return json({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderData = orderDoc.data()!;
     if (orderData.buyerId !== userId && orderData.sellerId !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+      return json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Parse body
@@ -84,35 +84,32 @@ export async function POST(
     const { documentUrl, type, permitNumber, issuedBy, issuedAt, expiresAt, metadata } = body;
 
     if (!documentUrl || !type) {
-      return NextResponse.json(
-        { error: 'documentUrl and type are required' },
-        { status: 400 }
-      );
+      return json({ error: 'documentUrl and type are required' }, { status: 400 });
     }
 
     // Validate document type for orders
     const validOrderDocTypes: DocumentType[] = ['TPWD_TRANSFER_APPROVAL', 'DELIVERY_PROOF', 'HEALTH_CERTIFICATE', 'OTHER'];
     if (!validOrderDocTypes.includes(type as DocumentType)) {
-      return NextResponse.json(
-        { error: `Invalid document type for orders. Must be one of: ${validOrderDocTypes.join(', ')}` },
-        { status: 400 }
-      );
+      return json({ error: `Invalid document type for orders. Must be one of: ${validOrderDocTypes.join(', ')}` }, { status: 400 });
     }
 
     // Create document
     const documentsRef = db.collection('orders').doc(orderId).collection('documents');
-    const docRef = await documentsRef.add({
+    // IMPORTANT: Never write `undefined` to Firestore (admin SDK will reject).
+    const docData: any = {
       type: type as DocumentType,
       documentUrl,
-      permitNumber,
-      issuedBy,
-      issuedAt: issuedAt ? Timestamp.fromDate(new Date(issuedAt)) : undefined,
-      expiresAt: expiresAt ? Timestamp.fromDate(new Date(expiresAt)) : undefined,
       status: 'uploaded',
       uploadedBy: userId,
       uploadedAt: Timestamp.now(),
-      metadata,
-    });
+    };
+    if (permitNumber) docData.permitNumber = permitNumber;
+    if (issuedBy) docData.issuedBy = issuedBy;
+    if (issuedAt) docData.issuedAt = Timestamp.fromDate(new Date(issuedAt));
+    if (expiresAt) docData.expiresAt = Timestamp.fromDate(new Date(expiresAt));
+    if (metadata !== undefined) docData.metadata = metadata;
+
+    const docRef = await documentsRef.add(docData);
 
     // Update order transferPermitStatus if TPWD_TRANSFER_APPROVAL uploaded
     if (type === 'TPWD_TRANSFER_APPROVAL') {
@@ -122,15 +119,12 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({
+    return json({
       success: true,
       documentId: docRef.id,
     });
   } catch (error: any) {
     console.error('Error uploading order document:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to upload document' },
-      { status: 500 }
-    );
+    return json({ error: error.message || 'Failed to upload document' }, { status: 500 });
   }
 }

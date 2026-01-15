@@ -16,7 +16,7 @@ import { PLAN_CONFIG } from '@/lib/pricing/plans';
  */
 export async function handleSubscriptionCreated(
   db: Firestore,
-  subscription: Stripe.Subscription,
+  subscription: any,
   requestId?: string
 ) {
   try {
@@ -113,7 +113,7 @@ export async function handleSubscriptionCreated(
  */
 export async function handleSubscriptionUpdated(
   db: Firestore,
-  subscription: Stripe.Subscription,
+  subscription: any,
   requestId?: string
 ) {
   try {
@@ -216,7 +216,7 @@ export async function handleSubscriptionUpdated(
  */
 export async function handleSubscriptionDeleted(
   db: Firestore,
-  subscription: Stripe.Subscription,
+  subscription: any,
   requestId?: string
 ) {
   try {
@@ -275,7 +275,7 @@ export async function handleSubscriptionDeleted(
     await createAuditLog(db, {
       actorUid: 'webhook',
       actorRole: 'webhook',
-      actionType: 'subscription_deleted',
+      actionType: 'subscription_canceled',
       beforeState: {
         subscriptionPlan: userData?.subscriptionPlan || 'free',
         subscriptionStatus: userData?.subscriptionStatus,
@@ -304,7 +304,7 @@ export async function handleSubscriptionDeleted(
  */
 export async function handleInvoicePaymentSucceeded(
   db: Firestore,
-  invoice: Stripe.Invoice,
+  invoice: any,
   requestId?: string
 ) {
   try {
@@ -358,7 +358,7 @@ export async function handleInvoicePaymentSucceeded(
  */
 export async function handleInvoicePaymentFailed(
   db: Firestore,
-  invoice: Stripe.Invoice,
+  invoice: any,
   requestId?: string
 ) {
   try {

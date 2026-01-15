@@ -16,13 +16,15 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_secret';
 export function buildStripeEvent(type: string, data: Record<string, any>, id?: string): Stripe.Event {
   const eventId = id || `evt_test_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   
+  // Stripe's Event typing is very strict (expects a concrete union per `data.object`).
+  // For tests, we intentionally allow partial objects and cast to `Stripe.Event`.
   return {
     id: eventId,
     object: 'event',
-    api_version: '2024-11-20.acacia',
+    api_version: '2025-12-15.clover',
     created: Math.floor(Date.now() / 1000),
     data: {
-      object: data,
+      object: data as any,
       previous_attributes: null,
     },
     livemode: false,
@@ -32,7 +34,7 @@ export function buildStripeEvent(type: string, data: Record<string, any>, id?: s
       idempotency_key: null,
     },
     type: type as Stripe.Event.Type,
-  };
+  } as unknown as Stripe.Event;
 }
 
 /**
@@ -54,7 +56,7 @@ export function buildCheckoutSessionCompletedEvent(params: {
   const paymentIntentId = params.paymentIntentId || `pi_test_${Date.now()}`;
   const amount = params.amount || 10000; // $100.00 in cents
 
-  const session: Stripe.Checkout.Session = {
+  const session = {
     id: sessionId,
     object: 'checkout.session',
     after_expiration: null,
@@ -125,7 +127,7 @@ export function buildCheckoutSessionCompletedEvent(params: {
     },
     ui_mode: 'hosted',
     url: null,
-  };
+  } as any;
 
   return buildStripeEvent('checkout.session.completed', session, params.eventId);
 }
@@ -146,7 +148,7 @@ export function buildChargeDisputeCreatedEvent(params: {
   const chargeId = params.chargeId || `ch_test_${Date.now()}`;
   const amount = params.amount || 10000; // $100.00 in cents
 
-  const dispute: Stripe.Dispute = {
+  const dispute = {
     id: disputeId,
     object: 'dispute',
     amount: amount,
@@ -192,9 +194,9 @@ export function buildChargeDisputeCreatedEvent(params: {
     livemode: false,
     metadata: {},
     payment_intent: params.paymentIntentId,
-    reason: (params.reason as Stripe.Dispute.Reason) || 'fraudulent',
+    reason: params.reason || 'fraudulent',
     status: 'warning_needs_response',
-  };
+  } as any;
 
   return buildStripeEvent('charge.dispute.created', dispute, params.eventId);
 }
@@ -203,7 +205,7 @@ export function buildChargeDisputeCreatedEvent(params: {
  * Generate a Stripe webhook signature for a payload
  */
 export function generateStripeSignature(payload: string | Buffer): string {
-  const stripe = new Stripe('sk_test_dummy', { apiVersion: '2024-11-20.acacia' });
+  const stripe = new Stripe('sk_test_dummy', { apiVersion: '2025-12-15.clover' });
   const payloadString = typeof payload === 'string' ? payload : payload.toString('utf8');
   const timestamp = Math.floor(Date.now() / 1000);
   

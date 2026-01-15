@@ -86,8 +86,8 @@ function migrateAttributes(doc: ListingDoc & { id: string }): ListingAttributes 
   }
 
   // Backward compatibility: migrate old metadata to new attributes
-  const oldMetadata = doc.metadata;
-  const category = doc.category;
+  const oldMetadata = (doc as any).metadata as any;
+  const category = (doc as any).category as any;
 
   // Default category for old listings without category
   const effectiveCategory: ListingCategory = category || 'wildlife_exotics';
@@ -108,28 +108,34 @@ function migrateAttributes(doc: ListingDoc & { id: string }): ListingAttributes 
   // Convert old metadata to new attributes based on category
   if (mappedCategory === 'wildlife_exotics') {
     return {
-      species: oldMetadata?.breed || 'Unknown',
+      // Best-effort mapping from legacy `metadata.breed` → `speciesId`
+      speciesId: String(oldMetadata?.breed || 'other_exotic'),
       sex: 'unknown',
-      age: oldMetadata?.age,
-      quantity: oldMetadata?.quantity || 1,
-      healthNotes: oldMetadata?.healthStatus,
+      age: oldMetadata?.age ? String(oldMetadata.age) : undefined,
+      quantity: Number(oldMetadata?.quantity || 1),
+      animalIdDisclosure: true,
+      healthDisclosure: true,
+      healthNotes: oldMetadata?.healthStatus ? String(oldMetadata.healthStatus) : undefined,
+      transportDisclosure: true,
     } as ListingAttributes;
   } else if (mappedCategory === 'cattle_livestock') {
     return {
-      breed: oldMetadata?.breed || 'Unknown',
+      breed: String(oldMetadata?.breed || 'Unknown'),
       sex: 'unknown',
-      age: oldMetadata?.age,
-      registered: oldMetadata?.papers || false,
-      registrationNumber: oldMetadata?.papers ? undefined : undefined,
-      quantity: oldMetadata?.quantity || 1,
-      healthNotes: oldMetadata?.healthStatus,
+      age: oldMetadata?.age ? String(oldMetadata.age) : undefined,
+      registered: Boolean(oldMetadata?.papers || false),
+      registrationNumber: oldMetadata?.registrationNumber ? String(oldMetadata.registrationNumber) : undefined,
+      quantity: Number(oldMetadata?.quantity || 1),
+      identificationDisclosure: true,
+      healthDisclosure: true,
+      healthNotes: oldMetadata?.healthStatus ? String(oldMetadata.healthStatus) : undefined,
     } as ListingAttributes;
   } else {
     // ranch_equipment
     return {
-      equipmentType: 'Equipment',
+      equipmentType: 'other' as any,
       condition: 'good',
-      quantity: oldMetadata?.quantity || 1,
+      quantity: Number(oldMetadata?.quantity || 1),
     } as ListingAttributes;
   }
 }

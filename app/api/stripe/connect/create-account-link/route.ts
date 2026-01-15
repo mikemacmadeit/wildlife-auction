@@ -5,7 +5,9 @@
  * Returns the onboarding URL
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
+// In the current environment, production builds can fail resolving an internal Next module
+// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -46,11 +48,21 @@ if (!getApps().length) {
 const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
-export async function POST(request: NextRequest) {
+function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function POST(request: Request) {
   try {
     // Check if Stripe is configured
     if (!isStripeConfigured() || !stripe) {
-      return NextResponse.json(
+      return json(
         { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.' },
         { status: 503 }
       );
@@ -59,7 +71,7 @@ export async function POST(request: NextRequest) {
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
+      return json(
         { error: 'Unauthorized - Missing or invalid authorization header' },
         { status: 401 }
       );
@@ -70,10 +82,7 @@ export async function POST(request: NextRequest) {
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Invalid token' },
-        { status: 401 }
-      );
+      return json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
     }
 
     const userId = decodedToken.uid;
@@ -83,20 +92,14 @@ export async function POST(request: NextRequest) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return json({ error: 'User not found' }, { status: 404 });
     }
 
     const userData = userDoc.data();
     const stripeAccountId = userData?.stripeAccountId;
 
     if (!stripeAccountId) {
-      return NextResponse.json(
-        { error: 'Stripe account not found. Please create an account first.' },
-        { status: 400 }
-      );
+      return json({ error: 'Stripe account not found. Please create an account first.' }, { status: 400 });
     }
 
     // Create account link for onboarding
@@ -108,13 +111,13 @@ export async function POST(request: NextRequest) {
       type: 'account_onboarding',
     });
 
-    return NextResponse.json({
+    return json({
       url: accountLink.url,
       message: 'Onboarding link created successfully',
     });
   } catch (error: any) {
     console.error('Error creating account link:', error);
-    return NextResponse.json(
+    return json(
       {
         error: 'Failed to create onboarding link',
         message: error.message || 'Unknown error',
