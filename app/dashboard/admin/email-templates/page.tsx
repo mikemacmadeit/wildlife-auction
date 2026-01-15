@@ -18,6 +18,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import {
   Select,
   SelectContent,
@@ -26,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Copy, RefreshCw, Mail, ShieldAlert } from 'lucide-react';
+import { Loader2, Copy, RefreshCw, Mail, ShieldAlert, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type RenderResponseOk = { ok: true; subject: string; preheader: string; html: string };
@@ -169,174 +172,208 @@ export default function AdminEmailTemplatesPage() {
   const canCopy = html && html.length > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-extrabold tracking-tight">Email Templates</h1>
-            <Badge variant="secondary" className="font-semibold">Preview</Badge>
+    <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Email Templates</h1>
+              <Badge variant="secondary" className="font-semibold">Preview</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              This does <span className="font-semibold">NOT</span> send email. It only renders templates in-browser via the server renderer.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            This does <span className="font-semibold">NOT</span> send email. It only renders templates locally via the server renderer.
-          </p>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const sample = getSamplePayload(eventType);
+                void safeCopy(prettyJson(sample))
+                  .then(() => toast({ title: 'Copied', description: 'Sample payload copied.' }))
+                  .catch(() => toast({ title: 'Copy failed', description: 'Clipboard not available.', variant: 'destructive' }));
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy sample payload
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canCopy}
+              onClick={() => {
+                void safeCopy(html)
+                  .then(() => toast({ title: 'Copied', description: 'HTML copied to clipboard.' }))
+                  .catch(() => toast({ title: 'Copy failed', description: 'Clipboard not available.', variant: 'destructive' }));
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy HTML
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              const sample = getSamplePayload(eventType);
-              void safeCopy(prettyJson(sample))
-                .then(() => toast({ title: 'Copied', description: 'Sample payload copied.' }))
-                .catch(() => toast({ title: 'Copy failed', description: 'Clipboard not available.', variant: 'destructive' }));
-            }}
-          >
-            <Copy className="h-4 w-4 mr-2" />
-            Copy sample payload
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!canCopy}
-            onClick={() => {
-              void safeCopy(html)
-                .then(() => toast({ title: 'Copied', description: 'HTML copied to clipboard.' }))
-                .catch(() => toast({ title: 'Copy failed', description: 'Clipboard not available.', variant: 'destructive' }));
-            }}
-          >
-            <Copy className="h-4 w-4 mr-2" />
-            Copy HTML
-          </Button>
-        </div>
-      </div>
 
-      {!adminLoading && !isAdmin && (
-        <Alert>
-          <ShieldAlert className="h-4 w-4" />
-          <AlertDescription>
-            Admin access required. If you believe you should have access, ensure your account has the admin role/claims.
-          </AlertDescription>
-        </Alert>
-      )}
+        {!adminLoading && !isAdmin && (
+          <Alert>
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              Admin access required. If you believe you should have access, ensure your account has the admin role/claims.
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {unauthorized && (
-        <Alert variant="destructive">
-          <AlertDescription>Admin access required.</AlertDescription>
-        </Alert>
-      )}
+        {unauthorized && (
+          <Alert variant="destructive">
+            <AlertDescription>Admin access required.</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left panel */}
-        <Card className="border-border/60">
-          <CardHeader className="space-y-2">
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-primary" />
-              Template + Data
-            </CardTitle>
-            <CardDescription>
-              Pick an event, edit sample JSON, and render. Rendering is debounced (450ms) and also available via the button.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">Template</div>
-              <Select
-                value={eventType}
-                onValueChange={(v) => setEventType(v as EmailEventType)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a template" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map((e) => (
-                    <SelectItem key={e.type} value={e.type}>
-                      {e.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedMeta?.description && (
-                <p className="text-xs text-muted-foreground">{selectedMeta.description}</p>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Sample payload (JSON)</div>
-                <Button
-                  size="sm"
-                  onClick={() => renderNow({ showToast: true })}
-                  disabled={loading || adminLoading || !isAdmin}
-                >
-                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                  Render
-                </Button>
-              </div>
-              <Textarea
-                value={payloadText}
-                onChange={(e) => setPayloadText(e.target.value)}
-                className="min-h-[420px] font-mono text-xs leading-relaxed"
-                spellCheck={false}
-              />
-              {parseError && (
-                <p className="text-sm text-destructive">JSON parse error: {parseError}</p>
-              )}
-              {schemaIssues && schemaIssues.length > 0 && (
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-destructive">Validation errors</div>
-                  <ul className="text-sm text-destructive space-y-1">
-                    {schemaIssues.slice(0, 12).map((i, idx) => (
-                      <li key={idx}>
-                        {i.path ? <span className="font-mono">{i.path}</span> : <span className="font-mono">payload</span>}
-                        : {i.message}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Right panel */}
         <Card className="border-border/60 overflow-hidden">
-          <CardHeader className="space-y-2">
-            <CardTitle>Live preview</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base md:text-lg">Editor + Preview</CardTitle>
             <CardDescription>
-              Rendered inside an iframe (email-like). Max width 700px, centered on a soft background.
+              Left: pick a template + edit sample JSON. Right: live rendered HTML in an iframe (email-like).
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1 min-w-0">
-                  <div className="text-sm font-semibold truncate">{subject || '—'}</div>
-                  <div className="text-xs text-muted-foreground truncate">{preheader || '—'}</div>
-                </div>
-                {loading && (
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Rendering…
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="rounded-2xl border bg-gradient-to-b from-muted/40 to-background p-4">
-              <div className="mx-auto w-full max-w-[700px] rounded-xl border bg-white shadow-2xl overflow-hidden">
-                {html ? (
-                  <iframe
-                    title="Email preview"
-                    className="w-full h-[760px]"
-                    srcDoc={html}
-                    sandbox=""
-                  />
-                ) : (
-                  <div className="h-[420px] flex items-center justify-center text-sm text-muted-foreground">
-                    Select a template and render to see the preview.
+          <CardContent className="p-0">
+            <div className="h-[78vh] min-h-[640px]">
+              <ResizablePanelGroup direction="horizontal" className="h-full">
+                {/* Left: editor */}
+                <ResizablePanel defaultSize={44} minSize={30}>
+                  <ScrollArea className="h-full">
+                    <div className="p-5 space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-5 w-5 text-primary" />
+                          <div className="text-sm font-semibold">Template + data</div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => renderNow({ showToast: true })}
+                          disabled={loading || adminLoading || !isAdmin}
+                        >
+                          {loading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                          )}
+                          Render
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Template</div>
+                        <Select value={eventType} onValueChange={(v) => setEventType(v as EmailEventType)}>
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Select a template" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {events.map((e) => (
+                              <SelectItem key={e.type} value={e.type}>
+                                {e.displayName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedMeta?.description && (
+                          <p className="text-sm text-muted-foreground">{selectedMeta.description}</p>
+                        )}
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sample payload (JSON)</div>
+                          <div className="text-xs text-muted-foreground">Auto-renders after you stop typing</div>
+                        </div>
+                        <Textarea
+                          value={payloadText}
+                          onChange={(e) => setPayloadText(e.target.value)}
+                          className="min-h-[520px] font-mono text-xs leading-relaxed"
+                          spellCheck={false}
+                        />
+                        {parseError && (
+                          <p className="text-sm text-destructive">JSON parse error: {parseError}</p>
+                        )}
+                        {schemaIssues && schemaIssues.length > 0 && (
+                          <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                            <div className="text-sm font-semibold text-destructive">Validation errors</div>
+                            <ul className="text-sm text-destructive space-y-1">
+                              {schemaIssues.slice(0, 12).map((i, idx) => (
+                                <li key={idx}>
+                                  {i.path ? <span className="font-mono">{i.path}</span> : <span className="font-mono">payload</span>}
+                                  : {i.message}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </ResizablePanel>
+
+                <ResizableHandle withHandle />
+
+                {/* Right: preview */}
+                <ResizablePanel defaultSize={56} minSize={35}>
+                  <div className="h-full bg-gradient-to-b from-muted/30 to-background">
+                    <div className="p-5 h-full flex flex-col gap-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-5 w-5 text-primary" />
+                          <div className="text-sm font-semibold">Live preview</div>
+                        </div>
+                        {loading && (
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Rendering…
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border bg-card/70 p-4">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subject</div>
+                        <div className="mt-1 text-sm font-semibold break-words">{subject || '—'}</div>
+                        <div className="mt-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preheader</div>
+                        <div className="mt-1 text-xs text-muted-foreground break-words">{preheader || '—'}</div>
+                      </div>
+
+                      <div className="flex-1 rounded-2xl border bg-background/60 p-4 overflow-hidden">
+                        <div className="mx-auto w-full max-w-[700px] rounded-xl border bg-white shadow-2xl overflow-hidden h-full">
+                          {html ? (
+                            <iframe
+                              title="Email preview"
+                              className="w-full h-full"
+                              srcDoc={html}
+                              sandbox=""
+                            />
+                          ) : loading ? (
+                            <div className="p-6 space-y-3">
+                              <Skeleton className="h-6 w-3/5" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-11/12" />
+                              <Skeleton className="h-4 w-10/12" />
+                              <Skeleton className="h-10 w-40 mt-4" />
+                              <div className="pt-6">
+                                <Skeleton className="h-64 w-full" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-sm text-muted-foreground px-6 text-center">
+                              Select a template and render to see the preview.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </div>
           </CardContent>
         </Card>
