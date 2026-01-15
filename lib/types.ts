@@ -161,6 +161,35 @@ export const EXOTIC_SPECIES = [
   'greater_kudu',
   'red_stag',
   'sika',
+  // Additional common exotics (TX ranch market)
+  'elk',
+  'red_deer', // non-stag phrasing
+  'sambar',
+  'rusa',
+  'muntjac',
+  'mouflon',
+  'dama_gazelle',
+  'dorcas_gazelle',
+  'springbok',
+  'impala',
+  'waterbuck',
+  'eland',
+  'bongo',
+  'nyala',
+  'lesser_kudu',
+  'gemsbok',
+  'zebra',
+  'wildebeest',
+  'black_wildebeest',
+  'blesbok',
+  'hartebeest',
+  'oryx',
+  'sitatunga',
+  'barasingha',
+  'chital', // synonym for axis; kept for UX
+  'ibex',
+  'markhor',
+  'tahr',
   'other_exotic' // Requires admin review
 ] as const;
 
