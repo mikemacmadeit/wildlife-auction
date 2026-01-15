@@ -131,9 +131,10 @@ export async function POST(request: Request) {
       updatedAt: Timestamp.now(),
     };
 
-    // If canceled immediately, revert to free plan
+    // If canceled immediately, revert to Standard tier
     if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
-      updateData.subscriptionPlan = 'free';
+      updateData.subscriptionTier = 'standard';
+      updateData.subscriptionPlan = 'free'; // legacy
       updateData.subscriptionStatus = 'canceled';
     }
 

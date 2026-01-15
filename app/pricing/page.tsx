@@ -21,9 +21,14 @@ import {
 import { cn } from '@/lib/utils';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { PLAN_CONFIG, getPlanConfig, type PlanId } from '@/lib/pricing/plans';
+import { PLAN_CONFIG } from '@/lib/pricing/plans';
+import { useAuth } from '@/hooks/use-auth';
+import { createSubscription } from '@/lib/stripe/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PricingPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -47,75 +52,106 @@ export default function PricingPage() {
 
   const pricingTiers = [
     {
-      id: 'free' as PlanId,
-      name: PLAN_CONFIG.free.displayName,
-      description: 'Best for occasional listings',
-      price: PLAN_CONFIG.free.monthlyPrice,
-      priceLabel: PLAN_CONFIG.free.monthlyPrice === 0 ? 'Free' : `$${PLAN_CONFIG.free.monthlyPrice}`,
-      period: PLAN_CONFIG.free.monthlyPrice === 0 ? '' : '/month',
+      id: 'standard',
+      name: `${PLAN_CONFIG.standard.displayName} Seller`,
+      description: 'For new and occasional sellers',
+      price: PLAN_CONFIG.standard.monthlyPrice,
+      priceLabel: 'Free',
+      period: '',
       icon: Gavel,
       gradient: 'from-secondary to-secondary/90',
       borderColor: 'border-primary/20',
       badge: null,
       features: [
-        `${PLAN_CONFIG.free.listingLimit} active listings`,
-        `${(PLAN_CONFIG.free.takeRate * 100).toFixed(0)}% transaction fee`,
-        'Standard listing visibility',
-        'Basic seller profile',
+        'Unlimited listings',
+        'Normal browse placement',
+        'Standard seller profile',
         'Standard support',
       ],
-      cta: 'Start Free',
+      cta: 'Get Started',
       popular: false,
     },
     {
-      id: 'pro' as PlanId,
-      name: PLAN_CONFIG.pro.displayName,
-      description: 'Best for active breeders',
-      price: PLAN_CONFIG.pro.monthlyPrice,
-      priceLabel: `$${PLAN_CONFIG.pro.monthlyPrice}`,
+      id: 'priority',
+      name: `${PLAN_CONFIG.priority.displayName} Seller`,
+      description: 'Higher placement and a seller tier badge',
+      price: PLAN_CONFIG.priority.monthlyPrice,
+      priceLabel: `$${PLAN_CONFIG.priority.monthlyPrice}`,
       period: '/month',
       icon: TrendingUp,
       gradient: 'from-primary to-primary/90',
       borderColor: 'border-primary/30',
       badge: 'Most Popular',
       features: [
-        `${PLAN_CONFIG.pro.listingLimit} active listings`,
-        `${(PLAN_CONFIG.pro.takeRate * 100).toFixed(0)}% transaction fee`,
-        'Featured placement options',
-        'Basic analytics',
-        'Priority support',
+        'Priority Seller badge',
+        'Higher placement in browse results',
+        'More frequent inclusion in recommendations (where available)',
+        'Priority compliance review (priority queue only — does not guarantee approval)',
       ],
-      cta: 'Go Pro',
+      cta: 'Upgrade to Priority',
       popular: true,
     },
     {
-      id: 'elite' as PlanId,
-      name: PLAN_CONFIG.elite.displayName,
-      description: 'Best for ranches and high volume',
-      price: PLAN_CONFIG.elite.monthlyPrice,
-      priceLabel: `$${PLAN_CONFIG.elite.monthlyPrice}`,
+      id: 'premier',
+      name: `${PLAN_CONFIG.premier.displayName} Seller`,
+      description: 'Top-of-category placement + premium seller styling',
+      price: PLAN_CONFIG.premier.monthlyPrice,
+      priceLabel: `$${PLAN_CONFIG.premier.monthlyPrice}`,
       period: '/month',
       icon: Crown,
       gradient: 'from-secondary to-secondary/90',
       borderColor: 'border-primary/20',
       badge: null,
       features: [
-        'Unlimited active listings',
-        `${(PLAN_CONFIG.elite.takeRate * 100).toFixed(0)}% transaction fee`,
-        'Priority support',
-        'Broker tools (coming soon)',
-        'Custom pricing available',
+        'Premier Seller badge',
+        'Top-of-category placement',
+        'Featured seller card styling on listing pages',
+        'Dedicated support (copy only)',
+        'Custom seller profile header styling',
       ],
-      cta: 'Talk to Sales',
+      cta: 'Upgrade to Premier',
       popular: false,
     },
   ];
+
+  const handleTierCta = async (tierId: 'standard' | 'priority' | 'premier') => {
+    // Standard: send to listing flow
+    if (tierId === 'standard') {
+      return;
+    }
+
+    // Paid tiers: create Stripe subscription (requires auth)
+    if (!user) {
+      try {
+        sessionStorage.setItem('redirectAfterLogin', `/pricing?plan=${tierId}`);
+      } catch {}
+      window.location.href = '/login';
+      return;
+    }
+
+    try {
+      const res = await createSubscription(tierId);
+      const url = (res as any)?.hostedInvoiceUrl;
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      // Fallback: pricing page with context
+      window.location.href = `/pricing?plan=${tierId}`;
+    } catch (e: any) {
+      toast({
+        title: 'Could not start checkout',
+        description: e?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const listingFees = [
     {
       type: 'Auction Listing',
       description: 'Set starting bid and let buyers compete',
-      fee: '4-7% of final bid (varies by plan)',
+      fee: '5% marketplace fee on completed transactions',
       minimum: '$50 minimum',
       featured: '+$25',
       icon: Gavel,
@@ -126,7 +162,7 @@ export default function PricingPage() {
     {
       type: 'Fixed Price',
       description: 'Set your price and sell instantly',
-      fee: '4-7% of sale price (varies by plan)',
+      fee: '5% marketplace fee on completed transactions',
       minimum: '$50 minimum',
       featured: '+$25',
       icon: CheckCircle2,
@@ -137,7 +173,7 @@ export default function PricingPage() {
     {
       type: 'Classified',
       description: 'Contact-based listings',
-      fee: '$25 flat fee',
+      fee: '5% marketplace fee on completed transactions (when paid through the platform)',
       minimum: 'No minimum',
       featured: '+$15',
       icon: Star,
@@ -202,7 +238,7 @@ export default function PricingPage() {
                 <Sparkles className="relative h-12 w-12 md:h-16 md:w-16 text-primary" />
               </div>
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight font-founders">
-                <span className="gradient-text">Pricing</span>
+                <span className="gradient-text">Exposure Plans</span>
               </h1>
             </motion.div>
 
@@ -212,7 +248,7 @@ export default function PricingPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight font-founders"
             >
-              Pricing for sellers
+              Exposure Plans for sellers
             </motion.h2>
 
             <motion.p
@@ -221,7 +257,7 @@ export default function PricingPage() {
               transition={{ duration: 0.6, delay: 0.6 }}
               className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
             >
-              Create an account, list animals, and reach serious buyers. Upgrade for more listings and visibility.
+              All sellers pay the same 5% marketplace fee. Plans are optional and provide exposure and seller-tier badges.
             </motion.p>
           </motion.div>
         </div>
@@ -238,13 +274,13 @@ export default function PricingPage() {
         >
           <motion.div variants={itemVariants} className="text-center space-y-3">
             <Badge className="px-4 py-1.5 text-sm font-bold bg-primary/10 border-primary/20 text-primary mb-2">
-              Subscription Plans
+              Exposure Plans
             </Badge>
             <h2 className="text-3xl md:text-5xl font-extrabold text-foreground font-founders">
               Choose Your Plan
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Start free and upgrade as you grow. Cancel anytime.
+              Start on Standard and upgrade anytime. Cancel anytime.
             </p>
           </motion.div>
 
@@ -347,19 +383,35 @@ export default function PricingPage() {
                         ))}
                       </div>
 
-                      <CreateListingGateButton
-                        href="/dashboard/listings/new"
-                        className={cn(
-                          'w-full min-h-[52px] font-bold text-base',
-                          tier.popular
-                            ? 'bg-accent text-accent-foreground hover:shadow-xl hover:shadow-accent/40'
-                            : 'bg-accent text-accent-foreground hover:shadow-lg hover:shadow-accent/30',
-                          'transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]'
-                        )}
-                      >
-                        {tier.cta}
-                        <ArrowRight className="h-5 w-5" />
-                      </CreateListingGateButton>
+                      {tier.id === 'standard' ? (
+                        <CreateListingGateButton
+                          href="/dashboard/listings/new"
+                          className={cn(
+                            'w-full min-h-[52px] font-bold text-base',
+                            tier.popular
+                              ? 'bg-accent text-accent-foreground hover:shadow-xl hover:shadow-accent/40'
+                              : 'bg-accent text-accent-foreground hover:shadow-lg hover:shadow-accent/30',
+                            'transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]'
+                          )}
+                        >
+                          {tier.cta}
+                          <ArrowRight className="h-5 w-5" />
+                        </CreateListingGateButton>
+                      ) : (
+                        <Button
+                          className={cn(
+                            'w-full min-h-[52px] font-bold text-base',
+                            tier.popular
+                              ? 'bg-accent text-accent-foreground hover:shadow-xl hover:shadow-accent/40'
+                              : 'bg-accent text-accent-foreground hover:shadow-lg hover:shadow-accent/30',
+                            'transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]'
+                          )}
+                          onClick={() => handleTierCta(tier.id as any)}
+                        >
+                          {tier.cta}
+                          <ArrowRight className="h-5 w-5 ml-2" />
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -381,13 +433,13 @@ export default function PricingPage() {
         >
           <motion.div variants={itemVariants} className="text-center space-y-3">
             <Badge className="px-4 py-1.5 text-sm font-bold bg-primary/10 border-primary/20 text-primary mb-2">
-              Listing Fees
+              Marketplace Fee
             </Badge>
             <h2 className="text-3xl md:text-5xl font-extrabold">
-              Transaction fee
+              5% marketplace fee
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              A small percentage applies when a sale completes.
+              All sellers pay the same 5% marketplace fee. Exposure Plans do not change fees.
             </p>
           </motion.div>
 
@@ -527,7 +579,7 @@ export default function PricingPage() {
               },
               {
                 q: 'Can I change my plan later?',
-                a: 'Yes! You can upgrade, downgrade, or cancel your subscription at any time. Changes take effect immediately.',
+                a: 'Yes! You can upgrade, downgrade, or cancel your exposure plan at any time. Changes take effect immediately.',
               },
               {
                 q: 'What payment methods do you accept?',

@@ -25,6 +25,7 @@ import { getDocument } from './firestore';
 import { Listing, ListingStatus, ListingType, ListingCategory, ListingAttributes, UserProfile } from '@/lib/types';
 import { ListingDoc } from '@/lib/types/firestore';
 import { validateListingCompliance, requiresComplianceReview } from '@/lib/compliance/validation';
+import { getTierWeight } from '@/lib/pricing/subscriptions';
 
 /**
  * Input type for creating a listing (omits fields that are auto-generated)
@@ -194,6 +195,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     location: doc.location || { city: 'Unknown', state: 'Unknown' },
     sellerId: doc.sellerId,
     sellerSnapshot: doc.sellerSnapshot,
+    sellerTier: (doc as any).sellerTierSnapshot,
     seller: legacySeller, // @deprecated - for backward compatibility only
     trust: doc.trust || { verified: false, insuranceAvailable: false, transportReady: false },
     subcategory: doc.subcategory,
@@ -796,6 +798,77 @@ export const queryListingsForBrowse = async (
         const price = listing.price || listing.currentBid || listing.startingBid || 0;
         return price >= filters.minPrice!;
       });
+    }
+
+    // Exposure Plans: deterministic tier boost without breaking relevance.
+    // Primary: seller tier weight DESC (standard=0, priority=10, premier=20)
+    // Secondary: the existing sort choice (createdAt/price/endsAt)
+    const getSecondaryKey = (l: Listing): number => {
+      switch (sort) {
+        case 'oldest':
+          return l.createdAt?.getTime?.() ? l.createdAt.getTime() : 0;
+        case 'priceAsc':
+        case 'priceDesc': {
+          const price = l.price || l.currentBid || l.startingBid || 0;
+          return Number(price) || 0;
+        }
+        case 'endingSoon':
+          // Prefer endsAt for auctions; otherwise fall back to createdAt.
+          return l.endsAt?.getTime?.() ? l.endsAt.getTime() : (l.createdAt?.getTime?.() ? l.createdAt.getTime() : 0);
+        case 'newest':
+        default:
+          return l.createdAt?.getTime?.() ? l.createdAt.getTime() : 0;
+      }
+    };
+
+    const originalIndex = new Map<string, number>();
+    filteredItems.forEach((l, idx) => originalIndex.set(l.id, idx));
+
+    filteredItems.sort((a, b) => {
+      const aw = getTierWeight((a.sellerTier as any) || 'standard');
+      const bw = getTierWeight((b.sellerTier as any) || 'standard');
+      if (aw !== bw) return bw - aw;
+
+      const as = getSecondaryKey(a);
+      const bs = getSecondaryKey(b);
+
+      // Align direction with the requested sort.
+      const desc = sort === 'newest' || sort === 'priceDesc' || sort === 'endingSoon';
+      if (as !== bs) return desc ? bs - as : as - bs;
+
+      // Stable tie-breakers.
+      const ai = originalIndex.get(a.id) ?? 0;
+      const bi = originalIndex.get(b.id) ?? 0;
+      if (ai !== bi) return ai - bi;
+      return a.id.localeCompare(b.id);
+    });
+
+    // Fairness constraint (lightweight, page-local):
+    // Ensure at least ~1 out of every 5 results is Standard if available.
+    if (sort === 'newest') {
+      const paid = filteredItems.filter((l) => (l.sellerTier || 'standard') !== 'standard');
+      const standard = filteredItems.filter((l) => (l.sellerTier || 'standard') === 'standard');
+      if (paid.length > 0 && standard.length > 0) {
+        const merged: Listing[] = [];
+        let p = 0;
+        let s = 0;
+        while (merged.length < filteredItems.length) {
+          for (let i = 0; i < 4 && p < paid.length && merged.length < filteredItems.length; i++) {
+            merged.push(paid[p++]);
+          }
+          if (s < standard.length && merged.length < filteredItems.length) {
+            merged.push(standard[s++]);
+          }
+          // Drain remainder if one bucket exhausted.
+          while (p < paid.length && merged.length < filteredItems.length && standard.length === s) {
+            merged.push(paid[p++]);
+          }
+          while (s < standard.length && merged.length < filteredItems.length && paid.length === p) {
+            merged.push(standard[s++]);
+          }
+        }
+        filteredItems = merged;
+      }
     }
     
     // Get next cursor (last document snapshot - most efficient for Firestore)

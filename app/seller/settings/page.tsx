@@ -135,7 +135,7 @@ export default function SellerSettingsPage() {
           <TabsList className="grid w-full grid-cols-5 h-auto bg-card border border-border/50 p-1">
             <TabsTrigger value="billing" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
               <CreditCard className="h-4 w-4 mr-2" />
-              Billing & Plan
+              Exposure Plans
             </TabsTrigger>
             <TabsTrigger value="business" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
               <Building2 className="h-4 w-4 mr-2" />

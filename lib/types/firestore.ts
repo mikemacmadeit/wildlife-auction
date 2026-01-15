@@ -44,6 +44,10 @@ export interface ListingDoc {
     verified: boolean;
   };
 
+  // Seller tier snapshot (Exposure Plans) - set server-side on publish for public display + ranking
+  sellerTierSnapshot?: 'standard' | 'priority' | 'premier';
+  sellerTierWeightSnapshot?: number;
+
   // Trust/Safety Flags
   trust: {
     verified: boolean;

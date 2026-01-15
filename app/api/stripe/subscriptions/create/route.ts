@@ -1,7 +1,9 @@
 /**
  * POST /api/stripe/subscriptions/create
  * 
- * Create a Stripe subscription for Pro or Elite plan
+ * Create a Stripe subscription for Exposure Plans:
+ * - Priority Seller ($99/mo)
+ * - Premier Seller ($299/mo)
  */
 
 // IMPORTANT:
@@ -18,6 +20,7 @@ import { validateRequest } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
 import { PLAN_CONFIG } from '@/lib/pricing/plans';
+import { mapLegacyPlanToTier, mapTierToLegacyPlanId, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 
@@ -61,7 +64,8 @@ const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
 const createSubscriptionSchema = z.object({
-  planId: z.enum(['pro', 'elite']),
+  // Back-compat: accept legacy plan ids too.
+  planId: z.enum(['priority', 'premier', 'pro', 'elite']),
 });
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
@@ -118,8 +122,9 @@ export async function POST(request: Request) {
       return json({ error: validation.error, details: validation.details?.errors }, { status: 400 });
     }
 
-    const { planId } = validation.data;
-    const planConfig = PLAN_CONFIG[planId];
+    const { planId: rawPlanId } = validation.data;
+    const tier: SubscriptionTier = mapLegacyPlanToTier(rawPlanId);
+    const planConfig = PLAN_CONFIG[tier];
 
     if (!planConfig) {
       return json({ error: 'Invalid plan ID' }, { status: 400 });
@@ -148,18 +153,21 @@ export async function POST(request: Request) {
 
     // Get Stripe Price ID for this plan (must be created in Stripe Dashboard)
     // Store in environment variables: STRIPE_PRICE_ID_PRO, STRIPE_PRICE_ID_ELITE
-    const priceId = process.env[`STRIPE_PRICE_ID_${planId.toUpperCase()}`];
+    // Prefer new env vars, fall back to legacy ones to avoid breaking existing deploys.
+    const preferredEnvKey = `STRIPE_PRICE_ID_${tier.toUpperCase()}`;
+    const legacyEnvKey = tier === 'priority' ? 'STRIPE_PRICE_ID_PRO' : 'STRIPE_PRICE_ID_ELITE';
+    const priceId = process.env[preferredEnvKey] || process.env[legacyEnvKey];
     
     if (!priceId) {
       logError('Stripe price ID not configured for plan', undefined, {
-        planId,
+        planId: tier,
         route: '/api/stripe/subscriptions/create',
       });
       return json(
         {
           error: `Subscription price for ${planConfig.displayName} plan is not configured. Please contact support.`,
           code: 'PRICE_NOT_CONFIGURED',
-          planId,
+          planId: tier,
         },
         { status: 503 }
       );
@@ -171,7 +179,7 @@ export async function POST(request: Request) {
       items: [{ price: priceId || undefined }],
       metadata: {
         userId: userId,
-        planId: planId,
+        planId: tier,
       },
       payment_behavior: 'default_incomplete',
       payment_settings: { save_default_payment_method: 'on_subscription' },
@@ -183,7 +191,10 @@ export async function POST(request: Request) {
     // Update user with subscription info
     await userRef.set({
       stripeSubscriptionId: subscription.id,
-      subscriptionPlan: planId,
+      // Single source of truth
+      subscriptionTier: tier,
+      // Legacy field preserved for older code paths
+      subscriptionPlan: mapTierToLegacyPlanId(tier),
       subscriptionStatus: subscription.status,
       subscriptionCurrentPeriodEnd: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000)

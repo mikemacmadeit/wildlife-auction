@@ -30,11 +30,11 @@ test.beforeAll(async () => {
   const projectId = process.env.TEST_FIREBASE_PROJECT_ID || 'wildlife-exchange-test';
   const useEmulator = !!process.env.FIRESTORE_EMULATOR_HOST;
 
-  if (!getFirebaseApps().length) {
+  if (!getApps().length) {
     if (useEmulator) {
       // Use emulator
       process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8080';
-      initApp({
+      initializeApp({
         projectId,
       });
     } else {
@@ -44,8 +44,8 @@ test.beforeAll(async () => {
         clientEmail: process.env.TEST_FIREBASE_CLIENT_EMAIL || 'test@example.com',
         privateKey: process.env.TEST_FIREBASE_PRIVATE_KEY || '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
       };
-      initApp({
-        credential: certCred(testServiceAccount as any),
+      initializeApp({
+        credential: cert(testServiceAccount as any),
         projectId,
       });
     }

@@ -1,8 +1,8 @@
 /**
  * POST /api/listings/check-limit
  * 
- * Server-side listing limit enforcement
- * Checks if user can create/publish/reactivate a listing
+ * Exposure Plans model: listing limits are NOT enforced.
+ * This endpoint is kept for backward compatibility with older clients.
  */
 
 // IMPORTANT:
@@ -16,7 +16,8 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { validateRequest } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
-import { canCreateListing, getPlanListingLimit, getPlanConfig, hasUnlimitedListings } from '@/lib/pricing/plans';
+import { PLAN_CONFIG, MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
+import { getEffectiveSubscriptionTier, mapTierToLegacyPlanId } from '@/lib/pricing/subscriptions';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
 
     const { action } = validation.data;
 
-    // Get user's plan
+    // Get user (tier snapshot)
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
     if (!userDoc.exists) {
@@ -139,50 +140,24 @@ export async function POST(request: Request) {
     }
 
     const userData = userDoc.data()!;
-    
-    // Determine effective plan (admin override takes precedence)
-    let planId = userData?.adminPlanOverride || userData?.subscriptionPlan || 'free';
-    
-    // If subscription is past_due or canceled, revert to free (unless admin override)
-    if (!userData?.adminPlanOverride) {
-      const subscriptionStatus = userData?.subscriptionStatus;
-      if (subscriptionStatus === 'past_due' || subscriptionStatus === 'canceled' || subscriptionStatus === 'unpaid') {
-        planId = 'free';
-      }
-    }
 
-    const planConfig = getPlanConfig(planId);
-
-    // Count active listings (status === 'active')
-    //
-    // IMPORTANT: Avoid composite-index requirements here. Firestore may require a composite
-    // index for (sellerId + status). We keep this endpoint "always works" by querying only
-    // by sellerId and filtering client-side.
-    const listingsRef = db.collection('listings');
-    const sellerListingsSnap = await listingsRef.where('sellerId', '==', userId).get();
-    let activeListingsCount = 0;
-    sellerListingsSnap.forEach((doc) => {
-      const data = doc.data();
-      if (data?.status === 'active') activeListingsCount++;
-    });
-
-    // Check if user can create more listings
-    const canCreate = canCreateListing(planId, activeListingsCount);
-    const limit = getPlanListingLimit(planId);
-    const remainingSlots = hasUnlimitedListings(planId) ? null : Math.max(0, (limit || 0) - activeListingsCount);
+    const tier = getEffectiveSubscriptionTier(userData as any);
+    const planConfig = PLAN_CONFIG[tier];
 
     return json({
-      canCreate,
-      planId,
+      canCreate: true,
+      action,
+      // Backward compatibility fields
+      planId: mapTierToLegacyPlanId(tier),
       planDisplayName: planConfig.displayName,
-      activeListingsCount,
-      listingLimit: limit,
-      remainingSlots,
-      isUnlimited: hasUnlimitedListings(planId),
-      feePercent: userData?.adminFeeOverride ?? planConfig.takeRate,
-      message: canCreate
-        ? undefined
-        : `You've reached your ${planConfig.displayName} plan limit of ${limit} active listings. Upgrade to create more listings.`,
+      // New canonical field
+      subscriptionTier: tier,
+      activeListingsCount: null,
+      listingLimit: null,
+      remainingSlots: null,
+      isUnlimited: true,
+      feePercent: MARKETPLACE_FEE_PERCENT,
+      message: undefined,
     });
   } catch (error: any) {
     if (error?.code === 'FIREBASE_ADMIN_NOT_CONFIGURED') {
@@ -199,7 +174,7 @@ export async function POST(request: Request) {
       );
     }
 
-    logError('Error checking listing limit', error, {
+    logError('Error checking listing limit (legacy endpoint)', error, {
       route: '/api/listings/check-limit',
     });
     captureException(error instanceof Error ? error : new Error(String(error)), {

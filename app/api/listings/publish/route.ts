@@ -1,7 +1,7 @@
 /**
  * POST /api/listings/publish
  * 
- * Server-side listing publish with limit enforcement
+ * Server-side listing publish (Exposure Plans model: NO listing limits)
  */
 
 // IMPORTANT:
@@ -15,7 +15,7 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { validateRequest } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
-import { canCreateListing, getPlanConfig } from '@/lib/pricing/plans';
+import { getEffectiveSubscriptionTier, getTierWeight } from '@/lib/pricing/subscriptions';
 import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 import { validateListingCompliance } from '@/lib/compliance/validation';
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get user's plan
+    // Get user (for seller tier snapshot)
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
     if (!userDoc.exists) {
@@ -224,46 +224,10 @@ export async function POST(request: Request) {
     }
 
     const userData = userDoc.data()!;
-    
-    // Determine effective plan (admin override takes precedence)
-    let planId = userData?.adminPlanOverride || userData?.subscriptionPlan || 'free';
-    
-    // If subscription is past_due or canceled, revert to free (unless admin override)
-    if (!userData?.adminPlanOverride) {
-      const subscriptionStatus = userData?.subscriptionStatus;
-      if (subscriptionStatus === 'past_due' || subscriptionStatus === 'canceled' || subscriptionStatus === 'unpaid') {
-        planId = 'free';
-      }
-    }
 
-    // Count active listings (status === 'active') WITHOUT composite index dependency.
-    const listingsRef = db.collection('listings');
-    const sellerListingsSnap = await listingsRef.where('sellerId', '==', userId).get();
-    let activeListingsCount = 0;
-    sellerListingsSnap.docs.forEach((d) => {
-      if (d.data()?.status === 'active') activeListingsCount++;
-    });
-
-    // Check if user can create more listings (excluding this listing if it's draft)
-    const effectiveCount = listingData.status === 'draft' ? activeListingsCount : activeListingsCount - 1;
-    const canCreate = canCreateListing(planId, effectiveCount);
-
-    if (!canCreate) {
-      const planConfig = getPlanConfig(planId);
-      const limit = planConfig.listingLimit;
-      return json(
-        {
-          error: 'Listing limit exceeded',
-          message: `You've reached your ${planConfig.displayName} plan limit of ${limit} active listings. Upgrade to create more listings.`,
-          planId,
-          planDisplayName: planConfig.displayName,
-          activeListingsCount: effectiveCount,
-          listingLimit: limit,
-          upgradeRequired: true,
-        },
-        { status: 403 }
-      );
-    }
+    // Snapshot seller tier onto listing for public badge + deterministic ranking (without reading users).
+    const sellerTier = getEffectiveSubscriptionTier(userData as any);
+    const sellerTierWeight = getTierWeight(sellerTier);
 
     // Compliance review gating:
     // - Whitetail breeder: always pending review (status='pending')
@@ -291,6 +255,8 @@ export async function POST(request: Request) {
         status: 'pending',
         updatedAt: Timestamp.now(),
         updatedBy: userId,
+        sellerTierSnapshot: sellerTier,
+        sellerTierWeightSnapshot: sellerTierWeight,
         ...flagUpdate,
       });
 
@@ -308,6 +274,8 @@ export async function POST(request: Request) {
       publishedAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
       updatedBy: userId,
+      sellerTierSnapshot: sellerTier,
+      sellerTierWeightSnapshot: sellerTierWeight,
       ...flagUpdate,
     });
 
@@ -315,7 +283,7 @@ export async function POST(request: Request) {
       route: '/api/listings/publish',
       listingId,
       userId,
-      planId,
+      sellerTier,
     });
 
     return json({

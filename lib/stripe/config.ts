@@ -3,6 +3,7 @@
  */
 
 import Stripe from 'stripe';
+import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 
 /**
  * Get Stripe client instance (server-side only)
@@ -35,11 +36,9 @@ export function isStripeConfigured(): boolean {
 }
 
 /**
- * Platform commission percentage (5%)
- * @deprecated Use getPlanTakeRate() and calculatePlatformFeeForPlan() instead
- * This is kept for backward compatibility but will default to 5% if plan is not provided
+ * Platform commission percentage (flat for all sellers/categories).
  */
-export const PLATFORM_COMMISSION_PERCENT = 0.05;
+export const PLATFORM_COMMISSION_PERCENT = MARKETPLACE_FEE_PERCENT;
 
 /**
  * Calculate platform fee (application fee) for a given amount
@@ -55,10 +54,9 @@ export function calculatePlatformFee(amount: number): number {
  * @param planId - Seller's plan ID ('free' | 'pro' | 'elite')
  * @returns Platform fee in cents
  */
-export function calculatePlatformFeeForPlan(amount: number, planId: string | null | undefined): number {
-  const { getPlanTakeRate } = require('@/lib/pricing/plans');
-  const takeRate = getPlanTakeRate(planId);
-  return Math.round(amount * takeRate);
+export function calculatePlatformFeeForPlan(amount: number, _planId: string | null | undefined): number {
+  // Exposure Plans do not affect the marketplace fee; keep it flat.
+  return calculatePlatformFee(amount);
 }
 
 /**

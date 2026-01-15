@@ -19,6 +19,9 @@ import { cn } from '@/lib/utils';
 import { Listing } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { getSellerStats } from '@/lib/firebase/sellerStats';
+import { getUserProfile } from '@/lib/firebase/users';
+import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/pricing/subscriptions';
+import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -42,6 +45,8 @@ export function EnhancedSellerProfile({
     completionRate: 0,
   });
 
+  const [sellerTier, setSellerTier] = useState<SubscriptionTier>('standard');
+
   useEffect(() => {
     if (sellerId) {
       getSellerStats(sellerId).then((stats) => {
@@ -55,10 +60,30 @@ export function EnhancedSellerProfile({
     }
   }, [sellerId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!sellerId) return;
+    getUserProfile(sellerId)
+      .then((profile) => {
+        if (cancelled) return;
+        setSellerTier(getEffectiveSubscriptionTier(profile));
+      })
+      .catch(() => {
+        if (!cancelled) setSellerTier('standard');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
+
   return (
     <Card className={cn(
-      'border border-border/50 shadow-warm',
-      'bg-card',
+      'shadow-warm',
+      sellerTier === 'premier'
+        ? 'border-2 border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 to-background'
+        : sellerTier === 'priority'
+        ? 'border-2 border-primary/25 bg-gradient-to-br from-primary/10 to-background'
+        : 'border border-border/50 bg-card',
       className
     )}>
       <CardHeader className="pb-4 border-b border-border/50">
@@ -84,6 +109,7 @@ export function EnhancedSellerProfile({
               <h3 className="text-base font-bold text-foreground truncate">
                 {sellerName}
               </h3>
+              <SellerTierBadge tier={sellerTier} />
               {sellerVerified && (
                 <Badge 
                   variant="default" 

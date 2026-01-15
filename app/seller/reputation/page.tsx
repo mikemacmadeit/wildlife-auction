@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,8 +20,31 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mockSellerStats } from '@/lib/seller-mock-data';
+import { useAuth } from '@/hooks/use-auth';
+import { getUserProfile } from '@/lib/firebase/users';
+import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/pricing/subscriptions';
+import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 
 export default function SellerReputationPage() {
+  const { user } = useAuth();
+  const [tier, setTier] = useState<SubscriptionTier>('standard');
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.uid) return;
+    getUserProfile(user.uid)
+      .then((p) => {
+        if (cancelled) return;
+        setTier(getEffectiveSubscriptionTier(p));
+      })
+      .catch(() => {
+        if (!cancelled) setTier('standard');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
   const verificationSteps = [
     { id: 1, label: 'Identity Verification', completed: true },
     { id: 2, label: 'Business License', completed: true },
@@ -75,6 +99,32 @@ export default function SellerReputationPage() {
             Your seller profile and verification status
           </p>
         </div>
+
+        {/* Seller Tier (Exposure Plans) */}
+        <Card className="border-2 border-border/50 bg-card">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl font-extrabold">Seller Tier</CardTitle>
+                <CardDescription>
+                  Optional exposure plan tier (does not indicate compliance approval)
+                </CardDescription>
+              </div>
+              <Button asChild variant="outline" className="font-semibold">
+                <Link href="/pricing">View Exposure Plans</Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2">
+            <Badge variant="secondary">
+              {tier === 'premier' ? 'Premier' : tier === 'priority' ? 'Priority' : 'Standard'}
+            </Badge>
+            <SellerTierBadge tier={tier} />
+            <span className="text-xs text-muted-foreground">
+              Seller tier reflects optional exposure benefits only.
+            </span>
+          </CardContent>
+        </Card>
 
         {/* Verification Status */}
         <Card className="border-2 border-border/50 bg-card">

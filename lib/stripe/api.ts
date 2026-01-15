@@ -574,9 +574,9 @@ export async function adminSetOrderHold(orderId: string, hold: boolean, reason: 
 }
 
 /**
- * Create a Stripe subscription for Pro or Elite plan
+ * Create a Stripe subscription for Exposure Plans (Priority/Premier)
  */
-export async function createSubscription(planId: 'pro' | 'elite'): Promise<{
+export async function createSubscription(planId: 'priority' | 'premier' | 'pro' | 'elite'): Promise<{
   subscriptionId: string;
   clientSecret: string;
   status: string;

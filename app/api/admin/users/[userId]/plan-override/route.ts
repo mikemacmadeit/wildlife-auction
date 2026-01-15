@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/users/[userId]/plan-override
  * 
- * Admin-only endpoint to override seller plan and fee
+ * Admin-only endpoint to override seller exposure tier
  */
 
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
@@ -14,7 +14,7 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { validateRequest } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
-import { PLAN_CONFIG, getPlanConfig } from '@/lib/pricing/plans';
+import { mapLegacyPlanToTier, mapTierToLegacyPlanId, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -50,8 +50,8 @@ const auth = getAuth(adminApp);
 const db = getFirestore(adminApp);
 
 const planOverrideSchema = z.object({
-  planOverride: z.enum(['free', 'pro', 'elite']).optional().nullable(), // null = remove override
-  feeOverride: z.number().min(0).max(1).optional().nullable(), // 0.07 = 7%, null = remove override
+  // Back-compat: allow legacy ids too. Stored as adminPlanOverride (legacy string) + subscriptionTier (canonical).
+  planOverride: z.enum(['standard', 'priority', 'premier', 'free', 'pro', 'elite']).optional().nullable(), // null = remove override
   reason: z.string().min(1).max(500), // Required reason for override
   notes: z.string().max(1000).optional(),
 });
@@ -128,7 +128,7 @@ export async function POST(
       return json({ error: validation.error, details: validation.details?.errors }, { status: 400 });
     }
 
-    const { planOverride, feeOverride, reason, notes } = validation.data;
+    const { planOverride, reason, notes } = validation.data;
 
     // Get user
     const userRef = db.collection('users').doc(userId);
@@ -140,8 +140,8 @@ export async function POST(
     const userData = userDoc.data()!;
     const beforeState = {
       adminPlanOverride: userData?.adminPlanOverride || null,
-      adminFeeOverride: userData?.adminFeeOverride || null,
       subscriptionPlan: userData?.subscriptionPlan || 'free',
+      subscriptionTier: userData?.subscriptionTier || null,
     };
 
     // Update user with override
@@ -154,23 +154,15 @@ export async function POST(
       updateData.adminOverrideReason = null;
       updateData.adminOverrideBy = null;
       updateData.adminOverrideAt = null;
+      // Do not force subscriptionTier here; webhook/subscription state will govern.
     } else if (planOverride) {
+      const tier: SubscriptionTier = mapLegacyPlanToTier(planOverride);
       updateData.adminPlanOverride = planOverride;
+      updateData.subscriptionTier = tier;
+      updateData.subscriptionPlan = mapTierToLegacyPlanId(tier); // legacy field
       updateData.adminOverrideReason = reason;
       updateData.adminOverrideBy = adminId;
       updateData.adminOverrideAt = Timestamp.now();
-    }
-
-    if (feeOverride === null) {
-      updateData.adminFeeOverride = null;
-    } else if (feeOverride !== undefined) {
-      updateData.adminFeeOverride = feeOverride;
-      // Update reason if not already set
-      if (!updateData.adminOverrideReason) {
-        updateData.adminOverrideReason = reason;
-        updateData.adminOverrideBy = adminId;
-        updateData.adminOverrideAt = Timestamp.now();
-      }
     }
 
     await userRef.update(updateData);
@@ -184,13 +176,12 @@ export async function POST(
       beforeState,
       afterState: {
         adminPlanOverride: updateData.adminPlanOverride ?? userData?.adminPlanOverride ?? null,
-        adminFeeOverride: updateData.adminFeeOverride ?? userData?.adminFeeOverride ?? null,
-        subscriptionPlan: userData?.subscriptionPlan || 'free',
+        subscriptionTier: updateData.subscriptionTier ?? userData?.subscriptionTier ?? null,
+        subscriptionPlan: (updateData.subscriptionPlan ?? userData?.subscriptionPlan) || 'free',
       },
       metadata: {
         targetUserId: userId,
         planOverride,
-        feeOverride,
         reason,
         notes: notes || undefined,
       },
@@ -202,15 +193,13 @@ export async function POST(
       adminId,
       targetUserId: userId,
       planOverride,
-      feeOverride,
     });
 
     return json({
       success: true,
       userId,
       planOverride: updateData.adminPlanOverride ?? null,
-      feeOverride: updateData.adminFeeOverride ?? null,
-      message: 'Plan override updated successfully',
+      message: 'Exposure tier override updated successfully',
     });
   } catch (error: any) {
     logError('Error setting plan override', error, {

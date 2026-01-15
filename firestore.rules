@@ -34,10 +34,58 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // Allow create: if authenticated and creating own document
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId &&
+        // Prevent self-assigning admin/billing fields at create time
+        !request.resource.data.keys().hasAny([
+          'subscriptionPlan',
+          'stripeCustomerId',
+          'stripeSubscriptionId',
+          'subscriptionStatus',
+          'subscriptionCurrentPeriodEnd',
+          'subscriptionCancelAtPeriodEnd',
+          'adminPlanOverride',
+          'adminFeeOverride',
+          'adminOverrideReason',
+          'adminOverrideBy',
+          'adminOverrideAt',
+          'role',
+          'superAdmin',
+          'stripeAccountId',
+          'stripeOnboardingStatus',
+          'chargesEnabled',
+          'payoutsEnabled',
+          'stripeDetailsSubmitted'
+        ]) &&
+        // If tier is included at create time, it must be Standard
+        (
+          !request.resource.data.keys().hasAny(['subscriptionTier']) ||
+          request.resource.data.subscriptionTier == 'standard'
+        );
       
       // Allow update: if authenticated and updating own document
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        // Prevent client-side mutation of billing/admin/tier fields (must be server-controlled)
+        !request.resource.data.diff(resource.data).changedKeys().hasAny([
+          'subscriptionTier',
+          'subscriptionPlan',
+          'stripeCustomerId',
+          'stripeSubscriptionId',
+          'subscriptionStatus',
+          'subscriptionCurrentPeriodEnd',
+          'subscriptionCancelAtPeriodEnd',
+          'adminPlanOverride',
+          'adminFeeOverride',
+          'adminOverrideReason',
+          'adminOverrideBy',
+          'adminOverrideAt',
+          'role',
+          'superAdmin',
+          'stripeAccountId',
+          'stripeOnboardingStatus',
+          'chargesEnabled',
+          'payoutsEnabled',
+          'stripeDetailsSubmitted'
+        ]);
       
       // Allow delete: if authenticated and deleting own document
       allow delete: if isAuthenticated() && request.auth.uid == userId;

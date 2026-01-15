@@ -29,10 +29,10 @@ import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { Listing, Order, UserProfile } from '@/lib/types';
 import { getUserProfile } from '@/lib/firebase/users';
-import { getPlanConfig, canCreateListing, getRemainingListingSlots, hasUnlimitedListings } from '@/lib/pricing/plans';
-import { PlanSavingsCard } from '@/components/seller/PlanSavingsCard';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
-import { Crown, Zap, CreditCard } from 'lucide-react';
+import { PLAN_CONFIG, MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
+import { getEffectiveSubscriptionTier, getTierLabel } from '@/lib/pricing/subscriptions';
+import { Crown, Zap, CreditCard, Info } from 'lucide-react';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -381,106 +381,73 @@ export default function SellerOverviewPage() {
           </CreateListingGateButton>
         </div>
 
-        {/* Subscription Plan Card */}
+        {/* Exposure Plan (Seller Tier) */}
         {userProfile && (() => {
-          // Determine effective plan (admin override takes precedence, then subscription status)
-          let planId = userProfile.adminPlanOverride || userProfile.subscriptionPlan || 'free';
-          
-          // If subscription is past_due or canceled, revert to free (unless admin override)
-          if (!userProfile.adminPlanOverride) {
-            const subscriptionStatus = userProfile.subscriptionStatus;
-            if (subscriptionStatus === 'past_due' || subscriptionStatus === 'canceled' || subscriptionStatus === 'unpaid') {
-              planId = 'free';
-            }
-          }
-          
-          const planConfig = getPlanConfig(planId);
-          const activeListings = listings.filter((l) => l.status === 'active');
-          const activeCount = activeListings.length;
-          const limit = planConfig.listingLimit;
-          const remainingSlots = getRemainingListingSlots(planId, activeCount);
-          const isUnlimited = hasUnlimitedListings(planId);
-          const feePercent = userProfile.adminFeeOverride ?? planConfig.takeRate;
+          const tier = getEffectiveSubscriptionTier(userProfile);
+          const tierConfig = PLAN_CONFIG[tier];
           const subscriptionStatus = userProfile.subscriptionStatus;
           const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
-          const showUpgrade = planId === 'free' || (planId === 'pro' && subscriptionStatus !== 'active');
-          const isPastDue = subscriptionStatus === 'past_due';
-          const hasAdminOverride = !!userProfile.adminPlanOverride || !!userProfile.adminFeeOverride;
+          const showUpgrade = tier === 'standard' || !isActive;
+
+          const Icon = tier === 'premier' ? Crown : tier === 'priority' ? Zap : CreditCard;
 
           return (
-            <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-background">
+            <Card className={cn(
+              'border-2',
+              tier === 'premier'
+                ? 'border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 to-background'
+                : tier === 'priority'
+                ? 'border-primary/30 bg-gradient-to-br from-primary/10 to-background'
+                : 'border-border/50 bg-card'
+            )}>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    {planId === 'elite' ? <Crown className="h-6 w-6 text-primary" /> :
-                     planId === 'pro' ? <Zap className="h-6 w-6 text-primary" /> :
-                     <CreditCard className="h-6 w-6 text-muted-foreground" />}
+                    <Icon className={cn('h-6 w-6', tier === 'standard' ? 'text-muted-foreground' : 'text-primary')} />
                     <div>
                       <CardTitle className="text-xl font-extrabold">
-                        {planConfig.displayName} Plan
+                        {getTierLabel(tier)}
                       </CardTitle>
-                      <CardDescription className="text-sm">
-                        {hasAdminOverride && (
-                          <Badge variant="outline" className="text-xs mb-1">Admin Override</Badge>
-                        )}
-                        {isActive ? 'Active subscription' : 
-                         planId === 'free' ? 'Free plan' : 
-                         isPastDue ? 'Payment past due - using Free plan rates' :
-                         `Status: ${subscriptionStatus || 'inactive'}`}
+                      <CardDescription className="text-sm flex items-center gap-2 flex-wrap">
+                        <span>Exposure plan (optional)</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span>Marketplace fee: {(MARKETPLACE_FEE_PERCENT * 100).toFixed(0)}%</span>
                       </CardDescription>
                     </div>
                   </div>
                   {showUpgrade && (
                     <Button asChild size="sm" className="font-semibold">
-                      <Link href="/pricing">Upgrade</Link>
+                      <Link href="/pricing">View Exposure Plans</Link>
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-2 rounded-lg border bg-background/50 p-3">
+                  <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Seller tier reflects an optional exposure plan and <span className="font-semibold">does not</span> indicate regulatory compliance approval.
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      Transaction Fee
+                      Monthly price
                     </p>
                     <p className="text-2xl font-extrabold text-foreground">
-                      {(feePercent * 100).toFixed(0)}%
+                      {tierConfig.monthlyPrice === 0 ? '$0' : `$${tierConfig.monthlyPrice}`}
+                      <span className="text-sm font-bold text-muted-foreground">/mo</span>
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      Active Listings
+                      Browse placement
                     </p>
                     <p className="text-2xl font-extrabold text-foreground">
-                      {activeCount} {isUnlimited ? '' : `/ ${limit}`}
+                      {tier === 'premier' ? 'Top' : tier === 'priority' ? 'High' : 'Normal'}
                     </p>
-                    {!isUnlimited && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {remainingSlots !== null && remainingSlots > 0
-                          ? `${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining`
-                          : remainingSlots === 0
-                          ? 'Limit reached'
-                          : ''}
-                      </p>
-                    )}
                   </div>
                 </div>
-                {!isUnlimited && remainingSlots !== null && remainingSlots === 0 && (
-                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                    <p className="text-sm font-semibold text-destructive mb-1">
-                      Listing limit reached
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Upgrade to {planId === 'free' ? 'Pro' : 'Elite'} to create more listings.
-                    </p>
-                    <Button asChild size="sm" variant="destructive" className="mt-2 w-full font-semibold">
-                      <Link href="/pricing">
-                        Upgrade Now
-                        <ArrowRight className="h-3 w-3 ml-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           );
@@ -524,7 +491,7 @@ export default function SellerOverviewPage() {
           })}
         </div>
 
-        {/* Payout Readiness and Plan Savings Cards */}
+        {/* Payout Readiness */}
         {user && userProfile && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <PayoutReadinessCard 
@@ -534,7 +501,25 @@ export default function SellerOverviewPage() {
                 setUserProfile(profile);
               }} 
             />
-            <PlanSavingsCard sellerId={user.uid} days={30} />
+            <Card className="border-2 border-border/50 bg-card">
+              <CardHeader>
+                <CardTitle className="text-xl font-extrabold">Exposure Plans</CardTitle>
+                <CardDescription>
+                  Optional subscriptions that improve placement and add seller-tier badges.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  All sellers pay the same {(MARKETPLACE_FEE_PERCENT * 100).toFixed(0)}% marketplace fee. Plans only affect exposure and styling.
+                </p>
+                <Button asChild className="w-full font-semibold">
+                  <Link href="/pricing">
+                    View Exposure Plans
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 

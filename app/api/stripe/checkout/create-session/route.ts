@@ -12,7 +12,9 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import Stripe from 'stripe';
-import { stripe, calculatePlatformFee, calculatePlatformFeeForPlan, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
+import { stripe, calculatePlatformFee, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
+import { getEffectiveSubscriptionTier, getTierWeight } from '@/lib/pricing/subscriptions';
+import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { validateRequest, createCheckoutSessionSchema } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -352,16 +354,8 @@ export async function POST(request: Request) {
     const sellerDetailsSubmitted = sellerData.stripeDetailsSubmitted ?? false;
     const sellerOnboardingStatus = sellerData.stripeOnboardingStatus || 'not_started';
     
-    // Determine effective plan (admin override takes precedence)
-    let sellerPlanId = sellerData?.adminPlanOverride || sellerData?.subscriptionPlan || 'free';
-    
-    // If subscription is past_due or canceled, revert to free (unless admin override)
-    if (!sellerData?.adminPlanOverride) {
-      const subscriptionStatus = sellerData?.subscriptionStatus;
-      if (subscriptionStatus === 'past_due' || subscriptionStatus === 'canceled' || subscriptionStatus === 'unpaid') {
-        sellerPlanId = 'free';
-      }
-    }
+    const sellerTier = getEffectiveSubscriptionTier(sellerData as any);
+    const sellerTierWeight = getTierWeight(sellerTier);
 
     // Check for admin override flag (optional, defaults to block)
     const allowUnreadySeller = request.headers.get('x-allow-unready-seller') === 'true';
@@ -433,13 +427,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Calculate fees based on seller's effective plan (server-side, never trust client)
-    const { getPlanConfig, getPlanTakeRate } = require('@/lib/pricing/plans');
-    const planConfig = getPlanConfig(sellerPlanId);
-    const feePercent = sellerData?.adminFeeOverride ?? planConfig.takeRate; // Admin fee override takes precedence
-    
+    // Calculate fees (flat fee for all sellers/categories; never trust client)
+    const feePercent = MARKETPLACE_FEE_PERCENT;
     const amount = Math.round(purchaseAmount * 100); // Convert to cents
-    const platformFee = Math.round(amount * feePercent); // Server-side calculation using effective plan
+    const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
     // Create Stripe Checkout Session with ESCROW (no destination charge)
@@ -480,8 +471,9 @@ export async function POST(request: Request) {
         listingTitle: listingData.title,
         sellerAmount: sellerAmount.toString(), // Store seller amount in metadata for transfer
         platformFee: platformFee.toString(),
-        sellerPlanSnapshot: sellerPlanId, // Store plan at checkout for order creation
-        platformFeePercent: feePercent.toString(), // Store fee percent for order snapshot
+        sellerTierSnapshot: sellerTier,
+        sellerTierWeight: String(sellerTierWeight),
+        platformFeePercent: feePercent.toString(), // Immutable snapshot at checkout time (flat)
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmount) } : {}),
       },
       customer_email: decodedToken.email || undefined,

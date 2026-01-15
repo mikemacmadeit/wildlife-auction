@@ -8,7 +8,7 @@ import { getFirestore, Timestamp, Firestore } from 'firebase-admin/firestore';
 import Stripe from 'stripe';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
-import { PLAN_CONFIG } from '@/lib/pricing/plans';
+import { mapLegacyPlanToTier, mapTierToLegacyPlanId, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 
 /**
  * Handle customer.subscription.created event
@@ -22,7 +22,8 @@ export async function handleSubscriptionCreated(
   try {
     const subscriptionId = subscription.id;
     const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-    const planId = subscription.metadata?.planId || 'free';
+    const rawPlanId = subscription.metadata?.planId || 'standard';
+    const tier: SubscriptionTier = mapLegacyPlanToTier(rawPlanId);
     const userId = subscription.metadata?.userId;
 
     logInfo('Processing subscription created', {
@@ -30,7 +31,7 @@ export async function handleSubscriptionCreated(
       route: '/api/stripe/webhook',
       subscriptionId,
       customerId,
-      planId,
+      planId: tier,
       userId,
     });
 
@@ -55,7 +56,8 @@ export async function handleSubscriptionCreated(
       // Update user with subscription info
       await userRef.update({
         stripeSubscriptionId: subscriptionId,
-        subscriptionPlan: planId,
+        subscriptionTier: tier,
+        subscriptionPlan: mapTierToLegacyPlanId(tier),
         subscriptionStatus: subscription.status,
         subscriptionCurrentPeriodEnd: subscription.current_period_end
           ? Timestamp.fromMillis(subscription.current_period_end * 1000)
@@ -74,13 +76,14 @@ export async function handleSubscriptionCreated(
           subscriptionPlan: userDoc.data()?.subscriptionPlan || 'free',
         },
         afterState: {
-          subscriptionPlan: planId,
+          subscriptionTier: tier,
+          subscriptionPlan: mapTierToLegacyPlanId(tier),
           subscriptionStatus: subscription.status,
         },
         metadata: {
           subscriptionId,
           customerId,
-          planId,
+          planId: tier,
         },
         source: 'webhook',
       });
@@ -89,7 +92,8 @@ export async function handleSubscriptionCreated(
       const userRef = db.collection('users').doc(userId);
       await userRef.update({
         stripeSubscriptionId: subscriptionId,
-        subscriptionPlan: planId,
+        subscriptionTier: tier,
+        subscriptionPlan: mapTierToLegacyPlanId(tier),
         subscriptionStatus: subscription.status,
         subscriptionCurrentPeriodEnd: subscription.current_period_end
           ? Timestamp.fromMillis(subscription.current_period_end * 1000)
@@ -119,7 +123,8 @@ export async function handleSubscriptionUpdated(
   try {
     const subscriptionId = subscription.id;
     const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-    const planId = subscription.metadata?.planId || 'free';
+    const rawPlanId = subscription.metadata?.planId || 'standard';
+    const tierFromMetadata: SubscriptionTier = mapLegacyPlanToTier(rawPlanId);
     const userId = subscription.metadata?.userId;
 
     logInfo('Processing subscription updated', {
@@ -158,21 +163,22 @@ export async function handleSubscriptionUpdated(
     const userDoc = await userRef.get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
-    // Determine effective plan based on subscription status
-    let effectivePlan = planId;
+    // Determine effective tier based on subscription status
+    let effectiveTier: SubscriptionTier = tierFromMetadata;
     if (subscription.status === 'canceled' || subscription.status === 'unpaid' || subscription.status === 'past_due') {
-      effectivePlan = 'free'; // Revert to free if subscription is not active
+      effectiveTier = 'standard'; // Revert if subscription is not active
     }
 
     // Check for admin override
     const adminOverridePlan = userData?.adminPlanOverride;
     if (adminOverridePlan) {
-      effectivePlan = adminOverridePlan; // Admin override takes precedence
+      effectiveTier = mapLegacyPlanToTier(String(adminOverridePlan)); // Admin override takes precedence
     }
 
     // Update user doc
     await userRef.update({
-      subscriptionPlan: effectivePlan,
+      subscriptionTier: effectiveTier,
+      subscriptionPlan: mapTierToLegacyPlanId(effectiveTier),
       subscriptionStatus: subscription.status,
       subscriptionCurrentPeriodEnd: subscription.current_period_end
         ? Timestamp.fromMillis(subscription.current_period_end * 1000)
@@ -191,7 +197,8 @@ export async function handleSubscriptionUpdated(
         subscriptionStatus: userData?.subscriptionStatus,
       },
       afterState: {
-        subscriptionPlan: effectivePlan,
+        subscriptionTier: effectiveTier,
+        subscriptionPlan: mapTierToLegacyPlanId(effectiveTier),
         subscriptionStatus: subscription.status,
       },
       metadata: {
@@ -259,11 +266,14 @@ export async function handleSubscriptionDeleted(
 
     // Check for admin override
     const adminOverridePlan = userData?.adminPlanOverride;
-    const effectivePlan = adminOverridePlan || 'free'; // Revert to free unless admin override
+    const effectiveTier: SubscriptionTier = adminOverridePlan
+      ? mapLegacyPlanToTier(String(adminOverridePlan))
+      : 'standard';
 
     // Update user doc
     await userRef.update({
-      subscriptionPlan: effectivePlan,
+      subscriptionTier: effectiveTier,
+      subscriptionPlan: mapTierToLegacyPlanId(effectiveTier),
       subscriptionStatus: 'canceled',
       stripeSubscriptionId: null,
       subscriptionCurrentPeriodEnd: null,
@@ -281,7 +291,8 @@ export async function handleSubscriptionDeleted(
         subscriptionStatus: userData?.subscriptionStatus,
       },
       afterState: {
-        subscriptionPlan: effectivePlan,
+        subscriptionTier: effectiveTier,
+        subscriptionPlan: mapTierToLegacyPlanId(effectiveTier),
         subscriptionStatus: 'canceled',
       },
       metadata: {
@@ -394,14 +405,16 @@ export async function handleInvoicePaymentFailed(
     const userDoc = await userRef.get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
-    // Mark subscription as past_due - this will cause new transactions to use higher fee
-    // Check for admin override
+    // Exposure Plans: payment failure reverts the effective tier to Standard unless admin override.
     const adminOverridePlan = userData?.adminPlanOverride;
-    const effectivePlan = adminOverridePlan || 'free'; // Revert to free if payment fails (unless admin override)
+    const effectiveTier: SubscriptionTier = adminOverridePlan
+      ? mapLegacyPlanToTier(String(adminOverridePlan))
+      : 'standard';
 
     await userRef.update({
       subscriptionStatus: 'past_due',
-      subscriptionPlan: effectivePlan, // Revert to free plan fee
+      subscriptionTier: effectiveTier,
+      subscriptionPlan: mapTierToLegacyPlanId(effectiveTier),
       updatedAt: Timestamp.now(),
     });
 
@@ -415,7 +428,8 @@ export async function handleInvoicePaymentFailed(
         subscriptionStatus: userData?.subscriptionStatus,
       },
       afterState: {
-        subscriptionPlan: effectivePlan,
+        subscriptionTier: effectiveTier,
+        subscriptionPlan: mapTierToLegacyPlanId(effectiveTier),
         subscriptionStatus: 'past_due',
       },
       metadata: {

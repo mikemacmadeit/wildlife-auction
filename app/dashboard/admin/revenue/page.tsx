@@ -286,28 +286,28 @@ export default function AdminRevenuePage() {
             </Card>
           </div>
 
-          {/* Fees by Plan */}
+          {/* Fees by Seller Tier */}
           <Card>
             <CardHeader>
-              <CardTitle>Fees by Plan (Last 30 Days)</CardTitle>
-              <CardDescription>Platform fees grouped by seller plan snapshot</CardDescription>
+              <CardTitle>Fees by Seller Tier (Last 30 Days)</CardTitle>
+              <CardDescription>Platform fees grouped by seller tier snapshot (legacy keys kept for older orders)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-4 rounded-lg border bg-card">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Free Plan</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Standard</p>
                   <p className="text-2xl font-bold">{formatCurrency(revenueData.feesByPlan.free)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">7% transaction fee</p>
+                  <p className="text-xs text-muted-foreground mt-1">5% marketplace fee</p>
                 </div>
                 <div className="p-4 rounded-lg border bg-card">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Pro Plan</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Priority</p>
                   <p className="text-2xl font-bold">{formatCurrency(revenueData.feesByPlan.pro)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">6% transaction fee</p>
+                  <p className="text-xs text-muted-foreground mt-1">5% marketplace fee</p>
                 </div>
                 <div className="p-4 rounded-lg border bg-card">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Elite Plan</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Premier</p>
                   <p className="text-2xl font-bold">{formatCurrency(revenueData.feesByPlan.elite)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">4% transaction fee</p>
+                  <p className="text-xs text-muted-foreground mt-1">5% marketplace fee</p>
                 </div>
                 <div className="p-4 rounded-lg border bg-card">
                   <p className="text-sm font-medium text-muted-foreground mb-1">Unknown</p>

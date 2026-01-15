@@ -27,7 +27,7 @@ import { AlertCircle } from 'lucide-react';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { checkListingLimit, type ListingLimitResponse } from '@/lib/listings/listing-limit';
+// Exposure Plans model: no listing limits.
 
 function NewListingPageContent() {
   const router = useRouter();
@@ -36,10 +36,7 @@ function NewListingPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
-  const [checkingLimit, setCheckingLimit] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<ListingLimitResponse | null>(null);
-  const [limitBlocked, setLimitBlocked] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  // (No listing-limit gating in Exposure Plans model)
   const [sellerAttestationAccepted, setSellerAttestationAccepted] = useState(false);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';
@@ -1398,46 +1395,6 @@ function NewListingPageContent() {
     }
   }, [user, toast]);
 
-  // Hard gate: prevent bypass by direct URL navigation if plan is at listing limit.
-  useEffect(() => {
-    const run = async () => {
-      if (authLoading) return;
-      if (!user) return;
-
-      setCheckingLimit(true);
-      try {
-        const token = await user.getIdToken();
-        const info = await checkListingLimit(token);
-        setLimitInfo(info);
-
-        if (!info.canCreate) {
-          setLimitBlocked(true);
-          setShowUpgradeModal(true);
-        } else {
-          setLimitBlocked(false);
-        }
-      } catch (e) {
-        // Fail CLOSED: if we can't verify eligibility, don't allow bypassing plan limits.
-        setLimitInfo({
-          canCreate: false,
-          planId: 'free',
-          planDisplayName: 'Account',
-          activeListingsCount: 0,
-          listingLimit: null,
-          remainingSlots: null,
-          isUnlimited: false,
-          message: 'We couldn’t verify your listing limit right now. Please refresh and try again.',
-        } as any);
-        setLimitBlocked(true);
-        setShowUpgradeModal(true);
-      } finally {
-        setCheckingLimit(false);
-      }
-    };
-
-    run();
-  }, [authLoading, user]);
-
   // Show loading state while checking authentication
   if (authLoading) {
     return (
@@ -1445,81 +1402,6 @@ function NewListingPageContent() {
         <div className="text-center">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Block the create flow entirely if plan is at limit.
-  if (user && limitBlocked) {
-    return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center px-4">
-        <div className="w-full max-w-lg space-y-4">
-          <Card className="border-2 border-border/50 bg-card">
-            <CardContent className="pt-8 pb-8 px-6 text-center space-y-3">
-              <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
-              <h1 className="text-xl font-extrabold">Upgrade required</h1>
-              <p className="text-sm text-muted-foreground">
-                {limitInfo?.message ||
-                  'You’ve reached your plan’s active listing limit. Upgrade to create more listings.'}
-              </p>
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <Badge variant="secondary">{limitInfo?.planDisplayName || 'Free'}</Badge>
-                {!limitInfo?.isUnlimited && (
-                  <Badge variant="outline">
-                    {limitInfo?.activeListingsCount ?? '—'}/{limitInfo?.listingLimit ?? '—'} active
-                  </Badge>
-                )}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center pt-4">
-                <Button variant="outline" onClick={() => router.push('/seller/overview')}>
-                  Back to Dashboard
-                </Button>
-                <Button asChild>
-                  <Link href="/pricing">View Plans</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Dialog open={showUpgradeModal} onOpenChange={(open) => {
-            setShowUpgradeModal(open);
-            if (!open) {
-              // If user closes the modal, keep them from interacting with the form
-              // by routing them away.
-              router.push('/seller/overview');
-            }
-          }}>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Upgrade to create more listings</DialogTitle>
-                <DialogDescription>
-                  You’ve reached your {limitInfo?.planDisplayName || 'Free'} plan limit.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div className="rounded-lg border bg-card p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">Active listings</span>
-                    <Badge variant="outline">
-                      {limitInfo?.activeListingsCount ?? '—'}/{limitInfo?.listingLimit ?? '—'}
-                    </Badge>
-                  </div>
-                  {limitInfo?.message && (
-                    <p className="text-xs text-muted-foreground mt-2">{limitInfo.message}</p>
-                  )}
-                </div>
-              </div>
-              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between">
-                <Button variant="outline" onClick={() => router.push('/seller/overview')}>
-                  Close
-                </Button>
-                <Button asChild>
-                  <Link href="/pricing">Upgrade</Link>
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
     );

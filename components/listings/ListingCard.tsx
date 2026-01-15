@@ -13,6 +13,7 @@ import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { ShareButton } from '@/components/listings/ShareButton';
 import { cn } from '@/lib/utils';
+import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 
 interface ListingCardProps {
   listing: Listing;
@@ -203,12 +204,16 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 )}
               </div>
               <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground max-w-[160px] truncate">
+                    {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
+                  </span>
+                  {/* Seller Tier badge (Exposure Plans) */}
+                  <SellerTierBadge tier={(listing as any).sellerTier} />
+                </div>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/50 border border-border/40">
                   <Star className="h-4 w-4 fill-primary/20 text-primary" />
                   <span className="font-bold text-sm">{listing.seller?.rating ?? 0}</span>
-                </div>
-                <div className="text-xs text-muted-foreground font-medium">
-                  {listing.seller?.responseTime ?? 'N/A'}
                 </div>
               </div>
             </div>

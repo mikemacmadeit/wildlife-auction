@@ -35,7 +35,7 @@ export function Footer() {
         { href: '/browse', label: 'Browse' },
         { href: '/dashboard/listings/new', label: 'List an Animal' },
         { href: '/how-it-works', label: 'How It Works' },
-        { href: '/pricing', label: 'Pricing' },
+        { href: '/pricing', label: 'Exposure Plans' },
       ],
       trust: [
         { href: '/trust', label: 'Trust & Compliance' },

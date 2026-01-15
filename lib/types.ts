@@ -202,6 +202,12 @@ export interface Listing {
     displayName: string;
     verified: boolean;
   };
+
+  /**
+   * Seller tier (Exposure Plans).
+   * Not stored on listing by default; typically decorated at runtime for browse/ranking + UI badges.
+   */
+  sellerTier?: 'standard' | 'priority' | 'premier';
   
   /**
    * @deprecated Legacy seller object - DO NOT persist to Firestore.
@@ -421,14 +427,27 @@ export interface UserProfile {
   role?: UserRole; // User role: 'user' (default), 'admin', 'super_admin'
   superAdmin?: boolean; // Legacy super admin flag (deprecated - use role instead)
   profileComplete?: boolean; // Flag to track if profile completion modal was shown/completed
-  subscriptionPlan?: string; // Seller subscription plan: 'free' | 'pro' | 'elite' (defaults to 'free' if not set)
+  /**
+   * Exposure Plans tier (single source of truth).
+   * NOTE: This tier is for exposure/badges only and does NOT imply compliance approval.
+   */
+  subscriptionTier?: 'standard' | 'priority' | 'premier';
+  /**
+   * @deprecated Legacy field. Still read for backward compatibility.
+   * Historically: 'free' | 'pro' | 'elite'
+   */
+  subscriptionPlan?: string;
   stripeCustomerId?: string; // Stripe Customer ID for subscriptions
   stripeSubscriptionId?: string; // Active Stripe Subscription ID
   subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'unpaid' | null; // Subscription status from Stripe
   subscriptionCurrentPeriodEnd?: Date; // Current billing period end date
   subscriptionCancelAtPeriodEnd?: boolean; // Whether subscription is set to cancel at period end
-  adminPlanOverride?: string; // Admin override plan (if set, takes precedence)
-  adminFeeOverride?: number; // Admin override fee percent (0.07 = 7%, if set, takes precedence)
+  adminPlanOverride?: string; // Admin override plan (legacy). Maps into subscriptionTier.
+  /**
+   * @deprecated Fee overrides are not used in the Exposure Plans model (marketplace fee is flat).
+   * Kept only for backward compatibility with older data.
+   */
+  adminFeeOverride?: number;
   adminOverrideReason?: string; // Reason for admin override
   adminOverrideBy?: string; // Admin UID who set override
   adminOverrideAt?: Date; // When override was set

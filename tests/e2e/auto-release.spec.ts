@@ -5,8 +5,8 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { getFirestore, initializeApp, cert, getApps, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp as initApp, cert as certCred, getApps as getFirebaseApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
 
 // Test database setup
 let testDb: ReturnType<typeof getFirestore>;

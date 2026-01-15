@@ -63,7 +63,7 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/browse', label: 'Browse' },
     { href: '/how-it-works', label: 'How It Works' },
-    { href: '/pricing', label: 'Pricing' },
+    { href: '/pricing', label: 'Exposure Plans' },
     { href: '/trust', label: 'Trust & Compliance' },
   ];
 

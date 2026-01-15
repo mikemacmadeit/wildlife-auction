@@ -29,6 +29,8 @@ export const createUserDocument = async (
       userId: user.uid,
       email: email || '',
       emailVerified,
+      // Exposure Plans default
+      subscriptionTier: 'standard',
       profile: {
         fullName: additionalData?.fullName || displayName || '',
         location: additionalData?.location || {

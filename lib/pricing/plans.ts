@@ -1,124 +1,89 @@
 /**
- * Seller Pricing Plans Configuration
- * Single source of truth for plan definitions
+ * Exposure Plans (Subscription Model)
+ *
+ * IMPORTANT:
+ * - Marketplace fee is flat at 5% for all sellers and categories (not tier-based).
+ * - Subscriptions are optional and only affect exposure/priority UX and styling.
+ * - We keep backward compatibility for legacy ids 'free'|'pro'|'elite'.
  */
 
-export type PlanId = 'free' | 'pro' | 'elite';
+import type { SubscriptionTier } from '@/lib/pricing/subscriptions';
+import { mapLegacyPlanToTier, getTierWeight } from '@/lib/pricing/subscriptions';
+
+// Back-compat: some older UI/routes still pass these ids.
+export type LegacyPlanId = 'free' | 'pro' | 'elite';
+export type PlanId = SubscriptionTier | LegacyPlanId;
+
+export const MARKETPLACE_FEE_PERCENT = 0.05;
 
 export interface PlanConfig {
-  id: PlanId;
-  displayName: string;
+  /** Canonical tier id */
+  id: SubscriptionTier;
+  displayName: string; // Standard / Priority / Premier
   monthlyPrice: number;
-  takeRate: number; // Transaction fee percentage (0.07 = 7%)
-  listingLimit: number | null; // null = unlimited
+  tierWeight: number; // standard=0 priority=10 premier=20
+
+  /** Kept for compatibility with older UI; always 5% */
+  takeRate: number;
+  /** Kept for compatibility with older UI; always unlimited */
+  listingLimit: null;
 }
 
-/**
- * Plan configuration - single source of truth
- */
-export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
-  free: {
-    id: 'free',
-    displayName: 'Free',
+export const PLAN_CONFIG: Record<SubscriptionTier, PlanConfig> = {
+  standard: {
+    id: 'standard',
+    displayName: 'Standard',
     monthlyPrice: 0,
-    takeRate: 0.07, // 7%
-    listingLimit: 3,
+    tierWeight: getTierWeight('standard'),
+    takeRate: MARKETPLACE_FEE_PERCENT,
+    listingLimit: null,
   },
-  pro: {
-    id: 'pro',
-    displayName: 'Pro',
-    monthlyPrice: 49,
-    takeRate: 0.06, // 6%
-    listingLimit: 10,
+  priority: {
+    id: 'priority',
+    displayName: 'Priority',
+    monthlyPrice: 99,
+    tierWeight: getTierWeight('priority'),
+    takeRate: MARKETPLACE_FEE_PERCENT,
+    listingLimit: null,
   },
-  elite: {
-    id: 'elite',
-    displayName: 'Elite',
-    monthlyPrice: 199,
-    takeRate: 0.04, // 4%
-    listingLimit: null, // Unlimited
+  premier: {
+    id: 'premier',
+    displayName: 'Premier',
+    monthlyPrice: 299,
+    tierWeight: getTierWeight('premier'),
+    takeRate: MARKETPLACE_FEE_PERCENT,
+    listingLimit: null,
   },
 };
 
-/**
- * Get plan configuration by plan ID
- * Handles backward compatibility: maps old plan names to new ones
- */
 export function getPlanConfig(planId: string | null | undefined): PlanConfig {
-  // Default to free if no plan specified
-  if (!planId) {
-    return PLAN_CONFIG.free;
-  }
-
-  // Normalize plan ID to lowercase
-  const normalizedId = planId.toLowerCase().trim();
-
-  // Backward compatibility: map old plan names to new ones
-  const planMapping: Record<string, PlanId> = {
-    'ranch': 'elite',
-    'broker': 'elite',
-    'ranch / broker': 'elite',
-    'starter': 'free',
-  };
-
-  const mappedId = planMapping[normalizedId] || (normalizedId as PlanId);
-
-  // Return plan config or default to free if invalid
-  return PLAN_CONFIG[mappedId as PlanId] || PLAN_CONFIG.free;
+  const tier = mapLegacyPlanToTier(planId);
+  return PLAN_CONFIG[tier];
 }
 
-/**
- * Get plan display name
- */
 export function getPlanDisplayName(planId: string | null | undefined): string {
   return getPlanConfig(planId).displayName;
 }
 
-/**
- * Get transaction fee percentage for a plan
- */
-export function getPlanTakeRate(planId: string | null | undefined): number {
-  return getPlanConfig(planId).takeRate;
+export function getPlanTakeRate(_planId: string | null | undefined): number {
+  // Flat fee for everyone.
+  return MARKETPLACE_FEE_PERCENT;
 }
 
-/**
- * Get listing limit for a plan
- */
-export function getPlanListingLimit(planId: string | null | undefined): number | null {
-  return getPlanConfig(planId).listingLimit;
+export function getPlanListingLimit(_planId: string | null | undefined): null {
+  // Unlimited listings for all tiers (limits are explicitly NOT part of the new model).
+  return null;
 }
 
-/**
- * Check if plan has unlimited listings
- */
-export function hasUnlimitedListings(planId: string | null | undefined): boolean {
-  return getPlanListingLimit(planId) === null;
+export function hasUnlimitedListings(_planId: string | null | undefined): boolean {
+  return true;
 }
 
-/**
- * Check if user can create more listings
- */
-export function canCreateListing(
-  planId: string | null | undefined,
-  currentActiveListings: number
-): boolean {
-  const limit = getPlanListingLimit(planId);
-  if (limit === null) {
-    return true; // Unlimited
-  }
-  return currentActiveListings < limit;
+export function canCreateListing(_planId: string | null | undefined, _currentActiveListings: number): boolean {
+  // Standard sellers must never be blocked from listing.
+  return true;
 }
 
-/**
- * Get remaining listing slots
- */
-export function getRemainingListingSlots(
-  planId: string | null | undefined,
-  currentActiveListings: number
-): number | null {
-  const limit = getPlanListingLimit(planId);
-  if (limit === null) {
-    return null; // Unlimited
-  }
-  return Math.max(0, limit - currentActiveListings);
+export function getRemainingListingSlots(_planId: string | null | undefined, _currentActiveListings: number): null {
+  return null;
 }

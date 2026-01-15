@@ -10,7 +10,7 @@ import Stripe from 'stripe';
 import { stripe, calculatePlatformFee } from '@/lib/stripe/config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
-import { getPlanConfig, getPlanTakeRate } from '@/lib/pricing/plans';
+import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 
 /**
  * Handle checkout.session.completed event
@@ -30,7 +30,7 @@ export async function handleCheckoutSessionCompleted(
     const sellerStripeAccountId = session.metadata?.sellerStripeAccountId;
     const sellerAmountCents = session.metadata?.sellerAmount;
     const platformFeeCents = session.metadata?.platformFee;
-    const sellerPlanSnapshot = session.metadata?.sellerPlanSnapshot; // Plan at checkout (immutable snapshot)
+    const sellerTierSnapshot = (session.metadata as any)?.sellerTierSnapshot || session.metadata?.sellerPlanSnapshot; // back-compat
     const platformFeePercentStr = session.metadata?.platformFeePercent; // Fee percent at checkout (immutable snapshot)
 
     if (!listingId || !buyerId || !sellerId || !sellerStripeAccountId) {
@@ -101,10 +101,10 @@ export async function handleCheckoutSessionCompleted(
 
     // Use plan snapshot from checkout metadata (immutable snapshot at time of checkout)
     // This ensures fee matches what was calculated at checkout, not current plan
-    const effectivePlanAtCheckout = sellerPlanSnapshot || 'free';
+    const effectivePlanAtCheckout = sellerTierSnapshot || 'standard';
     const feePercentAtCheckout = platformFeePercentStr
       ? parseFloat(platformFeePercentStr)
-      : getPlanConfig(effectivePlanAtCheckout).takeRate;
+      : MARKETPLACE_FEE_PERCENT;
     
     // Use fees from metadata if available (they were calculated at checkout using correct plan)
     // Otherwise recalculate (fallback, but metadata should always be present)
@@ -332,9 +332,9 @@ export async function handleCheckoutSessionCompleted(
       // Compliance fields
       transferPermitRequired: transferPermitRequired,
       transferPermitStatus: transferPermitRequired ? 'none' : undefined,
-      // Plan-based fee snapshot (immutable at time of checkout)
-      sellerPlanSnapshot: effectivePlanAtCheckout,
-      platformFeePercent: feePercentAtCheckout, // e.g., 0.07 = 7%
+      // Seller tier + fee snapshot (immutable at time of checkout)
+      sellerTierSnapshot: effectivePlanAtCheckout,
+      platformFeePercent: feePercentAtCheckout, // e.g., 0.05 = 5%
       platformFeeAmount: platformFee / 100, // Immutable snapshot (matches platformFee)
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
