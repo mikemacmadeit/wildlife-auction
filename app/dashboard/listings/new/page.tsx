@@ -785,6 +785,16 @@ function NewListingPageContent() {
                     // Create draft listing if it doesn't exist yet
                     let currentListingId = listingId;
                     if (!currentListingId) {
+                    // Whitetail-only: attestation is required even for draft creation (server/client enforcement).
+                    // Prevent confusing failures when users try to upload images before accepting attestation.
+                    if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
+                      toast({
+                        title: 'Seller attestation required',
+                        description: 'Please accept the seller attestation before uploading photos for a whitetail breeder listing.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
                       try {
                         const draftData: any = {
                           title: formData.title || 'Draft Listing',
