@@ -21,6 +21,15 @@ import { PLAN_CONFIG } from '@/lib/pricing/plans';
 import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 
+function normalizePrivateKey(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  let s = v.trim();
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1);
+  }
+  return s.replace(/\\n/g, '\n');
+}
+
 // Initialize Firebase Admin
 let adminApp: App;
 if (!getApps().length) {
@@ -29,7 +38,7 @@ if (!getApps().length) {
       ? {
           projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY),
         }
       : undefined;
 
@@ -147,8 +156,12 @@ export async function POST(request: Request) {
         route: '/api/stripe/subscriptions/create',
       });
       return json(
-        { error: `Subscription price for ${planConfig.displayName} plan is not configured. Please contact support.` },
-        { status: 500 }
+        {
+          error: `Subscription price for ${planConfig.displayName} plan is not configured. Please contact support.`,
+          code: 'PRICE_NOT_CONFIGURED',
+          planId,
+        },
+        { status: 503 }
       );
     }
 

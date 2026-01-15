@@ -599,8 +599,13 @@ export async function createSubscription(planId: 'pro' | 'elite'): Promise<{
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || error.message || 'Failed to create subscription');
+    const error = await response.json().catch(() => ({}));
+    const msg = error?.error || error?.message || 'Failed to create subscription';
+    // Preserve a stable "code" for callers that want to degrade gracefully.
+    const e: any = new Error(msg);
+    if (error?.code) e.code = error.code;
+    if (error?.planId) e.planId = error.planId;
+    throw e;
   }
 
   return response.json();

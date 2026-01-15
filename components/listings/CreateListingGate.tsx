@@ -171,6 +171,10 @@ export function CreateListingGateLink(props: {
                       return;
                     }
                     window.location.href = `/pricing?plan=${planId}`;
+                  } catch (e: any) {
+                    // If Stripe prices aren't configured (common in misconfigured envs),
+                    // fall back to the pricing page instead of throwing and breaking the UI.
+                    window.location.href = `/pricing?plan=${planId}`;
                   } finally {
                     setUpgradeLoading(null);
                   }
@@ -228,6 +232,8 @@ export function CreateListingGateLink(props: {
                         window.location.href = url;
                         return;
                       }
+                      window.location.href = `/pricing?plan=${target}`;
+                    } catch (e: any) {
                       window.location.href = `/pricing?plan=${target}`;
                     } finally {
                       setUpgradeLoading(null);

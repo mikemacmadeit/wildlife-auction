@@ -103,6 +103,12 @@ export function PlanCard({ userProfile, activeListingsCount, onUpdate }: PlanCar
       router.refresh();
     } catch (error: any) {
       console.error('Error upgrading subscription:', error);
+      // If Stripe price IDs are missing/misconfigured, don't dead-end the user.
+      // Send them to the pricing page (which can show instructions/contact).
+      if (error?.code === 'PRICE_NOT_CONFIGURED') {
+        router.push(`/pricing?plan=${targetPlan}`);
+        return;
+      }
       toast({
         title: 'Error',
         description: error.message || 'Failed to upgrade subscription',
