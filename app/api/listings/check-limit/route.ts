@@ -22,6 +22,15 @@ import { captureException } from '@/lib/monitoring/capture';
 
 // Lazy Firebase Admin init (avoid slow/hanging ADC attempts during cold starts if env isn't configured)
 let adminApp: App | null = null;
+function normalizePrivateKey(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  let s = v.trim();
+  // Netlify UI sometimes results in quoted values; strip one pair of matching quotes.
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1);
+  }
+  return s.replace(/\\n/g, '\n');
+}
 function getAdminApp(): App {
   if (adminApp) return adminApp;
   if (getApps().length) {
@@ -31,7 +40,7 @@ function getAdminApp(): App {
 
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+  const privateKeyRaw = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
   // In Netlify/production, we require explicit service-account env vars.
   // This avoids firebase-admin trying Application Default Credentials (slow/unstable in serverless).
