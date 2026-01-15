@@ -29,7 +29,8 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border bg-background text-foreground',
+        // Light mode: default toasts should read as a floating card (not blend into sand background).
+        default: 'border bg-card/95 text-foreground shadow-xl ring-1 ring-border/40 backdrop-blur-sm',
         destructive:
           // Light mode: make errors unmistakable (muted destructive bg can blend into warm sand theme)
           // Dark mode: keep strong destructive background.
