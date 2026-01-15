@@ -158,7 +158,7 @@ export function EmailCapturePopup(props: { source?: string }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[420px] p-0 overflow-hidden border-border/60 shadow-2xl">
+      <DialogContent className="max-w-[460px] p-0 overflow-hidden border-border/60 shadow-2xl">
         {/* Soft header band for visual polish */}
         <div className="relative px-6 sm:px-7 pt-6 sm:pt-7 pb-5 border-b bg-gradient-to-b from-primary/10 via-background to-background">
           <div className="absolute inset-0 pointer-events-none">
@@ -209,12 +209,13 @@ export function EmailCapturePopup(props: { source?: string }) {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="we-email" className="text-sm font-semibold">
                   Email
                 </Label>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="rounded-2xl border bg-muted/20 p-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     id="we-email"
                     type="email"
@@ -233,7 +234,7 @@ export function EmailCapturePopup(props: { source?: string }) {
                       }
                     }}
                     className={[
-                      'min-h-[48px] text-base',
+                      'min-h-[48px] text-base bg-background',
                       error ? 'border-destructive focus-visible:ring-destructive' : '',
                     ].join(' ')}
                   />
@@ -251,26 +252,29 @@ export function EmailCapturePopup(props: { source?: string }) {
                       'Subscribe'
                     )}
                   </Button>
+                  </div>
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
               </div>
 
-              <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="rounded-xl border bg-muted/30 p-3.5">
                 <p className="text-xs text-muted-foreground">
                   No spam. Just the best auctions, breeder inventory, and ranch deals—delivered weekly.
                 </p>
               </div>
 
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
-                <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
-                  Privacy
-                </Link>{' '}
-                ·{' '}
-                <Link href="/trust" className="underline underline-offset-2 hover:text-foreground">
-                  Trust &amp; Compliance
-                </Link>
-              </p>
+              <div className="pt-2 border-t">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
+                  <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                    Privacy
+                  </Link>{' '}
+                  ·{' '}
+                  <Link href="/trust" className="underline underline-offset-2 hover:text-foreground">
+                    Trust &amp; Compliance
+                  </Link>
+                </p>
+              </div>
             </div>
           )}
         </div>
