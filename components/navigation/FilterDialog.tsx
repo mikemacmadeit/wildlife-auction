@@ -33,6 +33,7 @@ interface FilterDialogProps {
 }
 
 const categories: { value: ListingCategory; label: string }[] = [
+  { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
   { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
   { value: 'cattle_livestock', label: 'Cattle & Livestock' },
   { value: 'ranch_equipment', label: 'Ranch Equipment' },
@@ -44,17 +45,21 @@ const types: { value: ListingType; label: string }[] = [
   { value: 'classified', label: 'Classified' },
 ];
 
+// IMPORTANT: These values should match real stored `attributes.speciesId` values.
 const species: { value: string; label: string }[] = [
-  { value: 'whitetail-deer', label: 'Whitetail Deer' },
-  { value: 'blackbuck-antelope', label: 'Blackbuck Antelope' },
-  { value: 'axis-deer', label: 'Axis Deer' },
-  { value: 'fallow-deer', label: 'Fallow Deer' },
-  { value: 'sika-deer', label: 'Sika Deer' },
+  { value: 'whitetail_deer', label: 'Whitetail Deer' },
+  { value: 'axis', label: 'Axis Deer' },
+  { value: 'fallow', label: 'Fallow Deer' },
+  { value: 'sika', label: 'Sika Deer' },
+  { value: 'blackbuck', label: 'Blackbuck' },
   { value: 'aoudad', label: 'Aoudad (Barbary Sheep)' },
-  { value: 'red-stag', label: 'Red Stag' },
-  { value: 'nilgai-antelope', label: 'Nilgai Antelope' },
-  { value: 'scimitar-oryx', label: 'Scimitar-Horned Oryx' },
-  { value: 'other', label: 'Other Species' },
+  { value: 'nilgai', label: 'Nilgai' },
+  { value: 'scimitar_horned_oryx', label: 'Scimitar-Horned Oryx' },
+  { value: 'addax', label: 'Addax' },
+  { value: 'greater_kudu', label: 'Greater Kudu' },
+  { value: 'red_stag', label: 'Red Stag' },
+  { value: 'zebra', label: 'Zebra' },
+  { value: 'other_exotic', label: 'Other / Exotic' },
 ];
 
 const states: { value: string; label: string }[] = [
@@ -147,6 +152,11 @@ export function FilterDialog({
       });
     }
   };
+
+  const showSpeciesFilter =
+    !localFilters.category ||
+    localFilters.category === 'wildlife_exotics' ||
+    localFilters.category === 'whitetail_breeder';
 
   // Count active filters
   const activeFilterCount = 
@@ -392,29 +402,32 @@ export function FilterDialog({
 
           <Separator />
 
-          {/* Species/Breed */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Species / Breed</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {species.map((spec) => (
-                <div key={spec.value} className="flex items-center space-x-3 min-h-[44px]">
-                  <Checkbox
-                    id={`species-${spec.value}`}
-                    checked={localFilters.species?.includes(spec.value) || false}
-                    onCheckedChange={(checked) => handleSpeciesChange(spec.value, checked as boolean)}
-                  />
-                  <Label
-                    htmlFor={`species-${spec.value}`}
-                    className="text-sm font-normal cursor-pointer flex-1"
-                  >
-                    {spec.label}
-                  </Label>
+          {/* Species (animals) */}
+          {showSpeciesFilter ? (
+            <>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Species</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {species.map((spec) => (
+                    <div key={spec.value} className="flex items-center space-x-3 min-h-[44px]">
+                      <Checkbox
+                        id={`species-${spec.value}`}
+                        checked={localFilters.species?.includes(spec.value) || false}
+                        onCheckedChange={(checked) => handleSpeciesChange(spec.value, checked as boolean)}
+                      />
+                      <Label
+                        htmlFor={`species-${spec.value}`}
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
+                        {spec.label}
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
+              </div>
+              <Separator />
+            </>
+          ) : null}
 
           {/* Quantity */}
           <div className="space-y-4">

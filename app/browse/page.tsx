@@ -214,7 +214,7 @@ export default function BrowsePage() {
         // Search in attributes (species, breed, equipmentType, etc.)
         const attributesMatch = listing.attributes
           ? (
-              (listing.attributes as any).species?.toLowerCase().includes(query) ||
+              String((listing.attributes as any).speciesId || '').toLowerCase().includes(query) ||
               (listing.attributes as any).breed?.toLowerCase().includes(query) ||
               (listing.attributes as any).equipmentType?.toLowerCase().includes(query) ||
               (listing.attributes as any).make?.toLowerCase().includes(query) ||
@@ -246,8 +246,11 @@ export default function BrowsePage() {
         filters.species!.some((species) => {
           if (listing.attributes) {
             const attrs = listing.attributes as any;
-            return attrs.species?.toLowerCase().includes(species.toLowerCase()) ||
-                   attrs.breed?.toLowerCase().includes(species.toLowerCase());
+            const token = species.toLowerCase();
+            const speciesId = String(attrs.speciesId || '').toLowerCase();
+            const breed = String(attrs.breed || '').toLowerCase();
+            const equipmentType = String(attrs.equipmentType || '').toLowerCase();
+            return speciesId === token || speciesId.includes(token) || breed.includes(token) || equipmentType.includes(token);
           }
           return false;
         })
@@ -350,7 +353,13 @@ export default function BrowsePage() {
   }, [filteredListings, sortBy]);
 
   const handleFilterChange = (newFilters: FilterState) => {
-    setFilters(newFilters);
+    // If user chose a type inside the dialog, sync the browse tabs and remove it from the filter blob.
+    const next = { ...newFilters } as any;
+    if (next.type) {
+      setSelectedType(next.type);
+      delete next.type;
+    }
+    setFilters(next);
   };
 
   const clearFilters = () => {
