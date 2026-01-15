@@ -28,6 +28,7 @@ import {
   Shield,
   CheckCircle,
   HeartPulse,
+  Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -82,6 +83,7 @@ const adminNavItems: DashboardNavItem[] = [
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
   { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
+  { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
 ];
 
 export default function DashboardLayout({
