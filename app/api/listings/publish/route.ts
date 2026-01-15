@@ -6,12 +6,8 @@
 
 // IMPORTANT:
 // Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
-// In the current environment, dev bundling can attempt to resolve a missing internal Next module
-// (`next/dist/server/web/exports/next-response`) and crash compilation.
 // Route handlers work fine with standard Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { validateRequest } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
@@ -19,36 +15,10 @@ import { getEffectiveSubscriptionTier, getTierWeight } from '@/lib/pricing/subsc
 import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 import { validateListingCompliance } from '@/lib/compliance/validation';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-// Initialize Firebase Admin
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        }
-      : undefined;
-
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      adminApp = initializeApp();
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-} else {
-  adminApp = getApps()[0];
-}
-
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
+const auth = getAdminAuth();
+const db = getAdminDb();
 
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
@@ -64,7 +34,7 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
   });
 }
 
-async function computeWhitetailInternalFlags(db: ReturnType<typeof getFirestore>, listingData: any): Promise<{
+async function computeWhitetailInternalFlags(db: Firestore, listingData: any): Promise<{
   internalFlags: { duplicatePermitNumber?: boolean; duplicateFacilityId?: boolean };
   internalFlagsNotes: { duplicatePermitNumber?: string; duplicateFacilityId?: string };
 }> {

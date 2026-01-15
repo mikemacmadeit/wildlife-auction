@@ -67,7 +67,20 @@ export async function GET(request: Request) {
   const status = parsed.data.status;
   const listingId = parsed.data.listingId;
 
-  const db = getAdminDb();
+  let db;
+  try {
+    db = getAdminDb();
+  } catch (e: any) {
+    // Common in misconfigured environments (missing FIREBASE_* env vars, bad private key formatting, etc.)
+    return json(
+      {
+        error: 'Server is not configured for offers yet',
+        code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+        message: e?.message || 'Failed to initialize Firebase Admin SDK',
+      },
+      { status: 503 }
+    );
+  }
   let q: any = db.collection('offers').where('buyerId', '==', buyerId);
   if (listingId) q = q.where('listingId', '==', listingId);
   if (status) q = q.where('status', '==', status);
