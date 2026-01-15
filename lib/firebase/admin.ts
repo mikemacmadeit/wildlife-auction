@@ -156,15 +156,27 @@ export function getAdminApp(): App {
 
   const envProjectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const envPrivateKey = process.env.FIREBASE_PRIVATE_KEY ? normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY) : undefined;
+  // IMPORTANT: do NOT parse/validate FIREBASE_PRIVATE_KEY unless we actually need to use it.
+  // In Netlify builds, a malformed FIREBASE_PRIVATE_KEY env var (even if unused) can crash `next build`
+  // because some route modules are imported during "Collecting page data".
+  const envPrivateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
 
   // If env vars are incomplete (common in local dev), fall back to a JSON credential file if present.
-  const fileSa = (!envProjectId || !envClientEmail || !envPrivateKey) ? readServiceAccountJsonIfPresent() : null;
+  const fileSa = (!envProjectId || !envClientEmail || !envPrivateKeyRaw) ? readServiceAccountJsonIfPresent() : null;
+
   const projectId = fileSaBundled?.projectId || b64Sa?.projectId || envProjectId || fileSa?.projectId;
   const clientEmail = fileSaBundled?.clientEmail || b64Sa?.clientEmail || envClientEmail || fileSa?.clientEmail;
-  const privateKey = fileSaBundled?.privateKey || b64Sa?.privateKey || envPrivateKey || fileSa?.privateKey;
 
-  const isProd = process.env.NODE_ENV === 'production' || !!process.env.NETLIFY;
+  // Only normalize/validate the split-key form if we actually fall back to it.
+  const privateKey =
+    fileSaBundled?.privateKey ||
+    b64Sa?.privateKey ||
+    (envPrivateKeyRaw ? normalizePrivateKey(envPrivateKeyRaw) : undefined) ||
+    fileSa?.privateKey;
+
+  // Only hard-require credentials when running on Netlify runtime.
+  // Local `next build` sets NODE_ENV=production, but should not require Admin creds to compile.
+  const isProd = !!process.env.NETLIFY;
   const missing = [
     !projectId ? 'FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID)' : null,
     !clientEmail ? 'FIREBASE_CLIENT_EMAIL' : null,
