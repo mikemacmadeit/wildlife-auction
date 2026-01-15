@@ -82,6 +82,7 @@ function getEmailTemplate(params: {
   const year = new Date().getFullYear();
   const origin = params.origin || 'https://wildlife.exchange';
   const logoUrl = `${origin}/images/Kudu.png`;
+  const heroUrl = `${origin}/images/Buck_1.webp`;
   const fontBrand = `'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const fontBody = `'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const cOlivewood = '#22251F';
@@ -130,23 +131,38 @@ function getEmailTemplate(params: {
           <tr>
             <td style="padding: 0 0 12px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                     style="background:${cOlivewood}; border-radius: 18px; overflow:hidden; border: 1px solid rgba(255,255,255,0.08);">
+                     style="background:${cOlivewood}; border-radius: 18px; overflow:hidden; border: 1px solid rgba(34,37,31,0.18);">
+                <!-- Hero banner image (matches homepage) -->
                 <tr>
-                  <td style="padding: 18px 18px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <td>
+                    <img
+                      src="${heroUrl}"
+                      width="600"
+                      alt="Wildlife Exchange"
+                      style="display:block; width:100%; max-width:600px; height:auto; border:0; outline:none; text-decoration:none;"
+                    />
+                  </td>
+                </tr>
+                <!-- Brand lockup strip (email-safe) -->
+                <tr>
+                  <td style="padding: 16px 18px; background:${cSandSurface};">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
-                        <td style="vertical-align: middle; padding-right: 10px;">
-                          <img src="${logoUrl}" width="36" height="36" alt="Wildlife Exchange"
-                               style="display:block; border:0; outline:none; text-decoration:none; border-radius: 10px; background:${cSandSurface};" />
+                        <td style="vertical-align: middle; padding-right: 12px; width: 44px;">
+                          <img src="${logoUrl}" width="40" height="40" alt="Wildlife Exchange"
+                               style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface};" />
                         </td>
                         <td style="vertical-align: middle;">
-                          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-                                      font-family: ${fontBrand}; font-size: 18px; font-weight: 900; color: ${cParchment}; letter-spacing: 0.3px;">
+                          <div style="font-family:${fontBrand}; font-size: 22px; font-weight: 900; color: ${cOlivewood}; letter-spacing: 0.2px;">
                             Wildlife Exchange
                           </div>
-                          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-                                      font-family: ${fontBody}; font-size: 12px; color: rgba(244,240,230,0.82); margin-top: 2px;">
-                            Texas marketplace for serious buyers & sellers
+                          <div style="font-family:${fontBody}; font-size: 12px; color: ${cBark}; margin-top: 2px;">
+                            Texas Exotic & Breeder Animal Marketplace
+                          </div>
+                        </td>
+                        <td align="right" style="vertical-align: middle;">
+                          <div style="font-family:${fontBody}; font-size: 12px; color:${cBark}; font-weight: 700;">
+                            wildlife.exchange
                           </div>
                         </td>
                       </tr>
@@ -154,7 +170,7 @@ function getEmailTemplate(params: {
                   </td>
                 </tr>
                 <tr>
-                  <td style="height: 5px; background: linear-gradient(90deg, ${cSage} 0%, ${cOlive} 40%, ${cSage} 100%); font-size:0; line-height:0;">
+                  <td style="height: 6px; background: linear-gradient(90deg, ${cSage} 0%, ${cOlive} 40%, ${cSage} 100%); font-size:0; line-height:0;">
                     &nbsp;
                   </td>
                 </tr>
@@ -164,10 +180,10 @@ function getEmailTemplate(params: {
 
           <!-- Body -->
           <tr>
-            <td style="background:${cParchment}; border:1px solid rgba(34,37,31,0.18); border-radius: 18px; overflow:hidden;">
+            <td style="background:${cParchment}; border:1px solid rgba(34,37,31,0.20); border-radius: 18px; overflow:hidden;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="padding: 22px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color:#0f172a; line-height:1.55;">
+                  <td style="padding: 22px 20px; font-family:${fontBody}; color:${cOlivewood}; line-height:1.55;">
                     ${params.contentHtml}
                   </td>
                 </tr>
