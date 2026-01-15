@@ -86,7 +86,20 @@ export async function GET(request: Request) {
   if (status) q = q.where('status', '==', status);
   q = q.orderBy('updatedAt', 'desc').limit(limitN);
 
-  const snap = await q.get();
-  return json({ ok: true, offers: snap.docs.map(serializeOffer) });
+  try {
+    const snap = await q.get();
+    return json({ ok: true, offers: snap.docs.map(serializeOffer) });
+  } catch (e: any) {
+    const msg = String(e?.message || '');
+    const looksLikeIndex = msg.toLowerCase().includes('requires an index') || msg.toLowerCase().includes('failed-precondition');
+    return json(
+      {
+        error: looksLikeIndex ? 'Offers query requires a Firestore index' : 'Failed to load offers',
+        code: looksLikeIndex ? 'FIRESTORE_INDEX_REQUIRED' : 'OFFERS_QUERY_FAILED',
+        message: e?.message || 'Unknown error',
+      },
+      { status: looksLikeIndex ? 503 : 500 }
+    );
+  }
 }
 
