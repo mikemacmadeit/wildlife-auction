@@ -648,7 +648,7 @@ export default function PricingPage() {
                   )}
                 >
                   <Zap className="h-5 w-5" />
-                  Create a Listing
+                  Create listing
                 </CreateListingGateButton>
                 <Button 
                   asChild 
