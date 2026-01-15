@@ -61,7 +61,7 @@ async function initializeFirebaseAdmin() {
   return db;
 }
 
-const handler: Handler = async (event, context) => {
+const baseHandler: Handler = async (event, context) => {
   const requestId = `cron_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   logInfo('Auto-release scheduled function triggered', { requestId, route: 'autoReleaseProtected' });
 
@@ -349,4 +349,4 @@ const handler: Handler = async (event, context) => {
 };
 
 // Schedule to run every 10 minutes
-export const autoReleaseProtected = schedule('*/10 * * * *', handler);
+export const handler = schedule('*/10 * * * *', baseHandler);
