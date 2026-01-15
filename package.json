@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_ENV=development PORT=3000 next dev",
+    "dev": "cross-env NODE_ENV=development next dev",
+    "dev:3001": "cross-env NODE_ENV=development PORT=3001 next dev",
     "build": "cross-env NODE_ENV=production next build",
     "start": "cross-env NODE_ENV=production next start",
     "lint": "next lint",
