@@ -12,9 +12,31 @@ function normalizePrivateKey(v: string | undefined): string | undefined {
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     s = s.slice(1, -1);
   }
-  // Netlify often stores multiline secrets as a single line with literal "\n".
-  // Some setups can also include "\r\n" sequences.
+  // Netlify/GitHub/etc can store multiline secrets with escaped newlines, sometimes double-escaped.
+  // Example bad inputs:
+  // - "-----BEGIN PRIVATE KEY-----\\n....\\n-----END PRIVATE KEY-----\\n"
+  // - "-----BEGIN PRIVATE KEY-----\\\\n....\\\\n-----END PRIVATE KEY-----"
+  while (s.includes('\\\\n') || s.includes('\\\\r\\\\n')) {
+    s = s.replace(/\\\\r\\\\n/g, '\\r\\n').replace(/\\\\n/g, '\\n');
+  }
+  // Now convert escaped sequences into actual newlines.
   s = s.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+  s = s.trim();
+
+  // Validate it looks like a PEM key. If not, fail loudly so routes return a useful 503 instead of
+  // falling back to ADC/metadata (which can crash in Netlify).
+  const looksLikePem =
+    s.includes('-----BEGIN PRIVATE KEY-----') ||
+    s.includes('-----BEGIN RSA PRIVATE KEY-----') ||
+    s.includes('-----BEGIN EC PRIVATE KEY-----');
+  if (!looksLikePem) {
+    const err: any = new Error(
+      'FIREBASE_PRIVATE_KEY does not look like a PEM private key. Paste the full key including BEGIN/END lines. ' +
+        'If you are using escaped newlines, use \\n between lines.'
+    );
+    err.code = 'FIREBASE_PRIVATE_KEY_INVALID_FORMAT';
+    throw err;
+  }
   return s;
 }
 
