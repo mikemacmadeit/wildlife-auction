@@ -8,39 +8,13 @@
 
 import { Handler, schedule } from '@netlify/functions';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
+import { getAdminDb } from '../../lib/firebase/admin';
 
-let adminApp: App | undefined;
 let db: ReturnType<typeof getFirestore>;
 
-function normalizePrivateKey(v: string | undefined): string | undefined {
-  if (!v) return undefined;
-  let s = v.trim();
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-    s = s.slice(1, -1);
-  }
-  return s.replace(/\\n/g, '\n');
-}
-
 async function initializeFirebaseAdmin() {
-  if (!adminApp) {
-    if (!getApps().length) {
-      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-      const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
-      const serviceAccount = projectId && clientEmail && privateKey ? { projectId, clientEmail, privateKey } : undefined;
-
-      if (serviceAccount) {
-        adminApp = initializeApp({ credential: cert(serviceAccount as any) });
-      } else {
-        adminApp = initializeApp();
-      }
-    } else {
-      adminApp = getApps()[0];
-    }
-  }
-  db = getFirestore(adminApp);
+  db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
   return db;
 }
 

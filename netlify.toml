@@ -9,8 +9,9 @@ package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
   # Include all environment variables
   include = "*"
-  # Exclude variables that shouldn't be inlined (sensitive ones that change frequently)
-  exclude = ""
+  # Exclude secrets that are commonly mangled/truncated when inlined (especially multiline PEM keys).
+  # These should be provided by Netlify as runtime env vars instead.
+  exclude = "FIREBASE_PRIVATE_KEY,FIREBASE_SERVICE_ACCOUNT_JSON_BASE64,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,BREVO_API_KEY"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"

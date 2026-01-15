@@ -109,6 +109,7 @@ export async function POST(request: Request) {
         code: e?.code,
         message: e?.message,
         missing: e?.missing,
+        details: e?.details,
       });
       captureException(e);
       return json(
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
           code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
           message: e?.message || 'Failed to initialize Firebase Admin SDK',
           missing: e?.missing || undefined,
+          details: e?.details || undefined,
         },
         { status: 503 }
       );

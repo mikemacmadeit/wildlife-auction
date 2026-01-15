@@ -88,6 +88,35 @@ function readServiceAccountJsonIfPresent(): { projectId?: string; clientEmail?: 
   return null;
 }
 
+function readServiceAccountJsonBase64FromEnv(): { projectId?: string; clientEmail?: string; privateKey?: string } | null {
+  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64;
+  if (!b64) return null;
+  try {
+    const raw = Buffer.from(b64, 'base64').toString('utf8');
+    const json = JSON.parse(raw);
+    const projectId = json.project_id || json.projectId;
+    const clientEmail = json.client_email || json.clientEmail;
+    const privateKey = normalizePrivateKey(json.private_key || json.privateKey);
+    if (projectId && clientEmail && privateKey) {
+      return { projectId, clientEmail, privateKey };
+    }
+    const err: any = new Error('FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 decoded but is missing required fields');
+    err.code = 'FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_INVALID';
+    err.missing = [
+      !projectId ? 'project_id' : null,
+      !clientEmail ? 'client_email' : null,
+      !privateKey ? 'private_key' : null,
+    ].filter(Boolean);
+    throw err;
+  } catch (e: any) {
+    if (e?.code) throw e;
+    const err: any = new Error('FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 could not be decoded/parsed as JSON');
+    err.code = 'FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_UNREADABLE';
+    err.details = { message: e?.message };
+    throw err;
+  }
+}
+
 /**
  * Initialize Firebase Admin deterministically.
  * In serverless production we require explicit service account env vars to avoid slow/unstable ADC.
@@ -99,15 +128,18 @@ export function getAdminApp(): App {
     return adminApp;
   }
 
+  // Preferred: single base64 JSON blob (avoids newline/escaping issues and Netlify plugin mangling)
+  const b64Sa = readServiceAccountJsonBase64FromEnv();
+
   const envProjectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const envPrivateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  const envPrivateKey = process.env.FIREBASE_PRIVATE_KEY ? normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY) : undefined;
 
   // If env vars are incomplete (common in local dev), fall back to a JSON credential file if present.
   const fileSa = (!envProjectId || !envClientEmail || !envPrivateKey) ? readServiceAccountJsonIfPresent() : null;
-  const projectId = envProjectId || fileSa?.projectId;
-  const clientEmail = envClientEmail || fileSa?.clientEmail;
-  const privateKey = envPrivateKey || fileSa?.privateKey;
+  const projectId = b64Sa?.projectId || envProjectId || fileSa?.projectId;
+  const clientEmail = b64Sa?.clientEmail || envClientEmail || fileSa?.clientEmail;
+  const privateKey = b64Sa?.privateKey || envPrivateKey || fileSa?.privateKey;
 
   const isProd = process.env.NODE_ENV === 'production' || !!process.env.NETLIFY;
   const missing = [
