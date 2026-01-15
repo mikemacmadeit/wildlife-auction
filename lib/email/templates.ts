@@ -82,7 +82,6 @@ function getEmailTemplate(params: {
   const year = new Date().getFullYear();
   const origin = params.origin || 'https://wildlife.exchange';
   const logoUrl = `${origin}/images/Kudu.png`;
-  const heroUrl = `${origin}/images/Buck_1.webp`;
   const fontBrand = `'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const fontBody = `'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const cOlivewood = '#22251F';
@@ -132,20 +131,8 @@ function getEmailTemplate(params: {
             <td style="padding: 0 0 12px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
                      style="background:${cOlivewood}; border-radius: 18px; overflow:hidden; border: 1px solid rgba(34,37,31,0.18);">
-                <!-- Hero banner image (matches homepage) -->
                 <tr>
-                  <td>
-                    <img
-                      src="${heroUrl}"
-                      width="600"
-                      alt="Wildlife Exchange"
-                      style="display:block; width:100%; max-width:600px; height:auto; border:0; outline:none; text-decoration:none;"
-                    />
-                  </td>
-                </tr>
-                <!-- Brand lockup strip (email-safe) -->
-                <tr>
-                  <td style="padding: 16px 18px; background:${cSandSurface};">
+                  <td style="padding: 18px 18px;">
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 12px; width: 44px;">
@@ -153,17 +140,17 @@ function getEmailTemplate(params: {
                                style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface};" />
                         </td>
                         <td style="vertical-align: middle;">
-                          <div style="font-family:${fontBrand}; font-size: 22px; font-weight: 900; color: ${cOlivewood}; letter-spacing: 0.2px;">
+                          <div style="font-family:${fontBrand}; font-size: 24px; font-weight: 900; color: ${cSandBase}; letter-spacing: 0.2px;">
                             Wildlife Exchange
                           </div>
-                          <div style="font-family:${fontBody}; font-size: 12px; color: ${cBark}; margin-top: 2px;">
+                          <div style="font-family:${fontBody}; font-size: 12px; color: rgba(244,240,230,0.86); margin-top: 2px;">
                             Texas Exotic & Breeder Animal Marketplace
                           </div>
                         </td>
                         <td align="right" style="vertical-align: middle;">
-                          <div style="font-family:${fontBody}; font-size: 12px; color:${cBark}; font-weight: 700;">
+                          <a href="${origin}" style="font-family:${fontBody}; font-size: 12px; color:${cOlive}; font-weight: 800; text-decoration:none;">
                             wildlife.exchange
-                          </div>
+                          </a>
                         </td>
                       </tr>
                     </table>
