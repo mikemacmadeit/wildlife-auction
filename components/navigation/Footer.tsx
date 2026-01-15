@@ -225,88 +225,63 @@ export function Footer() {
 
           {/* Newsletter */}
           <div className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] overflow-hidden">
-              {/* Header band */}
-              <div className="relative px-4 sm:px-5 pt-4 sm:pt-5 pb-4 border-b border-white/10 bg-[radial-gradient(90%_120%_at_0%_0%,hsl(90_12%_35%/.18)_0%,transparent_55%),radial-gradient(90%_120%_at_100%_0%,hsl(37_27%_70%/.14)_0%,transparent_55%)]">
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                    <Mail className="h-5 w-5 text-[hsl(37_27%_88%)]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-base font-extrabold tracking-tight text-[hsl(37_27%_92%)] leading-tight">
-                      Get listings before they hit the feed
-                    </div>
-                    <div className="mt-1 text-sm text-[hsl(37_27%_78%)] leading-relaxed">
-                      Weekly drops, new ranch inventory, and market insights. <span className="font-semibold">Texas-only.</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="px-4 sm:px-5 py-4 sm:py-5 space-y-3">
-                {success ? (
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                    <div className="text-sm font-semibold text-[hsl(37_27%_92%)]">You’re in.</div>
-                    <div className="text-sm text-[hsl(37_27%_78%)]">Check your inbox soon.</div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Input
-                          value={email}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            setError(null);
-                          }}
-                          placeholder="you@example.com"
-                          type="email"
-                          inputMode="email"
-                          autoComplete="email"
-                          className="min-h-[48px] bg-white/5 border-white/10 text-[hsl(37_27%_92%)] placeholder:text-[hsl(37_27%_70%)]"
-                        />
-                        <Button
-                          onClick={onSubmit}
-                          disabled={loading}
-                          className="min-h-[48px] sm:min-w-[132px] font-semibold bg-[hsl(90_12%_35%)] hover:bg-[hsl(90_12%_40%)] text-white"
-                        >
-                          {loading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Subscribing…
-                            </>
-                          ) : (
-                            <>
-                              Subscribe
-                              <ArrowRight className="h-4 w-4 ml-2" />
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      {error && <p className="text-xs text-red-200">{error}</p>}
-                    </div>
-
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs leading-relaxed text-[hsl(37_27%_78%)]">
-                        No spam. Just the best auctions, breeder inventory, and ranch deals—delivered weekly.
-                      </p>
-                    </div>
-
-                    <p className="text-[11px] leading-relaxed text-[hsl(37_27%_70%)]">
-                      By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
-                      <Link href="/privacy" className="underline underline-offset-2 hover:text-[hsl(37_27%_92%)]">
-                        Privacy
-                      </Link>{' '}
-                      ·{' '}
-                      <Link href="/trust" className="underline underline-offset-2 hover:text-[hsl(37_27%_92%)]">
-                        Trust &amp; Compliance
-                      </Link>
-                    </p>
-                  </>
-                )}
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-[hsl(37_27%_88%)]">Newsletter</div>
+              <Mail className="h-4 w-4 text-[hsl(37_27%_78%)]" />
             </div>
+
+            <p className="text-sm text-[hsl(37_27%_78%)]">
+              Get weekly drops, ranch inventory, and market insights—Texas-only.
+            </p>
+
+            {success ? (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="text-sm font-semibold text-[hsl(37_27%_92%)]">You’re in.</div>
+                <div className="text-sm text-[hsl(37_27%_78%)]">Check your inbox soon.</div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="you@example.com"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    className="min-h-[44px] bg-white/5 border-white/10 text-[hsl(37_27%_90%)] placeholder:text-[hsl(37_27%_70%)]"
+                  />
+                  <Button
+                    onClick={onSubmit}
+                    disabled={loading}
+                    className="min-h-[44px] sm:min-w-[120px] font-semibold bg-[hsl(90_12%_35%)] hover:bg-[hsl(90_12%_40%)] text-white"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Joining
+                      </>
+                    ) : (
+                      <>
+                        Join
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {error && <p className="text-xs text-red-200">{error}</p>}
+                <p className="text-[11px] leading-relaxed text-[hsl(37_27%_70%)]">
+                  By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
+                  <Link href="/privacy" className="underline underline-offset-2 hover:text-[hsl(37_27%_92%)]">
+                    Privacy
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
