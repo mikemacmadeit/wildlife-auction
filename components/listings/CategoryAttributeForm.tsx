@@ -72,7 +72,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             placeholder="Enter your TPWD Breeder Permit Number"
             value={(attributes as Partial<WhitetailBreederAttributes>).tpwdBreederPermitNumber || ''}
             onChange={(e) => updateAttribute('tpwdBreederPermitNumber', e.target.value)}
-            className={`min-h-[48px] text-base ${hasError('TPWD Breeder Permit Number') ? 'border-destructive border-2' : ''}`}
+            className={`min-h-[48px] text-base ${hasError('TPWD Breeder Permit Number') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}
             required
           />
           {hasError('TPWD Breeder Permit Number') && (
@@ -103,7 +103,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               // Store as Date; Firestore will persist it as Timestamp.
               updateAttribute('tpwdPermitExpirationDate', new Date(`${v}T00:00:00`));
             }}
-            className={`min-h-[48px] text-base ${hasError('Permit Expiration Date') ? 'border-destructive border-2' : ''}`}
+            className={`min-h-[48px] text-base ${hasError('Permit Expiration Date') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}
             required
           />
           {hasError('Permit Expiration Date') && (
@@ -136,7 +136,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             placeholder="Enter your Breeder Facility ID"
             value={(attributes as Partial<WhitetailBreederAttributes>).breederFacilityId || ''}
             onChange={(e) => updateAttribute('breederFacilityId', e.target.value)}
-            className={`min-h-[48px] text-base ${hasError('Breeder Facility ID') ? 'border-destructive border-2' : ''}`}
+            className={`min-h-[48px] text-base ${hasError('Breeder Facility ID') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}
             required
           />
           {hasError('Breeder Facility ID') && (
@@ -153,7 +153,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             placeholder="Enter the Deer ID Tag"
             value={(attributes as Partial<WhitetailBreederAttributes>).deerIdTag || ''}
             onChange={(e) => updateAttribute('deerIdTag', e.target.value)}
-            className={`min-h-[48px] text-base ${hasError('Deer ID Tag') ? 'border-destructive border-2' : ''}`}
+            className={`min-h-[48px] text-base ${hasError('Deer ID Tag') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}
             required
           />
           {hasError('Deer ID Tag') && (
@@ -169,7 +169,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             value={(attributes as Partial<WhitetailBreederAttributes>).sex || 'unknown'}
             onValueChange={(value) => updateAttribute('sex', value)}
           >
-            <SelectTrigger id="whitetail-sex" className={`min-h-[48px] ${hasError('Sex') ? 'border-destructive border-2' : ''}`}>
+            <SelectTrigger id="whitetail-sex" className={`min-h-[48px] ${hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -204,7 +204,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             min="1"
             value={(attributes as Partial<WhitetailBreederAttributes>).quantity || 1}
             onChange={(e) => updateAttribute('quantity', parseInt(e.target.value) || 1)}
-            className={`min-h-[48px] text-base ${hasError('Quantity (must be at least 1)') ? 'border-destructive border-2' : ''}`}
+            className={`min-h-[48px] text-base ${hasError('Quantity (must be at least 1)') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}
             required
           />
           {hasError('Quantity (must be at least 1)') && (
