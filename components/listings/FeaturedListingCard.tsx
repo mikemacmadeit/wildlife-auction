@@ -29,6 +29,10 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     ? `$${listing.price?.toLocaleString() || '0'}`
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
 
+  const hasCountdown = listing.type === 'auction' && !!listing.endsAt;
+  // Avoid overlapping the countdown (which lives top-right). If countdown exists, push the heart down.
+  const favoritePositionClass = hasCountdown ? 'top-14 right-3' : 'top-3 right-3';
+
   return (
     <motion.div
       ref={ref}
@@ -72,7 +76,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/20 to-transparent z-10" />
 
             {/* Watchlist button (always visible; does not navigate) */}
-            <div className="absolute top-3 right-3 z-30">
+            <div className={`absolute z-30 ${favoritePositionClass}`}>
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
@@ -98,7 +102,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             )}
 
             {/* Real-time countdown timer for auctions - Enhanced */}
-            {listing.type === 'auction' && listing.endsAt && (
+            {hasCountdown && (
               <div className="absolute top-3 right-3 z-20">
                 <CountdownTimer
                   endsAt={listing.endsAt}
