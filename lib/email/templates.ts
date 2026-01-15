@@ -143,23 +143,29 @@ function getEmailTemplate(params: {
                           <!--
                             Logo rendering note:
                             The website tints the Kudu mark using CSS masks. Email clients vary wildly in CSS support.
-                            We use an SVG mask for modern clients, with an Outlook (mso) fallback to a plain image.
+                            We use the same CSS mask approach for modern clients (matches the site icons), with an
+                            Outlook (mso) fallback to a plain image.
                           -->
                           <!--[if mso]>
                             <img src="${logoUrl}" width="40" height="40" alt="Wildlife Exchange"
                                  style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface};" />
                           <![endif]-->
                           <!--[if !mso]><!-->
-                            <svg width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="Wildlife Exchange"
-                                 style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px;">
-                              <defs>
-                                <mask id="weKuduMask">
-                                  <rect width="40" height="40" fill="black"></rect>
-                                  <image href="${logoUrl}" x="0" y="0" width="40" height="40" preserveAspectRatio="xMidYMid meet"></image>
-                                </mask>
-                              </defs>
-                              <rect width="40" height="40" fill="${logoTint}" mask="url(#weKuduMask)"></rect>
-                            </svg>
+                            <div
+                              style="
+                                width:40px; height:40px; display:block;
+                                background-color:${logoTint};
+                                mask-image:url('${logoUrl}');
+                                mask-size:contain;
+                                mask-repeat:no-repeat;
+                                mask-position:center;
+                                -webkit-mask-image:url('${logoUrl}');
+                                -webkit-mask-size:contain;
+                                -webkit-mask-repeat:no-repeat;
+                                -webkit-mask-position:center;
+                              "
+                              aria-label="Wildlife Exchange"
+                            ></div>
                           <!--<![endif]-->
                         </td>
                         <td style="vertical-align: middle;">
