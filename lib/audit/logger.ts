@@ -30,7 +30,8 @@ export type AuditActionType =
   | 'subscription_canceled'
   | 'subscription_payment_failed'
   | 'billing_portal_accessed'
-  | 'admin_plan_override';
+  | 'admin_plan_override'
+  | 'bid_placed';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 

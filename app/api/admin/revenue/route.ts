@@ -5,6 +5,9 @@
  * Returns platform revenue KPIs and breakdowns
  */
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, dev bundling can attempt to resolve a missing internal Next module
 // (`next/dist/server/web/exports/next-response`) and crash compilation.

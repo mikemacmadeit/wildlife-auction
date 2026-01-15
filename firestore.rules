@@ -173,14 +173,12 @@ service cloud.firestore {
       // (Bid history is public for active listings, but we require auth for now)
       allow read: if isAuthenticated();
       
-      // Allow create: authenticated users can place bids
-      // Validation: bidderId must match authenticated user, amount must be positive
-      allow create: if isAuthenticated() && 
-                      request.resource.data.bidderId == request.auth.uid &&
-                      request.resource.data.amount is number &&
-                      request.resource.data.amount > 0 &&
-                      request.resource.data.listingId is string &&
-                      request.resource.data.createdAt is timestamp;
+      // P0: Bids must be placed via server-side API (Admin SDK) to enforce:
+      // - listing status gates (active only)
+      // - auction end time
+      // - TX-only for animal categories
+      // Client-side creates are disallowed to prevent bypass/spam.
+      allow create: if false;
       
       // Bids are immutable - no updates or deletes allowed
       allow update: if false;

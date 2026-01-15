@@ -8,6 +8,9 @@
  * - cursor: string (order ID for pagination)
  */
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // IMPORTANT:
 // Avoid importing `NextRequest` / `NextResponse` from `next/server` here.
 // In this repo's current environment, dev bundling can attempt to resolve a missing internal

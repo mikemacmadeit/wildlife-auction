@@ -69,7 +69,8 @@ import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
-import { placeBidTx, getWinningBidder } from '@/lib/firebase/bids';
+import { getWinningBidder } from '@/lib/firebase/bids';
+import { placeBidServer } from '@/lib/api/bids';
 import {
   Tooltip,
   TooltipContent,
@@ -214,12 +215,10 @@ export default function ListingDetailPage() {
     setIsPlacingBid(true);
 
     try {
-      // Place bid using transaction
-      const result = await placeBidTx({
-        listingId: listingId,
-        bidderId: user.uid,
-        amount: amount,
-      });
+      const result = await placeBidServer({ listingId, amount });
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
 
       // Success - update local state optimistically
       setListing({

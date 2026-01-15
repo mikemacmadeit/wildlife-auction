@@ -62,7 +62,12 @@ export function validateSingleMode(type: ListingType, data: { price?: number; st
 /**
  * Validate prohibited items in listing content
  */
-export function validateProhibitedContent(title: string, description: string, attributes: ListingAttributes): void {
+export function validateProhibitedContent(
+  category: ListingCategory,
+  title: string,
+  description: string,
+  attributes: ListingAttributes
+): void {
   // Check title and description
   if (containsProhibitedKeywords(title)) {
     throw new Error('Listing title contains prohibited keywords. Cannot list venison, meat, hunting tags, licenses, or wild whitetail.');
@@ -72,16 +77,26 @@ export function validateProhibitedContent(title: string, description: string, at
     throw new Error('Listing description contains prohibited keywords. Cannot list venison, meat, hunting tags, licenses, or wild whitetail.');
   }
   
-  // Check species field for wildlife/exotics (use `speciesId`)
+  // Category hard rule: whitetail can NEVER be listed under wildlife_exotics
+  if (category === 'wildlife_exotics') {
+    const combined = `${title}\n${description}`.toLowerCase();
+    if (combined.includes('whitetail') || combined.includes('white-tail') || combined.includes('white tail')) {
+      throw new Error('Whitetail deer cannot be listed in Wildlife/Exotics category. Use "Whitetail Breeder" category instead.');
+    }
+  }
+
+  // Check attributes (speciesId) for prohibited keywords
   if ('speciesId' in attributes) {
     const species = String((attributes as any).speciesId || '');
     if (containsProhibitedKeywords(species)) {
       throw new Error('Species field contains prohibited keywords. Cannot list venison, meat, hunting tags, licenses, or wild whitetail.');
     }
-    // Additional check: block whitetail in species field if category is wildlife_exotics
-    const speciesLower = species.toLowerCase();
-    if (speciesLower.includes('whitetail') || speciesLower.includes('white-tail')) {
-      throw new Error('Whitetail deer cannot be listed in Wildlife/Exotics category. Use "Whitetail Breeder" category instead.');
+
+    if (category === 'wildlife_exotics') {
+      const speciesLower = species.toLowerCase();
+      if (speciesLower.includes('whitetail') || speciesLower.includes('white-tail') || speciesLower.includes('white tail')) {
+        throw new Error('Whitetail deer cannot be listed in Wildlife/Exotics category. Use "Whitetail Breeder" category instead.');
+      }
     }
   }
 }
@@ -251,7 +266,7 @@ export function validateListingCompliance(
   validateSingleMode(type, pricingData);
   
   // P0: Prohibited content
-  validateProhibitedContent(title, description, attributes);
+  validateProhibitedContent(category, title, description, attributes);
   
   // Category-specific validation
   switch (category) {
