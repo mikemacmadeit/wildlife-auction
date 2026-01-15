@@ -24,7 +24,7 @@ export function PlanPicker(props: {
   }, []);
 
   return (
-    <div className={cn('grid gap-3 sm:grid-cols-3', className)}>
+    <div className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-3', className)}>
       {plans.map((p) => {
         const isCurrent = currentPlanId === p.id;
         const Icon = p.id === 'elite' ? Crown : p.id === 'pro' ? Zap : CreditCard;
@@ -36,7 +36,7 @@ export function PlanPicker(props: {
           <Card
             key={p.id}
             className={cn(
-              'border-2',
+              'border-2 h-full',
               p.id === 'elite'
                 ? 'border-primary/30 bg-gradient-to-br from-primary/5 to-background'
                 : p.id === 'pro'
@@ -45,12 +45,12 @@ export function PlanPicker(props: {
               isCurrent && 'ring-2 ring-primary/30'
             )}
           >
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div
                     className={cn(
-                      'h-9 w-9 rounded-lg border-2 flex items-center justify-center',
+                      'h-10 w-10 rounded-xl border-2 flex items-center justify-center shrink-0',
                       p.id === 'free'
                         ? 'bg-muted/50 border-border/50'
                         : 'bg-primary/10 border-primary/20'
@@ -59,8 +59,8 @@ export function PlanPicker(props: {
                     <Icon className={cn('h-5 w-5', p.id === 'free' ? 'text-muted-foreground' : 'text-primary')} />
                   </div>
                   <div>
-                    <CardTitle className="text-base font-extrabold">{p.displayName}</CardTitle>
-                    <CardDescription className="text-xs">
+                    <CardTitle className="text-base sm:text-[15px] font-extrabold tracking-tight">{p.displayName}</CardTitle>
+                    <CardDescription className="text-xs sm:text-[13px]">
                       {p.monthlyPrice === 0 ? '$0/mo' : `$${p.monthlyPrice}/mo`}
                     </CardDescription>
                   </div>
@@ -74,30 +74,34 @@ export function PlanPicker(props: {
               </div>
             </CardHeader>
 
-            <CardContent className="pt-0 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Listing limit</span>
-                <span className="font-semibold">{limitLabel}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Transaction fee</span>
-                <span className="font-semibold">{Math.round(p.takeRate * 100)}%</span>
+            <CardContent className="pt-0 flex flex-col gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Listing limit</span>
+                  <span className="font-semibold">{limitLabel}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Transaction fee</span>
+                  <span className="font-semibold">{Math.round(p.takeRate * 100)}%</span>
+                </div>
               </div>
 
-              {p.id === 'free' ? (
-                <Button variant="outline" className="w-full" disabled>
-                  Included
-                </Button>
-              ) : (
-                <Button
-                  className="w-full font-semibold"
-                  variant={p.id === 'pro' ? 'secondary' : 'default'}
-                  disabled={isCurrent || loadingPlanId === p.id}
-                  onClick={() => onSelectPaidPlan(p.id as 'pro' | 'elite')}
-                >
-                  {isCurrent ? 'Current plan' : `Upgrade to ${p.displayName}`}
-                </Button>
-              )}
+              <div className="mt-auto">
+                {p.id === 'free' ? (
+                  <Button variant="outline" className="w-full min-h-[44px]" disabled>
+                    Included
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full min-h-[44px] font-semibold"
+                    variant={p.id === 'pro' ? 'secondary' : 'default'}
+                    disabled={isCurrent || loadingPlanId === p.id}
+                    onClick={() => onSelectPaidPlan(p.id as 'pro' | 'elite')}
+                  >
+                    {isCurrent ? 'Current plan' : `Upgrade to ${p.displayName}`}
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         );
