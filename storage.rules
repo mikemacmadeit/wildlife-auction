@@ -7,6 +7,21 @@ service firebase.storage {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    // Helper function to check if user is an admin (prefer custom claims; fall back to user doc role)
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'super_admin' ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin']
+      );
+    }
+
+    function isListingOwner(listingId) {
+      return isAuthenticated() &&
+        firestore.get(/databases/(default)/documents/listings/$(listingId)) != null &&
+        firestore.get(/databases/(default)/documents/listings/$(listingId)).data.sellerId == request.auth.uid;
+    }
     
     // ============================================
     // LISTING IMAGES
@@ -16,25 +31,10 @@ service firebase.storage {
       // Allow read: Public read - images are public for browsing
       allow read: if true;
       
-      // Allow write: Authenticated users can upload
-      // For now, we allow authenticated uploads to handle:
-      // 1. Cross-service rules setup (Firestore access from Storage)
-      // 2. Firestore propagation delays during draft creation
-      // 3. Draft creation flow where listing is created just before upload
-      // 
-      // The app logic ensures listings are created with correct ownership.
-      // Once cross-service rules are fully configured, we can add stricter checks.
-      allow write: if isAuthenticated();
+      // P0: owner/admin only. Prevent cross-tenant writes.
+      allow write: if isListingOwner(listingId) || isAdmin();
       
-      // Allow delete: Try to verify ownership, but allow if listing doesn't exist
-      // This handles cleanup cases and cross-service rule setup
-      allow delete: if isAuthenticated() && (
-        // If listing exists, verify ownership
-        (firestore.get(/databases/(default)/documents/listings/$(listingId)) != null &&
-         firestore.get(/databases/(default)/documents/listings/$(listingId)).data.sellerId == request.auth.uid) ||
-        // If listing doesn't exist, allow (cleanup case or cross-service rules not set up)
-        firestore.get(/databases/(default)/documents/listings/$(listingId)) == null
-      );
+      allow delete: if isListingOwner(listingId) || isAdmin();
     }
     
     // ============================================
@@ -42,25 +42,13 @@ service firebase.storage {
     // ============================================
     // Path: listings/{listingId}/documents/{docId}/{filename}
     match /listings/{listingId}/documents/{docId}/{fileName} {
-      // Allow read: Public read (documents are accessible to admins and listing owners)
-      // Note: Firestore rules control who can see document metadata
-      allow read: if true;
+      // P0: Compliance documents must not be publicly readable.
+      allow read: if isListingOwner(listingId) || isAdmin();
       
-      // Allow write: Authenticated users (app logic ensures ownership)
-      // Similar to listing images - allows authenticated uploads to handle:
-      // 1. Cross-service rules setup
-      // 2. Firestore propagation delays
-      // 3. Document upload flow where listing exists but cross-service rules may not be ready
-      allow write: if isAuthenticated();
+      // Owner/admin only.
+      allow write: if isListingOwner(listingId) || isAdmin();
       
-      // Allow delete: Try to verify ownership, but allow if listing doesn't exist
-      allow delete: if isAuthenticated() && (
-        // If listing exists, verify ownership
-        (firestore.get(/databases/(default)/documents/listings/$(listingId)) != null &&
-         firestore.get(/databases/(default)/documents/listings/$(listingId)).data.sellerId == request.auth.uid) ||
-        // If listing doesn't exist, allow (cleanup case or cross-service rules not set up)
-        firestore.get(/databases/(default)/documents/listings/$(listingId)) == null
-      );
+      allow delete: if isListingOwner(listingId) || isAdmin();
     }
     
     // ============================================

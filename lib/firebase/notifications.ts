@@ -37,26 +37,10 @@ export async function createNotification(params: {
   bidId?: string;
   metadata?: Record<string, any>;
 }): Promise<string> {
-  const notificationsRef = collection(db, 'notifications');
-  
-  const notificationData = {
-    userId: params.userId,
-    type: params.type,
-    title: params.title,
-    body: params.body,
-    read: false,
-    createdAt: serverTimestamp(),
-    linkUrl: params.linkUrl,
-    linkLabel: params.linkLabel,
-    listingId: params.listingId,
-    orderId: params.orderId,
-    threadId: params.threadId,
-    bidId: params.bidId,
-    metadata: params.metadata || {},
-  };
-
-  const notificationRef = await addDoc(notificationsRef, notificationData);
-  return notificationRef.id;
+  // P0: Notifications are server-controlled to prevent spoofing (users creating notifications for other users).
+  // The Firestore rules intentionally disallow client-side creation.
+  // If you need to create a notification, do it from a server route using the Admin SDK.
+  throw new Error('createNotification is server-only. Use a server API route to create notifications.');
 }
 
 /**

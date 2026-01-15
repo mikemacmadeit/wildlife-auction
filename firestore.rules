@@ -283,18 +283,24 @@ service cloud.firestore {
       
       // Documents subcollection
       match /documents/{documentId} {
+        // IMPORTANT: subcollection docs do NOT necessarily contain buyerId/sellerId; always reference the parent order.
+        function parentOrder() {
+          return get(/databases/$(database)/documents/orders/$(orderId));
+        }
+        function isOrderParticipant() {
+          return isAuthenticated() && parentOrder().data != null && (
+            parentOrder().data.buyerId == request.auth.uid ||
+            parentOrder().data.sellerId == request.auth.uid
+          );
+        }
+
         // Allow read: buyer, seller, or admin
-        allow read: if isAuthenticated() && (
-          resource.data.buyerId == request.auth.uid ||
-          resource.data.sellerId == request.auth.uid ||
-          isAdmin()
-        );
+        allow read: if isOrderParticipant() || isAdmin();
         
-        // Allow create: buyer or seller
-        allow create: if isAuthenticated() && (
-          resource.data.buyerId == request.auth.uid ||
-          resource.data.sellerId == request.auth.uid
-        ) && resource.data.status == 'uploaded';
+        // Allow create: buyer or seller uploading their own doc
+        allow create: if isOrderParticipant() &&
+          request.resource.data.status == 'uploaded' &&
+          request.resource.data.uploadedBy == request.auth.uid;
         
         // Allow update: only admin (for verification)
         allow update: if isAdmin() && 
@@ -413,9 +419,8 @@ service cloud.firestore {
       // Allow read: only the recipient can read their notifications
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
 
-      // Allow create: authenticated users (system/client)
-      // NOTE: app logic controls who can create notifications; reads remain recipient-only.
-      allow create: if isAuthenticated();
+      // P0: Notifications are server-controlled (Admin SDK) to prevent spoofing.
+      allow create: if false;
 
       // Allow update: only recipient (mark as read)
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
