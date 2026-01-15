@@ -36,6 +36,8 @@ function NewListingPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showPendingApprovalModal, setShowPendingApprovalModal] = useState(false);
+  const [submittedListingId, setSubmittedListingId] = useState<string | null>(null);
   // (No listing-limit gating in Exposure Plans model)
   const [sellerAttestationAccepted, setSellerAttestationAccepted] = useState(false);
   const [formData, setFormData] = useState<{
@@ -1449,19 +1451,20 @@ function NewListingPageContent() {
       const publishResult = await publishListing(user.uid, finalListingId);
 
       if (publishResult?.pendingReview) {
+        setSubmittedListingId(finalListingId);
+        setShowPendingApprovalModal(true);
         toast({
-          title: 'Listing submitted for review',
-          description: 'Your listing has been submitted and is pending admin compliance review. You will be notified once it\'s approved.',
+          title: 'Submitted for approval',
+          description: 'Your listing is in the review queue.',
         });
       } else {
         toast({
           title: 'Listing created successfully!',
           description: 'Your listing has been published and is now live.',
         });
+        // Redirect to seller listings dashboard so they can see their new listing
+        router.push('/seller/listings');
       }
-
-      // Redirect to seller listings dashboard so they can see their new listing
-      router.push('/seller/listings');
     } catch (error: any) {
       console.error('Error creating listing:', error);
       toast({
@@ -1597,6 +1600,44 @@ function NewListingPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Dialog
+        open={showPendingApprovalModal}
+        onOpenChange={(open) => {
+          setShowPendingApprovalModal(open);
+          if (!open) {
+            router.push('/seller/listings');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Listing submitted for approval</DialogTitle>
+            <DialogDescription>
+              Your listing is pending compliance review. Most approvals complete in <strong>30–60 minutes</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div>
+              <span className="font-semibold text-foreground">What happens next:</span> our team verifies required documents and
+              confirms the listing meets category rules. You’ll be notified when it’s approved.
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">You can:</span> keep browsing, or head to your seller listings to track status.
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            {submittedListingId && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/seller/listings/${submittedListingId}/edit`)}
+              >
+                Edit listing
+              </Button>
+            )}
+            <Button onClick={() => router.push('/seller/listings')}>Go to seller listings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Custom Header with Navigation */}
       <div className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-4 py-3">
