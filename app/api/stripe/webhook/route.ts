@@ -10,11 +10,11 @@
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import Stripe from 'stripe';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 import { logInfo, logWarn, logError, getRequestId } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
+import { getAdminDb } from '@/lib/firebase/admin';
 import {
   handleCheckoutSessionCompleted,
   handleChargeDisputeCreated,
@@ -30,39 +30,9 @@ import {
   handleInvoicePaymentFailed,
 } from './subscription-handlers';
 
-// Initialize Firebase Admin (if not already initialized)
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        }
-      : undefined;
-
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      try {
-        // Try Application Default Credentials (for production)
-        adminApp = initializeApp();
-      } catch {
-        throw new Error('Failed to initialize Firebase Admin SDK');
-      }
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-} else {
-  adminApp = getApps()[0];
-}
-
-const adminDb = getFirestore(adminApp);
+// IMPORTANT:
+// Do NOT initialize Firebase Admin at module scope in Netlify/Next route handlers.
+// Use the shared initializer (supports bundled service account file) inside the handler so we can return a 503 if misconfigured.
 
 function json(body: any, init?: { status?: number; headers?: Headers | Record<string, string> }) {
   const headers =
@@ -94,6 +64,28 @@ export async function POST(request: Request) {
   const requestId = getRequestId(request.headers);
   const responseHeaders = new Headers();
   responseHeaders.set('x-request-id', requestId);
+
+  // Initialize Admin DB (Netlify-safe)
+  let adminDb: ReturnType<typeof getFirestore>;
+  try {
+    adminDb = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
+  } catch (e: any) {
+    logError('Firebase Admin init failed for Stripe webhook', e, {
+      requestId,
+      route: '/api/stripe/webhook',
+      code: e?.code,
+      missing: e?.missing,
+    });
+    return NextResponse.json(
+      {
+        error: 'Server is not configured to process webhooks yet',
+        code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+        message: e?.message || 'Failed to initialize Firebase Admin SDK',
+        missing: e?.missing || undefined,
+      },
+      { status: 503, headers: responseHeaders }
+    );
+  }
 
   // Check if Stripe is configured
   if (!isStripeConfigured() || !stripe) {
@@ -236,7 +228,7 @@ export async function POST(request: Request) {
       switch (event.type) {
         case 'account.updated': {
           const account = event.data.object as Stripe.Account;
-          await handleAccountUpdated(account);
+          await handleAccountUpdated(adminDb, account);
           break;
         }
 
@@ -369,10 +361,10 @@ export async function POST(request: Request) {
  * Handle account.updated event (not extracted for testing yet)
  * Updates user's Stripe Connect status based on account capabilities
  */
-async function handleAccountUpdated(account: Stripe.Account) {
+async function handleAccountUpdated(db: ReturnType<typeof getFirestore>, account: Stripe.Account) {
   try {
     // Find user by stripeAccountId
-    const usersRef = adminDb.collection('users');
+    const usersRef = db.collection('users');
     const snapshot = await usersRef.where('stripeAccountId', '==', account.id).get();
 
     if (snapshot.empty) {

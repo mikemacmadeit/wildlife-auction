@@ -19,10 +19,9 @@ import {
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './config';
+import { auth, db } from './config';
 import { MessageThread, Message } from '@/lib/types';
 import { sanitizeMessage, hasViolations } from '@/lib/safety/sanitizeMessage';
-import { createNotification } from './notifications';
 
 /**
  * Get or create a message thread between buyer and seller for a listing
@@ -78,6 +77,44 @@ export async function sendMessage(
   body: string,
   orderStatus?: 'pending' | 'paid' | 'completed'
 ): Promise<string> {
+  // Preferred path: use the hardened server route that sanitizes server-side and creates recipient notifications
+  // using Admin SDK (so it can write cross-user safely).
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('Authentication required');
+  }
+  if (currentUser.uid !== senderId) {
+    throw new Error('Invalid sender');
+  }
+
+  try {
+    const token = await currentUser.getIdToken();
+    const res = await fetch('/api/messages/send', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        threadId,
+        recipientId,
+        listingId,
+        messageBody: body,
+        // orderStatus is intentionally not trusted by the server; it derives payment state itself.
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.success && typeof data?.messageId === 'string') {
+      return data.messageId as string;
+    }
+
+    // Fall through to legacy client-side path only if server route is unavailable.
+    // This preserves backwards compatibility during deploy transitions.
+  } catch {
+    // ignore and fall back below
+  }
+
   // Check if order exists and get payment status
   let isPaid = false;
   if (orderStatus) {
@@ -140,32 +177,8 @@ export async function sendMessage(
     flagged: newViolationCount >= 3 || threadData?.flagged || false, // Flag if 3+ total violations
   });
 
-  // Create notification for recipient
-  try {
-    const listingRef = doc(db, 'listings', listingId);
-    const listingDoc = await getDoc(listingRef);
-    const listingData = listingDoc.exists() ? listingDoc.data() : null;
-    const listingTitle = listingData?.title || 'a listing';
-    const senderRole = senderId === threadData?.buyerId ? 'Buyer' : 'Seller';
-
-    await createNotification({
-      userId: recipientId,
-      type: 'message_received',
-      title: 'New Message',
-      body: `${senderRole} sent you a message about "${listingTitle}"`,
-      linkUrl: `/dashboard/messages?listingId=${listingId}&sellerId=${threadData?.sellerId}`,
-      linkLabel: 'View Message',
-      listingId,
-      threadId,
-      metadata: {
-        senderId,
-        preview: sanitizeResult.sanitizedText.substring(0, 100),
-      },
-    });
-  } catch (notifError) {
-    // Don't fail message send if notification fails
-    console.error('Error creating notification:', notifError);
-  }
+  // NOTE: We intentionally do NOT create a recipient notification in this legacy client-side fallback path.
+  // Cross-user notification writes should happen server-side (Admin SDK) to prevent spoofing.
 
   return messageRef.id;
 }

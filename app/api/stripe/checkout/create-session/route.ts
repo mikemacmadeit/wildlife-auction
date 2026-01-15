@@ -19,9 +19,6 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-const auth = getAdminAuth();
-const db = getAdminDb();
-
 function json(body: any, init?: { status?: number; headers?: Record<string, string> | Headers }) {
   const headers =
     init?.headers instanceof Headers
@@ -42,6 +39,31 @@ const NextResponse = { json };
 
 export async function POST(request: Request) {
   try {
+    // Lazily initialize Admin SDK inside the handler so we can return a structured error instead of crashing at import-time.
+    // (Netlify functions frequently fail if Admin creds are missing/malformed at module load.)
+    let auth: ReturnType<typeof getAdminAuth>;
+    let db: ReturnType<typeof getAdminDb>;
+    try {
+      auth = getAdminAuth();
+      db = getAdminDb();
+    } catch (e: any) {
+      logWarn('Firebase Admin init failed in /api/stripe/checkout/create-session', {
+        code: e?.code,
+        message: e?.message,
+        missing: e?.missing,
+        details: e?.details,
+      });
+      return NextResponse.json(
+        {
+          error: 'Server is not configured for checkout yet',
+          code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+          message: e?.message || 'Failed to initialize Firebase Admin SDK',
+          missing: e?.missing || undefined,
+        },
+        { status: 503 }
+      );
+    }
+
     // Check if Stripe is configured
     if (!isStripeConfigured() || !stripe) {
       return NextResponse.json(

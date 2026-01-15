@@ -9,34 +9,13 @@
  * Body: { listingId: string; amount: number }
  */
 
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-let adminApp: App;
-if (!getApps().length) {
-  const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-    ? {
-        projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      }
-    : undefined;
-
-  adminApp = serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey
-    ? initializeApp({ credential: cert(serviceAccount as any) })
-    : initializeApp();
-} else {
-  adminApp = getApps()[0];
-}
-
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> | Headers }) {
   const headers =
@@ -48,6 +27,25 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
 }
 
 export async function POST(request: Request) {
+  // Lazily initialize Admin SDK inside the handler so we can return a structured error (instead of crashing at import-time).
+  let auth: ReturnType<typeof getAdminAuth>;
+  let db: ReturnType<typeof getAdminDb>;
+  try {
+    auth = getAdminAuth();
+    db = getAdminDb();
+  } catch (e: any) {
+    return json(
+      {
+        ok: false,
+        error: 'Server is not configured to place bids yet',
+        code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+        message: e?.message || 'Failed to initialize Firebase Admin SDK',
+        missing: e?.missing || undefined,
+      },
+      { status: 503 }
+    );
+  }
+
   // Rate limit (cheap, before auth)
   const rl = rateLimitMiddleware(RATE_LIMITS.checkout);
   const rlRes = await rl(request as any);

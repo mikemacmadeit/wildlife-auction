@@ -200,13 +200,8 @@ export function BidIncrementCalculator({
               <span className="text-muted-foreground">Your Bid</span>
               <span className="font-bold text-xl">${parseFloat(customBid).toLocaleString()}</span>
             </div>
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Platform Fee (3%)</span>
-              <span>${(parseFloat(customBid) * 0.03).toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between text-base font-bold pt-2 border-t border-border/30">
-              <span>Total</span>
-              <span className="text-primary text-xl">${((parseFloat(customBid) * 1.03)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <div className="text-sm text-muted-foreground">
+              Final pricing and any applicable fees are shown at checkout.
             </div>
           </div>
         )}
