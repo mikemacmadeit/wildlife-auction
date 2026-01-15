@@ -10,6 +10,7 @@ import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
+import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
 
 interface FeaturedListingCardProps {
@@ -69,6 +70,11 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
           <div className="relative aspect-[16/9] w-full bg-muted overflow-hidden rounded-t-xl">
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/20 to-transparent z-10" />
+
+            {/* Watchlist button (always visible; does not navigate) */}
+            <div className="absolute top-3 right-3 z-30">
+              <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
+            </div>
             
             {listing.images[0] ? (
               <Image
