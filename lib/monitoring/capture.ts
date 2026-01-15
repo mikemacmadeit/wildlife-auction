@@ -27,8 +27,12 @@ export function captureException(error: Error, context?: Record<string, any>) {
   }
 
   try {
-    // Dynamic import to avoid bundling Sentry if not configured
-    import('@sentry/nextjs').then((Sentry) => {
+    // IMPORTANT:
+    // We intentionally avoid a direct `import('@sentry/nextjs')` here because Next's bundler
+    // will still trace the dependency and can emit warnings (e.g. OpenTelemetry/require-in-the-middle).
+    // Using an indirect dynamic import keeps Sentry out of the bundle graph unless actually executed.
+    const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<any>;
+    dynamicImport('@sentry/nextjs').then((Sentry) => {
       Sentry.captureException(error, {
         extra: sanitizeContext(context),
       });
@@ -56,7 +60,8 @@ export function captureMessage(
   }
 
   try {
-    import('@sentry/nextjs').then((Sentry) => {
+    const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<any>;
+    dynamicImport('@sentry/nextjs').then((Sentry) => {
       Sentry.captureMessage(message, {
         level: level as any,
         extra: sanitizeContext(context),
