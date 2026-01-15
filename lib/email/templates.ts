@@ -39,26 +39,135 @@ export interface AuctionWinnerEmailData {
 /**
  * Generate HTML email template
  */
-function getEmailTemplate(title: string, content: string): string {
+function tryGetOrigin(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderButton(href: string, label: string): string {
+  return `
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
+    <tr>
+      <td align="center" bgcolor="#556b2f" style="border-radius: 10px;">
+        <a href="${href}"
+           style="display:inline-block; padding: 12px 18px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                  font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 10px;">
+          ${escapeHtml(label)}
+        </a>
+      </td>
+    </tr>
+  </table>
+  `.trim();
+}
+
+function getEmailTemplate(params: {
+  title: string;
+  preheader: string;
+  contentHtml: string;
+  origin?: string | null;
+}): string {
+  const year = new Date().getFullYear();
+  const origin = params.origin || 'https://wildlife.exchange';
+  const logoUrl = `${origin}/images/Kudu.png`;
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${escapeHtml(params.title)}</title>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Wildlife Exchange</h1>
+<body style="margin:0; padding:0; background-color:#f6f3ee;">
+  <!-- Preheader (hidden) -->
+  <div style="display:none; font-size:1px; color:#f6f3ee; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
+    ${escapeHtml(params.preheader)}
   </div>
-  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-    ${content}
-  </div>
-  <div style="text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px;">
-    <p>This is an automated message from Wildlife Exchange.</p>
-    <p>© ${new Date().getFullYear()} Wildlife Exchange. All rights reserved.</p>
-  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f6f3ee; padding: 24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px;">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 0 0 12px 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                     style="background:#0f172a; border-radius: 16px; overflow:hidden;">
+                <tr>
+                  <td style="padding: 18px 18px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 10px;">
+                          <img src="${logoUrl}" width="36" height="36" alt="Wildlife Exchange"
+                               style="display:block; border:0; outline:none; text-decoration:none; border-radius: 10px;" />
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                                      font-size: 16px; font-weight: 800; color: #f8fafc; letter-spacing: 0.2px;">
+                            Wildlife Exchange
+                          </div>
+                          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                                      font-size: 12px; color: #cbd5e1; margin-top: 2px;">
+                            Texas marketplace for serious buyers & sellers
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="height: 4px; background: linear-gradient(90deg, #556b2f 0%, #c8a15a 50%, #556b2f 100%); font-size:0; line-height:0;">
+                    &nbsp;
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background:#ffffff; border:1px solid #e6e0d6; border-radius: 16px; overflow:hidden;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding: 22px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color:#0f172a; line-height:1.55;">
+                    ${params.contentHtml}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 14px 8px 0 8px; text-align:center;">
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#64748b; line-height: 1.4;">
+                This is an automated message from Wildlife Exchange.
+              </div>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#64748b; line-height: 1.4; margin-top: 4px;">
+                © ${year} Wildlife Exchange. All rights reserved.
+              </div>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#64748b; line-height: 1.4; margin-top: 6px;">
+                <a href="${origin}" style="color:#556b2f; text-decoration:none; font-weight:600;">Visit wildlife.exchange</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
   `.trim();
@@ -66,76 +175,134 @@ function getEmailTemplate(title: string, content: string): string {
 
 export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { subject: string; html: string } {
   const subject = `Order Confirmation - ${data.listingTitle}`;
+  const preheader = `Order confirmed for ${data.listingTitle}. Funds held in escrow until delivery.`;
+  const origin = tryGetOrigin(data.orderUrl);
   const content = `
-    <h2 style="color: #1f2937; margin-top: 0;">Order Confirmed!</h2>
-    <p>Hi ${data.buyerName},</p>
-    <p>Your order has been confirmed and payment has been received.</p>
-    <div style="background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0 0 10px 0;"><strong>Order ID:</strong> ${data.orderId}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Listing:</strong> ${data.listingTitle}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Amount:</strong> $${data.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-      <p style="margin: 0;"><strong>Date:</strong> ${data.orderDate.toLocaleDateString()}</p>
+    <div style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">Order confirmed</div>
+    <div style="font-size: 14px; color:#334155; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.buyerName)} — your payment was received and your order is now in escrow.
     </div>
-    <p>Your funds are being held in escrow until delivery is confirmed. You'll receive another email when the seller marks the order as delivered.</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.orderUrl}" style="background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View Order</a>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 14px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-size: 12px; color:#64748b; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;">Order details</div>
+          <div style="margin-top: 10px; font-size: 14px; color:#0f172a;">
+            <div><span style="color:#64748b;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Amount:</span> <strong>$${data.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Date:</span> <strong>${escapeHtml(data.orderDate.toLocaleDateString())}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 16px 0 0 0; font-size: 13px; color:#334155;">
+      Your funds are held in escrow until delivery is confirmed. You’ll be notified when the seller marks the order delivered.
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'View order')}
     </div>
   `;
-  return { subject, html: getEmailTemplate(subject, content) };
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData): { subject: string; html: string } {
   const subject = `Delivery Confirmed - ${data.listingTitle}`;
+  const preheader = `Delivery confirmed for ${data.listingTitle}. Review and confirm receipt if everything looks good.`;
+  const origin = tryGetOrigin(data.orderUrl);
   const content = `
-    <h2 style="color: #1f2937; margin-top: 0;">Delivery Confirmed</h2>
-    <p>Hi ${data.buyerName},</p>
-    <p>The seller has marked your order as delivered.</p>
-    <div style="background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0 0 10px 0;"><strong>Order ID:</strong> ${data.orderId}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Listing:</strong> ${data.listingTitle}</p>
-      <p style="margin: 0;"><strong>Delivered:</strong> ${data.deliveryDate.toLocaleDateString()}</p>
+    <div style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">Delivery confirmed</div>
+    <div style="font-size: 14px; color:#334155; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.buyerName)} — the seller marked your order as delivered.
     </div>
-    <p>Please inspect your order and confirm receipt when you're satisfied. If you have any issues, you can open a dispute within the protection window.</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.orderUrl}" style="background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View Order</a>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 14px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-size: 12px; color:#64748b; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;">Order summary</div>
+          <div style="margin-top: 10px; font-size: 14px; color:#0f172a;">
+            <div><span style="color:#64748b;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Delivered:</span> <strong>${escapeHtml(data.deliveryDate.toLocaleDateString())}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 16px 0 0 0; font-size: 13px; color:#334155;">
+      Please inspect your order and confirm receipt when you’re satisfied. If there’s an issue, you can open a dispute within the protection window.
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'View order')}
     </div>
   `;
-  return { subject, html: getEmailTemplate(subject, content) };
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getPayoutNotificationEmail(data: PayoutNotificationEmailData): { subject: string; html: string } {
   const subject = `Payout Released - ${data.listingTitle}`;
+  const preheader = `Payout released for ${data.listingTitle}. Funds should arrive in 2–5 business days.`;
   const content = `
-    <h2 style="color: #1f2937; margin-top: 0;">Payout Released</h2>
-    <p>Hi ${data.sellerName},</p>
-    <p>Your payout has been released and should arrive in your account within 2-5 business days.</p>
-    <div style="background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0 0 10px 0;"><strong>Order ID:</strong> ${data.orderId}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Listing:</strong> ${data.listingTitle}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Amount:</strong> $${data.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Transfer ID:</strong> ${data.transferId}</p>
-      <p style="margin: 0;"><strong>Date:</strong> ${data.payoutDate.toLocaleDateString()}</p>
+    <div style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">Payout released</div>
+    <div style="font-size: 14px; color:#334155; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.sellerName)} — your payout was released and should arrive in your account within 2–5 business days.
     </div>
-    <p>Thank you for using Wildlife Exchange!</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 14px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-size: 12px; color:#64748b; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;">Payout details</div>
+          <div style="margin-top: 10px; font-size: 14px; color:#0f172a;">
+            <div><span style="color:#64748b;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Amount:</span> <strong>$${data.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Transfer ID:</span> <strong>${escapeHtml(data.transferId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Date:</span> <strong>${escapeHtml(data.payoutDate.toLocaleDateString())}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 16px 0 0 0; font-size: 13px; color:#334155;">
+      Thanks for selling on Wildlife Exchange.
+    </div>
   `;
-  return { subject, html: getEmailTemplate(subject, content) };
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin: null }) };
 }
 
 export function getAuctionWinnerEmail(data: AuctionWinnerEmailData): { subject: string; html: string } {
   const subject = `You Won the Auction - ${data.listingTitle}`;
+  const preheader = `You won ${data.listingTitle}. Complete checkout within 48 hours to secure your purchase.`;
+  const origin = tryGetOrigin(data.orderUrl);
   const content = `
-    <h2 style="color: #1f2937; margin-top: 0;">Congratulations! You Won!</h2>
-    <p>Hi ${data.winnerName},</p>
-    <p>You're the winning bidder for this auction!</p>
-    <div style="background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0 0 10px 0;"><strong>Listing:</strong> ${data.listingTitle}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Winning Bid:</strong> $${data.winningBid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-      <p style="margin: 0;"><strong>Auction Ended:</strong> ${data.auctionEndDate.toLocaleDateString()}</p>
+    <div style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">You won the auction</div>
+    <div style="font-size: 14px; color:#334155; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.winnerName)} — you’re the winning bidder. Complete checkout within <strong>48 hours</strong> to secure the purchase.
     </div>
-    <p>Complete your purchase now to secure this item. Payment must be completed within 48 hours.</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.orderUrl}" style="background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Complete Purchase</a>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 14px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-size: 12px; color:#64748b; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;">Auction details</div>
+          <div style="margin-top: 10px; font-size: 14px; color:#0f172a;">
+            <div><span style="color:#64748b;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Winning bid:</span> <strong>$${data.winningBid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#64748b;">Auction ended:</span> <strong>${escapeHtml(data.auctionEndDate.toLocaleDateString())}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'Complete checkout')}
     </div>
   `;
-  return { subject, html: getEmailTemplate(subject, content) };
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }

@@ -132,24 +132,40 @@ export default function SellerSettingsPage() {
         </div>
 
         <Tabs defaultValue="billing" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 h-auto bg-card border border-border/50 p-1">
-            <TabsTrigger value="billing" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+          {/* Responsive tab bar: scrolls on small screens so labels never get cramped */}
+          <TabsList className="w-full h-auto bg-card border border-border/50 p-1 flex gap-1 overflow-x-auto">
+            <TabsTrigger
+              value="billing"
+              className="min-h-[44px] font-semibold data-[state=active]:bg-background whitespace-nowrap min-w-[160px] justify-center"
+            >
               <CreditCard className="h-4 w-4 mr-2" />
               Exposure Plans
             </TabsTrigger>
-            <TabsTrigger value="business" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+            <TabsTrigger
+              value="business"
+              className="min-h-[44px] font-semibold data-[state=active]:bg-background whitespace-nowrap min-w-[140px] justify-center"
+            >
               <Building2 className="h-4 w-4 mr-2" />
               Business
             </TabsTrigger>
-            <TabsTrigger value="locations" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+            <TabsTrigger
+              value="locations"
+              className="min-h-[44px] font-semibold data-[state=active]:bg-background whitespace-nowrap min-w-[140px] justify-center"
+            >
               <MapPin className="h-4 w-4 mr-2" />
               Locations
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+            <TabsTrigger
+              value="notifications"
+              className="min-h-[44px] font-semibold data-[state=active]:bg-background whitespace-nowrap min-w-[160px] justify-center"
+            >
               <Bell className="h-4 w-4 mr-2" />
               Notifications
             </TabsTrigger>
-            <TabsTrigger value="payouts" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+            <TabsTrigger
+              value="payouts"
+              className="min-h-[44px] font-semibold data-[state=active]:bg-background whitespace-nowrap min-w-[140px] justify-center"
+            >
               <CreditCard className="h-4 w-4 mr-2" />
               Payouts
             </TabsTrigger>
