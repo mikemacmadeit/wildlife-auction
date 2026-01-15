@@ -26,6 +26,7 @@ export async function handleCheckoutSessionCompleted(
     const listingId = session.metadata?.listingId;
     const buyerId = session.metadata?.buyerId;
     const sellerId = session.metadata?.sellerId;
+    const offerId = session.metadata?.offerId;
     const sellerStripeAccountId = session.metadata?.sellerStripeAccountId;
     const sellerAmountCents = session.metadata?.sellerAmount;
     const platformFeeCents = session.metadata?.platformFee;
@@ -39,6 +40,7 @@ export async function handleCheckoutSessionCompleted(
         listingId,
         buyerId,
         sellerId,
+        offerId,
         sellerStripeAccountId,
       });
       return;
@@ -309,6 +311,7 @@ export async function handleCheckoutSessionCompleted(
       listingId,
       buyerId,
       sellerId,
+      ...(offerId ? { offerId: String(offerId) } : {}),
       amount: amount / 100,
       platformFee: platformFee / 100,
       sellerAmount: sellerAmount / 100,
@@ -337,6 +340,29 @@ export async function handleCheckoutSessionCompleted(
     };
     await orderRef.set(orderData);
 
+    // If this checkout originated from an accepted offer, link offer -> order + session
+    if (offerId) {
+      try {
+        const offerRef = db.collection('offers').doc(String(offerId));
+        await offerRef.set(
+          {
+            checkoutSessionId: checkoutSessionId,
+            orderId: orderRef.id,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        logWarn('Failed to link offer to order', {
+          requestId,
+          route: '/api/stripe/webhook',
+          offerId,
+          orderId: orderRef.id,
+          error: String(e),
+        });
+      }
+    }
+
     // Create audit log
     await createAuditLog(db, {
       actorUid: 'webhook',
@@ -356,6 +382,7 @@ export async function handleCheckoutSessionCompleted(
         paymentIntentId: paymentIntentId,
         protectedTransactionEnabled: protectedTransactionEnabled,
         protectedTransactionDays: protectedTransactionDays,
+        ...(offerId ? { offerId: String(offerId) } : {}),
       },
       source: 'webhook',
     });

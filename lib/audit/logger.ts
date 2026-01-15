@@ -31,7 +31,15 @@ export type AuditActionType =
   | 'subscription_payment_failed'
   | 'billing_portal_accessed'
   | 'admin_plan_override'
-  | 'bid_placed';
+  | 'bid_placed'
+  // Best Offer lifecycle
+  | 'offer_created'
+  | 'offer_countered'
+  | 'offer_accepted'
+  | 'offer_declined'
+  | 'offer_withdrawn'
+  | 'offer_expired'
+  | 'offer_checkout_session_created';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 

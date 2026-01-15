@@ -62,6 +62,18 @@ export interface CreateListingInput {
   // Whitetail-only seller attestation (top-level)
   sellerAttestationAccepted?: boolean;
   sellerAttestationAcceptedAt?: Date;
+
+  // Best Offer (Fixed/Classified; eBay-style)
+  bestOfferEnabled?: boolean;
+  bestOfferMinPrice?: number;
+  bestOfferAutoAcceptPrice?: number;
+  bestOfferSettings?: {
+    enabled: boolean;
+    minPrice?: number;
+    autoAcceptPrice?: number;
+    allowCounter: boolean;
+    offerExpiryHours: number;
+  };
 }
 
 /**
@@ -207,6 +219,16 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     sellerAttestationAcceptedAt: timestampToDate(doc.sellerAttestationAcceptedAt),
     internalFlags: doc.internalFlags,
     internalFlagsNotes: doc.internalFlagsNotes,
+
+    // Best Offer (optional)
+    bestOfferEnabled: (doc as any).bestOfferEnabled ?? (doc as any).bestOfferSettings?.enabled,
+    bestOfferMinPrice: (doc as any).bestOfferMinPrice ?? (doc as any).bestOfferSettings?.minPrice,
+    bestOfferAutoAcceptPrice: (doc as any).bestOfferAutoAcceptPrice ?? (doc as any).bestOfferSettings?.autoAcceptPrice,
+    bestOfferSettings: (doc as any).bestOfferSettings,
+
+    // Offer reservation (server-only)
+    offerReservedByOfferId: (doc as any).offerReservedByOfferId,
+    offerReservedAt: timestampToDate((doc as any).offerReservedAt),
   };
 }
 
@@ -267,6 +289,20 @@ function toListingDocInput(
     }),
     ...(listingInput.sellerAttestationAcceptedAt && {
       sellerAttestationAcceptedAt: Timestamp.fromDate(listingInput.sellerAttestationAcceptedAt),
+    }),
+
+    // Best Offer settings (only meaningful for fixed/classified; UI enforces)
+    ...(listingInput.bestOfferSettings && {
+      bestOfferSettings: {
+        enabled: !!listingInput.bestOfferSettings.enabled,
+        minPrice: listingInput.bestOfferSettings.minPrice,
+        autoAcceptPrice: listingInput.bestOfferSettings.autoAcceptPrice,
+        allowCounter: listingInput.bestOfferSettings.allowCounter ?? true,
+        offerExpiryHours: listingInput.bestOfferSettings.offerExpiryHours ?? 48,
+      },
+      bestOfferEnabled: !!listingInput.bestOfferSettings.enabled,
+      bestOfferMinPrice: listingInput.bestOfferSettings.minPrice,
+      bestOfferAutoAcceptPrice: listingInput.bestOfferSettings.autoAcceptPrice,
     }),
   };
 }

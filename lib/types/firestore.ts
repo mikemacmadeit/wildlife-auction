@@ -101,4 +101,57 @@ export interface ListingDoc {
     duplicatePermitNumber?: string;
     duplicateFacilityId?: string;
   };
+
+  // Best Offer (Fixed/Classified; eBay-style)
+  bestOfferEnabled?: boolean;
+  bestOfferMinPrice?: number;
+  bestOfferAutoAcceptPrice?: number;
+  bestOfferSettings?: {
+    enabled: boolean;
+    minPrice?: number;
+    autoAcceptPrice?: number;
+    allowCounter: boolean;
+    offerExpiryHours: number;
+  };
+
+  // Reserved by accepted offer (server-only)
+  offerReservedByOfferId?: string;
+  offerReservedAt?: Timestamp;
+}
+
+/**
+ * Offer document as stored in Firestore
+ * (Write via Admin SDK only; clients should have read-only access.)
+ */
+export interface OfferDoc {
+  listingId: string;
+  listingSnapshot: {
+    title: string;
+    category: ListingCategory;
+    type: ListingType;
+    sellerId: string;
+  };
+  sellerId: string;
+  buyerId: string;
+  currency: 'usd';
+  status: 'open' | 'countered' | 'accepted' | 'declined' | 'withdrawn' | 'expired' | 'cancelled';
+  currentAmount: number;
+  originalAmount: number;
+  lastActorRole: 'buyer' | 'seller' | 'system';
+  expiresAt: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  history: Array<{
+    type: 'offer' | 'counter' | 'accept' | 'decline' | 'withdraw' | 'expire';
+    actorId: string;
+    actorRole: 'buyer' | 'seller' | 'system';
+    amount?: number;
+    note?: string;
+    createdAt: Timestamp;
+  }>;
+  acceptedAmount?: number;
+  acceptedAt?: Timestamp;
+  acceptedBy?: string;
+  checkoutSessionId?: string;
+  orderId?: string;
 }

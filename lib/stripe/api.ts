@@ -183,7 +183,10 @@ export async function createAccountLink(): Promise<{ url: string }> {
 /**
  * Create a Stripe Checkout session for purchasing a listing
  */
-export async function createCheckoutSession(listingId: string): Promise<{ url: string; sessionId: string }> {
+export async function createCheckoutSession(
+  listingId: string,
+  offerId?: string
+): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
   if (!user) {
     throw new Error('User must be authenticated');
@@ -201,7 +204,7 @@ export async function createCheckoutSession(listingId: string): Promise<{ url: s
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ listingId }),
+    body: JSON.stringify({ listingId, ...(offerId ? { offerId } : {}) }),
   });
 
   if (!response.ok) {

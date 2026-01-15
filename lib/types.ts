@@ -12,6 +12,69 @@ export type ListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'expired' 
 
 export type ComplianceStatus = 'none' | 'pending_review' | 'approved' | 'rejected';
 
+// ============================================
+// BEST OFFER (eBay-style) TYPES
+// ============================================
+
+export interface BestOfferSettings {
+  enabled: boolean;
+  minPrice?: number;
+  autoAcceptPrice?: number;
+  allowCounter: boolean; // default true
+  offerExpiryHours: number; // default 48
+}
+
+export type OfferStatus =
+  | 'open'
+  | 'countered'
+  | 'accepted'
+  | 'declined'
+  | 'withdrawn'
+  | 'expired'
+  | 'cancelled';
+
+export type OfferActorRole = 'buyer' | 'seller' | 'system';
+
+export type OfferHistoryType = 'offer' | 'counter' | 'accept' | 'decline' | 'withdraw' | 'expire';
+
+export interface OfferHistoryEntry {
+  type: OfferHistoryType;
+  actorId: string;
+  actorRole: OfferActorRole;
+  amount?: number;
+  note?: string;
+  createdAt: Date;
+}
+
+export interface OfferListingSnapshot {
+  title: string;
+  category: ListingCategory;
+  type: ListingType;
+  sellerId: string;
+}
+
+export interface Offer {
+  offerId: string;
+  listingId: string;
+  listingSnapshot: OfferListingSnapshot;
+  sellerId: string;
+  buyerId: string;
+  currency: 'usd';
+  status: OfferStatus;
+  currentAmount: number;
+  originalAmount: number;
+  lastActorRole: OfferActorRole;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  history: OfferHistoryEntry[];
+  acceptedAmount?: number;
+  acceptedAt?: Date;
+  acceptedBy?: string;
+  checkoutSessionId?: string;
+  orderId?: string;
+}
+
 // Category-specific attribute types
 export interface WhitetailBreederAttributes {
   speciesId: 'whitetail_deer'; // Fixed enum
@@ -211,6 +274,16 @@ export interface Listing {
     duplicatePermitNumber?: string;
     duplicateFacilityId?: string;
   };
+
+  // Best Offer (Fixed/Classified; eBay-style)
+  bestOfferEnabled?: boolean;
+  bestOfferMinPrice?: number;
+  bestOfferAutoAcceptPrice?: number;
+  bestOfferSettings?: BestOfferSettings;
+
+  // Reserved by accepted offer (server-only)
+  offerReservedByOfferId?: string;
+  offerReservedAt?: Date;
 }
 
 export interface Bid {
@@ -238,6 +311,7 @@ export interface DisputeEvidence {
 export interface Order {
   id: string;
   listingId: string;
+  offerId?: string; // If purchased via accepted Best Offer
   buyerId: string;
   sellerId: string;
   amount: number;

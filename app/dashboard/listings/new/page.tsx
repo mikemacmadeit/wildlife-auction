@@ -57,6 +57,13 @@ function NewListingPageContent() {
     transport: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
+    bestOffer: {
+      enabled: boolean;
+      minPrice: string;
+      autoAcceptPrice: string;
+      allowCounter: boolean;
+      offerExpiryHours: number;
+    };
     // Union (not intersection): attributes vary by category.
     attributes: Partial<WildlifeAttributes | CattleAttributes | EquipmentAttributes | WhitetailBreederAttributes>;
   }>({
@@ -79,6 +86,13 @@ function NewListingPageContent() {
     transport: false,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
+    bestOffer: {
+      enabled: false,
+      minPrice: '',
+      autoAcceptPrice: '',
+      allowCounter: true,
+      offerExpiryHours: 48,
+    },
     attributes: {},
   });
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
@@ -545,6 +559,113 @@ function NewListingPageContent() {
             </div>
           )}
 
+          {/* Best Offer (Fixed/Classified) */}
+          {(formData.type === 'fixed' || formData.type === 'classified') && (
+            <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-extrabold tracking-tight">Or Best Offer</div>
+                  <div className="text-xs text-muted-foreground">
+                    Let buyers make offers. You can accept, counter, or decline.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="best-offer-enabled"
+                    checked={formData.bestOffer.enabled}
+                    onCheckedChange={(v) =>
+                      setFormData({
+                        ...formData,
+                        bestOffer: { ...formData.bestOffer, enabled: Boolean(v) },
+                      })
+                    }
+                  />
+                  <Label htmlFor="best-offer-enabled" className="text-sm cursor-pointer">
+                    Enable
+                  </Label>
+                </div>
+              </div>
+
+              {formData.bestOffer.enabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="best-offer-min" className="text-sm font-semibold">
+                      Minimum offer (optional)
+                    </Label>
+                    <Input
+                      id="best-offer-min"
+                      type="number"
+                      placeholder="0"
+                      value={formData.bestOffer.minPrice}
+                      onChange={(e) =>
+                        setFormData({ ...formData, bestOffer: { ...formData.bestOffer, minPrice: e.target.value } })
+                      }
+                      className="min-h-[44px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="best-offer-auto" className="text-sm font-semibold">
+                      Auto-accept at (optional)
+                    </Label>
+                    <Input
+                      id="best-offer-auto"
+                      type="number"
+                      placeholder="0"
+                      value={formData.bestOffer.autoAcceptPrice}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          bestOffer: { ...formData.bestOffer, autoAcceptPrice: e.target.value },
+                        })
+                      }
+                      className="min-h-[44px]"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="best-offer-expiry" className="text-sm font-semibold">
+                      Offer expiry (hours)
+                    </Label>
+                    <Input
+                      id="best-offer-expiry"
+                      type="number"
+                      min={1}
+                      max={168}
+                      value={String(formData.bestOffer.offerExpiryHours)}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          bestOffer: { ...formData.bestOffer, offerExpiryHours: Number(e.target.value || 48) },
+                        })
+                      }
+                      className="min-h-[44px]"
+                    />
+                    <div className="text-xs text-muted-foreground">Default: 48 hours</div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold">Allow seller counters</div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="best-offer-allow-counter"
+                        checked={formData.bestOffer.allowCounter}
+                        onCheckedChange={(v) =>
+                          setFormData({
+                            ...formData,
+                            bestOffer: { ...formData.bestOffer, allowCounter: Boolean(v) },
+                          })
+                        }
+                      />
+                      <Label htmlFor="best-offer-allow-counter" className="text-sm cursor-pointer">
+                        Allow counter offers
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="city" className="text-base font-semibold">City</Label>
@@ -700,6 +821,17 @@ function NewListingPageContent() {
 
                         if (formData.type === 'fixed' || formData.type === 'classified') {
                           draftData.price = parseFloat(formData.price || '0');
+                          if (formData.bestOffer.enabled) {
+                            draftData.bestOfferSettings = {
+                              enabled: true,
+                              minPrice: formData.bestOffer.minPrice ? parseFloat(formData.bestOffer.minPrice) : undefined,
+                              autoAcceptPrice: formData.bestOffer.autoAcceptPrice ? parseFloat(formData.bestOffer.autoAcceptPrice) : undefined,
+                              allowCounter: formData.bestOffer.allowCounter !== false,
+                              offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
+                            };
+                          } else {
+                            draftData.bestOfferSettings = { enabled: false, allowCounter: true, offerExpiryHours: 48 };
+                          }
                         } else if (formData.type === 'auction') {
                           if (formData.startingBid) {
                             draftData.startingBid = parseFloat(formData.startingBid || '0');
@@ -1186,6 +1318,15 @@ function NewListingPageContent() {
       // Add pricing based on type
       if (formData.type === 'fixed' || formData.type === 'classified') {
         listingData.price = parseFloat(formData.price || '0');
+        listingData.bestOfferSettings = formData.bestOffer.enabled
+          ? {
+              enabled: true,
+              minPrice: formData.bestOffer.minPrice ? parseFloat(formData.bestOffer.minPrice) : undefined,
+              autoAcceptPrice: formData.bestOffer.autoAcceptPrice ? parseFloat(formData.bestOffer.autoAcceptPrice) : undefined,
+              allowCounter: formData.bestOffer.allowCounter !== false,
+              offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
+            }
+          : { enabled: false, allowCounter: true, offerExpiryHours: 48 };
       } else if (formData.type === 'auction') {
         listingData.startingBid = parseFloat(formData.startingBid || '0');
         if (formData.reservePrice) {

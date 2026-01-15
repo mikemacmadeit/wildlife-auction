@@ -1,0 +1,121 @@
+/**
+ * POST /api/offers/[offerId]/accept
+ *
+ * Seller (or buyer, if accepting a seller counter) accepts the current offer.
+ * Server authoritative; transaction reserves listing to prevent double acceptance.
+ */
+
+import { Timestamp } from 'firebase-admin/firestore';
+import { getAdminDb } from '@/lib/firebase/admin';
+import { createAuditLog } from '@/lib/audit/logger';
+import { json, requireAuth, requireRateLimit } from '../../_util';
+
+export async function POST(request: Request, ctx: { params: { offerId: string } }) {
+  const rate = await requireRateLimit(request);
+  if (!rate.ok) return rate.response;
+
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
+  const actorId = auth.decoded.uid;
+  const offerId = ctx.params.offerId;
+  const db = getAdminDb();
+
+  const offerRef = db.collection('offers').doc(offerId);
+
+  try {
+    const now = Timestamp.now();
+
+    const result = await db.runTransaction(async (tx) => {
+      const offerSnap = await tx.get(offerRef);
+      if (!offerSnap.exists) {
+        return { ok: false as const, status: 404, body: { error: 'Offer not found' } };
+      }
+      const offer = offerSnap.data() as any;
+
+      const listingRef = db.collection('listings').doc(offer.listingId);
+      const listingSnap = await tx.get(listingRef);
+      if (!listingSnap.exists) {
+        return { ok: false as const, status: 404, body: { error: 'Listing not found' } };
+      }
+      const listing = listingSnap.data() as any;
+
+      // Ownership/role checks
+      const isSeller = offer.sellerId === actorId;
+      const isBuyer = offer.buyerId === actorId;
+      if (!isSeller && !isBuyer) {
+        return { ok: false as const, status: 403, body: { error: 'Forbidden' } };
+      }
+
+      if (listing.status !== 'active') {
+        return { ok: false as const, status: 400, body: { error: 'Listing is not active' } };
+      }
+
+      // Enforce expiry
+      const expiresAt: any = offer.expiresAt;
+      if ((offer.status === 'open' || offer.status === 'countered') && expiresAt?.toMillis && expiresAt.toMillis() < now.toMillis()) {
+        tx.update(offerRef, {
+          status: 'expired',
+          lastActorRole: 'system',
+          updatedAt: now,
+          history: [
+            ...(offer.history || []),
+            { type: 'expire', actorId: 'system', actorRole: 'system', createdAt: now },
+          ],
+        });
+        return { ok: false as const, status: 409, body: { error: 'Offer has expired' } };
+      }
+
+      if (offer.status !== 'open' && offer.status !== 'countered') {
+        return { ok: false as const, status: 400, body: { error: `Offer cannot be accepted from status ${offer.status}` } };
+      }
+
+      // Buyer can accept only if currently countered (seller last action)
+      if (isBuyer && offer.status !== 'countered') {
+        return { ok: false as const, status: 400, body: { error: 'Only countered offers can be accepted by the buyer' } };
+      }
+
+      // Prevent multiple acceptances / reservations
+      if (listing.offerReservedByOfferId && listing.offerReservedByOfferId !== offerId) {
+        return { ok: false as const, status: 409, body: { error: 'Listing is already reserved by another offer' } };
+      }
+
+      tx.update(offerRef, {
+        status: 'accepted',
+        acceptedAmount: offer.currentAmount,
+        acceptedAt: now,
+        acceptedBy: actorId,
+        lastActorRole: isSeller ? 'seller' : 'buyer',
+        updatedAt: now,
+        history: [
+          ...(offer.history || []),
+          { type: 'accept', actorId: actorId, actorRole: isSeller ? 'seller' : 'buyer', amount: offer.currentAmount, createdAt: now },
+        ],
+      });
+
+      tx.update(listingRef, {
+        offerReservedByOfferId: offerId,
+        offerReservedAt: now,
+        updatedAt: now,
+      });
+
+      return { ok: true as const, listingId: offer.listingId, amount: offer.currentAmount, sellerId: offer.sellerId, buyerId: offer.buyerId };
+    });
+
+    if (!result.ok) return json(result.body, { status: result.status });
+
+    await createAuditLog(db, {
+      actorUid: actorId,
+      actorRole: result.sellerId === actorId ? 'seller' : 'buyer',
+      actionType: 'offer_accepted',
+      listingId: result.listingId,
+      metadata: { offerId, acceptedAmount: result.amount },
+      source: result.sellerId === actorId ? 'seller_ui' : 'buyer_ui',
+    });
+
+    return json({ ok: true });
+  } catch (error: any) {
+    return json({ error: 'Failed to accept offer', message: error?.message || 'Unknown error' }, { status: 500 });
+  }
+}
+

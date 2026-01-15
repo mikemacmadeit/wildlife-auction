@@ -23,6 +23,7 @@ import { Order } from '@/lib/types';
  */
 export interface OrderDoc {
   listingId: string;
+  offerId?: string;
   buyerId: string;
   sellerId: string;
   amount: number;
@@ -78,6 +79,7 @@ function toOrder(docId: string, data: OrderDoc): Order {
   return {
     id: docId,
     listingId: data.listingId,
+    offerId: data.offerId,
     buyerId: data.buyerId,
     sellerId: data.sellerId,
     amount: data.amount,

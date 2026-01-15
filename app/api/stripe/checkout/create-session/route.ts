@@ -135,7 +135,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { listingId } = validation.data;
+    const { listingId, offerId } = validation.data as any;
 
     // Get listing from Firestore using Admin SDK
     const listingRef = db.collection('listings').doc(listingId);
@@ -150,6 +150,50 @@ export async function POST(request: Request) {
 
     const listingData = listingDoc.data()!;
 
+    // Best Offer checkout path (accepted offer -> checkout at agreed price)
+    let offerData: any = null;
+    let offerRef: any = null;
+    if (offerId) {
+      offerRef = db.collection('offers').doc(String(offerId));
+      const offerSnap = await offerRef.get();
+      if (!offerSnap.exists) {
+        return NextResponse.json({ error: 'Offer not found' }, { status: 404 });
+      }
+      offerData = offerSnap.data();
+
+      if (offerData?.listingId !== listingId) {
+        return NextResponse.json({ error: 'Offer does not match listing' }, { status: 400 });
+      }
+      if (offerData?.buyerId !== buyerId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      if (offerData?.status !== 'accepted') {
+        return NextResponse.json({ error: 'Offer is not accepted' }, { status: 400 });
+      }
+      if (listingData?.offerReservedByOfferId && listingData.offerReservedByOfferId !== String(offerId)) {
+        return NextResponse.json({ error: 'Listing is reserved by another offer' }, { status: 409 });
+      }
+      if (!listingData?.offerReservedByOfferId) {
+        return NextResponse.json({ error: 'Listing is not reserved for this offer' }, { status: 409 });
+      }
+      if (listingData?.sellerId !== offerData?.sellerId) {
+        return NextResponse.json({ error: 'Offer seller mismatch' }, { status: 400 });
+      }
+      // If we already created a session for this offer, reuse it (prevent double checkout sessions)
+      const existingSessionId = offerData?.checkoutSessionId;
+      if (existingSessionId && typeof existingSessionId === 'string' && !existingSessionId.startsWith('creating:')) {
+        const existing = await stripe.checkout.sessions.retrieve(existingSessionId);
+        return NextResponse.json({
+          sessionId: existing.id,
+          url: existing.url,
+          message: 'Checkout session already exists for this offer',
+        });
+      }
+      if (existingSessionId && typeof existingSessionId === 'string' && existingSessionId.startsWith('creating:')) {
+        return NextResponse.json({ error: 'Checkout session is being created. Please retry.' }, { status: 409 });
+      }
+    }
+
     // Validate listing is active
     if (listingData.status !== 'active') {
       return NextResponse.json(
@@ -158,10 +202,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // If listing is reserved by an accepted offer, block regular checkout
+    if (!offerId && listingData.offerReservedByOfferId) {
+      return NextResponse.json(
+        { error: 'Listing is reserved by an accepted offer' },
+        { status: 409 }
+      );
+    }
+
     // Validate listing type and get purchase amount
     let purchaseAmount: number;
     
-    if (listingData.type === 'fixed') {
+    if (offerId) {
+      // Accepted offer dictates the price (server authoritative)
+      if (listingData.type !== 'fixed' && listingData.type !== 'classified') {
+        return NextResponse.json({ error: 'Offer checkout is only supported for fixed/classified listings' }, { status: 400 });
+      }
+      const accepted = Number(offerData?.acceptedAmount ?? offerData?.currentAmount);
+      if (!Number.isFinite(accepted) || accepted <= 0) {
+        return NextResponse.json({ error: 'Offer has an invalid accepted amount' }, { status: 400 });
+      }
+      purchaseAmount = accepted;
+    } else if (listingData.type === 'fixed') {
       // Fixed price listing - use listing price
       if (!listingData.price || listingData.price <= 0) {
         return NextResponse.json(
@@ -407,7 +469,7 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       success_url: `${baseUrl}/dashboard/orders?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/listing/${listingId}`,
+      cancel_url: offerId ? `${baseUrl}/listing/${listingId}?offer=${offerId}` : `${baseUrl}/listing/${listingId}`,
       // NO payment_intent_data.transfer_data - funds stay in platform account (escrow)
       // Admin will release funds via transfer after delivery confirmation
       metadata: {
@@ -420,6 +482,7 @@ export async function POST(request: Request) {
         platformFee: platformFee.toString(),
         sellerPlanSnapshot: sellerPlanId, // Store plan at checkout for order creation
         platformFeePercent: feePercent.toString(), // Store fee percent for order snapshot
+        ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmount) } : {}),
       },
       customer_email: decodedToken.email || undefined,
     };
@@ -433,7 +496,37 @@ export async function POST(request: Request) {
       sessionConfig.billing_address_collection = 'required';
     }
     
+    // If this is an offer checkout, lock the offer against duplicate session creation.
+    if (offerId && offerRef) {
+      const lockToken = `creating:${Date.now()}:${buyerId}`;
+      await db.runTransaction(async (tx) => {
+        const snap: any = await (tx as any).get(offerRef);
+        if (!snap?.exists) throw new Error('Offer not found');
+        const offer = (snap.data ? snap.data() : snap?.docs?.[0]?.data?.()) as any;
+        if (offer.status !== 'accepted') throw new Error('Offer is not accepted');
+        if (offer.buyerId !== buyerId) throw new Error('Forbidden');
+        if (offer.checkoutSessionId) throw new Error('Checkout session already exists');
+        tx.update(offerRef, { checkoutSessionId: lockToken, updatedAt: Timestamp.now() });
+      });
+    }
+
     const session = await stripe.checkout.sessions.create(sessionConfig);
+
+    if (offerId && offerRef) {
+      try {
+        await offerRef.set({ checkoutSessionId: session.id, updatedAt: Timestamp.now() }, { merge: true });
+        await createAuditLog(db, {
+          actorUid: buyerId,
+          actorRole: 'buyer',
+          actionType: 'offer_checkout_session_created',
+          listingId,
+          metadata: { offerId: String(offerId), checkoutSessionId: session.id, acceptedAmount: purchaseAmount },
+          source: 'buyer_ui',
+        });
+      } catch {
+        // If we fail to persist the session id, we still return it; webhook will reconcile.
+      }
+    }
 
     return NextResponse.json({
       sessionId: session.id,

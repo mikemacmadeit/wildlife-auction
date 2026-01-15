@@ -10,6 +10,7 @@ import { z } from 'zod';
  */
 export const createCheckoutSessionSchema = z.object({
   listingId: z.string().min(1, 'Listing ID is required').max(100),
+  offerId: z.string().max(100).optional(),
 });
 
 /**

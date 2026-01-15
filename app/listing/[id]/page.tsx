@@ -64,6 +64,7 @@ import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { RelatedListings } from '@/components/listing/RelatedListings';
 import { ListingActivityMetrics } from '@/components/listing/ListingActivityMetrics';
+import { OfferPanel } from '@/components/offers/OfferPanel';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
@@ -281,6 +282,15 @@ export default function ListingDetailPage() {
       toast({
         title: 'Listing not available',
         description: `This listing is ${listing!.status} and cannot be purchased.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if ((listing as any)?.offerReservedByOfferId) {
+      toast({
+        title: 'Listing reserved',
+        description: 'This listing is reserved by an accepted offer right now.',
         variant: 'destructive',
       });
       return;
@@ -708,7 +718,7 @@ export default function ListingDetailPage() {
                       <Button 
                         size="lg" 
                         onClick={handleBuyNow}
-                        disabled={isPlacingBid || listing!.status !== 'active'}
+                        disabled={isPlacingBid || listing!.status !== 'active' || !!(listing as any).offerReservedByOfferId}
                         className="w-full min-h-[52px] text-base font-bold shadow-lg"
                       >
                         {isPlacingBid ? (
@@ -719,7 +729,7 @@ export default function ListingDetailPage() {
                         ) : (
                           <>
                             <ShoppingCart className="mr-2 h-5 w-5" />
-                            Buy Now - ${listing!.price?.toLocaleString()}
+                            {(listing as any).offerReservedByOfferId ? 'Reserved' : `Buy Now - $${listing!.price?.toLocaleString()}`}
                           </>
                         )}
                       </Button>
@@ -738,6 +748,9 @@ export default function ListingDetailPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Best Offer (Mobile) */}
+              <OfferPanel listing={listing!} />
 
               {/* Bid History - For Auctions (Mobile Only, Below Bidding Section) */}
               {listing!.type === 'auction' && (
@@ -1075,7 +1088,7 @@ export default function ListingDetailPage() {
                         <Button 
                           size="lg" 
                           onClick={handleBuyNow}
-                          disabled={isPlacingBid || listing!.status !== 'active'}
+                          disabled={isPlacingBid || listing!.status !== 'active' || !!(listing as any).offerReservedByOfferId}
                           className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >
                           {isPlacingBid ? (
@@ -1086,7 +1099,7 @@ export default function ListingDetailPage() {
                           ) : (
                             <>
                               <ShoppingCart className="mr-2 h-5 w-5" />
-                              Buy Now
+                              {(listing as any).offerReservedByOfferId ? 'Reserved' : 'Buy Now'}
                             </>
                           )}
                         </Button>
@@ -1103,6 +1116,9 @@ export default function ListingDetailPage() {
                           Contact Seller
                         </Button>
                       )}
+
+                      {/* Best Offer (Desktop sidebar) */}
+                      <OfferPanel listing={listing!} />
 
                       {/* Whitetail Breeder: Transfer & Legal Requirements (high-visibility) */}
                       {listing!.category === 'whitetail_breeder' && (

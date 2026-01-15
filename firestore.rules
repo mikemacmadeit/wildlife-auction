@@ -65,6 +65,8 @@ service cloud.firestore {
         request.resource.data.status == 'draft' &&
         // Validate required fields exist
         request.resource.data.keys().hasAll(['title', 'description', 'type', 'category', 'status', 'sellerId', 'createdBy', 'createdAt', 'updatedAt']) &&
+        // Best Offer reservation fields are server-only; clients cannot set them at create
+        !request.resource.data.keys().hasAny(['offerReservedByOfferId', 'offerReservedAt']) &&
         // Prevent setting sellerId to different value
         request.resource.data.sellerId == request.auth.uid &&
         // Whitetail breeder: require seller attestation + non-expired permit at creation time
@@ -87,6 +89,9 @@ service cloud.firestore {
                        (request.resource.data.complianceStatus == null || 
                         request.resource.data.complianceStatus == resource.data.complianceStatus ||
                         request.resource.data.complianceStatus == 'pending_review') &&
+                       // Best Offer reservation fields are server-only; sellers can't change them
+                       (request.resource.data.offerReservedByOfferId == resource.data.offerReservedByOfferId) &&
+                       (request.resource.data.offerReservedAt == resource.data.offerReservedAt) &&
                        // Whitetail breeder: block status transitions to pending/active if attestation missing or permit expired
                        (
                          resource.data.category != 'whitetail_breeder' ||
@@ -251,6 +256,20 @@ service cloud.firestore {
         // No delete allowed
         allow delete: if false;
       }
+    }
+
+    // ============================================
+    // OFFERS COLLECTION (Best Offer)
+    // ============================================
+    match /offers/{offerId} {
+      // Read-only for buyer/seller/admin.
+      // Writes are server-side only (Admin SDK via API routes).
+      allow read: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, update, delete: if false;
     }
 
     // ============================================
