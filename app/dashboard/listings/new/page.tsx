@@ -1276,8 +1276,19 @@ function NewListingPageContent() {
           setLimitBlocked(false);
         }
       } catch (e) {
-        // Fail open here; publish/create endpoints still enforce limits server-side.
-        setLimitBlocked(false);
+        // Fail CLOSED: if we can't verify eligibility, don't allow bypassing plan limits.
+        setLimitInfo({
+          canCreate: false,
+          planId: 'free',
+          planDisplayName: 'Account',
+          activeListingsCount: 0,
+          listingLimit: null,
+          remainingSlots: null,
+          isUnlimited: false,
+          message: 'We couldn’t verify your listing limit right now. Please refresh and try again.',
+        } as any);
+        setLimitBlocked(true);
+        setShowUpgradeModal(true);
       } finally {
         setCheckingLimit(false);
       }

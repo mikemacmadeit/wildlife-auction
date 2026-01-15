@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Wildlife Exchange">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6b3f"/>
+      <stop offset="1" stop-color="#c9a86a"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  <path d="M14 18c7-8 29-8 36 0v28c-7 8-29 8-36 0V18z" fill="url(#g)" opacity="0.22"/>
+  <path d="M20 42V22h6.2l5.4 9.7L37 22h7v20h-5.2V29.8l-6.1 10.6h-2.5l-6-10.6V42H20z" fill="#f5f0e6"/>
+</svg>
+

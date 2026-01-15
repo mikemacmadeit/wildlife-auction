@@ -33,6 +33,7 @@ export function CreateListingGateLink(props: {
   const [limitInfo, setLimitInfo] = useState<ListingLimitResponse | null>(null);
   const [showPlans, setShowPlans] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState<'pro' | 'elite' | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
   const inflight = useRef<Promise<ListingLimitResponse> | null>(null);
 
   const nextPlan = useMemo(() => getNextPlanLabel(limitInfo?.planId || 'free'), [limitInfo?.planId]);
@@ -47,6 +48,7 @@ export function CreateListingGateLink(props: {
     }
 
     setChecking(true);
+    setCheckError(null);
     try {
       const token = await user.getIdToken();
       inflight.current = inflight.current || checkListingLimit(token);
@@ -61,8 +63,21 @@ export function CreateListingGateLink(props: {
       setOpen(true);
       setShowPlans(false);
     } catch (e) {
-      // If we can't verify, fail safe: allow navigation; publish will still enforce limits server-side.
-      router.push(href);
+      // Fail CLOSED: if we can't verify eligibility, we should not let users bypass listing limits.
+      // We'll show a friendly modal with a retry + plans link.
+      setLimitInfo({
+        canCreate: false,
+        planId: 'free',
+        planDisplayName: 'Account',
+        activeListingsCount: 0,
+        listingLimit: null,
+        remainingSlots: null,
+        isUnlimited: false,
+        message: 'We couldn’t verify your listing limit right now. Please try again in a moment.',
+      });
+      setCheckError(e instanceof Error ? e.message : 'Unable to verify listing limit');
+      setOpen(true);
+      setShowPlans(false);
     } finally {
       setChecking(false);
       inflight.current = null;
@@ -134,6 +149,11 @@ export function CreateListingGateLink(props: {
                 {limitInfo?.message && (
                   <p className="text-xs text-muted-foreground mt-3">{limitInfo.message}</p>
                 )}
+                {checkError && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    If this keeps happening, refresh the page or contact support.
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -176,6 +196,20 @@ export function CreateListingGateLink(props: {
 
             {!showPlans && (
               <div className="flex gap-2">
+                {checkError && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setOpen(false);
+                      // Retry the gate check immediately after closing
+                      setTimeout(() => {
+                        checkAndMaybeNavigate();
+                      }, 50);
+                    }}
+                  >
+                    Try again
+                  </Button>
+                )}
                 <Button variant="secondary" onClick={() => setShowPlans(true)}>
                   View Plans
                 </Button>
