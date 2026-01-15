@@ -52,7 +52,6 @@ function NewListingPageContent() {
     location: { city: string; state: string; zip: string };
     images: string[];
     verification: boolean;
-    insurance: boolean;
     transport: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
@@ -81,7 +80,6 @@ function NewListingPageContent() {
     },
     images: [],
     verification: false,
-    insurance: false,
     transport: false,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
@@ -883,7 +881,7 @@ function NewListingPageContent() {
                           images: [],
                           trust: {
                             verified: formData.verification,
-                            insuranceAvailable: formData.insurance,
+                            insuranceAvailable: false,
                             transportReady: formData.transport,
                           },
                           protectedTransactionEnabled: formData.protectedTransactionEnabled,
@@ -1165,20 +1163,8 @@ function NewListingPageContent() {
           </Card>
 
           <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="insurance"
-                checked={formData.insurance}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, insurance: checked as boolean })
-                }
-              />
-              <Label htmlFor="insurance" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Offer Insurance to Buyers</div>
-                <div className="text-sm text-muted-foreground">
-                  Buyers can purchase insurance at checkout. No cost to you.
-                </div>
-              </Label>
+            <div className="text-sm text-muted-foreground">
+              Note: Buyer protection is available via <strong>Protected Transaction</strong> when enabled.
             </div>
           </Card>
 
@@ -1397,7 +1383,7 @@ function NewListingPageContent() {
         images: formData.images, // Firebase Storage URLs
         trust: {
           verified: formData.verification,
-          insuranceAvailable: formData.insurance,
+          insuranceAvailable: false,
           transportReady: formData.transport,
         },
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
@@ -1548,7 +1534,7 @@ function NewListingPageContent() {
         images: formData.images,
         trust: {
           verified: formData.verification,
-          insuranceAvailable: formData.insurance,
+          insuranceAvailable: false,
           transportReady: formData.transport,
         },
         protectedTransactionEnabled: formData.protectedTransactionEnabled,

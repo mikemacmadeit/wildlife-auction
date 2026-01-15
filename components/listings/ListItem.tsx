@@ -105,7 +105,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
               {/* Trust Badges */}
               <TrustBadges
                 verified={listing.trust?.verified || false}
-                insurance={listing.trust?.insuranceAvailable || false}
                 transport={listing.trust?.transportReady || false}
                 size="sm"
                 className="flex-wrap gap-2"

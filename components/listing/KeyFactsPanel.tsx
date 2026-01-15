@@ -120,12 +120,6 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       label: 'Quantity',
       value: `${(listing.attributes as EquipmentAttributes).quantity} ${(listing.attributes as EquipmentAttributes).quantity === 1 ? 'item' : 'items'}`,
     },
-    listing.trust?.insuranceAvailable && {
-      icon: Shield,
-      label: 'Insurance',
-      value: 'Available',
-      badge: { variant: 'outline' as const, label: 'Optional', color: '' },
-    },
     listing.trust?.transportReady && {
       icon: Truck,
       label: 'Transport',

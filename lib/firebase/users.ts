@@ -40,7 +40,6 @@ export const createUserDocument = async (
         },
         preferences: {
           verification: true,
-          insurance: true,
           transport: true,
         },
         notifications: {

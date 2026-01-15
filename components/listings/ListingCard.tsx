@@ -185,7 +185,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
           {/* Trust Badges - Mobile optimized */}
           <TrustBadges
             verified={listing.trust?.verified || false}
-            insurance={listing.trust?.insuranceAvailable || false}
             transport={listing.trust?.transportReady || false}
             size="sm"
             className="flex-wrap gap-1.5"

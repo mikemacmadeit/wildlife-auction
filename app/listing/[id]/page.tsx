@@ -51,7 +51,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { TrustBadges } from '@/components/trust/StatusBadge';
-import { insuranceTiers } from '@/lib/mock-data';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/use-favorites';
@@ -1267,7 +1266,6 @@ export default function ListingDetailPage() {
                     </div>
                     <TrustBadges
                       verified={listing!.trust?.verified || false}
-                      insurance={listing!.trust?.insuranceAvailable || false}
                       transport={listing!.trust?.transportReady || false}
                       size="md"
                     />
@@ -1326,24 +1324,6 @@ export default function ListingDetailPage() {
                         </p>
                       </AccordionContent>
                     </AccordionItem>
-                    {listing!.trust?.insuranceAvailable && (
-                      <AccordionItem value="insurance">
-                        <AccordionTrigger className="text-sm">Insurance Options</AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-3">
-                            {insuranceTiers.map((tier) => (
-                              <div key={tier.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                <div>
-                                  <p className="font-medium text-sm">{tier.name}</p>
-                                  <p className="text-xs text-muted-foreground">{tier.description}</p>
-                                </div>
-                                <span className="font-semibold">${tier.price}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
                   </Accordion>
                 </CardContent>
               </Card>

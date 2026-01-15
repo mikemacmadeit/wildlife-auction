@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Shield, Truck, CheckCircle2, AlertCircle, Clock, FileCheck } from 'lucide-react';
+import { Search, Truck, CheckCircle2, AlertCircle, Clock, FileCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mockSellerListings, SellerListing } from '@/lib/seller-mock-data';
 
@@ -16,7 +16,6 @@ type StatusFilter = 'all' | 'pending' | 'complete' | 'not_requested';
 export default function SellerLogisticsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [verificationFilter, setVerificationFilter] = useState<StatusFilter>('all');
-  const [insuranceFilter, setInsuranceFilter] = useState<StatusFilter>('all');
   const [transportFilter, setTransportFilter] = useState<StatusFilter>('all');
 
   const filteredListings = useMemo(() => {
@@ -42,16 +41,6 @@ export default function SellerLogisticsPage() {
       });
     }
 
-    // Insurance filter
-    if (insuranceFilter !== 'all') {
-      result = result.filter((listing) => {
-        if (insuranceFilter === 'pending') return listing.insuranceStatus === 'available';
-        if (insuranceFilter === 'complete') return listing.insuranceStatus === 'active';
-        if (insuranceFilter === 'not_requested') return listing.insuranceStatus === 'not_selected';
-        return true;
-      });
-    }
-
     // Transport filter
     if (transportFilter !== 'all') {
       result = result.filter((listing) => {
@@ -63,7 +52,7 @@ export default function SellerLogisticsPage() {
     }
 
     return result;
-  }, [searchQuery, verificationFilter, insuranceFilter, transportFilter]);
+  }, [searchQuery, verificationFilter, transportFilter]);
 
   const getVerificationBadge = (status: string) => {
     const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon?: React.ReactNode }> = {
@@ -71,21 +60,6 @@ export default function SellerLogisticsPage() {
       pending: { variant: 'destructive', label: 'Pending', icon: <Clock className="h-3 w-3" /> },
       verified: { variant: 'secondary', label: 'Verified', icon: <CheckCircle2 className="h-3 w-3" /> },
       not_requested: { variant: 'outline', label: 'Not Requested', icon: <AlertCircle className="h-3 w-3" /> },
-    };
-    const config = variants[status] || { variant: 'outline' as const, label: status };
-    return (
-      <Badge variant={config.variant} className="font-semibold text-xs gap-1">
-        {config.icon}
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getInsuranceBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'outline'; label: string; icon?: React.ReactNode }> = {
-      available: { variant: 'outline', label: 'Available', icon: <Shield className="h-3 w-3" /> },
-      active: { variant: 'secondary', label: 'Active', icon: <CheckCircle2 className="h-3 w-3" /> },
-      not_selected: { variant: 'outline', label: 'Not Selected', icon: <AlertCircle className="h-3 w-3" /> },
     };
     const config = variants[status] || { variant: 'outline' as const, label: status };
     return (
@@ -123,16 +97,6 @@ export default function SellerLogisticsPage() {
     return counts;
   }, []);
 
-  const insuranceCounts = useMemo(() => {
-    const counts = { all: mockSellerListings.length, pending: 0, complete: 0, not_requested: 0 };
-    mockSellerListings.forEach((listing) => {
-      if (listing.insuranceStatus === 'available') counts.pending++;
-      else if (listing.insuranceStatus === 'active') counts.complete++;
-      else if (listing.insuranceStatus === 'not_selected') counts.not_requested++;
-    });
-    return counts;
-  }, []);
-
   const transportCounts = useMemo(() => {
     const counts = { all: mockSellerListings.length, pending: 0, complete: 0, not_requested: 0 };
     mockSellerListings.forEach((listing) => {
@@ -149,10 +113,10 @@ export default function SellerLogisticsPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
-            Logistics & Insurance
+            Logistics
           </h1>
           <p className="text-base md:text-lg text-muted-foreground">
-            Manage verification, insurance, and transport for your listings
+            Manage verification and transport for your listings
           </p>
         </div>
 
@@ -171,12 +135,11 @@ export default function SellerLogisticsPage() {
             </div>
 
             <Tabs defaultValue="verification" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-auto bg-background border border-border/50 p-1">
+              <TabsList className="grid w-full grid-cols-2 h-auto bg-background border border-border/50 p-1">
                 <TabsTrigger 
                   value="verification" 
                   className="min-h-[44px] font-semibold data-[state=active]:bg-card"
                   onClick={() => {
-                    setInsuranceFilter('all');
                     setTransportFilter('all');
                   }}
                 >
@@ -184,22 +147,10 @@ export default function SellerLogisticsPage() {
                   Verification
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="insurance" 
-                  className="min-h-[44px] font-semibold data-[state=active]:bg-card"
-                  onClick={() => {
-                    setVerificationFilter('all');
-                    setTransportFilter('all');
-                  }}
-                >
-                  <Shield className="h-4 w-4 mr-2" />
-                  Insurance
-                </TabsTrigger>
-                <TabsTrigger 
                   value="transport" 
                   className="min-h-[44px] font-semibold data-[state=active]:bg-card"
                   onClick={() => {
                     setVerificationFilter('all');
-                    setInsuranceFilter('all');
                   }}
                 >
                   <Truck className="h-4 w-4 mr-2" />
@@ -240,43 +191,6 @@ export default function SellerLogisticsPage() {
                     className="text-xs"
                   >
                     Not Requested ({verificationCounts.not_requested})
-                  </Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="insurance" className="space-y-3 mt-4">
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={insuranceFilter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsuranceFilter('all')}
-                    className="text-xs"
-                  >
-                    All ({insuranceCounts.all})
-                  </Button>
-                  <Button
-                    variant={insuranceFilter === 'pending' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsuranceFilter('pending')}
-                    className="text-xs"
-                  >
-                    Available ({insuranceCounts.pending})
-                  </Button>
-                  <Button
-                    variant={insuranceFilter === 'complete' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsuranceFilter('complete')}
-                    className="text-xs"
-                  >
-                    Active ({insuranceCounts.complete})
-                  </Button>
-                  <Button
-                    variant={insuranceFilter === 'not_requested' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsuranceFilter('not_requested')}
-                    className="text-xs"
-                  >
-                    Not Selected ({insuranceCounts.not_requested})
                   </Button>
                 </div>
               </TabsContent>
@@ -393,40 +307,6 @@ export default function SellerLogisticsPage() {
                         {listing.verificationStatus === 'eligible' && (
                           <p className="text-xs text-muted-foreground">
                             Eligible for verification
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Insurance */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Shield className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-semibold text-foreground">Insurance</span>
-                          </div>
-                          {getInsuranceBadge(listing.insuranceStatus)}
-                        </div>
-                        {listing.insuranceStatus === 'not_selected' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full min-h-[36px] font-semibold text-xs"
-                          >
-                            Enable Insurance
-                          </Button>
-                        )}
-                        {listing.insuranceStatus === 'available' && (
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            <p>Available for purchase</p>
-                            <Button variant="ghost" size="sm" className="w-full text-xs h-8">
-                              View Options
-                            </Button>
-                          </div>
-                        )}
-                        {listing.insuranceStatus === 'active' && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-primary" />
-                            Active coverage
                           </p>
                         )}
                       </div>

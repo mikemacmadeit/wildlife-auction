@@ -580,7 +580,7 @@ export default function SellerPayoutsPage() {
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
                 <p className="text-sm font-semibold text-foreground mb-1">Services</p>
                 <p className="text-2xl font-extrabold text-primary mb-1">Varies</p>
-                <p className="text-xs text-muted-foreground">Verification, transport, insurance</p>
+                <p className="text-xs text-muted-foreground">Verification and transport</p>
               </div>
             </div>
           </CardContent>

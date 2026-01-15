@@ -1,4 +1,4 @@
-import { Listing, InsuranceTier } from './types';
+import { Listing } from './types';
 
 export const mockListings: Listing[] = [
   {
@@ -36,7 +36,7 @@ export const mockListings: Listing[] = [
     },
     trust: {
       verified: true,
-      insuranceAvailable: true,
+      insuranceAvailable: false,
       transportReady: true,
     },
     attributes: {
@@ -85,7 +85,7 @@ export const mockListings: Listing[] = [
     },
     trust: {
       verified: true,
-      insuranceAvailable: true,
+      insuranceAvailable: false,
       transportReady: true,
     },
     attributes: {
@@ -135,7 +135,7 @@ export const mockListings: Listing[] = [
     },
     trust: {
       verified: true,
-      insuranceAvailable: true,
+      insuranceAvailable: false,
       transportReady: true,
     },
     attributes: {
@@ -181,7 +181,7 @@ export const mockListings: Listing[] = [
     },
     trust: {
       verified: true,
-      insuranceAvailable: true,
+      insuranceAvailable: false,
       transportReady: true,
     },
     attributes: {
@@ -228,7 +228,7 @@ export const mockListings: Listing[] = [
     },
     trust: {
       verified: true,
-      insuranceAvailable: true,
+      insuranceAvailable: false,
       transportReady: true,
     },
     attributes: {
@@ -244,26 +244,4 @@ export const mockListings: Listing[] = [
   },
 ];
 
-export const insuranceTiers: InsuranceTier[] = [
-  {
-    id: 'basic',
-    name: 'Basic Coverage',
-    coverage: 'Health & Transport ($5,000)',
-    price: 250,
-    description: 'Coverage for health issues and transport accidents up to $5,000',
-  },
-  {
-    id: 'standard',
-    name: 'Standard Coverage',
-    coverage: 'Full Protection ($15,000)',
-    price: 500,
-    description: 'Comprehensive coverage including health, transport, and mortality up to $15,000',
-  },
-  {
-    id: 'premium',
-    name: 'Premium Coverage',
-    coverage: 'Complete Protection ($50,000)',
-    price: 1000,
-    description: 'Maximum coverage for all risks including mortality, health, transport, and loss of use up to $50,000',
-  },
-];
+// Note: We do not offer insurance products. Protected Transaction provides buyer protection via escrow + dispute window.

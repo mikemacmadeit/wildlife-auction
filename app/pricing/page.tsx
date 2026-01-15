@@ -205,13 +205,6 @@ export default function PricingPage() {
       duration: 'Per order',
       icon: CheckCircle2,
     },
-    {
-      name: 'Insurance Options',
-      description: 'Optional insurance coverage (coming soon)',
-      price: 'Coming soon',
-      duration: 'Per transaction',
-      icon: Shield,
-    },
   ];
 
   return (
@@ -510,7 +503,7 @@ export default function PricingPage() {
               Optional services (coming soon)
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Verification, transport coordination, insurance options
+              Verification and transport coordination
             </p>
           </motion.div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Shield, Truck } from 'lucide-react';
+import { CheckCircle2, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 
 interface StatusBadgeProps {
-  type: 'verified' | 'insurance' | 'transport';
+  type: 'verified' | 'transport';
   className?: string;
   showTooltip?: boolean;
   size?: 'sm' | 'md' | 'lg';
@@ -25,14 +25,6 @@ const badgeConfig = {
       color: 'text-foreground bg-primary/15 border-primary/30 dark:bg-primary/20 dark:border-primary/40',
       iconColor: 'text-primary dark:text-primary/90',
     },
-  insurance: {
-    icon: Shield,
-    label: 'Insurance Available',
-    description: 'Optional insurance coverage available at checkout to protect your purchase.',
-    // Bark/muted for insurance - outline style
-    color: 'text-foreground bg-background/50 border-border/50 dark:bg-muted/30 dark:border-border/50',
-    iconColor: 'text-muted-foreground',
-  },
   transport: {
     icon: Truck,
     label: 'Transport Ready',
@@ -104,7 +96,6 @@ export function StatusBadge({
 
 interface TrustBadgesProps {
   verified?: boolean;
-  insurance?: boolean;
   transport?: boolean;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
@@ -113,7 +104,6 @@ interface TrustBadgesProps {
 
 export function TrustBadges({
   verified = false,
-  insurance = false,
   transport = false,
   className,
   size = 'md',
@@ -123,9 +113,6 @@ export function TrustBadges({
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       {verified && (
         <StatusBadge type="verified" size={size} showTooltip={showTooltips} />
-      )}
-      {insurance && (
-        <StatusBadge type="insurance" size={size} showTooltip={showTooltips} />
       )}
       {transport && (
         <StatusBadge type="transport" size={size} showTooltip={showTooltips} />

@@ -162,7 +162,6 @@ export function FilterDialog({
     (filters.papers ? 1 : 0) +
     (filters.verifiedSeller ? 1 : 0) +
     (filters.transportReady ? 1 : 0) +
-    (filters.insuranceAvailable ? 1 : 0) +
     (filters.endingSoon ? 1 : 0) +
     (filters.newlyListed ? 1 : 0) +
     (filters.featured ? 1 : 0);
@@ -533,21 +532,6 @@ export function FilterDialog({
                 />
                 <Label htmlFor="transport-ready" className="text-sm font-normal cursor-pointer flex-1">
                   Transport Ready
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3 min-h-[44px]">
-                <Checkbox
-                  id="insurance-available"
-                  checked={localFilters.insuranceAvailable || false}
-                  onCheckedChange={(checked) => {
-                    setLocalFilters({
-                      ...localFilters,
-                      insuranceAvailable: checked ? true : undefined,
-                    });
-                  }}
-                />
-                <Label htmlFor="insurance-available" className="text-sm font-normal cursor-pointer flex-1">
-                  Insurance Available
                 </Label>
               </div>
             </div>

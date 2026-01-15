@@ -429,18 +429,9 @@ export interface FilterState {
   papers?: boolean; // Has registration/papers
   verifiedSeller?: boolean; // Only verified sellers
   transportReady?: boolean; // Transport-ready listings
-  insuranceAvailable?: boolean; // Insurance available
   endingSoon?: boolean; // Ending within 24 hours
   newlyListed?: boolean; // Listed within 7 days
   featured?: boolean; // Featured listings only
-}
-
-export interface InsuranceTier {
-  id: string;
-  name: string;
-  coverage: string;
-  price: number;
-  description: string;
 }
 
 // User Profile Types
@@ -494,7 +485,6 @@ export interface UserProfile {
     };
     preferences: {
       verification: boolean;
-      insurance: boolean;
       transport: boolean;
     };
     notifications: {

@@ -51,7 +51,6 @@ function EditListingPageContent() {
     location: { city: string; state: string; zip: string };
     images: string[];
     verification: boolean;
-    insurance: boolean;
     transport: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
@@ -80,7 +79,6 @@ function EditListingPageContent() {
     },
     images: [],
     verification: false,
-    insurance: false,
     transport: false,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
@@ -154,7 +152,6 @@ function EditListingPageContent() {
           },
           images: listing.images || [],
           verification: listing.trust?.verified || false,
-          insurance: listing.trust?.insuranceAvailable || false,
           transport: listing.trust?.transportReady || false,
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
@@ -953,20 +950,8 @@ function EditListingPageContent() {
           </Card>
 
           <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="insurance"
-                checked={formData.insurance}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, insurance: checked as boolean })
-                }
-              />
-              <Label htmlFor="insurance" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Offer Insurance to Buyers</div>
-                <div className="text-sm text-muted-foreground">
-                  Buyers can purchase insurance at checkout. No cost to you.
-                </div>
-              </Label>
+            <div className="text-sm text-muted-foreground">
+              Note: Buyer protection is available via <strong>Protected Transaction</strong> when enabled.
             </div>
           </Card>
 
@@ -1133,9 +1118,6 @@ function EditListingPageContent() {
                 {formData.verification && (
                   <Badge variant="secondary" className="font-semibold">Verification</Badge>
                 )}
-                {formData.insurance && (
-                  <Badge variant="secondary" className="font-semibold">Insurance Available</Badge>
-                )}
                 {formData.transport && (
                   <Badge variant="secondary" className="font-semibold">Transport Ready</Badge>
                 )}
@@ -1159,7 +1141,7 @@ function EditListingPageContent() {
       images: formData.images,
       trust: {
         verified: formData.verification,
-        insuranceAvailable: formData.insurance,
+        insuranceAvailable: false,
         transportReady: formData.transport,
       },
       attributes: formData.attributes as ListingAttributes,

@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   User,
   MapPin,
-  Shield,
   Truck,
   ArrowRight,
   TrendingUp,
@@ -42,16 +41,6 @@ const getPaymentBadge = (status: string) => {
     return <Badge variant="secondary" className="font-semibold text-xs">Paid</Badge>;
   }
   return <Badge variant="destructive" className="font-semibold text-xs">Pending</Badge>;
-};
-
-const getInsuranceBadge = (status: string) => {
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'outline'; label: string }> = {
-    available: { variant: 'outline', label: 'Available' },
-    active: { variant: 'secondary', label: 'Active' },
-    not_selected: { variant: 'outline', label: 'Not Selected' },
-  };
-  const config = variants[status] || { variant: 'outline' as const, label: status };
-  return <Badge variant={config.variant} className="font-semibold text-xs">{config.label}</Badge>;
 };
 
 const getTransportBadge = (status: string) => {
@@ -194,11 +183,6 @@ const SaleCard = memo(({ sale }: { sale: Sale }) => (
           </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/50">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">Insurance:</span>
-              {getInsuranceBadge(sale.insuranceStatus)}
-            </div>
             <div className="flex items-center gap-2">
               <Truck className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground font-medium">Transport:</span>

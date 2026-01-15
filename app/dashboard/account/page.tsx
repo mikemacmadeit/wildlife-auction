@@ -77,7 +77,6 @@ export default function AccountPage() {
     },
     preferences: {
       verification: true,
-      insurance: true,
       transport: true,
     }
   });
@@ -118,7 +117,6 @@ export default function AccountPage() {
             },
             preferences: profile.profile?.preferences || {
               verification: true,
-              insurance: true,
               transport: true,
             },
           });
@@ -220,7 +218,6 @@ export default function AccountPage() {
         },
         preferences: userProfile.profile?.preferences || {
           verification: true,
-          insurance: true,
           transport: true,
         },
       });
@@ -783,19 +780,6 @@ export default function AccountPage() {
                     onCheckedChange={(checked) => setFormData({
                       ...formData,
                       preferences: { ...formData.preferences, verification: checked }
-                    })}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">Insurance Available</p>
-                    <p className="text-sm text-muted-foreground">Mark insurance as available by default</p>
-                  </div>
-                  <Switch 
-                    checked={formData.preferences.insurance}
-                    onCheckedChange={(checked) => setFormData({
-                      ...formData,
-                      preferences: { ...formData.preferences, insurance: checked }
                     })}
                   />
                 </div>

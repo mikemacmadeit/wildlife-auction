@@ -134,7 +134,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             {/* Trust Badges - Premium styling */}
             <TrustBadges
               verified={listing.trust.verified}
-              insurance={listing.trust.insuranceAvailable}
               transport={listing.trust.transportReady}
               size="sm"
               className="flex-wrap gap-2"

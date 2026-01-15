@@ -41,8 +41,6 @@ const getAlertIcon = (type: string) => {
       return Clock;
     case 'transport_request':
       return Truck;
-    case 'insurance_pending':
-      return Shield;
     case 'message':
       return MessageSquare;
     case 'bid':
@@ -93,7 +91,7 @@ const formatTimeAgo = (date: Date) => {
 
 interface SellerAlert {
   id: string;
-  type: 'auction_ending' | 'transport_request' | 'insurance_pending' | 'message' | 'bid';
+  type: 'auction_ending' | 'transport_request' | 'message' | 'bid';
   priority: 'high' | 'medium' | 'low';
   title: string;
   description: string;

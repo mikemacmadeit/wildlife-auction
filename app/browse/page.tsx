@@ -310,11 +310,6 @@ export default function BrowsePage() {
       result = result.filter((listing) => listing.trust?.transportReady);
     }
 
-    // Insurance available filter (client-side - nested field not indexed)
-    if (filters.insuranceAvailable) {
-      result = result.filter((listing) => listing.trust?.insuranceAvailable);
-    }
-
     // Ending soon filter (client-side - time-based calculation)
     if (filters.endingSoon) {
       const now = Date.now();
@@ -377,7 +372,6 @@ export default function BrowsePage() {
     if (filters.papers !== undefined) count++;
     if (filters.verifiedSeller) count++;
     if (filters.transportReady) count++;
-    if (filters.insuranceAvailable) count++;
     if (filters.endingSoon) count++;
     if (filters.newlyListed) count++;
     if (filters.featured) count++;
