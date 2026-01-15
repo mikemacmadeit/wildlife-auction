@@ -115,6 +115,7 @@ interface SellerActivity {
 
 export default function SellerOverviewPage() {
   const { user, loading: authLoading } = useAuth();
+  const uid = user?.uid || null;
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -123,61 +124,59 @@ export default function SellerOverviewPage() {
 
   // Fetch listings and orders
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+    let cancelled = false;
 
+    const fetchData = async (sellerId: string) => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching seller data for user:', user.uid);
-        
-        // Fetch listings, orders, and user profile separately to identify which one fails
-        let sellerListings: Listing[] = [];
-        let sellerOrders: Order[] = [];
-        let profile: UserProfile | null = null;
-        
-        try {
-          sellerListings = await listSellerListings(user.uid);
-          console.log('Fetched listings:', sellerListings.length, sellerListings);
-        } catch (listingsError: any) {
-          console.error('Error fetching listings:', listingsError);
-          throw new Error(`Failed to load listings: ${listingsError.message || listingsError.code || 'Unknown error'}`);
+
+        const [listingsRes, ordersRes, profileRes] = await Promise.allSettled([
+          listSellerListings(sellerId),
+          getOrdersForUser(sellerId, 'seller'),
+          getUserProfile(sellerId),
+        ]);
+
+        if (cancelled) return;
+
+        if (listingsRes.status === 'rejected') {
+          const e: any = listingsRes.reason;
+          throw new Error(`Failed to load listings: ${e?.message || e?.code || 'Unknown error'}`);
         }
-        
-        try {
-          sellerOrders = await getOrdersForUser(user.uid, 'seller');
-          console.log('Fetched orders:', sellerOrders.length, sellerOrders);
-        } catch (ordersError: any) {
-          console.error('Error fetching orders:', ordersError);
-          // Don't fail completely if orders fail - just log it
-          console.warn('Continuing without orders due to error');
+
+        setListings(listingsRes.value);
+
+        if (ordersRes.status === 'fulfilled') {
+          setOrders(ordersRes.value);
+        } else {
+          // Non-fatal: keep page usable even if orders fail
+          setOrders([]);
         }
-        
-        try {
-          profile = await getUserProfile(user.uid);
-        } catch (profileError: any) {
-          console.error('Error fetching user profile:', profileError);
-          // Don't fail completely if profile fails
+
+        if (profileRes.status === 'fulfilled') {
+          setUserProfile(profileRes.value);
+        } else {
+          setUserProfile(null);
         }
-        
-        setListings(sellerListings);
-        setOrders(sellerOrders);
-        setUserProfile(profile);
       } catch (err: any) {
-        console.error('Error fetching seller data:', err);
-        setError(err.message || 'Failed to load seller data');
+        if (cancelled) return;
+        setError(err?.message || 'Failed to load seller data');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    if (!authLoading) {
-      fetchData();
+    if (authLoading) return;
+    if (!uid) {
+      setLoading(false);
+      return;
     }
-  }, [user, authLoading]);
+
+    fetchData(uid);
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, authLoading]);
 
   // Calculate stats from real data
   const stats = useMemo(() => {
