@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, X, Loader2, ArrowLeft, Save } from 'lucide-react';
+import { Upload, X, Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react';
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
@@ -111,10 +111,23 @@ function NewListingPageContent() {
           </Alert>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card
-              className={`cursor-pointer transition-all border-2 ${
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'whitetail_breeder'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({
+                    ...formData,
+                    category: 'whitetail_breeder',
+                    location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'whitetail_breeder'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30'
               }`}
               onClick={() => {
                 setFormData({ 
@@ -125,6 +138,13 @@ function NewListingPageContent() {
               }}
             >
               <CardContent className="p-6 text-center space-y-3">
+                {formData.category === 'whitetail_breeder' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-center">
                   <div 
                     className="w-16 h-16"
@@ -150,10 +170,23 @@ function NewListingPageContent() {
             </Card>
 
             <Card
-              className={`cursor-pointer transition-all border-2 ${
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'wildlife_exotics'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({
+                    ...formData,
+                    category: 'wildlife_exotics',
+                    location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'wildlife_exotics'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30'
               }`}
               onClick={() => {
                 setFormData({ 
@@ -164,6 +197,13 @@ function NewListingPageContent() {
               }}
             >
               <CardContent className="p-6 text-center space-y-3">
+                {formData.category === 'wildlife_exotics' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-center">
                   <div 
                     className="w-16 h-16"
@@ -188,10 +228,23 @@ function NewListingPageContent() {
             </Card>
 
             <Card
-              className={`cursor-pointer transition-all border-2 ${
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'cattle_livestock'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({
+                    ...formData,
+                    category: 'cattle_livestock',
+                    location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'cattle_livestock'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30'
               }`}
               onClick={() => {
                 setFormData({ 
@@ -202,6 +255,13 @@ function NewListingPageContent() {
               }}
             >
               <CardContent className="p-6 text-center space-y-3">
+                {formData.category === 'cattle_livestock' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-center">
                   <div 
                     className="w-16 h-16"
@@ -226,14 +286,30 @@ function NewListingPageContent() {
             </Card>
 
             <Card
-              className={`cursor-pointer transition-all border-2 ${
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'ranch_equipment'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({ ...formData, category: 'ranch_equipment' });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'ranch_equipment'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30'
               }`}
               onClick={() => setFormData({ ...formData, category: 'ranch_equipment' })}
             >
               <CardContent className="p-6 text-center space-y-3">
+                {formData.category === 'ranch_equipment' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-center">
                   <div 
                     className="w-16 h-16"
