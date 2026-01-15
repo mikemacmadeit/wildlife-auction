@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -78,13 +80,7 @@ export default function AdminPayoutsPage() {
   const [refundReason, setRefundReason] = useState('');
   const [refundAmount, setRefundAmount] = useState<string>('');
 
-  useEffect(() => {
-    if (!adminLoading && isAdmin) {
-      loadOrders();
-    }
-  }, [adminLoading, isAdmin]);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
       const ordersRef = collection(db, 'orders');
@@ -158,7 +154,13 @@ export default function AdminPayoutsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin) {
+      loadOrders();
+    }
+  }, [adminLoading, isAdmin, loadOrders]);
 
   const handleConfirmDelivery = async (orderId: string) => {
     if (!user) return;

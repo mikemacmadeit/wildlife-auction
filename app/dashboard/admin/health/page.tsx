@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import { formatDate, formatDistanceToNow } from '@/lib/utils';
 import Link from 'next/link';
 import { getFirestore, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { useToast } from '@/hooks/use-toast';
 
 interface AutoReleaseHealth {
   lastRunAt?: Timestamp;
@@ -45,18 +46,14 @@ interface WebhookHealth {
 export default function OpsHealthPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [runningAutoRelease, setRunningAutoRelease] = useState(false);
   const [autoReleaseHealth, setAutoReleaseHealth] = useState<AutoReleaseHealth | null>(null);
   const [webhookHealth, setWebhookHealth] = useState<WebhookHealth | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  useEffect(() => {
-    if (!adminLoading && isAdmin && user) {
-      loadHealthData();
-    }
-  }, [adminLoading, isAdmin, user]);
-
-  const loadHealthData = async () => {
+  const loadHealthData = useCallback(async () => {
     if (!user?.uid) return;
 
     setLoading(true);
@@ -78,7 +75,38 @@ export default function OpsHealthPage() {
       setLoading(false);
       setLastRefresh(new Date());
     }
-  };
+  }, [user?.uid]);
+
+  const runAutoReleaseNow = useCallback(async () => {
+    // This endpoint exists in Netlify; locally it may 404.
+    setRunningAutoRelease(true);
+    try {
+      const res = await fetch('/.netlify/functions/autoReleaseProtected', { method: 'GET' });
+      const text = await res.text().catch(() => '');
+      if (!res.ok) {
+        throw new Error(text || `Failed to invoke auto-release (HTTP ${res.status})`);
+      }
+      toast({
+        title: 'Auto-release triggered',
+        description: 'The scheduler run has been invoked. Refreshing health…',
+      });
+      await loadHealthData();
+    } catch (error: any) {
+      toast({
+        title: 'Failed to trigger auto-release',
+        description: error?.message || 'This may not be available in local dev. Try in production.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRunningAutoRelease(false);
+    }
+  }, [loadHealthData, toast]);
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin && user) {
+      loadHealthData();
+    }
+  }, [adminLoading, isAdmin, user, loadHealthData]);
 
   const getAutoReleaseStatus = () => {
     if (!autoReleaseHealth?.lastRunAt) return { status: 'unknown', label: 'Unknown', color: 'gray' };
@@ -147,10 +175,16 @@ export default function OpsHealthPage() {
             Real-time monitoring of critical system operations
           </p>
         </div>
-        <Button onClick={loadHealthData} disabled={loading} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={runAutoReleaseNow} disabled={runningAutoRelease || loading} variant="secondary">
+            <Activity className={`h-4 w-4 mr-2 ${runningAutoRelease ? 'animate-spin' : ''}`} />
+            Run Auto-Release Now
+          </Button>
+          <Button onClick={loadHealthData} disabled={loading} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {loading ? (

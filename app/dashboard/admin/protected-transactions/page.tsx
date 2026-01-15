@@ -8,6 +8,8 @@
 
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,18 +31,7 @@ export default function MessagesPage() {
   const [orderStatus, setOrderStatus] = useState<'pending' | 'paid' | 'completed' | undefined>();
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      if (listingIdParam && sellerIdParam) {
-        // Create or get thread for this listing
-        initializeThread();
-      } else {
-        setLoading(false);
-      }
-    }
-  }, [authLoading, user, listingIdParam, sellerIdParam]);
-
-  const initializeThread = async () => {
+  const initializeThread = useCallback(async () => {
     if (!user || !listingIdParam || !sellerIdParam) return;
 
     try {
@@ -98,7 +87,18 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [listingIdParam, sellerIdParam, toast, user]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (listingIdParam && sellerIdParam) {
+        // Create or get thread for this listing
+        initializeThread();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread]);
 
   if (authLoading || loading) {
     return (

@@ -52,7 +52,7 @@ export function ProfileCompletionModal({
     if (userDisplayName && !formData.fullName) {
       setFormData(prev => ({ ...prev, fullName: userDisplayName }));
     }
-  }, [userDisplayName]);
+  }, [userDisplayName, formData.fullName]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};

@@ -12,6 +12,8 @@ import { CheckCircle2, FileText, Clock, XCircle, Shield, HelpCircle } from 'luci
 import { Listing, ComplianceStatus } from '@/lib/types';
 import { getDocuments } from '@/lib/firebase/documents';
 import { useEffect, useState } from 'react';
+import { getPermitExpirationStatus } from '@/lib/compliance/validation';
+import { formatDate } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
@@ -27,6 +29,13 @@ interface TrustBadgesProps {
 export function ComplianceBadges({ listing, className }: TrustBadgesProps) {
   const [hasVerifiedPermit, setHasVerifiedPermit] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const expirationRaw =
+    listing.category === 'whitetail_breeder' ? (listing.attributes as any)?.tpwdPermitExpirationDate : null;
+  const expirationDate: Date | null =
+    (expirationRaw as any)?.toDate?.() ||
+    (expirationRaw instanceof Date ? expirationRaw : null);
+  const expStatus = getPermitExpirationStatus(expirationDate);
 
   useEffect(() => {
     const checkDocuments = async () => {
@@ -137,6 +146,25 @@ export function ComplianceBadges({ listing, className }: TrustBadgesProps) {
             </div>
           )}
 
+          {/* Permit Expiration (whitetail only) */}
+          {listing.category === 'whitetail_breeder' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Permit Expiration:</span>
+              {!expirationDate ? (
+                <Badge variant="destructive">Missing</Badge>
+              ) : expStatus.expired ? (
+                <Badge variant="destructive">Expired</Badge>
+              ) : expStatus.expiringSoon ? (
+                <Badge variant="secondary">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Expiring in {expStatus.daysRemaining ?? '?'}d
+                </Badge>
+              ) : (
+                <Badge variant="outline">Valid until {formatDate(expirationDate)}</Badge>
+              )}
+            </div>
+          )}
+
           {/* Seller Attestation (whitetail only; not "TPWD approved") */}
           {listing.category === 'whitetail_breeder' && (
             <div className="flex items-center gap-2">
@@ -159,6 +187,9 @@ export function ComplianceBadges({ listing, className }: TrustBadgesProps) {
                 Payout is released only after delivery/acceptance requirements are met, and after Transfer Approval is uploaded and verified (see Transfer Requirements).
               </p>
             )}
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Learn more: <a className="underline underline-offset-2 hover:text-foreground" href="/trust#whitetail">Trust &amp; Compliance</a>
+            </p>
           </div>
         </div>
       </CardContent>

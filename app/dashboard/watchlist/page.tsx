@@ -219,9 +219,10 @@ export default function WatchlistPage() {
     fetchListings();
 
     // Cleanup subscriptions on unmount
+    const subs = subscriptionsRef.current;
     return () => {
-      subscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
-      subscriptionsRef.current.clear();
+      subs.forEach((unsubscribe) => unsubscribe());
+      subs.clear();
     };
   }, [favoriteIds, user, authLoading, favoritesLoading, enrichListing]);
 
@@ -287,7 +288,7 @@ export default function WatchlistPage() {
     });
 
     return result;
-  }, [categorizedListings, activeTab, searchQuery, sortBy, filters]);
+  }, [categorizedListings, activeTab, searchQuery, sortBy]);
 
   const handleRemove = async (listingId: string) => {
     try {

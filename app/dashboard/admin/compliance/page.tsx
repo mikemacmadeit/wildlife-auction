@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -77,13 +77,7 @@ export default function AdminCompliancePage() {
   const [quickVerifyDocId, setQuickVerifyDocId] = useState<string | null>(null);
   const [listingDocsMap, setListingDocsMap] = useState<Record<string, ComplianceDocument[]>>({});
 
-  useEffect(() => {
-    if (!adminLoading && isAdmin) {
-      loadData();
-    }
-  }, [activeTab, adminLoading, isAdmin]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       if (activeTab === 'listings') {
@@ -101,7 +95,13 @@ export default function AdminCompliancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, toast]);
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin) {
+      loadData();
+    }
+  }, [activeTab, adminLoading, isAdmin, loadData]);
 
   const loadPendingListings = async () => {
     const listingsRef = collection(db, 'listings');

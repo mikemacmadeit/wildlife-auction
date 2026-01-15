@@ -10,6 +10,8 @@
 
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
@@ -110,13 +112,6 @@ export default function AdminOpsPage() {
     setDetailDialogOpen(true);
   }, []);
 
-  // Load orders when tab changes
-  useEffect(() => {
-    if (!adminLoading && isAdmin && user) {
-      loadOrders();
-    }
-  }, [activeTab, adminLoading, isAdmin, user]);
-
   const loadOrders = useCallback(async () => {
     if (!user?.uid || !isAdmin) return;
     
@@ -189,6 +184,13 @@ export default function AdminOpsPage() {
       setLoading(false);
     }
   }, [activeTab, user?.uid, isAdmin, toast]);
+
+  // Load orders when tab changes
+  useEffect(() => {
+    if (!adminLoading && isAdmin && user) {
+      loadOrders();
+    }
+  }, [adminLoading, isAdmin, user, loadOrders]);
 
   // Debounce search query
   const debouncedSearchQuery = useDebounce(searchQuery, 300);

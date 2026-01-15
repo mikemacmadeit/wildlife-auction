@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -71,13 +73,7 @@ export default function AdminListingsPage() {
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
   const [viewingDocTitle, setViewingDocTitle] = useState<string>('Document');
 
-  useEffect(() => {
-    if (!adminLoading && isAdmin) {
-      loadPendingListings();
-    }
-  }, [adminLoading, isAdmin]);
-
-  const loadPendingListings = async () => {
+  const loadPendingListings = useCallback(async () => {
     try {
       setLoading(true);
       const listingsRef = collection(db, 'listings');
@@ -201,7 +197,13 @@ export default function AdminListingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin) {
+      loadPendingListings();
+    }
+  }, [adminLoading, isAdmin, loadPendingListings]);
 
   const handleApprove = async (listingId: string) => {
     if (!user) return;

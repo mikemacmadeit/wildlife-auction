@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, memo, useState, useEffect } from 'react';
+import { useCallback, useEffect, memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -38,6 +38,24 @@ export default function SellerPayoutsPage() {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
+  const loadUserProfile = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoadingProfile(true);
+      const profile = await getUserProfile(user.uid);
+      setUserProfile(profile);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load profile information.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, [toast, user]);
+
   // Check for onboarding completion
   useEffect(() => {
     const onboardingComplete = searchParams?.get('onboarding');
@@ -64,14 +82,14 @@ export default function SellerPayoutsPage() {
       };
       checkStatus();
     }
-  }, [searchParams, toast, user]);
+  }, [searchParams, toast, user, loadUserProfile]);
 
   // Load user profile
   useEffect(() => {
     if (user && !authLoading) {
       loadUserProfile();
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, loadUserProfile]);
 
   // Check Stripe account status after profile loads
   useEffect(() => {
@@ -90,25 +108,7 @@ export default function SellerPayoutsPage() {
       const timer = setTimeout(checkStatus, 500);
       return () => clearTimeout(timer);
     }
-  }, [userProfile?.stripeAccountId, userProfile?.payoutsEnabled]);
-
-  const loadUserProfile = async () => {
-    if (!user) return;
-    try {
-      setLoadingProfile(true);
-      const profile = await getUserProfile(user.uid);
-      setUserProfile(profile);
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load profile information.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingProfile(false);
-    }
-  };
+  }, [userProfile?.stripeAccountId, userProfile?.payoutsEnabled, loadUserProfile]);
 
   const handleEnablePayouts = async () => {
     if (!user) {

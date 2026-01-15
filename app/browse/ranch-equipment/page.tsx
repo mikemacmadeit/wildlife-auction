@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, Wrench } from 'lucide-react';
@@ -61,7 +61,7 @@ export default function RanchEquipmentBrowsePage() {
     }
   };
 
-  const getBrowseFilters = (): BrowseFilters => {
+  const getBrowseFilters = useCallback((): BrowseFilters => {
     const browseFilters: BrowseFilters = {
       status: 'active',
       category: 'ranch_equipment', // Always filter by this category
@@ -72,9 +72,9 @@ export default function RanchEquipmentBrowsePage() {
     }
     
     return browseFilters;
-  };
+  }, [selectedType]);
 
-  const getSortOption = (): BrowseSort => {
+  const getSortOption = useCallback((): BrowseSort => {
     switch (sortBy) {
       case 'newest':
         return 'newest';
@@ -91,9 +91,9 @@ export default function RanchEquipmentBrowsePage() {
       default:
         return 'newest';
     }
-  };
+  }, [sortBy]);
 
-  const fetchListings = async (reset = false) => {
+  const fetchListings = useCallback(async (reset = false) => {
     try {
       if (reset) {
         setLoading(true);
@@ -131,11 +131,11 @@ export default function RanchEquipmentBrowsePage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [getBrowseFilters, getSortOption, nextCursor, toast]);
 
   useEffect(() => {
     fetchListings(true);
-  }, [selectedType, sortBy, debouncedSearchQuery]);
+  }, [fetchListings]);
 
   const filteredListings = useMemo(() => {
     let result = listings;

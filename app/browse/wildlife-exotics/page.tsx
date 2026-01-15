@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, Sparkles } from 'lucide-react';
@@ -61,7 +61,7 @@ export default function WildlifeExoticsBrowsePage() {
     }
   };
 
-  const getBrowseFilters = (): BrowseFilters => {
+  const getBrowseFilters = useCallback((): BrowseFilters => {
     const browseFilters: BrowseFilters = {
       status: 'active',
       category: 'wildlife_exotics', // Always filter by this category
@@ -72,9 +72,9 @@ export default function WildlifeExoticsBrowsePage() {
     }
     
     return browseFilters;
-  };
+  }, [selectedType]);
 
-  const getSortOption = (): BrowseSort => {
+  const getSortOption = useCallback((): BrowseSort => {
     switch (sortBy) {
       case 'newest':
         return 'newest';
@@ -91,9 +91,9 @@ export default function WildlifeExoticsBrowsePage() {
       default:
         return 'newest';
     }
-  };
+  }, [sortBy]);
 
-  const fetchListings = async (reset = false) => {
+  const fetchListings = useCallback(async (reset = false) => {
     try {
       if (reset) {
         setLoading(true);
@@ -131,11 +131,11 @@ export default function WildlifeExoticsBrowsePage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [getBrowseFilters, getSortOption, nextCursor, toast]);
 
   useEffect(() => {
     fetchListings(true);
-  }, [selectedType, sortBy, debouncedSearchQuery]);
+  }, [fetchListings]);
 
   const filteredListings = useMemo(() => {
     let result = listings;
@@ -145,8 +145,8 @@ export default function WildlifeExoticsBrowsePage() {
       result = result.filter((listing) => {
         const titleMatch = listing.title.toLowerCase().includes(query);
         const descMatch = listing.description.toLowerCase().includes(query);
-        const speciesMatch = listing.attributes && 'species' in listing.attributes 
-          ? (listing.attributes as any).species?.toLowerCase().includes(query)
+        const speciesMatch = listing.attributes && 'speciesId' in listing.attributes 
+          ? String((listing.attributes as any).speciesId || '').toLowerCase().includes(query)
           : false;
         return titleMatch || descMatch || speciesMatch;
       });

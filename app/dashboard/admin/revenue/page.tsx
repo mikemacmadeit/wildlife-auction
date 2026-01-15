@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -75,7 +75,7 @@ export default function AdminRevenuePage() {
   const [sellerId, setSellerId] = useState<string>('');
   const [listingId, setListingId] = useState<string>('');
 
-  const fetchRevenue = async () => {
+  const fetchRevenue = useCallback(async () => {
     if (!user?.uid || !isAdmin) return;
 
     setLoading(true);
@@ -117,13 +117,13 @@ export default function AdminRevenuePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [endDate, isAdmin, listingId, sellerId, startDate, toast, user?.uid]);
 
   useEffect(() => {
     if (!adminLoading && isAdmin && user) {
       fetchRevenue();
     }
-  }, [adminLoading, isAdmin, user]);
+  }, [adminLoading, isAdmin, user, fetchRevenue]);
 
   const handleResetFilters = () => {
     setStartDate('');
