@@ -43,6 +43,7 @@ export function OfferPanel(props: { listing: Listing }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<'make' | 'counter'>('make');
   const [amount, setAmount] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const eligible = useMemo(() => {
     const enabled = !!(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled);
@@ -72,8 +73,9 @@ export function OfferPanel(props: { listing: Listing }) {
       } else {
         setOffer(null);
       }
+      setLoadError(null);
     } catch {
-      // Ignore; don't spam users on listing view.
+      setLoadError('Unable to load your offer status right now. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -219,6 +221,12 @@ export function OfferPanel(props: { listing: Listing }) {
           Refresh
         </Button>
       </div>
+
+      {loadError ? (
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          {loadError}
+        </div>
+      ) : null}
 
       {showMake ? (
         <div className="flex flex-col sm:flex-row gap-2">
