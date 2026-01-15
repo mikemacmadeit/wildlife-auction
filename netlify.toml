@@ -1,22 +1,12 @@
 [build]
-command = "npx next build"
+command = "node scripts/netlify-write-firebase-service-account.mjs && npx next build"
 publish = ".next"
-
-# IMPORTANT: Plugin order matters! Inline plugin must run BEFORE Next.js plugin
-# Inline environment variables into function code to bypass 4KB Lambda limit
-[[plugins]]
-package = "netlify-plugin-inline-functions-env"
-  [plugins.inputs]
-  # Include all environment variables
-  include = "*"
-  # Exclude secrets that are commonly mangled/truncated when inlined (especially multiline PEM keys).
-  # These should be provided by Netlify as runtime env vars instead.
-  exclude = "FIREBASE_PRIVATE_KEY,FIREBASE_SERVICE_ACCOUNT_JSON_BASE64,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,BREVO_API_KEY"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
 
-# Scheduled Functions
-# Auto-release protected transactions every 10 minutes
-[functions]
-  included_files = ["netlify/functions/**"]
+# Functions
+# Important: do NOT include .env/.env.* files in deployed functions.
+# The Next.js Runtime sometimes auto-adds them; this overrides to include only what we explicitly need.
+[functions."*"]
+  included_files = ["netlify/secrets/firebase-service-account.json"]

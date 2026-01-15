@@ -127,6 +127,21 @@ project/
 └── public/             # Static assets (create if needed)
 ```
 
+## Netlify Production: Firebase Admin Credentials (IMPORTANT)
+
+Netlify Functions are deployed to AWS Lambda and the **total environment variables per function are limited to ~4KB**.
+Firebase service account JSON is typically larger than that, so **do not** provide it as a runtime env var.
+
+**Recommended (reliable) setup:**
+- In Netlify UI, add `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` as a **Build-only** environment variable (Sensitive).
+- The Netlify build runs `scripts/netlify-write-firebase-service-account.mjs` which writes:
+  - `netlify/secrets/firebase-service-account.json` (generated at build time; never committed)
+- `netlify.toml` bundles that file into all functions via `functions."*".included_files`.
+- Server code initializes Firebase Admin via `lib/firebase/admin.ts` and will prefer the bundled file.
+
+**Fallback (if you don't want base64):**
+- Provide `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` as runtime env vars.
+
 ## Technologies Used
 
 - **Next.js 14.2.5** - React framework with App Router (upgraded from 13.5.1)

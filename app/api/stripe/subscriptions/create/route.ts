@@ -11,9 +11,7 @@
 // In the current environment, dev bundling can attempt to resolve a missing internal Next module
 // (`next/dist/server/web/exports/next-response`) and crash compilation.
 // Route handlers work fine with standard Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { Timestamp } from 'firebase-admin/firestore';
 import { stripe, isStripeConfigured, getAppUrl } from '@/lib/stripe/config';
 import Stripe from 'stripe';
 import { validateRequest } from '@/lib/validation/api-schemas';
@@ -23,45 +21,10 @@ import { PLAN_CONFIG } from '@/lib/pricing/plans';
 import { mapLegacyPlanToTier, mapTierToLegacyPlanId, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-function normalizePrivateKey(v: string | undefined): string | undefined {
-  if (!v) return undefined;
-  let s = v.trim();
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-    s = s.slice(1, -1);
-  }
-  return s.replace(/\\n/g, '\n');
-}
-
-// Initialize Firebase Admin
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY),
-        }
-      : undefined;
-
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      adminApp = initializeApp();
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-} else {
-  adminApp = getApps()[0];
-}
-
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
+const auth = getAdminAuth();
+const db = getAdminDb();
 
 const createSubscriptionSchema = z.object({
   // Back-compat: accept legacy plan ids too.

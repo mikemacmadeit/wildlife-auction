@@ -42,6 +42,7 @@ next-env.d.ts
 
 # Netlify
 .netlify
+netlify/secrets/
 
 # Environment variables (already covered but being explicit)
 .env.local

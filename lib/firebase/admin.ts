@@ -88,6 +88,24 @@ function readServiceAccountJsonIfPresent(): { projectId?: string; clientEmail?: 
   return null;
 }
 
+function readServiceAccountJsonFromBundledFile(): { projectId?: string; clientEmail?: string; privateKey?: string } | null {
+  // Netlify build step can generate this file (see scripts/netlify-write-firebase-service-account.mjs).
+  // It is then bundled into all functions via netlify.toml `functions."*".included_files`.
+  try {
+    const p = path.resolve(process.cwd(), 'netlify', 'secrets', 'firebase-service-account.json');
+    if (!fs.existsSync(p)) return null;
+    const raw = fs.readFileSync(p, 'utf8');
+    const json = JSON.parse(raw);
+    const projectId = json.project_id || json.projectId;
+    const clientEmail = json.client_email || json.clientEmail;
+    const privateKey = normalizePrivateKey(json.private_key || json.privateKey);
+    if (projectId && clientEmail && privateKey) return { projectId, clientEmail, privateKey };
+  } catch {
+    // ignore and fall through
+  }
+  return null;
+}
+
 function readServiceAccountJsonBase64FromEnv(): { projectId?: string; clientEmail?: string; privateKey?: string } | null {
   const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64;
   if (!b64) return null;
@@ -128,8 +146,13 @@ export function getAdminApp(): App {
     return adminApp;
   }
 
-  // Preferred: single base64 JSON blob (avoids newline/escaping issues and Netlify plugin mangling)
-  const b64Sa = readServiceAccountJsonBase64FromEnv();
+  // Preferred (Netlify): bundled JSON file generated at build time (avoids AWS Lambda 4KB env var limit).
+  const fileSaBundled = readServiceAccountJsonFromBundledFile();
+
+  // Preferred (generic): single base64 JSON blob.
+  // IMPORTANT: on Netlify Functions, do NOT provide this as a runtime env var because it can exceed the AWS 4KB limit.
+  // Use build-only + bundled file instead.
+  const b64Sa = !fileSaBundled ? readServiceAccountJsonBase64FromEnv() : null;
 
   const envProjectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -137,9 +160,9 @@ export function getAdminApp(): App {
 
   // If env vars are incomplete (common in local dev), fall back to a JSON credential file if present.
   const fileSa = (!envProjectId || !envClientEmail || !envPrivateKey) ? readServiceAccountJsonIfPresent() : null;
-  const projectId = b64Sa?.projectId || envProjectId || fileSa?.projectId;
-  const clientEmail = b64Sa?.clientEmail || envClientEmail || fileSa?.clientEmail;
-  const privateKey = b64Sa?.privateKey || envPrivateKey || fileSa?.privateKey;
+  const projectId = fileSaBundled?.projectId || b64Sa?.projectId || envProjectId || fileSa?.projectId;
+  const clientEmail = fileSaBundled?.clientEmail || b64Sa?.clientEmail || envClientEmail || fileSa?.clientEmail;
+  const privateKey = fileSaBundled?.privateKey || b64Sa?.privateKey || envPrivateKey || fileSa?.privateKey;
 
   const isProd = process.env.NODE_ENV === 'production' || !!process.env.NETLIFY;
   const missing = [
