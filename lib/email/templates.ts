@@ -94,6 +94,9 @@ function getEmailTemplate(params: {
   const cOlive = '#B9C2A4';
   const cBark = '#5B564A';
 
+  // Logo tint: use the lighter olive brand accent (matches site dark-mode accent usage).
+  const logoTint = cOlive;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -155,7 +158,7 @@ function getEmailTemplate(params: {
                                   <image href="${logoUrl}" x="0" y="0" width="40" height="40" preserveAspectRatio="xMidYMid meet"></image>
                                 </mask>
                               </defs>
-                              <rect width="40" height="40" fill="${cSandBase}" mask="url(#weKuduMask)"></rect>
+                              <rect width="40" height="40" fill="${logoTint}" mask="url(#weKuduMask)"></rect>
                             </svg>
                           <!--<![endif]-->
                         </td>
