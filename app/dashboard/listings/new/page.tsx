@@ -1258,6 +1258,16 @@ function NewListingPageContent() {
       return;
     }
 
+    // Whitetail-only hard gate (required even for draft creation)
+    if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
+      toast({
+        title: 'Seller attestation required',
+        description: 'Please accept the seller attestation before saving or publishing a whitetail breeder listing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate images
     if (formData.images.length === 0) {
       toast({
@@ -1431,6 +1441,16 @@ function NewListingPageContent() {
       return;
     }
 
+    // Whitetail-only hard gate (required even for draft creation)
+    if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
+      toast({
+        title: 'Seller attestation required',
+        description: 'Please accept the seller attestation before saving a whitetail breeder listing draft.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const locationData: any = {
         city: formData.location.city,
@@ -1456,6 +1476,11 @@ function NewListingPageContent() {
         protectedTransactionDays: formData.protectedTransactionDays,
         ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
         attributes: formData.attributes as ListingAttributes,
+        // Whitetail-only seller attestation (draft creation requires it)
+        ...(formData.category === 'whitetail_breeder' && {
+          sellerAttestationAccepted: true,
+          sellerAttestationAcceptedAt: new Date(),
+        }),
       } as any;
 
       if (formData.type === 'fixed' || formData.type === 'classified') {
