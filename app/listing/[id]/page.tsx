@@ -136,6 +136,28 @@ export default function ListingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingId, listing]);
 
+  // Record a listing view (server-side counter) with simple client-side de-dupe
+  useEffect(() => {
+    if (!listingId || !listing) return;
+    // Only count views for public/active listings to avoid inflating drafts.
+    if (listing.status !== 'active') return;
+
+    try {
+      const key = `wx:viewed:${listingId}`;
+      const now = Date.now();
+      const last = Number(localStorage.getItem(key) || 0) || 0;
+      // Count at most once per 6 hours per browser.
+      if (last && now - last < 6 * 60 * 60 * 1000) return;
+      localStorage.setItem(key, String(now));
+
+      fetch(`/api/listings/${listingId}/view`, { method: 'POST' }).catch(() => {
+        // best-effort; ignore failures
+      });
+    } catch {
+      // ignore storage errors
+    }
+  }, [listingId, listing]);
+
   // Define all handlers first (before early returns)
   const handlePlaceBid = async () => {
     // Check authentication

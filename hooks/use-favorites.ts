@@ -190,6 +190,27 @@ export function useFavorites() {
     }
   }, [favoriteIds, user, authLoading]);
 
+  const syncWatchlistServer = useCallback(
+    async (listingId: string, action: 'add' | 'remove') => {
+      if (!user) throw new Error('Authentication required');
+      const token = await user.getIdToken();
+      const res = await fetch('/api/watchlist/toggle', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ listingId, action }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.message || json?.error || 'Failed to update watchlist');
+      }
+      return json;
+    },
+    [user]
+  );
+
   const toggleFavorite = useCallback(
     async (listingId: string): Promise<'added' | 'removed'> => {
       const isCurrentlyFavorite = favoriteIds.has(listingId);
@@ -206,21 +227,10 @@ export function useFavorites() {
         return next;
       });
 
-      // If logged in, sync to Firestore
+      // If logged in, use server endpoint to keep listing metrics accurate.
       if (user) {
         try {
-          const watchlistDocRef = doc(db, 'users', user.uid, 'watchlist', listingId);
-
-          if (isCurrentlyFavorite) {
-            // Remove from Firestore
-            await deleteDoc(watchlistDocRef);
-          } else {
-            // Add to Firestore
-            await setDoc(watchlistDocRef, {
-              listingId,
-              createdAt: serverTimestamp(),
-            });
-          }
+          await syncWatchlistServer(listingId, isCurrentlyFavorite ? 'remove' : 'add');
 
           // Success - optimistic update was correct, Firestore will update via onSnapshot
           return action;
@@ -274,11 +284,7 @@ export function useFavorites() {
 
       if (user) {
         try {
-          const watchlistDocRef = doc(db, 'users', user.uid, 'watchlist', listingId);
-          await setDoc(watchlistDocRef, {
-            listingId,
-            createdAt: serverTimestamp(),
-          });
+          await syncWatchlistServer(listingId, 'add');
         } catch (error: any) {
           // Rollback
           setFavoriteIds((prev) => {
@@ -297,7 +303,7 @@ export function useFavorites() {
         }
       }
     },
-    [favoriteIds, user, toast]
+    [favoriteIds, user, toast, syncWatchlistServer]
   );
 
   const removeFavorite = useCallback(
@@ -313,8 +319,7 @@ export function useFavorites() {
 
       if (user) {
         try {
-          const watchlistDocRef = doc(db, 'users', user.uid, 'watchlist', listingId);
-          await deleteDoc(watchlistDocRef);
+          await syncWatchlistServer(listingId, 'remove');
         } catch (error: any) {
           // Rollback
           setFavoriteIds((prev) => new Set(prev).add(listingId));
@@ -329,7 +334,7 @@ export function useFavorites() {
         }
       }
     },
-    [favoriteIds, user, toast]
+    [favoriteIds, user, toast, syncWatchlistServer]
   );
 
   const favoriteIdsArray = useMemo(() => Array.from(favoriteIds), [favoriteIds]);
