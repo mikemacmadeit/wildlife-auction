@@ -28,6 +28,39 @@ import { validateListingCompliance, requiresComplianceReview } from '@/lib/compl
 import { getTierWeight } from '@/lib/pricing/subscriptions';
 
 /**
+ * Firestore does not allow `undefined` values anywhere in a document (including nested objects).
+ * This helper removes undefined fields recursively from *plain objects* and filters undefined from arrays.
+ *
+ * Important: we only recurse into plain objects to avoid corrupting Firestore sentinels (e.g. serverTimestamp())
+ * and special classes like Timestamp.
+ */
+function stripUndefinedDeep<T>(value: T): T {
+  if (value === undefined) return value;
+  if (Array.isArray(value)) {
+    const cleaned = (value as unknown as unknown[])
+      .map((v) => stripUndefinedDeep(v))
+      .filter((v) => v !== undefined);
+    return cleaned as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const proto = Object.getPrototypeOf(value);
+    // Only recurse into plain objects (including `{}`).
+    if (proto !== Object.prototype && proto !== null) {
+      return value;
+    }
+    const out: any = {};
+    for (const [k, v] of Object.entries(value as any)) {
+      if (v === undefined) continue;
+      const vv = stripUndefinedDeep(v);
+      if (vv === undefined) continue;
+      out[k] = vv;
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/**
  * Input type for creating a listing (omits fields that are auto-generated)
  */
 
@@ -381,7 +414,9 @@ export const createListingDraft = async (
       updatedAt: serverTimestamp() as unknown as Timestamp,
     };
 
-    const docRef = await addDoc(listingRef, docData);
+    // Firestore rejects nested undefined values (e.g. bestOfferSettings.minPrice when empty).
+    const cleanedDocData = stripUndefinedDeep(docData);
+    const docRef = await addDoc(listingRef, cleanedDocData as any);
     return docRef.id;
   } catch (error) {
     console.error('Error creating listing draft:', error);
@@ -477,28 +512,8 @@ export const updateListing = async (
       firestoreUpdates.featuredUntil = Timestamp.fromDate(updates.featuredUntil);
     }
 
-    // Recursively remove undefined values (handles nested objects like location)
-    const removeUndefined = (obj: any): any => {
-      if (obj === null || obj === undefined) {
-        return null;
-      }
-      if (Array.isArray(obj)) {
-        return obj.map(removeUndefined);
-      }
-      if (typeof obj === 'object') {
-        const cleaned: any = {};
-        for (const key in obj) {
-          if (obj[key] !== undefined) {
-            cleaned[key] = removeUndefined(obj[key]);
-          }
-        }
-        return cleaned;
-      }
-      return obj;
-    };
-
-    // Remove undefined values recursively
-    const cleanedUpdates = removeUndefined(firestoreUpdates);
+    // Remove undefined values recursively (nested objects like bestOfferSettings, location, etc.)
+    const cleanedUpdates = stripUndefinedDeep(firestoreUpdates);
 
     await updateDoc(listingRef, cleanedUpdates);
   } catch (error) {

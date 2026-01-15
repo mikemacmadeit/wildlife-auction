@@ -829,13 +829,14 @@ function NewListingPageContent() {
                         if (formData.type === 'fixed' || formData.type === 'classified') {
                           draftData.price = parseFloat(formData.price || '0');
                           if (formData.bestOffer.enabled) {
-                            draftData.bestOfferSettings = {
+                            const bo: any = {
                               enabled: true,
-                              minPrice: formData.bestOffer.minPrice ? parseFloat(formData.bestOffer.minPrice) : undefined,
-                              autoAcceptPrice: formData.bestOffer.autoAcceptPrice ? parseFloat(formData.bestOffer.autoAcceptPrice) : undefined,
                               allowCounter: formData.bestOffer.allowCounter !== false,
                               offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
                             };
+                            if (formData.bestOffer.minPrice) bo.minPrice = parseFloat(formData.bestOffer.minPrice);
+                            if (formData.bestOffer.autoAcceptPrice) bo.autoAcceptPrice = parseFloat(formData.bestOffer.autoAcceptPrice);
+                            draftData.bestOfferSettings = bo;
                           } else {
                             draftData.bestOfferSettings = { enabled: false, allowCounter: true, offerExpiryHours: 48 };
                           }
@@ -1325,15 +1326,18 @@ function NewListingPageContent() {
       // Add pricing based on type
       if (formData.type === 'fixed' || formData.type === 'classified') {
         listingData.price = parseFloat(formData.price || '0');
-        listingData.bestOfferSettings = formData.bestOffer.enabled
-          ? {
-              enabled: true,
-              minPrice: formData.bestOffer.minPrice ? parseFloat(formData.bestOffer.minPrice) : undefined,
-              autoAcceptPrice: formData.bestOffer.autoAcceptPrice ? parseFloat(formData.bestOffer.autoAcceptPrice) : undefined,
-              allowCounter: formData.bestOffer.allowCounter !== false,
-              offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
-            }
-          : { enabled: false, allowCounter: true, offerExpiryHours: 48 };
+        if (formData.bestOffer.enabled) {
+          const bo: any = {
+            enabled: true,
+            allowCounter: formData.bestOffer.allowCounter !== false,
+            offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
+          };
+          if (formData.bestOffer.minPrice) bo.minPrice = parseFloat(formData.bestOffer.minPrice);
+          if (formData.bestOffer.autoAcceptPrice) bo.autoAcceptPrice = parseFloat(formData.bestOffer.autoAcceptPrice);
+          listingData.bestOfferSettings = bo;
+        } else {
+          listingData.bestOfferSettings = { enabled: false, allowCounter: true, offerExpiryHours: 48 };
+        }
       } else if (formData.type === 'auction') {
         listingData.startingBid = parseFloat(formData.startingBid || '0');
         if (formData.reservePrice) {

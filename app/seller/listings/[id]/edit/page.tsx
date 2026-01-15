@@ -1170,15 +1170,18 @@ function EditListingPageContent() {
     // Add pricing based on type
     if (formData.type === 'fixed' || formData.type === 'classified') {
       updates.price = parseFloat(formData.price || '0');
-      updates.bestOfferSettings = formData.bestOffer.enabled
-        ? {
-            enabled: true,
-            minPrice: formData.bestOffer.minPrice ? parseFloat(formData.bestOffer.minPrice) : undefined,
-            autoAcceptPrice: formData.bestOffer.autoAcceptPrice ? parseFloat(formData.bestOffer.autoAcceptPrice) : undefined,
-            allowCounter: formData.bestOffer.allowCounter !== false,
-            offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
-          }
-        : { enabled: false, allowCounter: true, offerExpiryHours: 48 };
+      if (formData.bestOffer.enabled) {
+        const bo: any = {
+          enabled: true,
+          allowCounter: formData.bestOffer.allowCounter !== false,
+          offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
+        };
+        if (formData.bestOffer.minPrice) bo.minPrice = parseFloat(formData.bestOffer.minPrice);
+        if (formData.bestOffer.autoAcceptPrice) bo.autoAcceptPrice = parseFloat(formData.bestOffer.autoAcceptPrice);
+        updates.bestOfferSettings = bo;
+      } else {
+        updates.bestOfferSettings = { enabled: false, allowCounter: true, offerExpiryHours: 48 };
+      }
     } else if (formData.type === 'auction') {
       if (formData.startingBid) {
         updates.startingBid = parseFloat(formData.startingBid);
