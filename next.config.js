@@ -6,6 +6,17 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false, // Keep type checking enabled
   },
+  async headers() {
+    // Avoid noisy popup warnings (Firebase/Stripe auth flows) in Chrome:
+    // "Cross-Origin-Opener-Policy policy would block the window.closed/window.close call."
+    // This is safe for the app and keeps popups working as expected.
+    return [
+      {
+        source: '/:path*',
+        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' }],
+      },
+    ];
+  },
   images: { 
     unoptimized: true,
     // Some Next.js versions still validate remote image hosts against `images.domains`
