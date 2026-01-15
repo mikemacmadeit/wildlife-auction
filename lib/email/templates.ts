@@ -82,7 +82,8 @@ function getEmailTemplate(params: {
   const year = new Date().getFullYear();
   const origin = params.origin || 'https://wildlife.exchange';
   const logoUrl = `${origin}/images/Kudu.png`;
-  const fontBrand = `'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
+  // Match homepage hero: the main wordmark uses Barletta Stamp.
+  const fontBrand = `'BarlettaStamp','BarlettaInline','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const fontBody = `'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const cOlivewood = '#22251F';
   const cParchment = '#F4F0E6';
@@ -136,11 +137,30 @@ function getEmailTemplate(params: {
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 12px; width: 44px;">
-                          <img src="${logoUrl}" width="40" height="40" alt="Wildlife Exchange"
-                               style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface};" />
+                          <!--
+                            Logo rendering note:
+                            The website tints the Kudu mark using CSS masks. Email clients vary wildly in CSS support.
+                            We use an SVG mask for modern clients, with an Outlook (mso) fallback to a plain image.
+                          -->
+                          <!--[if mso]>
+                            <img src="${logoUrl}" width="40" height="40" alt="Wildlife Exchange"
+                                 style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface};" />
+                          <![endif]-->
+                          <!--[if !mso]><!-->
+                            <svg width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="Wildlife Exchange"
+                                 style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px;">
+                              <defs>
+                                <mask id="weKuduMask">
+                                  <rect width="40" height="40" fill="black"></rect>
+                                  <image href="${logoUrl}" x="0" y="0" width="40" height="40" preserveAspectRatio="xMidYMid meet"></image>
+                                </mask>
+                              </defs>
+                              <rect width="40" height="40" fill="${cSandBase}" mask="url(#weKuduMask)"></rect>
+                            </svg>
+                          <!--<![endif]-->
                         </td>
                         <td style="vertical-align: middle;">
-                          <div style="font-family:${fontBrand}; font-size: 24px; font-weight: 900; color: ${cSandBase}; letter-spacing: 0.2px;">
+                          <div style="font-family:${fontBrand}; font-size: 26px; font-weight: 900; color: ${cSandBase}; letter-spacing: 0.2px;">
                             Wildlife Exchange
                           </div>
                           <div style="font-family:${fontBody}; font-size: 12px; color: rgba(244,240,230,0.86); margin-top: 2px;">
