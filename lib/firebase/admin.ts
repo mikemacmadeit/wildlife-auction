@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import fs from 'fs';
 import path from 'path';
+import { createPrivateKey } from 'crypto';
 
 let adminApp: App | null = null;
 
@@ -35,6 +36,26 @@ function normalizePrivateKey(v: string | undefined): string | undefined {
         'If you are using escaped newlines, use \\n between lines.'
     );
     err.code = 'FIREBASE_PRIVATE_KEY_INVALID_FORMAT';
+    throw err;
+  }
+
+  // Validate the key is actually parseable by the runtime crypto provider.
+  // This catches truncated/mangled keys early (common with env inlining/escaping issues),
+  // preventing confusing downstream gRPC "metadata plugin" errors.
+  try {
+    createPrivateKey(s);
+  } catch (e: any) {
+    const err: any = new Error(
+      'FIREBASE_PRIVATE_KEY was found but could not be parsed by Node crypto. This usually means the value is truncated or malformed.'
+    );
+    err.code = 'FIREBASE_PRIVATE_KEY_UNREADABLE';
+    err.details = {
+      length: s.length,
+      lines: s.split('\n').length,
+      beginsWith: s.slice(0, 30),
+      endsWith: s.slice(-30),
+      cryptoMessage: e?.message,
+    };
     throw err;
   }
   return s;
