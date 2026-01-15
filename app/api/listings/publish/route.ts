@@ -17,9 +17,6 @@ import { captureException } from '@/lib/monitoring/capture';
 import { validateListingCompliance } from '@/lib/compliance/validation';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-const auth = getAdminAuth();
-const db = getAdminDb();
-
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
 });
@@ -100,6 +97,31 @@ async function computeWhitetailInternalFlags(db: Firestore, listingData: any): P
 
 export async function POST(request: Request) {
   try {
+    // Lazily initialize Admin SDK inside the handler so we can return a structured error
+    // (instead of a generic 500 caused by module-load failure) if production env vars are missing/misformatted.
+    let auth: ReturnType<typeof getAdminAuth>;
+    let db: Firestore;
+    try {
+      auth = getAdminAuth();
+      db = getAdminDb() as unknown as Firestore;
+    } catch (e: any) {
+      logError('Firebase Admin init failed in /api/listings/publish', {
+        code: e?.code,
+        message: e?.message,
+        missing: e?.missing,
+      });
+      captureException(e);
+      return json(
+        {
+          error: 'Server is not configured to publish listings yet',
+          code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+          message: e?.message || 'Failed to initialize Firebase Admin SDK',
+          missing: e?.missing || undefined,
+        },
+        { status: 503 }
+      );
+    }
+
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
     const rateLimitResult = await rateLimitCheck(request as any);
