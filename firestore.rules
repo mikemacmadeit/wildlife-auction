@@ -116,17 +116,7 @@ service cloud.firestore {
         // Best Offer reservation fields are server-only; clients cannot set them at create
         !request.resource.data.keys().hasAny(['offerReservedByOfferId', 'offerReservedAt']) &&
         // Prevent setting sellerId to different value
-        request.resource.data.sellerId == request.auth.uid &&
-        // Whitetail breeder: require seller attestation + non-expired permit at creation time
-        (
-          request.resource.data.category != 'whitetail_breeder' ||
-          (
-            request.resource.data.sellerAttestationAccepted == true &&
-            request.resource.data.sellerAttestationAcceptedAt is timestamp &&
-            request.resource.data.attributes.tpwdPermitExpirationDate is timestamp &&
-            request.resource.data.attributes.tpwdPermitExpirationDate >= request.time
-          )
-        );
+        request.resource.data.sellerId == request.auth.uid;
       
       // Allow update: if authenticated and user is the seller OR if user is an admin
       // Validation: cannot change sellerId, status transitions are allowed
