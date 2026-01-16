@@ -28,6 +28,9 @@ import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeFo
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { HelpTooltip } from '@/components/help/HelpTooltip';
+import { ImageGallery } from '@/components/listing/ImageGallery';
+import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
+import { Separator } from '@/components/ui/separator';
 // Exposure Plans model: no listing limits.
 
 function NewListingPageContent() {
@@ -1302,115 +1305,228 @@ function NewListingPageContent() {
       description: 'Review your listing before publishing',
       content: (
         <div className="space-y-6">
-          <Card>
-            <div className="p-4 space-y-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Type</div>
-                <div className="font-medium capitalize">{formData.type}</div>
+          <Alert className="bg-muted/40 border-border/60">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              This is a <strong>preview</strong> of what buyers will see. If anything looks off, hit <strong>Back</strong> and edit it before publishing.
+            </AlertDescription>
+          </Alert>
+
+          {/* Listing Preview (photos + primary info) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <ImageGallery images={formData.images} title={formData.title || 'Listing'} />
+              <div className="text-xs text-muted-foreground">
+                {formData.images.length} photo{formData.images.length === 1 ? '' : 's'} will appear on the listing.
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Category</div>
-                <div className="font-medium capitalize">{formData.category}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Title</div>
-                <div className="font-medium">{formData.title}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Description</div>
-                <div className="text-sm whitespace-pre-line">{formData.description}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Location</div>
-                <div className="font-medium">
-                  {formData.location.city}, {formData.location.state}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Price/Bid</div>
-                <div className="font-medium">
-                  {formData.type === 'auction'
-                    ? `Starting: $${parseFloat(formData.startingBid || '0').toLocaleString()}`
-                    : `$${parseFloat(formData.price || '0').toLocaleString()}`}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Photos</div>
-                <div className="font-medium">{formData.images.length} photos</div>
-              </div>
-              {formData.location.zip && (
-                <div>
-                  <div className="text-sm text-muted-foreground">ZIP Code</div>
-                  <div className="font-medium">{formData.location.zip}</div>
-                </div>
-              )}
-              {formData.type === 'auction' && formData.endsAt && (
-                <div>
-                  <div className="text-sm text-muted-foreground">Auction Ends</div>
-                  <div className="font-medium">
-                    {new Date(formData.endsAt).toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </div>
-                </div>
-              )}
-              {formData.category && Object.keys(formData.attributes).length > 0 && (
-                <div>
-                  <div className="text-sm text-muted-foreground">Specifications</div>
-                  <div className="text-sm space-y-1 mt-1">
-                    {formData.category === 'wildlife_exotics' && (
-                      <>
-                        {(formData.attributes as Partial<WildlifeAttributes>).speciesId && (
-                          <div>Species: {(formData.attributes as Partial<WildlifeAttributes>).speciesId}</div>
-                        )}
-                        {(formData.attributes as Partial<WildlifeAttributes>).sex && (
-                          <div>Sex: {(formData.attributes as Partial<WildlifeAttributes>).sex}</div>
-                        )}
-                        {(formData.attributes as Partial<WildlifeAttributes>).quantity && (
-                          <div>Quantity: {(formData.attributes as Partial<WildlifeAttributes>).quantity}</div>
-                        )}
-                      </>
-                    )}
-                    {formData.category === 'cattle_livestock' && (
-                      <>
-                        {(formData.attributes as Partial<CattleAttributes>).breed && (
-                          <div>Breed: {(formData.attributes as Partial<CattleAttributes>).breed}</div>
-                        )}
-                        {(formData.attributes as Partial<CattleAttributes>).sex && (
-                          <div>Sex: {(formData.attributes as Partial<CattleAttributes>).sex}</div>
-                        )}
-                        {(formData.attributes as Partial<CattleAttributes>).registered !== undefined && (
-                          <div>Registered: {(formData.attributes as Partial<CattleAttributes>).registered ? 'Yes' : 'No'}</div>
-                        )}
-                        {(formData.attributes as Partial<CattleAttributes>).quantity && (
-                          <div>Quantity: {(formData.attributes as Partial<CattleAttributes>).quantity}</div>
-                        )}
-                      </>
-                    )}
-                    {formData.category === 'ranch_equipment' && (
-                      <>
-                        {(formData.attributes as Partial<EquipmentAttributes>).equipmentType && (
-                          <div>Type: {(formData.attributes as Partial<EquipmentAttributes>).equipmentType}</div>
-                        )}
-                        {(formData.attributes as Partial<EquipmentAttributes>).condition && (
-                          <div>Condition: {(formData.attributes as Partial<EquipmentAttributes>).condition}</div>
-                        )}
-                        {(formData.attributes as Partial<EquipmentAttributes>).year && (
-                          <div>Year: {(formData.attributes as Partial<EquipmentAttributes>).year}</div>
-                        )}
-                        {(formData.attributes as Partial<EquipmentAttributes>).quantity && (
-                          <div>Quantity: {(formData.attributes as Partial<EquipmentAttributes>).quantity}</div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
+
+            <Card className="border-2 border-border/50">
+              <CardContent className="p-5 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold leading-tight">
+                        {formData.title || 'Untitled listing'}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {formData.type && (
+                          <Badge variant="secondary" className="capitalize">
+                            {formData.type}
+                          </Badge>
+                        )}
+                        {formData.category && (
+                          <Badge variant="outline" className="capitalize">
+                            {String(formData.category).replaceAll('_', ' ')}
+                          </Badge>
+                        )}
+                        {formData.verification && <Badge>Verification</Badge>}
+                        {formData.transport && <Badge variant="outline">Transport Ready</Badge>}
+                        {formData.protectedTransactionEnabled && (
+                          <Badge variant="outline">
+                            Protected ({formData.protectedTransactionDays ?? '—'} days)
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-muted-foreground">
+                    {formData.location.city ? `${formData.location.city}, ` : ''}
+                    {formData.location.state || '—'}
+                    {formData.location.zip ? ` • ${formData.location.zip}` : ''}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Pricing</div>
+                  {formData.type === 'auction' ? (
+                    <div className="space-y-1">
+                      <div className="text-lg font-bold">
+                        Starting bid: ${Number(parseFloat(formData.startingBid || '0') || 0).toLocaleString()}
+                      </div>
+                      {formData.reservePrice ? (
+                        <div className="text-sm">
+                          Reserve price: <span className="font-semibold">${Number(parseFloat(formData.reservePrice) || 0).toLocaleString()}</span>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Reserve price: none</div>
+                      )}
+                      {formData.endsAt ? (
+                        <div className="text-sm">
+                          Ends: <span className="font-semibold">{new Date(formData.endsAt).toLocaleString()}</span>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">End time: not set</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-lg font-bold">
+                        ${Number(parseFloat(formData.price || '0') || 0).toLocaleString()}
+                      </div>
+                      {(formData.type === 'fixed' || formData.type === 'classified') && (
+                        <div className="text-sm">
+                          Best Offer:{' '}
+                          <span className="font-semibold">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span>
+                          {formData.bestOffer.enabled && (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              • min {formData.bestOffer.minPrice ? `$${Number(parseFloat(formData.bestOffer.minPrice) || 0).toLocaleString()}` : '—'}
+                              {' '}
+                              • auto-accept {formData.bestOffer.autoAcceptPrice ? `$${Number(parseFloat(formData.bestOffer.autoAcceptPrice) || 0).toLocaleString()}` : '—'}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {formData.category === 'whitetail_breeder' && (
+                  <>
+                    <Separator />
+                    <div className="space-y-1 text-sm">
+                      <div className="text-sm text-muted-foreground">Whitetail breeder attestation</div>
+                      <div className="font-semibold">
+                        {sellerAttestationAccepted ? 'Accepted' : 'Not accepted'}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Description */}
+          <Card className="border-2 border-border/50">
+            <CardContent className="p-5 space-y-2">
+              <div className="text-sm font-semibold">Description</div>
+              <div className="text-sm whitespace-pre-line text-muted-foreground">
+                {formData.description || '—'}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Key Facts (matches the style used on the public listing page) */}
+          <KeyFactsPanel
+            listing={{
+              id: listingId || 'preview',
+              title: formData.title || 'Listing',
+              description: formData.description || '',
+              type: (formData.type || 'fixed') as any,
+              category: (formData.category || 'wildlife_exotics') as any,
+              status: 'draft' as any,
+              price: formData.type !== 'auction' ? Number(parseFloat(formData.price || '0') || 0) : undefined,
+              startingBid: formData.type === 'auction' ? Number(parseFloat(formData.startingBid || '0') || 0) : undefined,
+              reservePrice: formData.type === 'auction' && formData.reservePrice ? Number(parseFloat(formData.reservePrice) || 0) : undefined,
+              images: formData.images || [],
+              location: formData.location,
+              sellerId: user?.uid || 'preview',
+              trust: {
+                verified: !!formData.verification,
+                insuranceAvailable: false,
+                transportReady: !!formData.transport,
+              },
+              attributes: (formData.attributes || {}) as any,
+              endsAt: formData.endsAt ? new Date(formData.endsAt) : undefined,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              createdBy: user?.uid || 'preview',
+              updatedBy: user?.uid || 'preview',
+              metrics: { views: 0, favorites: 0, bidCount: 0 },
+            } as any}
+          />
+
+          {/* Full “everything we will save” snapshot (so nothing is hidden on review) */}
+          <Card className="border-2 border-border/50">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-sm font-semibold">All listing details (review)</div>
+                  <div className="text-xs text-muted-foreground">
+                    This section shows every field that will be saved/published.
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basics</div>
+                  <div className="mt-2 space-y-1">
+                    <div><span className="text-muted-foreground">Type:</span> <span className="font-medium capitalize">{formData.type || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Category:</span> <span className="font-medium capitalize">{String(formData.category || '—').replaceAll('_', ' ')}</span></div>
+                    <div><span className="text-muted-foreground">Title:</span> <span className="font-medium">{formData.title || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Location:</span> <span className="font-medium">{formData.location.city || '—'}, {formData.location.state || '—'} {formData.location.zip ? `(${formData.location.zip})` : ''}</span></div>
+                  </div>
+                </div>
+
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Options</div>
+                  <div className="mt-2 space-y-1">
+                    <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
+                    <div><span className="text-muted-foreground">Transport ready:</span> <span className="font-medium">{formData.transport ? 'Yes' : 'No'}</span></div>
+                    <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
+                    {(formData.type === 'fixed' || formData.type === 'classified') && (
+                      <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-background p-3">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Specifications (all fields)</div>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  {Object.entries(formData.attributes || {})
+                    .filter(([, v]) => v !== undefined && v !== null && String(v).trim?.() !== '')
+                    .map(([k, v]) => {
+                      const label = k
+                        .replaceAll('_', ' ')
+                        .replace(/([a-z])([A-Z])/g, '$1 $2')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                      const isObject = typeof v === 'object';
+                      return (
+                        <div key={k} className="rounded-md border bg-muted/30 p-2">
+                          <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+                          <div className="mt-1 font-medium break-words">
+                            {isObject ? (
+                              <pre className="text-xs whitespace-pre-wrap leading-relaxed">{JSON.stringify(v, null, 2)}</pre>
+                            ) : (
+                              String(v)
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {Object.keys(formData.attributes || {}).length === 0 && (
+                    <div className="text-sm text-muted-foreground">—</div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </div>
       ),
