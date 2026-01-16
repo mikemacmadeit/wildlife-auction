@@ -9,6 +9,7 @@ import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { Providers } from '@/components/providers';
 import { PublicEmailCaptureMount } from '@/components/marketing/PublicEmailCaptureMount';
+import { HelpLauncher } from '@/components/help/HelpLauncher';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -111,6 +112,7 @@ export default function RootLayout({
             </div>
             <ConditionalNavbar />
             <PublicEmailCaptureMount />
+            <HelpLauncher />
             <main className="flex-1 relative z-10">
               {children}
             </main>

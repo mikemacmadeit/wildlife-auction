@@ -295,7 +295,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Mobile: Card View */}
-        <div className="md:hidden space-y-4">
+        <div className="md:hidden space-y-4" data-tour="orders-list">
           {orders.map((order) => (
             <Card key={order.id}>
               <CardContent className="p-4 space-y-3">
@@ -374,7 +374,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Desktop: Table View */}
-        <div className="hidden md:block">
+        <div className="hidden md:block" data-tour="orders-list">
           <Card>
             <CardContent className="p-0">
               <div className="rounded-md border">

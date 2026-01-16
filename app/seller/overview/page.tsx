@@ -376,15 +376,17 @@ export default function SellerOverviewPage() {
               Daily briefing and action items for your listings
             </p>
           </div>
-          <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
-            <Package className="h-4 w-4" />
-            Create Listing
-          </CreateListingGateButton>
+          <div data-tour="seller-create-listing">
+            <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
+              <Package className="h-4 w-4" />
+              Create Listing
+            </CreateListingGateButton>
+          </div>
         </div>
 
         {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
         {user && (
-          <Card className="border-2 border-border/50 bg-card">
+          <Card className="border-2 border-border/50 bg-card" data-tour="seller-setup-checklist">
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div>

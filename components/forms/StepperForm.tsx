@@ -25,6 +25,7 @@ interface StepperFormProps {
   onSave?: () => void | Promise<void>; // Optional save handler for any step (uses parent's formData)
   saving?: boolean; // Loading state for save operation
   showSaveButton?: boolean; // Whether to show save button on each step
+  completeButtonDataTour?: string; // Optional data-tour selector for the final action button
 }
 
 export function StepperForm({
@@ -36,6 +37,7 @@ export function StepperForm({
   onSave,
   saving = false,
   showSaveButton = false,
+  completeButtonDataTour,
 }: StepperFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -188,6 +190,7 @@ export function StepperForm({
             type="button"
             onClick={handleNext}
             disabled={saving}
+            {...(isLastStep && completeButtonDataTour ? { 'data-tour': completeButtonDataTour } : {})}
             className={cn(
               "min-h-[48px] min-w-[150px] font-semibold shadow-lg hover:shadow-xl transition-shadow",
               isLastStep && "bg-gradient-to-r from-primary to-primary/90"

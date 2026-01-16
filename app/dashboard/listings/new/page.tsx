@@ -27,6 +27,7 @@ import { AlertCircle } from 'lucide-react';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { HelpTooltip } from '@/components/help/HelpTooltip';
 // Exposure Plans model: no listing limits.
 
 function NewListingPageContent() {
@@ -102,7 +103,7 @@ function NewListingPageContent() {
       title: 'Category',
       description: 'Choose what you\'re listing',
       content: (
-        <div className="space-y-6">
+        <div className="space-y-6" data-tour="listing-category-step">
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
@@ -535,9 +536,16 @@ function NewListingPageContent() {
       content: (
         <div className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="title" className="text-base font-semibold">Title</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="title" className="text-base font-semibold">Title</Label>
+              <HelpTooltip
+                side="left"
+                text="Be specific: species/breed, sex/quantity, and a key selling point. Great titles get more clicks."
+              />
+            </div>
             <Input
               id="title"
+              data-tour="listing-title"
               placeholder="e.g., Registered Texas Longhorn Bull"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -546,7 +554,13 @@ function NewListingPageContent() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-base font-semibold">Description</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="description" className="text-base font-semibold">Description</Label>
+              <HelpTooltip
+                side="left"
+                text="Include health, genetics/papers, transport details, and anything a buyer needs to decide without messaging."
+              />
+            </div>
             <Textarea
               id="description"
               placeholder="Provide detailed information about your listing..."
@@ -558,10 +572,17 @@ function NewListingPageContent() {
 
           {formData.type === 'fixed' && (
             <div className="space-y-2">
-              <Label htmlFor="price" className="text-base font-semibold">Price</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="price" className="text-base font-semibold">Price</Label>
+                <HelpTooltip
+                  side="left"
+                  text="This is the Buy Now price buyers will pay at checkout. Be realistic—better detail supports higher prices."
+                />
+              </div>
               <Input
                 id="price"
                 type="number"
+                data-tour="listing-price"
                 placeholder="0.00"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -573,10 +594,17 @@ function NewListingPageContent() {
           {formData.type === 'auction' && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="starting-bid" className="text-base font-semibold">Starting Bid</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="starting-bid" className="text-base font-semibold">Starting Bid</Label>
+                  <HelpTooltip
+                    side="left"
+                    text="Your auction starts here. Lower starts can drive bidding, but ensure you’re comfortable with the risk."
+                  />
+                </div>
                 <Input
                   id="starting-bid"
                   type="number"
+                  data-tour="listing-price"
                   placeholder="0.00"
                   value={formData.startingBid}
                   onChange={(e) => setFormData({ ...formData, startingBid: e.target.value })}
@@ -584,9 +612,15 @@ function NewListingPageContent() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reserve-price" className="text-base font-semibold">
-                  Reserve Price (Optional)
-                </Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="reserve-price" className="text-base font-semibold">
+                    Reserve Price (Optional)
+                  </Label>
+                  <HelpTooltip
+                    side="left"
+                    text="Your private minimum. If bids don’t reach it, you’re not forced to sell. Buyers won’t see this."
+                  />
+                </div>
                 <Input
                   id="reserve-price"
                   type="number"
@@ -600,9 +634,15 @@ function NewListingPageContent() {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="auction-end" className="text-base font-semibold">
-                  Auction End Date & Time
-                </Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="auction-end" className="text-base font-semibold">
+                    Auction End Date & Time
+                  </Label>
+                  <HelpTooltip
+                    side="left"
+                    text="Pick a time when buyers are active (evenings/weekends). It must be in the future."
+                  />
+                </div>
                 <Input
                   id="auction-end"
                   type="datetime-local"
@@ -1711,6 +1751,7 @@ function NewListingPageContent() {
           <StepperForm 
             steps={steps} 
             onComplete={handleComplete}
+            completeButtonDataTour="listing-publish"
           />
         </div>
       </div>
