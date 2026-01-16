@@ -126,10 +126,12 @@ export async function POST(request: Request) {
         raw: stripeError,
       });
 
-      // Founder-friendly: this specific Stripe error means the PLATFORM Stripe account
-      // hasn't completed activation/onboarding, so Connect operations are blocked.
+      // Founder-friendly: these specific Stripe errors mean the PLATFORM Stripe account
+      // hasn't completed required activation/profile steps, so Connect operations are blocked.
       const msg = String(stripeError?.message || '');
-      if (msg.toLowerCase().includes('account must be activated')) {
+      const lower = msg.toLowerCase();
+
+      if (lower.includes('account must be activated')) {
         return json(
           {
             error: 'Stripe account activation required',
@@ -138,6 +140,29 @@ export async function POST(request: Request) {
               'Your platform Stripe account must be activated before Wildlife.Exchange can create seller payout accounts. ' +
               'Open Stripe Dashboard → Activate your account, then retry.',
             actionUrl: 'https://dashboard.stripe.com/account/onboarding',
+            stripe: {
+              type: stripeError?.type,
+              code: stripeError?.code,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        lower.includes('complete your platform profile') ||
+        lower.includes('platform profile') ||
+        lower.includes('answer the questionnaire') ||
+        lower.includes('/connect/accounts/overview')
+      ) {
+        return json(
+          {
+            error: 'Stripe Connect platform profile required',
+            code: 'STRIPE_PLATFORM_PROFILE_INCOMPLETE',
+            message:
+              'Stripe requires your platform to complete the Connect questionnaire/profile before creating seller payout accounts. ' +
+              'Open Stripe Dashboard → Connect → Accounts, complete the platform profile, then retry.',
+            actionUrl: 'https://dashboard.stripe.com/connect/accounts/overview',
             stripe: {
               type: stripeError?.type,
               code: stripeError?.code,

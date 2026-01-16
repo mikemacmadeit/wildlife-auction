@@ -71,12 +71,24 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
 
       const msg = String(error?.message || 'Failed to set up payout. Please try again.');
       const actionUrl = (error as any)?.actionUrl as string | undefined;
-      const isPlatformNotActivated = (error as any)?.code === 'STRIPE_PLATFORM_NOT_ACTIVATED' || msg.toLowerCase().includes('account must be activated');
+      const code = (error as any)?.code as string | undefined;
+      const isPlatformNotActivated =
+        code === 'STRIPE_PLATFORM_NOT_ACTIVATED' || msg.toLowerCase().includes('account must be activated');
+      const isPlatformProfileIncomplete =
+        code === 'STRIPE_PLATFORM_PROFILE_INCOMPLETE' ||
+        msg.toLowerCase().includes('platform profile') ||
+        msg.toLowerCase().includes('answer the questionnaire');
 
       toast({
-        title: isPlatformNotActivated ? 'Stripe activation required' : 'Error',
+        title: isPlatformNotActivated
+          ? 'Stripe activation required'
+          : isPlatformProfileIncomplete
+          ? 'Stripe Connect setup required'
+          : 'Error',
         description: isPlatformNotActivated
           ? 'Wildlife.Exchange must activate its Stripe account before we can create seller payout accounts. Open Stripe onboarding, complete activation, then retry.'
+          : isPlatformProfileIncomplete
+          ? 'Stripe requires the platform to complete a Connect questionnaire/profile before we can create seller payout accounts. Open Connect setup in Stripe Dashboard, complete it, then retry.'
           : msg,
         variant: 'destructive',
         ...(actionUrl
