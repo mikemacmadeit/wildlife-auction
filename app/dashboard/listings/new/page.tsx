@@ -31,6 +31,9 @@ import { HelpTooltip } from '@/components/help/HelpTooltip';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { Separator } from '@/components/ui/separator';
+import { getUserProfile } from '@/lib/firebase/users';
+import { UserProfile } from '@/lib/types';
+import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 // Exposure Plans model: no listing limits.
 
 function NewListingPageContent() {
@@ -99,6 +102,34 @@ function NewListingPageContent() {
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [payoutsGateOpen, setPayoutsGateOpen] = useState(false);
+
+  const refreshUserProfile = async () => {
+    if (!user) return;
+    try {
+      const profile = await getUserProfile(user.uid);
+      setUserProfile(profile);
+    } catch (e) {
+      // Best-effort; don't block listing creation UX on profile fetch
+      console.warn('Failed to load user profile for payouts readiness', e);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      setUserProfile(null);
+      return;
+    }
+    refreshUserProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
+
+  const payoutsReady =
+    !!userProfile?.stripeAccountId &&
+    userProfile?.stripeOnboardingStatus === 'complete' &&
+    userProfile?.payoutsEnabled === true &&
+    userProfile?.chargesEnabled === true;
 
   const steps = [
     {
@@ -1305,6 +1336,23 @@ function NewListingPageContent() {
       description: 'Review your listing before publishing',
       content: (
         <div className="space-y-6">
+          {!payoutsReady && user && (
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <AlertDescription className="text-amber-900">
+                <strong>Before you can publish:</strong> you’ll need to connect Stripe payouts so you can get paid.
+                <div className="mt-3">
+                  <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => setPayoutsGateOpen(true)}>
+                    Connect payouts now
+                  </Button>
+                  <span className="ml-3 text-xs text-amber-800/80">
+                    You can still save a draft anytime.
+                  </span>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Alert className="bg-muted/40 border-border/60">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -1676,6 +1724,17 @@ function NewListingPageContent() {
       }
     } catch (error: any) {
       console.error('Error creating listing:', error);
+
+      // UX: If the server blocks publish because payouts aren't ready, show a friendly action dialog.
+      if (error?.code === 'PAYOUTS_NOT_READY' || String(error?.message || '').toLowerCase().includes('connect stripe payouts')) {
+        setPayoutsGateOpen(true);
+        toast({
+          title: 'Connect payouts to publish',
+          description: 'You can still save this as a draft right now.',
+        });
+        return;
+      }
+
       toast({
         title: 'Error creating listing',
         description: error.message || 'An error occurred while creating your listing. Please try again.',
@@ -1809,6 +1868,45 @@ function NewListingPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Payouts Gate Dialog (publish blocker, not draft blocker) */}
+      <Dialog open={payoutsGateOpen} onOpenChange={setPayoutsGateOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Connect payouts to publish</DialogTitle>
+            <DialogDescription>
+              You can create drafts anytime. To <strong>publish</strong> a listing (go live), you must connect Stripe payouts so buyers can pay and you can get paid.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <PayoutReadinessCard userProfile={userProfile} onRefresh={refreshUserProfile} />
+
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="font-semibold text-foreground">Founder-friendly guidance</div>
+              <div className="mt-1">
+                Best practice is: <strong>let sellers draft listings first</strong>, but make payout setup obvious early and required only at publish.
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={async () => {
+                await handleSaveDraft();
+                setPayoutsGateOpen(false);
+              }}
+            >
+              Save draft
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPayoutsGateOpen(false)}>
+              Continue editing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={showPendingApprovalModal}
         onOpenChange={(open) => {
@@ -1847,6 +1945,26 @@ function NewListingPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Early warning banner (start of flow) */}
+      {!authLoading && user && !payoutsReady && (
+        <div className="mx-auto w-full max-w-6xl px-4 pt-6">
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-700" />
+            <AlertDescription className="text-amber-900">
+              <strong>Heads up:</strong> Stripe payouts are not connected yet. You can create a draft listing now, but you’ll need payouts connected to publish.
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => setPayoutsGateOpen(true)}>
+                  Connect payouts
+                </Button>
+                <Button type="button" variant="ghost" className="min-h-[44px]" onClick={() => router.push('/seller/overview')}>
+                  Go to seller checklist
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
       {/* Custom Header with Navigation */}
       <div className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-4 py-3">

@@ -451,7 +451,11 @@ export const publishListing = async (uid: string, listingId: string): Promise<{ 
 
     const json = await res.json();
     if (!res.ok) {
-      throw new Error(json?.message || json?.error || 'Failed to publish listing');
+      const err: any = new Error(json?.message || json?.error || 'Failed to publish listing');
+      // Surface structured error codes to the UI (e.g. PAYOUTS_NOT_READY) for better UX.
+      if (json?.code) err.code = json.code;
+      if (json?.error) err.error = json.error;
+      throw err;
     }
 
     if (json?.pendingReview) {
