@@ -66,7 +66,11 @@ export async function createStripeAccount(): Promise<{ stripeAccountId: string }
         console.error('Error details:', errorDetails);
       }
     }
-    throw new Error(errorMessage);
+    const err: any = new Error(errorMessage);
+    if (errorDetails?.code) err.code = errorDetails.code;
+    if (errorDetails?.actionUrl) err.actionUrl = errorDetails.actionUrl;
+    if (errorDetails?.message) err.detailsMessage = errorDetails.message;
+    throw err;
   }
 
   return response.json();

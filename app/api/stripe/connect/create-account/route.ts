@@ -8,57 +8,11 @@
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-// Initialize Firebase Admin (if not already initialized)
-let adminApp: App | null = null;
-let auth: ReturnType<typeof getAuth> | null = null;
-let db: ReturnType<typeof getFirestore> | null = null;
-
-function initializeFirebaseAdmin() {
-  if (adminApp) {
-    return { auth: auth!, db: db! };
-  }
-
-  if (!getApps().length) {
-    try {
-      const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-        ? {
-            projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-          }
-        : undefined;
-
-      if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-        adminApp = initializeApp({
-          credential: cert(serviceAccount as any),
-        });
-      } else {
-        // Try Application Default Credentials (for production)
-        try {
-          adminApp = initializeApp();
-        } catch (error) {
-          console.error('Firebase Admin initialization error:', error);
-          throw new Error('Failed to initialize Firebase Admin SDK - missing credentials');
-        }
-      }
-    } catch (error) {
-      console.error('Firebase Admin initialization error:', error);
-      throw error;
-    }
-  } else {
-    adminApp = getApps()[0];
-  }
-
-  auth = getAuth(adminApp);
-  db = getFirestore(adminApp);
-  return { auth, db };
-}
+export const runtime = 'nodejs';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -93,9 +47,10 @@ export async function POST(request: Request) {
     }
 
     // Initialize Firebase Admin (inside handler to catch errors gracefully)
-    let firebaseAdmin;
     try {
-      firebaseAdmin = initializeFirebaseAdmin();
+      // Initialize Admin SDK lazily inside handler (Netlify-safe) via shared helper.
+      getAdminAuth();
+      getAdminDb();
     } catch (error: any) {
       console.error('Failed to initialize Firebase Admin:', error);
       return json(
@@ -108,7 +63,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { auth, db } = firebaseAdmin;
+    const auth = getAdminAuth();
+    const db = getAdminDb();
 
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');
@@ -169,6 +125,28 @@ export async function POST(request: Request) {
         message: stripeError?.message,
         raw: stripeError,
       });
+
+      // Founder-friendly: this specific Stripe error means the PLATFORM Stripe account
+      // hasn't completed activation/onboarding, so Connect operations are blocked.
+      const msg = String(stripeError?.message || '');
+      if (msg.toLowerCase().includes('account must be activated')) {
+        return json(
+          {
+            error: 'Stripe account activation required',
+            code: 'STRIPE_PLATFORM_NOT_ACTIVATED',
+            message:
+              'Your platform Stripe account must be activated before Wildlife.Exchange can create seller payout accounts. ' +
+              'Open Stripe Dashboard → Activate your account, then retry.',
+            actionUrl: 'https://dashboard.stripe.com/account/onboarding',
+            stripe: {
+              type: stripeError?.type,
+              code: stripeError?.code,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
       throw stripeError;
     }
 

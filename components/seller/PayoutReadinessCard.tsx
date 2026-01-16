@@ -9,6 +9,7 @@ import { UserProfile } from '@/lib/types';
 import { createStripeAccount, createAccountLink, checkStripeAccountStatus } from '@/lib/stripe/api';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { ToastAction } from '@/components/ui/toast';
 
 interface PayoutReadinessCardProps {
   userProfile: UserProfile | null;
@@ -67,10 +68,26 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
       }
     } catch (error: any) {
       console.error('Error setting up payout:', error);
+
+      const msg = String(error?.message || 'Failed to set up payout. Please try again.');
+      const actionUrl = (error as any)?.actionUrl as string | undefined;
+      const isPlatformNotActivated = (error as any)?.code === 'STRIPE_PLATFORM_NOT_ACTIVATED' || msg.toLowerCase().includes('account must be activated');
+
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to set up payout. Please try again.',
+        title: isPlatformNotActivated ? 'Stripe activation required' : 'Error',
+        description: isPlatformNotActivated
+          ? 'Wildlife.Exchange must activate its Stripe account before we can create seller payout accounts. Open Stripe onboarding, complete activation, then retry.'
+          : msg,
         variant: 'destructive',
+        ...(actionUrl
+          ? {
+              action: (
+                <ToastAction altText="Open Stripe onboarding" onClick={() => window.open(actionUrl, '_blank', 'noopener,noreferrer')}>
+                  Open Stripe
+                </ToastAction>
+              ),
+            }
+          : {}),
       });
     } finally {
       setIsCreatingAccount(false);
