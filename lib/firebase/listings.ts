@@ -523,6 +523,31 @@ export const updateListing = async (
 };
 
 /**
+ * Server-side (Admin SDK) helper: append one image URL to a listing.
+ * This bypasses client Firestore rules while still enforcing seller ownership server-side.
+ */
+export async function addListingImageServer(listingId: string, url: string): Promise<void> {
+  const { auth } = await import('./config');
+  const user = auth.currentUser;
+  if (!user) throw new Error('Authentication required');
+
+  const token = await user.getIdToken();
+  const res = await fetch(`/api/listings/${listingId}/images/add`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ url }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || 'Failed to update listing images');
+  }
+}
+
+/**
  * Unpublish/Pause a listing (change status from active to draft)
  */
 export const unpublishListing = async (uid: string, listingId: string): Promise<void> => {

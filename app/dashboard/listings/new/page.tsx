@@ -15,7 +15,7 @@ import { Upload, X, Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react'
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
-import { createListingDraft, publishListing, updateListing } from '@/lib/firebase/listings';
+import { createListingDraft, publishListing, updateListing, addListingImageServer } from '@/lib/firebase/listings';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
 import { uploadListingImage } from '@/lib/firebase/storage';
@@ -1103,19 +1103,22 @@ function NewListingPageContent() {
                           images: newImages,
                         }));
 
-                        // Update listing document with new image URL
+                        // Persist image URL to Firestore (server route is more reliable than client rules in production)
                         try {
-                          await updateListing(user.uid, currentListingId!, {
-                            images: newImages,
-                          } as any);
-                        } catch (updateError: any) {
-                          console.error('Error updating listing with image:', updateError);
-                          // Don't fail the upload if update fails - images are already in formData
-                          toast({
-                            title: 'Image uploaded',
-                            description: 'Image uploaded successfully, but failed to update listing. Please try refreshing.',
-                            variant: 'default',
-                          });
+                          await addListingImageServer(currentListingId!, result.url);
+                        } catch (serverErr: any) {
+                          // Fallback to direct client update (if server env isn't configured)
+                          try {
+                            await updateListing(user.uid, currentListingId!, { images: newImages } as any);
+                          } catch (updateError: any) {
+                            console.error('Error updating listing with image:', updateError);
+                            // Don't fail the upload if update fails - images are already in formData
+                            toast({
+                              title: 'Image uploaded',
+                              description: 'Image uploaded successfully, but failed to save to the listing. Please refresh and try again.',
+                              variant: 'default',
+                            });
+                          }
                         }
 
                         toast({
