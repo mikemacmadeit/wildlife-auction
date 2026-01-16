@@ -57,8 +57,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
               </div>
             )}
             
-            {/* Action Buttons - Always visible on mobile, hover on desktop */}
-            <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+            {/* Action Buttons - Always visible (watchlist must be easy to find) */}
+            <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
               <ShareButton listingId={listing.id} listingTitle={listing.title} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>

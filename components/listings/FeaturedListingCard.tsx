@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
+import { ShareButton } from '@/components/listings/ShareButton';
 import { cn } from '@/lib/utils';
 
 interface FeaturedListingCardProps {
@@ -30,8 +31,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
 
   const hasCountdown = listing.type === 'auction' && !!listing.endsAt;
-  // Avoid overlapping the countdown (which lives top-right). If countdown exists, push the heart down.
-  const favoritePositionClass = hasCountdown ? 'top-14 right-3' : 'top-3 right-3';
 
   return (
     <motion.div
@@ -75,9 +74,10 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/20 to-transparent z-10" />
 
-            {/* Watchlist button (always visible; does not navigate) */}
-            <div className={`absolute z-30 ${favoritePositionClass}`}>
+            {/* Action Buttons - Always visible and consistent with browse/home cards */}
+            <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
+              <ShareButton listingId={listing.id} listingTitle={listing.title} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
             {listing.images[0] ? (
@@ -101,9 +101,9 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </div>
             )}
 
-            {/* Real-time countdown timer for auctions - Enhanced */}
+            {/* Real-time countdown timer for auctions - placed to avoid action buttons */}
             {hasCountdown && (
-              <div className="absolute top-3 right-3 z-20">
+              <div className="absolute top-14 left-3 z-20">
                 <CountdownTimer
                   endsAt={listing.endsAt}
                   variant="badge"
