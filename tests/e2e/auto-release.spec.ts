@@ -64,6 +64,10 @@ test.beforeEach(() => {
  * Test: autoReleaseProtected processes eligible orders
  */
 test('autoReleaseProtected processes eligible orders', async () => {
+  // Auto-release is OFF by default in production; tests enable logic explicitly.
+  process.env.AUTO_RELEASE_ENABLED = 'true';
+  process.env.AUTO_RELEASE_HOURS_AFTER_DELIVERY = '1';
+
   // Arrange: Create eligible orders
   const now = new Date();
   const pastDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
@@ -103,7 +107,7 @@ test('autoReleaseProtected processes eligible orders', async () => {
     status: 'paid',
     stripePaymentIntentId: 'pi_test_2',
     sellerStripeAccountId: 'acct_test',
-    disputeDeadlineAt: pastDate,
+    deliveryConfirmedAt: pastDate,
     adminHold: false,
     disputeStatus: 'none',
     createdAt: now,
@@ -183,28 +187,15 @@ test('autoReleaseProtected processes eligible orders', async () => {
       return;
     }
 
-    // Check protected transaction eligibility
-    const protectedDays = orderData.protectedTransactionDaysSnapshot;
-    const protectionEndsAt = orderData.protectionEndsAt?.toDate?.() || (orderData.protectionEndsAt ? new Date(orderData.protectionEndsAt) : null);
-    const deliveryConfirmedAt = orderData.deliveryConfirmedAt;
+    // Auto-release eligibility (new): deliveryConfirmedAt + hoursAfterDelivery must have elapsed
+    const deliveryConfirmedAt = orderData.deliveryConfirmedAt?.toDate?.() || (orderData.deliveryConfirmedAt ? new Date(orderData.deliveryConfirmedAt) : null);
+    if (!deliveryConfirmedAt) return;
 
-    if (protectedDays !== null && protectedDays !== undefined) {
-      // Protected transaction: must have deliveryConfirmedAt and protectionEndsAt <= now
-      if (deliveryConfirmedAt && protectionEndsAt && protectionEndsAt.getTime() <= now.getTime()) {
-        eligibleOrders.push({ id: orderId, data: orderData });
-        return;
-      }
-    }
+    const hoursAfterDelivery = parseInt(process.env.AUTO_RELEASE_HOURS_AFTER_DELIVERY || '72', 10);
+    const minReleaseAt = new Date(deliveryConfirmedAt.getTime() + hoursAfterDelivery * 60 * 60 * 1000);
+    if (minReleaseAt.getTime() > now.getTime()) return;
 
-    // Check standard escrow eligibility
-    const disputeDeadline = orderData.disputeDeadlineAt?.toDate?.() || (orderData.disputeDeadlineAt ? new Date(orderData.disputeDeadlineAt) : null);
-    const status = orderData.status;
-
-    if (disputeDeadline && disputeDeadline.getTime() <= now.getTime()) {
-      if (['paid', 'in_transit', 'delivered'].includes(status)) {
-        eligibleOrders.push({ id: orderId, data: orderData });
-      }
-    }
+    eligibleOrders.push({ id: orderId, data: orderData });
   });
 
   // Process eligible orders with mock release function

@@ -1,8 +1,8 @@
 /**
  * POST /api/orders/[orderId]/accept
  * 
- * Buyer confirms receipt and accepts the order
- * Transitions: paid/in_transit/delivered → accepted
+ * Buyer confirms receipt
+ * Transitions: paid_held/paid/in_transit/delivered → buyer_confirmed (or ready_to_release if eligible)
  */
 
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
@@ -112,9 +112,9 @@ export async function POST(
       return json({ error: 'Unauthorized - You can only accept your own orders' }, { status: 403 });
     }
 
-    // Validate status transition
+    // Validate status transition (back-compat: 'paid' treated same as 'paid_held')
     const currentStatus = orderData.status as OrderStatus;
-    const allowedStatuses: OrderStatus[] = ['paid', 'in_transit', 'delivered'];
+    const allowedStatuses: OrderStatus[] = ['paid', 'paid_held', 'in_transit', 'delivered'];
     
     if (!allowedStatuses.includes(currentStatus)) {
       return json(
@@ -136,30 +136,35 @@ export async function POST(
       return json({ error: 'Order already accepted' }, { status: 400 });
     }
 
-    // Check if delivery was confirmed (required for protected transactions)
-    if (!orderData.deliveryConfirmedAt) {
+    // Require delivery to be marked before buyer can confirm receipt.
+    // Accept either seller-marked `deliveredAt` or ops/admin `deliveryConfirmedAt`.
+    if (!orderData.deliveredAt && !orderData.deliveryConfirmedAt) {
       return json(
-        { 
+        {
           error: 'Delivery not confirmed',
-          details: 'Delivery must be confirmed before buyer can accept. Please wait for delivery confirmation.'
+          details: 'Delivery must be marked as delivered before you can confirm receipt.',
         },
         { status: 400 }
       );
     }
 
-    // Update order to accepted
+    // Update order to buyer_confirmed (canonical)
     const now = new Date();
     const updateData: any = {
-      status: 'accepted' as OrderStatus,
+      status: 'buyer_confirmed' as OrderStatus,
+      buyerConfirmedAt: now,
+      // Maintain legacy fields for older UI and protected transaction code paths
       acceptedAt: now,
-      buyerAcceptedAt: now, // Protected transaction field
+      buyerAcceptedAt: now,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
     };
 
-    // If protected transaction and no open dispute, mark as ready to release
-    if (orderData.protectedTransactionDaysSnapshot && 
-        (!orderData.protectedDisputeStatus || orderData.protectedDisputeStatus === 'none')) {
+    // If protected transaction and no open dispute, mark as ready_to_release
+    if (
+      orderData.protectedTransactionDaysSnapshot &&
+      (!orderData.protectedDisputeStatus || orderData.protectedDisputeStatus === 'none')
+    ) {
       updateData.status = 'ready_to_release';
       updateData.payoutHoldReason = 'none';
     }
@@ -170,7 +175,7 @@ export async function POST(
       success: true,
       orderId,
       status: updateData.status,
-      acceptedAt: now,
+      buyerConfirmedAt: now,
       message: updateData.status === 'ready_to_release' 
         ? 'Order accepted. Funds will be released to seller.'
         : 'Order accepted successfully. Funds will be released to seller.',

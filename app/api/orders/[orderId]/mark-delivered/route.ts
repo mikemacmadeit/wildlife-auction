@@ -134,7 +134,7 @@ export async function POST(
 
     // Validate status transition
     const currentStatus = orderData.status as OrderStatus;
-    const allowedStatuses: OrderStatus[] = ['paid', 'in_transit'];
+    const allowedStatuses: OrderStatus[] = ['paid', 'paid_held', 'in_transit'];
     
     if (!allowedStatuses.includes(currentStatus)) {
       return json(
@@ -147,7 +147,7 @@ export async function POST(
     }
 
     // Check if already delivered or beyond
-    if (['delivered', 'accepted', 'completed', 'disputed'].includes(currentStatus)) {
+    if (['delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'completed', 'disputed'].includes(currentStatus)) {
       return json({ error: `Order is already ${currentStatus}` }, { status: 400 });
     }
 

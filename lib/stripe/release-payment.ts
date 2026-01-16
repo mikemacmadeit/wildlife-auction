@@ -6,6 +6,7 @@
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { stripe, isStripeConfigured } from './config';
 import { createAuditLog } from '@/lib/audit/logger';
+import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 
 export interface ReleasePaymentResult {
   success: boolean;
@@ -53,8 +54,10 @@ export async function releasePaymentForOrder(
   const disputeDeadline = orderData.disputeDeadlineAt?.toDate();
   const isDisputed = currentStatus === 'disputed';
   const hasAdminHold = orderData.adminHold === true;
-  const isAccepted = currentStatus === 'accepted';
+  const isAccepted = currentStatus === 'accepted' || currentStatus === 'buyer_confirmed';
   const isReadyToRelease = currentStatus === 'ready_to_release';
+  const isAutoRelease = releasedBy === 'system';
+  const chargebackStatus = orderData.chargebackStatus as string | undefined;
 
   // Check protected transaction dispute status
   const protectedDisputeStatus = orderData.disputeStatus;
@@ -73,6 +76,14 @@ export async function releasePaymentForOrder(
     return {
       success: false,
       error: 'Order has an open dispute. Admin must resolve dispute before release.',
+    };
+  }
+
+  // Block release if there is an active chargeback
+  if (chargebackStatus && ['active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(chargebackStatus)) {
+    return {
+      success: false,
+      error: 'Order has an active chargeback. Do not release funds until chargeback is resolved.',
     };
   }
 
@@ -137,25 +148,45 @@ export async function releasePaymentForOrder(
     }
   }
 
-  // Determine release eligibility
+  // Determine release eligibility.
+  //
+  // Core product rule: payouts are MANUAL (admin-triggered) after buyer confirms receipt.
+  // Auto-release is optional and gated by environment in the scheduled function.
   let isEligible = false;
 
-  // Always allow if accepted or ready_to_release
-  if (isAccepted || isReadyToRelease) {
-    isEligible = true;
-  }
-  // Allow if deadline passed and status allows it
-  else if (disputeDeadline && disputeDeadline.getTime() < now.getTime()) {
-    const eligibleStatuses = ['paid', 'in_transit', 'delivered'];
-    if (eligibleStatuses.includes(currentStatus)) {
+  const hasBuyerConfirmation =
+    !!orderData.buyerConfirmedAt ||
+    !!orderData.buyerAcceptedAt ||
+    !!orderData.acceptedAt ||
+    currentStatus === 'ready_to_release' ||
+    currentStatus === 'buyer_confirmed' ||
+    currentStatus === 'accepted';
+
+  const hasDeliveryMarked = !!orderData.deliveredAt || !!orderData.deliveryConfirmedAt;
+
+  if (!isAutoRelease) {
+    // Manual release requires buyer confirmation + delivery marked.
+    if ((isReadyToRelease || isAccepted) && hasBuyerConfirmation && hasDeliveryMarked) {
       isEligible = true;
     }
-  }
-
-  // Allow if protection window has passed
-  if (!isEligible && protectionEndsAt && protectionEndsAt.getTime() < now.getTime()) {
-    if (['paid', 'in_transit', 'delivered', 'accepted'].includes(currentStatus)) {
+  } else {
+    // Auto-release path (only called when enabled by scheduled job):
+    // - allow if ready_to_release / buyer_confirmed / accepted
+    // - OR if deadline/protection window elapsed AND delivery is marked
+    if ((isReadyToRelease || isAccepted) && hasDeliveryMarked) {
       isEligible = true;
+    } else if (hasDeliveryMarked) {
+      if (disputeDeadline && disputeDeadline.getTime() < now.getTime()) {
+        const eligibleStatuses = ['paid', 'paid_held', 'in_transit', 'delivered'];
+        if (eligibleStatuses.includes(currentStatus)) {
+          isEligible = true;
+        }
+      }
+      if (!isEligible && protectionEndsAt && protectionEndsAt.getTime() < now.getTime()) {
+        if (['paid', 'paid_held', 'in_transit', 'delivered', 'accepted', 'buyer_confirmed'].includes(currentStatus)) {
+          isEligible = true;
+        }
+      }
     }
   }
 
@@ -177,44 +208,69 @@ export async function releasePaymentForOrder(
   }
 
   // Validate required fields
-  const sellerStripeAccountId = orderData.sellerStripeAccountId;
-  const sellerAmount = orderData.sellerAmount;
-
-  if (!sellerStripeAccountId) {
-    console.error(`[releasePaymentForOrder] Order ${orderId} missing sellerStripeAccountId`);
-    return {
-      success: false,
-      error: 'Seller Stripe account not found',
-    };
+  const sellerId = orderData.sellerId as string | undefined;
+  if (!sellerId) {
+    return { success: false, error: 'Order missing sellerId' };
   }
 
-  if (!sellerAmount || sellerAmount <= 0) {
-    console.error(`[releasePaymentForOrder] Order ${orderId} has invalid sellerAmount: ${sellerAmount}`);
-    return {
-      success: false,
-      error: 'Invalid seller amount',
-    };
+  // Re-derive seller Stripe account ID from the seller user doc (DO NOT trust order.sellerStripeAccountId).
+  const sellerSnap = await db.collection('users').doc(sellerId).get();
+  const derivedSellerStripeAccountId = sellerSnap.exists ? (sellerSnap.data() as any)?.stripeAccountId : null;
+  if (!derivedSellerStripeAccountId || typeof derivedSellerStripeAccountId !== 'string') {
+    console.error(`[releasePaymentForOrder] Seller ${sellerId} missing stripeAccountId`);
+    return { success: false, error: 'Seller Stripe account not found (seller not payout-ready)' };
   }
 
-  // Convert seller amount to cents
-  const transferAmount = Math.round(sellerAmount * 100);
+  // Verify payment intent is succeeded (defense-in-depth)
+  const paymentIntentId = orderData.stripePaymentIntentId as string | undefined;
+  if (paymentIntentId && stripe) {
+    try {
+      const pi: any = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (pi?.status !== 'succeeded') {
+        return { success: false, error: `Payment is not settled yet (payment_intent status: ${pi?.status || 'unknown'})` };
+      }
+    } catch (e: any) {
+      return { success: false, error: `Unable to verify payment intent status: ${e?.message || 'unknown error'}` };
+    }
+  }
+
+  // Recompute seller payout amount from order snapshots (DO NOT trust order.sellerAmount).
+  const orderAmountUsd = Number(orderData.amount);
+  if (!Number.isFinite(orderAmountUsd) || orderAmountUsd <= 0) {
+    return { success: false, error: 'Invalid order amount' };
+  }
+  const amountCents = Math.round(orderAmountUsd * 100);
+  const feePercent = typeof orderData.platformFeePercent === 'number' ? orderData.platformFeePercent : MARKETPLACE_FEE_PERCENT;
+  const computedPlatformFeeCents = Math.round(amountCents * feePercent);
+  const computedSellerCents = amountCents - computedPlatformFeeCents;
+  if (computedSellerCents <= 0) {
+    return { success: false, error: 'Computed seller payout is invalid' };
+  }
+
+  const transferAmount = computedSellerCents;
+  const sellerAmount = computedSellerCents / 100;
 
   try {
     // Create Stripe transfer to seller's connected account
-    console.log(`[releasePaymentForOrder] Creating Stripe transfer for order ${orderId}: $${sellerAmount} to ${sellerStripeAccountId}`);
-    const transfer = await stripe.transfers.create({
-      amount: transferAmount,
-      currency: 'usd',
-      destination: sellerStripeAccountId,
-      metadata: {
-        orderId: orderId,
-        listingId: orderData.listingId,
-        buyerId: orderData.buyerId,
-        sellerId: orderData.sellerId,
-        releasedBy: releasedBy || 'system',
-        releaseType: releasedBy ? 'manual' : 'auto',
+    console.log(
+      `[releasePaymentForOrder] Creating Stripe transfer for order ${orderId}: $${sellerAmount} to ${derivedSellerStripeAccountId}`
+    );
+    const transfer = await stripe.transfers.create(
+      {
+        amount: transferAmount,
+        currency: 'usd',
+        destination: derivedSellerStripeAccountId,
+        metadata: {
+          orderId: orderId,
+          listingId: orderData.listingId,
+          buyerId: orderData.buyerId,
+          sellerId: orderData.sellerId,
+          releasedBy: releasedBy || 'system',
+          releaseType: releasedBy && releasedBy !== 'system' ? 'manual' : 'auto',
+        },
       },
-    });
+      { idempotencyKey: `transfer:${orderId}` }
+    );
 
     // Capture before state for audit
     const beforeState = {
@@ -251,7 +307,7 @@ export async function releasePaymentForOrder(
       metadata: {
         transferId: transfer.id,
         amount: sellerAmount,
-        sellerStripeAccountId: sellerStripeAccountId,
+        sellerStripeAccountId: derivedSellerStripeAccountId,
       },
       source: releasedBy ? 'admin_ui' : 'cron',
     });
@@ -272,7 +328,9 @@ export async function releasePaymentForOrder(
       });
     }
 
-    console.log(`[releasePaymentForOrder] Payment released successfully for order ${orderId}: Transfer ${transfer.id} of $${sellerAmount} to ${sellerStripeAccountId}`);
+    console.log(
+      `[releasePaymentForOrder] Payment released successfully for order ${orderId}: Transfer ${transfer.id} of $${sellerAmount} to ${derivedSellerStripeAccountId}`
+    );
 
     // Send payout notification email to seller
     try {

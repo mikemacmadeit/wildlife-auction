@@ -35,12 +35,13 @@ export function Footer() {
         { href: '/browse', label: 'Browse' },
         { href: '/dashboard/listings/new', label: 'List an Animal' },
         { href: '/how-it-works', label: 'How It Works' },
-        { href: '/pricing', label: 'Exposure Plans' },
+        { href: '/how-it-works/plans', label: 'Exposure Plans' },
+        { href: '/field-notes', label: 'Field Notes' },
       ],
       trust: [
-        { href: '/trust', label: 'Trust & Compliance' },
-        { href: '/trust#badges', label: 'Seller Verification' },
-        { href: '/trust#safety', label: 'Safety Tips' },
+        { href: '/how-it-works/trust', label: 'Trust & Compliance' },
+        { href: '/how-it-works/trust#badges', label: 'Seller Verification' },
+        { href: '/how-it-works/trust#safety', label: 'Safety Tips' },
       ],
       legal: [
         { href: '/privacy', label: 'Privacy Policy' },

@@ -185,7 +185,8 @@ export async function createAccountLink(): Promise<{ url: string }> {
  */
 export async function createCheckoutSession(
   listingId: string,
-  offerId?: string
+  offerId?: string,
+  paymentMethod?: 'card' | 'bank_transfer' | 'wire'
 ): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
   if (!user) {
@@ -204,7 +205,11 @@ export async function createCheckoutSession(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ listingId, ...(offerId ? { offerId } : {}) }),
+    body: JSON.stringify({
+      listingId,
+      ...(offerId ? { offerId } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+    }),
   });
 
   if (!response.ok) {
@@ -247,13 +252,13 @@ export async function releasePayment(orderId: string): Promise<{
     throw new Error('Failed to get authentication token');
   }
 
-  const response = await fetch(`${API_BASE}/transfers/release`, {
+  // Canonical admin release endpoint (order-scoped)
+  const response = await fetch(`/api/admin/orders/${orderId}/release`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ orderId }),
   });
 
   if (!response.ok) {
@@ -261,6 +266,32 @@ export async function releasePayment(orderId: string): Promise<{
     const errorMessage = error.error || error.message || 'Failed to release payment';
     console.error('Failed to release payment:', errorMessage, error);
     throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * Admin-only: Mark bank/wire order as paid_held (fallback if webhook delivery fails)
+ */
+export async function adminMarkOrderPaid(orderId: string): Promise<{ success: boolean; orderId: string; status: string }> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User must be authenticated');
+
+  const token = await getIdToken(user, true);
+  if (!token) throw new Error('Failed to get authentication token');
+
+  const response = await fetch(`/api/admin/orders/${orderId}/mark-paid`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || error.message || 'Failed to mark order paid');
   }
 
   return response.json();
@@ -308,7 +339,8 @@ export async function processRefund(orderId: string, reason: string, amount?: nu
 }
 
 /**
- * Accept an order (buyer confirms receipt)
+ * Confirm receipt (buyer)
+ * NOTE: `acceptOrder` is kept for backward compatibility with older UI code.
  */
 export async function acceptOrder(orderId: string): Promise<{
   success: boolean;
@@ -326,7 +358,7 @@ export async function acceptOrder(orderId: string): Promise<{
     throw new Error('Failed to get authentication token');
   }
 
-  const response = await fetch(`/api/orders/${orderId}/accept`, {
+  const response = await fetch(`/api/orders/${orderId}/confirm-receipt`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -343,6 +375,8 @@ export async function acceptOrder(orderId: string): Promise<{
 
   return response.json();
 }
+
+export const confirmReceipt = acceptOrder;
 
 /**
  * Open a dispute on an order

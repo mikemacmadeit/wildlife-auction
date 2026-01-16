@@ -10,6 +10,7 @@ import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { Providers } from '@/components/providers';
 import { PublicEmailCaptureMount } from '@/components/marketing/PublicEmailCaptureMount';
 import { HelpLauncher } from '@/components/help/HelpLauncher';
+import { getSiteUrl } from '@/lib/site-url';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -47,6 +48,7 @@ const foundersGrotesk = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: 'Wildlife Exchange | Texas Exotic & Breeder Animal Marketplace',
   description: 'Buy and sell exotics, breeder stock, and ranch essentials across Texas. Auctions, fixed price, and classifieds—built for serious buyers and sellers.',
   // Icons can be added when favicon files are placed in /public/logos/

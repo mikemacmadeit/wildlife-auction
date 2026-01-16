@@ -11,6 +11,8 @@ import { createOffer, acceptOffer, counterOffer, declineOffer, withdrawOffer, ge
 import { createCheckoutSession } from '@/lib/stripe/api';
 import type { Listing } from '@/lib/types';
 import { Loader2, Handshake, Clock, CheckCircle2, XCircle, RefreshCw, DollarSign } from 'lucide-react';
+import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
+import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
 
 type OfferDTO = {
   offerId: string;
@@ -44,6 +46,14 @@ export function OfferPanel(props: { listing: Listing }) {
   const [mode, setMode] = useState<'make' | 'counter'>('make');
   const [amount, setAmount] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [pendingCheckoutAmount, setPendingCheckoutAmount] = useState<number | null>(null);
+  const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<{
+    attemptedMethod: PaymentMethodChoice;
+    message: string;
+    technical?: string;
+  } | null>(null);
 
   const eligible = useMemo(() => {
     const enabled = !!(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled);
@@ -177,11 +187,34 @@ export function OfferPanel(props: { listing: Listing }) {
     if (!offer) return;
     setLoading(true);
     try {
-      const { url } = await createCheckoutSession(listing.id, offer.offerId);
-      window.location.href = url;
+      const purchaseAmount = Number(offer.acceptedAmount ?? offer.currentAmount);
+      setPendingCheckoutAmount(Number.isFinite(purchaseAmount) ? purchaseAmount : 0);
+      setPaymentDialogOpen(true);
+      setLoading(false);
+      return;
     } catch (e: any) {
       toast({ title: 'Checkout failed', description: e?.message || 'Please try again.', variant: 'destructive' });
       setLoading(false);
+    }
+  };
+
+  const handleSelectPaymentMethod = async (method: PaymentMethodChoice) => {
+    if (!offer) return;
+    setPaymentDialogOpen(false);
+    setLoading(true);
+    try {
+      const { url } = await createCheckoutSession(listing.id, offer.offerId, method);
+      window.location.href = url;
+    } catch (e: any) {
+      setCheckoutError({
+        attemptedMethod: method,
+        message: 'We couldn’t start checkout. You can retry card or switch to bank transfer / wire.',
+        technical: e?.message ? String(e.message) : String(e),
+      });
+      setCheckoutErrorOpen(true);
+      setLoading(false);
+    } finally {
+      setPendingCheckoutAmount(null);
     }
   };
 
@@ -291,6 +324,30 @@ export function OfferPanel(props: { listing: Listing }) {
           )}
         </div>
       )}
+
+      <PaymentMethodDialog
+        open={paymentDialogOpen}
+        onOpenChange={(open) => {
+          setPaymentDialogOpen(open);
+          if (!open) setPendingCheckoutAmount(null);
+        }}
+        amountUsd={pendingCheckoutAmount || 0}
+        onSelect={handleSelectPaymentMethod}
+      />
+
+      <CheckoutStartErrorDialog
+        open={checkoutErrorOpen}
+        onOpenChange={(open) => {
+          setCheckoutErrorOpen(open);
+          if (!open) setCheckoutError(null);
+        }}
+        attemptedMethod={checkoutError?.attemptedMethod || 'card'}
+        errorMessage={checkoutError?.message || 'Checkout could not be started.'}
+        technicalDetails={checkoutError?.technical}
+        onRetryCard={() => handleSelectPaymentMethod('card')}
+        onSwitchBank={() => handleSelectPaymentMethod('bank_transfer')}
+        onSwitchWire={() => handleSelectPaymentMethod('wire')}
+      />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">

@@ -23,6 +23,7 @@ export type AuditActionType =
   | 'chargeback_funds_reinstated'
   | 'auto_release_executed'
   | 'delivery_confirmed'
+  | 'order_marked_paid_admin'
   | 'order_created'
   | 'order_status_changed'
   | 'subscription_created'

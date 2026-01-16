@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { Order, OrderStatus } from '@/lib/types';
-import { acceptOrder, disputeOrder } from '@/lib/stripe/api';
+import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
 import {
   Dialog,
@@ -89,15 +89,15 @@ export default function OrdersPage() {
     }
   }, [user, authLoading]);
 
-  const handleAcceptOrder = async (orderId: string) => {
+  const handleConfirmReceipt = async (orderId: string) => {
     if (!user) return;
     
     try {
       setProcessingOrderId(orderId);
-      await acceptOrder(orderId);
+      await confirmReceipt(orderId);
       toast({
-        title: 'Order accepted',
-        description: 'You have confirmed receipt. Funds will be released to the seller.',
+        title: 'Receipt confirmed',
+        description: 'Confirm only after you have received the animal/equipment. Funds remain held until admin release.',
       });
       // Refresh orders
       const userOrders = await getOrdersForUser(user.uid, 'buyer');
@@ -184,7 +184,7 @@ export default function OrdersPage() {
 
   const canAcceptOrDispute = (order: Order): boolean => {
     const status = order.status as OrderStatus;
-    return ['paid', 'in_transit', 'delivered'].includes(status) && !order.stripeTransferId;
+    return ['paid', 'paid_held', 'in_transit', 'delivered'].includes(status) && !order.stripeTransferId;
   };
 
   const isDisputeDeadlinePassed = (order: Order): boolean => {
@@ -197,12 +197,17 @@ export default function OrdersPage() {
       case 'completed':
         return <CheckCircle className="h-5 w-5 text-accent" />;
       case 'accepted':
+      case 'buyer_confirmed':
         return <CheckCircle className="h-5 w-5 text-green-600" />;
       case 'delivered':
         return <Package className="h-5 w-5 text-blue-600" />;
       case 'in_transit':
         return <Clock className="h-5 w-5 text-blue-500" />;
       case 'paid':
+      case 'paid_held':
+        return <Clock className="h-5 w-5 text-orange-500" />;
+      case 'awaiting_bank_transfer':
+      case 'awaiting_wire':
         return <Clock className="h-5 w-5 text-orange-500" />;
       case 'disputed':
         return <XCircle className="h-5 w-5 text-destructive" />;
@@ -221,13 +226,21 @@ export default function OrdersPage() {
       case 'completed':
         return <Badge variant="default" className="bg-accent text-accent-foreground">Completed</Badge>;
       case 'accepted':
-        return <Badge variant="default" className="bg-green-600 text-white">Accepted</Badge>;
+      case 'buyer_confirmed':
+        return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
       case 'delivered':
         return <Badge variant="default" className="bg-blue-600 text-white">Delivered</Badge>;
       case 'in_transit':
         return <Badge variant="default" className="bg-blue-500 text-white">In Transit</Badge>;
       case 'paid':
+      case 'paid_held':
+        return <Badge variant="default" className="bg-orange-500 text-white">Paid (Held)</Badge>;
+      case 'paid':
         return <Badge variant="default" className="bg-orange-500 text-white">Paid</Badge>;
+      case 'awaiting_bank_transfer':
+        return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Bank Transfer</Badge>;
+      case 'awaiting_wire':
+        return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Wire</Badge>;
       case 'disputed':
         return <Badge variant="destructive">Disputed</Badge>;
       case 'pending':
@@ -290,7 +303,7 @@ export default function OrdersPage() {
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 space-y-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">My Orders</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">My Purchases</h1>
           <p className="text-muted-foreground">View your purchase history</p>
         </div>
 
@@ -322,7 +335,7 @@ export default function OrdersPage() {
                   <div className="flex gap-2 pt-2 border-t">
                     <Button
                       size="sm"
-                      onClick={() => handleAcceptOrder(order.id)}
+                      onClick={() => handleConfirmReceipt(order.id)}
                       disabled={processingOrderId === order.id}
                       className="flex-1"
                     >
@@ -334,7 +347,7 @@ export default function OrdersPage() {
                       ) : (
                         <>
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Accept
+                          Confirm Receipt
                         </>
                       )}
                     </Button>
@@ -414,7 +427,7 @@ export default function OrdersPage() {
                               <div className="flex gap-2 mt-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => handleAcceptOrder(order.id)}
+                                  onClick={() => handleConfirmReceipt(order.id)}
                                   disabled={processingOrderId === order.id}
                                   className="text-xs"
                                 >

@@ -100,7 +100,7 @@ export default function AdminPayoutsPage() {
         
         // Filter to only paid/completed orders (client-side filter before processing)
         // Include all escrow statuses for admin view
-        const escrowStatuses = ['paid', 'in_transit', 'delivered', 'accepted', 'disputed', 'completed'];
+        const escrowStatuses = ['paid', 'paid_held', 'awaiting_bank_transfer', 'awaiting_wire', 'in_transit', 'delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'disputed', 'completed'];
         if (!escrowStatuses.includes(data.status)) {
           continue;
         }

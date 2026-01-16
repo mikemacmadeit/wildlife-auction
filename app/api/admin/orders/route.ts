@@ -132,11 +132,17 @@ export async function GET(request: Request) {
     const now = Timestamp.now();
 
     if (filter === 'escrow') {
-      // Orders in escrow: status == 'paid' AND no transfer ID
+      // Orders in escrow/held: paid funds awaiting release OR high-ticket awaiting payment confirmation
       orders = orders.filter((order: any) => {
         const status = order.status as OrderStatus;
         const hasTransfer = !!order.stripeTransferId;
-        return status === 'paid' && !hasTransfer;
+        if (hasTransfer) return false;
+        return (
+          status === 'paid' ||
+          status === 'paid_held' ||
+          status === 'awaiting_bank_transfer' ||
+          status === 'awaiting_wire'
+        );
       });
     } else if (filter === 'protected') {
       // Protected transactions: has protectedTransactionDaysSnapshot AND deliveryConfirmedAt exists
@@ -171,26 +177,12 @@ export async function GET(request: Request) {
           return false;
         }
 
-        // Check if buyer accepted
-        if (order.buyerAcceptedAt) return true;
+        // Manual release queue: buyer confirmed + delivery marked
+        const hasBuyerConfirm = !!order.buyerConfirmedAt || !!order.buyerAcceptedAt || !!order.acceptedAt;
+        const hasDelivery = !!order.deliveredAt || !!order.deliveryConfirmedAt;
 
-        // Check protected transaction window
-        if (order.protectedTransactionDaysSnapshot !== null && order.protectedTransactionDaysSnapshot !== undefined) {
-          if (order.protectionEndsAt) {
-            const protectionEndsAt = order.protectionEndsAt.toDate ? order.protectionEndsAt.toDate() : new Date(order.protectionEndsAt);
-            if (protectionEndsAt.getTime() <= Date.now() && order.deliveryConfirmedAt) {
-              return ['paid', 'in_transit', 'delivered'].includes(status);
-            }
-          }
-          return false;
-        }
-
-        // Check standard escrow dispute deadline
-        if (order.disputeDeadlineAt) {
-          const deadline = order.disputeDeadlineAt.toDate ? order.disputeDeadlineAt.toDate() : new Date(order.disputeDeadlineAt);
-          if (deadline.getTime() <= Date.now()) {
-            return ['paid', 'in_transit', 'delivered'].includes(status);
-          }
+        if ((status === 'ready_to_release' || status === 'buyer_confirmed' || status === 'accepted') && hasBuyerConfirm && hasDelivery) {
+          return true;
         }
 
         return false;
@@ -205,7 +197,7 @@ export async function GET(request: Request) {
       // Convert Timestamps to ISO strings
       const timestampFields = [
         'createdAt', 'updatedAt', 'paidAt', 'disputeDeadlineAt', 'deliveredAt',
-        'acceptedAt', 'disputedAt', 'deliveryConfirmedAt', 'protectionStartAt',
+        'acceptedAt', 'buyerConfirmedAt', 'releaseEligibleAt', 'disputedAt', 'deliveryConfirmedAt', 'protectionStartAt',
         'protectionEndsAt', 'buyerAcceptedAt', 'disputeOpenedAt', 'releasedAt',
         'refundedAt', 'completedAt'
       ];

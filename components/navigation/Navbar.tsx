@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut } from 'lucide-react';
+import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -63,8 +63,13 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/browse', label: 'Browse' },
     { href: '/how-it-works', label: 'How It Works' },
-    { href: '/pricing', label: 'Exposure Plans' },
-    { href: '/trust', label: 'Trust & Compliance' },
+    { href: '/field-notes', label: 'Field Notes' },
+  ];
+
+  const howItWorksItems = [
+    { href: '/how-it-works', label: 'Overview' },
+    { href: '/how-it-works/plans', label: 'Exposure Plans' },
+    { href: '/how-it-works/trust', label: 'Trust & Compliance' },
   ];
 
   return (
@@ -113,11 +118,8 @@ export function Navbar() {
                 />
               </div>
             </div>
-            <span className="text-lg md:text-xl lg:text-2xl font-extrabold whitespace-nowrap tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] hidden sm:inline">
+            <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none">
               Wildlife Exchange
-            </span>
-            <span className="text-lg font-extrabold whitespace-nowrap tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] sm:hidden">
-              WE
             </span>
           </Link>
 
@@ -125,10 +127,48 @@ export function Navbar() {
           <nav className="hidden lg:flex items-center justify-center gap-0.5 xl:gap-1 min-w-0 px-2 xl:px-4 overflow-hidden">
             <div className="flex items-center gap-0.5 xl:gap-1 flex-wrap justify-center max-w-full">
               {navLinks.map((link) => {
-                const isActive = pathname === link.href || 
-                  (link.href !== '/' && pathname?.startsWith(link.href + '/'));
-                // Hide "Trust & Compliance" on smaller desktop screens, show shorter version
-                const isLongLink = link.label === 'Trust & Compliance';
+                const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href + '/'));
+
+                if (link.href === '/how-it-works') {
+                  const isHowActive = pathname === '/how-it-works' || pathname?.startsWith('/how-it-works/');
+                  return (
+                    <DropdownMenu key={link.href}>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className={cn(
+                            'px-2 xl:px-3 py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
+                            'hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1.5',
+                            isHowActive && 'text-primary dark:text-[hsl(37,27%,70%)]'
+                          )}
+                          type="button"
+                        >
+                          <span className="relative z-10">{link.label}</span>
+                          <ChevronDown className="h-4 w-4 opacity-60" />
+                          {isHowActive && (
+                            <motion.div
+                              layoutId="activeTab"
+                              className="absolute bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-[hsl(37,27%,70%)] rounded-full"
+                              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                            />
+                          )}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-56">
+                        <DropdownMenuLabel>How It Works</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {howItWorksItems.map((it) => (
+                          <DropdownMenuItem key={it.href} asChild>
+                            <Link href={it.href} className="cursor-pointer">
+                              {it.label}
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                }
+
+                const isFieldNotes = link.href === '/field-notes';
                 return (
                   <Link
                     key={link.href}
@@ -137,9 +177,10 @@ export function Navbar() {
                       'px-2 xl:px-3 py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
                       'hover:bg-muted/50 hover:text-foreground',
                       isActive && 'text-primary dark:text-[hsl(37,27%,70%)]',
-                      isLongLink && 'hidden xl:inline-flex'
+                      isFieldNotes && 'inline-flex items-center gap-2'
                     )}
                   >
+                    {isFieldNotes ? <BookOpen className="h-4 w-4 opacity-70" /> : null}
                     <span className="relative z-10">{link.label}</span>
                     {isActive && (
                       <motion.div
@@ -151,24 +192,6 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              {/* Shorter "Trust" link for medium desktop */}
-              <Link
-                href="/trust"
-                className={cn(
-                  'px-2 xl:px-3 py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
-                  'hover:bg-muted/50 hover:text-foreground xl:hidden',
-                  (pathname === '/trust' || pathname?.startsWith('/trust/')) && 'text-primary dark:text-[hsl(37,27%,70%)]'
-                )}
-              >
-                <span className="relative z-10">Trust</span>
-                {(pathname === '/trust' || pathname?.startsWith('/trust/')) && (
-                  <motion.div
-                    layoutId="activeTabTrust"
-                    className="absolute bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-[hsl(37,27%,70%)] rounded-full"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  />
-                )}
-              </Link>
             </div>
           </nav>
 
@@ -323,8 +346,49 @@ export function Navbar() {
                 </SheetHeader>
                 <div className="flex flex-col gap-2 mt-6 pb-4">
                   {navLinks.map((link) => {
-                    const isActive = pathname === link.href || 
-                      (link.href !== '/' && pathname?.startsWith(link.href + '/'));
+                    const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href + '/'));
+
+                    if (link.href === '/how-it-works') {
+                      const isHowActive = pathname === '/how-it-works' || pathname?.startsWith('/how-it-works/');
+                      return (
+                        <div key={link.href} className="space-y-1">
+                          <SheetClose asChild>
+                            <Link
+                              href="/how-it-works"
+                              className={cn(
+                                'px-4 py-3 rounded-lg text-base font-semibold transition-all min-h-[48px] flex items-center w-full',
+                                'hover:bg-muted active:bg-muted',
+                                isHowActive && 'bg-primary/10 text-primary dark:text-[hsl(37,27%,70%)] border-l-4 border-primary dark:border-[hsl(37,27%,70%)]'
+                              )}
+                            >
+                              <span className="truncate">How It Works</span>
+                            </Link>
+                          </SheetClose>
+                          <div className="pl-4 space-y-1">
+                            {howItWorksItems
+                              .filter((it) => it.href !== '/how-it-works')
+                              .map((it) => {
+                                const subActive = pathname === it.href || pathname?.startsWith(it.href + '/');
+                                return (
+                                  <SheetClose key={it.href} asChild>
+                                    <Link
+                                      href={it.href}
+                                      className={cn(
+                                        'px-4 py-2 rounded-lg text-sm font-semibold transition-all min-h-[40px] flex items-center w-full',
+                                        'hover:bg-muted/60 active:bg-muted',
+                                        subActive && 'bg-primary/10 text-primary dark:text-[hsl(37,27%,70%)]'
+                                      )}
+                                    >
+                                      <span className="truncate">{it.label}</span>
+                                    </Link>
+                                  </SheetClose>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <SheetClose key={link.href} asChild>
                         <Link

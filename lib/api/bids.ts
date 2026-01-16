@@ -27,3 +27,39 @@ export async function placeBidServer(params: {
   return { ok: true, newCurrentBid: data.newCurrentBid, bidId: data.bidId };
 }
 
+export type MyBidRow = {
+  kind: 'bid';
+  listingId: string;
+  listingType: string;
+  listingTitle: string;
+  listingImage?: string;
+  sellerId?: string;
+  sellerName?: string;
+  myMaxBid: number;
+  myBidCount: number;
+  myLastBidAt: number | null;
+  currentHighestBid: number;
+  endsAt: number | null;
+  status: 'WINNING' | 'OUTBID' | 'WON' | 'LOST';
+};
+
+export async function getMyBids(params?: { limit?: number }): Promise<{ ok: true; bids: MyBidRow[] } | { ok: false; error: string }> {
+  const user = auth.currentUser;
+  if (!user) return { ok: false, error: 'You must be signed in to view your bids.' };
+
+  const token = await getIdToken(user, true);
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set('limit', String(params.limit));
+
+  const res = await fetch(`/api/bids/mine?${qs.toString()}`, {
+    method: 'GET',
+    headers: { authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) {
+    return { ok: false, error: data?.error || data?.message || 'Failed to load bids' };
+  }
+  return { ok: true, bids: (data.bids || []) as MyBidRow[] };
+}
+

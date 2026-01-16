@@ -61,7 +61,7 @@ import { Order, OrderStatus, DisputeStatus, PayoutHoldReason } from '@/lib/types
 import { getAdminOrders } from '@/lib/stripe/api';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
-import { releasePayment, processRefund, resolveDispute, confirmDelivery } from '@/lib/stripe/api';
+import { releasePayment, processRefund, resolveDispute, confirmDelivery, adminMarkOrderPaid } from '@/lib/stripe/api';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
 import { useDebounce } from '@/hooks/use-debounce';
 import Link from 'next/link';
@@ -235,6 +235,27 @@ export default function AdminOpsPage() {
     }
   }, [loadOrders, toast]);
 
+  const handleMarkPaid = useCallback(async (orderId: string) => {
+    setProcessingOrderId(orderId);
+    try {
+      await adminMarkOrderPaid(orderId);
+      toast({
+        title: 'Payment confirmed',
+        description: 'Order marked as paid (held). Funds remain held until manual release.',
+      });
+      await loadOrders();
+    } catch (error: any) {
+      console.error('Error marking paid:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to mark order paid',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingOrderId(null);
+    }
+  }, [loadOrders, toast]);
+
   const handleProcessRefund = useCallback(async () => {
     if (!refundDialogOpen) return;
     
@@ -319,13 +340,13 @@ export default function AdminOpsPage() {
   // Calculate stats
   const stats = useMemo(() => {
     const total = orders.length;
-    const paid = orders.filter(o => o.status === 'paid' && !o.stripeTransferId).length;
+    const paid = orders.filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId).length;
     const completed = orders.filter(o => o.status === 'completed').length;
     const totalValue = orders.reduce((sum, o) => sum + o.amount, 0);
     const totalFees = orders.reduce((sum, o) => sum + o.platformFee, 0);
     const totalPayouts = orders.reduce((sum, o) => sum + o.sellerAmount, 0);
     const pendingPayouts = orders
-      .filter(o => o.status === 'paid' && !o.stripeTransferId)
+      .filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId)
       .reduce((sum, o) => sum + o.sellerAmount, 0);
 
     return { total, paid, completed, totalValue, totalFees, totalPayouts, pendingPayouts };
@@ -362,10 +383,12 @@ export default function AdminOpsPage() {
       if (order.stripeTransferId || order.status === 'completed') return false;
       if (order.adminHold) return false;
       if (order.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(order.disputeStatus)) return false;
-      if (order.buyerAcceptedAt) return true;
-      if (order.protectedTransactionDaysSnapshot && order.protectionEndsAt && order.protectionEndsAt.getTime() <= Date.now() && order.deliveryConfirmedAt) return true;
-      if (!order.protectedTransactionDaysSnapshot && order.disputeDeadlineAt && order.disputeDeadlineAt.getTime() <= Date.now()) return true;
-      return false;
+
+      const hasBuyerConfirm = !!(order.buyerConfirmedAt || order.buyerAcceptedAt || order.acceptedAt);
+      const hasDelivery = !!(order.deliveredAt || order.deliveryConfirmedAt);
+      if (!hasBuyerConfirm || !hasDelivery) return false;
+
+      return order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted';
     });
 
     if (eligibleOrders.length === 0) {
@@ -518,12 +541,22 @@ export default function AdminOpsPage() {
     switch (status) {
       case 'paid':
         return <Badge variant="default" className="bg-orange-500 text-white">Paid</Badge>;
+      case 'paid_held':
+        return <Badge variant="default" className="bg-orange-500 text-white">Paid (Held)</Badge>;
+      case 'awaiting_bank_transfer':
+        return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Bank Transfer</Badge>;
+      case 'awaiting_wire':
+        return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Wire</Badge>;
       case 'in_transit':
         return <Badge variant="default" className="bg-blue-500 text-white">In Transit</Badge>;
       case 'delivered':
         return <Badge variant="default" className="bg-blue-600 text-white">Delivered</Badge>;
       case 'accepted':
-        return <Badge variant="default" className="bg-green-600 text-white">Accepted</Badge>;
+        return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
+      case 'buyer_confirmed':
+        return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
+      case 'ready_to_release':
+        return <Badge variant="default" className="bg-emerald-700 text-white">Ready to Release</Badge>;
       case 'completed':
         return <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">Completed</Badge>;
       case 'refunded':
@@ -541,6 +574,8 @@ export default function AdminOpsPage() {
         return 'Protection Window';
       case 'dispute_open':
         return 'Dispute Open';
+      case 'admin_hold':
+        return 'Admin Hold';
       case 'none':
         return 'None';
       default:
@@ -704,7 +739,7 @@ export default function AdminOpsPage() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="escrow">
             <DollarSign className="h-4 w-4 mr-2" />
-            Orders in Escrow ({orders.filter(o => o.status === 'paid' && !o.stripeTransferId).length})
+            Orders in Escrow ({orders.filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId).length})
           </TabsTrigger>
           <TabsTrigger value="protected">
             <Shield className="h-4 w-4 mr-2" />
@@ -720,10 +755,10 @@ export default function AdminOpsPage() {
               if (o.stripeTransferId || o.status === 'completed') return false;
               if (o.adminHold) return false;
               if (o.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(o.disputeStatus)) return false;
-              if (o.buyerAcceptedAt) return true;
-              if (o.protectedTransactionDaysSnapshot && o.protectionEndsAt && o.protectionEndsAt.getTime() <= Date.now()) return true;
-              if (!o.protectedTransactionDaysSnapshot && o.disputeDeadlineAt && o.disputeDeadlineAt.getTime() <= Date.now()) return true;
-              return false;
+              const hasBuyerConfirm = !!(o.buyerConfirmedAt || o.buyerAcceptedAt || o.acceptedAt);
+              const hasDelivery = !!(o.deliveredAt || o.deliveryConfirmedAt);
+              if (!hasBuyerConfirm || !hasDelivery) return false;
+              return o.status === 'ready_to_release' || o.status === 'buyer_confirmed' || o.status === 'accepted';
             }).length})
           </TabsTrigger>
         </TabsList>
@@ -768,6 +803,7 @@ export default function AdminOpsPage() {
                       order={order}
                       onRelease={() => setReleaseDialogOpen(order.id)}
                       onRefund={() => setRefundDialogOpen(order.id)}
+                      onMarkPaid={() => handleMarkPaid(order.id)}
                       onView={() => handleViewOrder(order)}
                       getStatusBadge={getStatusBadge}
                       getHoldReasonText={getHoldReasonText}
@@ -1281,6 +1317,7 @@ function OrderCard({
   order,
   onRelease,
   onRefund,
+  onMarkPaid,
   onView,
   getStatusBadge,
   getHoldReasonText,
@@ -1288,10 +1325,14 @@ function OrderCard({
   order: OrderWithDetails;
   onRelease: () => void;
   onRefund: () => void;
+  onMarkPaid: () => void;
   onView: () => void;
   getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
   getHoldReasonText: (reason: PayoutHoldReason) => string;
 }) {
+  const isAwaitingBankRails = order.status === 'awaiting_bank_transfer' || order.status === 'awaiting_wire';
+  const isReleaseCandidate = order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted';
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -1317,10 +1358,22 @@ function OrderCard({
               <Eye className="h-4 w-4 mr-2" />
               View
             </Button>
-            <Button size="sm" onClick={onRelease} className="bg-green-600 hover:bg-green-700">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Release
-            </Button>
+            {isAwaitingBankRails ? (
+              <Button size="sm" onClick={onMarkPaid} className="bg-blue-600 hover:bg-blue-700">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Mark Paid (Stripe)
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={onRelease}
+                disabled={!isReleaseCandidate}
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-50"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Release
+              </Button>
+            )}
             <Button variant="destructive" size="sm" onClick={onRefund}>
               Refund
             </Button>
@@ -1478,11 +1531,12 @@ function ReadyToReleaseCard({
   onView: () => void;
   getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
 }) {
-  const eligibleReason = order.buyerAcceptedAt 
-    ? 'Buyer Accepted'
-    : order.protectionEndsAt && order.protectionEndsAt.getTime() <= Date.now()
-    ? 'Protection Window Expired'
-    : 'Dispute Deadline Passed';
+  const eligibleReason =
+    order.status === 'ready_to_release'
+      ? 'Ready to release'
+      : order.buyerConfirmedAt || order.buyerAcceptedAt || order.acceptedAt
+        ? 'Buyer confirmed receipt'
+        : 'Eligible';
   
   return (
     <Card>

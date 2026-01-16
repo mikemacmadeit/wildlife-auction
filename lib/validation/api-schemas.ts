@@ -11,6 +11,13 @@ import { z } from 'zod';
 export const createCheckoutSessionSchema = z.object({
   listingId: z.string().min(1, 'Listing ID is required').max(100),
   offerId: z.string().max(100).optional(),
+  /**
+   * Payment method selection step (high-ticket rails).
+   * - card: existing Stripe Checkout card flow
+   * - bank_transfer: Stripe Checkout bank transfer (customer balance) flow
+   * - wire: treated as bank transfer rails in Stripe (instructions shown in Checkout)
+   */
+  paymentMethod: z.enum(['card', 'bank_transfer', 'wire']).optional(),
 });
 
 /**

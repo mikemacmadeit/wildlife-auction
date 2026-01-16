@@ -1,0 +1,66 @@
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import type { PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
+
+export function CheckoutStartErrorDialog(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  attemptedMethod: PaymentMethodChoice;
+  errorMessage: string;
+  technicalDetails?: string;
+  onRetryCard: () => void | Promise<void>;
+  onSwitchBank: () => void | Promise<void>;
+  onSwitchWire: () => void | Promise<void>;
+}) {
+  const { open, onOpenChange, attemptedMethod, errorMessage, technicalDetails, onRetryCard, onSwitchBank, onSwitchWire } = props;
+  const [showTech, setShowTech] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Checkout couldn’t be started</DialogTitle>
+          <DialogDescription>
+            Your bank declined this transaction. This is common for large purchases. You can contact your bank to authorize the charge, or switch to bank transfer or wire.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold">What happened</div>
+              <Badge variant="secondary">Tried: {attemptedMethod}</Badge>
+            </div>
+            <div className="text-muted-foreground mt-1">{errorMessage}</div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Button variant="outline" onClick={onSwitchBank}>Switch to Bank</Button>
+            <Button variant="outline" onClick={onSwitchWire}>Switch to Wire</Button>
+            <Button onClick={onRetryCard}>Retry Card</Button>
+          </div>
+
+          {technicalDetails ? (
+            <div className="rounded-lg border p-3">
+              <button
+                type="button"
+                className="w-full flex items-center justify-between text-sm font-semibold"
+                onClick={() => setShowTech((s) => !s)}
+              >
+                Technical details
+                {showTech ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {showTech ? (
+                <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{technicalDetails}</pre>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

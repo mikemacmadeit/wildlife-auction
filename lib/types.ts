@@ -210,6 +210,7 @@ export interface Listing {
   // Pricing (type-specific)
   price?: number; // For fixed price listings
   currentBid?: number; // For auction listings (denormalized from bids)
+  currentBidderId?: string; // For auction listings (denormalized: current highest bidder UID)
   reservePrice?: number; // For auction listings
   startingBid?: number; // For auction listings
   
@@ -329,13 +330,39 @@ export interface Bid {
   timestamp: Date;
 }
 
-export type OrderStatus = 'pending' | 'paid' | 'in_transit' | 'delivered' | 'accepted' | 'disputed' | 'completed' | 'refunded' | 'cancelled' | 'ready_to_release';
+/**
+ * Canonical order state machine (with backwards compatibility).
+ *
+ * - New canonical: paid_held → in_transit → delivered → buyer_confirmed → ready_to_release → completed
+ * - Legacy/back-compat: `paid` ~= `paid_held`, `accepted` ~= `buyer_confirmed`
+ */
+export type OrderStatus =
+  | 'pending'
+  // High-ticket rails (async / offline-like)
+  | 'awaiting_bank_transfer'
+  | 'awaiting_wire'
+  // Canonical paid+held (funds in platform, not released)
+  | 'paid_held'
+  // Legacy paid (still present in older docs)
+  | 'paid'
+  | 'in_transit'
+  | 'delivered'
+  | 'buyer_confirmed'
+  // Legacy accepted (still present in older docs)
+  | 'accepted'
+  | 'ready_to_release'
+  | 'disputed'
+  | 'completed'
+  | 'refunded'
+  | 'cancelled';
 
 export type DisputeReason = 'death' | 'serious_illness' | 'injury' | 'escape' | 'wrong_animal';
 
 export type DisputeStatus = 'none' | 'open' | 'needs_evidence' | 'under_review' | 'resolved_refund' | 'resolved_partial_refund' | 'resolved_release' | 'cancelled';
 
-export type PayoutHoldReason = 'none' | 'protection_window' | 'dispute_open';
+export type PayoutHoldReason = 'none' | 'protection_window' | 'dispute_open' | 'admin_hold';
+
+export type OrderPaymentMethod = 'card' | 'bank_transfer' | 'wire';
 
 export interface DisputeEvidence {
   type: 'photo' | 'video' | 'vet_report' | 'delivery_doc' | 'tag_microchip';
@@ -369,10 +396,17 @@ export interface Order {
   completedAt?: Date;
   
   // Escrow workflow fields
-  paidAt?: Date; // When payment was captured
+  paymentMethod?: OrderPaymentMethod; // How buyer paid (card vs bank rails)
+  paidAt?: Date; // When payment was confirmed/settled into platform (card: immediate; bank/wire: async)
   disputeDeadlineAt?: Date; // Deadline for buyer to dispute
   deliveredAt?: Date; // When seller marked as delivered
-  acceptedAt?: Date; // When buyer accepted/received
+  /**
+   * @deprecated Prefer buyerConfirmedAt/buyerAcceptedAt.
+   * Legacy field used by older UI code paths.
+   */
+  acceptedAt?: Date; // When buyer accepted/received (legacy)
+  buyerConfirmedAt?: Date; // When buyer confirms receipt (canonical)
+  releaseEligibleAt?: Date; // When order becomes eligible for admin release (computed server-side)
   disputedAt?: Date; // When buyer opened dispute
   disputeReason?: string; // Reason for dispute (legacy, string-based)
   disputeNotes?: string; // Additional dispute details (used for both regular and protected disputes)

@@ -17,6 +17,8 @@ import { captureException } from '@/lib/monitoring/capture';
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
   handleCheckoutSessionCompleted,
+  handleCheckoutSessionAsyncPaymentSucceeded,
+  handleCheckoutSessionAsyncPaymentFailed,
   handleChargeDisputeCreated,
   handleChargeDisputeClosed,
   handleChargeDisputeFundsWithdrawn,
@@ -235,6 +237,20 @@ export async function POST(request: Request) {
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session;
           await handleCheckoutSessionCompleted(adminDb, session, requestId);
+          break;
+        }
+
+        // Async payment methods (bank transfer rails) succeed/fail after the checkout session is "completed".
+        // We use these events to transition orders from awaiting_* → paid_held and mark listing sold.
+        case 'checkout.session.async_payment_succeeded': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          await handleCheckoutSessionAsyncPaymentSucceeded(adminDb, session, requestId);
+          break;
+        }
+
+        case 'checkout.session.async_payment_failed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          await handleCheckoutSessionAsyncPaymentFailed(adminDb, session, requestId);
           break;
         }
 

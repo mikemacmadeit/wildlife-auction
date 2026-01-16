@@ -59,6 +59,93 @@
     mask-image: url("/images/Tractor Icon.png");
     -webkit-mask-image: url("/images/Tractor Icon.png");
   }
+
+  /* Lightweight "prose" styles without adding tailwind-typography */
+  .we-prose {
+    font-family: var(--font-founders), sans-serif;
+    font-size: 1rem;
+    line-height: 1.75;
+    color: hsl(var(--foreground));
+  }
+  .we-prose > * + * {
+    margin-top: 1rem;
+  }
+  .we-prose h2 {
+    margin-top: 2.2rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .we-prose h3 {
+    margin-top: 1.8rem;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .we-prose a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    font-weight: 600;
+  }
+  .we-prose ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+  .we-prose ol {
+    list-style: decimal;
+    padding-left: 1.25rem;
+  }
+  .we-prose li {
+    margin-top: 0.35rem;
+  }
+  .we-prose blockquote {
+    border-left: 3px solid hsl(var(--border));
+    padding-left: 1rem;
+    color: hsl(var(--muted-foreground));
+  }
+  .we-prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background: hsl(var(--muted));
+    padding: 0.2rem 0.35rem;
+    border-radius: 0.35rem;
+    font-size: 0.95em;
+  }
+  .we-prose pre {
+    overflow-x: auto;
+    background: hsl(var(--muted));
+    padding: 1rem;
+    border-radius: 0.75rem;
+  }
+  .we-prose pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Article polish: images, separators, stronger typographic rhythm */
+  .we-prose-article img {
+    border-radius: 1rem;
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 20px 60px hsl(var(--foreground) / 0.06);
+  }
+  .we-prose-article hr {
+    border: 0;
+    border-top: 1px solid hsl(var(--border));
+    margin: 2rem 0;
+  }
+  .we-prose-article strong {
+    font-weight: 800;
+  }
+  .we-prose-article h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    margin-right: 0.6rem;
+    background: hsl(var(--primary));
+    vertical-align: middle;
+  }
 }
 
 @layer base {

@@ -77,6 +77,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
+import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -94,6 +96,14 @@ export default function ListingDetailPage() {
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState<{ amountUsd: number } | null>(null);
+  const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<{
+    attemptedMethod: PaymentMethodChoice;
+    message: string;
+    technical?: string;
+  } | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -340,13 +350,10 @@ export default function ListingDetailPage() {
         return;
       }
 
-      // Create checkout session
-      setIsPlacingBid(true); // Reuse loading state
-      const { createCheckoutSession } = await import('@/lib/stripe/api');
-      const { url } = await createCheckoutSession(listing!.id);
-      
-      // Redirect to Stripe Checkout
-      window.location.href = url;
+      const price = Number(listing!.price || 0);
+      setPendingCheckout({ amountUsd: Number.isFinite(price) ? price : 0 });
+      setPaymentDialogOpen(true);
+      return;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
       toast({
@@ -413,13 +420,10 @@ export default function ListingDetailPage() {
         return;
       }
 
-      // Create checkout session
-      setIsPlacingBid(true);
-      const { createCheckoutSession } = await import('@/lib/stripe/api');
-      const { url } = await createCheckoutSession(listing!.id);
-      
-      // Redirect to Stripe Checkout
-      window.location.href = url;
+      const amt = Number(winningBidAmount || listing!.currentBid || listing!.startingBid || 0);
+      setPendingCheckout({ amountUsd: Number.isFinite(amt) ? amt : 0 });
+      setPaymentDialogOpen(true);
+      return;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
       toast({
@@ -442,6 +446,28 @@ export default function ListingDetailPage() {
       });
     } catch (error) {
       // Error toast is handled in the hook
+    }
+  };
+
+  const handleSelectPaymentMethod = async (method: PaymentMethodChoice) => {
+    if (!listing) return;
+    try {
+      setPaymentDialogOpen(false);
+      setIsPlacingBid(true);
+      const { createCheckoutSession } = await import('@/lib/stripe/api');
+      const { url } = await createCheckoutSession(listing.id, undefined, method);
+      window.location.href = url;
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error);
+      setCheckoutError({
+        attemptedMethod: method,
+        message: 'We couldn’t start checkout. You can retry card or switch to bank transfer / wire.',
+        technical: error?.message ? String(error.message) : String(error),
+      });
+      setCheckoutErrorOpen(true);
+      setIsPlacingBid(false);
+    } finally {
+      setPendingCheckout(null);
     }
   };
 
@@ -1320,7 +1346,7 @@ export default function ListingDetailPage() {
                       <AccordionTrigger className="text-sm">Payment Methods</AccordionTrigger>
                       <AccordionContent className="text-sm">
                         <p className="text-muted-foreground">
-                          Payment methods will be discussed with the seller. Common methods include wire transfer, check, or escrow services.
+                          Checkout supports card payments, and for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
                         </p>
                       </AccordionContent>
                     </AccordionItem>
@@ -1332,6 +1358,31 @@ export default function ListingDetailPage() {
         </div>
 
       </div>
+
+      {/* High-ticket: Choose payment method (shown only when amount >= $20k) */}
+      <PaymentMethodDialog
+        open={paymentDialogOpen}
+        onOpenChange={(open) => {
+          setPaymentDialogOpen(open);
+          if (!open) setPendingCheckout(null);
+        }}
+        amountUsd={pendingCheckout?.amountUsd || 0}
+        onSelect={handleSelectPaymentMethod}
+      />
+
+      <CheckoutStartErrorDialog
+        open={checkoutErrorOpen}
+        onOpenChange={(open) => {
+          setCheckoutErrorOpen(open);
+          if (!open) setCheckoutError(null);
+        }}
+        attemptedMethod={checkoutError?.attemptedMethod || 'card'}
+        errorMessage={checkoutError?.message || 'Checkout could not be started.'}
+        technicalDetails={checkoutError?.technical}
+        onRetryCard={() => handleSelectPaymentMethod('card')}
+        onSwitchBank={() => handleSelectPaymentMethod('bank_transfer')}
+        onSwitchWire={() => handleSelectPaymentMethod('wire')}
+      />
 
       {/* Bid Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

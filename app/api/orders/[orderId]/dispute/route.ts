@@ -130,7 +130,7 @@ export async function POST(
 
     // Validate status transition
     const currentStatus = orderData.status as OrderStatus;
-    const allowedStatuses: OrderStatus[] = ['paid', 'in_transit', 'delivered'];
+    const allowedStatuses: OrderStatus[] = ['paid', 'paid_held', 'in_transit', 'delivered'];
     
     if (!allowedStatuses.includes(currentStatus)) {
       return json(

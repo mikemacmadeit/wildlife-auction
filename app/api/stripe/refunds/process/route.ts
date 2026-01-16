@@ -200,19 +200,22 @@ export async function POST(request: Request) {
     }
 
     // Create Stripe refund
-    const refund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      amount: refundAmountCents,
-      reason: 'requested_by_customer', // or 'duplicate', 'fraudulent'
-      metadata: {
-        orderId: orderId,
-        listingId: orderData.listingId,
-        buyerId: orderData.buyerId,
-        sellerId: orderData.sellerId,
-        refundedBy: adminId,
-        refundReason: reason || 'Admin refund',
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: paymentIntentId,
+        amount: refundAmountCents,
+        reason: 'requested_by_customer', // or 'duplicate', 'fraudulent'
+        metadata: {
+          orderId: orderId,
+          listingId: orderData.listingId,
+          buyerId: orderData.buyerId,
+          sellerId: orderData.sellerId,
+          refundedBy: adminId,
+          refundReason: reason || 'Admin refund',
+        },
       },
-    });
+      { idempotencyKey: `refund:${orderId}:${refundAmountCents}` }
+    );
 
     // Capture before state for audit
     const beforeState = {

@@ -40,10 +40,27 @@ const baseHandler: Handler = async (event, context) => {
   let lastError: string | null = null;
 
   try {
+    // OFF by default. This scheduled function is a fallback only.
+    const enabled = String(process.env.AUTO_RELEASE_ENABLED || 'false').toLowerCase() === 'true';
+    if (!enabled) {
+      logInfo('Auto-release is disabled (AUTO_RELEASE_ENABLED=false). Exiting.', {
+        requestId,
+        route: 'autoReleaseProtected',
+      });
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ success: true, skipped: true, reason: 'AUTO_RELEASE_DISABLED' }),
+      };
+    }
+
     await initializeFirebaseAdmin();
 
     const now = new Date();
     const nowTimestamp = Timestamp.fromDate(now);
+    const hoursAfterDelivery = parseInt(process.env.AUTO_RELEASE_HOURS_AFTER_DELIVERY || '72', 10);
+    const maxAmountCents = process.env.AUTO_RELEASE_MAX_AMOUNT_CENTS
+      ? parseInt(process.env.AUTO_RELEASE_MAX_AMOUNT_CENTS, 10)
+      : null;
 
     // Query eligible orders
     // We'll fetch all paid orders and filter client-side (since Firestore queries are limited)
@@ -83,41 +100,28 @@ const baseHandler: Handler = async (event, context) => {
         return;
       }
 
-      // Check if order meets "ready_to_release" criteria
-      const deliveryConfirmedAt = orderData.deliveryConfirmedAt;
-      const protectionEndsAt = orderData.protectionEndsAt?.toDate();
-      const protectedTransaction = orderData.protectedTransactionDaysSnapshot !== null && orderData.protectedTransactionDaysSnapshot !== undefined;
-      const hasAdminHold = orderData.adminHold === true;
-      const hasChargeback = orderData.chargebackStatus && ['active', 'funds_withdrawn'].includes(orderData.chargebackStatus);
+      // Auto-release eligibility (fallback only):
+      // - Delivery must be confirmed (deliveryConfirmedAt)
+      // - Wait hoursAfterDelivery after delivery confirmation
+      // - Must have no active dispute/admin hold/chargeback
+      // - Optional max amount guard
+      const deliveryConfirmedAt = orderData.deliveryConfirmedAt?.toDate?.() || null;
+      if (!deliveryConfirmedAt) return;
 
-      // Check if order is eligible for ready_to_release status
-      const isEligibleForReadyToRelease = 
-        deliveryConfirmedAt && // Delivery confirmed
-        (!protectedTransaction || (protectionEndsAt && protectionEndsAt.getTime() <= now.getTime())) && // Protection window passed (if applicable)
-        (!disputeStatus || ['none', 'cancelled', 'resolved_release'].includes(disputeStatus)) && // No active dispute
-        !hasAdminHold && // No admin hold
-        !hasChargeback; // No active chargeback
+      const minReleaseAt = new Date(deliveryConfirmedAt.getTime() + hoursAfterDelivery * 60 * 60 * 1000);
+      if (minReleaseAt.getTime() > now.getTime()) return;
 
-      // Check protected transaction eligibility
-      const protectedDays = orderData.protectedTransactionDaysSnapshot;
-      
-      if (protectedDays !== null && protectedDays !== undefined) {
-        // Protected transaction: must have deliveryConfirmedAt and protectionEndsAt <= now
-        if (deliveryConfirmedAt && protectionEndsAt && protectionEndsAt.getTime() <= now.getTime()) {
-          eligibleOrders.push({ id: orderId, data: orderData });
-          return;
-        }
+      const hasChargeback = orderData.chargebackStatus && ['active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(orderData.chargebackStatus);
+      if (hasChargeback) return;
+
+      // Max amount guard (optional)
+      if (maxAmountCents !== null) {
+        const amountUsd = Number(orderData.amount || 0);
+        const amountCents = Math.round(amountUsd * 100);
+        if (!Number.isFinite(amountCents) || amountCents > maxAmountCents) return;
       }
 
-      // Check standard escrow eligibility
-      const disputeDeadline = orderData.disputeDeadlineAt?.toDate();
-      const status = orderData.status;
-
-      if (disputeDeadline && disputeDeadline.getTime() <= now.getTime()) {
-        if (['paid', 'in_transit', 'delivered'].includes(status)) {
-          eligibleOrders.push({ id: orderId, data: orderData });
-        }
-      }
+      eligibleOrders.push({ id: orderId, data: orderData });
     });
 
     logInfo('Auto-release: eligible orders found', {
@@ -151,53 +155,13 @@ const baseHandler: Handler = async (event, context) => {
           orderId,
         });
 
-        // Check if order should be set to ready_to_release status first
-        const deliveryConfirmedAt = orderData.deliveryConfirmedAt;
-        const protectionEndsAt = orderData.protectionEndsAt?.toDate();
-        const protectedTransaction = orderData.protectedTransactionDaysSnapshot !== null && orderData.protectedTransactionDaysSnapshot !== undefined;
-        const disputeStatus = orderData.disputeStatus;
-        const hasAdminHold = orderData.adminHold === true;
-        const hasChargeback = orderData.chargebackStatus && ['active', 'funds_withdrawn'].includes(orderData.chargebackStatus);
-        const currentStatus = orderData.status;
-
-        const isEligibleForReadyToRelease = 
-          deliveryConfirmedAt && // Delivery confirmed
-          (!protectedTransaction || (protectionEndsAt && protectionEndsAt.getTime() <= now.getTime())) && // Protection window passed (if applicable)
-          (!disputeStatus || ['none', 'cancelled', 'resolved_release'].includes(disputeStatus)) && // No active dispute
-          !hasAdminHold && // No admin hold
-          !hasChargeback; // No active chargeback
-
-        // Update status to ready_to_release if eligible and not already set
-        if (isEligibleForReadyToRelease && currentStatus !== 'ready_to_release' && currentStatus !== 'completed') {
-          const orderRef = db.collection('orders').doc(orderId);
-          await orderRef.update({
-            status: 'ready_to_release',
-            updatedAt: Timestamp.now(),
-          });
-
-          // Audit log for status change
-          await createAuditLog(db, {
-            actorUid: 'system',
-            actorRole: 'system',
-            actionType: 'order_status_changed',
-            orderId: orderId,
-            listingId: orderData.listingId,
-            beforeState: { status: currentStatus },
-            afterState: { status: 'ready_to_release' },
-            metadata: {
-              reason: 'auto_ready_to_release',
-              deliveryConfirmedAt: deliveryConfirmedAt ? deliveryConfirmedAt.toISOString() : null,
-              protectionEndsAt: protectionEndsAt ? protectionEndsAt.toISOString() : null,
-            },
-            source: 'cron',
-          });
-
-          logInfo('Auto-release: order set to ready_to_release', {
-            requestId,
-            route: 'autoReleaseProtected',
-            orderId,
-            previousStatus: currentStatus,
-          });
+        // Optionally set status to ready_to_release before releasing (helps admin UI + tracking)
+        const currentStatus = String(orderData.status || '');
+        if (currentStatus !== 'ready_to_release' && currentStatus !== 'completed') {
+          await db.collection('orders').doc(orderId).set(
+            { status: 'ready_to_release', updatedAt: Timestamp.now() },
+            { merge: true }
+          );
         }
 
         const result = await releasePaymentForOrder(db, orderId, 'system');

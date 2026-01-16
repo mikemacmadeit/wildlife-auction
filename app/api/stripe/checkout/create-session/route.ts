@@ -142,7 +142,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { listingId, offerId } = validation.data as any;
+    const { listingId, offerId, paymentMethod: paymentMethodRaw } = validation.data as any;
+    const paymentMethod = (paymentMethodRaw || 'card') as 'card' | 'bank_transfer' | 'wire';
 
     // Get listing from Firestore using Admin SDK
     const listingRef = db.collection('listings').doc(listingId);
@@ -156,6 +157,15 @@ export async function POST(request: Request) {
     }
 
     const listingData = listingDoc.data()!;
+
+    // If a high-ticket checkout is pending for this listing, block additional checkouts
+    // to avoid double-selling while waiting on bank rails.
+    if (listingData.purchaseReservedByOrderId) {
+      return NextResponse.json(
+        { error: 'Listing is reserved pending payment confirmation. Please try again later.' },
+        { status: 409 }
+      );
+    }
 
     // Best Offer checkout path (accepted offer -> checkout at agreed price)
     let offerData: any = null;
@@ -437,6 +447,9 @@ export async function POST(request: Request) {
     const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
+    // IMPORTANT: Do not price-gate payment methods. All methods are allowed at any amount.
+    // (Stripe-level constraints still apply; e.g., bank rails require a Stripe Customer.)
+
     // Create Stripe Checkout Session with ESCROW (no destination charge)
     // Funds are held in platform account until admin confirms delivery
     const baseUrl = getAppUrl();
@@ -478,10 +491,54 @@ export async function POST(request: Request) {
         sellerTierSnapshot: sellerTier,
         sellerTierWeight: String(sellerTierWeight),
         platformFeePercent: feePercent.toString(), // Immutable snapshot at checkout time (flat)
+        paymentMethod,
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmount) } : {}),
       },
       customer_email: decodedToken.email || undefined,
     };
+
+    // High-ticket rails: Stripe Checkout bank transfer (customer balance funding instructions).
+    // NOTE: This keeps the "hold on platform + release by transfer" model intact
+    // because we still DO NOT use destination charges / transfer_data here.
+    if (paymentMethod === 'bank_transfer' || paymentMethod === 'wire') {
+      if (!decodedToken.email) {
+        return NextResponse.json(
+          { error: 'Email is required to use bank transfer checkout.' },
+          { status: 400 }
+        );
+      }
+
+      // Get or create Stripe Customer for buyer (required for bank transfer in Checkout)
+      const buyerRef = db.collection('users').doc(buyerId);
+      const buyerSnap = await buyerRef.get();
+      const buyerData = buyerSnap.exists ? buyerSnap.data() : {};
+      let stripeCustomerId = buyerData?.stripeCustomerId as string | undefined;
+
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: decodedToken.email,
+          metadata: { userId: buyerId },
+        });
+        stripeCustomerId = customer.id;
+        await buyerRef.set({ stripeCustomerId }, { merge: true });
+      }
+
+      // Stripe bank transfer / wire rails are asynchronous; Checkout shows funding instructions.
+      // We intentionally restrict to customer_balance to avoid card use on this path.
+      sessionConfig.customer = stripeCustomerId;
+      delete (sessionConfig as any).customer_email;
+      sessionConfig.payment_method_types = ['customer_balance'];
+      sessionConfig.payment_method_options = {
+        customer_balance: {
+          funding_type: 'bank_transfer',
+          bank_transfer: {
+            // Stripe will generate US bank transfer instructions (push payment rails).
+            // This is the closest supported "bank transfer / wire" experience without custom bank reconciliation.
+            type: 'us_bank_transfer',
+          },
+        },
+      } as any;
+    }
     
     // Require address collection for animal listings (TX-only enforcement)
     if (requiresAddress) {

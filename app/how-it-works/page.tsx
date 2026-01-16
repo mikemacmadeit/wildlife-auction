@@ -220,6 +220,68 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
+      {/* Sub-categories (Plans + Trust) */}
+      <section className="container mx-auto px-4 -mt-8 md:-mt-12 pb-12">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="border-2 hover:border-primary/40 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Exposure Plans
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Understand seller tiers, placement, and how to get more eyes on your listings.
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/how-it-works/plans" className="flex items-center justify-center gap-2">
+                  View plans <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 hover:border-primary/40 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Trust & Compliance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                What badges mean, how verification works, and what’s required for regulated categories.
+              </p>
+              <Button asChild className="w-full" variant="outline">
+                <Link href="/how-it-works/trust" className="flex items-center justify-center gap-2">
+                  Learn trust basics <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 hover:border-primary/40 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Field Notes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Guides and insights for high-ticket marketplace transactions.
+              </p>
+              <Button asChild className="w-full" variant="secondary">
+                <Link href="/field-notes" className="flex items-center justify-center gap-2">
+                  Read Field Notes <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       {/* Steps Section */}
       <section className="container mx-auto px-4 py-12 md:py-20">
         <motion.div

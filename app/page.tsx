@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, LayoutGrid, List, FileCheck } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, LayoutGrid, List, FileCheck, BookOpen } from 'lucide-react';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
@@ -21,6 +21,10 @@ export default function HomePage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [fieldNotesLoading, setFieldNotesLoading] = useState(true);
+  const [fieldNotesFeatured, setFieldNotesFeatured] = useState<any | null>(null);
+  const [fieldNotesPicks, setFieldNotesPicks] = useState<any[]>([]);
 
   // View mode with localStorage persistence
   // Initialize to 'card' to ensure server/client consistency
@@ -59,6 +63,33 @@ export default function HomePage() {
       }
     }
     fetchListings();
+  }, []);
+
+  // Fetch Field Notes (Featured + Editor picks) from server (client page cannot read filesystem)
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchFieldNotes() {
+      try {
+        setFieldNotesLoading(true);
+        const res = await fetch('/api/field-notes/index');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed to load Field Notes');
+        if (cancelled) return;
+        setFieldNotesFeatured(data.featured || null);
+        setFieldNotesPicks(Array.isArray(data.editorPicks) ? data.editorPicks : []);
+      } catch {
+        if (!cancelled) {
+          setFieldNotesFeatured(null);
+          setFieldNotesPicks([]);
+        }
+      } finally {
+        if (!cancelled) setFieldNotesLoading(false);
+      }
+    }
+    fetchFieldNotes();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const featuredListings = listings.filter(l => l.featured).slice(0, 3);
@@ -397,6 +428,115 @@ export default function HomePage() {
                 )}
               </AnimatePresence>
             </motion.div>
+          )}
+        </div>
+      </section>
+
+      {/* Field Notes (Featured + Editor Picks) */}
+      <section className="py-12 md:py-16 border-t border-border/50 bg-card/30">
+        <div className="container mx-auto px-4 space-y-8">
+          <div className="flex items-end justify-between gap-4">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                <BookOpen className="h-4 w-4" />
+                Field Notes
+              </div>
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight font-founders">
+                Trust-first education for high-ticket deals
+              </h2>
+              <p className="text-muted-foreground max-w-2xl">
+                Guides on payments, compliance, transport, and how to buy/sell with confidence.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="min-h-[44px]">
+              <Link href="/field-notes">
+                View all <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          {fieldNotesLoading ? (
+            <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
+              Loading Field Notes…
+            </div>
+          ) : !fieldNotesFeatured ? (
+            <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
+              Field Notes is coming alive—check back soon.
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+              <Link href={`/field-notes/${fieldNotesFeatured.slug}`} className="group">
+                <Card className="h-full border-2 overflow-hidden hover:border-primary/40 transition-colors">
+                  <CardContent className="p-0">
+                    <div className="relative h-56 sm:h-72 bg-muted">
+                      {fieldNotesFeatured.coverImage ? (
+                        <Image src={fieldNotesFeatured.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.02]" />
+                      ) : null}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-5">
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white">
+                            Featured
+                          </span>
+                          {fieldNotesFeatured.category ? (
+                            <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white">
+                              {fieldNotesFeatured.category}
+                            </span>
+                          ) : null}
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white">
+                            {fieldNotesFeatured.readingMinutes} min
+                          </span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+                          {fieldNotesFeatured.title}
+                        </div>
+                        <div className="text-sm text-white/80 mt-1 line-clamp-2">
+                          {fieldNotesFeatured.description}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <div className="space-y-3">
+                <div className="text-sm font-extrabold tracking-tight">Editor picks</div>
+                <div className="space-y-3">
+                  {fieldNotesPicks.slice(0, 3).map((p) => (
+                    <Link key={p.slug} href={`/field-notes/${p.slug}`} className="group block">
+                      <Card className="border-2 hover:border-primary/40 transition-colors">
+                        <CardContent className="p-4 space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            {p.category ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-primary">
+                                {p.category}
+                              </span>
+                            ) : null}
+                            <span className="text-xs px-2 py-0.5 rounded-full border bg-muted/20">
+                              {p.readingMinutes} min
+                            </span>
+                          </div>
+                          <div className="font-extrabold tracking-tight leading-snug group-hover:underline underline-offset-4">
+                            {p.title}
+                          </div>
+                          <div className="text-sm text-muted-foreground line-clamp-2">{p.description}</div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+
+                <div className="pt-1 text-sm">
+                  <Link href="/field-notes/tags" className="font-semibold text-primary hover:underline underline-offset-4">
+                    Browse by tags →
+                  </Link>
+                  <span className="text-muted-foreground"> · </span>
+                  <Link href="/field-notes/authors" className="font-semibold text-primary hover:underline underline-offset-4">
+                    Browse by authors →
+                  </Link>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </section>

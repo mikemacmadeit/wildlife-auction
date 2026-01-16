@@ -29,7 +29,21 @@ export interface OrderDoc {
   amount: number;
   platformFee: number;
   sellerAmount: number;
-  status: 'pending' | 'paid' | 'in_transit' | 'delivered' | 'accepted' | 'disputed' | 'completed' | 'refunded' | 'cancelled';
+  status:
+    | 'pending'
+    | 'awaiting_bank_transfer'
+    | 'awaiting_wire'
+    | 'paid_held'
+    | 'paid' // legacy
+    | 'in_transit'
+    | 'delivered'
+    | 'buyer_confirmed'
+    | 'accepted' // legacy
+    | 'ready_to_release'
+    | 'disputed'
+    | 'completed'
+    | 'refunded'
+    | 'cancelled';
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;
   stripeTransferId?: string;

@@ -140,6 +140,9 @@ service cloud.firestore {
                        // Best Offer reservation fields are server-only; sellers can't change them
                        (request.resource.data.offerReservedByOfferId == resource.data.offerReservedByOfferId) &&
                        (request.resource.data.offerReservedAt == resource.data.offerReservedAt) &&
+                       // Purchase reservation fields are server-only (used for high-ticket bank/wire pending payment)
+                       (request.resource.data.purchaseReservedByOrderId == resource.data.purchaseReservedByOrderId) &&
+                       (request.resource.data.purchaseReservedAt == resource.data.purchaseReservedAt) &&
                        // Whitetail breeder: block status transitions to pending/active if attestation missing or permit expired
                        (
                          resource.data.category != 'whitetail_breeder' ||
@@ -256,25 +259,39 @@ service cloud.firestore {
                       request.resource.data.status == 'pending' &&
                       request.resource.data.keys().hasAll(['listingId', 'buyerId', 'sellerId', 'amount', 'platformFee', 'sellerAmount', 'status', 'createdAt', 'updatedAt']);
       
-      // Allow update: buyer or seller can update their own orders (for accept/dispute/delivered), OR admin
-      // Buyers can: accept, dispute
-      // Sellers can: mark delivered
-      // Admins can: release, refund, set adminHold
+      // Allow update: buyer or seller can update their own orders (limited client-side actions), OR admin
+      // IMPORTANT: payout + payment fields must be server-controlled.
       allow update: if isAuthenticated() && (
-        (resource.data.buyerId == request.auth.uid && 
-         // Buyer can only update status to accepted or disputed, and only allowed fields
-         (request.resource.data.status == 'accepted' || request.resource.data.status == 'disputed') &&
+        (resource.data.buyerId == request.auth.uid &&
+         // Buyer can only update status to buyer_confirmed/accepted (legacy) or disputed
+         (request.resource.data.status == 'buyer_confirmed' || request.resource.data.status == 'accepted' || request.resource.data.status == 'disputed' || request.resource.data.status == 'ready_to_release') &&
+         // Never allow buyer to mutate payout/payment/admin-controlled fields
+         !request.resource.data.diff(resource.data).changedKeys().hasAny([
+           'amount','platformFee','sellerAmount',
+           'stripeCheckoutSessionId','stripePaymentIntentId','stripeTransferId','stripeRefundId',
+           'sellerStripeAccountId','releasedBy','releasedAt','refundedBy','refundedAt','refundReason','refundAmount',
+           'adminHold','adminHoldReason','adminActionNotes',
+           'paidAt','disputeDeadlineAt','deliveryConfirmedAt','protectionStartAt','protectionEndsAt','payoutHoldReason',
+           'protectedTransactionDaysSnapshot','protectedTermsVersion','chargebackStatus'
+         ]) &&
          request.resource.data.buyerId == resource.data.buyerId &&
          request.resource.data.sellerId == resource.data.sellerId &&
-         request.resource.data.listingId == resource.data.listingId &&
-         request.resource.data.amount == resource.data.amount) ||
+         request.resource.data.listingId == resource.data.listingId) ||
         (resource.data.sellerId == request.auth.uid &&
          // Seller can only update status to in_transit or delivered
          (request.resource.data.status == 'in_transit' || request.resource.data.status == 'delivered') &&
+         // Never allow seller to mutate payout/payment/admin-controlled fields
+         !request.resource.data.diff(resource.data).changedKeys().hasAny([
+           'amount','platformFee','sellerAmount',
+           'stripeCheckoutSessionId','stripePaymentIntentId','stripeTransferId','stripeRefundId',
+           'sellerStripeAccountId','releasedBy','releasedAt','refundedBy','refundedAt','refundReason','refundAmount',
+           'adminHold','adminHoldReason','adminActionNotes',
+           'paidAt','disputeDeadlineAt','deliveryConfirmedAt','protectionStartAt','protectionEndsAt','payoutHoldReason',
+           'protectedTransactionDaysSnapshot','protectedTermsVersion','chargebackStatus'
+         ]) &&
          request.resource.data.buyerId == resource.data.buyerId &&
          request.resource.data.sellerId == resource.data.sellerId &&
-         request.resource.data.listingId == resource.data.listingId &&
-         request.resource.data.amount == resource.data.amount) ||
+         request.resource.data.listingId == resource.data.listingId) ||
         isAdmin() // Admins can update orders (e.g., to complete payouts, set adminHold)
       );
       
