@@ -22,6 +22,20 @@ export async function requireAuth(request: Request) {
   const token = authHeader.split('Bearer ')[1];
   try {
     const decoded = await getAdminAuth().verifyIdToken(token);
+    // Require verified email across all offer operations (prevents spam/abuse and aligns with checkout gating).
+    if ((decoded as any)?.email_verified !== true) {
+      return {
+        ok: false as const,
+        response: json(
+          {
+            error: 'Email verification required',
+            code: 'EMAIL_NOT_VERIFIED',
+            message: 'Please verify your email address to use offers.',
+          },
+          { status: 403 }
+        ),
+      };
+    }
     return { ok: true as const, decoded };
   } catch {
     return { ok: false as const, response: json({ error: 'Unauthorized - Invalid token' }, { status: 401 }) };

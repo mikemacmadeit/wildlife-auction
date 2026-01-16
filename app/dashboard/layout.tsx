@@ -49,6 +49,7 @@ import { signOutUser } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
@@ -206,11 +207,17 @@ export default function DashboardLayout({
 
   // Don't show dashboard layout for listing creation page
   if (pathname === '/dashboard/listings/new') {
-    return <RequireAuth>{children}</RequireAuth>;
+    return (
+      <RequireAuth>
+        <ProfileCompletionGate />
+        {children}
+      </RequireAuth>
+    );
   }
 
   return (
     <RequireAuth>
+      <ProfileCompletionGate />
       <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside

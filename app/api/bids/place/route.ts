@@ -75,6 +75,19 @@ export async function POST(request: Request) {
 
   const bidderId = decoded.uid;
 
+  // Verified email required for bidding (prevents abuse + aligns with payments readiness).
+  if ((decoded as any)?.email_verified !== true) {
+    return json(
+      {
+        ok: false,
+        error: 'Email verification required',
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Please verify your email address before placing bids.',
+      },
+      { status: 403 }
+    );
+  }
+
   let body: any;
   try {
     body = await request.json();

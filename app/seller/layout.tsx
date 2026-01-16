@@ -45,6 +45,7 @@ import { signOutUser } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
 
 interface SellerNavItem {
@@ -149,6 +150,7 @@ export default function SellerLayout({
   // Protect all seller routes - require authentication
   return (
     <RequireAuth>
+      <ProfileCompletionGate />
       <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside

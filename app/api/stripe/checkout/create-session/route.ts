@@ -106,6 +106,18 @@ export async function POST(request: Request) {
 
     const buyerId = decodedToken.uid;
 
+    // Verified email required before checkout (reduces fraud + ensures receipt delivery / supportability).
+    if ((decodedToken as any)?.email_verified !== true) {
+      return NextResponse.json(
+        {
+          error: 'Email verification required',
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Please verify your email address before checking out.',
+        },
+        { status: 403 }
+      );
+    }
+
     // Parse and validate request body
     let body;
     try {

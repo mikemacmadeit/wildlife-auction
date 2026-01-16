@@ -149,6 +149,17 @@ export async function POST(request: Request) {
     }
 
     const userId = decodedToken.uid;
+    // Require verified email before allowing publish (reduces abuse + ensures reliable seller contact).
+    if ((decodedToken as any)?.email_verified !== true) {
+      return json(
+        {
+          error: 'Email verification required',
+          message: 'Please verify your email address before publishing listings.',
+          code: 'EMAIL_NOT_VERIFIED',
+        },
+        { status: 403 }
+      );
+    }
 
     // Validate request body
     const body = await request.json();
@@ -218,6 +229,39 @@ export async function POST(request: Request) {
     }
 
     const userData = userDoc.data()!;
+
+    // Seller readiness gates (publish is the "go live" moment).
+    const fullNameOk = !!userData?.profile?.fullName && String(userData.profile.fullName).trim().length > 0;
+    const phoneOk = !!userData?.phoneNumber && String(userData.phoneNumber).trim().length > 0;
+    const loc = userData?.profile?.location;
+    const locationOk = !!loc && !!loc.city && !!loc.state && !!loc.zip;
+    if (!fullNameOk || !phoneOk || !locationOk) {
+      return json(
+        {
+          error: 'Seller profile incomplete',
+          code: 'SELLER_PROFILE_INCOMPLETE',
+          message: 'Please complete your profile (name, phone, and location) before publishing listings.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const payoutsReady =
+      userData?.stripeOnboardingStatus === 'complete' &&
+      userData?.payoutsEnabled === true &&
+      userData?.chargesEnabled === true &&
+      !!userData?.stripeAccountId;
+
+    if (!payoutsReady) {
+      return json(
+        {
+          error: 'Payouts setup required',
+          code: 'PAYOUTS_NOT_READY',
+          message: 'Please connect Stripe payouts before publishing listings so you can get paid.',
+        },
+        { status: 400 }
+      );
+    }
 
     // Snapshot seller tier onto listing for public badge + deterministic ranking (without reading users).
     const sellerTier = getEffectiveSubscriptionTier(userData as any);

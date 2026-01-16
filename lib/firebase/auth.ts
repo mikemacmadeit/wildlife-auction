@@ -94,6 +94,28 @@ export const updateUserProfile = async (
 };
 
 /**
+ * Re-send the verification email to the currently signed-in user.
+ */
+export const resendVerificationEmail = async (): Promise<void> => {
+  if (!auth.currentUser) {
+    throw new Error('No user is currently signed in');
+  }
+  await sendEmailVerification(auth.currentUser);
+};
+
+/**
+ * Force-refresh the currently signed-in user from Firebase Auth.
+ * Useful after verifying email in another tab.
+ */
+export const reloadCurrentUser = async (): Promise<void> => {
+  if (!auth.currentUser) {
+    throw new Error('No user is currently signed in');
+  }
+  // `reload()` exists on the User instance in the Firebase v9 modular SDK.
+  await (auth.currentUser as any).reload();
+};
+
+/**
  * Get the current user
  */
 export const getCurrentUser = (): User | null => {

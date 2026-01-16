@@ -28,11 +28,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { Listing, Order, UserProfile } from '@/lib/types';
-import { getUserProfile } from '@/lib/firebase/users';
+import { getUserProfile, isProfileComplete } from '@/lib/firebase/users';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { PLAN_CONFIG, MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { getEffectiveSubscriptionTier, getTierLabel } from '@/lib/pricing/subscriptions';
 import { Crown, Zap, CreditCard, Info } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -112,6 +114,7 @@ interface SellerActivity {
 }
 
 export default function SellerOverviewPage() {
+  const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const uid = user?.uid || null;
   const [listings, setListings] = useState<Listing[]>([]);
@@ -378,6 +381,124 @@ export default function SellerOverviewPage() {
             Create Listing
           </CreateListingGateButton>
         </div>
+
+        {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
+        {user && (
+          <Card className="border-2 border-border/50 bg-card">
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-xl font-extrabold">Seller Setup Checklist</CardTitle>
+                  <CardDescription>
+                    Complete these steps to publish listings and get paid. (Buyers can still browse and save listings anytime.)
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary" className="font-semibold">
+                  {(() => {
+                    const steps = [
+                      !!userProfile && isProfileComplete(userProfile),
+                      user.emailVerified === true,
+                      !!userProfile && userProfile.stripeOnboardingStatus === 'complete' && userProfile.payoutsEnabled === true && userProfile.chargesEnabled === true,
+                    ];
+                    const done = steps.filter(Boolean).length;
+                    return `${done}/${steps.length} complete`;
+                  })()}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(() => {
+                const profileOk = !!userProfile && isProfileComplete(userProfile);
+                const emailOk = user.emailVerified === true;
+                const payoutsOk =
+                  !!userProfile &&
+                  userProfile.stripeOnboardingStatus === 'complete' &&
+                  userProfile.payoutsEnabled === true &&
+                  userProfile.chargesEnabled === true;
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className={cn('rounded-lg border-2 p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">1) Profile</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Full name, phone number, and location.
+                          </p>
+                        </div>
+                        {profileOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3">
+                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[40px] font-semibold">
+                          <Link href="/dashboard/account">{profileOk ? 'View Profile' : 'Complete Profile'}</Link>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className={cn('rounded-lg border-2 p-4', emailOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">2) Verify Email</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Required before publishing and checkout actions.
+                          </p>
+                        </div>
+                        {emailOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        <Button
+                          variant={emailOk ? 'outline' : 'default'}
+                          className="w-full min-h-[40px] font-semibold"
+                          onClick={async () => {
+                            try {
+                              if (emailOk) {
+                                await reloadCurrentUser();
+                                toast({ title: 'Account refreshed', description: 'Your verification status has been refreshed.' });
+                                return;
+                              }
+                              await resendVerificationEmail();
+                              toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                            } catch (e: any) {
+                              toast({
+                                title: 'Could not send verification email',
+                                description: e?.message || 'Please try again.',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          {emailOk ? 'Refresh Status' : 'Resend Verification Email'}
+                        </Button>
+                        {!emailOk && (
+                          <p className="text-xs text-muted-foreground">
+                            Tip: after you click the link in your email, come back here and press “Refresh Status”.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={cn('rounded-lg border-2 p-4', payoutsOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">3) Payouts</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Connect Stripe to receive payouts.
+                          </p>
+                        </div>
+                        {payoutsOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3">
+                        <Button asChild variant={payoutsOk ? 'outline' : 'default'} className="w-full min-h-[40px] font-semibold">
+                          <Link href="/seller/payouts">{payoutsOk ? 'View Payouts' : 'Connect Stripe'}</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Exposure Plan (Seller Tier) */}
         {userProfile && (() => {

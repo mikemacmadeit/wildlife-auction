@@ -66,6 +66,18 @@ export async function POST(request: Request) {
 
     const senderId = decodedToken.uid;
 
+    // Verified email required for messaging (cuts spam + makes contact workflows reliable).
+    if ((decodedToken as any)?.email_verified !== true) {
+      return json(
+        {
+          error: 'Email verification required',
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Please verify your email address before sending messages.',
+        },
+        { status: 403 }
+      );
+    }
+
     // Parse request body
     const body = await request.json();
     const { threadId, recipientId, listingId, messageBody } = body;
