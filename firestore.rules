@@ -111,10 +111,16 @@ service cloud.firestore {
         request.resource.data.sellerId == request.auth.uid &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.status == 'draft' &&
-        // Validate required fields exist
-        request.resource.data.keys().hasAll(['title', 'description', 'type', 'category', 'status', 'sellerId', 'createdBy', 'createdAt', 'updatedAt']) &&
-        // Best Offer reservation fields are server-only; clients cannot set them at create
-        !request.resource.data.keys().hasAny(['offerReservedByOfferId', 'offerReservedAt']) &&
+        // Draft-first UX: allow creating a draft before all listing details exist.
+        // Require only identity + audit fields; enforce deeper validation at publish time (server route).
+        request.resource.data.keys().hasAll(['status', 'sellerId', 'createdBy', 'createdAt', 'updatedAt']) &&
+        // Server-only reservation fields cannot be set by clients at create time
+        !request.resource.data.keys().hasAny([
+          'offerReservedByOfferId',
+          'offerReservedAt',
+          'purchaseReservedByOrderId',
+          'purchaseReservedAt'
+        ]) &&
         // Prevent setting sellerId to different value
         request.resource.data.sellerId == request.auth.uid;
       
@@ -123,16 +129,19 @@ service cloud.firestore {
       // Admins can update listings for approval/rejection purposes
       // Compliance: Only admins can change complianceStatus to approved/rejected
       allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid && 
+                       // Sellers cannot mutate immutable identity/audit fields
+                       !request.resource.data.diff(resource.data).changedKeys().hasAny(['sellerId', 'createdBy', 'createdAt']) &&
                        // Sellers cannot change complianceStatus to approved/rejected
                        (request.resource.data.complianceStatus == null || 
                         request.resource.data.complianceStatus == resource.data.complianceStatus ||
                         request.resource.data.complianceStatus == 'pending_review') &&
-                       // Best Offer reservation fields are server-only; sellers can't change them
-                       (request.resource.data.offerReservedByOfferId == resource.data.offerReservedByOfferId) &&
-                       (request.resource.data.offerReservedAt == resource.data.offerReservedAt) &&
-                       // Purchase reservation fields are server-only (used for high-ticket bank/wire pending payment)
-                       (request.resource.data.purchaseReservedByOrderId == resource.data.purchaseReservedByOrderId) &&
-                       (request.resource.data.purchaseReservedAt == resource.data.purchaseReservedAt) &&
+                       // Server-only reservation fields: sellers can't set/clear/mutate them
+                       !request.resource.data.diff(resource.data).changedKeys().hasAny([
+                         'offerReservedByOfferId',
+                         'offerReservedAt',
+                         'purchaseReservedByOrderId',
+                         'purchaseReservedAt'
+                       ]) &&
                        // Whitetail breeder: block status transitions to pending/active if attestation missing or permit expired
                        (
                          resource.data.category != 'whitetail_breeder' ||
