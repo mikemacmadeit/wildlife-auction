@@ -8,6 +8,9 @@ import { z } from 'zod';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { json, requireAuth, requireRateLimit } from '../_util';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const querySchema = z.object({
   status: z.string().optional(),
   listingId: z.string().optional(),
@@ -81,24 +84,31 @@ export async function GET(request: Request) {
       { status: 503 }
     );
   }
-  let q: any = db.collection('offers').where('buyerId', '==', buyerId);
-  if (listingId) q = q.where('listingId', '==', listingId);
-  if (status) q = q.where('status', '==', status);
-  q = q.orderBy('updatedAt', 'desc').limit(limitN);
 
   try {
-    const snap = await q.get();
-    return json({ ok: true, offers: snap.docs.map(serializeOffer) });
+    // Avoid composite-index requirements by querying only on buyerId and filtering in-memory.
+    // (Firestore commonly requires indexes for multi-field filters + orderBy.)
+    const snap = await db.collection('offers').where('buyerId', '==', buyerId).limit(200).get();
+    let offers = snap.docs.map(serializeOffer);
+
+    if (listingId) offers = offers.filter((o: any) => o.listingId === listingId);
+    if (status) offers = offers.filter((o: any) => o.status === status);
+
+    offers.sort((a: any, b: any) => {
+      const am = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+      const bm = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+      return bm - am;
+    });
+
+    return json({ ok: true, offers: offers.slice(0, limitN) });
   } catch (e: any) {
-    const msg = String(e?.message || '');
-    const looksLikeIndex = msg.toLowerCase().includes('requires an index') || msg.toLowerCase().includes('failed-precondition');
     return json(
       {
-        error: looksLikeIndex ? 'Offers query requires a Firestore index' : 'Failed to load offers',
-        code: looksLikeIndex ? 'FIRESTORE_INDEX_REQUIRED' : 'OFFERS_QUERY_FAILED',
+        error: 'Failed to load offers',
+        code: 'OFFERS_QUERY_FAILED',
         message: e?.message || 'Unknown error',
       },
-      { status: looksLikeIndex ? 503 : 500 }
+      { status: 500 }
     );
   }
 }

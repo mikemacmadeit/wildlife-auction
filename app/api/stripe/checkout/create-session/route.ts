@@ -18,6 +18,10 @@ import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { containsProhibitedKeywords } from '@/lib/compliance/validation';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> | Headers }) {
   const headers =
@@ -328,7 +332,6 @@ export async function POST(request: Request) {
       }
 
       // Defensive: Re-check prohibited content
-      const { containsProhibitedKeywords } = require('@/lib/compliance/validation');
       if (containsProhibitedKeywords(listingData.title) || containsProhibitedKeywords(listingData.description)) {
         return NextResponse.json(
           { error: 'Listing contains prohibited content and cannot be purchased.' },

@@ -209,7 +209,11 @@ export async function createCheckoutSession(
 
   if (!response.ok) {
     const error = await response.json();
-    const errorMessage = error.error || 'Failed to create checkout session';
+    const errorMessage =
+      error.message ||
+      (error.code ? `${error.code}: ${error.error || 'Checkout failed'}` : undefined) ||
+      error.error ||
+      'Failed to create checkout session';
     // Don't log expected configuration errors
     const isConfigError = errorMessage.includes('Stripe is not configured') || 
                           errorMessage.includes('STRIPE_SECRET_KEY');

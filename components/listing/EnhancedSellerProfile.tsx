@@ -22,6 +22,7 @@ import { getSellerStats } from '@/lib/firebase/sellerStats';
 import { getUserProfile } from '@/lib/firebase/users';
 import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
+import { useAuth } from '@/hooks/use-auth';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -32,6 +33,8 @@ export function EnhancedSellerProfile({
   listing, 
   className 
 }: EnhancedSellerProfileProps) {
+  const { user } = useAuth();
+  const viewerId = user?.uid || null;
   // Derive seller info from listing (using sellerSnapshot or legacy seller field)
   const sellerName = listing.sellerSnapshot?.displayName || listing.seller?.name || 'Unknown Seller';
   const sellerVerified = listing.sellerSnapshot?.verified || listing.seller?.verified || false;
@@ -40,25 +43,29 @@ export function EnhancedSellerProfile({
   const [sellerStats, setSellerStats] = useState<{
     completedSalesCount: number;
     completionRate: number;
+    visible: boolean;
   }>({
     completedSalesCount: 0,
     completionRate: 0,
+    visible: false,
   });
 
   const [sellerTier, setSellerTier] = useState<SubscriptionTier>('standard');
 
   useEffect(() => {
     if (sellerId) {
-      getSellerStats(sellerId).then((stats) => {
+      getSellerStats(sellerId, viewerId).then((stats) => {
         setSellerStats({
           completedSalesCount: stats.completedSalesCount,
           completionRate: stats.completionRate,
+          visible: stats.visible,
         });
-      }).catch((error) => {
-        console.error('Error fetching seller stats:', error);
+      }).catch(() => {
+        // Treat as not available; don't spam console on public pages.
+        setSellerStats({ completedSalesCount: 0, completionRate: 0, visible: false });
       });
     }
-  }, [sellerId]);
+  }, [sellerId, viewerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +134,9 @@ export function EnhancedSellerProfile({
                 <Star className="h-3.5 w-3.5 fill-primary text-primary" />
                 <span className="text-sm font-bold text-foreground">5.0</span>
                 <span className="text-[11px] text-muted-foreground">
-                  ({sellerStats.completedSalesCount} completed {sellerStats.completedSalesCount === 1 ? 'sale' : 'sales'})
+                  {sellerStats.visible
+                    ? `(${sellerStats.completedSalesCount} completed ${sellerStats.completedSalesCount === 1 ? 'sale' : 'sales'})`
+                    : '(sales: —)'}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
