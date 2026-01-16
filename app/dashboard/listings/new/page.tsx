@@ -411,6 +411,44 @@ function NewListingPageContent() {
                 if (!attrs.cwdDisclosureChecklist?.cwdCompliant) errs.push('CWD Compliance confirmation');
                 return errs;
               }
+              if (formData.category === 'wildlife_exotics') {
+                const attrs = formData.attributes as Partial<WildlifeAttributes>;
+                const errs: string[] = [];
+                if (!attrs.speciesId) errs.push('Species');
+                if (!attrs.sex) errs.push('Sex');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
+                if (!attrs.animalIdDisclosure) errs.push('Animal Identification Disclosure');
+                if (!attrs.healthDisclosure) errs.push('Health Disclosure');
+                if (!attrs.transportDisclosure) errs.push('Transport Disclosure');
+                return errs;
+              }
+              if (formData.category === 'cattle_livestock') {
+                const attrs = formData.attributes as Partial<CattleAttributes>;
+                const errs: string[] = [];
+                if (!attrs.breed?.trim()) errs.push('Breed');
+                if (!attrs.sex) errs.push('Sex');
+                // Registered is modeled as a checkbox; defaulting to false is acceptable, but if it's still unset, flag it.
+                if ((attrs as any).registered !== true && (attrs as any).registered !== false) errs.push('Registered');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
+                if (!attrs.identificationDisclosure) errs.push('Identification Disclosure');
+                if (!attrs.healthDisclosure) errs.push('Health Disclosure');
+                if (!(attrs.age || attrs.weightRange)) errs.push('Age or Weight Range');
+                return errs;
+              }
+              if (formData.category === 'ranch_equipment') {
+                const attrs = formData.attributes as Partial<EquipmentAttributes>;
+                const errs: string[] = [];
+                const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
+                const requiresTitle = attrs.equipmentType && vehiclesRequiringTitle.includes(attrs.equipmentType.toLowerCase());
+                if (!attrs.equipmentType) errs.push('Equipment Type');
+                if (!attrs.condition) errs.push('Condition');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
+                if (requiresTitle) {
+                  if (!attrs.hasTitle) errs.push('Has Title');
+                  if (!attrs.vinOrSerial?.trim()) errs.push('VIN or Serial Number');
+                }
+                return errs;
+              }
               return [];
             })()}
           />
@@ -493,38 +531,64 @@ function NewListingPageContent() {
         }
         if (formData.category === 'wildlife_exotics') {
           const attrs = formData.attributes as Partial<WildlifeAttributes>;
-          return !!(
-            attrs.speciesId &&
-            attrs.sex &&
-            attrs.quantity &&
-            attrs.quantity >= 1 &&
-            attrs.animalIdDisclosure &&
-            attrs.healthDisclosure &&
-            attrs.transportDisclosure
-          );
+          const errors: string[] = [];
+          if (!attrs.speciesId) errors.push('Species');
+          if (!attrs.sex) errors.push('Sex');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (!attrs.animalIdDisclosure) errors.push('Animal Identification Disclosure');
+          if (!attrs.healthDisclosure) errors.push('Health Disclosure');
+          if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
+          if (errors.length) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
         }
         if (formData.category === 'cattle_livestock') {
           const attrs = formData.attributes as Partial<CattleAttributes>;
-          return !!(
-            attrs.breed &&
-            attrs.sex &&
-            attrs.registered !== undefined &&
-            attrs.quantity &&
-            attrs.quantity >= 1 &&
-            attrs.identificationDisclosure &&
-            attrs.healthDisclosure &&
-            (attrs.age || attrs.weightRange)
-          );
+          const errors: string[] = [];
+          if (!attrs.breed?.trim()) errors.push('Breed');
+          if (!attrs.sex) errors.push('Sex');
+          if ((attrs as any).registered !== true && (attrs as any).registered !== false) errors.push('Registered');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
+          if (!attrs.healthDisclosure) errors.push('Health Disclosure');
+          if (!(attrs.age || attrs.weightRange)) errors.push('Age or Weight Range');
+          if (errors.length) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
         }
         if (formData.category === 'ranch_equipment') {
           const attrs = formData.attributes as Partial<EquipmentAttributes>;
           const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
           const requiresTitle = attrs.equipmentType && vehiclesRequiringTitle.includes(attrs.equipmentType.toLowerCase());
-          const baseValid = !!(attrs.equipmentType && attrs.condition && attrs.quantity && attrs.quantity >= 1);
+          const errors: string[] = [];
+          if (!attrs.equipmentType) errors.push('Equipment Type');
+          if (!attrs.condition) errors.push('Condition');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
           if (requiresTitle) {
-            return baseValid && attrs.hasTitle !== undefined && !!attrs.vinOrSerial;
+            if (!attrs.hasTitle) errors.push('Has Title');
+            if (!attrs.vinOrSerial?.trim()) errors.push('VIN or Serial Number');
           }
-          return baseValid;
+          if (errors.length) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
         }
         return false;
       },

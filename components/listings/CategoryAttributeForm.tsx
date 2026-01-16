@@ -5,6 +5,7 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import { ListingCategory, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes, EXOTIC_SPECIES } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
+import { cn } from '@/lib/utils';
 
 type ListingAttributes =
   | WildlifeAttributes
@@ -35,6 +37,33 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
   };
   
   const hasError = (fieldName: string) => errors.includes(fieldName);
+
+  // IMPORTANT: Some required fields (like Quantity) visually default to 1, but were not being written into state
+  // until the user interacted. This caused validation failures with no obvious missing input.
+  const currentQuantity = (attributes as any)?.quantity;
+  useEffect(() => {
+    const needsQuantity =
+      category === 'whitetail_breeder' ||
+      category === 'wildlife_exotics' ||
+      category === 'cattle_livestock' ||
+      category === 'ranch_equipment';
+
+    if (!needsQuantity) return;
+    if (typeof currentQuantity === 'number' && Number.isFinite(currentQuantity) && currentQuantity >= 1) return;
+
+    // Default to 1 (and persist it into parent form state)
+    updateAttribute('quantity', 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, currentQuantity]);
+
+  const currentRegistered = (attributes as any)?.registered;
+  useEffect(() => {
+    if (category !== 'cattle_livestock') return;
+    if (currentRegistered === true || currentRegistered === false) return;
+    // Unchecked checkbox should mean "false" by default; persist so validation doesn't treat it as missing.
+    updateAttribute('registered', false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, currentRegistered]);
 
   if (category === 'whitetail_breeder') {
     const expStatus = getPermitExpirationStatus(
@@ -289,7 +318,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             value={(attributes as Partial<WildlifeAttributes>).speciesId || ''}
             onValueChange={(value) => updateAttribute('speciesId', value)}
           >
-            <SelectTrigger id="species-id" className="min-h-[48px]">
+            <SelectTrigger
+              id="species-id"
+              className={cn(
+                'min-h-[48px]',
+                hasError('Species') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+              )}
+            >
               <SelectValue placeholder="Select species" />
             </SelectTrigger>
             <SelectContent>
@@ -313,7 +348,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             value={(attributes as Partial<WildlifeAttributes>).sex || 'unknown'}
             onValueChange={(value) => updateAttribute('sex', value)}
           >
-            <SelectTrigger id="wildlife-sex" className="min-h-[48px]">
+            <SelectTrigger
+              id="wildlife-sex"
+              className={cn(
+                'min-h-[48px]',
+                hasError('Sex') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+              )}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -345,9 +386,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             min="1"
             value={(attributes as Partial<WildlifeAttributes>).quantity || 1}
             onChange={(e) => updateAttribute('quantity', parseInt(e.target.value) || 1)}
-            className="min-h-[48px] text-base"
+            className={cn(
+              'min-h-[48px] text-base',
+              hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+            )}
             required
           />
+          {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Quantity must be at least 1</p> : null}
         </div>
 
         <div className="space-y-2">
@@ -377,16 +422,26 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
-        <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+        <div
+          className={cn(
+            'space-y-4 p-4 border rounded-lg bg-muted/50',
+            (hasError('Animal Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) &&
+              'border-destructive border-2'
+          )}
+        >
           <Label className="text-base font-semibold">
             TAHC Compliance Disclosures <span className="text-destructive">*</span>
           </Label>
+          {(hasError('Animal Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? (
+            <p className="text-sm text-destructive">All disclosures are required</p>
+          ) : null}
           <div className="space-y-3">
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="animal-id-disclosure"
                 checked={(attributes as Partial<WildlifeAttributes>).animalIdDisclosure || false}
                 onCheckedChange={(checked) => updateAttribute('animalIdDisclosure', checked)}
+                className={hasError('Animal Identification Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="animal-id-disclosure" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Animal Identification Disclosure</div>
@@ -400,6 +455,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 id="health-disclosure"
                 checked={(attributes as Partial<WildlifeAttributes>).healthDisclosure || false}
                 onCheckedChange={(checked) => updateAttribute('healthDisclosure', checked)}
+                className={hasError('Health Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="health-disclosure" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Health Disclosure</div>
@@ -413,6 +469,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 id="transport-disclosure"
                 checked={(attributes as Partial<WildlifeAttributes>).transportDisclosure || false}
                 onCheckedChange={(checked) => updateAttribute('transportDisclosure', checked)}
+                className={hasError('Transport Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="transport-disclosure" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Transport Disclosure (Texas-Only)</div>
@@ -439,9 +496,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             placeholder="e.g., Angus, Hereford, Texas Longhorn"
             value={(attributes as Partial<CattleAttributes>).breed || ''}
             onChange={(e) => updateAttribute('breed', e.target.value)}
-            className="min-h-[48px] text-base"
+            className={cn(
+              'min-h-[48px] text-base',
+              hasError('Breed') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+            )}
             required
           />
+          {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
         </div>
 
         <div className="space-y-2">
@@ -452,7 +513,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             value={(attributes as Partial<CattleAttributes>).sex || 'unknown'}
             onValueChange={(value) => updateAttribute('sex', value)}
           >
-            <SelectTrigger id="cattle-sex" className="min-h-[48px]">
+            <SelectTrigger
+              id="cattle-sex"
+              className={cn(
+                'min-h-[48px]',
+                hasError('Sex') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+              )}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -477,11 +544,12 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-start space-x-3 min-h-[44px]">
+          <div className={cn('flex items-start space-x-3 min-h-[44px]', hasError('Registered') && 'rounded-lg border-2 border-destructive p-3')}>
             <Checkbox
               id="registered"
               checked={(attributes as Partial<CattleAttributes>).registered || false}
               onCheckedChange={(checked) => updateAttribute('registered', checked)}
+              className={hasError('Registered') ? 'border-destructive' : ''}
             />
             <Label htmlFor="registered" className="cursor-pointer flex-1">
               <div className="font-medium mb-1">
@@ -492,6 +560,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               </div>
             </Label>
           </div>
+          {hasError('Registered') ? <p className="text-sm text-destructive">Please confirm registered yes/no</p> : null}
         </div>
 
         {(attributes as Partial<CattleAttributes>).registered && (
@@ -544,9 +613,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             min="1"
             value={(attributes as Partial<CattleAttributes>).quantity || 1}
             onChange={(e) => updateAttribute('quantity', parseInt(e.target.value) || 1)}
-            className="min-h-[48px] text-base"
+            className={cn(
+              'min-h-[48px] text-base',
+              hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+            )}
             required
           />
+          {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Quantity must be at least 1</p> : null}
         </div>
 
         <div className="space-y-2">
@@ -560,16 +633,25 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
-        <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+        <div
+          className={cn(
+            'space-y-4 p-4 border rounded-lg bg-muted/50',
+            (hasError('Identification Disclosure') || hasError('Health Disclosure')) && 'border-destructive border-2'
+          )}
+        >
           <Label className="text-base font-semibold">
             Compliance Disclosures <span className="text-destructive">*</span>
           </Label>
+          {(hasError('Identification Disclosure') || hasError('Health Disclosure')) ? (
+            <p className="text-sm text-destructive">All disclosures are required</p>
+          ) : null}
           <div className="space-y-3">
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="identification-disclosure"
                 checked={(attributes as Partial<CattleAttributes>).identificationDisclosure || false}
                 onCheckedChange={(checked) => updateAttribute('identificationDisclosure', checked)}
+                className={hasError('Identification Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="identification-disclosure" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Identification Disclosure</div>
@@ -583,6 +665,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 id="cattle-health-disclosure"
                 checked={(attributes as Partial<CattleAttributes>).healthDisclosure || false}
                 onCheckedChange={(checked) => updateAttribute('healthDisclosure', checked)}
+                className={hasError('Health Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="cattle-health-disclosure" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Health Disclosure</div>
@@ -612,7 +695,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             value={equipmentType || ''}
             onValueChange={(value) => updateAttribute('equipmentType', value)}
           >
-            <SelectTrigger id="equipment-type" className="min-h-[48px]">
+            <SelectTrigger
+              id="equipment-type"
+              className={cn(
+                'min-h-[48px]',
+                hasError('Equipment Type') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+              )}
+            >
               <SelectValue placeholder="Select equipment type" />
             </SelectTrigger>
             <SelectContent>
@@ -690,7 +779,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             value={(attributes as Partial<EquipmentAttributes>).condition || 'good'}
             onValueChange={(value) => updateAttribute('condition', value)}
           >
-            <SelectTrigger id="equipment-condition" className="min-h-[48px]">
+            <SelectTrigger
+              id="equipment-condition"
+              className={cn(
+                'min-h-[48px]',
+                hasError('Condition') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+              )}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -715,16 +810,25 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         {requiresTitle && (
-          <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+          <div
+            className={cn(
+              'space-y-4 p-4 border rounded-lg bg-muted/50',
+              (hasError('Has Title') || hasError('VIN or Serial Number')) && 'border-destructive border-2'
+            )}
+          >
             <Label className="text-base font-semibold">
               Title & VIN Information <span className="text-destructive">*</span>
             </Label>
+            {(hasError('Has Title') || hasError('VIN or Serial Number')) ? (
+              <p className="text-sm text-destructive">Title + VIN are required for this equipment type</p>
+            ) : null}
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
                 <Checkbox
                   id="has-title"
                   checked={(attributes as Partial<EquipmentAttributes>).hasTitle || false}
                   onCheckedChange={(checked) => updateAttribute('hasTitle', checked)}
+                  className={hasError('Has Title') ? 'border-destructive' : ''}
                 />
                 <Label htmlFor="has-title" className="cursor-pointer flex-1">
                   <div className="font-medium mb-1">Has Title</div>
@@ -742,9 +846,15 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   placeholder="Enter VIN or Serial Number"
                   value={(attributes as Partial<EquipmentAttributes>).vinOrSerial || ''}
                   onChange={(e) => updateAttribute('vinOrSerial', e.target.value)}
-                  className="min-h-[48px] text-base"
+                  className={cn(
+                    'min-h-[48px] text-base',
+                    hasError('VIN or Serial Number') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+                  )}
                   required={requiresTitle}
                 />
+                {hasError('VIN or Serial Number') ? (
+                  <p className="text-sm text-destructive">VIN or Serial Number is required</p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -760,9 +870,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             min="1"
             value={(attributes as Partial<EquipmentAttributes>).quantity || 1}
             onChange={(e) => updateAttribute('quantity', parseInt(e.target.value) || 1)}
-            className="min-h-[48px] text-base"
+            className={cn(
+              'min-h-[48px] text-base',
+              hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+            )}
             required
           />
+          {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Quantity must be at least 1</p> : null}
         </div>
       </div>
     );
