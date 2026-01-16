@@ -9,6 +9,7 @@ import { TourOverlay } from '@/components/help/TourOverlay';
 import { HELP_CONTENT } from '@/help/helpContent';
 import { TOURS } from '@/help/tours';
 import { getHelpKeyForPathname } from '@/lib/help/helpKeys';
+import { setTourBannerDismissed } from '@/lib/help/helpState';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,11 @@ export function HelpLauncher() {
 
   const [open, setOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+
+  const dismissTourBanner = async () => {
+    if (!helpKey) return;
+    await setTourBannerDismissed(uid, helpKey);
+  };
 
   const topOffset = useMemo(() => {
     // Public pages have the sticky navbar (h-20). Keep the help button below it.
@@ -61,6 +67,8 @@ export function HelpLauncher() {
         content={content}
         showStartTour={!!tour?.steps?.length}
         onStartTour={() => {
+          // Starting from the Help panel should also permanently dismiss the first-time banner.
+          void dismissTourBanner();
           setOpen(false);
           setTourOpen(true);
         }}
@@ -71,7 +79,11 @@ export function HelpLauncher() {
           open={tourOpen}
           title={tour.title}
           steps={tour.steps}
-          onClose={() => setTourOpen(false)}
+          onClose={() => {
+            // If they complete OR exit, don't show the tour popup again for this page.
+            void dismissTourBanner();
+            setTourOpen(false);
+          }}
         />
       ) : null}
     </>

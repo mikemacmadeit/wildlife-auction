@@ -52,7 +52,10 @@ export function FirstTimeTourBanner(props: {
           <Button
             type="button"
             className="min-h-[44px] font-semibold"
-            onClick={() => {
+            onClick={async () => {
+              // If they start (or later exit/complete) we never want to show this banner again.
+              await setTourBannerDismissed(uid, helpKey);
+              setVisible(false);
               onStartTour();
             }}
           >
