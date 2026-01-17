@@ -204,13 +204,6 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                {formData.category === 'whitetail_breeder' && (
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs font-bold">
-                      Selected
-                    </span>
-                  </div>
-                )}
                 <div className="flex justify-center">
                   <div 
                     className="w-16 h-16"
@@ -268,13 +261,6 @@ function NewListingPageContent() {
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
                       <CheckCircle2 className="h-5 w-5" />
                     </div>
-                  </div>
-                )}
-                {formData.category === 'wildlife_exotics' && (
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs font-bold">
-                      Selected
-                    </span>
                   </div>
                 )}
                 <div className="flex justify-center">
@@ -335,13 +321,6 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                {formData.category === 'cattle_livestock' && (
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs font-bold">
-                      Selected
-                    </span>
-                  </div>
-                )}
                 <div className="flex justify-center">
                   <div 
                     className="w-16 h-16"
@@ -388,13 +367,6 @@ function NewListingPageContent() {
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
                       <CheckCircle2 className="h-5 w-5" />
                     </div>
-                  </div>
-                )}
-                {formData.category === 'ranch_equipment' && (
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs font-bold">
-                      Selected
-                    </span>
                   </div>
                 )}
                 <div className="flex justify-center">
