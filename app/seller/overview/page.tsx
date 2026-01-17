@@ -83,8 +83,35 @@ const getActivityIcon = (type: string) => {
   }
 };
 
-const formatTimeAgo = (date: Date) => {
-  const minutes = Math.floor((Date.now() - date.getTime()) / (1000 * 60));
+function toDateSafe(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  // Firestore Timestamp (client) shape
+  if (typeof value?.toDate === 'function') {
+    try {
+      const d = value.toDate();
+      if (d instanceof Date) return d;
+    } catch {
+      // ignore
+    }
+  }
+  // Serialized timestamp (e.g. { seconds, nanoseconds })
+  if (typeof value?.seconds === 'number') {
+    const ms = value.seconds * 1000;
+    const d = new Date(ms);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
+const formatTimeAgo = (date: any) => {
+  const d = toDateSafe(date);
+  if (!d) return '';
+  const minutes = Math.floor((Date.now() - d.getTime()) / (1000 * 60));
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -250,8 +277,9 @@ export default function SellerOverviewPage() {
     
     // Check for auctions ending soon (within 24 hours)
     listings.forEach((listing) => {
-      if (listing.type === 'auction' && listing.status === 'active' && listing.endsAt) {
-        const hoursUntilEnd = (listing.endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      const endsAt = toDateSafe((listing as any).endsAt);
+      if (listing.type === 'auction' && listing.status === 'active' && endsAt) {
+        const hoursUntilEnd = (endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
         if (hoursUntilEnd > 0 && hoursUntilEnd <= 24) {
           alertsList.push({
             id: `auction-ending-${listing.id}`,
@@ -288,8 +316,12 @@ export default function SellerOverviewPage() {
     const activitiesList: SellerActivity[] = [];
     
     // Add listing creation activities (most recent first)
-    listings
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    [...listings]
+      .sort((a, b) => {
+        const aD = toDateSafe((a as any).createdAt)?.getTime() ?? 0;
+        const bD = toDateSafe((b as any).createdAt)?.getTime() ?? 0;
+        return bD - aD;
+      })
       .slice(0, 10)
       .forEach((listing) => {
         activitiesList.push({
@@ -297,15 +329,19 @@ export default function SellerOverviewPage() {
           type: 'listing_created',
           title: `Created listing: ${listing.title}`,
           description: `${listing.type} listing in ${listing.category}`,
-          timestamp: listing.createdAt,
+          timestamp: (toDateSafe((listing as any).createdAt) || new Date()) as any,
           listingId: listing.id,
         });
       });
 
     // Add completed sales
-    orders
+    [...orders]
       .filter((o) => o.status === 'paid' || o.status === 'completed')
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .sort((a, b) => {
+        const aD = toDateSafe((a as any).createdAt)?.getTime() ?? 0;
+        const bD = toDateSafe((b as any).createdAt)?.getTime() ?? 0;
+        return bD - aD;
+      })
       .slice(0, 5)
       .forEach((order) => {
         activitiesList.push({
@@ -313,13 +349,17 @@ export default function SellerOverviewPage() {
           type: 'sale_completed',
           title: `Sale completed`,
           description: `Order #${order.id.slice(0, 8)} - $${order.amount.toLocaleString()}`,
-          timestamp: order.completedAt || order.createdAt,
+          timestamp: (toDateSafe((order as any).completedAt) || toDateSafe((order as any).createdAt) || new Date()) as any,
           listingId: order.listingId,
         });
       });
 
     // Sort by timestamp (most recent first)
-    activitiesList.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    activitiesList.sort((a, b) => {
+      const aD = toDateSafe((a as any).timestamp)?.getTime() ?? 0;
+      const bD = toDateSafe((b as any).timestamp)?.getTime() ?? 0;
+      return bD - aD;
+    });
     
     return activitiesList.slice(0, 10);
   }, [listings, orders]);
