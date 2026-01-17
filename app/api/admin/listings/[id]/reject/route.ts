@@ -5,7 +5,7 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
 
@@ -60,32 +60,55 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   const title = String(listing?.title || 'Listing');
   if (!sellerId) return json({ ok: false, error: 'Listing is missing sellerId' }, { status: 400 });
 
-  await listingRef.update({
-    status: 'removed',
-    rejectedBy: uid,
-    rejectedAt: Timestamp.now(),
-    rejectionReason: reason || undefined,
-    updatedAt: Timestamp.now(),
-    updatedBy: uid,
-  });
+  try {
+    await listingRef.update({
+      status: 'removed',
+      rejectedBy: uid,
+      rejectedAt: Timestamp.now(),
+      // Firestore rejects undefined; if no reason, delete any existing reason.
+      rejectionReason: reason ? reason : FieldValue.delete(),
+      updatedAt: Timestamp.now(),
+      updatedBy: uid,
+    });
+  } catch (e: any) {
+    console.error('[admin.listings.reject] Failed to update listing', {
+      listingId,
+      actorId: uid,
+      message: e?.message,
+    });
+    return json({ ok: false, error: 'Failed to reject listing', message: e?.message }, { status: 500 });
+  }
 
   const bodyText = reason
     ? `Your listing “${title}” was rejected. Reason: ${reason}`
     : `Your listing “${title}” was rejected.`;
 
   const notifRef = db.collection('users').doc(sellerId).collection('notifications').doc();
-  await notifRef.set({
-    userId: sellerId,
-    type: 'listing_rejected',
-    title: 'Listing rejected',
-    body: bodyText,
-    read: false,
-    createdAt: Timestamp.now(),
-    linkUrl: `/seller/listings/${listingId}/edit`,
-    linkLabel: 'Edit listing',
-    listingId,
-    metadata: { status: 'removed', reason: reason || undefined },
-  });
+  try {
+    const metadata: Record<string, any> = { status: 'removed' };
+    if (reason) metadata.reason = reason;
+
+    await notifRef.set({
+      userId: sellerId,
+      type: 'listing_rejected',
+      title: 'Listing rejected',
+      body: bodyText,
+      read: false,
+      createdAt: Timestamp.now(),
+      linkUrl: `/seller/listings/${listingId}/edit`,
+      linkLabel: 'Edit listing',
+      listingId,
+      metadata,
+    });
+  } catch (e: any) {
+    // Notification failures shouldn't block moderation action.
+    console.warn('[admin.listings.reject] Failed to create notification', {
+      listingId,
+      sellerId,
+      actorId: uid,
+      message: e?.message,
+    });
+  }
 
   return json({ ok: true });
 }
