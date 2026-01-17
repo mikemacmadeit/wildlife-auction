@@ -278,6 +278,21 @@ export async function POST(request: Request) {
 
     // Defensive compliance validation (server-side)
     try {
+      // Type switches can leave legacy fields on the doc (e.g. auction -> fixed leaving startingBid).
+      // Validate against the fields that matter for the chosen type so publishing stays smooth.
+      const pricingForType =
+        listingData.type === 'auction'
+          ? {
+              price: undefined,
+              startingBid: listingData.startingBid,
+              reservePrice: listingData.reservePrice,
+            }
+          : {
+              price: listingData.price,
+              startingBid: undefined,
+              reservePrice: undefined,
+            };
+
       validateListingCompliance(
         listingData.category,
         listingData.attributes,
@@ -285,11 +300,7 @@ export async function POST(request: Request) {
         listingData.title,
         listingData.description,
         listingData.type,
-        {
-          price: listingData.price,
-          startingBid: listingData.startingBid,
-          reservePrice: listingData.reservePrice,
-        }
+        pricingForType
       );
     } catch (e: any) {
       return json({ error: 'Compliance validation failed', message: e?.message || String(e) }, { status: 400 });

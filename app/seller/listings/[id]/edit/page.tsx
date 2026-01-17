@@ -219,7 +219,20 @@ function EditListingPageContent() {
             <Label className="text-base font-semibold">Listing Type</Label>
             <RadioGroup
               value={formData.type}
-              onValueChange={(value) => setFormData({ ...formData, type: value as ListingType })}
+              onValueChange={(value) => {
+                const nextType = value as ListingType;
+                const next: any = { ...formData, type: nextType };
+                // Smooth type switching: clear incompatible fields immediately so save/publish never fails.
+                if (nextType === 'auction') {
+                  next.price = '';
+                  next.bestOffer = { ...next.bestOffer, enabled: false, minPrice: '', autoAcceptPrice: '' };
+                } else {
+                  next.startingBid = '';
+                  next.reservePrice = '';
+                  next.endsAt = '';
+                }
+                setFormData(next);
+              }}
               disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
             >
               {[

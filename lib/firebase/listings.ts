@@ -19,6 +19,7 @@ import {
   onSnapshot,
   Unsubscribe,
   FieldPath,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from './config';
 import { getDocument } from './firestore';
@@ -541,6 +542,26 @@ export const updateListing = async (
       updatedAt: serverTimestamp(),
       updatedBy: uid,
     };
+
+    // If switching listing type, clear incompatible fields so compliance validation and publish won't fail.
+    const nextType = (safeUpdates as any)?.type as ListingType | undefined;
+    if (nextType) {
+      if (nextType === 'auction') {
+        // Auction cannot have fixed price fields
+        firestoreUpdates.price = deleteField();
+        // Best offer is fixed/classified-only; clear it to avoid confusing state.
+        firestoreUpdates.bestOfferSettings = deleteField();
+        firestoreUpdates.bestOfferEnabled = deleteField();
+        firestoreUpdates.bestOfferMinPrice = deleteField();
+        firestoreUpdates.bestOfferAutoAcceptPrice = deleteField();
+      } else {
+        // Fixed/Classified cannot have auction fields
+        firestoreUpdates.startingBid = deleteField();
+        firestoreUpdates.reservePrice = deleteField();
+        firestoreUpdates.endsAt = deleteField();
+        firestoreUpdates.currentBid = deleteField();
+      }
+    }
 
     // Convert Date fields to Timestamps
     if (updates.endsAt) {
