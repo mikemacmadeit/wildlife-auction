@@ -35,6 +35,7 @@ import { getEffectiveSubscriptionTier, getTierLabel } from '@/lib/pricing/subscr
 import { Crown, Zap, CreditCard, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
+import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -122,6 +123,7 @@ export default function SellerOverviewPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [connectingStripe, setConnectingStripe] = useState(false);
 
   // Fetch listings and orders
   useEffect(() => {
@@ -490,9 +492,54 @@ export default function SellerOverviewPage() {
                         {payoutsOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
                       </div>
                       <div className="mt-3">
-                        <Button asChild variant={payoutsOk ? 'outline' : 'default'} className="w-full min-h-[40px] font-semibold">
-                          <Link href="/seller/payouts">{payoutsOk ? 'View Payouts' : 'Connect Stripe'}</Link>
-                        </Button>
+                        {payoutsOk ? (
+                          <Button asChild variant="outline" className="w-full min-h-[40px] font-semibold">
+                            <Link href="/seller/payouts">View Payouts</Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="default"
+                            className="w-full min-h-[40px] font-semibold"
+                            disabled={connectingStripe}
+                            onClick={async () => {
+                              if (!user) {
+                                toast({
+                                  title: 'Sign in required',
+                                  description: 'Please sign in to connect Stripe payouts.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+                              try {
+                                setConnectingStripe(true);
+                                // Ensure seller has a Connect account, then send them directly to Stripe onboarding.
+                                if (!userProfile?.stripeAccountId) {
+                                  await createStripeAccount();
+                                }
+                                const { url } = await createAccountLink();
+                                window.location.href = url;
+                              } catch (e: any) {
+                                toast({
+                                  title: 'Could not connect Stripe',
+                                  description: e?.message || 'Please try again.',
+                                  variant: 'destructive',
+                                });
+                              } finally {
+                                setConnectingStripe(false);
+                              }
+                            }}
+                          >
+                            {connectingStripe ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Redirecting…
+                              </>
+                            ) : (
+                              'Connect Stripe'
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -72,6 +72,8 @@ export async function createStripeAccount(): Promise<{ stripeAccountId: string }
     if (errorDetails?.message) err.detailsMessage = errorDetails.message;
     if (errorDetails?.stripe?.requestLogUrl) err.requestLogUrl = errorDetails.stripe.requestLogUrl;
     if (errorDetails?.stripe?.requestId) err.requestId = errorDetails.stripe.requestId;
+    if (errorDetails?.stripe?.platformAccountId) err.platformAccountId = errorDetails.stripe.platformAccountId;
+    if (typeof errorDetails?.stripe?.platformLivemode === 'boolean') err.platformLivemode = errorDetails.stripe.platformLivemode;
     throw err;
   }
 
@@ -172,8 +174,25 @@ export async function createAccountLink(): Promise<{ url: string }> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const errorMessage = error.error || error.message || 'Failed to create onboarding link';
+    let errorMessage = 'Failed to create onboarding link';
+    let errorDetails: any = {};
+
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        errorDetails = error;
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        errorMessage = `${response.status} ${response.statusText}`;
+        const text = await response.text();
+        const match = text.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (match) errorMessage = match[1];
+      }
+    } catch {
+      errorMessage = `${response.status} ${response.statusText}`;
+    }
+
     // Don't log expected configuration errors
     const isConfigError = errorMessage.includes('Stripe is not configured') || 
                           errorMessage.includes('STRIPE_SECRET_KEY');
@@ -181,9 +200,13 @@ export async function createAccountLink(): Promise<{ url: string }> {
       console.error('Failed to create onboarding link:', errorMessage);
     }
     const err: any = new Error(errorMessage);
-    if (error?.code) err.code = error.code;
-    if (error?.actionUrl) err.actionUrl = error.actionUrl;
-    if (error?.message) err.detailsMessage = error.message;
+    if (errorDetails?.code) err.code = errorDetails.code;
+    if (errorDetails?.actionUrl) err.actionUrl = errorDetails.actionUrl;
+    if (errorDetails?.message) err.detailsMessage = errorDetails.message;
+    if (errorDetails?.stripe?.requestId) err.requestId = errorDetails.stripe.requestId;
+    if (errorDetails?.stripe?.platformAccountId) err.platformAccountId = errorDetails.stripe.platformAccountId;
+    if (typeof errorDetails?.stripe?.platformLivemode === 'boolean') err.platformLivemode = errorDetails.stripe.platformLivemode;
+    if (errorDetails?.stripe?.requestLogUrl) err.requestLogUrl = errorDetails.stripe.requestLogUrl;
     throw err;
   }
 

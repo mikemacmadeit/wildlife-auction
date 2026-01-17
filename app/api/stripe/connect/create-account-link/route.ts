@@ -34,6 +34,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // From here on, Stripe is guaranteed to be present.
+    const stripeClient = stripe;
+
     // Lazily initialize Admin SDK inside handler (Netlify-safe)
     let auth;
     let db;
@@ -82,7 +85,15 @@ export async function POST(request: Request) {
     const stripeAccountId = userData?.stripeAccountId;
 
     if (!stripeAccountId) {
-      return json({ error: 'Stripe account not found. Please create an account first.' }, { status: 400 });
+      return json(
+        {
+          error: 'Stripe account not found. Please create an account first.',
+          code: 'STRIPE_ACCOUNT_MISSING',
+          message:
+            'No stripeAccountId is set for this user yet. Create the Connect account first (create-account), then retry creating an onboarding link.',
+        },
+        { status: 400 }
+      );
     }
 
     // Create account link for onboarding
@@ -99,7 +110,7 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-    const accountLink = await stripe.accountLinks.create({
+    const accountLink = await stripeClient.accountLinks.create({
       account: stripeAccountId,
       refresh_url: `${baseUrl}/seller/payouts?onboarding=restart`,
       return_url: `${baseUrl}/seller/payouts?onboarding=complete`,
@@ -116,11 +127,37 @@ export async function POST(request: Request) {
     // Provide structured Stripe errors when possible
     const msg = String(error?.message || '');
     if (error?.type && msg) {
+      const requestLogUrl =
+        (error?.raw as any)?.request_log_url || (error?.raw as any)?.requestLogUrl || undefined;
+      const requestId = (error as any)?.requestId || (error?.raw as any)?.requestId || undefined;
+
+      // Helpful diagnostics (safe): identify which platform account this server key belongs to.
+      let platformAccountId: string | undefined;
+      let platformLivemode: boolean | undefined;
+      try {
+        // `stripe` can be null at type-level; best-effort only.
+        const stripeClient2 = stripe;
+        if (stripeClient2) {
+          const acct = (await stripeClient2.accounts.retrieve()) as any;
+          platformAccountId = acct?.id;
+          platformLivemode = acct?.livemode;
+        }
+      } catch {
+        // ignore
+      }
+
       return json(
         {
           error: 'Failed to create onboarding link',
           message: msg,
-          stripe: { type: error?.type, code: error?.code },
+          stripe: {
+            type: error?.type,
+            code: error?.code,
+            requestId,
+            platformAccountId,
+            platformLivemode,
+            requestLogUrl: process.env.NODE_ENV === 'production' ? undefined : requestLogUrl,
+          },
         },
         { status: 400 }
       );

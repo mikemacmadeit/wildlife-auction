@@ -1409,6 +1409,11 @@ function NewListingPageContent() {
         await updateListing(user.uid, finalListingId, listingData);
       }
 
+      // Critical: persist the draft ID immediately.
+      // If publish is blocked (e.g. payouts not ready), the user may click "Save draft" from the dialog.
+      // Without setting this, we’d create a SECOND draft listing (duplicate).
+      setListingId(finalListingId);
+
       // Publish immediately (user clicked "Publish" in the form)
       const publishResult = await publishListing(user.uid, finalListingId);
 

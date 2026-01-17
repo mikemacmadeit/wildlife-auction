@@ -141,6 +141,18 @@ export async function POST(request: Request) {
           (stripeError?.raw as any)?.requestId ||
           undefined;
 
+        // Helpful diagnostics: confirm which platform account the server key belongs to.
+        // This is safe to return (acct_... is not a secret) and helps detect "wrong Stripe account" instantly.
+        let platformAccountId: string | undefined;
+        let platformLivemode: boolean | undefined;
+        try {
+          const acct = (await stripe.accounts.retrieve()) as any;
+          platformAccountId = acct?.id;
+          platformLivemode = acct?.livemode;
+        } catch {
+          // ignore (best-effort)
+        }
+
         return json(
           {
             error: 'Stripe platform account rejected',
@@ -153,6 +165,8 @@ export async function POST(request: Request) {
               type: stripeError?.type,
               code: stripeError?.code,
               requestId,
+              platformAccountId,
+              platformLivemode,
               // Only include Stripe request logs in non-production (they can contain sensitive debugging context).
               requestLogUrl: process.env.NODE_ENV === 'production' ? undefined : requestLogUrl,
             },

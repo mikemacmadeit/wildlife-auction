@@ -10,9 +10,10 @@ export function FirstTimeTourBanner(props: {
   uid: string | null;
   helpKey: string;
   onStartTour: () => void;
+  onDismissed?: () => void;
   className?: string;
 }) {
-  const { uid, helpKey, onStartTour, className } = props;
+  const { uid, helpKey, onStartTour, onDismissed, className } = props;
   const [ready, setReady] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -57,6 +58,7 @@ export function FirstTimeTourBanner(props: {
               // If they start (or later exit/complete) we never want to show this banner again.
               await setTourBannerDismissed(uid, helpKey);
               setVisible(false);
+              onDismissed?.();
               onStartTour();
             }}
           >
@@ -69,6 +71,7 @@ export function FirstTimeTourBanner(props: {
             onClick={async () => {
               await setTourBannerDismissed(uid, helpKey);
               setVisible(false);
+              onDismissed?.();
             }}
           >
             Not now

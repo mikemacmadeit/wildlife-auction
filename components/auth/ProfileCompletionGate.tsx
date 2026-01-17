@@ -23,6 +23,8 @@ export function ProfileCompletionGate() {
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
 
+  const gateOpen = open && !checking;
+
   const isAuthedArea = useMemo(() => {
     // Only enforce inside authenticated app areas; avoid popping modals while browsing public pages.
     return pathname?.startsWith('/dashboard') || pathname?.startsWith('/seller');
@@ -62,18 +64,55 @@ export function ProfileCompletionGate() {
     refresh();
   }, [isAuthedArea, initialized, loading, user, refresh]);
 
+  // Signal other UI (e.g. tour prompt) to wait until profile completion modal is done.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('ui:profile-completion-gate-open:v1', gateOpen ? '1' : '0');
+    } catch {
+      // ignore
+    }
+    try {
+      window.dispatchEvent(
+        new CustomEvent('we:profile-completion-gate', {
+          detail: { open: gateOpen },
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [gateOpen]);
+
   if (!isAuthedArea) return null;
   if (!initialized || loading) return null;
   if (!user) return null;
 
   return (
     <ProfileCompletionModal
-      open={open && !checking}
+      open={gateOpen}
       userId={user.uid}
       userEmail={user.email || ''}
       userDisplayName={user.displayName || undefined}
       onComplete={() => {
         setOpen(false);
+        // Let other UI know the user just completed the profile gate (useful to show a "want a tour?" prompt next).
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('ui:profile-completion-gate-just-completed:v1', String(Date.now()));
+            // Re-arm the post-profile tour prompt (it will self-consume after the user responds).
+            // If they’ve already consumed it, we leave it consumed.
+            if (window.localStorage.getItem('ui:tour-prompt-after-profile-consumed:v1') !== '1') {
+              // no-op: presence of the timestamp is the "armed" signal
+            }
+            window.dispatchEvent(
+              new CustomEvent('we:profile-completion-gate', {
+                detail: { open: false, justCompleted: true },
+              })
+            );
+          }
+        } catch {
+          // ignore
+        }
         // Re-check in background to ensure the Firestore doc is now complete.
         refresh();
       }}

@@ -27,6 +27,60 @@ export function HelpLauncher() {
   const [tourSeen, setTourSeenState] = useState<boolean>(false);
   const [tourBannerDismissed, setTourBannerDismissedState] = useState<boolean>(false);
   const [ready, setReady] = useState(false);
+  const [profileGateOpen, setProfileGateOpen] = useState<boolean>(false);
+  const [tourPromptArmed, setTourPromptArmed] = useState<boolean>(false);
+
+  const consumeTourPrompt = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      window.localStorage.setItem('ui:tour-prompt-after-profile-consumed:v1', '1');
+      window.localStorage.removeItem('ui:profile-completion-gate-just-completed:v1');
+    } catch {
+      // ignore
+    }
+    setTourPromptArmed(false);
+  };
+
+  // If the profile completion modal is open, suppress the tour prompt until it's finished.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const readInitial = () => {
+      try {
+        const raw = window.localStorage.getItem('ui:profile-completion-gate-open:v1');
+        setProfileGateOpen(raw === '1');
+      } catch {
+        setProfileGateOpen(false);
+      }
+
+      // Only show the tour opt-in prompt immediately after profile completion, once.
+      try {
+        const consumed = window.localStorage.getItem('ui:tour-prompt-after-profile-consumed:v1') === '1';
+        const justCompleted = window.localStorage.getItem('ui:profile-completion-gate-just-completed:v1');
+        setTourPromptArmed(!consumed && !!justCompleted);
+      } catch {
+        setTourPromptArmed(false);
+      }
+    };
+
+    readInitial();
+
+    const onGate = (e: any) => {
+      const open = e?.detail?.open === true;
+      setProfileGateOpen(open);
+      if (e?.detail?.justCompleted === true) {
+        try {
+          const consumed = window.localStorage.getItem('ui:tour-prompt-after-profile-consumed:v1') === '1';
+          if (!consumed) setTourPromptArmed(true);
+        } catch {
+          setTourPromptArmed(true);
+        }
+      }
+    };
+
+    window.addEventListener('we:profile-completion-gate', onGate as any);
+    return () => window.removeEventListener('we:profile-completion-gate', onGate as any);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,12 +146,18 @@ export function HelpLauncher() {
       ) : null}
 
       {/* First-time banner (only shows on pages with a tour) */}
-      {helpKey && tour?.steps?.length && tourSeen !== true && tourBannerDismissed !== true ? (
+      {helpKey &&
+      tour?.steps?.length &&
+      tourSeen !== true &&
+      tourBannerDismissed !== true &&
+      !profileGateOpen &&
+      tourPromptArmed ? (
         <div className="fixed bottom-20 md:bottom-6 left-0 right-0 z-[55] px-4">
           <div className="container mx-auto max-w-4xl">
             <FirstTimeTourBanner
               uid={uid}
               helpKey={helpKey}
+              onDismissed={consumeTourPrompt}
               onStartTour={() => setTourOpen(true)}
               // If they click "Not now", persist dismissal and stop showing the banner.
               className=""
@@ -115,6 +175,7 @@ export function HelpLauncher() {
           onStartTour={() => {
             // Tour should only ever open once (even if user clicks Start tour).
             void markTourSeen();
+            consumeTourPrompt();
             setOpen(false);
             setTourOpen(true);
           }}
@@ -129,6 +190,7 @@ export function HelpLauncher() {
           onClose={() => {
             // If they complete OR exit, don't show the tour popup again for this page.
             void markTourSeen();
+            consumeTourPrompt();
             setTourOpen(false);
           }}
         />
