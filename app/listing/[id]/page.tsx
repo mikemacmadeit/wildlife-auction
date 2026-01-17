@@ -50,7 +50,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { TrustBadges } from '@/components/trust/StatusBadge';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
@@ -115,6 +115,18 @@ export default function ListingDetailPage() {
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToListing: addToRecentlyViewed } = useRecentlyViewed();
+  const isSold = listing?.status === 'sold';
+
+  const similarBrowseUrl = useMemo(() => {
+    if (!listing) return '/browse';
+    const p = new URLSearchParams();
+    p.set('status', 'active');
+    if (listing.category) p.set('category', listing.category);
+    if (listing.type) p.set('type', listing.type);
+    if (listing.location?.state) p.set('state', listing.location.state);
+    if ((listing.attributes as any)?.speciesId) p.set('speciesId', String((listing.attributes as any).speciesId));
+    return `/browse?${p.toString()}`;
+  }, [listing]);
 
   const minBidUsd = useMemo(() => {
     if (!listing) return 0;
@@ -712,7 +724,29 @@ export default function ListingDetailPage() {
 
             {/* Bidding Section - Below Price (Mobile Only) */}
             <div className="lg:hidden">
-              {listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) > new Date() && (
+              {isSold && (
+                <Card className="border-2 border-destructive/30 bg-destructive/5 mb-4">
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="font-extrabold">This listing has ended</div>
+                        <div className="text-sm text-muted-foreground">
+                          {typeof listing!.soldPriceCents === 'number'
+                            ? `Sold for $${(Math.round(listing!.soldPriceCents) / 100).toLocaleString()}`
+                            : null}
+                          {listing!.soldAt ? ` • Sold on ${format(listing!.soldAt, 'MMM d, yyyy')}` : null}
+                        </div>
+                      </div>
+                      <Badge className="bg-destructive text-destructive-foreground font-extrabold">SOLD</Badge>
+                    </div>
+                    <Button asChild variant="outline" className="w-full min-h-[52px] text-base font-bold border-2">
+                      <Link href={similarBrowseUrl}>View similar listings</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isSold && listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) > new Date() && (
                 <Card className="border-2 shadow-lg bg-card">
                   <CardHeader className="pb-4 border-b">
                     <CardTitle className="text-lg font-bold">Place Your Bid</CardTitle>
@@ -782,7 +816,7 @@ export default function ListingDetailPage() {
               )}
 
               {/* Buy Now / Contact Seller - For Fixed/Classified (Mobile Only) */}
-              {listing!.type !== 'auction' && (
+              {!isSold && listing!.type !== 'auction' && (
                 <Card className="border-2">
                   <CardContent className="pt-6">
                     {listing!.type === 'fixed' && (
@@ -821,7 +855,7 @@ export default function ListingDetailPage() {
               )}
 
               {/* Best Offer (Mobile) */}
-              <OfferPanel listing={listing!} />
+              {!isSold ? <OfferPanel listing={listing!} /> : null}
 
               {/* Bid History - For Auctions (Mobile Only, Below Bidding Section) */}
               {listing!.type === 'auction' && (
@@ -1060,7 +1094,7 @@ export default function ListingDetailPage() {
                       </div>
 
                       {/* Countdown - Very Prominent for Auctions */}
-                      {listing!.type === 'auction' && listing!.endsAt && (
+                      {!isSold && listing!.type === 'auction' && listing!.endsAt && (
                         <div className="space-y-3 pb-4 border-b">
                           <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                             ⏰ Time Remaining
@@ -1071,7 +1105,7 @@ export default function ListingDetailPage() {
 
                       {/* Primary CTA Button - Large & Prominent */}
                       {/* Auction Winner - Complete Purchase */}
-                      {listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) <= new Date() && isWinningBidder && (
+                      {!isSold && listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) <= new Date() && isWinningBidder && (
                         <div className="space-y-3">
                           <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4 text-center">
                             <div className="flex items-center justify-center gap-2 mb-2">
@@ -1106,7 +1140,7 @@ export default function ListingDetailPage() {
                         </div>
                       )}
                       {/* Auction Active - Place Bid */}
-                      {listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) > new Date() && (
+                      {!isSold && listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) > new Date() && (
                         <Dialog open={showBidDialog} onOpenChange={setShowBidDialog}>
                           <DialogTrigger asChild>
                             <Button 
@@ -1161,7 +1195,7 @@ export default function ListingDetailPage() {
                         </Dialog>
                       )}
 
-                      {listing!.type === 'fixed' && (
+                      {!isSold && listing!.type === 'fixed' && (
                         <Button 
                           size="lg" 
                           onClick={handleBuyNow}
@@ -1182,7 +1216,7 @@ export default function ListingDetailPage() {
                         </Button>
                       )}
 
-                      {listing!.type === 'classified' && (
+                      {!isSold && listing!.type === 'classified' && (
                         <Button 
                           size="lg" 
                           variant="outline" 
@@ -1195,7 +1229,7 @@ export default function ListingDetailPage() {
                       )}
 
                       {/* Best Offer (Desktop sidebar) */}
-                      <OfferPanel listing={listing!} />
+                      {!isSold ? <OfferPanel listing={listing!} /> : null}
 
                       {/* Whitetail Breeder: Transfer & Legal Requirements (high-visibility) */}
                       {listing!.category === 'whitetail_breeder' && (

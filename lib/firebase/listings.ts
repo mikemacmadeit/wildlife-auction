@@ -261,6 +261,9 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     subcategory: doc.subcategory,
     attributes, // Migrate old metadata to new attributes if needed + normalize whitetail dates
     endsAt: timestampToDate(doc.endsAt),
+    soldAt: timestampToDate((doc as any).soldAt) || null,
+    soldPriceCents: typeof (doc as any).soldPriceCents === 'number' ? (doc as any).soldPriceCents : null,
+    saleType: typeof (doc as any).saleType === 'string' ? ((doc as any).saleType as any) : undefined,
     featured: doc.featured,
     featuredUntil: timestampToDate(doc.featuredUntil),
     metrics: doc.metrics || { views: 0, favorites: 0, bidCount: 0 },
@@ -739,6 +742,11 @@ export type BrowseCursor = QueryDocumentSnapshot<DocumentData> | {
  */
 export interface BrowseFilters {
   status?: 'active' | 'draft' | 'sold' | 'expired' | 'removed';
+  /**
+   * Optional multi-status filter for eBay-style browse toggles (e.g., Active + Sold).
+   * If provided, `statuses` takes precedence over `status`.
+   */
+  statuses?: Array<'active' | 'sold'>;
   type?: ListingType;
   category?: ListingCategory;
   location?: {
@@ -788,8 +796,15 @@ export const queryListingsForBrowse = async (
     const constraints: QueryConstraint[] = [];
     
     // Status filter (default to active)
+    const statuses = Array.isArray(filters.statuses) && filters.statuses.length ? filters.statuses : null;
     const status = filters.status || 'active';
-    constraints.push(where('status', '==', status));
+    const soldOnly = statuses ? statuses.length === 1 && statuses[0] === 'sold' : status === 'sold';
+    if (statuses) {
+      // Firestore supports `in` for up to 10 values.
+      constraints.push(where('status', 'in', statuses));
+    } else {
+      constraints.push(where('status', '==', status));
+    }
     
     // Type filter
     if (filters.type) {
@@ -818,7 +833,13 @@ export const queryListingsForBrowse = async (
       // For price range queries, we need to order by price
       // This means we can't combine with other orderBy fields
       // We'll handle this by using a separate query path
-      constraints.push(where('price', '<=', filters.maxPrice));
+      constraints.push(
+        where(
+          soldOnly ? 'soldPriceCents' : 'price',
+          '<=',
+          soldOnly ? Math.round(filters.maxPrice * 100) : filters.maxPrice
+        )
+      );
     } else if (filters.minPrice !== undefined && sort !== 'priceAsc' && sort !== 'priceDesc') {
       // minPrice without price sort - filter client-side after fetch
       // For now, we'll note this limitation
@@ -829,25 +850,26 @@ export const queryListingsForBrowse = async (
     // Firestore requires orderBy to match the sort direction
     switch (sort) {
       case 'newest':
-        constraints.push(orderBy('createdAt', 'desc'));
+        // For sold-only mode, treat "newest" as "recently sold".
+        constraints.push(orderBy(soldOnly ? 'soldAt' : 'createdAt', 'desc'));
         break;
       case 'oldest':
-        constraints.push(orderBy('createdAt', 'asc'));
+        constraints.push(orderBy(soldOnly ? 'soldAt' : 'createdAt', 'asc'));
         break;
       case 'priceAsc':
         // For price sorting, we need to handle listings without price
         // Use a computed field or filter out nulls
-        constraints.push(orderBy('price', 'asc'));
+        constraints.push(orderBy(soldOnly ? 'soldPriceCents' : 'price', 'asc'));
         // If minPrice is provided, add it as a where clause
         if (filters.minPrice !== undefined) {
-          constraints.push(where('price', '>=', filters.minPrice));
+          constraints.push(where(soldOnly ? 'soldPriceCents' : 'price', '>=', soldOnly ? Math.round(filters.minPrice * 100) : filters.minPrice));
         }
         break;
       case 'priceDesc':
-        constraints.push(orderBy('price', 'desc'));
+        constraints.push(orderBy(soldOnly ? 'soldPriceCents' : 'price', 'desc'));
         // If minPrice is provided, add it as a where clause
         if (filters.minPrice !== undefined) {
-          constraints.push(where('price', '>=', filters.minPrice));
+          constraints.push(where(soldOnly ? 'soldPriceCents' : 'price', '>=', soldOnly ? Math.round(filters.minPrice * 100) : filters.minPrice));
         }
         break;
       case 'endingSoon':
@@ -856,7 +878,7 @@ export const queryListingsForBrowse = async (
         if (filters.type !== 'auction') {
           // If not filtering by auction type, we can't sort by endsAt
           // Fall back to newest
-          constraints.push(orderBy('createdAt', 'desc'));
+          constraints.push(orderBy(soldOnly ? 'soldAt' : 'createdAt', 'desc'));
         } else {
           constraints.push(orderBy('endsAt', 'asc'));
         }
@@ -884,7 +906,22 @@ export const queryListingsForBrowse = async (
     // Build and execute query
     const listingsRef = collection(db, 'listings');
     const q = query(listingsRef, ...constraints);
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      querySnapshot = await getDocs(q);
+    } catch (error: any) {
+      // Fallback for missing composite index (common during rollout / index build).
+      if (error?.code === 'failed-precondition' || String(error?.message || '').includes('requires an index')) {
+        console.warn('[queryListingsForBrowse] Missing index; using fallback ordering', error);
+        // Remove all orderBy constraints and apply a safe default.
+        const fallback = constraints.filter((c: any) => (c as any)?.type !== 'orderBy');
+        fallback.push(orderBy('createdAt', 'desc'));
+        const qFallback = query(collection(db, 'listings'), ...fallback);
+        querySnapshot = await getDocs(qFallback);
+      } else {
+        throw error;
+      }
+    }
     
     // Check if there are more results
     const hasMore = querySnapshot.docs.length > limitCount;
@@ -904,6 +941,16 @@ export const queryListingsForBrowse = async (
       filteredItems = items.filter((listing) => {
         const price = listing.price || listing.currentBid || listing.startingBid || 0;
         return price >= filters.minPrice!;
+      });
+    }
+
+    // For sold-only mode, sort client-side by soldAt as a stable, backwards-compatible tie-breaker.
+    if (soldOnly && (sort === 'newest' || sort === 'oldest')) {
+      const dir = sort === 'newest' ? -1 : 1;
+      filteredItems = [...filteredItems].sort((a, b) => {
+        const at = a.soldAt?.getTime?.() ? a.soldAt.getTime() : a.updatedAt?.getTime?.() ? a.updatedAt.getTime() : a.createdAt.getTime();
+        const bt = b.soldAt?.getTime?.() ? b.soldAt.getTime() : b.updatedAt?.getTime?.() ? b.updatedAt.getTime() : b.createdAt.getTime();
+        return dir * (at - bt);
       });
     }
 

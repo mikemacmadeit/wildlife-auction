@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test",
+    "test:unit": "npx --yes tsx --test",
     "postinstall": "node scripts/patch-nextjs.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

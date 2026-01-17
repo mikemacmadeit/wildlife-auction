@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2 } from 'lucide-react';
 import { Listing } from '@/lib/types';
+import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -18,6 +19,7 @@ interface ListItemProps {
 
 export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   ({ listing }, ref) => {
+  const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
 
@@ -43,6 +45,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
           {/* Image - Fixed Width - Smaller on mobile */}
           <div className="relative w-32 sm:w-40 md:w-64 lg:w-80 h-32 sm:h-40 md:h-56 flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-transparent z-10" />
+            {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
             
             {listing.images[0] ? (
               <Image
@@ -67,7 +70,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
             </div>
             
             {/* Countdown Timer */}
-            {listing.type === 'auction' && listing.endsAt && (
+            {!sold.isSold && listing.type === 'auction' && listing.endsAt && (
               <div className="absolute top-2 left-2 z-20">
                 <CountdownTimer
                   endsAt={listing.endsAt}
@@ -85,10 +88,24 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
             </div>
+
+            {sold.isSold && (
+              <div className="absolute bottom-2 left-2 z-20">
+                <Badge className="bg-destructive text-destructive-foreground font-extrabold text-xs shadow-warm">
+                  SOLD
+                </Badge>
+              </div>
+            )}
           </div>
 
           {/* Content - Flexible Width */}
           <div className="flex-1 flex flex-col p-3 sm:p-4 md:p-6 gap-2 sm:gap-3 md:gap-4">
+            {sold.isSold && (
+              <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
+                <div className="font-semibold">{sold.soldPriceLabel}</div>
+                {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
+              </div>
+            )}
             {/* Title and Location Row */}
             <div className="flex-1 space-y-2">
               <h3 className="font-bold text-lg md:text-xl line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">

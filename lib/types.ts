@@ -301,6 +301,14 @@ export interface Listing {
   
   // Auction-specific
   endsAt?: Date; // Auction end time
+
+  /**
+   * Sold listing metadata (public-safe; eBay-style historical market data).
+   * Backwards compatible: older sold listings may not have these fields.
+   */
+  soldAt?: Date | null;
+  soldPriceCents?: number | null;
+  saleType?: 'auction' | 'offer' | 'buy_now' | 'classified';
   
   // Featured/Promotion
   featured?: boolean;

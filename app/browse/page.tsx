@@ -43,6 +43,7 @@ export default function BrowsePage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
   const [filters, setFilters] = useState<FilterState>({});
   const [selectedType, setSelectedType] = useState<ListingType | 'all'>('all');
+  const [listingStatus, setListingStatus] = useState<'active' | 'sold'>('active');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +89,35 @@ export default function BrowsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user?.uid]);
 
+  // Public deep links (used by sold listing pages): /browse?status=active&category=...&state=...&type=...&speciesId=...
+  useEffect(() => {
+    const savedSearchId = searchParams.get('savedSearchId');
+    if (savedSearchId) return; // Saved search should take precedence.
+
+    const status = searchParams.get('status');
+    if (status === 'active' || status === 'sold') {
+      setListingStatus(status);
+    }
+
+    const type = searchParams.get('type');
+    if (type === 'auction' || type === 'fixed' || type === 'classified' || type === 'all') {
+      setSelectedType(type as any);
+    }
+
+    const category = searchParams.get('category');
+    const state = searchParams.get('state');
+    const speciesId = searchParams.get('speciesId');
+
+    setFilters((prev) => {
+      const next: any = { ...(prev || {}) };
+      if (category) next.category = category;
+      if (state) next.location = { ...(next.location || {}), state };
+      if (speciesId) next.species = [speciesId];
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     if (typeof window !== 'undefined') {
@@ -98,7 +128,7 @@ export default function BrowsePage() {
   // Convert UI filters to Firestore query filters
   const getBrowseFilters = (): BrowseFilters => {
     const browseFilters: BrowseFilters = {
-      status: 'active',
+      status: listingStatus,
     };
     
     if (selectedType !== 'all') {
@@ -218,9 +248,14 @@ export default function BrowsePage() {
   
   // Load initial page when filters/sort change
   useEffect(() => {
+    // Sold listings don't have an "ending soon" concept.
+    if (listingStatus === 'sold' && sortBy === 'ending-soon') {
+      setSortBy('newest');
+      return;
+    }
     loadInitial();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedType, filters, sortBy]);
+  }, [selectedType, filters, sortBy, listingStatus]);
 
   // Client-side filtering for fields not supported by Firestore
   // (Full-text search, city-level location, metadata fields, etc.)
@@ -470,7 +505,11 @@ export default function BrowsePage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">
-              {loading ? 'Loading...' : `${sortedListings.length} ${sortedListings.length === 1 ? 'Listing' : 'Listings'}`}
+              {loading
+                ? 'Loading...'
+                : `${sortedListings.length} ${listingStatus === 'sold' ? 'Sold ' : ''}${
+                    sortedListings.length === 1 ? 'Listing' : 'Listings'
+                  }`}
             </h1>
             {activeFilterCount > 0 && (
               <p className="text-sm text-muted-foreground">
@@ -480,6 +519,28 @@ export default function BrowsePage() {
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* Active / Sold toggle */}
+            <div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-card">
+              <Button
+                type="button"
+                variant={listingStatus === 'active' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setListingStatus('active')}
+                className="h-10 px-3 font-semibold"
+              >
+                Active
+              </Button>
+              <Button
+                type="button"
+                variant={listingStatus === 'sold' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setListingStatus('sold')}
+                className="h-10 px-3 font-semibold"
+              >
+                Sold
+              </Button>
+            </div>
+
             {/* Sort Dropdown */}
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
               <SelectTrigger className="w-full md:w-[180px] min-h-[48px]">
@@ -489,13 +550,13 @@ export default function BrowsePage() {
                 <SelectItem value="newest">
                   <div className="flex items-center gap-2">
                     <ArrowDown className="h-4 w-4" />
-                    Newest
+                    {listingStatus === 'sold' ? 'Recently sold' : 'Newest'}
                   </div>
                 </SelectItem>
                 <SelectItem value="oldest">
                   <div className="flex items-center gap-2">
                     <ArrowUp className="h-4 w-4" />
-                    Oldest
+                    {listingStatus === 'sold' ? 'Oldest sold' : 'Oldest'}
                   </div>
                 </SelectItem>
                 <SelectItem value="price-low">
@@ -510,7 +571,7 @@ export default function BrowsePage() {
                     Price: High to Low
                   </div>
                 </SelectItem>
-                <SelectItem value="ending-soon">Ending Soon</SelectItem>
+                {listingStatus !== 'sold' ? <SelectItem value="ending-soon">Ending Soon</SelectItem> : null}
                 <SelectItem value="featured">Featured First</SelectItem>
               </SelectContent>
             </Select>

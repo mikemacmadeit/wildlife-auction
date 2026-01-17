@@ -76,6 +76,14 @@ export interface ListingDoc {
   // Auction-specific
   endsAt?: Timestamp; // Auction end time
 
+  /**
+   * Sold listing metadata (public-safe; market history).
+   * Backwards compatible: older docs may not have these fields.
+   */
+  soldAt?: Timestamp;
+  soldPriceCents?: number;
+  saleType?: 'auction' | 'offer' | 'buy_now' | 'classified';
+
   // Featured/Promotion
   featured?: boolean;
   featuredUntil?: Timestamp;

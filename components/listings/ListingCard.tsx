@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
+import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -26,6 +27,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
   const watchers = typeof listing.watcherCount === 'number' ? listing.watcherCount : listing.metrics?.favorites || 0;
+  const sold = useMemo(() => getSoldSummary(listing), [listing]);
 
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
@@ -106,6 +108,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
           <div className="relative aspect-[4/3] w-full bg-muted overflow-hidden rounded-t-xl">
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent z-10" />
+            {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
             
             {listing.images[0] ? (
               <Image
@@ -130,7 +133,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             </div>
             
             {/* Real-time countdown timer for auctions */}
-            {listing.type === 'auction' && listing.endsAt && (
+            {!sold.isSold && listing.type === 'auction' && listing.endsAt && (
               <div className="absolute top-2 left-2 z-20">
                 <CountdownTimer
                   endsAt={listing.endsAt}
@@ -163,19 +166,24 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
 
             {/* Social proof (watchers + bids) */}
             <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5">
+              {sold.isSold && (
+                <Badge className="bg-destructive text-destructive-foreground text-xs shadow-warm">
+                  SOLD
+                </Badge>
+              )}
               {watchers > 0 && (
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
                   <Heart className="h-3 w-3 mr-1" />
                   {watchers} watching
                 </Badge>
               )}
-              {(listing.metrics?.bidCount || 0) > 0 && listing.type === 'auction' && (
+              {!sold.isSold && (listing.metrics?.bidCount || 0) > 0 && listing.type === 'auction' && (
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
                   <TrendingUp className="h-3 w-3 mr-1" />
                   {listing.metrics.bidCount} bids
                 </Badge>
               )}
-              {(watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) && (
+              {!sold.isSold && (watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) && (
                 <Badge variant="default" className="text-xs shadow-warm">
                   <Zap className="h-3 w-3 mr-1" />
                   Trending
@@ -186,6 +194,12 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
 
           {/* Content */}
           <div className="p-4 flex-1 flex flex-col gap-3">
+            {sold.isSold && (
+              <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
+                <div className="font-semibold">{sold.soldPriceLabel}</div>
+                {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
+              </div>
+            )}
             {/* Title */}
             <h3 className="font-bold text-base line-clamp-2 leading-snug group-hover:text-primary transition-colors duration-300">
               {listing.title}

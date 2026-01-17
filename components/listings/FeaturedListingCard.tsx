@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Listing } from '@/lib/types';
+import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -22,6 +23,7 @@ interface FeaturedListingCardProps {
 
 export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCardProps>(
   ({ listing, className, index = 0 }, ref) => {
+  const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
 
@@ -33,7 +35,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     ? `$${listing.price?.toLocaleString() || '0'}`
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
 
-  const hasCountdown = listing.type === 'auction' && !!listing.endsAt;
+  const hasCountdown = !sold.isSold && listing.type === 'auction' && !!listing.endsAt;
 
   return (
     <motion.div
@@ -76,6 +78,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
           <div className="relative aspect-[16/9] w-full bg-muted overflow-hidden rounded-t-xl">
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/20 to-transparent z-10" />
+            {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
 
             {/* Action Buttons - Always visible and consistent with browse/home cards */}
             <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
@@ -127,12 +130,26 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </Badge>
             </div>
 
+            {sold.isSold && (
+              <div className="absolute bottom-3 left-3 z-20">
+                <Badge className="bg-destructive text-destructive-foreground font-extrabold px-3 py-1.5 shadow-lg">
+                  SOLD
+                </Badge>
+              </div>
+            )}
+
             {/* Subtle shimmer effect - warm tones */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-parchment/8 to-transparent z-5" />
           </div>
 
           {/* Content with Premium Styling */}
           <div className="p-5 flex-1 flex flex-col gap-4">
+            {sold.isSold && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
+                <div className="font-semibold">{sold.soldPriceLabel}</div>
+                {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
+              </div>
+            )}
             {/* Title with gradient text effect */}
             <h3 className="font-bold text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors duration-300 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
               {listing.title}

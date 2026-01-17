@@ -137,7 +137,7 @@ service cloud.firestore {
       //   - OR if user is an admin (admins can see all listings including draft/pending)
       // Note: For queries, sellers can query their own listings (where sellerId == auth.uid)
       //       and the rule evaluates per-document, so each document must pass this check
-      allow read: if resource.data.status == 'active' || 
+      allow read: if (resource.data.status == 'active' || resource.data.status == 'sold') || 
                     (isAuthenticated() && resource.data.sellerId == request.auth.uid) ||
                     isAdmin();
       

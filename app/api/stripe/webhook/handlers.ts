@@ -436,6 +436,22 @@ export async function handleCheckoutSessionCompleted(
       source: 'webhook',
     });
 
+    // Derive public-safe sold metadata (stored on listing doc only; never store buyer PII/order details).
+    const saleType: 'auction' | 'offer' | 'buy_now' | 'classified' =
+      offerId
+        ? 'offer'
+        : listingData?.type === 'auction'
+          ? 'auction'
+          : listingData?.type === 'fixed'
+            ? 'buy_now'
+            : 'classified';
+    const soldPriceCents =
+      typeof (session as any).amount_total === 'number'
+        ? (session as any).amount_total
+        : typeof amount === 'number'
+          ? amount
+          : null;
+
     // For async payment methods, reserve the listing (do NOT mark sold until payment is confirmed).
     if (isAsync) {
       await listingRef.set(
@@ -448,10 +464,16 @@ export async function handleCheckoutSessionCompleted(
       );
     } else {
       // Card flow: payment is already confirmed at checkout completion.
-      await listingRef.update({
+      const listingUpdates: any = {
         status: 'sold',
-        updatedAt: new Date(),
-      });
+        soldAt: now,
+        saleType,
+        updatedAt: now,
+      };
+      if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
+        listingUpdates.soldPriceCents = soldPriceCents;
+      }
+      await listingRef.update(listingUpdates);
     }
 
     // Emit canonical notification events for buyer and seller
@@ -589,6 +611,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
 
   const orderDoc = orderQuery2.docs[0];
   const orderData = orderDoc.data() as any;
+  const offerId = session.metadata?.offerId || orderData?.offerId || null;
 
   // If already paid/held or completed, treat as idempotent.
   if (orderData.status === 'paid_held' || orderData.status === 'paid' || orderData.status === 'completed') {
@@ -646,16 +669,36 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     { merge: true }
   );
 
+  // Determine listing type (public-safe) for sold metadata.
+  let listingType: string | null = null;
+  try {
+    const listingSnap = await db.collection('listings').doc(listingId).get();
+    if (listingSnap.exists) listingType = String((listingSnap.data() as any)?.type || '') || null;
+  } catch {
+    // ignore; fallback to unknown below
+  }
+  const saleType: 'auction' | 'offer' | 'buy_now' | 'classified' =
+    offerId
+      ? 'offer'
+      : listingType === 'auction'
+        ? 'auction'
+        : listingType === 'fixed'
+          ? 'buy_now'
+          : 'classified';
+
   // Mark listing sold and clear reservation fields
-  await db.collection('listings').doc(listingId).set(
-    {
-      status: 'sold',
-      purchaseReservedByOrderId: null,
-      purchaseReservedAt: null,
-      updatedAt: now,
-    },
-    { merge: true }
-  );
+  const listingSoldUpdate: any = {
+    status: 'sold',
+    soldAt: now,
+    saleType,
+    purchaseReservedByOrderId: null,
+    purchaseReservedAt: null,
+    updatedAt: now,
+  };
+  if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
+    listingSoldUpdate.soldPriceCents = amountCents;
+  }
+  await db.collection('listings').doc(listingId).set(listingSoldUpdate, { merge: true });
 
   logInfo('Async payment succeeded: order marked paid_held and listing marked sold', {
     requestId,
@@ -792,6 +835,7 @@ export async function handleWirePaymentIntentSucceeded(
   }
 
   const listingId = orderData?.listingId ? String(orderData.listingId) : null;
+  const offerId = orderData?.offerId ? String(orderData.offerId) : null;
 
   const now = new Date();
   const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
@@ -810,15 +854,43 @@ export async function handleWirePaymentIntentSucceeded(
   );
 
   if (listingId) {
-    await db.collection('listings').doc(listingId).set(
-      {
-        status: 'sold',
-        purchaseReservedByOrderId: null,
-        purchaseReservedAt: null,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
+    let listingType: string | null = null;
+    try {
+      const listingSnap = await db.collection('listings').doc(listingId).get();
+      if (listingSnap.exists) listingType = String((listingSnap.data() as any)?.type || '') || null;
+    } catch {
+      // ignore
+    }
+
+    const saleType: 'auction' | 'offer' | 'buy_now' | 'classified' =
+      offerId
+        ? 'offer'
+        : listingType === 'auction'
+          ? 'auction'
+          : listingType === 'fixed'
+            ? 'buy_now'
+            : 'classified';
+
+    const soldPriceCents =
+      typeof (paymentIntent as any).amount_received === 'number'
+        ? (paymentIntent as any).amount_received
+        : typeof paymentIntent.amount === 'number'
+          ? paymentIntent.amount
+          : null;
+
+    const listingSoldUpdate: any = {
+      status: 'sold',
+      soldAt: now,
+      saleType,
+      purchaseReservedByOrderId: null,
+      purchaseReservedAt: null,
+      updatedAt: now,
+    };
+    if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
+      listingSoldUpdate.soldPriceCents = soldPriceCents;
+    }
+
+    await db.collection('listings').doc(listingId).set(listingSoldUpdate, { merge: true });
   }
 
   logInfo('Wire PI succeeded: order marked paid_held and listing marked sold', {
