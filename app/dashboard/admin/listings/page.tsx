@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -99,6 +100,28 @@ export default function AdminListingsPage() {
   const [sortType, setSortType] = useState<SortType>('newest');
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
   const [viewingDocTitle, setViewingDocTitle] = useState<string>('Document');
+
+  // Reject dialog state
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectListingId, setRejectListingId] = useState<string | null>(null);
+  const [rejectReasonKey, setRejectReasonKey] = useState<string>('');
+  const [rejectCustomNote, setRejectCustomNote] = useState<string>('');
+
+  const rejectReasonOptions = useMemo(
+    () =>
+      [
+        { key: 'missing_required_info', label: 'Missing required information (title/description/location/photos)' },
+        { key: 'poor_photo_quality', label: 'Poor photo quality / insufficient photos' },
+        { key: 'pricing_issue', label: 'Pricing issue (missing/invalid/unreasonable)' },
+        { key: 'category_mismatch', label: 'Wrong category / incorrect attributes' },
+        { key: 'policy_prohibited', label: 'Prohibited item / policy violation' },
+        { key: 'suspected_scam', label: 'Suspected scam / misleading listing' },
+        { key: 'compliance_required', label: 'Compliance documents required / not verifiable' },
+        { key: 'duplicate_listing', label: 'Duplicate listing' },
+        { key: 'other', label: 'Other (add a note)' },
+      ] as const,
+    []
+  );
 
   const loadPendingListings = useCallback(async () => {
     try {
@@ -253,7 +276,23 @@ export default function AdminListingsPage() {
     }
   };
 
-  const handleReject = async (listingId: string) => {
+  const openRejectDialog = (listingId: string) => {
+    setRejectListingId(listingId);
+    setRejectReasonKey('');
+    setRejectCustomNote('');
+    setRejectOpen(true);
+  };
+
+  const buildRejectReason = () => {
+    const selected = rejectReasonOptions.find((r) => r.key === rejectReasonKey);
+    const base = selected?.label || '';
+    const note = rejectCustomNote.trim();
+    if (rejectReasonKey === 'other') return note || 'Other';
+    if (!base) return note || '';
+    return note ? `${base} — ${note}` : base;
+  };
+
+  const handleReject = async (listingId: string, reason: string) => {
     if (!user) return;
     
     try {
@@ -266,7 +305,7 @@ export default function AdminListingsPage() {
           'content-type': 'application/json',
           authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ reason: '' }),
+        body: JSON.stringify({ reason }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok !== true) {
@@ -283,7 +322,7 @@ export default function AdminListingsPage() {
       console.error('Error rejecting listing:', error);
       toast({
         title: 'Error',
-        description: 'Failed to reject listing.',
+        description: error instanceof Error ? error.message : 'Failed to reject listing.',
         variant: 'destructive',
       });
     } finally {
@@ -978,7 +1017,7 @@ export default function AdminListingsPage() {
                               )}
                               
                               <Button
-                                onClick={() => handleReject(listing.id)}
+                                onClick={() => openRejectDialog(listing.id)}
                                 disabled={processingId === listing.id}
                                 variant="destructive"
                                 className="w-full"
@@ -1036,6 +1075,98 @@ export default function AdminListingsPage() {
               Open in New Tab
             </Button>
             <Button onClick={() => setViewingDocUrl(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Listing Dialog */}
+      <Dialog
+        open={rejectOpen}
+        onOpenChange={(open) => {
+          setRejectOpen(open);
+          if (!open) {
+            setRejectListingId(null);
+            setRejectReasonKey('');
+            setRejectCustomNote('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reject listing</DialogTitle>
+            <DialogDescription>
+              Choose a reason (this will be included in the seller’s notification). Avoid buyer info or private order details.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">Reason</div>
+              <Select value={rejectReasonKey} onValueChange={(v) => setRejectReasonKey(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {rejectReasonOptions.map((r) => (
+                    <SelectItem key={r.key} value={r.key}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">
+                Optional note {rejectReasonKey === 'other' ? '(recommended)' : ''}
+              </div>
+              <Textarea
+                value={rejectCustomNote}
+                onChange={(e) => setRejectCustomNote(e.target.value)}
+                placeholder={
+                  rejectReasonKey === 'other'
+                    ? 'Add a short, specific note the seller can act on...'
+                    : 'Optional: add details (e.g., what to fix)'
+                }
+                className="min-h-[90px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRejectOpen(false)}
+              disabled={!!processingId}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={
+                !rejectListingId ||
+                !!processingId ||
+                (rejectReasonKey === 'other' && rejectCustomNote.trim().length < 3) ||
+                (!rejectReasonKey && rejectCustomNote.trim().length < 3)
+              }
+              onClick={async () => {
+                if (!rejectListingId) return;
+                const reason = buildRejectReason();
+                await handleReject(rejectListingId, reason);
+                setRejectOpen(false);
+              }}
+            >
+              {processingId === rejectListingId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                'Reject listing'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
