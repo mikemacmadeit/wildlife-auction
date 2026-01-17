@@ -155,14 +155,49 @@ export async function uploadUserPhoto(
 
 export async function listUserPhotos(uid: string, opts?: { includeDeleted?: boolean }) {
   const refCol = collection(db, 'users', uid, 'photos');
-  const constraints: any[] = [];
-  if (!opts?.includeDeleted) {
-    constraints.push(where('status', '==', 'active'));
+  const includeDeleted = opts?.includeDeleted === true;
+
+  function toMillisSafe(v: any): number {
+    if (!v) return 0;
+    if (typeof v?.toMillis === 'function') {
+      try {
+        return Number(v.toMillis()) || 0;
+      } catch {
+        return 0;
+      }
+    }
+    if (typeof v?.toDate === 'function') {
+      try {
+        const d = v.toDate();
+        return d instanceof Date ? d.getTime() : 0;
+      } catch {
+        return 0;
+      }
+    }
+    if (typeof v?.seconds === 'number') return v.seconds * 1000;
+    if (v instanceof Date) return v.getTime();
+    return 0;
   }
-  constraints.push(orderBy('updatedAt', 'desc'));
-  const q = query(refCol, ...constraints);
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as UserPhotoDoc);
+
+  try {
+    // Preferred: deterministic ordering (requires composite index when combined with where(status==active)).
+    const q = includeDeleted
+      ? query(refCol, orderBy('updatedAt', 'desc'))
+      : query(refCol, where('status', '==', 'active'), orderBy('updatedAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => d.data() as UserPhotoDoc);
+  } catch (e: any) {
+    // Fallback: avoid blocking uploads if the composite index is missing or still building.
+    // NOTE: Firestore can require an index even when the collection is empty.
+    if (e?.code === 'failed-precondition' || String(e?.message || '').includes('requires an index')) {
+      const q2 = includeDeleted ? query(refCol) : query(refCol, where('status', '==', 'active'));
+      const snap2 = await getDocs(q2);
+      const docs = snap2.docs.map((d) => d.data() as UserPhotoDoc);
+      docs.sort((a, b) => toMillisSafe(b.updatedAt) - toMillisSafe(a.updatedAt));
+      return docs;
+    }
+    throw e;
+  }
 }
 
 export async function softDeleteUserPhoto(uid: string, photoId: string): Promise<void> {
