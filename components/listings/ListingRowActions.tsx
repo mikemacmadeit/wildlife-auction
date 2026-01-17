@@ -1,10 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect, memo } from 'react';
+import { memo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Edit, Pause, TrendingUp, Copy, CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ListingRowActionsProps {
   listingId: string;
@@ -23,127 +30,84 @@ const ListingRowActions = memo(function ListingRowActions({
   onDuplicate,
   onDelete,
 }: ListingRowActionsProps) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    if (!open) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        buttonRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
-  // Close menu on escape key
-  useEffect(() => {
-    if (!open) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [open]);
-
   return (
-    <div className="relative">
-      <Button
-        ref={buttonRef}
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => setOpen(!open)}
-        aria-label="Actions"
-      >
-        <MoreVertical className="h-4 w-4" />
-      </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
 
-      {open && (
-        <div
-          ref={menuRef}
-          className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border-2 border-border/50 bg-card shadow-lg py-1"
-        >
-          <Link
-            href={`/seller/listings/${listingId}/edit`}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer"
-            onClick={() => setOpen(false)}
-          >
+      <DropdownMenuContent align="end" sideOffset={8} className="w-52">
+        <DropdownMenuItem asChild>
+          <Link href={`/seller/listings/${listingId}/edit`} className="flex items-center gap-2 font-semibold">
             <Edit className="h-4 w-4" />
             Edit
           </Link>
-          {status === 'active' && (
-            <button
-              onClick={() => {
-                onPause?.();
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer text-left"
-            >
-              <Pause className="h-4 w-4" />
-              Pause
-            </button>
-          )}
-          <button
-            onClick={() => {
-              onPromote?.();
-              setOpen(false);
+        </DropdownMenuItem>
+
+        {status === 'active' && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onPause?.();
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer text-left"
+            className="flex items-center gap-2 font-semibold"
+          >
+            <Pause className="h-4 w-4" />
+            Pause
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            onPromote?.();
+          }}
+          className="flex items-center gap-2 font-semibold"
+        >
+          <TrendingUp className="h-4 w-4" />
+          Promote
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            onDuplicate?.();
+          }}
+          className="flex items-center gap-2 font-semibold"
+        >
+          <Copy className="h-4 w-4" />
+          Duplicate
+        </DropdownMenuItem>
+
+        {status === 'draft' && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onPromote?.();
+            }}
+            className="flex items-center gap-2 font-semibold"
           >
             <TrendingUp className="h-4 w-4" />
-            Promote
-          </button>
-          <button
-            onClick={() => {
-              onDuplicate?.();
-              setOpen(false);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer text-left"
-          >
-            <Copy className="h-4 w-4" />
-            Duplicate
-          </button>
-          {status === 'draft' && (
-            <button
-              onClick={() => {
-                onPromote?.();
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold hover:bg-background/50 cursor-pointer text-left"
-            >
-              <TrendingUp className="h-4 w-4" />
-              Publish
-            </button>
-          )}
-          <div className="h-px bg-border/50 my-1" />
-          <button
-            onClick={() => {
-              onDelete?.();
-              setOpen(false);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 cursor-pointer text-left"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
+            Publish
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            onDelete?.();
+          }}
+          className={cn('flex items-center gap-2 font-semibold text-destructive focus:text-destructive')}
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 });
 
