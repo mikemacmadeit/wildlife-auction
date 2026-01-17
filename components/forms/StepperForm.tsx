@@ -26,6 +26,7 @@ interface StepperFormProps {
   saving?: boolean; // Loading state for save operation
   showSaveButton?: boolean; // Whether to show save button on each step
   completeButtonDataTour?: string; // Optional data-tour selector for the final action button
+  completeButtonLabel?: string; // Optional label for the final action button (defaults to Publish Listing)
 }
 
 export function StepperForm({
@@ -38,6 +39,7 @@ export function StepperForm({
   saving = false,
   showSaveButton = false,
   completeButtonDataTour,
+  completeButtonLabel,
 }: StepperFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -198,8 +200,7 @@ export function StepperForm({
           >
             {isLastStep ? (
               <>
-                <span className="mr-2">✨</span>
-                Publish Listing
+                {completeButtonLabel || 'Publish Listing'}
               </>
             ) : (
               <>

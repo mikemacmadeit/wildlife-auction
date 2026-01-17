@@ -1333,17 +1333,28 @@ function EditListingPageContent() {
       const updates = prepareListingUpdates();
       await updateListing(user.uid, listingId, updates);
 
-      toast({
-        title: 'Listing updated successfully!',
-        description: 'Your changes have been saved.',
-      });
+      // If this is still a draft, the primary action should actually publish it (go live).
+      if (listingData?.status === 'draft') {
+        const result = await publishListing(user.uid, listingId);
+        toast({
+          title: result?.pendingReview ? 'Submitted for review' : 'Listing published',
+          description: result?.pendingReview
+            ? 'Your listing is now pending compliance review.'
+            : 'Your listing is now live.',
+        });
+      } else {
+        toast({
+          title: 'Changes saved',
+          description: 'Your listing has been updated.',
+        });
+      }
 
       // Redirect back to listings page
       router.push('/seller/listings');
     } catch (err: any) {
       console.error('Error updating listing:', err);
       toast({
-        title: 'Error updating listing',
+        title: listingData?.status === 'draft' ? 'Error publishing listing' : 'Error updating listing',
         description: err.message || 'Failed to update listing. Please try again.',
         variant: 'destructive',
       });
@@ -1408,6 +1419,7 @@ function EditListingPageContent() {
               onSave={handleSave}
               saving={saving}
               showSaveButton={true}
+              completeButtonLabel={listingData?.status === 'draft' ? 'Publish Listing' : 'Save Changes'}
             />
           </CardContent>
         </Card>

@@ -28,7 +28,7 @@ import { ListingRowActions } from '@/components/listings/ListingRowActions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { listSellerListings, unpublishListing, deleteListing } from '@/lib/firebase/listings';
+import { listSellerListings, unpublishListing, deleteListing, publishListing } from '@/lib/firebase/listings';
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -81,10 +81,12 @@ const formatTimeRemaining = (date?: Date) => {
 // Memoized Listing Row component for performance
 const ListingRow = memo(({ 
   listing, 
+  onPublish,
   onPause, 
   onDelete 
 }: { 
   listing: Listing;
+  onPublish: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
@@ -151,6 +153,7 @@ const ListingRow = memo(({
       <ListingRowActions
         listingId={listing.id}
         status={listing.status}
+        onPromote={() => onPublish(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
       />
@@ -162,10 +165,12 @@ ListingRow.displayName = 'ListingRow';
 // Memoized Mobile Listing Card
 const MobileListingCard = memo(({ 
   listing, 
+  onPublish,
   onPause, 
   onDelete 
 }: { 
   listing: Listing;
+  onPublish: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
@@ -186,6 +191,7 @@ const MobileListingCard = memo(({
       <ListingRowActions
         listingId={listing.id}
         status={listing.status}
+        onPromote={() => onPublish(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
       />
@@ -383,6 +389,48 @@ function SellerListingsPageContent() {
     }
   }, [user?.uid, selectedListing, toast, refreshListings]);
 
+  const handlePublish = useCallback(
+    async (listing: Listing) => {
+      if (!user?.uid) return;
+      if (listing.status !== 'draft') {
+        toast({
+          title: 'Publish not available',
+          description: `This listing is ${listing.status}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      try {
+        setActionLoading(listing.id);
+        const result = await publishListing(user.uid, listing.id);
+
+        // If they were filtering to Draft only, switch to All so they can see the new status.
+        if (statusFilter === 'draft') {
+          setStatusFilter('all');
+        }
+
+        toast({
+          title: result?.pendingReview ? 'Submitted for review' : 'Listing published',
+          description: result?.pendingReview
+            ? 'Your listing is now pending compliance review.'
+            : 'Your listing is now live.',
+        });
+
+        await refreshListings();
+      } catch (err: any) {
+        toast({
+          title: 'Error publishing listing',
+          description: err?.message || 'Failed to publish listing. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [user?.uid, toast, refreshListings, statusFilter]
+  );
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
@@ -534,16 +582,17 @@ function SellerListingsPageContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {filteredListings.map((listing) => (
-                      <ListingRow 
-                        key={listing.id} 
-                        listing={listing}
-                        onPause={handlePause}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </tbody>
+              <tbody>
+                {filteredListings.map((listing) => (
+                  <ListingRow
+                    key={listing.id}
+                    listing={listing}
+                    onPublish={handlePublish}
+                    onPause={handlePause}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </tbody>
                 </table>
               </div>
 
@@ -553,6 +602,7 @@ function SellerListingsPageContent() {
                   <MobileListingCard 
                     key={listing.id} 
                     listing={listing}
+                    onPublish={handlePublish}
                     onPause={handlePause}
                     onDelete={handleDelete}
                   />
