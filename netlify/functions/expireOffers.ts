@@ -10,6 +10,8 @@ import { Handler, schedule } from '@netlify/functions';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
 import { getAdminDb } from '../../lib/firebase/admin';
+import { emitEventForUser } from '../../lib/notifications/emitEvent';
+import { getSiteUrl } from '../../lib/site-url';
 
 let db: ReturnType<typeof getFirestore>;
 
@@ -75,6 +77,56 @@ const baseHandler: Handler = async () => {
     });
 
     await batch.commit();
+
+    // Phase 3A (A3): Offer expiry notifications (best-effort, in-app).
+    try {
+      const base = getSiteUrl();
+      for (const doc of snap.docs) {
+        const data = doc.data() as any;
+        const offerId = doc.id;
+        const listingId = String(data.listingId || '');
+        const listingTitle = String(data?.listingSnapshot?.title || 'a listing');
+        const buyerId = String(data.buyerId || '');
+        const sellerId = String(data.sellerId || '');
+
+        if (buyerId) {
+          await emitEventForUser({
+            type: 'Offer.Expired',
+            actorId: 'system',
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserId: buyerId,
+            payload: {
+              type: 'Offer.Expired',
+              offerId,
+              listingId,
+              listingTitle,
+              offerUrl: `${base}/dashboard/offers`,
+            },
+            optionalHash: `offer:${offerId}:expired`,
+          });
+        }
+        if (sellerId) {
+          await emitEventForUser({
+            type: 'Offer.Expired',
+            actorId: 'system',
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserId: sellerId,
+            payload: {
+              type: 'Offer.Expired',
+              offerId,
+              listingId,
+              listingTitle,
+              offerUrl: `${base}/seller/offers/${offerId}`,
+            },
+            optionalHash: `offer:${offerId}:expired_seller`,
+          });
+        }
+      }
+    } catch (e: any) {
+      logWarn('expireOffers: failed to emit Offer.Expired events', { requestId, error: String(e?.message || e) });
+    }
 
     logInfo('expireOffers: completed', { requestId, scanned, expired, ms: Date.now() - startedAt });
     return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, expired }) };

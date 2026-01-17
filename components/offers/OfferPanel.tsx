@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { createOffer, acceptOffer, counterOffer, declineOffer, withdrawOffer, getMyOffers } from '@/lib/offers/api';
-import { createCheckoutSession } from '@/lib/stripe/api';
+import { createCheckoutSession, createWireIntent } from '@/lib/stripe/api';
 import type { Listing } from '@/lib/types';
 import { Loader2, Handshake, Clock, CheckCircle2, XCircle, RefreshCw, DollarSign } from 'lucide-react';
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
+import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
 
 type OfferDTO = {
   offerId: string;
@@ -54,6 +55,12 @@ export function OfferPanel(props: { listing: Listing }) {
     message: string;
     technical?: string;
   } | null>(null);
+  const [wireDialogOpen, setWireDialogOpen] = useState(false);
+  const [wireData, setWireData] = useState<null | {
+    orderId: string;
+    paymentIntentId: string;
+    instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
+  }>(null);
 
   const eligible = useMemo(() => {
     const enabled = !!(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled);
@@ -203,12 +210,18 @@ export function OfferPanel(props: { listing: Listing }) {
     setPaymentDialogOpen(false);
     setLoading(true);
     try {
-      const { url } = await createCheckoutSession(listing.id, offer.offerId, method);
-      window.location.href = url;
+      if (method === 'wire') {
+        const out = await createWireIntent(listing.id, offer.offerId);
+        setWireData(out);
+        setWireDialogOpen(true);
+      } else {
+        const { url } = await createCheckoutSession(listing.id, offer.offerId, method);
+        window.location.href = url;
+      }
     } catch (e: any) {
       setCheckoutError({
         attemptedMethod: method,
-        message: 'We couldn’t start checkout. You can retry card or switch to bank transfer / wire.',
+        message: 'We couldn’t start checkout. You can retry card or switch to ACH debit / wire.',
         technical: e?.message ? String(e.message) : String(e),
       });
       setCheckoutErrorOpen(true);
@@ -333,6 +346,8 @@ export function OfferPanel(props: { listing: Listing }) {
         }}
         amountUsd={pendingCheckoutAmount || 0}
         onSelect={handleSelectPaymentMethod}
+        isAuthenticated={!!user}
+        isEmailVerified={!!user?.emailVerified}
       />
 
       <CheckoutStartErrorDialog
@@ -345,9 +360,11 @@ export function OfferPanel(props: { listing: Listing }) {
         errorMessage={checkoutError?.message || 'Checkout could not be started.'}
         technicalDetails={checkoutError?.technical}
         onRetryCard={() => handleSelectPaymentMethod('card')}
-        onSwitchBank={() => handleSelectPaymentMethod('bank_transfer')}
+        onSwitchBank={() => handleSelectPaymentMethod('ach_debit')}
         onSwitchWire={() => handleSelectPaymentMethod('wire')}
       />
+
+      <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">

@@ -4,7 +4,7 @@ import { forwardRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, Star, Sparkles, ArrowRight } from 'lucide-react';
+import { MapPin, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Listing } from '@/lib/types';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,9 @@ interface FeaturedListingCardProps {
 
 export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCardProps>(
   ({ listing, className, index = 0 }, ref) => {
+  const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
+  const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
+
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
       ? `$${listing.currentBid.toLocaleString()}`
@@ -162,12 +165,26 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 )}
               </div>
               <div className="flex flex-col items-end gap-1.5">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/50 border border-border/40">
-                  <Star className="h-4 w-4 fill-primary/20 text-primary" />
-                  <span className="font-bold text-sm">{listing.seller?.rating ?? 0}</span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {listing.sellerSnapshot?.verified && (
+                    <Badge variant="secondary" className="text-[10px] font-semibold">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Verified
+                    </Badge>
+                  )}
+                  {sellerTxCount !== null && sellerTxCount > 0 && (
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      {sellerTxCount} tx
+                    </Badge>
+                  )}
+                  {sellerBadges.includes('Identity verified') && (
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      ID verified
+                    </Badge>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground font-medium">
-                  {listing.seller?.responseTime ?? 'N/A'}
+                <div className="text-xs text-muted-foreground font-medium max-w-[180px] truncate">
+                  {listing.sellerSnapshot?.displayName || 'Seller'}
                 </div>
               </div>
             </div>

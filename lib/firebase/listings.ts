@@ -74,6 +74,15 @@ export interface CreateListingInput {
   startingBid?: number;
   reservePrice?: number;
   images: string[];
+  photoIds?: string[];
+  photos?: Array<{
+    photoId: string;
+    url: string;
+    width?: number;
+    height?: number;
+    sortOrder?: number;
+  }>;
+  coverPhotoId?: string;
   location: {
     city: string;
     state: string;
@@ -213,6 +222,21 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     }
   }
 
+  const photoSnapshot = (doc as any).photos as any[] | undefined;
+  const normalizedPhotos =
+    Array.isArray(photoSnapshot) && photoSnapshot.length
+      ? photoSnapshot
+          .map((p) => ({
+            photoId: String(p.photoId),
+            url: String(p.url),
+            width: typeof p.width === 'number' ? p.width : undefined,
+            height: typeof p.height === 'number' ? p.height : undefined,
+            sortOrder: typeof p.sortOrder === 'number' ? p.sortOrder : undefined,
+          }))
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      : undefined;
+  const derivedImages = normalizedPhotos?.map((p) => p.url).filter(Boolean) ?? doc.images ?? [];
+
   return {
     id: doc.id,
     title: doc.title,
@@ -224,7 +248,10 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     currentBid: doc.currentBid,
     reservePrice: doc.reservePrice,
     startingBid: doc.startingBid,
-    images: doc.images || [],
+    images: derivedImages,
+    photoIds: Array.isArray((doc as any).photoIds) ? ((doc as any).photoIds as any[]).map(String) : undefined,
+    photos: normalizedPhotos,
+    coverPhotoId: (doc as any).coverPhotoId ? String((doc as any).coverPhotoId) : undefined,
     location: doc.location || { city: 'Unknown', state: 'Unknown' },
     sellerId: doc.sellerId,
     sellerSnapshot: doc.sellerSnapshot,
@@ -237,6 +264,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     featured: doc.featured,
     featuredUntil: timestampToDate(doc.featuredUntil),
     metrics: doc.metrics || { views: 0, favorites: 0, bidCount: 0 },
+    watcherCount: typeof (doc as any).watcherCount === 'number' ? (doc as any).watcherCount : undefined,
     createdAt: timestampToDate(doc.createdAt) || new Date(),
     updatedAt: timestampToDate(doc.updatedAt) || new Date(),
     createdBy: doc.createdBy,
@@ -290,7 +318,13 @@ function toListingDocInput(
     description: listingInput.description.trim(),
     type: listingInput.type,
     category: listingInput.category,
-    images: listingInput.images || [],
+    images:
+      (listingInput.photos && listingInput.photos.length
+        ? listingInput.photos.map((p) => p.url).filter(Boolean)
+        : listingInput.images) || [],
+    ...(Array.isArray(listingInput.photoIds) && { photoIds: listingInput.photoIds }),
+    ...(Array.isArray(listingInput.photos) && { photos: listingInput.photos }),
+    ...(listingInput.coverPhotoId && { coverPhotoId: listingInput.coverPhotoId }),
     location,
     sellerId,
     sellerSnapshot,
@@ -959,6 +993,92 @@ export const listActiveListings = async (
     return result.items;
   } catch (error) {
     console.error('Error fetching active listings:', error);
+    throw error;
+  }
+};
+
+export const listMostWatchedAuctions = async (params?: { limitCount?: number }): Promise<Listing[]> => {
+  const limitCount = params?.limitCount || 12;
+  try {
+    const listingsRef = collection(db, 'listings');
+    const q = query(
+      listingsRef,
+      where('status', '==', 'active'),
+      where('type', '==', 'auction'),
+      orderBy('metrics.favorites', 'desc'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((docSnap) =>
+      toListing({
+        id: docSnap.id,
+        ...(docSnap.data() as ListingDoc),
+      })
+    );
+  } catch (error) {
+    // Production safety: if the composite index for metrics.favorites isn't available yet,
+    // fall back to a query that should already be indexed (status + type + createdAt),
+    // then sort in-memory by favorites. This keeps the homepage working even if indexes
+    // are missing/building, at the cost of a slightly less efficient query.
+    const msg = String((error as any)?.message || '');
+    const code = String((error as any)?.code || '');
+    const looksLikeMissingIndex =
+      code === 'failed-precondition' || /requires an index/i.test(msg);
+
+    if (looksLikeMissingIndex) {
+      console.warn('[listMostWatchedAuctions] Missing index for favorites query; using fallback', {
+        code,
+        message: msg,
+      });
+
+      const listingsRef = collection(db, 'listings');
+      const fallbackLimit = Math.max(limitCount * 8, 50); // grab a wider sample then rank
+      const qFallback = query(
+        listingsRef,
+        where('status', '==', 'active'),
+        where('type', '==', 'auction'),
+        orderBy('createdAt', 'desc'),
+        limit(fallbackLimit)
+      );
+      const snap = await getDocs(qFallback);
+      const items = snap.docs.map((docSnap) =>
+        toListing({
+          id: docSnap.id,
+          ...(docSnap.data() as ListingDoc),
+        })
+      );
+      return items
+        .sort((a: any, b: any) => Number(b?.metrics?.favorites || 0) - Number(a?.metrics?.favorites || 0))
+        .slice(0, limitCount);
+    }
+
+    console.error('Error fetching most watched auctions:', error);
+    throw error;
+  }
+};
+
+export const listEndingSoonAuctions = async (params?: { limitCount?: number }): Promise<Listing[]> => {
+  const limitCount = params?.limitCount || 12;
+  try {
+    const listingsRef = collection(db, 'listings');
+    const now = Timestamp.fromDate(new Date());
+    const q = query(
+      listingsRef,
+      where('status', '==', 'active'),
+      where('type', '==', 'auction'),
+      where('endsAt', '>=', now),
+      orderBy('endsAt', 'asc'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((docSnap) =>
+      toListing({
+        id: docSnap.id,
+        ...(docSnap.data() as ListingDoc),
+      })
+    );
+  } catch (error) {
+    console.error('Error fetching ending soon auctions:', error);
     throw error;
   }
 };

@@ -13,6 +13,9 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getSiteUrl } from '@/lib/site-url';
+import { emitEventForUser } from '@/lib/notifications';
+import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib/auctions/proxyBidding';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -104,6 +107,18 @@ export async function POST(request: Request) {
   const animalCategories = new Set(['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock']);
 
   try {
+    let eventInfo:
+      | {
+          listingId: string;
+          listingTitle: string;
+          listingUrl: string;
+          endsAtIso?: string;
+          sellerId?: string;
+          prevBidderId?: string;
+          newBidderId: string;
+        }
+      | null = null;
+
     const result = await db.runTransaction(async (tx) => {
       const listingRef = db.collection('listings').doc(listingId);
       const listingSnap = await tx.get(listingRef);
@@ -132,60 +147,156 @@ export async function POST(request: Request) {
         }
       }
 
-      const currentBid = listing.currentBid ?? listing.startingBid ?? 0;
-      if (amount <= currentBid) {
-        throw new Error(`Bid must be higher than the current bid of $${Number(currentBid).toLocaleString()}`);
+      const now = Timestamp.now();
+      const nowMs = now.toMillis();
+
+      const startingBidUsd = Number(listing.startingBid ?? 0) || 0;
+      const currentBidUsd = Number(listing.currentBid ?? listing.startingBid ?? 0) || 0;
+      const currentBidCents =
+        Number.isFinite(Number(listing.currentBidCents)) && Math.floor(Number(listing.currentBidCents)) === Number(listing.currentBidCents)
+          ? Number(listing.currentBidCents)
+          : Math.max(0, Math.round(currentBidUsd * 100));
+      const startingBidCents =
+        Number.isFinite(Number(listing.startingBidCents)) && Math.floor(Number(listing.startingBidCents)) === Number(listing.startingBidCents)
+          ? Number(listing.startingBidCents)
+          : Math.max(0, Math.round(startingBidUsd * 100));
+
+      const amountCents = Math.max(0, Math.round(amount * 100));
+
+      // Enforce minimum increment server-side.
+      const hasAnyBids = Boolean(listing.currentBidderId) || Number(listing?.metrics?.bidCount || 0) > 0;
+      const minRequiredCents = hasAnyBids ? currentBidCents + getMinIncrementCents(currentBidCents) : startingBidCents;
+      if (amountCents < minRequiredCents) {
+        throw new Error(`Bid must be at least $${(minRequiredCents / 100).toLocaleString()}`);
       }
 
-      const bidRef = db.collection('bids').doc();
-      tx.set(bidRef, {
+      // Upsert bidder max bid (proxy bidding always uses max bids).
+      const autoBidRef = listingRef.collection('autoBids').doc(bidderId);
+      const autoBidSnap = await tx.get(autoBidRef);
+      const existingAutoBid = autoBidSnap.exists ? (autoBidSnap.data() as any) : null;
+      const existingMax = Number(existingAutoBid?.maxBidCents || 0) || 0;
+      const createdAtMs = existingAutoBid?.createdAt?.toMillis ? existingAutoBid.createdAt.toMillis() : nowMs;
+
+      if (existingAutoBid && existingAutoBid.enabled === true && amountCents <= existingMax) {
+        throw new Error('Your maximum bid must be higher than your current maximum bid.');
+      }
+
+      tx.set(
+        autoBidRef,
+        {
+          userId: bidderId,
+          maxBidCents: amountCents,
+          enabled: true,
+          ...(autoBidSnap.exists ? {} : { createdAt: now }),
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // Load enabled max bids for this auction (transactional snapshot).
+      const autoBidsSnap = await tx.get(listingRef.collection('autoBids').where('enabled', '==', true));
+      const autoBidSet: AutoBidEntry[] = autoBidsSnap.docs.map((d) => {
+        const data = d.data() as any;
+        const created = data?.createdAt?.toMillis ? data.createdAt.toMillis() : nowMs;
+        const updated = data?.updatedAt?.toMillis ? data.updatedAt.toMillis() : undefined;
+        return {
+          userId: String(data.userId || d.id),
+          maxBidCents: Number(data.maxBidCents || 0) || 0,
+          enabled: Boolean(data.enabled),
+          createdAtMs: created,
+          updatedAtMs: updated,
+        };
+      });
+
+      // Ensure bidder's updated max is represented.
+      const mergedAutoBidSet: AutoBidEntry[] = [
+        ...autoBidSet.filter((e) => e.userId !== bidderId),
+        { userId: bidderId, maxBidCents: amountCents, enabled: true, createdAtMs },
+      ];
+
+      const prevBidderId = typeof listing.currentBidderId === 'string' ? listing.currentBidderId : null;
+      const out = computeNextState({
+        currentBidCents,
+        highBidderId: prevBidderId,
+        autoBidSet: mergedAutoBidSet,
+      });
+
+      const newCurrentBidCents = out.newCurrentBidCents;
+      const newHighBidderId = out.newHighBidderId;
+
+      // If the bidder is already winning and only increased their max without moving price, do not write bid docs.
+      const priceMoved = newCurrentBidCents !== currentBidCents;
+      const highBidderChanged = newHighBidderId && newHighBidderId !== prevBidderId;
+
+      const bidsCol = db.collection('bids');
+      const bidWrites: Array<{ id: string; bidderId: string; amountCents: number; isAuto: boolean }> = [];
+
+      if (priceMoved || highBidderChanged) {
+        const bidderBidAmountCents = newHighBidderId === bidderId ? newCurrentBidCents : amountCents;
+        bidWrites.push({
+          id: bidsCol.doc().id,
+          bidderId,
+          amountCents: bidderBidAmountCents,
+          isAuto: false,
+        });
+
+        const synthetic = out.syntheticBidsToWrite.find((b) => b.bidderId === newHighBidderId);
+        if (synthetic && synthetic.bidderId && synthetic.bidderId !== bidderId) {
+          bidWrites.push({
+            id: bidsCol.doc().id,
+            bidderId: synthetic.bidderId,
+            amountCents: synthetic.amountCents,
+            isAuto: true,
+          });
+          // best-effort marker
+          tx.set(
+            listingRef.collection('autoBids').doc(synthetic.bidderId),
+            { lastAutoBidAt: now, updatedAt: now },
+            { merge: true }
+          );
+        }
+
+        for (const w of bidWrites) {
+          tx.set(bidsCol.doc(w.id), {
+            listingId,
+            bidderId: w.bidderId,
+            amount: w.amountCents / 100,
+            amountCents: w.amountCents,
+            isAuto: w.isAuto,
+            createdAt: now,
+          });
+        }
+
+        tx.update(listingRef, {
+          currentBid: newCurrentBidCents / 100,
+          currentBidCents: newCurrentBidCents,
+          currentBidderId: newHighBidderId,
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: bidderId,
+          'metrics.bidCount': FieldValue.increment(bidWrites.length),
+          'metrics.lastBidAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // No visible change; only max increased.
+        tx.update(listingRef, {
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: bidderId,
+        });
+      }
+
+      // Capture info for notification events after tx commits.
+      const endsAt = listing.endsAt?.toDate ? (listing.endsAt.toDate() as Date) : undefined;
+      eventInfo = {
         listingId,
-        bidderId,
-        amount,
-        createdAt: Timestamp.now(),
-      });
+        listingTitle: listing.title || 'a listing',
+        listingUrl: `${getSiteUrl()}/listing/${listingId}`,
+        ...(endsAt ? { endsAtIso: endsAt.toISOString() } : {}),
+        ...(listing.sellerId ? { sellerId: listing.sellerId } : {}),
+        ...(prevBidderId ? { prevBidderId } : {}),
+        newBidderId: newHighBidderId || prevBidderId || bidderId,
+      };
 
-      const prevBidderId = listing.currentBidderId || null;
-      tx.update(listingRef, {
-        currentBid: amount,
-        currentBidderId: bidderId,
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: bidderId,
-        'metrics.bidCount': FieldValue.increment(1),
-      });
-
-      // Notifications (best-effort, still inside tx for consistency)
-      const notificationsRef = db.collection('notifications');
-      if (listing.sellerId) {
-        tx.set(notificationsRef.doc(), {
-          userId: listing.sellerId,
-          type: 'bid_received',
-          title: 'New Bid Received',
-          body: `Someone placed a bid of $${amount.toLocaleString()} on "${listing.title || 'your listing'}"`,
-          read: false,
-          createdAt: Timestamp.now(),
-          linkUrl: `/listing/${listingId}`,
-          linkLabel: 'View Listing',
-          listingId,
-          metadata: { bidAmount: amount, bidderId },
-        });
-      }
-      if (prevBidderId && prevBidderId !== bidderId) {
-        tx.set(notificationsRef.doc(), {
-          userId: prevBidderId,
-          type: 'bid_outbid',
-          title: 'You Were Outbid',
-          body: `Someone placed a higher bid of $${amount.toLocaleString()} on "${listing.title || 'a listing'}"`,
-          read: false,
-          createdAt: Timestamp.now(),
-          linkUrl: `/listing/${listingId}`,
-          linkLabel: 'Place New Bid',
-          listingId,
-          metadata: { newBidAmount: amount },
-        });
-      }
-
-      return { newCurrentBid: amount, bidId: bidRef.id };
+      return { newCurrentBid: newCurrentBidCents / 100, bidId: bidWrites[0]?.id || db.collection('bids').doc().id, prevBidderId, newBidderId: newHighBidderId };
     });
 
     // Audit (outside tx)
@@ -202,6 +313,88 @@ export async function POST(request: Request) {
       });
     } catch {
       // ignore audit failures
+    }
+
+    // Notification events (outside tx, idempotent)
+    if (eventInfo) {
+      const { sellerId, prevBidderId, listingTitle, listingUrl, endsAtIso, newBidderId } = eventInfo;
+
+      // Seller: bid received (low priority but useful)
+      if (sellerId) {
+        await emitEventForUser({
+          type: 'Auction.BidReceived',
+          actorId: bidderId,
+          entityType: 'listing',
+          entityId: listingId,
+          targetUserId: sellerId,
+          payload: {
+            type: 'Auction.BidReceived',
+            listingId,
+            listingTitle,
+            listingUrl,
+            bidAmount: result.newCurrentBid,
+          },
+          optionalHash: `bid:${result.bidId}`,
+        });
+      }
+
+      // Previous high bidder: outbid (only if high bidder changed)
+      if (prevBidderId && newBidderId && prevBidderId !== newBidderId) {
+        await emitEventForUser({
+          type: 'Auction.Outbid',
+          actorId: bidderId,
+          entityType: 'listing',
+          entityId: listingId,
+          targetUserId: prevBidderId,
+          payload: {
+            type: 'Auction.Outbid',
+            listingId,
+            listingTitle,
+            listingUrl,
+            newHighBidAmount: result.newCurrentBid,
+            ...(endsAtIso ? { endsAt: endsAtIso } : {}),
+          },
+          optionalHash: `bid:${result.bidId}`,
+        });
+      }
+
+      // Bidder: winning vs immediately surpassed.
+      if (newBidderId !== bidderId) {
+        await emitEventForUser({
+          type: 'Auction.Outbid',
+          actorId: bidderId,
+          entityType: 'listing',
+          entityId: listingId,
+          targetUserId: bidderId,
+          payload: {
+            type: 'Auction.Outbid',
+            listingId,
+            listingTitle,
+            listingUrl,
+            newHighBidAmount: result.newCurrentBid,
+            ...(endsAtIso ? { endsAt: endsAtIso } : {}),
+          },
+          optionalHash: `bid:${result.bidId}:immediate`,
+        });
+      } else {
+        await emitEventForUser({
+          type: 'Auction.HighBidder',
+          actorId: bidderId,
+          entityType: 'listing',
+          entityId: listingId,
+          targetUserId: bidderId,
+          payload: {
+            type: 'Auction.HighBidder',
+            listingId,
+            listingTitle,
+            listingUrl,
+            yourBidAmount: result.newCurrentBid,
+            currentBidAmount: result.newCurrentBid,
+            ...(endsAtIso ? { endsAt: endsAtIso } : {}),
+          },
+          optionalHash: `bid:${result.bidId}`,
+        });
+      }
     }
 
     return json({ ok: true, ...result });

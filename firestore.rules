@@ -8,9 +8,10 @@ service cloud.firestore {
     }
     
     // Helper function to check if user owns a document
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
+    // (keep only if/when used in rules below; otherwise remove to reduce warnings)
+    // function isOwner(userId) {
+    //   return isAuthenticated() && request.auth.uid == userId;
+    // }
     
     // Helper function to check if user is an admin
     // Checks the auth token role claim first (fast, no get() call), then falls back to reading user document
@@ -30,8 +31,8 @@ service cloud.firestore {
     // USERS COLLECTION
     // ============================================
     match /users/{userId} {
-      // Allow read: if authenticated (any user can read any user profile)
-      allow read: if isAuthenticated();
+      // Allow read: only owner or admin (user docs may contain sensitive fields)
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       
       // Allow create: if authenticated and creating own document
       allow create: if isAuthenticated() && request.auth.uid == userId &&
@@ -89,6 +90,41 @@ service cloud.firestore {
       
       // Allow delete: if authenticated and deleting own document
       allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // PUBLIC PROFILES (SAFE FIELDS ONLY)
+    // ============================================
+    // This collection is intended for public/marketplace display (seller cards, bidder names, etc.).
+    // Never store email, phone, Stripe IDs, or billing/admin fields here.
+    match /publicProfiles/{userId} {
+      // Read is public so listing pages can show seller info to logged-out users.
+      allow read: if true;
+
+      // Owner can upsert their public profile doc.
+      // We restrict which keys can be written so sensitive fields can't be smuggled in.
+      allow create, update: if isAuthenticated() && request.auth.uid == userId &&
+        !request.resource.data.keys().hasAny([
+          'email',
+          'phoneNumber',
+          'stripeCustomerId',
+          'stripeAccountId',
+          'stripeSubscriptionId',
+          'subscriptionPlan',
+          'subscriptionStatus',
+          'role',
+          'superAdmin'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // ============================================
+    // USER PHOTOS (Uploads Library)
+    // ============================================
+    // /users/{uid}/photos/{photoId}
+    match /users/{userId}/photos/{photoId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // ============================================
@@ -197,6 +233,18 @@ service cloud.firestore {
         // No delete allowed
         allow delete: if false;
       }
+
+      // ============================================
+      // AUCTION AUTO-BIDS (Proxy bidding max bids)
+      // ============================================
+      // /listings/{listingId}/autoBids/{userId}
+      match /autoBids/{userId} {
+        // Users may read *their own* max bid doc (for UI), but cannot write directly.
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+      }
     }
     
     // ============================================
@@ -206,18 +254,69 @@ service cloud.firestore {
     match /users/{userId}/watchlist/{listingId} {
       // Allow read: only the owner can read their watchlist
       allow read: if isAuthenticated() && request.auth.uid == userId;
-      
-      // Allow create: only the owner can add to their watchlist
-      allow create: if isAuthenticated() && 
-        request.auth.uid == userId &&
-        request.resource.data.listingId == listingId &&
-        request.resource.data.keys().hasAll(['listingId', 'createdAt']);
-      
-      // Allow delete: only the owner can remove from their watchlist
-      allow delete: if isAuthenticated() && request.auth.uid == userId;
+
+      // Phase 3A/B3 (scale + correctness): watch/unwatch mutations must go through
+      // `POST /api/watchlist/toggle` (Admin SDK) so we can maintain:
+      // - listings/{listingId}.watcherCount
+      // - listings/{listingId}/watchers/{uid} reverse index
+      // Allowing client writes here would cause drift under concurrency and break seller analytics.
+      allow create: if false;
+      allow delete: if false;
       
       // No updates allowed - watchlist entries are immutable
       allow update: if false;
+    }
+
+    // ============================================
+    // SAVED SEARCHES (Subcollection under users)
+    // ============================================
+    // /users/{uid}/savedSearches/{searchId}
+    match /users/{userId}/savedSearches/{searchId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // (Removed duplicate /users/{uid}/photos rules block; the canonical one lives above.)
+
+    // ============================================
+    // USER NOTIFICATIONS (Subcollection under users)
+    // ============================================
+    // /users/{uid}/notifications/{notificationId}
+    match /users/{userId}/notifications/{notificationId} {
+      // Allow read: only owner
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // Server-controlled creation (Admin SDK / processors)
+      allow create: if false;
+
+      // Allow update: only owner (mark read / clicked)
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+
+      // No delete
+      allow delete: if false;
+    }
+
+    // ============================================
+    // USER HELP FLAGS (per-page help/tour state)
+    // ============================================
+    // /users/{uid}/helpFlags/{helpKey}
+    match /users/{userId}/helpFlags/{helpKey} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // NOTIFICATION PREFERENCES (Subcollection under users)
+    // ============================================
+    // /users/{uid}/notificationPreferences/{docId}
+    match /users/{userId}/notificationPreferences/{docId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // PUSH TOKENS (Subcollection under users)
+    // ============================================
+    // /users/{uid}/pushTokens/{tokenId}
+    match /users/{userId}/pushTokens/{tokenId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // ============================================
@@ -251,12 +350,9 @@ service cloud.firestore {
         isAdmin()
       );
       
-      // Allow create: authenticated users (webhook will create via Admin SDK)
-      // For client-side, we allow authenticated users to create pending orders
-      allow create: if isAuthenticated() &&
-                      request.resource.data.buyerId == request.auth.uid &&
-                      request.resource.data.status == 'pending' &&
-                      request.resource.data.keys().hasAll(['listingId', 'buyerId', 'sellerId', 'amount', 'platformFee', 'sellerAmount', 'status', 'createdAt', 'updatedAt']);
+      // Allow create: server-side only (Admin SDK via Stripe webhooks / API routes).
+      // Clients should never create orders directly.
+      allow create: if false;
       
       // Allow update: buyer or seller can update their own orders (limited client-side actions), OR admin
       // IMPORTANT: payout + payment fields must be server-controlled.
@@ -443,6 +539,30 @@ service cloud.firestore {
 
       // No delete allowed
       allow delete: if false;
+    }
+
+    // ============================================
+    // CANONICAL NOTIFICATION EVENT STREAM + JOB QUEUES
+    // ============================================
+    match /events/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /emailJobs/{jobId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /pushJobs/{jobId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /smsJobs/{jobId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /notificationRateLimits/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
     
     // Deny all other access

@@ -8,48 +8,12 @@
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
-
-// Initialize Firebase Admin
-let adminApp: App | undefined;
-let auth: ReturnType<typeof getAuth>;
-let db: ReturnType<typeof getFirestore>;
-
-async function initializeFirebaseAdmin() {
-  if (!adminApp) {
-    if (!getApps().length) {
-      try {
-        const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-          ? {
-              projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-              clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-              privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            }
-          : undefined;
-
-        if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-          adminApp = initializeApp({
-            credential: cert(serviceAccount as any),
-          });
-        } else {
-          adminApp = initializeApp();
-        }
-      } catch (error) {
-        console.error('Firebase Admin initialization error:', error);
-        throw error;
-      }
-    } else {
-      adminApp = getApps()[0];
-    }
-  }
-  auth = getAuth(adminApp);
-  db = getFirestore(adminApp);
-  return { auth, db };
-}
+import { getSiteUrl } from '@/lib/site-url';
+import { emitEventForUser } from '@/lib/notifications';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -66,7 +30,8 @@ export async function POST(
   { params }: { params: { orderId: string } }
 ) {
   try {
-    const { auth, db } = await initializeFirebaseAdmin();
+    const auth = getAdminAuth();
+    const db = getAdminDb();
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
@@ -206,33 +171,31 @@ export async function POST(
       source: 'admin_ui',
     });
 
-    // Send delivery confirmation email to buyer
+    // Emit canonical notification event for buyer (in-app/email/push handled by scheduled processors)
     try {
-      const buyerDoc = await db.collection('users').doc(orderData.buyerId).get();
-      const buyerEmail = buyerDoc.data()?.email;
-      const buyerName = buyerDoc.data()?.displayName || buyerDoc.data()?.profile?.fullName || 'Customer';
-      
       // Get listing title
       const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
       const listingTitle = listingDoc.data()?.title || 'Unknown Listing';
-      
-      if (buyerEmail) {
-        const { sendDeliveryConfirmationEmail } = await import('@/lib/email/sender');
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
-          ? `https://${process.env.VERCEL_URL}` 
-          : 'http://localhost:3000';
-        
-        await sendDeliveryConfirmationEmail(buyerEmail, {
-          buyerName,
+
+      await emitEventForUser({
+        type: 'Order.DeliveryConfirmed',
+        actorId: adminId,
+        entityType: 'order',
+        entityId: orderId,
+        targetUserId: orderData.buyerId,
+        payload: {
+          type: 'Order.DeliveryConfirmed',
           orderId,
+          listingId: orderData.listingId,
           listingTitle,
-          deliveryDate: now,
-          orderUrl: `${baseUrl}/dashboard/orders/${orderId}`,
-        });
-      }
+          orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
+          deliveryDate: now.toISOString(),
+        },
+        optionalHash: `delivery:${now.toISOString()}`,
+      });
     } catch (emailError) {
       // Don't fail the confirmation if email fails
-      console.error('Error sending delivery confirmation email:', emailError);
+      console.error('Error emitting delivery_confirmed notification event:', emailError);
     }
 
     return json({

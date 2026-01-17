@@ -16,6 +16,7 @@ import {
   getRedirectResult,
 } from 'firebase/auth';
 import { auth } from './config';
+import { getSiteUrl } from '@/lib/site-url';
 
 /**
  * Create a new user account with email and password
@@ -66,7 +67,13 @@ export const signOutUser = async (): Promise<void> => {
  * Send password reset email
  */
 export const resetPassword = async (email: string): Promise<void> => {
-  return await sendPasswordResetEmail(auth, email);
+  // Ensure Firebase sends users back to our app after completing the reset flow.
+  // Note: your domain (including localhost for dev) must be allowed in Firebase Auth settings.
+  const actionCodeSettings = {
+    url: `${getSiteUrl()}/login?reset=1`,
+    handleCodeInApp: false,
+  };
+  return await sendPasswordResetEmail(auth, email, actionCodeSettings);
 };
 
 /**
@@ -100,7 +107,12 @@ export const resendVerificationEmail = async (): Promise<void> => {
   if (!auth.currentUser) {
     throw new Error('No user is currently signed in');
   }
-  await sendEmailVerification(auth.currentUser);
+  // Ensure users land back on our app after verification.
+  const actionCodeSettings = {
+    url: `${getSiteUrl()}/seller/overview?verified=1`,
+    handleCodeInApp: false,
+  };
+  await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
 };
 
 /**
@@ -113,6 +125,12 @@ export const reloadCurrentUser = async (): Promise<void> => {
   }
   // `reload()` exists on the User instance in the Firebase v9 modular SDK.
   await (auth.currentUser as any).reload();
+  // Refresh ID token so server-side `email_verified` checks don't use stale claims.
+  try {
+    await auth.currentUser.getIdToken(true);
+  } catch {
+    // best-effort
+  }
 };
 
 /**

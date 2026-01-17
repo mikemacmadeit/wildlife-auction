@@ -15,17 +15,16 @@ import { Upload, X, Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react'
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
-import { createListingDraft, publishListing, updateListing, addListingImageServer } from '@/lib/firebase/listings';
+import { createListingDraft, publishListing, updateListing } from '@/lib/firebase/listings';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
-import { uploadListingImage } from '@/lib/firebase/storage';
-import Image from 'next/image';
+import { ListingPhotoPicker, type ListingPhotoSnapshot } from '@/components/photos/ListingPhotoPicker';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ListingAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes } from '@/lib/types';
 import { AlertCircle } from 'lucide-react';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { HelpTooltip } from '@/components/help/HelpTooltip';
 import { ImageGallery } from '@/components/listing/ImageGallery';
@@ -58,6 +57,9 @@ function NewListingPageContent() {
     endsAt: string;
     location: { city: string; state: string; zip: string };
     images: string[];
+    photoIds: string[];
+    photos: ListingPhotoSnapshot[];
+    coverPhotoId?: string;
     verification: boolean;
     transport: boolean;
     protectedTransactionEnabled: boolean;
@@ -86,6 +88,9 @@ function NewListingPageContent() {
       zip: '',
     },
     images: [],
+    photoIds: [],
+    photos: [],
+    coverPhotoId: undefined,
     verification: false,
     transport: false,
     protectedTransactionEnabled: false,
@@ -99,8 +104,6 @@ function NewListingPageContent() {
     },
     attributes: {},
   });
-  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [payoutsGateOpen, setPayoutsGateOpen] = useState(false);
@@ -466,7 +469,12 @@ function NewListingPageContent() {
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
                 if (!attrs.identificationDisclosure) errs.push('Identification Disclosure');
                 if (!attrs.healthDisclosure) errs.push('Health Disclosure');
-                if (!(attrs.age || attrs.weightRange)) errs.push('Age or Weight Range');
+                const hasAge =
+                  typeof (attrs as any).age === 'number'
+                    ? Number.isFinite((attrs as any).age)
+                    : !!String((attrs as any).age || '').trim();
+                const hasWeight = !!String(attrs.weightRange || '').trim();
+                if (!hasAge && !hasWeight) errs.push('Age or Weight Range');
                 return errs;
               }
               if (formData.category === 'ranch_equipment') {
@@ -591,7 +599,12 @@ function NewListingPageContent() {
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
           if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
           if (!attrs.healthDisclosure) errors.push('Health Disclosure');
-          if (!(attrs.age || attrs.weightRange)) errors.push('Age or Weight Range');
+          const hasAge =
+            typeof (attrs as any).age === 'number'
+              ? Number.isFinite((attrs as any).age)
+              : !!String((attrs as any).age || '').trim();
+          const hasWeight = !!String(attrs.weightRange || '').trim();
+          if (!hasAge && !hasWeight) errors.push('Age or Weight Range');
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -956,328 +969,40 @@ function NewListingPageContent() {
     {
       id: 'media',
       title: 'Photos',
-      description: 'Upload photos of your listing (required)',
+      description: 'Upload + select photos (required)',
       content: (
         <div className="space-y-4">
-          {/* Upload Area */}
-          <Card className="border-2 border-dashed p-8 text-center min-h-[200px] flex items-center justify-center">
-            <div className="space-y-4 w-full">
-              <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
-              <div>
-                <Input
-                  id="images"
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  disabled={formData.images.length >= 8 || uploadingImages.size > 0}
-                  onChange={async (e) => {
-                    const files = Array.from(e.target.files || []);
-                    if (files.length === 0) return;
-
-                    // Check total count
-                    const totalImages = formData.images.length + files.length;
-                    if (totalImages > 8) {
-                      toast({
-                        title: 'Too many images',
-                        description: 'You can upload a maximum of 8 photos per listing.',
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-
-                    // Ensure user is authenticated
-                    if (!user) {
-                      toast({
-                        title: 'Authentication required',
-                        description: 'Please sign in to upload images.',
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-
-                    // Create draft listing if it doesn't exist yet
-                    let currentListingId = listingId;
-                    if (!currentListingId) {
-                    // Whitetail-only: attestation is required even for draft creation (server/client enforcement).
-                    // Prevent confusing failures when users try to upload images before accepting attestation.
-                    if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
-                      toast({
-                        title: 'Seller attestation required',
-                        description: 'Please accept the seller attestation before uploading photos for a whitetail breeder listing.',
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-                      try {
-                        const draftData: any = {
-                          title: formData.title || 'Draft Listing',
-                          description: formData.description || '',
-                          type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
-                          category: (formData.category || 'other') as ListingCategory,
-                          location: formData.location,
-                          images: [],
-                          trust: {
-                            verified: formData.verification,
-                            insuranceAvailable: false,
-                            transportReady: formData.transport,
-                          },
-                          protectedTransactionEnabled: formData.protectedTransactionEnabled,
-                          protectedTransactionDays: formData.protectedTransactionDays,
-                          attributes: formData.attributes as ListingAttributes,
-                        };
-
-                        // Whitetail-only seller attestation (required even for draft creation)
-                        if (formData.category === 'whitetail_breeder') {
-                          draftData.sellerAttestationAccepted = sellerAttestationAccepted === true;
-                          if (sellerAttestationAccepted) {
-                            draftData.sellerAttestationAcceptedAt = new Date();
-                          }
-                        }
-                        
-                        // Only include protectedTermsVersion if protectedTransactionEnabled is true
-                        if (formData.protectedTransactionEnabled) {
-                          draftData.protectedTermsVersion = 'v1';
-                        }
-
-                        if (formData.type === 'fixed' || formData.type === 'classified') {
-                          draftData.price = parseFloat(formData.price || '0');
-                          if (formData.bestOffer.enabled) {
-                            const bo: any = {
-                              enabled: true,
-                              allowCounter: formData.bestOffer.allowCounter !== false,
-                              offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
-                            };
-                            if (formData.bestOffer.minPrice) bo.minPrice = parseFloat(formData.bestOffer.minPrice);
-                            if (formData.bestOffer.autoAcceptPrice) bo.autoAcceptPrice = parseFloat(formData.bestOffer.autoAcceptPrice);
-                            draftData.bestOfferSettings = bo;
-                          } else {
-                            draftData.bestOfferSettings = { enabled: false, allowCounter: true, offerExpiryHours: 48 };
-                          }
-                        } else if (formData.type === 'auction') {
-                          if (formData.startingBid) {
-                            draftData.startingBid = parseFloat(formData.startingBid || '0');
-                          }
-                          if (formData.reservePrice) {
-                            draftData.reservePrice = parseFloat(formData.reservePrice);
-                          }
-                          if (formData.endsAt) {
-                            draftData.endsAt = new Date(formData.endsAt);
-                          }
-                        }
-
-                        currentListingId = await createListingDraft(user.uid, draftData);
-                        setListingId(currentListingId);
-                        
-                        // Wait longer and verify listing exists before allowing upload
-                        // Storage rules check Firestore, so we need to ensure propagation
-                        let retries = 0;
-                        let listingVerified = false;
-                        while (retries < 5 && !listingVerified) {
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                          try {
-                            // Verify listing exists by trying to read it
-                            const { getListingById } = await import('@/lib/firebase/listings');
-                            const listing = await getListingById(currentListingId);
-                            if (listing && listing.sellerId === user.uid) {
-                              listingVerified = true;
-                            }
-                          } catch (err) {
-                            console.log(`Verification attempt ${retries + 1} failed, retrying...`);
-                          }
-                          retries++;
-                        }
-                        
-                        if (!listingVerified) {
-                          toast({
-                            title: 'Verification failed',
-                            description: 'Listing created but could not verify. Please try uploading again.',
-                            variant: 'destructive',
-                          });
-                          // Still allow upload attempt - rules might work anyway
-                        }
-                        
-                        toast({
-                          title: 'Draft created',
-                          description: 'Listing draft created. You can now upload images.',
-                        });
-                      } catch (error: any) {
-                        console.error('Error creating draft listing:', error);
-                        toast({
-                          title: 'Error creating draft',
-                          description: error.message || 'Failed to create listing draft. Please try again.',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                    }
-
-                    // Upload each file
-                    for (const file of files) {
-                      const fileId = `${Date.now()}-${Math.random()}`;
-                      setUploadingImages((prev) => new Set(prev).add(fileId));
-                      setUploadProgress((prev) => ({ ...prev, [fileId]: 0 }));
-
-                      try {
-                        const result = await uploadListingImage(
-                          currentListingId!,
-                          file,
-                          (progress) => {
-                            setUploadProgress((prev) => ({
-                              ...prev,
-                              [fileId]: progress.progress,
-                            }));
-                          }
-                        );
-
-                        // Add URL to images array
-                        const newImages = [...formData.images, result.url];
-                        setFormData((prev) => ({
-                          ...prev,
-                          images: newImages,
-                        }));
-
-                        // Persist image URL to Firestore (server route is more reliable than client rules in production)
-                        try {
-                          await addListingImageServer(currentListingId!, result.url);
-                        } catch (serverErr: any) {
-                          // Fallback to direct client update (if server env isn't configured)
-                          try {
-                            await updateListing(user.uid, currentListingId!, { images: newImages } as any);
-                          } catch (updateError: any) {
-                            console.error('Error updating listing with image:', updateError);
-                            // Don't fail the upload if update fails - images are already in formData
-                            toast({
-                              title: 'Image uploaded',
-                              description: 'Image uploaded successfully, but failed to save to the listing. Please refresh and try again.',
-                              variant: 'default',
-                            });
-                          }
-                        }
-
-                        toast({
-                          title: 'Upload successful',
-                          description: `${file.name} uploaded successfully.`,
-                        });
-                      } catch (error: any) {
-                        console.error('Error uploading image:', error);
-                        
-                        // Provide more specific error messages
-                        let errorMessage = `Failed to upload ${file.name}.`;
-                        if (error.code === 'storage/unauthorized') {
-                          errorMessage = 'You are not authorized to upload images. Please ensure you are logged in and try again.';
-                        } else if (error.code === 'storage/quota-exceeded') {
-                          errorMessage = 'Storage quota exceeded. Please contact support.';
-                        } else if (error.code === 'storage/unauthenticated') {
-                          errorMessage = 'Please sign in to upload images.';
-                        } else if (error.message) {
-                          errorMessage = error.message;
-                        }
-                        
-                        toast({
-                          title: 'Upload failed',
-                          description: errorMessage,
-                          variant: 'destructive',
-                        });
-                      } finally {
-                        setUploadingImages((prev) => {
-                          const next = new Set(prev);
-                          next.delete(fileId);
-                          return next;
-                        });
-                        setUploadProgress((prev) => {
-                          const next = { ...prev };
-                          delete next[fileId];
-                          return next;
-                        });
-                      }
-                    }
-
-                    // Reset file input
-                    e.target.value = '';
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-[48px] min-w-[200px]"
-                  disabled={formData.images.length >= 8 || uploadingImages.size > 0}
-                  onClick={() => {
-                    const input = document.getElementById('images') as HTMLInputElement;
-                    if (input) {
-                      input.click();
-                    }
-                  }}
-                >
-                  {uploadingImages.size > 0 ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Photos
-                    </>
-                  )}
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Upload up to 8 photos (JPG, PNG, WebP)
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Images are automatically compressed and optimized
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Image Grid */}
-          {(formData.images.length > 0 || uploadingImages.size > 0) && (
-            <div className="grid grid-cols-3 gap-2">
-              {/* Uploaded Images */}
-              {formData.images.map((img, idx) => (
-                <div key={idx} className="relative aspect-square rounded-md overflow-hidden border group">
-                  <Image
-                    src={img}
-                    alt={`Upload ${idx + 1}`}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 33vw, 200px"
-                    unoptimized
-                  />
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        images: formData.images.filter((_, i) => i !== idx),
-                      });
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
+          {user ? (
+            <ListingPhotoPicker
+              uid={user.uid}
+              selected={formData.photos}
+              coverPhotoId={formData.coverPhotoId}
+              max={8}
+              onChange={({ selected, coverPhotoId }) => {
+                const normalized = selected.map((p, i) => ({ ...p, sortOrder: i }));
+                setFormData((prev) => ({
+                  ...prev,
+                  photos: normalized,
+                  photoIds: normalized.map((p) => p.photoId),
+                  coverPhotoId,
+                  images: normalized.map((p) => p.url),
+                }));
+              }}
+            />
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center">
+                <div className="font-semibold">Sign in to add photos</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Create an account to upload and reuse photos across listings.
                 </div>
-              ))}
-
-              {/* Uploading Images (Placeholders) */}
-              {Array.from(uploadingImages).map((fileId) => (
-                <div key={fileId} className="relative aspect-square rounded-md overflow-hidden border bg-muted flex items-center justify-center">
-                  <div className="text-center space-y-2 p-4">
-                    <Loader2 className="h-6 w-6 mx-auto animate-spin text-primary" />
-                    <p className="text-xs text-muted-foreground">
-                      {Math.round(uploadProgress[fileId] || 0)}%
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       ),
-      validate: () => formData.images.length > 0, // At least 1 image required
-      errorMessage: 'Please upload at least one photo',
+      validate: () => formData.photoIds.length > 0,
+      errorMessage: 'Please select at least one photo',
     },
     {
       id: 'verification',
@@ -1336,22 +1061,7 @@ function NewListingPageContent() {
       description: 'Review your listing before publishing',
       content: (
         <div className="space-y-6">
-          {!payoutsReady && user && (
-            <Alert className="bg-amber-50 border-amber-200">
-              <AlertCircle className="h-4 w-4 text-amber-700" />
-              <AlertDescription className="text-amber-900">
-                <strong>Before you can publish:</strong> you’ll need to connect Stripe payouts so you can get paid.
-                <div className="mt-3">
-                  <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => setPayoutsGateOpen(true)}>
-                    Connect payouts now
-                  </Button>
-                  <span className="ml-3 text-xs text-amber-800/80">
-                    You can still save a draft anytime.
-                  </span>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Payout gating is already surfaced earlier in the flow; keep review step clean. */}
 
           <Alert className="bg-muted/40 border-border/60">
             <AlertCircle className="h-4 w-4" />
@@ -1603,8 +1313,8 @@ function NewListingPageContent() {
       return;
     }
 
-    // Validate images
-    if (formData.images.length === 0) {
+    // Validate photos
+    if (formData.photoIds.length === 0) {
       toast({
         title: 'Images required',
         description: 'Please upload at least one photo before publishing.',
@@ -1613,20 +1323,10 @@ function NewListingPageContent() {
       return;
     }
 
-    if (formData.images.length > 8) {
+    if (formData.photoIds.length > 8) {
       toast({
         title: 'Too many images',
         description: 'You can upload a maximum of 8 photos per listing.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Check if images are still uploading
-    if (uploadingImages.size > 0) {
-      toast({
-        title: 'Upload in progress',
-        description: 'Please wait for all images to finish uploading.',
         variant: 'destructive',
       });
       return;
@@ -1651,7 +1351,12 @@ function NewListingPageContent() {
         type: formData.type as 'auction' | 'fixed' | 'classified',
         category: formData.category as ListingCategory,
         location: locationData,
-        images: formData.images, // Firebase Storage URLs
+        // Back-compat: `images` is derived from the cached snapshot.
+        images: formData.images,
+        // Phase 1 (Uploads library): reference user photos.
+        photoIds: formData.photoIds,
+        photos: formData.photos.map((p, i) => ({ ...p, sortOrder: i })),
+        coverPhotoId: formData.coverPhotoId || formData.photos[0]?.photoId,
         trust: {
           verified: formData.verification,
           insuranceAvailable: false,
@@ -1946,25 +1651,6 @@ function NewListingPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Early warning banner (start of flow) */}
-      {!authLoading && user && !payoutsReady && (
-        <div className="mx-auto w-full max-w-6xl px-4 pt-6">
-          <Alert className="bg-amber-50 border-amber-200">
-            <AlertCircle className="h-4 w-4 text-amber-700" />
-            <AlertDescription className="text-amber-900">
-              <strong>Heads up:</strong> Stripe payouts are not connected yet. You can create a draft listing now, but you’ll need payouts connected to publish.
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => setPayoutsGateOpen(true)}>
-                  Connect payouts
-                </Button>
-                <Button type="button" variant="ghost" className="min-h-[44px]" onClick={() => router.push('/seller/overview')}>
-                  Go to seller checklist
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
       {/* Custom Header with Navigation */}
       <div className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-4 py-3">
@@ -2049,6 +1735,15 @@ function NewListingPageContent() {
         )}
         
         <div className="bg-card rounded-lg border border-border/50 shadow-sm p-6 md:p-8">
+          {/* Better placement: keep the payout callout inside the form container so it feels native to the flow. */}
+          {!authLoading && user && !payoutsReady ? (
+            <div className="mb-6">
+              <PayoutsNotReadyCallout
+                onConnect={() => setPayoutsGateOpen(true)}
+                onChecklist={() => router.push('/seller/overview')}
+              />
+            </div>
+          ) : null}
           <StepperForm 
             steps={steps} 
             onComplete={handleComplete}
@@ -2120,4 +1815,66 @@ function NewListingPageContent() {
 
 export default function NewListingPage() {
   return <NewListingPageContent />;
+}
+
+function PayoutsNotReadyCallout(props: {
+  compact?: boolean;
+  onConnect: () => void;
+  onChecklist: () => void;
+}) {
+  const { compact, onConnect, onChecklist } = props;
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('ui:payouts-not-ready-callout:v1');
+      if (raw === 'dismissed') setDismissed(true);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  if (dismissed) return null;
+
+  return (
+    <Alert className="border-primary/20 bg-primary/10">
+      <AlertCircle className="h-4 w-4 text-primary" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <AlertTitle className="text-sm font-semibold text-foreground">
+            Connect payouts to publish
+          </AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            You can create drafts anytime. To publish (go live) and get paid, connect Stripe payouts.
+          </AlertDescription>
+
+          <div className={compact ? 'mt-3 flex flex-wrap gap-2' : 'mt-4 flex flex-wrap gap-2'}>
+            <Button type="button" className="min-h-[44px]" onClick={onConnect}>
+              Connect payouts
+            </Button>
+            <Button type="button" variant="secondary" className="min-h-[44px]" onClick={onChecklist}>
+              Seller checklist
+            </Button>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-9 w-9 p-0 text-muted-foreground"
+          aria-label="Dismiss"
+          onClick={() => {
+            setDismissed(true);
+            try {
+              window.localStorage.setItem('ui:payouts-not-ready-callout:v1', 'dismissed');
+            } catch {
+              // ignore
+            }
+          }}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </Alert>
+  );
 }

@@ -1,6 +1,8 @@
 /**
  * Email Service Configuration
- * Uses Resend for transactional emails
+ * Transactional email provider:
+ * - Prefer Brevo if BREVO_API_KEY is set (matches marketing/newsletter integration)
+ * - Otherwise fall back to Resend if RESEND_API_KEY is set
  */
 
 import { Resend } from 'resend';
@@ -11,7 +13,6 @@ export function getResendClient(): Resend | null {
   const apiKey = process.env.RESEND_API_KEY;
   
   if (!apiKey) {
-    console.warn('RESEND_API_KEY not set - email notifications disabled');
     return null;
   }
 
@@ -22,8 +23,16 @@ export function getResendClient(): Resend | null {
   return resendInstance;
 }
 
+export type EmailProvider = 'resend' | 'brevo' | 'none';
+
+export function getEmailProvider(): EmailProvider {
+  if (process.env.BREVO_API_KEY) return 'brevo';
+  if (process.env.RESEND_API_KEY) return 'resend';
+  return 'none';
+}
+
 export function isEmailEnabled(): boolean {
-  return !!process.env.RESEND_API_KEY;
+  return getEmailProvider() !== 'none';
 }
 
 export const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@wildlifeexchange.com';

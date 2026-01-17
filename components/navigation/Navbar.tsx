@@ -82,7 +82,7 @@ export function Navbar() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] h-20 items-center gap-4">
           {/* Logo Section - Left side */}
-          <Link href="/" className="flex items-center gap-2 md:gap-3 group flex-shrink-0 min-w-0 z-10">
+          <Link href="/" className="flex items-center gap-2 md:gap-3 group flex-shrink-0 min-w-0 z-10" aria-label="Wildlife Exchange">
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-primary/10 blur-xl rounded-full group-hover:bg-primary/20 transition-colors" />
               <div className="relative h-9 w-9 md:h-10 md:w-10 lg:h-11 lg:w-11 group-hover:scale-110 transition-transform">
@@ -118,7 +118,8 @@ export function Navbar() {
                 />
               </div>
             </div>
-            <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none">
+            <span className="sr-only">Wildlife Exchange</span>
+            <span className="hidden md:inline text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none">
               Wildlife Exchange
             </span>
           </Link>
@@ -341,7 +342,7 @@ export function Navbar() {
                         WebkitMaskPosition: 'center',
                       }}
                     />
-                    Wildlife Exchange
+                    <span className="sr-only">Wildlife Exchange</span>
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col gap-2 mt-6 pb-4">

@@ -131,6 +131,36 @@ export async function POST(request: Request) {
       const msg = String(stripeError?.message || '');
       const lower = msg.toLowerCase();
 
+      if (lower.includes('rejected') || lower.includes('cannot create new accounts')) {
+        const requestLogUrl =
+          (stripeError?.raw as any)?.request_log_url ||
+          (stripeError?.raw as any)?.requestLogUrl ||
+          undefined;
+        const requestId =
+          (stripeError as any)?.requestId ||
+          (stripeError?.raw as any)?.requestId ||
+          undefined;
+
+        return json(
+          {
+            error: 'Stripe platform account rejected',
+            code: 'STRIPE_PLATFORM_REJECTED',
+            message:
+              'Your platform Stripe account is currently rejected, so Stripe will not allow creating new seller payout accounts. ' +
+              'Resolve this in Stripe Dashboard (or contact Stripe support), then retry.',
+            actionUrl: 'https://dashboard.stripe.com/support',
+            stripe: {
+              type: stripeError?.type,
+              code: stripeError?.code,
+              requestId,
+              // Only include Stripe request logs in non-production (they can contain sensitive debugging context).
+              requestLogUrl: process.env.NODE_ENV === 'production' ? undefined : requestLogUrl,
+            },
+          },
+          { status: 403 }
+        );
+      }
+
       if (lower.includes('account must be activated')) {
         return json(
           {

@@ -1,0 +1,290 @@
+/**
+ * Buyer Order Detail
+ *
+ * Phase 2A: Provides a canonical per-order page used by:
+ * - notification deep links (`/dashboard/orders/${orderId}`)
+ * - post-checkout reassurance
+ *
+ * This page does NOT change escrow/payout logic. It only renders backend-truth state.
+ */
+
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import type { Listing, Order } from '@/lib/types';
+import { getOrderById } from '@/lib/firebase/orders';
+import { getListingById } from '@/lib/firebase/listings';
+import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
+import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
+import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
+import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
+
+export default function BuyerOrderDetailPage() {
+  const params = useParams<{ orderId: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+
+  const orderId = params?.orderId;
+  const [order, setOrder] = useState<Order | null>(null);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState<'confirm' | 'dispute' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!user?.uid || !orderId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const o = await getOrderById(orderId);
+        if (!o) throw new Error('Order not found');
+        if (o.buyerId !== user.uid) throw new Error('You can only view your own orders.');
+
+        const l = await getListingById(o.listingId);
+
+        if (cancelled) return;
+        setOrder(o);
+        setListing(l || null);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Failed to load order');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    if (!authLoading) void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, orderId, user?.uid]);
+
+  const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
+  const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
+
+  const canConfirmReceipt = !!order && ['paid', 'paid_held', 'in_transit', 'delivered'].includes(order.status) && !order.stripeTransferId;
+  const canDispute = !!order && ['paid', 'paid_held', 'in_transit', 'delivered'].includes(order.status) && !order.stripeTransferId;
+
+  const checkin = searchParams?.get('checkin') === '1';
+  const issueParam = searchParams?.get('issue') === '1';
+
+  useEffect(() => {
+    if (!issueParam) return;
+    const el = document.getElementById('report-issue');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [issueParam]);
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <div className="font-semibold">Sign in required</div>
+              <div className="text-sm text-muted-foreground mt-1">Please sign in to view your order.</div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6">
+        <div className="container mx-auto px-4 py-8 max-w-4xl space-y-4">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/orders">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to orders
+            </Link>
+          </Button>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="font-semibold text-destructive">Couldn’t load order</div>
+              <div className="text-sm text-muted-foreground mt-1">{error || 'Order not found.'}</div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-5xl space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/orders">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to orders
+              </Link>
+            </Button>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Order</h1>
+            <p className="text-sm text-muted-foreground break-words">
+              {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {trustState && <Badge variant="secondary" className="font-semibold text-xs capitalize">{trustState.replaceAll('_', ' ')}</Badge>}
+            {issueState !== 'none' && (
+              <Badge variant="destructive" className="font-semibold text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Issue under review
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <Dialog
+          open={checkin}
+          onOpenChange={(open) => {
+            if (!open) router.replace(`/dashboard/orders/${order.id}`);
+          }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Delivery check-in</DialogTitle>
+              <DialogDescription>
+                Confirm receipt if delivery arrived, or report an issue so we can review before payout is released.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary mt-0.5" />
+              <div className="text-sm text-muted-foreground">
+                Funds are held securely until delivery and issue windows are complete.
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => router.replace(`/dashboard/orders/${order.id}`)}
+                disabled={processing !== null}
+              >
+                Not now
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!canDispute || processing !== null}
+                onClick={() => router.replace(`/dashboard/orders/${order.id}?issue=1`)}
+              >
+                I have an issue
+              </Button>
+              <Button
+                disabled={!canConfirmReceipt || processing !== null}
+                onClick={async () => {
+                  try {
+                    setProcessing('confirm');
+                    await confirmReceipt(order.id);
+                    toast({
+                      title: 'Receipt confirmed',
+                      description: 'Thanks—your confirmation helps us release funds safely.',
+                    });
+                    const refreshed = await getOrderById(order.id);
+                    if (refreshed) setOrder(refreshed);
+                    router.replace(`/dashboard/orders/${order.id}`);
+                  } catch (e: any) {
+                    toast({ title: 'Error', description: e?.message || 'Failed to confirm receipt', variant: 'destructive' });
+                  } finally {
+                    setProcessing(null);
+                  }
+                }}
+              >
+                {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Yes, delivery arrived
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <TransactionTimeline order={order} role="buyer" />
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Next actions</CardTitle>
+            <CardDescription>These actions reflect the current backend-truth state of this order.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="font-semibold text-sm">Confirm receipt</div>
+                <div className="text-xs text-muted-foreground">Only confirm after delivery is complete.</div>
+              </div>
+              <Button
+                disabled={!canConfirmReceipt || processing !== null}
+                onClick={async () => {
+                  try {
+                    setProcessing('confirm');
+                    await confirmReceipt(order.id);
+                    toast({ title: 'Receipt confirmed', description: 'Funds remain held until admin release.' });
+                    const refreshed = await getOrderById(order.id);
+                    if (refreshed) setOrder(refreshed);
+                  } catch (e: any) {
+                    toast({ title: 'Error', description: e?.message || 'Failed to confirm receipt', variant: 'destructive' });
+                  } finally {
+                    setProcessing(null);
+                  }
+                }}
+              >
+                {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Confirm receipt
+              </Button>
+            </div>
+            <Separator />
+            <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
+              <div>
+                <div className="font-semibold text-sm">Report an issue</div>
+                <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
+              </div>
+              <Button
+                variant="outline"
+                disabled={!canDispute || processing !== null}
+                onClick={async () => {
+                  try {
+                    setProcessing('dispute');
+                    await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
+                    toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
+                    const refreshed = await getOrderById(order.id);
+                    if (refreshed) setOrder(refreshed);
+                  } catch (e: any) {
+                    toast({ title: 'Error', description: e?.message || 'Failed to report issue', variant: 'destructive' });
+                  } finally {
+                    setProcessing(null);
+                  }
+                }}
+              >
+                {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Report an issue
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+

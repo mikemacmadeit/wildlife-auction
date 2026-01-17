@@ -20,6 +20,28 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 
+let warnedFirestorePermissionDenied = false;
+function isPermissionDenied(error: any) {
+  const code = String(error?.code || '');
+  const msg = String(error?.message || '');
+  return (
+    code === 'permission-denied' ||
+    code === 'auth/permission-denied' ||
+    msg.toLowerCase().includes('missing or insufficient permissions') ||
+    msg.toLowerCase().includes('permission denied')
+  );
+}
+
+function warnPermissionDeniedOnce(context: string, error: any) {
+  if (warnedFirestorePermissionDenied) return;
+  warnedFirestorePermissionDenied = true;
+  console.warn(
+    `[firestore] permission-denied (${context}). This usually means your deployed Firestore rules are out of sync with this repo. ` +
+      `Deploy project/firestore.rules (or use the emulator).`,
+    error
+  );
+}
+
 /**
  * Generic function to get a document by ID
  */
@@ -36,6 +58,7 @@ export const getDocument = async <T = DocumentData>(
     }
     return null;
   } catch (error) {
+    if (isPermissionDenied(error)) warnPermissionDeniedOnce(`getDocument(${collectionName}/${documentId})`, error);
     console.error(`Error getting document ${documentId}:`, error);
     throw error;
   }
@@ -58,6 +81,7 @@ export const getDocuments = async <T = DocumentData>(
       ...doc.data(),
     })) as T[];
   } catch (error) {
+    if (isPermissionDenied(error)) warnPermissionDeniedOnce(`getDocuments(${collectionName})`, error);
     console.error(`Error getting documents from ${collectionName}:`, error);
     throw error;
   }
@@ -110,14 +134,15 @@ export const updateDocument = async <T = DocumentData>(
 export const setDocument = async <T = DocumentData>(
   collectionName: string,
   documentId: string,
-  data: T
+  data: T,
+  merge: boolean = false
 ): Promise<void> => {
   try {
     const docRef = doc(db, collectionName, documentId);
     await setDoc(docRef, {
       ...data,
       updatedAt: Timestamp.now(),
-    });
+    }, { merge });
   } catch (error) {
     console.error(`Error setting document ${documentId}:`, error);
     throw error;

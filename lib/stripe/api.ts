@@ -70,6 +70,8 @@ export async function createStripeAccount(): Promise<{ stripeAccountId: string }
     if (errorDetails?.code) err.code = errorDetails.code;
     if (errorDetails?.actionUrl) err.actionUrl = errorDetails.actionUrl;
     if (errorDetails?.message) err.detailsMessage = errorDetails.message;
+    if (errorDetails?.stripe?.requestLogUrl) err.requestLogUrl = errorDetails.stripe.requestLogUrl;
+    if (errorDetails?.stripe?.requestId) err.requestId = errorDetails.stripe.requestId;
     throw err;
   }
 
@@ -194,7 +196,7 @@ export async function createAccountLink(): Promise<{ url: string }> {
 export async function createCheckoutSession(
   listingId: string,
   offerId?: string,
-  paymentMethod?: 'card' | 'bank_transfer' | 'wire'
+  paymentMethod?: 'card' | 'ach_debit'
 ): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
   if (!user) {
@@ -233,6 +235,47 @@ export async function createCheckoutSession(
     if (!isConfigError) {
       console.error('Failed to create checkout session:', errorMessage);
     }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function createWireIntent(
+  listingId: string,
+  offerId?: string
+): Promise<{
+  orderId: string;
+  paymentIntentId: string;
+  paymentMethod: 'wire';
+  status: 'awaiting_wire';
+  instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
+}> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  const token = await getIdToken(user, true);
+  if (!token) {
+    throw new Error('Failed to get authentication token');
+  }
+
+  const response = await fetch(`${API_BASE}/wire/create-intent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      listingId,
+      ...(offerId ? { offerId } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const errorMessage = error.error || error.message || 'Failed to create wire transfer instructions';
     throw new Error(errorMessage);
   }
 

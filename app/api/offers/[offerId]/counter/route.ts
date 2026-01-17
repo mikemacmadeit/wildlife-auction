@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 import { offerAmountSchema, json, requireAuth, requireRateLimit } from '../../_util';
 
 const counterSchema = z.object({
@@ -126,7 +128,15 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       });
 
       const role: 'seller' | 'buyer' = isSeller ? 'seller' : 'buyer';
-      return { ok: true as const, listingId: offer.listingId, role };
+      return {
+        ok: true as const,
+        listingId: offer.listingId,
+        listingTitle: String(listing.title || 'a listing'),
+        role,
+        sellerId: String(offer.sellerId),
+        buyerId: String(offer.buyerId),
+        expiresAtIso: newExpiresAt.toDate().toISOString(),
+      };
     });
 
     if (!result.ok) return json(result.body, { status: result.status });
@@ -139,6 +149,32 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       metadata: { offerId, amount },
       source: result.role === 'seller' ? 'seller_ui' : 'buyer_ui',
     });
+
+    // Phase 3A (A3): Notify the counterparty today's amount + expiry.
+    try {
+      const base = getSiteUrl();
+      const targetUserId = result.role === 'seller' ? result.buyerId : result.sellerId;
+      const offerUrl = result.role === 'seller' ? `${base}/dashboard/offers` : `${base}/seller/offers/${offerId}`;
+      await emitEventForUser({
+        type: 'Offer.Countered',
+        actorId,
+        entityType: 'listing',
+        entityId: result.listingId,
+        targetUserId,
+        payload: {
+          type: 'Offer.Countered',
+          offerId,
+          listingId: result.listingId,
+          listingTitle: result.listingTitle,
+          offerUrl,
+          amount,
+          expiresAt: result.expiresAtIso,
+        },
+        optionalHash: `offer:${offerId}:counter:${result.expiresAtIso}`,
+      });
+    } catch {
+      // best-effort
+    }
 
     return json({ ok: true });
   } catch (error: any) {

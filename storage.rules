@@ -36,6 +36,17 @@ service firebase.storage {
       
       allow delete: if isListingOwner(listingId) || isAdmin();
     }
+
+    // ============================================
+    // USER UPLOADS (Uploads Library)
+    // ============================================
+    // Path: users/{uid}/uploads/{photoId}/{filename}
+    // P0: Users can only read/write their own uploads.
+    match /users/{userId}/uploads/{photoId}/{fileName} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
     
     // ============================================
     // LISTING DOCUMENTS (Compliance Documents)

@@ -1,10 +1,8 @@
 'use client';
 
 import { 
-  Star, 
   CheckCircle2, 
-  Clock, 
-  TrendingUp, 
+  TrendingUp,
   Package, 
   Award,
   MapPin,
@@ -23,6 +21,9 @@ import { getUserProfile } from '@/lib/firebase/users';
 import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { useAuth } from '@/hooks/use-auth';
+import type { UserProfile } from '@/lib/types';
+import { getSellerReputation } from '@/lib/users/getSellerReputation';
+import Link from 'next/link';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -51,6 +52,7 @@ export function EnhancedSellerProfile({
   });
 
   const [sellerTier, setSellerTier] = useState<SubscriptionTier>('standard');
+  const [sellerProfile, setSellerProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (sellerId) {
@@ -70,18 +72,35 @@ export function EnhancedSellerProfile({
   useEffect(() => {
     let cancelled = false;
     if (!sellerId) return;
+    // Firestore rules allow reading `/users/{uid}` only when authenticated.
+    // Avoid noisy permission errors on public pages.
+    if (!viewerId) {
+      setSellerProfile(null);
+      setSellerTier('standard');
+      return;
+    }
+
     getUserProfile(sellerId)
       .then((profile) => {
         if (cancelled) return;
+        setSellerProfile(profile);
         setSellerTier(getEffectiveSubscriptionTier(profile));
       })
       .catch(() => {
-        if (!cancelled) setSellerTier('standard');
+        if (!cancelled) {
+          setSellerProfile(null);
+          setSellerTier('standard');
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [sellerId]);
+  }, [sellerId, viewerId]);
+
+  const reputation = getSellerReputation({ profile: sellerProfile });
+  const publicTxCount = sellerProfile
+    ? Math.max(Number(sellerProfile.verifiedTransactionsCount || 0), Number(sellerProfile.completedSalesCount || 0))
+    : null;
 
   return (
     <Card className={cn(
@@ -117,6 +136,14 @@ export function EnhancedSellerProfile({
                 {sellerName}
               </h3>
               <SellerTierBadge tier={sellerTier} />
+              {sellerProfile && reputation.level === 'trusted' && (
+                <Badge
+                  variant="default"
+                  className="bg-primary/15 text-primary border-primary/30 text-[10px] px-1.5 py-0.5 h-auto font-semibold"
+                >
+                  Trusted Seller
+                </Badge>
+              )}
               {sellerVerified && (
                 <Badge 
                   variant="default" 
@@ -128,17 +155,16 @@ export function EnhancedSellerProfile({
               )}
             </div>
             
-            {/* Rating & Response Time - Compact Row */}
+            {/* Location + reputation (derived; no fake ratings) */}
             <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-                <span className="text-sm font-bold text-foreground">5.0</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {sellerStats.visible
-                    ? `(${sellerStats.completedSalesCount} completed ${sellerStats.completedSalesCount === 1 ? 'sale' : 'sales'})`
-                    : '(sales: —)'}
-                </span>
-              </div>
+              {publicTxCount !== null && (
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" />
+                  <span>
+                    <span className="font-semibold text-foreground">{publicTxCount}</span> successful transaction{publicTxCount === 1 ? '' : 's'}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <MapPin className="h-3 w-3" />
                 <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
@@ -150,30 +176,30 @@ export function EnhancedSellerProfile({
 
       <CardContent className="pt-5 space-y-4">
         {/* Message Button - Prominent but Compact */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full gap-2 h-9 text-sm font-semibold border-primary/30 hover:border-primary/50 hover:bg-primary/5"
-        >
-          <MessageSquare className="h-4 w-4" />
-          Message Seller
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 h-9 text-sm font-semibold border-primary/30 hover:border-primary/50 hover:bg-primary/5"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Message Seller
+          </Button>
+          <Button asChild variant="outline" size="sm" className="w-full h-9 text-sm font-semibold">
+            <Link href={`/sellers/${sellerId}`}>
+              View profile
+            </Link>
+          </Button>
+        </div>
 
         {/* Key Metrics - Elegant Compact Grid */}
-        {/* TODO: Fetch seller stats from Firestore users collection in Phase 2 */}
-        <div className="grid grid-cols-3 gap-2.5">
-          <div className="text-center p-2.5 rounded-lg bg-primary/10 border border-primary/30">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Star className="h-3.5 w-3.5 text-primary fill-primary" />
-              <span className="text-base font-bold text-foreground">5.0</span>
-            </div>
-            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Rating</div>
-          </div>
-
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
           <div className="text-center p-2.5 rounded-lg bg-accent/10 border border-accent/30">
             <div className="flex items-center justify-center gap-1 mb-1">
               <Package className="h-3.5 w-3.5 text-accent" />
-              <span className="text-base font-bold text-foreground">0</span>
+              <span className="text-base font-bold text-foreground">
+                {typeof sellerProfile?.totalListingsCount === 'number' ? sellerProfile.totalListingsCount : '—'}
+              </span>
             </div>
             <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Listings</div>
           </div>
@@ -181,9 +207,19 @@ export function EnhancedSellerProfile({
           <div className="text-center p-2.5 rounded-lg bg-secondary/10 border border-secondary/30">
             <div className="flex items-center justify-center gap-1 mb-1">
               <TrendingUp className="h-3.5 w-3.5 text-secondary" />
-              <span className="text-base font-bold text-foreground">0</span>
+              <span className="text-base font-bold text-foreground">{publicTxCount !== null ? publicTxCount : '—'}</span>
             </div>
             <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Sales</div>
+          </div>
+
+          <div className="text-center p-2.5 rounded-lg bg-primary/10 border border-primary/30">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span className="text-base font-bold text-foreground">
+                {sellerProfile?.createdAt ? new Date(sellerProfile.createdAt).getFullYear() : '—'}
+              </span>
+            </div>
+            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Member since</div>
           </div>
         </div>
         
@@ -216,13 +252,25 @@ export function EnhancedSellerProfile({
             {sellerVerified && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-3 w-3 text-primary flex-shrink-0" />
+                <span>Verified seller</span>
+              </div>
+            )}
+            {sellerProfile?.seller?.credentials?.identityVerified && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3 w-3 text-primary flex-shrink-0" />
                 <span>Identity verified</span>
               </div>
             )}
-            {sellerStats.completedSalesCount > 0 && (
+            {publicTxCount !== null && publicTxCount > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-3 w-3 text-accent flex-shrink-0" />
-                <span>{sellerStats.completedSalesCount} verified {sellerStats.completedSalesCount === 1 ? 'transaction' : 'transactions'}</span>
+                <span>{publicTxCount} successful {publicTxCount === 1 ? 'transaction' : 'transactions'}</span>
+              </div>
+            )}
+            {!viewerId && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MessageSquare className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                <span>Sign in to see seller trust details</span>
               </div>
             )}
           </div>

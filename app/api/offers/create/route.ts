@@ -11,6 +11,8 @@ import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 import { offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
 
 const createOfferSchema = z.object({
@@ -195,6 +197,77 @@ export async function POST(request: Request) {
         metadata: { offerId: result.offerId, amount, auto: true },
         source: 'api',
       });
+    }
+
+    // Phase 3A (A3): Offer lifecycle notifications (existing pipeline; in-app by default via rules).
+    try {
+      const base = getSiteUrl();
+      const listingTitle = String(result.offerDoc?.listingSnapshot?.title || 'your listing');
+      const sellerId = String(result.offerDoc?.sellerId || '');
+      const buyerId = String(result.offerDoc?.buyerId || '');
+
+      if (result.offerDoc.status === 'accepted') {
+        // Auto-accepted offers: notify buyer (and seller for visibility).
+        if (buyerId) {
+          await emitEventForUser({
+            type: 'Offer.Accepted',
+            actorId: 'system',
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserId: buyerId,
+            payload: {
+              type: 'Offer.Accepted',
+              offerId: result.offerId,
+              listingId,
+              listingTitle,
+              offerUrl: `${base}/dashboard/offers`,
+              amount,
+            },
+            optionalHash: `offer:${result.offerId}:accepted`,
+          });
+        }
+        if (sellerId) {
+          await emitEventForUser({
+            type: 'Offer.Accepted',
+            actorId: 'system',
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserId: sellerId,
+            payload: {
+              type: 'Offer.Accepted',
+              offerId: result.offerId,
+              listingId,
+              listingTitle,
+              offerUrl: `${base}/seller/offers/${result.offerId}`,
+              amount,
+            },
+            optionalHash: `offer:${result.offerId}:accepted_seller`,
+          });
+        }
+      } else {
+        // Regular offer: notify seller.
+        if (sellerId) {
+          await emitEventForUser({
+            type: 'Offer.Received',
+            actorId: buyerId || null,
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserId: sellerId,
+            payload: {
+              type: 'Offer.Received',
+              offerId: result.offerId,
+              listingId,
+              listingTitle,
+              offerUrl: `${base}/seller/offers/${result.offerId}`,
+              amount,
+              expiresAt: result.offerDoc?.expiresAt?.toDate?.().toISOString?.() || undefined,
+            },
+            optionalHash: `offer:${result.offerId}:received`,
+          });
+        }
+      }
+    } catch {
+      // best-effort; do not fail offer creation on notification errors
     }
 
     return json({ ok: true, offerId: result.offerId });

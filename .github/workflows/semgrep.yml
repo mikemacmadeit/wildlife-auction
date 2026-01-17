@@ -1,0 +1,23 @@
+name: Semgrep
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          # "auto" uses Semgrep's best-practice rules for the repo language mix.
+          config: auto
+        env:
+          # If you later add SEMGREP_APP_TOKEN, Semgrep can upload results to Semgrep Cloud.
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+

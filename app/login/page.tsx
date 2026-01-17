@@ -165,13 +165,23 @@ export default function LoginPage() {
       await resetPassword(formData.email);
       toast({
         title: 'Password reset email sent',
-        description: 'Check your inbox for instructions to reset your password.',
+        // Avoid account enumeration: do not confirm whether the email exists.
+        description: 'If an account exists for this email, you’ll receive reset instructions shortly.',
       });
     } catch (error: any) {
       let errorMessage = 'Failed to send password reset email.';
-      
+      // Avoid account enumeration: treat user-not-found as success UX.
       if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email address.';
+        toast({
+          title: 'Password reset email sent',
+          description: 'If an account exists for this email, you’ll receive reset instructions shortly.',
+        });
+        return;
+      }
+      if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'This domain is not authorized for password reset. Check Firebase Auth settings.';
       } else if (error.message) {
         errorMessage = error.message;
       }

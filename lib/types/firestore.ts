@@ -28,6 +28,20 @@ export interface ListingDoc {
   // Media
   images: string[]; // Firebase Storage URLs
 
+  /**
+   * Phase 1 (Uploads Library): listing photos reference user-scoped uploads.
+   * `photoIds` is the source-of-truth; `photos` is a cached snapshot for fast public loads.
+   */
+  photoIds?: string[];
+  photos?: Array<{
+    photoId: string;
+    url: string;
+    width?: number;
+    height?: number;
+    sortOrder?: number;
+  }>;
+  coverPhotoId?: string;
+
   // Location
   location: {
     city: string;

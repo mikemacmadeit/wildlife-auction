@@ -61,8 +61,12 @@ export async function POST(request: Request, { params }: { params: { orderId: st
 
     const order = orderSnap.data() as any;
     const currentStatus = String(order.status || '');
-    if (!['awaiting_bank_transfer', 'awaiting_wire'].includes(currentStatus)) {
-      return json({ error: `Order is not awaiting bank/wire payment (status: ${currentStatus})` }, { status: 400 });
+    const isAchPending = currentStatus === 'pending' && String(order.paymentMethod || '') === 'ach_debit';
+    if (!isAchPending && !['awaiting_bank_transfer', 'awaiting_wire'].includes(currentStatus)) {
+      return json(
+        { error: `Order is not awaiting ACH/bank/wire payment (status: ${currentStatus})` },
+        { status: 400 }
+      );
     }
 
     const checkoutSessionId = order.stripeCheckoutSessionId as string | undefined;

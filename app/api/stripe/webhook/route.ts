@@ -19,7 +19,10 @@ import {
   handleCheckoutSessionCompleted,
   handleCheckoutSessionAsyncPaymentSucceeded,
   handleCheckoutSessionAsyncPaymentFailed,
+  handleWirePaymentIntentSucceeded,
+  handleWirePaymentIntentCanceled,
   handleChargeDisputeCreated,
+  handleChargeDisputeUpdated,
   handleChargeDisputeClosed,
   handleChargeDisputeFundsWithdrawn,
   handleChargeDisputeFundsReinstated,
@@ -183,6 +186,9 @@ export async function POST(request: Request) {
           eventData.paymentIntentId = typeof session.payment_intent === 'string'
             ? session.payment_intent
             : session.payment_intent?.id;
+        } else if (event.type.startsWith('payment_intent.')) {
+          const pi = event.data.object as Stripe.PaymentIntent;
+          eventData.paymentIntentId = pi.id;
         } else if (event.type.startsWith('charge.dispute')) {
           const dispute = event.data.object as Stripe.Dispute;
           eventData.disputeId = dispute.id;
@@ -254,9 +260,27 @@ export async function POST(request: Request) {
           break;
         }
 
+        case 'payment_intent.succeeded': {
+          const pi = event.data.object as Stripe.PaymentIntent;
+          await handleWirePaymentIntentSucceeded(adminDb, pi, requestId);
+          break;
+        }
+
+        case 'payment_intent.canceled': {
+          const pi = event.data.object as Stripe.PaymentIntent;
+          await handleWirePaymentIntentCanceled(adminDb, pi, requestId);
+          break;
+        }
+
         case 'charge.dispute.created': {
           const dispute = event.data.object as Stripe.Dispute;
           await handleChargeDisputeCreated(adminDb, dispute, requestId);
+          break;
+        }
+
+        case 'charge.dispute.updated': {
+          const dispute = event.data.object as Stripe.Dispute;
+          await handleChargeDisputeUpdated(adminDb, dispute, requestId);
           break;
         }
 

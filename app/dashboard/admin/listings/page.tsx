@@ -329,9 +329,20 @@ export default function AdminListingsPage() {
 
     // Filter by status
     if (filterType === 'pending') {
-      filtered = filtered.filter(listing => listing.status === 'pending' && listing.complianceStatus !== 'pending_review');
+      // "Pending" = submitted listings that do NOT require compliance review.
+      // Whitetail breeder listings always require compliance review (even if complianceStatus isn't set on older docs).
+      filtered = filtered.filter(
+        (listing) =>
+          listing.status === 'pending' &&
+          listing.complianceStatus !== 'pending_review' &&
+          listing.category !== 'whitetail_breeder'
+      );
     } else if (filterType === 'compliance') {
-      filtered = filtered.filter(listing => listing.complianceStatus === 'pending_review');
+      // "Compliance" = listings requiring compliance review.
+      // NOTE: whitetail breeder always requires review; some older docs may have complianceStatus unset.
+      filtered = filtered.filter(
+        (listing) => listing.complianceStatus === 'pending_review' || listing.category === 'whitetail_breeder'
+      );
     }
     // 'all' shows everything (no filter)
 
@@ -373,7 +384,7 @@ export default function AdminListingsPage() {
   const stats = useMemo(() => {
     const total = listings.length;
     const pending = listings.filter(l => l.status === 'pending').length;
-    const complianceReview = listings.filter(l => l.complianceStatus === 'pending_review').length;
+    const complianceReview = listings.filter(l => l.complianceStatus === 'pending_review' || l.category === 'whitetail_breeder').length;
     const totalValue = listings.reduce((sum, l) => {
       return sum + (l.price || l.startingBid || 0);
     }, 0);

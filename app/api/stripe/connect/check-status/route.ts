@@ -1,62 +1,11 @@
 /**
  * POST /api/stripe/connect/check-status
- * 
+ *
  * Checks the status of the authenticated user's Stripe Connect account
  * and updates the user document with current status
  */
-
-// IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
-// In the current environment, production builds can fail resolving an internal Next module
-// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
-
-// Initialize Firebase Admin (if not already initialized)
-let adminApp: App | null = null;
-let auth: ReturnType<typeof getAuth> | null = null;
-let db: ReturnType<typeof getFirestore> | null = null;
-
-function initializeFirebaseAdmin() {
-  if (adminApp) {
-    return { auth: auth!, db: db! };
-  }
-
-  if (!getApps().length) {
-    try {
-      const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-        ? {
-            projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-          }
-        : undefined;
-
-      if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-        adminApp = initializeApp({
-          credential: cert(serviceAccount as any),
-        });
-      } else {
-        try {
-          adminApp = initializeApp();
-        } catch (error) {
-          console.error('Firebase Admin initialization error:', error);
-          throw new Error('Failed to initialize Firebase Admin SDK - missing credentials');
-        }
-      }
-    } catch (error) {
-      console.error('Firebase Admin initialization error:', error);
-      throw error;
-    }
-  } else {
-    adminApp = getApps()[0];
-  }
-
-  auth = getAuth(adminApp);
-  db = getFirestore(adminApp);
-  return { auth, db };
-}
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -78,23 +27,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Initialize Firebase Admin
-    let firebaseAdmin;
+    // Lazily initialize Admin SDK inside handler (Netlify-safe).
+    let auth: ReturnType<typeof getAdminAuth>;
+    let db: ReturnType<typeof getAdminDb>;
     try {
-      firebaseAdmin = initializeFirebaseAdmin();
+      auth = getAdminAuth();
+      db = getAdminDb();
     } catch (error: any) {
       console.error('Failed to initialize Firebase Admin:', error);
       return json(
         {
           error: 'Server configuration error',
-          message: 'Failed to initialize Firebase Admin SDK. Please check server logs.',
-          details: error?.message || 'Unknown error',
+          code: error?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+          message: error?.message || 'Failed to initialize Firebase Admin SDK. Please check server logs.',
         },
-        { status: 500 }
+        { status: 503 }
       );
     }
-
-    const { auth, db } = firebaseAdmin;
 
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, Sparkles, ArrowUpDown, ArrowUp, ArrowDown, LayoutGrid, List } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,8 @@ import { FilterState, ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
+import { getSavedSearch } from '@/lib/firebase/savedSearches';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 
@@ -35,6 +37,8 @@ type ViewMode = 'card' | 'list';
 
 export default function BrowsePage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
   const [filters, setFilters] = useState<FilterState>({});
@@ -60,6 +64,29 @@ export default function BrowsePage() {
       }
     }
   }, []);
+
+  // Deep link: /browse?savedSearchId=... loads criteria for the signed-in user.
+  useEffect(() => {
+    const savedSearchId = searchParams.get('savedSearchId');
+    if (!savedSearchId) return;
+    if (!user?.uid) return;
+
+    (async () => {
+      try {
+        const ss = await getSavedSearch(user.uid, savedSearchId);
+        if (!ss) return;
+        const criteria = ss.criteria || {};
+        const nextType = (criteria as any).type || 'all';
+        setSelectedType(nextType);
+        const { type, ...rest } = criteria as any;
+        setFilters(rest);
+        toast({ title: 'Saved search loaded', description: ss.name || 'Criteria applied to Browse.' });
+      } catch (e) {
+        // ignore
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user?.uid]);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);

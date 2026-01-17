@@ -6,7 +6,6 @@
 import {
   collection,
   doc,
-  addDoc,
   updateDoc,
   query,
   where,
@@ -14,12 +13,33 @@ import {
   limit,
   getDocs,
   serverTimestamp,
-  Timestamp,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './config';
 import { Notification, NotificationType } from '@/lib/types';
+
+let warnedPermissions = false;
+function handleListenerError(source: string, error: any, callback: (count: number) => void) {
+  const code = String(error?.code || '');
+  // This usually means Firestore rules haven't been deployed to match the repo,
+  // or the app is pointing at a project with different rules.
+  if (code === 'permission-denied') {
+    if (!warnedPermissions) {
+      warnedPermissions = true;
+      console.warn(
+        `[${source}] Firestore permission denied while subscribing to notifications. ` +
+          `This typically means your deployed Firestore rules are missing the /users/{uid}/notifications rule. ` +
+          `Deploy firestore.rules (or point local dev at the emulator).`
+      );
+    }
+    callback(0);
+    return;
+  }
+
+  console.error(`${source} error:`, error);
+  callback(0);
+}
 
 /**
  * Create a notification for a user
@@ -46,8 +66,8 @@ export async function createNotification(params: {
 /**
  * Mark a notification as read
  */
-export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  const notificationRef = doc(db, 'notifications', notificationId);
+export async function markNotificationAsRead(userId: string, notificationId: string): Promise<void> {
+  const notificationRef = doc(db, 'users', userId, 'notifications', notificationId);
   await updateDoc(notificationRef, {
     read: true,
     readAt: serverTimestamp(),
@@ -58,10 +78,9 @@ export async function markNotificationAsRead(notificationId: string): Promise<vo
  * Mark all notifications as read for a user
  */
 export async function markAllNotificationsAsRead(userId: string): Promise<void> {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const unreadQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     where('read', '==', false)
   );
   
@@ -83,10 +102,9 @@ export async function getUserNotifications(
   userId: string,
   limitCount: number = 50
 ): Promise<Notification[]> {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const notificationsQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     orderBy('createdAt', 'desc'),
     limit(limitCount)
   );
@@ -107,10 +125,9 @@ export async function getUserNotifications(
  * Get unread notification count for a user
  */
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const unreadQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     where('read', '==', false)
   );
   
@@ -126,10 +143,9 @@ export function subscribeToNotifications(
   callback: (notifications: Notification[]) => void,
   limitCount: number = 50
 ): Unsubscribe {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const notificationsQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     orderBy('createdAt', 'desc'),
     limit(limitCount)
   );
@@ -155,10 +171,9 @@ export function subscribeToUnreadCount(
   userId: string,
   callback: (count: number) => void
 ): Unsubscribe {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const unreadQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     where('read', '==', false)
   );
 
@@ -168,9 +183,7 @@ export function subscribeToUnreadCount(
       callback(snapshot.size);
     },
     (error) => {
-      console.error('subscribeToUnreadCount error:', error);
-      // Prevent stale badges if listener fails (e.g., rules not yet deployed).
-      callback(0);
+      handleListenerError('subscribeToUnreadCount', error, callback);
     }
   );
 }
@@ -184,10 +197,9 @@ export function subscribeToUnreadCountByType(
   type: NotificationType,
   callback: (count: number) => void
 ): Unsubscribe {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const unreadQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     where('type', '==', type),
     where('read', '==', false)
   );
@@ -198,8 +210,7 @@ export function subscribeToUnreadCountByType(
       callback(snapshot.size);
     },
     (error) => {
-      console.error('subscribeToUnreadCountByType error:', error);
-      callback(0);
+      handleListenerError('subscribeToUnreadCountByType', error, callback);
     }
   );
 }
@@ -212,10 +223,9 @@ export async function markNotificationsAsReadByType(
   userId: string,
   type: NotificationType
 ): Promise<void> {
-  const notificationsRef = collection(db, 'notifications');
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
   const unreadQuery = query(
     notificationsRef,
-    where('userId', '==', userId),
     where('type', '==', type),
     where('read', '==', false)
   );

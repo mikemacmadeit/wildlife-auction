@@ -1,0 +1,428 @@
+import { FieldValue } from 'firebase-admin/firestore';
+import { getDefaultNotificationPreferences, notificationPreferencesSchema } from './preferences';
+import { decideChannels, getEventRule } from './rules';
+import { buildInAppNotification } from './inApp';
+import { checkAndIncrementRateLimit } from './rateLimit';
+import { stableHash } from './eventKey';
+import type { NotificationEventDoc, NotificationEventPayload, NotificationEventType, NotificationChannel } from './types';
+
+export interface ProcessEventResult {
+  ok: boolean;
+  eventId: string;
+  processed: boolean;
+  error?: string;
+}
+
+function safeString(v: any): string {
+  return typeof v === 'string' ? v : String(v ?? '');
+}
+
+async function loadUserContact(
+  db: FirebaseFirestore.Firestore,
+  userId: string
+): Promise<{ email: string | null; name: string }> {
+  try {
+    const snap = await db.collection('users').doc(userId).get();
+    const data = snap.exists ? (snap.data() as any) : null;
+    const email = data?.email;
+    const name =
+      data?.displayName ||
+      data?.profile?.fullName ||
+      data?.profile?.businessName ||
+      'there';
+    return { email: typeof email === 'string' && email.includes('@') ? email : null, name: String(name || 'there') };
+  } catch {
+    return { email: null, name: 'there' };
+  }
+}
+
+function buildEmailJobPayload(params: {
+  eventType: NotificationEventType;
+  payload: NotificationEventPayload;
+  recipientName: string;
+}): { template: string; templatePayload: Record<string, any> } | null {
+  const { eventType, payload, recipientName } = params;
+
+  switch (eventType) {
+    case 'Auction.Outbid': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.Outbid' }>;
+      return {
+        template: 'auction_outbid',
+        templatePayload: {
+          outbidderName: recipientName,
+          listingTitle: p.listingTitle,
+          newBidAmount: p.newHighBidAmount,
+          listingUrl: p.listingUrl,
+          auctionEndsAt: p.endsAt || undefined,
+        },
+      };
+    }
+    case 'Auction.HighBidder': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.HighBidder' }>;
+      return {
+        template: 'auction_high_bidder',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          yourBidAmount: p.yourBidAmount,
+          listingUrl: p.listingUrl,
+          auctionEndsAt: p.endsAt || undefined,
+        },
+      };
+    }
+    case 'Auction.EndingSoon': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.EndingSoon' }>;
+      return {
+        template: 'auction_ending_soon',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          threshold: p.threshold,
+          listingUrl: p.listingUrl,
+          auctionEndsAt: p.endsAt,
+          currentBidAmount: p.currentBidAmount,
+        },
+      };
+    }
+    case 'Auction.Won': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.Won' }>;
+      return {
+        template: 'auction_winner',
+        templatePayload: {
+          winnerName: recipientName,
+          listingTitle: p.listingTitle,
+          winningBid: p.winningBidAmount,
+          orderUrl: p.checkoutUrl || p.listingUrl,
+          auctionEndDate: p.endsAt || new Date().toISOString(),
+        },
+      };
+    }
+    case 'Auction.Lost': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.Lost' }>;
+      return {
+        template: 'auction_lost',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          listingUrl: p.listingUrl,
+          finalBidAmount: p.finalBidAmount,
+        },
+      };
+    }
+    case 'Order.Confirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Confirmed' }>;
+      return {
+        template: 'order_confirmation',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
+          orderDate: new Date().toISOString(),
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryConfirmed' }>;
+      return {
+        template: 'delivery_confirmation',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          deliveryDate: p.deliveryDate,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryCheckIn': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryCheckIn' }>;
+      return {
+        template: 'order_delivery_checkin',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          daysSinceDelivery: p.daysSinceDelivery,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Payout.Released': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Payout.Released' }>;
+      return {
+        template: 'payout_released',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
+          transferId: p.transferId,
+          payoutDate: p.payoutDate,
+        },
+      };
+    }
+    case 'User.Welcome': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'User.Welcome' }>;
+      return {
+        template: 'user_welcome',
+        templatePayload: {
+          userName: recipientName,
+          dashboardUrl: p.dashboardUrl,
+        },
+      };
+    }
+    case 'User.ProfileIncompleteReminder': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'User.ProfileIncompleteReminder' }>;
+      return {
+        template: 'profile_incomplete_reminder',
+        templatePayload: {
+          userName: recipientName,
+          settingsUrl: p.settingsUrl,
+          missingFields: p.missingFields || undefined,
+        },
+      };
+    }
+    case 'Marketing.WeeklyDigest': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Marketing.WeeklyDigest' }>;
+      return {
+        template: 'marketing_weekly_digest',
+        templatePayload: {
+          userName: recipientName,
+          listings: (p.listings || []).map((l) => ({
+            title: l.title,
+            url: l.url,
+            price: l.price,
+            endsAt: l.endsAt || undefined,
+          })),
+          unsubscribeUrl: p.unsubscribeUrl || undefined,
+        },
+      };
+    }
+    case 'Marketing.SavedSearchAlert': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Marketing.SavedSearchAlert' }>;
+      return {
+        template: 'marketing_saved_search_alert',
+        templatePayload: {
+          userName: recipientName,
+          queryName: p.queryName,
+          resultsCount: p.resultsCount,
+          searchUrl: p.searchUrl,
+          unsubscribeUrl: p.unsubscribeUrl || undefined,
+        },
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+async function loadUserPrefs(db: FirebaseFirestore.Firestore, userId: string) {
+  const ref = db.collection('users').doc(userId).collection('notificationPreferences').doc('default');
+  const snap = await ref.get();
+  if (!snap.exists) return getDefaultNotificationPreferences();
+  const data = snap.data() as any;
+  // Parse with defaults.
+  return notificationPreferencesSchema.parse(data || {});
+}
+
+async function listUserPushTokens(db: FirebaseFirestore.Firestore, userId: string): Promise<Array<{ token: string; platform?: string }>> {
+  const snap = await db.collection('users').doc(userId).collection('pushTokens').get();
+  const out: Array<{ token: string; platform?: string }> = [];
+  snap.docs.forEach((d) => {
+    const data = d.data() as any;
+    if (typeof data?.token === 'string' && data.token.length > 20) {
+      out.push({ token: data.token, platform: typeof data.platform === 'string' ? data.platform : undefined });
+    }
+  });
+  return out;
+}
+
+function buildPushPayload(eventType: NotificationEventType, payload: NotificationEventPayload): { title: string; body: string; deepLinkUrl?: string; notificationType: string; entityId?: string } {
+  switch (eventType) {
+    case 'Auction.Outbid': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.Outbid' }>;
+      return { title: 'You were outbid', body: p.listingTitle, deepLinkUrl: p.listingUrl, notificationType: 'Auction.Outbid', entityId: p.listingId };
+    }
+    case 'Auction.EndingSoon': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.EndingSoon' }>;
+      return { title: `Ending soon (${p.threshold})`, body: p.listingTitle, deepLinkUrl: p.listingUrl, notificationType: 'Auction.EndingSoon', entityId: p.listingId };
+    }
+    case 'Auction.Won': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Auction.Won' }>;
+      return { title: 'You won!', body: p.listingTitle, deepLinkUrl: p.checkoutUrl || p.listingUrl, notificationType: 'Auction.Won', entityId: p.listingId };
+    }
+    case 'Message.Received': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Message.Received' }>;
+      return { title: 'New message', body: p.listingTitle, deepLinkUrl: p.threadUrl, notificationType: 'Message.Received', entityId: p.threadId };
+    }
+    default:
+      return { title: 'Update', body: 'You have a new update.', notificationType: eventType };
+  }
+}
+
+async function enforceRateLimit(params: {
+  db: FirebaseFirestore.Firestore;
+  userId: string;
+  channel: NotificationChannel;
+  perHour: number;
+  perDay: number;
+}): Promise<boolean> {
+  const res = await checkAndIncrementRateLimit(params);
+  return res.allowed;
+}
+
+export async function processEventDoc(params: {
+  db: FirebaseFirestore.Firestore;
+  eventRef: FirebaseFirestore.DocumentReference;
+  eventData: NotificationEventDoc;
+}): Promise<ProcessEventResult> {
+  const { db, eventRef, eventData } = params;
+  const eventId = eventData.id;
+
+  const targetUserId = eventData.targetUserIds?.[0];
+  if (!targetUserId) {
+    await eventRef.set(
+      { status: 'failed', processing: { ...(eventData.processing || { attempts: 0, lastAttemptAt: null }), error: 'Missing targetUserIds' } },
+      { merge: true }
+    );
+    return { ok: false, eventId, processed: false, error: 'Missing target user' };
+  }
+
+  const prefs = await loadUserPrefs(db, targetUserId);
+  const decision = decideChannels({ eventType: eventData.type, payload: eventData.payload, prefs });
+  const rule = getEventRule(eventData.type, eventData.payload);
+
+  // If marketing event and user has marketing disabled, decision.allow will be false.
+  if (!decision.allow) {
+    await eventRef.set({ status: 'processed', processing: { ...(eventData.processing || { attempts: 0, lastAttemptAt: null }) } }, { merge: true });
+    return { ok: true, eventId, processed: true };
+  }
+
+  // 1) In-app
+  if (decision.channels.inApp.enabled) {
+    const notif = buildInAppNotification({
+      eventId,
+      eventType: eventData.type,
+      category: decision.category,
+      userId: targetUserId,
+      actorId: eventData.actorId,
+      entityType: eventData.entityType,
+      entityId: eventData.entityId,
+      payload: eventData.payload,
+      test: eventData.test === true,
+    });
+    const notifRef = db.collection('users').doc(targetUserId).collection('notifications').doc(eventId);
+    await notifRef.set(notif as any, { merge: true });
+  }
+
+  // 2) Email job
+  if (decision.channels.email.enabled) {
+    const allowed = await enforceRateLimit({
+      db,
+      userId: targetUserId,
+      channel: 'email',
+      perHour: rule.rateLimitPerUser.email?.perHour || 0,
+      perDay: rule.rateLimitPerUser.email?.perDay || 0,
+    });
+    if (allowed) {
+      const contact = await loadUserContact(db, targetUserId);
+      const built = buildEmailJobPayload({ eventType: eventData.type, payload: eventData.payload as any, recipientName: contact.name });
+      if (contact.email && built) {
+        const jobRef = db.collection('emailJobs').doc(eventId);
+        await jobRef.set(
+          {
+            id: eventId,
+            eventId,
+            userId: targetUserId,
+            toEmail: contact.email,
+            template: built.template,
+            templatePayload: built.templatePayload,
+            status: 'queued',
+            createdAt: FieldValue.serverTimestamp(),
+            attempts: 0,
+            lastAttemptAt: null,
+            ...(decision.channels.email.deliverAfterMs ? { deliverAfterAt: new Date(Date.now() + decision.channels.email.deliverAfterMs) } : {}),
+            ...(eventData.test ? { test: true } : {}),
+          } as any,
+          { merge: true }
+        );
+      }
+    }
+  }
+
+  // 3) Push jobs
+  if (decision.channels.push.enabled) {
+    const allowed = await enforceRateLimit({
+      db,
+      userId: targetUserId,
+      channel: 'push',
+      perHour: rule.rateLimitPerUser.push?.perHour || 0,
+      perDay: rule.rateLimitPerUser.push?.perDay || 0,
+    });
+    if (allowed) {
+      const tokens = await listUserPushTokens(db, targetUserId);
+      if (tokens.length > 0) {
+        const pushPayload = buildPushPayload(eventData.type, eventData.payload as any);
+        for (const t of tokens) {
+          const jobId = `${eventId}_${stableHash(t.token).slice(0, 10)}`;
+          const jobRef = db.collection('pushJobs').doc(jobId);
+          await jobRef.set(
+            {
+              id: jobId,
+              eventId,
+              userId: targetUserId,
+              token: t.token,
+              platform: t.platform || null,
+              payload: pushPayload,
+              status: 'queued',
+              createdAt: FieldValue.serverTimestamp(),
+              attempts: 0,
+              lastAttemptAt: null,
+              ...(decision.channels.push.deliverAfterMs ? { deliverAfterAt: new Date(Date.now() + decision.channels.push.deliverAfterMs) } : {}),
+              ...(eventData.test ? { test: true } : {}),
+            } as any,
+            { merge: true }
+          );
+        }
+      }
+    }
+  }
+
+  // 4) SMS stub: we create smsJobs but do not dispatch yet
+  if (decision.channels.sms.enabled) {
+    const allowed = await enforceRateLimit({
+      db,
+      userId: targetUserId,
+      channel: 'sms',
+      perHour: rule.rateLimitPerUser.sms?.perHour || 0,
+      perDay: rule.rateLimitPerUser.sms?.perDay || 0,
+    });
+    if (allowed) {
+      // We don't have a phone field/provider in repo. Leave as architecture stub.
+      const jobRef = db.collection('smsJobs').doc(eventId);
+      await jobRef.set(
+        {
+          id: eventId,
+          eventId,
+          userId: targetUserId,
+          toPhone: '',
+          body: safeString((eventData.payload as any)?.listingTitle || 'Notification'),
+          status: 'skipped',
+          createdAt: FieldValue.serverTimestamp(),
+          attempts: 0,
+          lastAttemptAt: null,
+          error: 'SMS provider not configured',
+          ...(eventData.test ? { test: true } : {}),
+        } as any,
+        { merge: true }
+      );
+    }
+  }
+
+  // Mark processed
+  await eventRef.set({ status: 'processed', processing: { ...(eventData.processing || { attempts: 0, lastAttemptAt: null }), error: FieldValue.delete() } }, { merge: true });
+  return { ok: true, eventId, processed: true };
+}
+

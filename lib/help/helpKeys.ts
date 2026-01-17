@@ -14,7 +14,8 @@ export function getHelpKeyForPathname(pathname: string | null | undefined): Help
   if (!pathname) return null;
 
   // Exact matches first
-  if (pathname === '/') return 'public_home';
+  // Home page: do not show help launcher.
+  if (pathname === '/') return null;
   if (pathname === '/browse') return 'public_browse';
   if (pathname === '/how-it-works') return 'public_how_it_works';
 

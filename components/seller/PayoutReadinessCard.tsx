@@ -10,6 +10,8 @@ import { createStripeAccount, createAccountLink, checkStripeAccountStatus } from
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { ToastAction } from '@/components/ui/toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { auth } from '@/lib/firebase/config';
 
 interface PayoutReadinessCardProps {
   userProfile: UserProfile | null;
@@ -22,6 +24,16 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [isCheckingPlatform, setIsCheckingPlatform] = useState(false);
+  const [platformBlock, setPlatformBlock] = useState<
+    | null
+    | {
+        title: string;
+        description: string;
+        actionUrl?: string;
+        requestLogUrl?: string;
+      }
+  >(null);
 
   const hasConnectedAccount = !!userProfile?.stripeAccountId;
   const chargesEnabled = userProfile?.chargesEnabled ?? false;
@@ -36,6 +48,7 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
 
   const handleFixPayoutSetup = async () => {
     try {
+      setPlatformBlock(null);
       if (!hasConnectedAccount) {
         // Create account first
         setIsCreatingAccount(true);
@@ -72,23 +85,50 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
       const msg = String(error?.message || 'Failed to set up payout. Please try again.');
       const actionUrl = (error as any)?.actionUrl as string | undefined;
       const code = (error as any)?.code as string | undefined;
+      const requestLogUrl = (error as any)?.requestLogUrl as string | undefined;
       const isPlatformNotActivated =
         code === 'STRIPE_PLATFORM_NOT_ACTIVATED' || msg.toLowerCase().includes('account must be activated');
       const isPlatformProfileIncomplete =
         code === 'STRIPE_PLATFORM_PROFILE_INCOMPLETE' ||
         msg.toLowerCase().includes('platform profile') ||
         msg.toLowerCase().includes('answer the questionnaire');
+      const isPlatformRejected =
+        code === 'STRIPE_PLATFORM_REJECTED' ||
+        msg.toLowerCase().includes('has been rejected') ||
+        msg.toLowerCase().includes('cannot create new accounts');
+
+      // Make this obvious in the UI: this is a PLATFORM Stripe status blocker, not a user misconfiguration.
+      if (isPlatformRejected || isPlatformNotActivated || isPlatformProfileIncomplete) {
+        setPlatformBlock({
+          title: isPlatformNotActivated
+            ? 'Stripe activation required (platform)'
+            : isPlatformProfileIncomplete
+            ? 'Stripe Connect setup required (platform)'
+            : 'Stripe platform account rejected',
+          description: isPlatformNotActivated
+            ? 'Stripe requires the platform account to complete activation before seller payout accounts can be created.'
+            : isPlatformProfileIncomplete
+            ? 'Stripe requires the platform to complete the Connect questionnaire/profile before seller payout accounts can be created.'
+            : 'Stripe is blocking new seller payout accounts because the platform account is currently rejected.',
+          actionUrl,
+          requestLogUrl,
+        });
+      }
 
       toast({
         title: isPlatformNotActivated
           ? 'Stripe activation required'
           : isPlatformProfileIncomplete
           ? 'Stripe Connect setup required'
+          : isPlatformRejected
+          ? 'Stripe account rejected'
           : 'Error',
         description: isPlatformNotActivated
           ? 'Wildlife.Exchange must activate its Stripe account before we can create seller payout accounts. Open Stripe onboarding, complete activation, then retry.'
           : isPlatformProfileIncomplete
           ? 'Stripe requires the platform to complete a Connect questionnaire/profile before we can create seller payout accounts. Open Connect setup in Stripe Dashboard, complete it, then retry.'
+          : isPlatformRejected
+          ? 'Your platform Stripe account is rejected, so Stripe is blocking new seller payout accounts. Resolve this in Stripe Dashboard (or contact Stripe support), then retry.'
           : msg,
         variant: 'destructive',
         ...(actionUrl
@@ -104,6 +144,38 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
     } finally {
       setIsCreatingAccount(false);
       setIsCreatingLink(false);
+    }
+  };
+
+  const handleCheckPlatformStatus = async () => {
+    try {
+      setIsCheckingPlatform(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error('User must be authenticated');
+      const token = await user.getIdToken(true);
+      const res = await fetch('/api/stripe/debug/platform', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.error || body?.message || `${res.status} ${res.statusText}`);
+      }
+      toast({
+        title: 'Stripe platform status',
+        description: `acct=${body?.accountId} livemode=${String(body?.livemode)} disabledReason=${String(body?.requirements?.disabledReason || '')}`,
+      });
+      // Keep it in console for copy/paste.
+      // eslint-disable-next-line no-console
+      console.log('[stripe platform status]', body);
+    } catch (e: any) {
+      toast({
+        title: 'Failed to check platform status',
+        description: e?.message || 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCheckingPlatform(false);
     }
   };
 
@@ -160,6 +232,60 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {platformBlock ? (
+          <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <div className="space-y-2">
+              <AlertTitle>{platformBlock.title}</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>{platformBlock.description}</p>
+                <p>
+                  This is not fixable in-app until the platform Stripe account is resolved. If you’re in dev, you can also
+                  swap to a different Stripe account by updating your `STRIPE_SECRET_KEY` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {platformBlock.actionUrl ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-[40px]"
+                      onClick={() => window.open(platformBlock.actionUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      Open Stripe Dashboard
+                    </Button>
+                  ) : null}
+                  {platformBlock.requestLogUrl ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-[40px]"
+                      onClick={() => window.open(platformBlock.requestLogUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      View Stripe request log
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[40px]"
+                    disabled={isCheckingPlatform}
+                    onClick={handleCheckPlatformStatus}
+                  >
+                    {isCheckingPlatform ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Checking…
+                      </>
+                    ) : (
+                      'Check platform status'
+                    )}
+                  </Button>
+                </div>
+              </AlertDescription>
+            </div>
+          </Alert>
+        ) : null}
+
         {/* Status Badge */}
         <div className="flex items-center gap-2">
           {isReady ? (

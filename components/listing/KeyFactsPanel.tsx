@@ -28,6 +28,13 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
     return null;
   }
 
+  const formatAge = (age: any): string | undefined => {
+    if (age === null || age === undefined) return undefined;
+    if (typeof age === 'number' && Number.isFinite(age)) return `${age} yr${age === 1 ? '' : 's'}`;
+    const s = String(age).trim();
+    return s ? s : undefined;
+  };
+
   const facts = [
     listing.location && {
       icon: MapPin,
@@ -52,7 +59,7 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       icon: Package,
       label: 'Species',
       value: (listing.attributes as WildlifeAttributes).speciesId,
-      detail: (listing.attributes as WildlifeAttributes).age || undefined,
+      detail: formatAge((listing.attributes as WildlifeAttributes).age),
     },
     listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).sex && {
       icon: Package,
@@ -68,7 +75,7 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       icon: Package,
       label: 'Breed',
       value: (listing.attributes as CattleAttributes).breed,
-      detail: (listing.attributes as CattleAttributes).age || undefined,
+      detail: formatAge((listing.attributes as CattleAttributes).age) || (listing.attributes as CattleAttributes).weightRange || undefined,
     },
     listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).sex && {
       icon: Package,

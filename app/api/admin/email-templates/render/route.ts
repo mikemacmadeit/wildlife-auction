@@ -40,7 +40,9 @@ const bodySchema = z.object({
 
 export async function POST(request: Request) {
   // Rate limiting (admin)
-  const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.admin);
+  // In dev, Fast Refresh + preview UI can spam this endpoint; keep it usable.
+  const effectiveLimit = process.env.NODE_ENV === 'production' ? RATE_LIMITS.admin : RATE_LIMITS.default;
+  const rateLimitCheck = rateLimitMiddleware(effectiveLimit);
   const rateLimitResult = await rateLimitCheck(request as any);
   if (!rateLimitResult.allowed) {
     return json(rateLimitResult.body, {

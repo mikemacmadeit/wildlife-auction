@@ -62,17 +62,21 @@ import { getAdminOrders } from '@/lib/stripe/api';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
 import { releasePayment, processRefund, resolveDispute, confirmDelivery, adminMarkOrderPaid } from '@/lib/stripe/api';
-import { OrderTimeline } from '@/components/orders/OrderTimeline';
+import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { useDebounce } from '@/hooks/use-debounce';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getHoldInfo, generatePayoutExplanation } from '@/lib/orders/hold-reasons';
 import { Copy, Check } from 'lucide-react';
+import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
+import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 
 interface OrderWithDetails extends Order {
   listingTitle?: string;
   listingImage?: string;
+  listingComplianceStatus?: string;
+  listingCategory?: string;
   buyerName?: string;
   buyerEmail?: string;
   sellerName?: string;
@@ -155,6 +159,8 @@ export default function AdminOpsPage() {
               ...order,
               listingTitle: listing?.title,
               listingImage: listing?.images?.[0],
+              listingComplianceStatus: (listing as any)?.complianceStatus,
+              listingCategory: (listing as any)?.category,
               buyerName: buyer?.displayName || buyer?.profile?.fullName || 'N/A',
               buyerEmail: buyer?.email,
               sellerName: seller?.displayName || seller?.profile?.fullName || 'N/A',
@@ -1165,6 +1171,108 @@ export default function AdminOpsPage() {
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-6">
+              {/* Phase 2G: Admin Order Health Summary (derived; no DB writes) */}
+              <div className="space-y-3 p-4 rounded-lg border border-border/50 bg-muted/20">
+                {(() => {
+                  const trust = getOrderTrustState(selectedOrder);
+                  const issue = getOrderIssueState(selectedOrder);
+                  const now = new Date();
+                  const protectionEndsAt = selectedOrder.protectionEndsAt || null;
+                  const protectionRemaining =
+                    protectionEndsAt && protectionEndsAt.getTime() > now.getTime()
+                      ? formatDistanceToNow(protectionEndsAt, { addSuffix: true })
+                      : null;
+
+                  const hasDeliveryMarked = !!selectedOrder.deliveredAt || !!selectedOrder.deliveryConfirmedAt;
+                  const hasBuyerConfirmation =
+                    !!selectedOrder.buyerConfirmedAt ||
+                    !!selectedOrder.buyerAcceptedAt ||
+                    !!selectedOrder.acceptedAt ||
+                    selectedOrder.status === 'ready_to_release' ||
+                    selectedOrder.status === 'buyer_confirmed' ||
+                    selectedOrder.status === 'accepted';
+
+                  const hasOpenProtectedDispute =
+                    !!selectedOrder.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(selectedOrder.disputeStatus);
+                  const hasChargeback =
+                    !!selectedOrder.chargebackStatus &&
+                    ['open', 'active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(selectedOrder.chargebackStatus as any);
+                  const inProtectionWindow =
+                    selectedOrder.payoutHoldReason === 'protection_window' &&
+                    protectionEndsAt &&
+                    protectionEndsAt.getTime() > now.getTime();
+
+                  const payoutEligible =
+                    !selectedOrder.stripeTransferId &&
+                    !selectedOrder.adminHold &&
+                    !hasOpenProtectedDispute &&
+                    !hasChargeback &&
+                    !inProtectionWindow &&
+                    hasDeliveryMarked &&
+                    hasBuyerConfirmation &&
+                    (selectedOrder.status === 'ready_to_release' ||
+                      selectedOrder.status === 'buyer_confirmed' ||
+                      selectedOrder.status === 'accepted');
+
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Trust state</Label>
+                        <div className="mt-1">
+                          <Badge variant="secondary" className="font-semibold text-xs capitalize">
+                            {trust.replaceAll('_', ' ')}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Issue state</Label>
+                        <div className="mt-1">
+                          <Badge variant={issue === 'none' ? 'secondary' : 'destructive'} className="font-semibold text-xs capitalize">
+                            {issue.replaceAll('_', ' ')}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Payout eligible</Label>
+                        <div className="mt-1">
+                          <Badge variant={payoutEligible ? 'default' : 'secondary'} className="font-semibold text-xs">
+                            {payoutEligible ? 'Yes' : 'No'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Protection window</Label>
+                        <div className="mt-1 text-xs">
+                          {protectionRemaining ? (
+                            <Badge variant="secondary" className="font-semibold text-xs">
+                              Ends {protectionRemaining}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="col-span-2 md:col-span-4">
+                        <Label className="text-xs text-muted-foreground">Compliance</Label>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="font-semibold text-xs">
+                            {(selectedOrder.listingCategory as any) || 'unknown_category'}
+                          </Badge>
+                          <Badge variant="outline" className="font-semibold text-xs">
+                            {(selectedOrder.listingComplianceStatus as any) || 'unknown_compliance'}
+                          </Badge>
+                          {selectedOrder.transferPermitRequired !== false && (
+                            <Badge variant="outline" className="font-semibold text-xs">
+                              Transfer permit: {selectedOrder.transferPermitStatus || 'none'}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* Order Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1296,8 +1404,8 @@ export default function AdminOpsPage() {
 
               {/* Timeline */}
               <div>
-                <Label className="text-xs text-muted-foreground mb-2 block">Order Timeline</Label>
-                <OrderTimeline order={selectedOrder} showAdminFields={true} />
+                <Label className="text-xs text-muted-foreground mb-2 block">Transaction Timeline (Unified)</Label>
+                <TransactionTimeline order={selectedOrder} role="admin" />
               </div>
             </div>
           )}

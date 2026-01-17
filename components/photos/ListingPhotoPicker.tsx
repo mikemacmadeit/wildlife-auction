@@ -1,0 +1,388 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Upload, Star, GripVertical, ArrowLeft, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { listUserPhotos, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
+import { useToast } from '@/hooks/use-toast';
+
+export type ListingPhotoSnapshot = {
+  photoId: string;
+  url: string;
+  width?: number;
+  height?: number;
+  sortOrder?: number;
+};
+
+export function ListingPhotoPicker(props: {
+  uid: string;
+  selected: ListingPhotoSnapshot[];
+  coverPhotoId?: string;
+  max?: number;
+  onChange: (next: { selected: ListingPhotoSnapshot[]; coverPhotoId?: string }) => void;
+}) {
+  const { uid, selected, coverPhotoId, max = 8, onChange } = props;
+  const { toast } = useToast();
+  const [tab, setTab] = useState<'choose' | 'upload'>(() => (selected.length ? 'choose' : 'upload'));
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [photos, setPhotos] = useState<UserPhotoDoc[]>([]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedIds = useMemo(() => new Set(selected.map((s) => s.photoId)), [selected]);
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const p = await listUserPhotos(uid, { includeDeleted: false });
+      setPhotos(p);
+    } catch (e: any) {
+      // Make permission issues obvious during dev: the common cause is missing Firestore rules.
+      // Still show a toast for the user.
+      // eslint-disable-next-line no-console
+      console.error('[ListingPhotoPicker] Failed to load uploads', {
+        code: e?.code,
+        message: e?.message,
+      });
+      toast({ title: 'Error', description: e?.message || 'Failed to load uploads.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  const setCover = (photoId: string) => {
+    onChange({ selected, coverPhotoId: photoId });
+  };
+
+  const move = (fromIdx: number, toIdx: number) => {
+    const next = [...selected];
+    const [item] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, item);
+    onChange({
+      selected: next.map((p, i) => ({ ...p, sortOrder: i })),
+      coverPhotoId,
+    });
+  };
+
+  const toggleSelect = (p: UserPhotoDoc) => {
+    if (selectedIds.has(p.photoId)) {
+      const next = selected.filter((s) => s.photoId !== p.photoId).map((x, i) => ({ ...x, sortOrder: i }));
+      const nextCover = coverPhotoId && next.some((x) => x.photoId === coverPhotoId) ? coverPhotoId : next[0]?.photoId;
+      onChange({ selected: next, coverPhotoId: nextCover });
+      return;
+    }
+    if (selected.length >= max) {
+      toast({ title: 'Limit reached', description: `You can select up to ${max} photos.`, variant: 'destructive' });
+      return;
+    }
+    const next = [
+      ...selected,
+      { photoId: p.photoId, url: p.downloadUrl, width: p.width, height: p.height, sortOrder: selected.length },
+    ];
+    onChange({ selected: next, coverPhotoId: coverPhotoId || p.photoId });
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-2 border-border/50 bg-card">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-sm font-extrabold">Photos</div>
+                <Badge variant="secondary" className="font-semibold">
+                  Required • Up to {max}
+                </Badge>
+              </div>
+              <div className="text-sm text-muted-foreground leading-relaxed">
+                Upload once, reuse across listings. Your <span className="font-semibold">first selected photo</span> is the cover.
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Tip: drag to reorder on desktop • use arrows on mobile.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                className="min-h-[40px] font-semibold"
+                onClick={() => {
+                  setTab('upload');
+                  inputRef.current?.click();
+                }}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[40px] font-semibold"
+                onClick={() => setTab('choose')}
+              >
+                Choose
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="min-h-[40px] font-semibold">
+                <Link href="/dashboard/uploads">Uploads</Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {tab === 'choose' ? (
+        <div className="mt-2 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs text-muted-foreground">
+              Tap to select. Selected photos appear below.
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Selected: <span className="font-semibold">{selected.length}</span> / {max}
+            </div>
+          </div>
+          {loading ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="aspect-square rounded-md border bg-muted/30 animate-pulse" />
+              ))}
+            </div>
+          ) : photos.length ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {photos.map((p) => {
+                const isSelected = selectedIds.has(p.photoId);
+                const isCover = coverPhotoId === p.photoId;
+                return (
+                  <button
+                    key={p.photoId}
+                    type="button"
+                    onClick={() => toggleSelect(p)}
+                    className={cn(
+                      'relative aspect-square rounded-md overflow-hidden border-2 transition',
+                      'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                      isSelected ? 'border-primary' : 'border-border/50 hover:border-primary/50'
+                    )}
+                  >
+                    <Image
+                      src={p.downloadUrl}
+                      alt="Upload"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 160px"
+                      unoptimized
+                    />
+                    {isSelected && <div className="absolute inset-0 bg-primary/15" />}
+                    {isCover && (
+                      <div className="absolute top-1 left-1">
+                        <Badge className="bg-primary text-primary-foreground">Cover</Badge>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center space-y-3">
+                <div className="font-semibold">No uploads yet</div>
+                <div className="text-sm text-muted-foreground">
+                  Upload your photos once—then reuse them across listings.
+                </div>
+                <Button type="button" className="min-h-[44px] font-semibold" onClick={() => setTab('upload')}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload photos
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 space-y-4">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={uploading}
+            onChange={async (e) => {
+              const files = Array.from(e.target.files || []);
+              if (!files.length) return;
+              setUploading(true);
+              setUploadPct(0);
+              try {
+                for (const f of files) {
+                  const res = await uploadUserPhoto(f, (pct) => setUploadPct(pct));
+                  // Auto-select newly uploaded photos until max is reached.
+                  if (selected.length < max) {
+                    const next = [
+                      ...selected,
+                      { photoId: res.photoId, url: res.downloadUrl, width: res.width, height: res.height, sortOrder: selected.length },
+                    ];
+                    onChange({ selected: next.map((x, i) => ({ ...x, sortOrder: i })), coverPhotoId: coverPhotoId || res.photoId });
+                  }
+                }
+                await refresh();
+                toast({ title: 'Uploaded', description: 'Photos uploaded to your library.' });
+                setTab('choose');
+              } catch (err: any) {
+                toast({ title: 'Upload failed', description: err?.message || 'Failed to upload.', variant: 'destructive' });
+              } finally {
+                setUploading(false);
+                setUploadPct(0);
+                e.target.value = '';
+              }
+            }}
+          />
+
+          <Card className="border-2 border-dashed">
+            <CardContent className="py-8 text-center space-y-3">
+              <div className="text-sm text-muted-foreground">
+                Upload photos to your library. We’ll resize and optimize them automatically.
+              </div>
+              <Button
+                type="button"
+                className="min-h-[44px] font-semibold"
+                disabled={uploading}
+                onClick={() => inputRef.current?.click()}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading {Math.round(uploadPct)}%
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Choose files
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Selected / reorder / cover */}
+      <Card className="border-2 border-border/50 bg-muted/10">
+        <CardContent className="p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-extrabold">
+              Selected <span className="text-muted-foreground">({selected.length}/{max})</span>
+            </div>
+            <div className="text-xs text-muted-foreground">Drag (desktop) • Arrows (mobile)</div>
+          </div>
+
+          {selected.length ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {selected.map((p, idx) => (
+                <SelectedTile
+                  key={p.photoId}
+                  p={p}
+                  idx={idx}
+                  total={selected.length}
+                  isCover={coverPhotoId === p.photoId || (!coverPhotoId && idx === 0)}
+                  onSetCover={() => setCover(p.photoId)}
+                  onMoveLeft={() => idx > 0 && move(idx, idx - 1)}
+                  onMoveRight={() => idx < selected.length - 1 && move(idx, idx + 1)}
+                  onDragMove={(from, to) => move(from, to)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Select at least 1 photo to continue.</div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SelectedTile(props: {
+  p: ListingPhotoSnapshot;
+  idx: number;
+  total: number;
+  isCover: boolean;
+  onSetCover: () => void;
+  onMoveLeft: () => void;
+  onMoveRight: () => void;
+  onDragMove: (from: number, to: number) => void;
+}) {
+  const { p, idx, total } = props;
+  return (
+    <div
+      className={cn(
+        'relative rounded-lg overflow-hidden border bg-muted/20',
+        'focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2'
+      )}
+      // Mobile QA: HTML5 drag isn't reliable on touch. We still keep `draggable` for desktop,
+      // but provide explicit arrow buttons (min 40px) for mobile reordering.
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', String(idx));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        const from = Number(e.dataTransfer.getData('text/plain'));
+        if (!Number.isFinite(from)) return;
+        if (from === idx) return;
+        props.onDragMove(from, idx);
+      }}
+    >
+      <div className="relative aspect-square">
+        <Image src={p.url} alt="Selected" fill className="object-cover" unoptimized />
+      </div>
+
+      <div className="absolute top-2 left-2 flex items-center gap-2">
+        <div className="rounded-md bg-black/55 text-white px-2 py-1 text-xs font-semibold flex items-center gap-1">
+          <GripVertical className="h-3.5 w-3.5" />
+          {idx + 1}/{total}
+        </div>
+        {props.isCover && (
+          <Badge className="bg-primary text-primary-foreground">
+            <Star className="h-3.5 w-3.5 mr-1" />
+            Cover
+          </Badge>
+        )}
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 p-2 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
+        <div className="flex gap-2">
+          <Button type="button" size="icon" variant="secondary" className="min-h-[40px] min-w-[40px]" onClick={props.onMoveLeft} disabled={idx === 0}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            className="min-h-[40px] min-w-[40px]"
+            onClick={props.onMoveRight}
+            disabled={idx === total - 1}
+          >
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <Button type="button" size="sm" variant="secondary" className="min-h-[40px] font-semibold" onClick={props.onSetCover}>
+          <Star className="h-4 w-4 mr-2" />
+          Set cover
+        </Button>
+      </div>
+    </div>
+  );
+}
+

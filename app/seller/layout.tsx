@@ -22,9 +22,11 @@ import {
   User,
   LogOut,
   ChevronDown,
+  Search,
   Heart,
   Shield,
   CheckCircle,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,7 +48,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
-import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
+import { subscribeToUnreadCount, subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
 
 interface SellerNavItem {
   href: string;
@@ -60,6 +62,8 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/seller/listings', label: 'Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
+  { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
+  { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/seller/sales', label: 'Sales & Bids', icon: DollarSign },
   { href: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
   { href: '/seller/logistics', label: 'Logistics', icon: Truck },
@@ -87,22 +91,33 @@ export default function SellerLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
 
   // Real-time unread badge for Messages (same source of truth as notifications)
   useEffect(() => {
     if (!user?.uid) {
       setUnreadMessagesCount(0);
+      setUnreadNotificationsCount(0);
       return;
     }
 
     try {
-      const unsub = subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
-        setUnreadMessagesCount(count || 0);
-      });
-      return () => unsub();
+      const unsubs: Array<() => void> = [];
+      unsubs.push(
+        subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
+          setUnreadMessagesCount(count || 0);
+        })
+      );
+      unsubs.push(
+        subscribeToUnreadCount(user.uid, (count) => {
+          setUnreadNotificationsCount(count || 0);
+        })
+      );
+      return () => unsubs.forEach((fn) => fn());
     } catch (e) {
       console.error('Failed to subscribe to unread message count:', e);
       setUnreadMessagesCount(0);
+      setUnreadNotificationsCount(0);
       return;
     }
   }, [user?.uid]);
@@ -117,14 +132,18 @@ export default function SellerLayout({
       ); // Show base items while loading
     }
 
-    const withBadges = baseNavItems.map((item) =>
-      item.href === '/seller/messages'
-        ? { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined }
-        : item
-    );
+    const withBadges = baseNavItems.map((item) => {
+      if (item.href === '/seller/messages') {
+        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
+      }
+      if (item.href === '/dashboard/notifications') {
+        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
+      }
+      return item;
+    });
 
     return isAdmin ? [...withBadges, ...adminNavItems] : withBadges;
-  }, [isAdmin, adminLoading, unreadMessagesCount]);
+  }, [isAdmin, adminLoading, unreadMessagesCount, unreadNotificationsCount]);
 
   // Close mobile menu on route change
   useEffect(() => {

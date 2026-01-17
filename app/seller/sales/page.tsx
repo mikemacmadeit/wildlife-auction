@@ -1,318 +1,414 @@
 'use client';
 
-import { useMemo, memo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useAuth } from '@/hooks/use-auth';
+import { getIdToken } from '@/lib/firebase/auth-helper';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CountdownTimer } from '@/components/auction/CountdownTimer';
-import {
-  DollarSign,
-  Gavel,
-  Clock,
-  CheckCircle2,
-  User,
-  MapPin,
-  Truck,
-  ArrowRight,
-  TrendingUp,
-  Eye,
-  Heart,
-} from 'lucide-react';
-import { mockSales, Sale } from '@/lib/seller-mock-data';
-import { mockSellerListings, SellerListing } from '@/lib/seller-mock-data';
-import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AlertTriangle, ArrowRight, Clock, DollarSign, Heart, TrendingUp } from 'lucide-react';
+import type { SellerDashboardData, SellerDashboardListing, SellerDashboardOffer, SellerDashboardOrder } from '@/lib/seller/getSellerDashboardData';
+import { getSellerInsights } from '@/lib/seller/getSellerInsights';
 
-// Helper functions outside component
-const getStatusBadge = (status: string) => {
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-    pending_payment: { variant: 'destructive', label: 'Awaiting Payment' },
-    pending_verification: { variant: 'outline', label: 'Pending Verification' },
-    in_transit: { variant: 'default', label: 'In Transit' },
-    completed: { variant: 'secondary', label: 'Completed' },
-  };
-  const config = variants[status] || { variant: 'outline' as const, label: status };
-  return <Badge variant={config.variant} className="font-semibold text-xs">{config.label}</Badge>;
-};
+async function authedGet(path: string, token: string) {
+  const res = await fetch(path, { method: 'GET', headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || data?.message || `Request failed (${res.status})`);
+  return data;
+}
 
-const getPaymentBadge = (status: string) => {
-  if (status === 'completed') {
-    return <Badge variant="secondary" className="font-semibold text-xs">Paid</Badge>;
-  }
-  return <Badge variant="destructive" className="font-semibold text-xs">Pending</Badge>;
-};
+function money(n: number) {
+  return `$${(Number(n || 0) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
 
-const getTransportBadge = (status: string) => {
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-    quote_requested: { variant: 'destructive', label: 'Quote Requested' },
-    scheduled: { variant: 'default', label: 'Scheduled' },
-    complete: { variant: 'secondary', label: 'Complete' },
-    not_requested: { variant: 'outline', label: 'Not Requested' },
-  };
-  const config = variants[status] || { variant: 'outline' as const, label: status };
-  return <Badge variant={config.variant} className="font-semibold text-xs">{config.label}</Badge>;
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
-};
-
-// Active Bid Card component
-const ActiveBidCard = memo(({ listing }: { listing: SellerListing }) => (
-  <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-    <CardContent className="pt-6 pb-6 px-4 md:px-6">
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="flex-1 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <Link
-                href={`/listing/${listing.id}`}
-                className="text-lg font-bold text-foreground hover:text-primary block mb-2"
-              >
-                {listing.title}
-              </Link>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge variant="outline" className="font-semibold text-xs">
-                  {listing.type === 'auction' ? 'Auction' : listing.type}
-                </Badge>
-                {listing.status === 'ending_soon' && (
-                  <Badge variant="destructive" className="font-semibold text-xs">Ending Soon</Badge>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-extrabold text-foreground mb-1">
-                ${listing.currentBid?.toLocaleString() || listing.startingBid?.toLocaleString() || '0'}
-              </div>
-              <div className="text-xs text-muted-foreground font-medium">
-                {listing.startingBid && listing.currentBid && (
-                  <>Starting: ${listing.startingBid.toLocaleString()}</>
-                )}
-                {listing.reservePrice && (
-                  <div className="mt-1">Reserve: ${listing.reservePrice.toLocaleString()}</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Auction Info */}
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              <span className="font-medium">{listing.bids} bid{listing.bids !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Eye className="h-4 w-4" />
-              <span>{listing.views} views</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Heart className="h-4 w-4" />
-              <span>{listing.watchers} watching</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
-            </div>
-          </div>
-
-          {/* Countdown Timer */}
-          {listing.endsAt && (
-            <div className="pt-2 border-t border-border/50">
-              <CountdownTimer endsAt={listing.endsAt} variant="compact" />
-            </div>
-          )}
-        </div>
-
-        <div className="flex md:flex-col gap-2 md:w-32 flex-shrink-0">
-          <Link href={`/listing/${listing.id}`}>
-            <Button variant="outline" className="w-full min-h-[36px] font-semibold text-xs gap-2">
-              View Listing
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-));
-ActiveBidCard.displayName = 'ActiveBidCard';
-
-// SaleCard component outside main component - memoized for performance
-const SaleCard = memo(({ sale }: { sale: Sale }) => (
-  <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-    <CardContent className="pt-6 pb-6 px-4 md:px-6">
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="flex-1 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <Link
-                href={`/listing/${sale.listingId}`}
-                className="text-lg font-bold text-foreground hover:text-primary block mb-1"
-              >
-                {sale.listingTitle}
-              </Link>
-              <div className="flex items-center gap-2 mb-2">
-                {getStatusBadge(sale.status)}
-                {getPaymentBadge(sale.paymentStatus)}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-extrabold text-foreground mb-1">
-                ${sale.price.toLocaleString()}
-              </div>
-              <div className="text-xs text-muted-foreground font-medium">
-                {formatDate(sale.createdAt)}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span className="font-medium">{sale.buyer.name}</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{sale.buyer.location}</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/50">
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">Transport:</span>
-              {getTransportBadge(sale.transportStatus)}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex md:flex-col gap-2 md:w-32 flex-shrink-0">
-          <Link href={`/seller/logistics?listing=${sale.listingId}`}>
-            <Button variant="outline" className="w-full min-h-[36px] font-semibold text-xs gap-2">
-              Manage
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-));
-SaleCard.displayName = 'SaleCard';
+function hoursUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  return Math.round(ms / (60 * 60 * 1000));
+}
 
 export default function SellerSalesPage() {
-  // Get active auctions (listings with type 'auction' that are active or ending_soon)
-  const activeBids = useMemo(() => 
-    mockSellerListings.filter((listing) => 
-      listing.type === 'auction' && 
-      (listing.status === 'active' || listing.status === 'ending_soon') &&
-      listing.bids > 0
-    ),
-    []
-  );
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<SellerDashboardData | null>(null);
 
-  const pendingSales = useMemo(() => 
-    mockSales.filter((sale) => sale.status === 'pending_verification' || sale.status === 'pending_payment'),
-    []
-  );
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        setData(null);
 
-  const completedSales = useMemo(() => 
-    mockSales.filter((sale) => sale.status === 'completed'),
-    []
-  );
+        if (!user) return;
+        const token = await getIdToken(user, true);
+        if (!token) throw new Error('Failed to get auth token');
+
+        const res = await authedGet('/api/seller/dashboard', token);
+        if (!mounted) return;
+        setData(res.data as SellerDashboardData);
+      } catch (e: any) {
+        if (!mounted) return;
+        setError(e?.message || String(e));
+      } finally {
+        if (!mounted) return;
+        setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  const attentionListings = useMemo(() => {
+    const active = data?.activeListings || [];
+    const drafts = data?.draftListings || [];
+    const highWatchNoBid = active
+      .filter((l) => l.watcherCount >= 5 && l.bidCount === 0)
+      .sort((a, b) => b.watcherCount - a.watcherCount)
+      .slice(0, 8);
+    const needsPublish = drafts.slice(0, 8);
+    return { highWatchNoBid, needsPublish };
+  }, [data]);
+
+  const offersWaitingOnSeller = useMemo(() => {
+    const offers = data?.offers || [];
+    return offers
+      .filter((o) => (o.status === 'open' || o.status === 'countered') && o.lastActorRole === 'buyer')
+      .sort((a, b) => (a.expiresAt || '').localeCompare(b.expiresAt || ''))
+      .slice(0, 10);
+  }, [data]);
+
+  const recentSales = useMemo(() => {
+    const all = data?.soldListings?.all || [];
+    return [...all]
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .slice(0, 10);
+  }, [data]);
+
+  const insights = useMemo(() => (data ? getSellerInsights(data) : []), [data]);
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div>
+                <div className="font-semibold">Sign in required</div>
+                <div className="text-sm text-muted-foreground">Please sign in to view your seller dashboard.</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        {/* Header */}
+    <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
-            Sales & Bids
-          </h1>
-          <p className="text-base md:text-lg text-muted-foreground">
-            Track your sales pipeline and active auction bids
-          </p>
+          <h1 className="text-3xl font-bold">Seller dashboard</h1>
+          <p className="text-muted-foreground">Operational view of listings, offers, sales, and revenue status.</p>
         </div>
-
-        <Tabs defaultValue="bids" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 h-auto bg-card border border-border/50 p-1">
-            <TabsTrigger value="bids" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
-              <Gavel className="h-4 w-4 mr-2" />
-              Active Bids ({activeBids.length})
-            </TabsTrigger>
-            <TabsTrigger value="pending" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
-              <Clock className="h-4 w-4 mr-2" />
-              Pending Sales ({pendingSales.length})
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Completed ({completedSales.length})
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Active Bids */}
-          <TabsContent value="bids" className="space-y-4">
-            {activeBids.length === 0 ? (
-              <Card className="border-2 border-border/50 bg-card">
-                <CardContent className="pt-12 pb-12 px-6 text-center">
-                  <Gavel className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No active bids</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Active auctions with bids will appear here
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              activeBids.map((listing) => (
-                <ActiveBidCard key={listing.id} listing={listing} />
-              ))
-            )}
-          </TabsContent>
-
-          {/* Pending Sales */}
-          <TabsContent value="pending" className="space-y-4">
-            {pendingSales.length === 0 ? (
-              <Card className="border-2 border-border/50 bg-card">
-                <CardContent className="pt-12 pb-12 px-6 text-center">
-                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No pending sales</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Sales awaiting payment or verification will appear here
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              pendingSales.map((sale) => (
-                <SaleCard key={sale.id} sale={sale} />
-              ))
-            )}
-          </TabsContent>
-
-          {/* Completed Sales */}
-          <TabsContent value="completed" className="space-y-4">
-            {completedSales.length === 0 ? (
-              <Card className="border-2 border-border/50 bg-card">
-                <CardContent className="pt-12 pb-12 px-6 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No completed sales</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Completed sales will appear here
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              completedSales.map((sale) => (
-                <SaleCard key={sale.id} sale={sale} />
-              ))
-            )}
-          </TabsContent>
-        </Tabs>
+        <Button asChild variant="secondary">
+          <Link href="/dashboard/listings/new">Create listing</Link>
+        </Button>
       </div>
+
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+      ) : error ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+              <div>
+                <div className="font-semibold">Failed to load dashboard</div>
+                <div className="text-sm text-muted-foreground">{error}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : !data ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">No data.</div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Insights */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Insights</CardTitle>
+              <CardDescription>Rules-first nudges to help you sell faster (derived from your data).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {insights.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No insights right now.</div>
+              ) : (
+                insights.slice(0, 8).map((i) => (
+                  <div key={i.id} className="flex items-start justify-between gap-3 border rounded-md px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={i.severity === 'warning' ? 'destructive' : 'secondary'} className="text-[10px]">
+                          {i.severity === 'warning' ? 'Action' : 'FYI'}
+                        </Badge>
+                        <div className="font-semibold">{i.title}</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">{i.description}</div>
+                    </div>
+                    {i.actionUrl ? (
+                      <Button asChild variant="ghost" className="shrink-0">
+                        <Link href={i.actionUrl}>{i.actionLabel || 'View'}</Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Performance snapshot */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" /> GMV
+                </CardTitle>
+                <CardDescription>Sales volume (orders created)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="text-2xl font-bold">{money(data.totals.gmv30d)}</div>
+                <div className="text-sm text-muted-foreground">30d · {money(data.totals.gmv90d)} 90d · {money(data.totals.gmvAll)} all</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" /> Velocity
+                </CardTitle>
+                <CardDescription>Average time-to-sale</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="text-2xl font-bold">
+                  {data.totals.avgTimeToSaleDays === null ? '—' : `${data.totals.avgTimeToSaleDays.toFixed(1)}d`}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Based on listing publish → first order created (when available)
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Heart className="h-4 w-4" /> Interest (active)
+                </CardTitle>
+                <CardDescription>Watchers and bids across active listings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="text-2xl font-bold">{data.totals.watcherCountTotal.toLocaleString()}</div>
+                <div className="text-sm text-muted-foreground">{data.totals.bidCountTotal.toLocaleString()} total bids</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Tabs defaultValue="attention">
+            <TabsList>
+              <TabsTrigger value="attention">Listings needing attention</TabsTrigger>
+              <TabsTrigger value="offers">Offers waiting on you</TabsTrigger>
+              <TabsTrigger value="sales">Recent sales</TabsTrigger>
+              <TabsTrigger value="revenue">Revenue status</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="attention" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>High watchers, no bids</CardTitle>
+                  <CardDescription>Consider adjusting reserve/price or improving photos/details.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {attentionListings.highWatchNoBid.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No listings matched this rule.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {attentionListings.highWatchNoBid.map((l) => (
+                        <ListingRow key={l.id} listing={l} />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Drafts / pending</CardTitle>
+                  <CardDescription>Finish publishing to increase inventory and sales velocity.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {attentionListings.needsPublish.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No drafts found.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {attentionListings.needsPublish.map((l) => (
+                        <ListingRow key={l.id} listing={l} isDraft />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="offers" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Offers waiting on you</CardTitle>
+                  <CardDescription>Open/countered offers where the buyer acted last.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {offersWaitingOnSeller.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No offers waiting on you.</div>
+                  ) : (
+                    offersWaitingOnSeller.map((o) => <OfferRow key={o.id} offer={o} />)
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="sales" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent sales</CardTitle>
+                  <CardDescription>Latest orders created for your listings.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {recentSales.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No sales yet.</div>
+                  ) : (
+                    recentSales.map((o) => <OrderRow key={o.id} order={o} />)
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="revenue" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue status</CardTitle>
+                  <CardDescription>Held vs released; protected vs non-protected (derived).</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Held (not transferred)</div>
+                    <div className="text-2xl font-bold">{money(data.totals.revenue.held)}</div>
+                    <div className="text-sm text-muted-foreground">Protected held: {money(data.totals.revenue.protectedHeld)}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Released (transfer created)</div>
+                    <div className="text-2xl font-bold">{money(data.totals.revenue.released)}</div>
+                    <div className="text-sm text-muted-foreground">Protected released: {money(data.totals.revenue.protectedReleased)}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
     </div>
   );
 }
+
+function ListingRow({ listing, isDraft }: { listing: SellerDashboardListing; isDraft?: boolean }) {
+  return (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-md px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href={`/seller/listings/${listing.id}/edit`} className="font-semibold hover:underline truncate">
+            {listing.title || 'Untitled listing'}
+          </Link>
+          <Badge variant="outline" className="text-xs">{listing.type}</Badge>
+          <Badge variant={isDraft ? 'secondary' : 'outline'} className="text-xs">{listing.status}</Badge>
+        </div>
+        <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap mt-1">
+          <span className="inline-flex items-center gap-1"><Heart className="h-4 w-4" /> {listing.watcherCount}</span>
+          <span className="inline-flex items-center gap-1"><TrendingUp className="h-4 w-4" /> {listing.bidCount}</span>
+          {listing.endsAt ? <span className="inline-flex items-center gap-1"><Clock className="h-4 w-4" /> ends {new Date(listing.endsAt).toLocaleString()}</span> : null}
+        </div>
+      </div>
+      <Button asChild variant="ghost" className="justify-start md:justify-center">
+        <Link href={`/listing/${listing.id}`}>
+          View <ArrowRight className="h-4 w-4 ml-1" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function OfferRow({ offer }: { offer: SellerDashboardOffer }) {
+  const hrs = hoursUntil(offer.expiresAt);
+  const expLabel = hrs === null ? null : hrs <= 0 ? 'Expired' : `${hrs}h left`;
+  return (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-md px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href={`/seller/offers/${offer.id}`} className="font-semibold hover:underline truncate">
+            {offer.listingTitle || 'Offer'}
+          </Link>
+          <Badge variant="outline" className="text-xs">{offer.status}</Badge>
+          {expLabel ? (
+            <Badge variant={hrs !== null && hrs <= 3 ? 'destructive' : 'secondary'} className="text-xs inline-flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" /> {expLabel}
+            </Badge>
+          ) : null}
+        </div>
+        <div className="text-sm text-muted-foreground mt-1">
+          Offer: {money(offer.currentAmount)}
+        </div>
+      </div>
+      <Button asChild variant="ghost" className="justify-start md:justify-center">
+        <Link href={`/seller/offers/${offer.id}`}>
+          Review <ArrowRight className="h-4 w-4 ml-1" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function OrderRow({ order }: { order: SellerDashboardOrder }) {
+  return (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-md px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href={`/seller/orders/${order.id}`} className="font-semibold hover:underline truncate">
+            {order.listingTitle || order.listingId}
+          </Link>
+          <Badge variant="outline" className="text-xs">{order.status}</Badge>
+          {order.stripeTransferId ? <Badge variant="secondary" className="text-xs">Released</Badge> : <Badge variant="outline" className="text-xs">Held</Badge>}
+        </div>
+        <div className="text-sm text-muted-foreground mt-1">
+          {money(order.amount)} · {order.createdAt ? new Date(order.createdAt).toLocaleString() : ''}
+        </div>
+      </div>
+      <Button asChild variant="ghost" className="justify-start md:justify-center">
+        <Link href={`/seller/orders/${order.id}`}>
+          View <ArrowRight className="h-4 w-4 ml-1" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+

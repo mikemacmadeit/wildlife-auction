@@ -4,7 +4,9 @@ import matter from 'gray-matter';
 import readingTime from 'reading-time';
 import { remark } from 'remark';
 import remarkGfm from 'remark-gfm';
-import remarkHtml from 'remark-html';
+import remarkRehype from 'remark-rehype';
+import rehypeStringify from 'rehype-stringify';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 
 export type FieldNoteFrontmatter = {
   title: string;
@@ -150,7 +152,23 @@ export async function getFieldNoteBySlug(slug: string): Promise<FieldNotePost | 
   const fm = assertFrontmatter(slug, parsed.data);
   const rt = readingTime(parsed.content || '');
 
-  const processed = await remark().use(remarkGfm).use(remarkHtml).process(parsed.content || '');
+  // SECURITY: We intentionally do NOT allow raw HTML passthrough from markdown.
+  // This prevents XSS via inline HTML in content files. We also run a conservative sanitizer.
+  const processed = await remark()
+    .use(remarkGfm)
+    .use(remarkRehype, { allowDangerousHtml: false })
+    .use(rehypeSanitize, {
+      ...defaultSchema,
+      // Allow common class-based styling (Tailwind prose classes, etc.)
+      attributes: {
+        ...(defaultSchema.attributes || {}),
+        '*': [...((defaultSchema.attributes as any)?.['*'] || []), 'className', 'class'],
+        a: [...((defaultSchema.attributes as any)?.a || []), 'target', 'rel'],
+      },
+    })
+    .use(rehypeStringify)
+    .process(parsed.content || '');
+
   const html = String(processed);
 
   return {

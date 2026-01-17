@@ -30,6 +30,7 @@ import {
   CheckCircle,
   HeartPulse,
   Mail,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,7 +54,7 @@ import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
+import { subscribeToUnreadCount, subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
 
 interface DashboardNavItem {
   href: string;
@@ -67,6 +68,8 @@ const baseNavItems: DashboardNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/seller/listings', label: 'Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
+  { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
+  { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/seller/sales', label: 'Sales & Bids', icon: DollarSign },
   { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
@@ -87,6 +90,7 @@ const adminNavItems: DashboardNavItem[] = [
   { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
   { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
+  { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
 ];
 
 export default function DashboardLayout({
@@ -100,7 +104,8 @@ export default function DashboardLayout({
   const { isAdmin, loading: adminLoading, role } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
   // IMPORTANT: Don't gate admin nav rendering on adminLoading/authLoading.
@@ -110,7 +115,8 @@ export default function DashboardLayout({
   // Real-time badges (unread messages/notifications + pending approvals)
   useEffect(() => {
     if (!user?.uid) {
-      setUnreadCount(0);
+      setUnreadMessagesCount(0);
+      setUnreadNotificationsCount(0);
       setPendingApprovalsCount(0);
       return;
     }
@@ -121,11 +127,22 @@ export default function DashboardLayout({
     try {
       unsubs.push(
         subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
-          setUnreadCount(count || 0);
+          setUnreadMessagesCount(count || 0);
         })
       );
     } catch (e) {
       console.error('Failed to subscribe to unread notifications count:', e);
+    }
+
+    // 1b) Notifications badge: all unread (includes messages; acceptable for now)
+    try {
+      unsubs.push(
+        subscribeToUnreadCount(user.uid, (count) => {
+          setUnreadNotificationsCount(count || 0);
+        })
+      );
+    } catch (e) {
+      console.error('Failed to subscribe to unread total notifications count:', e);
     }
 
     // 2) Admin badge: pending listing approvals (drops as listings are approved/rejected)
@@ -162,7 +179,10 @@ export default function DashboardLayout({
     // Always include base items
     const items = baseNavItems.map((item) => {
       if (item.href === '/seller/messages') {
-        return { ...item, badge: unreadCount > 0 ? unreadCount : undefined };
+        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
+      }
+      if (item.href === '/dashboard/notifications') {
+        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
       }
       return item;
     });
@@ -181,7 +201,7 @@ export default function DashboardLayout({
     }
     
     return items;
-  }, [showAdminNav, unreadCount, pendingApprovalsCount]);
+  }, [showAdminNav, unreadMessagesCount, unreadNotificationsCount, pendingApprovalsCount]);
 
   // Close mobile menu on route change
   useEffect(() => {

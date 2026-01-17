@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -47,7 +47,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { TrustBadges } from '@/components/trust/StatusBadge';
@@ -58,6 +57,7 @@ import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { BidHistory } from '@/components/auction/BidHistory';
 import { BidIncrementCalculator } from '@/components/auction/BidIncrementCalculator';
+import { AutoBidPanel } from '@/components/auction/AutoBidPanel';
 import { EnhancedSellerProfile } from '@/components/listing/EnhancedSellerProfile';
 import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
@@ -69,7 +69,7 @@ import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
-import { getWinningBidder } from '@/lib/firebase/bids';
+import { getWinningBidder, subscribeBidCountSince } from '@/lib/firebase/bids';
 import { placeBidServer } from '@/lib/api/bids';
 import {
   Tooltip,
@@ -79,6 +79,7 @@ import {
 } from '@/components/ui/tooltip';
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
+import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -90,12 +91,12 @@ export default function ListingDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [bidAmount, setBidAmount] = useState('');
   const [selectedInsurance, setSelectedInsurance] = useState<string>('');
-  const [includeVerification, setIncludeVerification] = useState(false);
   const [showBidDialog, setShowBidDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
+  const [bidsLastHour, setBidsLastHour] = useState<number>(0);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ amountUsd: number } | null>(null);
   const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
@@ -104,10 +105,24 @@ export default function ListingDetailPage() {
     message: string;
     technical?: string;
   } | null>(null);
+  const [wireDialogOpen, setWireDialogOpen] = useState(false);
+  const [wireData, setWireData] = useState<null | {
+    orderId: string;
+    paymentIntentId: string;
+    instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
+  }>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToListing: addToRecentlyViewed } = useRecentlyViewed();
+
+  const minBidUsd = useMemo(() => {
+    if (!listing) return 0;
+    const base = Number(listing.currentBid || listing.startingBid || 0) || 0;
+    if (base <= 0) return Number(listing.startingBid || 0) || 0;
+    const inc = Math.max(base * 0.05, 50);
+    return Math.ceil(base + inc);
+  }, [listing]);
 
   // Scroll to top when listing ID changes
   useEffect(() => {
@@ -135,6 +150,13 @@ export default function ListingDetailPage() {
     return () => {
       unsubscribe();
     };
+  }, [listingId]);
+
+  // Bid velocity (last hour) for social proof on the listing detail page.
+  useEffect(() => {
+    if (!listingId) return;
+    const since = new Date(Date.now() - 60 * 60_000);
+    return subscribeBidCountSince(listingId, since, setBidsLastHour);
   }, [listingId]);
 
   // Track recently viewed listing (only when listingId changes)
@@ -454,14 +476,21 @@ export default function ListingDetailPage() {
     try {
       setPaymentDialogOpen(false);
       setIsPlacingBid(true);
-      const { createCheckoutSession } = await import('@/lib/stripe/api');
-      const { url } = await createCheckoutSession(listing.id, undefined, method);
-      window.location.href = url;
+      if (method === 'wire') {
+        const { createWireIntent } = await import('@/lib/stripe/api');
+        const out = await createWireIntent(listing.id);
+        setWireData(out);
+        setWireDialogOpen(true);
+      } else {
+        const { createCheckoutSession } = await import('@/lib/stripe/api');
+        const { url } = await createCheckoutSession(listing.id, undefined, method);
+        window.location.href = url;
+      }
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
       setCheckoutError({
         attemptedMethod: method,
-        message: 'We couldn’t start checkout. You can retry card or switch to bank transfer / wire.',
+        message: 'We couldn’t start checkout. You can retry card or switch to ACH debit / wire.',
         technical: error?.message ? String(error.message) : String(error),
       });
       setCheckoutErrorOpen(true);
@@ -727,19 +756,14 @@ export default function ListingDetailPage() {
                           className="text-lg h-12"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Minimum bid: ${((listing!.currentBid || listing!.startingBid || 0) + 100).toLocaleString()}
+                          Minimum bid: ${minBidUsd.toLocaleString()}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="auto-bid-mobile"
-                          checked={includeVerification}
-                          onCheckedChange={(checked) => setIncludeVerification(checked as boolean)}
-                        />
-                        <Label htmlFor="auto-bid-mobile" className="text-sm cursor-pointer">
-                          Enable auto-bidding (max bid)
-                        </Label>
-                      </div>
+                      <AutoBidPanel
+                        auctionId={listing!.id}
+                        currentBidUsd={listing!.currentBid || listing!.startingBid || 0}
+                        currentHighBidderId={listing!.currentBidderId || null}
+                      />
                       <Button
                         onClick={() => {
                           setShowBidDialog(false);
@@ -842,12 +866,17 @@ export default function ListingDetailPage() {
                           <div className="text-base font-semibold capitalize">{(listing!.attributes as WildlifeAttributes).sex}</div>
                         </div>
                       )}
-                      {(listing!.attributes as WildlifeAttributes).age && (
+                      {((listing!.attributes as WildlifeAttributes).age !== undefined &&
+                        (listing!.attributes as WildlifeAttributes).age !== null) ? (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Age</div>
-                          <div className="text-base font-semibold">{(listing!.attributes as WildlifeAttributes).age}</div>
+                          <div className="text-base font-semibold">
+                            {typeof (listing!.attributes as WildlifeAttributes).age === 'number'
+                              ? `${(listing!.attributes as WildlifeAttributes).age} yr${(listing!.attributes as WildlifeAttributes).age === 1 ? '' : 's'}`
+                              : String((listing!.attributes as WildlifeAttributes).age)}
+                          </div>
                         </div>
-                      )}
+                      ) : null}
                       {(listing!.attributes as WildlifeAttributes).quantity && (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Quantity</div>
@@ -882,12 +911,17 @@ export default function ListingDetailPage() {
                           <div className="text-base font-semibold capitalize">{(listing!.attributes as CattleAttributes).sex}</div>
                         </div>
                       )}
-                      {(listing!.attributes as CattleAttributes).age && (
+                      {((listing!.attributes as CattleAttributes).age !== undefined &&
+                        (listing!.attributes as CattleAttributes).age !== null) ? (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Age</div>
-                          <div className="text-base font-semibold">{(listing!.attributes as CattleAttributes).age}</div>
+                          <div className="text-base font-semibold">
+                            {typeof (listing!.attributes as CattleAttributes).age === 'number'
+                              ? `${(listing!.attributes as CattleAttributes).age} yr${(listing!.attributes as CattleAttributes).age === 1 ? '' : 's'}`
+                              : String((listing!.attributes as CattleAttributes).age)}
+                          </div>
                         </div>
-                      )}
+                      ) : null}
                       {(listing!.attributes as CattleAttributes).registered !== undefined && (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Registered</div>
@@ -990,7 +1024,8 @@ export default function ListingDetailPage() {
               views={listing!.metrics?.views || 0}
               favorites={listing!.metrics?.favorites || 0}
               bids={listing!.metrics?.bidCount || 0}
-              watchers={Math.floor((listing!.metrics?.favorites || 0) * 0.3)}
+              watchers={listing!.metrics?.favorites || 0}
+              bidsLastHour={bidsLastHour}
               inquiries={0}
             />
           </div>
@@ -1086,12 +1121,12 @@ export default function ListingDetailPage() {
                             <DialogHeader>
                               <DialogTitle>Place Your Bid</DialogTitle>
                               <DialogDescription>
-                                Enter your bid amount. Minimum bid: ${((listing!.currentBid || listing!.startingBid || 0) + 100).toLocaleString()}
+                                Enter your max bid (proxy bidding). Minimum: ${minBidUsd.toLocaleString()}
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
-                                <Label htmlFor="bid-amount">Bid Amount</Label>
+                                <Label htmlFor="bid-amount">Max Bid</Label>
                                 <Input
                                   id="bid-amount"
                                   type="number"
@@ -1105,16 +1140,11 @@ export default function ListingDetailPage() {
                                 currentBid={listing!.currentBid || listing!.startingBid || 0}
                                 onBidChange={(amount) => setBidAmount(amount.toString())}
                               />
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id="auto-bid"
-                                  checked={includeVerification}
-                                  onCheckedChange={(checked) => setIncludeVerification(checked as boolean)}
-                                />
-                                <Label htmlFor="auto-bid" className="text-sm cursor-pointer">
-                                  Enable auto-bidding (max bid)
-                                </Label>
-                              </div>
+                              <AutoBidPanel
+                                auctionId={listing!.id}
+                                currentBidUsd={listing!.currentBid || listing!.startingBid || 0}
+                                currentHighBidderId={listing!.currentBidderId || null}
+                              />
                               <Button
                                 onClick={() => {
                                   setShowBidDialog(false);
@@ -1368,6 +1398,8 @@ export default function ListingDetailPage() {
         }}
         amountUsd={pendingCheckout?.amountUsd || 0}
         onSelect={handleSelectPaymentMethod}
+        isAuthenticated={!!user}
+        isEmailVerified={!!user?.emailVerified}
       />
 
       <CheckoutStartErrorDialog
@@ -1380,9 +1412,11 @@ export default function ListingDetailPage() {
         errorMessage={checkoutError?.message || 'Checkout could not be started.'}
         technicalDetails={checkoutError?.technical}
         onRetryCard={() => handleSelectPaymentMethod('card')}
-        onSwitchBank={() => handleSelectPaymentMethod('bank_transfer')}
+        onSwitchBank={() => handleSelectPaymentMethod('ach_debit')}
         onSwitchWire={() => handleSelectPaymentMethod('wire')}
       />
+
+      <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
 
       {/* Bid Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

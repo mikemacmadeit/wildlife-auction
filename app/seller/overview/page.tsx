@@ -575,7 +575,7 @@ export default function SellerOverviewPage() {
         })()}
 
         {/* Status Snapshot Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" data-tour="seller-stats">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -615,14 +615,16 @@ export default function SellerOverviewPage() {
         {/* Payout Readiness */}
         {user && userProfile && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <PayoutReadinessCard 
-              userProfile={userProfile} 
-              onRefresh={async () => {
-                const profile = await getUserProfile(user.uid);
-                setUserProfile(profile);
-              }} 
-            />
-            <Card className="border-2 border-border/50 bg-card">
+            <div data-tour="seller-payout-readiness">
+              <PayoutReadinessCard 
+                userProfile={userProfile} 
+                onRefresh={async () => {
+                  const profile = await getUserProfile(user.uid);
+                  setUserProfile(profile);
+                }} 
+              />
+            </div>
+            <Card className="border-2 border-border/50 bg-card" data-tour="seller-exposure-plans">
               <CardHeader>
                 <CardTitle className="text-xl font-extrabold">Exposure Plans</CardTitle>
                 <CardDescription>
@@ -647,7 +649,7 @@ export default function SellerOverviewPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           {/* Action Required Panel */}
           <div className="space-y-4">
-            <Card className="border-2 border-border/50 bg-card">
+            <Card className="border-2 border-border/50 bg-card" data-tour="seller-action-required">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -735,7 +737,7 @@ export default function SellerOverviewPage() {
 
           {/* Recent Activity & Performance */}
           <div className="space-y-4">
-            <Card className="border-2 border-border/50 bg-card">
+            <Card className="border-2 border-border/50 bg-card" data-tour="seller-recent-activity">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-primary" />
@@ -786,7 +788,7 @@ export default function SellerOverviewPage() {
             </Card>
 
             {/* Performance (Lightweight) */}
-            <Card className="border-2 border-border/50 bg-card">
+            <Card className="border-2 border-border/50 bg-card" data-tour="seller-performance">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />

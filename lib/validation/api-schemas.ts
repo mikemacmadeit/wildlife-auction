@@ -12,12 +12,19 @@ export const createCheckoutSessionSchema = z.object({
   listingId: z.string().min(1, 'Listing ID is required').max(100),
   offerId: z.string().max(100).optional(),
   /**
-   * Payment method selection step (high-ticket rails).
-   * - card: existing Stripe Checkout card flow
-   * - bank_transfer: Stripe Checkout bank transfer (customer balance) flow
-   * - wire: treated as bank transfer rails in Stripe (instructions shown in Checkout)
+   * Payment method selection step.
+   * - card: Credit/Debit via Stripe Checkout
+   * - ach_debit: US bank account (ACH) via Stripe Checkout
    */
-  paymentMethod: z.enum(['card', 'bank_transfer', 'wire']).optional(),
+  paymentMethod: z.enum(['card', 'ach_debit', 'ach']).optional(),
+});
+
+/**
+ * Wire (bank transfer) intent creation schema
+ */
+export const createWireIntentSchema = z.object({
+  listingId: z.string().min(1, 'Listing ID is required').max(100),
+  offerId: z.string().max(100).optional(),
 });
 
 /**

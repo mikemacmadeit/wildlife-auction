@@ -6,38 +6,10 @@
  */
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus } from '@/lib/types';
-
-let adminApp: App | undefined;
-let auth: ReturnType<typeof getAuth>;
-let db: ReturnType<typeof getFirestore>;
-
-async function initializeFirebaseAdmin() {
-  if (!adminApp) {
-    if (!getApps().length) {
-      const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-        ? {
-            projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-          }
-        : undefined;
-
-      adminApp = serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey
-        ? initializeApp({ credential: cert(serviceAccount as any) })
-        : initializeApp();
-    } else {
-      adminApp = getApps()[0];
-    }
-  }
-  auth = getAuth(adminApp);
-  db = getFirestore(adminApp);
-  return { auth, db };
-}
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -51,7 +23,8 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
 
 export async function POST(request: Request, { params }: { params: { orderId: string } }) {
   try {
-    const { auth, db } = await initializeFirebaseAdmin();
+    const auth = getAdminAuth();
+    const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);

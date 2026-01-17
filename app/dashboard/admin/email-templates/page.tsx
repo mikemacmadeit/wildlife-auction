@@ -42,6 +42,43 @@ function prettyJson(v: any): string {
   return JSON.stringify(v, null, 2);
 }
 
+function getPreviewOrigin(): string | null {
+  if (typeof window === 'undefined') return null;
+  const origin = window.location?.origin;
+  if (!origin) return null;
+  // If we're already on wildlife.exchange, do not rewrite.
+  if (origin.includes('wildlife.exchange')) return null;
+  return origin.replace(/\/$/, '');
+}
+
+function rewriteUrlsForPreview<T>(value: T): T {
+  const origin = getPreviewOrigin();
+  if (!origin) return value;
+
+  const visit = (v: any): any => {
+    if (typeof v === 'string') {
+      // Only rewrite the canonical production origin in preview to avoid CORS failures in srcDoc iframes.
+      if (v.startsWith('https://wildlife.exchange')) return v.replace('https://wildlife.exchange', origin);
+      return v;
+    }
+    if (Array.isArray(v)) return v.map(visit);
+    if (v && typeof v === 'object') {
+      const out: any = {};
+      for (const [k, child] of Object.entries(v)) out[k] = visit(child);
+      return out;
+    }
+    return v;
+  };
+
+  return visit(value) as T;
+}
+
+function rewriteHtmlForPreview(html: string): string {
+  const origin = getPreviewOrigin();
+  if (!origin) return html;
+  return html.replaceAll('https://wildlife.exchange', origin);
+}
+
 function safeCopy(text: string): Promise<void> {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
     return navigator.clipboard.writeText(text);
@@ -59,7 +96,7 @@ export default function AdminEmailTemplatesPage() {
   const defaultEvent = (events[0]?.type || 'order_confirmation') as EmailEventType;
 
   const [eventType, setEventType] = useState<EmailEventType>(defaultEvent);
-  const [payloadText, setPayloadText] = useState<string>(() => prettyJson(getSamplePayload(defaultEvent)));
+  const [payloadText, setPayloadText] = useState<string>(() => prettyJson(rewriteUrlsForPreview(getSamplePayload(defaultEvent))));
   const debouncedPayloadText = useDebounce(payloadText, 450);
   const debouncedEventType = useDebounce(eventType, 150);
 
@@ -132,7 +169,7 @@ export default function AdminEmailTemplatesPage() {
         const ok = data as RenderResponseOk;
         setSubject(ok.subject);
         setPreheader(ok.preheader);
-        setHtml(ok.html);
+        setHtml(rewriteHtmlForPreview(ok.html));
         if (opts?.showToast) {
           toast({ title: 'Rendered', description: 'Template rendered successfully.' });
         }
@@ -148,7 +185,7 @@ export default function AdminEmailTemplatesPage() {
   // When template changes, reset to sample payload
   useEffect(() => {
     const sample = getSamplePayload(eventType);
-    setPayloadText(prettyJson(sample));
+    setPayloadText(prettyJson(rewriteUrlsForPreview(sample)));
     setParseError(null);
     setSchemaIssues(null);
     setSubject('');
@@ -350,7 +387,9 @@ export default function AdminEmailTemplatesPage() {
                               title="Email preview"
                               className="w-full h-full"
                               srcDoc={html}
-                              sandbox=""
+                              // NOTE: we keep the iframe sandboxed, but allow same-origin so local assets
+                              // (e.g., /fonts/*, /images/*) can load inside srcDoc without CORS issues.
+                              sandbox="allow-same-origin"
                             />
                           ) : loading ? (
                             <div className="p-6 space-y-3">

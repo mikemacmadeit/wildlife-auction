@@ -92,6 +92,31 @@ export function subscribeBidsForListing(
   );
 }
 
+export function subscribeBidCountSince(
+  listingId: string,
+  since: Date,
+  onCount: (count: number) => void
+): Unsubscribe {
+  const bidsRef = collection(db, 'bids');
+  const sinceTs = Timestamp.fromDate(since);
+  const q = query(
+    bidsRef,
+    where('listingId', '==', listingId),
+    where('createdAt', '>=', sinceTs),
+    orderBy('createdAt', 'desc'),
+    limit(200)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => onCount(snapshot.size),
+    (error) => {
+      console.error('Error subscribing to bid count:', error);
+      onCount(0);
+    }
+  );
+}
+
 /**
  * Place a bid on an auction listing using a Firestore transaction
  * 

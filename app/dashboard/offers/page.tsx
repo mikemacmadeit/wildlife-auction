@@ -192,7 +192,7 @@ export default function MyOffersPage() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-        <TabsList className="grid grid-cols-5 w-full sm:w-auto">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full sm:w-auto">
           <TabsTrigger value="open">Open</TabsTrigger>
           <TabsTrigger value="countered">Countered</TabsTrigger>
           <TabsTrigger value="accepted">Accepted</TabsTrigger>

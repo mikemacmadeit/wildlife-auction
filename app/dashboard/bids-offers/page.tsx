@@ -21,9 +21,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Gavel, Handshake, MoreHorizontal, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { getMyBids, type MyBidRow } from '@/lib/api/bids';
 import { getMyOffers } from '@/lib/offers/api';
-import { createCheckoutSession } from '@/lib/stripe/api';
+import { createCheckoutSession, createWireIntent } from '@/lib/stripe/api';
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
+import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
 
 type OfferRow = {
   offerId: string;
@@ -118,6 +119,12 @@ export default function BidsOffersPage() {
   const [pendingOfferCheckout, setPendingOfferCheckout] = useState<{ listingId: string; offerId: string; amountUsd: number } | null>(null);
   const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<{ attemptedMethod: PaymentMethodChoice; message: string; technical?: string } | null>(null);
+  const [wireDialogOpen, setWireDialogOpen] = useState(false);
+  const [wireData, setWireData] = useState<null | {
+    orderId: string;
+    paymentIntentId: string;
+    instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
+  }>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -241,12 +248,18 @@ export default function BidsOffersPage() {
     if (!pendingOfferCheckout) return;
     try {
       setPaymentDialogOpen(false);
-      const { url } = await createCheckoutSession(pendingOfferCheckout.listingId, pendingOfferCheckout.offerId, method);
-      window.location.href = url;
+      if (method === 'wire') {
+        const out = await createWireIntent(pendingOfferCheckout.listingId, pendingOfferCheckout.offerId);
+        setWireData(out);
+        setWireDialogOpen(true);
+      } else {
+        const { url } = await createCheckoutSession(pendingOfferCheckout.listingId, pendingOfferCheckout.offerId, method);
+        window.location.href = url;
+      }
     } catch (e: any) {
       setCheckoutError({
         attemptedMethod: method,
-        message: 'We couldn’t start checkout. You can retry card or switch to bank transfer / wire.',
+        message: 'We couldn’t start checkout. You can retry card or switch to ACH debit / wire.',
         technical: e?.message ? String(e.message) : String(e),
       });
       setCheckoutErrorOpen(true);
@@ -496,6 +509,8 @@ export default function BidsOffersPage() {
           }}
           amountUsd={pendingOfferCheckout?.amountUsd || 0}
           onSelect={handleSelectPaymentMethod}
+          isAuthenticated={!!user}
+          isEmailVerified={!!user?.emailVerified}
         />
 
         <CheckoutStartErrorDialog
@@ -508,9 +523,11 @@ export default function BidsOffersPage() {
           errorMessage={checkoutError?.message || 'Checkout could not be started.'}
           technicalDetails={checkoutError?.technical}
           onRetryCard={() => handleSelectPaymentMethod('card')}
-          onSwitchBank={() => handleSelectPaymentMethod('bank_transfer')}
+          onSwitchBank={() => handleSelectPaymentMethod('ach_debit')}
           onSwitchWire={() => handleSelectPaymentMethod('wire')}
         />
+
+        <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
       </div>
     </div>
   );

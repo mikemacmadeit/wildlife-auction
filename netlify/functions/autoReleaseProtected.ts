@@ -94,8 +94,8 @@ const baseHandler: Handler = async (event, context) => {
         return;
       }
 
-      // Skip if open dispute
-      const disputeStatus = orderData.disputeStatus;
+      // Skip if open dispute (back-compat: check both `disputeStatus` and `protectedDisputeStatus`)
+      const disputeStatus = orderData.protectedDisputeStatus || orderData.disputeStatus;
       if (disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(disputeStatus)) {
         return;
       }
@@ -111,7 +111,10 @@ const baseHandler: Handler = async (event, context) => {
       const minReleaseAt = new Date(deliveryConfirmedAt.getTime() + hoursAfterDelivery * 60 * 60 * 1000);
       if (minReleaseAt.getTime() > now.getTime()) return;
 
-      const hasChargeback = orderData.chargebackStatus && ['active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(orderData.chargebackStatus);
+      const hasChargeback =
+        (orderData.payoutHoldReason && String(orderData.payoutHoldReason) === 'chargeback') ||
+        (orderData.chargebackStatus &&
+          ['open', 'active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(orderData.chargebackStatus));
       if (hasChargeback) return;
 
       // Max amount guard (optional)

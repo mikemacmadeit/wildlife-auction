@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
 
 const declineSchema = z.object({
@@ -87,7 +89,14 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       });
 
       const role: 'seller' | 'buyer' = isSeller ? 'seller' : 'buyer';
-      return { ok: true as const, listingId: offer.listingId, role };
+      return {
+        ok: true as const,
+        listingId: offer.listingId,
+        listingTitle: String(listing.title || 'a listing'),
+        role,
+        sellerId: String(offer.sellerId),
+        buyerId: String(offer.buyerId),
+      };
     });
 
     if (!result.ok) return json(result.body, { status: result.status });
@@ -100,6 +109,30 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       metadata: { offerId, note: note || undefined },
       source: result.role === 'seller' ? 'seller_ui' : 'buyer_ui',
     });
+
+    // Phase 3A (A3): notify counterparty of decline.
+    try {
+      const base = getSiteUrl();
+      const targetUserId = result.role === 'seller' ? result.buyerId : result.sellerId;
+      const offerUrl = result.role === 'seller' ? `${base}/dashboard/offers` : `${base}/seller/offers/${offerId}`;
+      await emitEventForUser({
+        type: 'Offer.Declined',
+        actorId,
+        entityType: 'listing',
+        entityId: result.listingId,
+        targetUserId,
+        payload: {
+          type: 'Offer.Declined',
+          offerId,
+          listingId: result.listingId,
+          listingTitle: result.listingTitle,
+          offerUrl,
+        },
+        optionalHash: `offer:${offerId}:declined`,
+      });
+    } catch {
+      // best-effort
+    }
 
     return json({ ok: true });
   } catch (error: any) {

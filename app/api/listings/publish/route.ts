@@ -267,6 +267,34 @@ export async function POST(request: Request) {
     const sellerTier = getEffectiveSubscriptionTier(userData as any);
     const sellerTierWeight = getTierWeight(sellerTier);
 
+    // Phase 3A (A4): Public trust snapshot (anon-safe).
+    // Copy seller trust signals into the listing doc at publish time so listing cards/details
+    // can show trust without requiring a /users/{uid} read (which is auth-gated in firestore.rules).
+    const completedSalesCount = Number(userData?.completedSalesCount || 0) || 0;
+    const identityVerified = userData?.seller?.credentials?.identityVerified === true;
+    const sellerVerified = userData?.seller?.verified === true || identityVerified;
+    const displayName =
+      (listingData?.sellerSnapshot?.displayName && String(listingData.sellerSnapshot.displayName)) ||
+      (userData?.displayName && String(userData.displayName)) ||
+      (userData?.profile?.fullName && String(userData.profile.fullName)) ||
+      'Seller';
+
+    const sellerBadges: string[] = [];
+    if ((decodedToken as any)?.email_verified === true) sellerBadges.push('Email verified');
+    if (identityVerified) sellerBadges.push('Identity verified');
+    if (userData?.payoutsEnabled === true) sellerBadges.push('Payouts enabled');
+    if (userData?.profile?.location?.state === 'TX') sellerBadges.push('Texas-based');
+    if (listingData?.category === 'whitetail_breeder' && listingData?.attributes?.tpwdBreederPermitNumber) {
+      sellerBadges.push('TPWD permit provided');
+    }
+
+    const publicSellerSnapshot = {
+      displayName,
+      verified: sellerVerified,
+      completedSalesCount,
+      badges: sellerBadges,
+    };
+
     // Compliance review gating:
     // - Whitetail breeder: always pending review (status='pending')
     // - Other categories: can go active
@@ -295,6 +323,7 @@ export async function POST(request: Request) {
         updatedBy: userId,
         sellerTierSnapshot: sellerTier,
         sellerTierWeightSnapshot: sellerTierWeight,
+        sellerSnapshot: publicSellerSnapshot,
         ...flagUpdate,
       });
 
@@ -314,6 +343,7 @@ export async function POST(request: Request) {
       updatedBy: userId,
       sellerTierSnapshot: sellerTier,
       sellerTierWeightSnapshot: sellerTierWeight,
+      sellerSnapshot: publicSellerSnapshot,
       ...flagUpdate,
     });
 

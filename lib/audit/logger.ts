@@ -18,6 +18,7 @@ export type AuditActionType =
   | 'admin_hold_placed'
   | 'admin_hold_removed'
   | 'chargeback_created'
+  | 'chargeback_updated'
   | 'chargeback_closed'
   | 'chargeback_funds_withdrawn'
   | 'chargeback_funds_reinstated'
@@ -40,7 +41,9 @@ export type AuditActionType =
   | 'offer_declined'
   | 'offer_withdrawn'
   | 'offer_expired'
-  | 'offer_checkout_session_created';
+  | 'offer_checkout_session_created'
+  // Wire / bank transfer rails
+  | 'wire_payment_intent_created';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 
@@ -80,18 +83,19 @@ export async function createAuditLog(
   const auditRef = db.collection('auditLogs').doc();
   const auditId = auditRef.id;
 
+  // Firestore Admin SDK rejects `undefined` values. Only include optional fields when present.
   const auditLog: AuditLog = {
     auditId,
     actorUid: params.actorUid,
     actorRole: params.actorRole,
     actionType: params.actionType,
-    orderId: params.orderId,
-    listingId: params.listingId,
-    beforeState: params.beforeState,
-    afterState: params.afterState,
-    metadata: params.metadata,
     source: params.source,
     createdAt: Timestamp.now(),
+    ...(params.orderId ? { orderId: params.orderId } : {}),
+    ...(params.listingId ? { listingId: params.listingId } : {}),
+    ...(params.beforeState ? { beforeState: params.beforeState } : {}),
+    ...(params.afterState ? { afterState: params.afterState } : {}),
+    ...(params.metadata ? { metadata: params.metadata } : {}),
   };
 
   await auditRef.set(auditLog);

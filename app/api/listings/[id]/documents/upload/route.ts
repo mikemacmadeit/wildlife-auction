@@ -1,47 +1,33 @@
 /**
  * POST /api/listings/[id]/documents/upload
- * 
- * Upload a compliance document for a listing
+ *
+ * Upload a compliance document for a listing.
+ *
+ * SECURITY:
+ * - Auth required (seller-only for the listing)
+ * - Validates documentUrl as https URL (prevents javascript:/data: URL injection)
+ * - Never writes undefined values to Firestore
+ * - Uses shared Firebase Admin initializer
  */
 
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { uploadDocument } from '@/lib/firebase/documents';
+import { Timestamp } from 'firebase-admin/firestore';
 import { DocumentType } from '@/lib/types';
+import { z } from 'zod';
+import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-// Initialize Firebase Admin
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        }
-      : undefined;
-
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      adminApp = initializeApp();
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-} else {
-  adminApp = getApps()[0];
-}
-
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
+const bodySchema = z.object({
+  documentUrl: z.string().url(),
+  type: z.string().min(1),
+  permitNumber: z.string().max(200).optional(),
+  issuedBy: z.string().max(200).optional(),
+  issuedAt: z.string().optional(),
+  expiresAt: z.string().optional(),
+  metadata: z.any().optional(),
+});
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -55,6 +41,16 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Rate limiting
+    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
+    const rateLimitResult = await rateLimitCheck(request as any);
+    if (!rateLimitResult.allowed) {
+      return json(rateLimitResult.body, { status: rateLimitResult.status });
+    }
+
+    const auth = getAdminAuth();
+    const db = getAdminDb();
+
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -80,29 +76,36 @@ export async function POST(
       return json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Parse body
-    const body = await request.json();
-    const { documentUrl, type, permitNumber, issuedBy, issuedAt, expiresAt, metadata } = body;
-
-    if (!documentUrl || !type) {
-      return json({ error: 'documentUrl and type are required' }, { status: 400 });
+    // Parse + validate body
+    const body = await request.json().catch(() => null);
+    const parsed = bodySchema.safeParse(body);
+    if (!parsed.success) {
+      return json({ error: 'Invalid body' }, { status: 400 });
     }
 
-    // Upload document (using client SDK helper - will need to adapt for admin SDK)
-    // For now, create directly in Firestore
+    const { documentUrl, type, permitNumber, issuedBy, issuedAt, expiresAt, metadata } = parsed.data;
+
+    // Only allow https URLs (prevents javascript:/data: URL injection)
+    if (!documentUrl.startsWith('https://')) {
+      return json({ error: 'documentUrl must be an https URL' }, { status: 400 });
+    }
+
+    // Create document (never write undefined)
     const documentsRef = db.collection('listings').doc(listingId).collection('documents');
-    const docRef = await documentsRef.add({
+    const docData: any = {
       type: type as DocumentType,
       documentUrl,
-      permitNumber,
-      issuedBy,
-      issuedAt: issuedAt ? new Date(issuedAt) : undefined,
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
       status: 'uploaded',
       uploadedBy: userId,
-      uploadedAt: new Date(),
-      metadata,
-    });
+      uploadedAt: Timestamp.now(),
+    };
+    if (permitNumber) docData.permitNumber = permitNumber;
+    if (issuedBy) docData.issuedBy = issuedBy;
+    if (issuedAt) docData.issuedAt = Timestamp.fromDate(new Date(issuedAt));
+    if (expiresAt) docData.expiresAt = Timestamp.fromDate(new Date(expiresAt));
+    if (metadata !== undefined) docData.metadata = metadata;
+
+    const docRef = await documentsRef.add(docData);
 
     return json({
       success: true,

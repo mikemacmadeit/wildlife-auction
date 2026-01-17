@@ -10,7 +10,26 @@ import Stripe from 'stripe';
 import { stripe, calculatePlatformFee } from '@/lib/stripe/config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
+
+function inferEffectivePaymentMethodFromCheckoutSession(
+  session: Stripe.Checkout.Session
+): 'card' | 'ach_debit' | 'bank_transfer' | 'wire' {
+  const meta = (session.metadata?.paymentMethod as any) as string | undefined;
+  if (meta === 'ach') return 'ach_debit';
+  if (meta === 'card' || meta === 'ach_debit' || meta === 'bank_transfer' || meta === 'wire') return meta;
+
+  const types = (session as any).payment_method_types;
+  if (Array.isArray(types) && types.includes('us_bank_account')) return 'ach_debit';
+  return 'card';
+}
+
+function isCheckoutSessionPaid(session: Stripe.Checkout.Session): boolean {
+  const paymentStatus = String((session as any).payment_status || '');
+  return paymentStatus === 'paid';
+}
 
 /**
  * Handle checkout.session.completed event
@@ -32,13 +51,10 @@ export async function handleCheckoutSessionCompleted(
     const platformFeeCents = session.metadata?.platformFee;
     const sellerTierSnapshot = (session.metadata as any)?.sellerTierSnapshot || session.metadata?.sellerPlanSnapshot; // back-compat
     const platformFeePercentStr = session.metadata?.platformFeePercent; // Fee percent at checkout (immutable snapshot)
-    const paymentMethod = (session.metadata?.paymentMethod as any) as
-      | 'card'
-      | 'bank_transfer'
-      | 'wire'
-      | undefined;
-    const effectivePaymentMethod = paymentMethod || 'card';
+    const effectivePaymentMethod = inferEffectivePaymentMethodFromCheckoutSession(session);
     const isBankRails = effectivePaymentMethod === 'bank_transfer' || effectivePaymentMethod === 'wire';
+    const paymentConfirmed = isCheckoutSessionPaid(session);
+    const isAsync = !paymentConfirmed;
 
     if (!listingId || !buyerId || !sellerId || !sellerStripeAccountId) {
       logError('Missing required metadata in checkout session', undefined, {
@@ -332,9 +348,11 @@ export async function handleCheckoutSessionCompleted(
     const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
     
     const orderRef = db.collection('orders').doc();
-    const orderStatus: string = isBankRails
-      ? (effectivePaymentMethod === 'wire' ? 'awaiting_wire' : 'awaiting_bank_transfer')
-      : 'paid_held';
+    const orderStatus: string = paymentConfirmed
+      ? 'paid_held'
+      : isBankRails
+        ? (effectivePaymentMethod === 'wire' ? 'awaiting_wire' : 'awaiting_bank_transfer')
+        : 'pending';
 
     const orderData: any = {
       listingId,
@@ -350,8 +368,8 @@ export async function handleCheckoutSessionCompleted(
       stripePaymentIntentId: paymentIntentId,
       sellerStripeAccountId: sellerStripeAccountId,
       // For async bank rails, payment is not confirmed yet; paidAt/dispute window are set on async success.
-      paidAt: isBankRails ? null : now,
-      disputeDeadlineAt: isBankRails ? null : disputeDeadline,
+      paidAt: isAsync ? null : now,
+      disputeDeadlineAt: isAsync ? null : disputeDeadline,
       adminHold: false,
       createdAt: now,
       updatedAt: now,
@@ -362,7 +380,7 @@ export async function handleCheckoutSessionCompleted(
       protectedDisputeStatus: 'none',
       // Compliance fields
       transferPermitRequired: transferPermitRequired,
-      transferPermitStatus: transferPermitRequired ? 'none' : undefined,
+      ...(transferPermitRequired ? { transferPermitStatus: 'none' as const } : {}),
       // Seller tier + fee snapshot (immutable at time of checkout)
       sellerTierSnapshot: effectivePlanAtCheckout,
       platformFeePercent: feePercentAtCheckout, // e.g., 0.05 = 5%
@@ -403,7 +421,7 @@ export async function handleCheckoutSessionCompleted(
       listingId: listingId,
       beforeState: {},
       afterState: {
-        status: 'paid',
+        status: orderStatus,
         amount: amount / 100,
         platformFee: platformFee / 100,
         sellerAmount: sellerAmount / 100,
@@ -418,8 +436,8 @@ export async function handleCheckoutSessionCompleted(
       source: 'webhook',
     });
 
-    // For async bank rails, reserve the listing (do NOT mark sold until payment is confirmed).
-    if (isBankRails) {
+    // For async payment methods, reserve the listing (do NOT mark sold until payment is confirmed).
+    if (isAsync) {
       await listingRef.set(
         {
           purchaseReservedByOrderId: orderRef.id,
@@ -436,48 +454,52 @@ export async function handleCheckoutSessionCompleted(
       });
     }
 
-    // Create notifications for buyer and seller
+    // Emit canonical notification events for buyer and seller
     try {
       const listingTitle = listingData.title || 'your listing';
       
-        // Notify buyer
-      await db.collection('notifications').add({
-        userId: buyerId,
-        type: 'order_created',
-        title: 'Order Confirmed',
-          body: isBankRails
-            ? `Your order for "${listingTitle}" has been created. Awaiting ${effectivePaymentMethod === 'wire' ? 'wire' : 'bank transfer'} payment.`
-            : `Your order for "${listingTitle}" has been confirmed. Payment received.`,
-        read: false,
-        createdAt: now,
-        linkUrl: `/dashboard/orders`,
-        linkLabel: 'View Order',
-        listingId,
-        orderId: orderRef.id,
-        metadata: {
-          amount: amount / 100,
-        },
-      });
+      const base = getSiteUrl();
+      const buyerOrderUrl = `${base}/dashboard/orders/${orderRef.id}`;
+      const sellerOrderUrl = `${base}/seller/orders/${orderRef.id}`;
 
-        // Notify seller
-      await db.collection('notifications').add({
-        userId: sellerId,
-        type: 'order_created',
-        title: 'New Order Received',
-          body: isBankRails
-            ? `You received a high-ticket order for "${listingTitle}" - awaiting payment confirmation.`
-            : `You received an order for "${listingTitle}" - $${(amount / 100).toLocaleString()}`,
-        read: false,
-        createdAt: now,
-        linkUrl: `/seller/orders`,
-        linkLabel: 'View Order',
-        listingId,
-        orderId: orderRef.id,
-        metadata: {
-          amount: amount / 100,
-          sellerAmount: sellerAmount / 100,
-        },
-      });
+      if (buyerId) {
+        await emitEventForUser({
+          type: 'Order.Confirmed',
+          actorId: 'system',
+          entityType: 'order',
+          entityId: orderRef.id,
+          targetUserId: buyerId,
+          payload: {
+            type: 'Order.Confirmed',
+            orderId: orderRef.id,
+            listingId,
+            listingTitle,
+            orderUrl: buyerOrderUrl,
+            amount: amount / 100,
+            paymentMethod: effectivePaymentMethod || undefined,
+          },
+          optionalHash: `checkout:${checkoutSessionId}`,
+        });
+      }
+
+      if (sellerId) {
+        await emitEventForUser({
+          type: 'Order.Received',
+          actorId: 'system',
+          entityType: 'order',
+          entityId: orderRef.id,
+          targetUserId: sellerId,
+          payload: {
+            type: 'Order.Received',
+            orderId: orderRef.id,
+            listingId,
+            listingTitle,
+            orderUrl: sellerOrderUrl,
+            amount: amount / 100,
+          },
+          optionalHash: `checkout:${checkoutSessionId}`,
+        });
+      }
     } catch (notifError) {
       // Don't fail order creation if notification fails
       logWarn('Error creating notifications for order', {
@@ -488,11 +510,13 @@ export async function handleCheckoutSessionCompleted(
       });
     }
 
-    logInfo(isBankRails ? 'Order created and listing reserved (awaiting bank rails)' : 'Order created and listing marked as sold', {
+    logInfo(isAsync ? 'Order created and listing reserved (awaiting async payment confirmation)' : 'Order created and listing marked as sold', {
       requestId,
       route: '/api/stripe/webhook',
       orderId: orderRef.id,
       listingId,
+      paymentMethod: effectivePaymentMethod,
+      paymentStatus: (session as any).payment_status,
     });
   } catch (error) {
     logError('Error handling checkout.session.completed', error, {
@@ -518,8 +542,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
   const listingId = session.metadata?.listingId;
   const buyerId = session.metadata?.buyerId;
   const sellerId = session.metadata?.sellerId;
-  const paymentMethod = (session.metadata?.paymentMethod as any) as 'card' | 'bank_transfer' | 'wire' | undefined;
-  const effectivePaymentMethod = paymentMethod || 'bank_transfer';
+  const effectivePaymentMethod = inferEffectivePaymentMethodFromCheckoutSession(session);
 
   if (!listingId || !buyerId || !sellerId) {
     logError('Missing required metadata in async_payment_succeeded session', undefined, {
@@ -641,6 +664,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     listingId,
     checkoutSessionId,
     paymentIntentId,
+    paymentMethod: effectivePaymentMethod,
   });
 }
 
@@ -713,6 +737,151 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
 }
 
 /**
+ * Handle payment_intent.succeeded for wire/bank transfer PaymentIntents (non-Checkout flow).
+ *
+ * Transitions: awaiting_wire → paid_held and marks listing sold.
+ */
+export async function handleWirePaymentIntentSucceeded(
+  db: Firestore,
+  paymentIntent: Stripe.PaymentIntent,
+  requestId?: string
+) {
+  const pi: any = paymentIntent as any;
+  const paymentMethod = String(pi?.metadata?.paymentMethod || '');
+  if (paymentMethod !== 'wire') return; // Only handle wire intents created by this app.
+
+  const orderIdFromMeta = pi?.metadata?.orderId ? String(pi.metadata.orderId) : null;
+  const paymentIntentId = String(paymentIntent.id || '');
+  if (!paymentIntentId) return;
+
+  const ordersRef = db.collection('orders');
+
+  // Prefer direct lookup by orderId (if present), fall back to query by PI id.
+  let orderDoc: FirebaseFirestore.DocumentSnapshot | null = null;
+  if (orderIdFromMeta) {
+    const snap = await ordersRef.doc(orderIdFromMeta).get();
+    if (snap.exists) orderDoc = snap;
+  }
+  if (!orderDoc) {
+    const q = await ordersRef.where('stripePaymentIntentId', '==', paymentIntentId).limit(1).get();
+    orderDoc = q.empty ? null : q.docs[0]!;
+  }
+
+  if (!orderDoc || !orderDoc.exists) {
+    logWarn('Wire PI succeeded but no order found', {
+      requestId,
+      route: '/api/stripe/webhook',
+      paymentIntentId,
+      orderIdFromMeta: orderIdFromMeta || undefined,
+    });
+    return;
+  }
+
+  const orderData = orderDoc.data() as any;
+  const currentStatus = String(orderData?.status || '');
+
+  if (currentStatus === 'paid_held' || currentStatus === 'paid' || currentStatus === 'completed') {
+    logInfo('Wire PI succeeded already applied (idempotent)', {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId: orderDoc.id,
+      paymentIntentId,
+      status: currentStatus,
+    });
+    return;
+  }
+
+  const listingId = orderData?.listingId ? String(orderData.listingId) : null;
+
+  const now = new Date();
+  const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
+  const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
+
+  await (orderDoc.ref as any).set(
+    {
+      status: 'paid_held',
+      paymentMethod: 'wire',
+      stripePaymentIntentId: paymentIntentId,
+      paidAt: now,
+      disputeDeadlineAt: disputeDeadline,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  if (listingId) {
+    await db.collection('listings').doc(listingId).set(
+      {
+        status: 'sold',
+        purchaseReservedByOrderId: null,
+        purchaseReservedAt: null,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  }
+
+  logInfo('Wire PI succeeded: order marked paid_held and listing marked sold', {
+    requestId,
+    route: '/api/stripe/webhook',
+    orderId: orderDoc.id,
+    listingId: listingId || undefined,
+    paymentIntentId,
+  });
+}
+
+/**
+ * Handle payment_intent.canceled for wire PaymentIntents.
+ *
+ * Transitions: awaiting_wire → cancelled and clears listing reservation.
+ */
+export async function handleWirePaymentIntentCanceled(
+  db: Firestore,
+  paymentIntent: Stripe.PaymentIntent,
+  requestId?: string
+) {
+  const pi: any = paymentIntent as any;
+  const paymentMethod = String(pi?.metadata?.paymentMethod || '');
+  if (paymentMethod !== 'wire') return;
+
+  const paymentIntentId = String(paymentIntent.id || '');
+  if (!paymentIntentId) return;
+
+  const ordersRef = db.collection('orders');
+  const q = await ordersRef.where('stripePaymentIntentId', '==', paymentIntentId).limit(1).get();
+  if (q.empty) return;
+
+  const orderDoc = q.docs[0]!;
+  const orderData = orderDoc.data() as any;
+  const status = String(orderData?.status || '');
+  if (status === 'paid_held' || status === 'paid' || status === 'completed') return;
+
+  const listingId = orderData?.listingId ? String(orderData.listingId) : null;
+  const now = new Date();
+
+  await orderDoc.ref.set({ status: 'cancelled', updatedAt: now }, { merge: true });
+
+  if (listingId) {
+    await db.collection('listings').doc(listingId).set(
+      {
+        purchaseReservedByOrderId: null,
+        purchaseReservedAt: null,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  }
+
+  logInfo('Wire PI canceled: order cancelled and listing reservation cleared', {
+    requestId,
+    route: '/api/stripe/webhook',
+    orderId: orderDoc.id,
+    listingId: listingId || undefined,
+    paymentIntentId,
+  });
+}
+
+/**
  * Handle charge.dispute.created event
  * Creates chargeback record and places order on hold
  */
@@ -762,13 +931,18 @@ export async function handleChargeDisputeCreated(
       if (!orderQuery.empty) {
         const orderDoc = orderQuery.docs[0];
         const orderId = orderDoc.id;
-        
-        // Place order on hold
+        const before = orderDoc.data() || {};
+
+        // Phase 2D (CRITICAL): Normalize chargeback → order safety flags.
+        // We do NOT rewrite escrow logic; we only ensure the data that escrow logic already relies on is present.
+        // - chargebackStatus: normalized to 'open' | 'won' | 'lost'
+        // - adminHold: true (prevents manual/auto release)
+        // - payoutHoldReason: 'chargeback' (explicit UI + safety gate)
         await orderDoc.ref.update({
+          chargebackStatus: 'open',
           adminHold: true,
-          payoutHoldReason: 'admin_hold',
-          disputeStatus: 'open',
-          disputedAt: new Date(),
+          payoutHoldReason: 'chargeback',
+          adminHoldReason: `Stripe chargeback opened (${disputeId})`,
           updatedAt: new Date(),
           lastUpdatedByRole: 'admin',
         });
@@ -781,13 +955,14 @@ export async function handleChargeDisputeCreated(
           orderId: orderId,
           listingId: orderDoc.data()?.listingId,
           beforeState: {
-            adminHold: orderDoc.data()?.adminHold || false,
-            disputeStatus: orderDoc.data()?.disputeStatus || 'none',
+            adminHold: before?.adminHold || false,
+            payoutHoldReason: before?.payoutHoldReason || 'none',
+            chargebackStatus: before?.chargebackStatus || 'unknown',
           },
           afterState: {
             adminHold: true,
-            payoutHoldReason: 'admin_hold',
-            disputeStatus: 'open',
+            payoutHoldReason: 'chargeback',
+            chargebackStatus: 'open',
           },
           metadata: {
             disputeId,
@@ -814,6 +989,76 @@ export async function handleChargeDisputeCreated(
     }
   } catch (error) {
     logError('Error handling charge.dispute.created', error, {
+      requestId,
+      route: '/api/stripe/webhook',
+    });
+    throw error;
+  }
+}
+
+/**
+ * Handle charge.dispute.updated event
+ *
+ * Phase 2D (CRITICAL): Keep order safety flags in sync as Stripe dispute status changes.
+ * This prevents ghost states where the chargeback exists in Stripe but the order is still releasable.
+ */
+export async function handleChargeDisputeUpdated(db: Firestore, dispute: Stripe.Dispute, requestId?: string) {
+  try {
+    const disputeId = dispute.id;
+    const paymentIntentId = dispute.payment_intent;
+    const status = String(dispute.status || '');
+
+    logInfo('Processing chargeback updated', {
+      requestId,
+      route: '/api/stripe/webhook',
+      disputeId,
+      paymentIntentId,
+      status,
+    });
+
+    if (!paymentIntentId) return;
+
+    const ordersRef = db.collection('orders');
+    const orderQuery = await ordersRef.where('stripePaymentIntentId', '==', paymentIntentId).limit(1).get();
+    if (orderQuery.empty) return;
+
+    const orderDoc = orderQuery.docs[0];
+    const orderId = orderDoc.id;
+    const before = orderDoc.data() || {};
+
+    const normalized: 'open' | 'won' | 'lost' =
+      status === 'won' ? 'won' : status === 'lost' ? 'lost' : 'open';
+
+    await orderDoc.ref.update({
+      chargebackStatus: normalized,
+      adminHold: true,
+      payoutHoldReason: 'chargeback',
+      adminHoldReason: `Stripe chargeback ${normalized} (${disputeId})`,
+      updatedAt: new Date(),
+      lastUpdatedByRole: 'admin',
+    });
+
+    await createAuditLog(db, {
+      actorUid: 'webhook',
+      actorRole: 'webhook',
+      actionType: 'chargeback_updated',
+      orderId,
+      listingId: before?.listingId,
+      beforeState: {
+        adminHold: before?.adminHold || false,
+        payoutHoldReason: before?.payoutHoldReason || 'none',
+        chargebackStatus: before?.chargebackStatus || 'unknown',
+      },
+      afterState: {
+        adminHold: true,
+        payoutHoldReason: 'chargeback',
+        chargebackStatus: normalized,
+      },
+      metadata: { disputeId, status },
+      source: 'webhook',
+    });
+  } catch (error) {
+    logError('Error handling charge.dispute.updated', error, {
       requestId,
       route: '/api/stripe/webhook',
     });

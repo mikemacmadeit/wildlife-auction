@@ -79,7 +79,11 @@ export interface Offer {
 export interface WhitetailBreederAttributes {
   speciesId: 'whitetail_deer'; // Fixed enum
   sex: 'male' | 'female' | 'unknown'; // Required
-  age?: string; // Optional
+  /**
+   * Age in years (number). Kept as `number | string` for backward compatibility with legacy docs.
+   * New listing creation should write a number so we can filter/query reliably.
+   */
+  age?: number | string;
   quantity: number; // Required, default 1
   tpwdBreederPermitNumber: string; // Required
   breederFacilityId: string; // Required
@@ -99,7 +103,11 @@ export interface WhitetailBreederAttributes {
 export interface WildlifeAttributes {
   speciesId: string; // Controlled list: axis, fallow, blackbuck, aoudad, nilgai, etc. or 'other_exotic'
   sex: 'male' | 'female' | 'unknown'; // Required
-  age?: string; // Optional
+  /**
+   * Age in years (number). Kept as `number | string` for backward compatibility with legacy docs.
+   * New listing creation should write a number so we can filter/query reliably.
+   */
+  age?: number | string;
   quantity: number; // Required, default 1
   locationType?: 'seller_location' | 'facility'; // Optional
   animalIdDisclosure: boolean; // Required: seller confirms animals are properly identified/tagged
@@ -111,7 +119,11 @@ export interface WildlifeAttributes {
 export interface CattleAttributes {
   breed: string; // Required
   sex: 'bull' | 'cow' | 'heifer' | 'steer' | 'unknown'; // Required
-  age?: string; // Optional (one of age or weightRange required)
+  /**
+   * Age in years (number). Kept as `number | string` for backward compatibility with legacy docs.
+   * New listing creation should write a number so we can filter/query reliably.
+   */
+  age?: number | string; // Optional (one of age or weightRange required)
   weightRange?: string; // Optional, ex "1100-1250 lbs" (one of age or weightRange required)
   registered: boolean; // Required
   registrationNumber?: string; // Required if registered=true
@@ -215,7 +227,25 @@ export interface Listing {
   startingBid?: number; // For auction listings
   
   // Media
+  /**
+   * Legacy image URLs (back-compat).
+   * New code should prefer `photos` / `photoIds` and derive URLs from the cached snapshot.
+   */
   images: string[]; // Firebase Storage URLs
+
+  /**
+   * Phase 1 (Uploads Library): listing photos reference user-scoped uploads.
+   * Source-of-truth is `photoIds`; `photos` is a cached snapshot for fast public reads.
+   */
+  photoIds?: string[];
+  photos?: Array<{
+    photoId: string;
+    url: string;
+    width?: number;
+    height?: number;
+    sortOrder?: number;
+  }>;
+  coverPhotoId?: string;
   
   // Location
   location: {
@@ -231,6 +261,12 @@ export interface Listing {
   sellerSnapshot?: {
     displayName: string;
     verified: boolean;
+    /**
+     * Phase 3A (A4): public trust snapshot for anon-safe trust surfaces.
+     * These values are copied at publish time (server-side) to avoid requiring reads of /users/{uid}.
+     */
+    completedSalesCount?: number;
+    badges?: string[];
   };
 
   /**
@@ -276,6 +312,14 @@ export interface Listing {
     favorites: number;
     bidCount: number;
   };
+
+  /**
+   * Phase 3A/B3 (scale-safe watchers): denormalized, server-maintained watcher count.
+   * Source of truth is maintained by `POST /api/watchlist/toggle` (Admin SDK).
+   *
+   * Back-compat: older listings may rely on `metrics.favorites`.
+   */
+  watcherCount?: number;
   
   // Audit Trail (JavaScript Date objects - converted from Firestore Timestamps)
   createdAt: Date;
@@ -360,9 +404,9 @@ export type DisputeReason = 'death' | 'serious_illness' | 'injury' | 'escape' | 
 
 export type DisputeStatus = 'none' | 'open' | 'needs_evidence' | 'under_review' | 'resolved_refund' | 'resolved_partial_refund' | 'resolved_release' | 'cancelled';
 
-export type PayoutHoldReason = 'none' | 'protection_window' | 'dispute_open' | 'admin_hold';
+export type PayoutHoldReason = 'none' | 'protection_window' | 'dispute_open' | 'admin_hold' | 'chargeback';
 
-export type OrderPaymentMethod = 'card' | 'bank_transfer' | 'wire';
+export type OrderPaymentMethod = 'card' | 'ach_debit' | 'bank_transfer' | 'wire';
 
 export interface DisputeEvidence {
   type: 'photo' | 'video' | 'vet_report' | 'delivery_doc' | 'tag_microchip';
@@ -445,7 +489,17 @@ export interface Order {
   transferPermitRequired?: boolean; // Whether transfer permit is required for this order
 
   // Chargeback tracking (optional; used for payout hold logic)
-  chargebackStatus?: 'active' | 'funds_withdrawn' | 'won' | 'lost' | 'warning_needs_response' | 'needs_response' | 'unknown';
+  /**
+   * Stripe dispute/chargeback safety flag (normalized in Stripe webhooks).
+   *
+   * Phase 2D requires that payouts are never released while a chargeback is open.
+   * We normalize disparate Stripe statuses into a simple set:
+   * - open: any in-progress dispute status
+   * - won / lost: terminal outcomes
+   *
+   * Back-compat: older values like 'needs_response' may still appear on historical orders.
+   */
+  chargebackStatus?: 'open' | 'active' | 'funds_withdrawn' | 'won' | 'lost' | 'warning_needs_response' | 'needs_response' | 'unknown';
 }
 
 export interface FilterState {

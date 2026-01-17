@@ -139,7 +139,7 @@ const ListingRow = memo(({
           <>
             <div className="flex items-center gap-2">
               <Users className="h-3 w-3" />
-              <span>{Math.floor(listing.metrics.favorites * 0.3)} watchers</span>
+              <span>{listing.metrics.favorites} watchers</span>
             </div>
             <div className="flex items-center gap-2">
               <Gavel className="h-3 w-3" />
@@ -231,7 +231,7 @@ const MobileListingCard = memo(({
         <>
           <div className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            <span>{Math.floor(listing.metrics.favorites * 0.3)} watchers</span>
+            <span>{listing.metrics.favorites} watchers</span>
           </div>
           <div className="flex items-center gap-1">
             <Gavel className="h-3 w-3" />

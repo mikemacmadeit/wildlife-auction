@@ -47,6 +47,26 @@ if (typeof window !== 'undefined') {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+
+  // Dev diagnostics: if auth/project/bucket are mismatched, you'll see rules "permission-denied" even after deploy.
+  // Don't rely on NODE_ENV (some environments set it to non-standard values); just log on localhost.
+  try {
+    const host = window.location?.hostname || '';
+    const isLocal =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.endsWith('.localhost');
+    if (isLocal) {
+      // eslint-disable-next-line no-console
+      console.log('[firebase] client config', {
+        projectId: firebaseConfig.projectId,
+        storageBucket: firebaseConfig.storageBucket,
+        authDomain: firebaseConfig.authDomain,
+      });
+    }
+  } catch {
+    // ignore
+  }
   
   // Initialize Analytics (only on client-side, async)
   isSupported().then((supported) => {

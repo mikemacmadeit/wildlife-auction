@@ -19,6 +19,7 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { containsProhibitedKeywords } from '@/lib/compliance/validation';
+import { ACH_DEBIT_MIN_TOTAL_USD } from '@/lib/payments/constants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -111,7 +112,9 @@ export async function POST(request: Request) {
     const buyerId = decodedToken.uid;
 
     // Verified email required before checkout (reduces fraud + ensures receipt delivery / supportability).
-    if ((decodedToken as any)?.email_verified !== true) {
+    // IMPORTANT: do not rely solely on ID token claims here; they can be stale until the client refreshes.
+    const buyerRecord = await auth.getUser(buyerId).catch(() => null as any);
+    if (buyerRecord?.emailVerified !== true) {
       return NextResponse.json(
         {
           error: 'Email verification required',
@@ -143,7 +146,10 @@ export async function POST(request: Request) {
     }
 
     const { listingId, offerId, paymentMethod: paymentMethodRaw } = validation.data as any;
-    const paymentMethod = (paymentMethodRaw || 'card') as 'card' | 'bank_transfer' | 'wire';
+    // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
+    const normalizedPaymentMethod =
+      paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');
+    const paymentMethod = normalizedPaymentMethod as 'card' | 'ach_debit';
 
     // Get listing from Firestore using Admin SDK
     const listingRef = db.collection('listings').doc(listingId);
@@ -447,8 +453,17 @@ export async function POST(request: Request) {
     const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
-    // IMPORTANT: Do not price-gate payment methods. All methods are allowed at any amount.
-    // (Stripe-level constraints still apply; e.g., bank rails require a Stripe Customer.)
+    // Server-side gating (mirrors UI gating): ACH is only allowed above the configured threshold.
+    if (paymentMethod === 'ach_debit' && amount < Math.round(ACH_DEBIT_MIN_TOTAL_USD * 100)) {
+      return NextResponse.json(
+        {
+          error: 'ACH debit is only available for eligible orders',
+          code: 'ACH_NOT_ELIGIBLE',
+          details: { minTotalUsd: ACH_DEBIT_MIN_TOTAL_USD, totalUsd: amount / 100 },
+        },
+        { status: 400 }
+      );
+    }
 
     // Create Stripe Checkout Session with ESCROW (no destination charge)
     // Funds are held in platform account until admin confirms delivery
@@ -458,7 +473,7 @@ export async function POST(request: Request) {
     const requiresAddress = animalCategories.includes(listingData.category);
     
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ['card'],
+      payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],
       line_items: [
         {
           price_data: {
@@ -496,49 +511,6 @@ export async function POST(request: Request) {
       },
       customer_email: decodedToken.email || undefined,
     };
-
-    // High-ticket rails: Stripe Checkout bank transfer (customer balance funding instructions).
-    // NOTE: This keeps the "hold on platform + release by transfer" model intact
-    // because we still DO NOT use destination charges / transfer_data here.
-    if (paymentMethod === 'bank_transfer' || paymentMethod === 'wire') {
-      if (!decodedToken.email) {
-        return NextResponse.json(
-          { error: 'Email is required to use bank transfer checkout.' },
-          { status: 400 }
-        );
-      }
-
-      // Get or create Stripe Customer for buyer (required for bank transfer in Checkout)
-      const buyerRef = db.collection('users').doc(buyerId);
-      const buyerSnap = await buyerRef.get();
-      const buyerData = buyerSnap.exists ? buyerSnap.data() : {};
-      let stripeCustomerId = buyerData?.stripeCustomerId as string | undefined;
-
-      if (!stripeCustomerId) {
-        const customer = await stripe.customers.create({
-          email: decodedToken.email,
-          metadata: { userId: buyerId },
-        });
-        stripeCustomerId = customer.id;
-        await buyerRef.set({ stripeCustomerId }, { merge: true });
-      }
-
-      // Stripe bank transfer / wire rails are asynchronous; Checkout shows funding instructions.
-      // We intentionally restrict to customer_balance to avoid card use on this path.
-      sessionConfig.customer = stripeCustomerId;
-      delete (sessionConfig as any).customer_email;
-      sessionConfig.payment_method_types = ['customer_balance'];
-      sessionConfig.payment_method_options = {
-        customer_balance: {
-          funding_type: 'bank_transfer',
-          bank_transfer: {
-            // Stripe will generate US bank transfer instructions (push payment rails).
-            // This is the closest supported "bank transfer / wire" experience without custom bank reconciliation.
-            type: 'us_bank_transfer',
-          },
-        },
-      } as any;
-    }
     
     // Require address collection for animal listings (TX-only enforcement)
     if (requiresAddress) {
@@ -563,7 +535,26 @@ export async function POST(request: Request) {
       });
     }
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await stripe.checkout.sessions.create(sessionConfig);
+    } catch (stripeError: any) {
+      const msg = String(stripeError?.message || '');
+      const lower = msg.toLowerCase();
+      if (lower.includes('rejected') || lower.includes('account has been rejected') || lower.includes('cannot create new')) {
+        return NextResponse.json(
+          {
+            error: 'Stripe platform account rejected',
+            code: 'STRIPE_PLATFORM_REJECTED',
+            message:
+              'Stripe is currently blocking payments because the platform account is rejected. Resolve this in Stripe Dashboard, then retry.',
+            stripe: { type: stripeError?.type, code: stripeError?.code },
+          },
+          { status: 503 }
+        );
+      }
+      throw stripeError;
+    }
 
     if (offerId && offerRef) {
       try {

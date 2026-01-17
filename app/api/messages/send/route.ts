@@ -9,6 +9,8 @@
 import { sanitizeMessage } from '@/lib/safety/sanitizeMessage';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -151,33 +153,33 @@ export async function POST(request: Request) {
       flagged: newViolationCount >= 3 || threadData.flagged || false,
     });
 
-    // Create notification for recipient
+    // Emit canonical notification event for recipient (fan-out handled by processors)
     try {
       const listingRef = db.collection('listings').doc(listingId);
       const listingDoc = await listingRef.get();
       const listingData = listingDoc.exists ? listingDoc.data() : null;
       const listingTitle = listingData?.title || 'a listing';
 
-      const notificationsRef = db.collection('notifications');
-      await notificationsRef.add({
-        userId: recipientId,
-        type: 'message_received',
-        title: 'New Message',
-        body: `${senderId === threadData.buyerId ? 'Buyer' : 'Seller'} sent you a message about "${listingTitle}"`,
-        read: false,
-        createdAt: new Date(),
-        linkUrl: `/dashboard/messages?listingId=${listingId}&sellerId=${threadData.sellerId}`,
-        linkLabel: 'View Message',
-        listingId,
-        threadId,
-        metadata: {
-          senderId,
+      await emitEventForUser({
+        type: 'Message.Received',
+        actorId: senderId,
+        entityType: 'message_thread',
+        entityId: threadId,
+        targetUserId: recipientId,
+        payload: {
+          type: 'Message.Received',
+          threadId,
+          listingId,
+          listingTitle,
+          threadUrl: `${getSiteUrl()}/dashboard/messages?listingId=${listingId}&sellerId=${threadData.sellerId}`,
+          senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
           preview: sanitizeResult.sanitizedText.substring(0, 100),
         },
+        optionalHash: `msg:${messageRef.id}`,
       });
     } catch (notifError) {
       // Don't fail message send if notification fails
-      console.error('Error creating notification:', notifError);
+      console.error('Error emitting message_received notification event:', notifError);
     }
 
     return json({

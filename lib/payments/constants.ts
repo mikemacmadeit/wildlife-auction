@@ -1,0 +1,3 @@
+export const ACH_DEBIT_MIN_TOTAL_USD = 2_500;
+export const WIRE_TRANSFER_MIN_TOTAL_USD = 10_000;
+

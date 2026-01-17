@@ -8,16 +8,18 @@ interface ListingActivityMetricsProps {
   favorites?: number;
   bids?: number;
   watchers?: number;
+  bidsLastHour?: number;
   inquiries?: number;
   className?: string;
 }
 
 export function ListingActivityMetrics({
-  views = 1247,
-  favorites = 23,
-  bids = 8,
-  watchers = 12,
-  inquiries = 5,
+  views = 0,
+  favorites = 0,
+  bids = 0,
+  watchers = 0,
+  bidsLastHour = 0,
+  inquiries = 0,
   className
 }: ListingActivityMetricsProps) {
   const metrics = [
@@ -47,6 +49,17 @@ export function ListingActivityMetrics({
       icon: TrendingUp,
       label: 'Bids',
       value: bids,
+      iconColor: 'text-[hsl(90,18%,35%)] dark:text-primary',
+      valueColor: 'text-[hsl(90,18%,35%)] dark:text-primary',
+      bgColor: 'bg-primary/25 dark:bg-primary/30',
+      borderColor: 'border-2 border-[hsl(90,18%,35%)]/70 dark:border-primary/60',
+      hoverBg: 'hover:bg-primary/30 dark:hover:bg-primary/35',
+      hoverBorder: 'hover:border-[hsl(90,18%,35%)]/90 dark:hover:border-primary/70',
+    },
+    {
+      icon: TrendingUp,
+      label: 'Bids (1h)',
+      value: bidsLastHour,
       iconColor: 'text-[hsl(90,18%,35%)] dark:text-primary',
       valueColor: 'text-[hsl(90,18%,35%)] dark:text-primary',
       bgColor: 'bg-primary/25 dark:bg-primary/30',

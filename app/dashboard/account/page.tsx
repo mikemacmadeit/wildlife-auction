@@ -686,75 +686,23 @@ export default function AccountPage() {
                   Notification Preferences
                 </CardTitle>
                 <CardDescription>
-                  Choose how you want to be notified about activity on your listings
+                  Manage email, push, quiet hours, and category-level controls.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">Email Notifications</p>
-                    <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+                <div className="rounded-lg border border-border/50 bg-background/50 p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Notification settings have moved to a dedicated page so they can control in-app, email, and push
+                    notifications consistently across auctions, orders, onboarding, and marketing.
+                  </p>
+                  <div className="mt-4 flex gap-2 flex-wrap">
+                    <Button asChild>
+                      <Link href="/dashboard/settings/notifications">Open notification settings</Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/dashboard/notifications">View notifications</Link>
+                    </Button>
                   </div>
-                  <Switch 
-                    checked={formData.notifications.email}
-                    onCheckedChange={(checked) => setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, email: checked }
-                    })}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">SMS Notifications</p>
-                    <p className="text-sm text-muted-foreground">Receive notifications via text message</p>
-                  </div>
-                  <Switch 
-                    checked={formData.notifications.sms}
-                    onCheckedChange={(checked) => setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, sms: checked }
-                    })}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">New Bids</p>
-                    <p className="text-sm text-muted-foreground">Get notified when someone places a bid on your listings</p>
-                  </div>
-                  <Switch 
-                    checked={formData.notifications.bids}
-                    onCheckedChange={(checked) => setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, bids: checked }
-                    })}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">Messages</p>
-                    <p className="text-sm text-muted-foreground">Get notified when you receive new messages</p>
-                  </div>
-                  <Switch 
-                    checked={formData.notifications.messages}
-                    onCheckedChange={(checked) => setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, messages: checked }
-                    })}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
-                  <div>
-                    <p className="font-semibold text-foreground">Promotional Emails</p>
-                    <p className="text-sm text-muted-foreground">Receive tips, updates, and special offers</p>
-                  </div>
-                  <Switch 
-                    checked={formData.notifications.promotions}
-                    onCheckedChange={(checked) => setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, promotions: checked }
-                    })}
-                  />
                 </div>
               </CardContent>
             </Card>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { HelpButton } from '@/components/help/HelpButton';
 import { HelpPanel } from '@/components/help/HelpPanel';
@@ -9,7 +9,7 @@ import { TourOverlay } from '@/components/help/TourOverlay';
 import { HELP_CONTENT } from '@/help/helpContent';
 import { TOURS } from '@/help/tours';
 import { getHelpKeyForPathname } from '@/lib/help/helpKeys';
-import { setTourBannerDismissed } from '@/lib/help/helpState';
+import { getHelpBannerState, setTourBannerDismissed, setTourSeen } from '@/lib/help/helpState';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 
@@ -24,10 +24,42 @@ export function HelpLauncher() {
 
   const [open, setOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+  const [tourSeen, setTourSeenState] = useState<boolean>(false);
+  const [tourBannerDismissed, setTourBannerDismissedState] = useState<boolean>(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!helpKey) {
+        if (!cancelled) {
+          setTourSeenState(false);
+          setTourBannerDismissedState(false);
+          setReady(true);
+        }
+        return;
+      }
+      const s = await getHelpBannerState(uid, helpKey);
+      if (cancelled) return;
+      setTourSeenState(s.tourSeen === true);
+      setTourBannerDismissedState(s.dismissedTourBanner === true);
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, helpKey]);
 
   const dismissTourBanner = async () => {
     if (!helpKey) return;
     await setTourBannerDismissed(uid, helpKey);
+    setTourBannerDismissedState(true);
+  };
+
+  const markTourSeen = async () => {
+    if (!helpKey) return;
+    await setTourSeen(uid, helpKey);
+    setTourSeenState(true);
   };
 
   const topOffset = useMemo(() => {
@@ -41,38 +73,53 @@ export function HelpLauncher() {
   const hideOnAuthPages = pathname === '/login' || pathname === '/register';
   if (hideOnAuthPages) return null;
 
+  // Refine help scope: only show on pages with curated help content.
+  // Also: never show on homepage (per request).
+  if (pathname === '/') return null;
+  if (!helpKey) return null;
+  if (!ready) return null;
+
+  // Seller overview: we want tour-only (no floating help button / panel).
+  const tourOnly = helpKey === 'seller_overview';
+
   return (
     <>
       {/* Persistent launcher (consistent placement, minimal overlap risk) */}
-      <div className={cn('fixed right-4 z-[60]', topOffset)}>
-        <HelpButton onClick={() => setOpen(true)} />
-      </div>
+      {!tourOnly ? (
+        <div className={cn('fixed right-4 z-[60]', topOffset)}>
+          <HelpButton onClick={() => setOpen(true)} />
+        </div>
+      ) : null}
 
       {/* First-time banner (only shows on pages with a tour) */}
-      {helpKey && tour?.steps?.length ? (
+      {helpKey && tour?.steps?.length && tourSeen !== true && tourBannerDismissed !== true ? (
         <div className="fixed bottom-20 md:bottom-6 left-0 right-0 z-[55] px-4">
           <div className="container mx-auto max-w-4xl">
             <FirstTimeTourBanner
               uid={uid}
               helpKey={helpKey}
               onStartTour={() => setTourOpen(true)}
+              // If they click "Not now", persist dismissal and stop showing the banner.
+              className=""
             />
           </div>
         </div>
       ) : null}
 
-      <HelpPanel
-        open={open}
-        onOpenChange={setOpen}
-        content={content}
-        showStartTour={!!tour?.steps?.length}
-        onStartTour={() => {
-          // Starting from the Help panel should also permanently dismiss the first-time banner.
-          void dismissTourBanner();
-          setOpen(false);
-          setTourOpen(true);
-        }}
-      />
+      {!tourOnly ? (
+        <HelpPanel
+          open={open}
+          onOpenChange={setOpen}
+          content={content}
+          showStartTour={!!tour?.steps?.length && tourSeen !== true}
+          onStartTour={() => {
+            // Tour should only ever open once (even if user clicks Start tour).
+            void markTourSeen();
+            setOpen(false);
+            setTourOpen(true);
+          }}
+        />
+      ) : null}
 
       {tour?.steps?.length ? (
         <TourOverlay
@@ -81,7 +128,7 @@ export function HelpLauncher() {
           steps={tour.steps}
           onClose={() => {
             // If they complete OR exit, don't show the tour popup again for this page.
-            void dismissTourBanner();
+            void markTourSeen();
             setTourOpen(false);
           }}
         />

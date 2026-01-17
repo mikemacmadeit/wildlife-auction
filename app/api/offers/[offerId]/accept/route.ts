@@ -8,6 +8,8 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
 
 export async function POST(request: Request, ctx: { params: { offerId: string } }) {
@@ -112,6 +114,48 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       metadata: { offerId, acceptedAmount: result.amount },
       source: result.sellerId === actorId ? 'seller_ui' : 'buyer_ui',
     });
+
+    // Phase 3A (A3): Notify both sides that the offer was accepted.
+    try {
+      const base = getSiteUrl();
+      const listingTitle = String((await db.collection('listings').doc(result.listingId).get()).data()?.title || 'a listing');
+
+      await emitEventForUser({
+        type: 'Offer.Accepted',
+        actorId,
+        entityType: 'listing',
+        entityId: result.listingId,
+        targetUserId: result.buyerId,
+        payload: {
+          type: 'Offer.Accepted',
+          offerId,
+          listingId: result.listingId,
+          listingTitle,
+          offerUrl: `${base}/dashboard/offers`,
+          amount: result.amount,
+        },
+        optionalHash: `offer:${offerId}:accepted`,
+      });
+
+      await emitEventForUser({
+        type: 'Offer.Accepted',
+        actorId,
+        entityType: 'listing',
+        entityId: result.listingId,
+        targetUserId: result.sellerId,
+        payload: {
+          type: 'Offer.Accepted',
+          offerId,
+          listingId: result.listingId,
+          listingTitle,
+          offerUrl: `${base}/seller/offers/${offerId}`,
+          amount: result.amount,
+        },
+        optionalHash: `offer:${offerId}:accepted_seller`,
+      });
+    } catch {
+      // best-effort
+    }
 
     return json({ ok: true });
   } catch (error: any) {

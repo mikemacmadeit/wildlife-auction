@@ -12,10 +12,28 @@ import {
   getDeliveryConfirmationEmail,
   getPayoutNotificationEmail,
   getAuctionWinnerEmail,
+  getAuctionOutbidEmail,
+  getWelcomeEmail,
+  getAuctionHighBidderEmail,
+  getAuctionEndingSoonEmail,
+  getAuctionLostEmail,
+  getDeliveryCheckInEmail,
+  getProfileIncompleteReminderEmail,
+  getWeeklyDigestEmail,
+  getSavedSearchAlertEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type PayoutNotificationEmailData,
   type AuctionWinnerEmailData,
+  type AuctionOutbidEmailData,
+  type WelcomeEmailData,
+  type AuctionHighBidderEmailData,
+  type AuctionEndingSoonEmailData,
+  type AuctionLostEmailData,
+  type DeliveryCheckInEmailData,
+  type ProfileIncompleteReminderEmailData,
+  type WeeklyDigestEmailData,
+  type SavedSearchAlertEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -66,6 +84,78 @@ const auctionWinnerSchema = z.object({
   winningBid: z.number().finite().nonnegative(),
   orderUrl: urlSchema,
   auctionEndDate: dateSchema,
+});
+
+const auctionOutbidSchema = z.object({
+  outbidderName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  newBidAmount: z.number().finite().nonnegative(),
+  listingUrl: urlSchema,
+  auctionEndsAt: dateSchema.optional(),
+});
+
+const welcomeSchema = z.object({
+  userName: z.string().min(1),
+  dashboardUrl: urlSchema,
+});
+
+const auctionHighBidderSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  yourBidAmount: z.number().finite().nonnegative(),
+  listingUrl: urlSchema,
+  auctionEndsAt: dateSchema.optional(),
+});
+
+const auctionEndingSoonSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  threshold: z.enum(['24h', '1h', '10m', '2m']),
+  listingUrl: urlSchema,
+  auctionEndsAt: dateSchema,
+  currentBidAmount: z.number().finite().nonnegative().optional(),
+});
+
+const auctionLostSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingUrl: urlSchema,
+  finalBidAmount: z.number().finite().nonnegative().optional(),
+});
+
+const deliveryCheckInSchema = z.object({
+  buyerName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().min(1),
+  daysSinceDelivery: z.number().int().nonnegative(),
+  orderUrl: urlSchema,
+});
+
+const profileIncompleteReminderSchema = z.object({
+  userName: z.string().min(1),
+  settingsUrl: urlSchema,
+  missingFields: z.array(z.string()).optional(),
+});
+
+const weeklyDigestSchema = z.object({
+  userName: z.string().min(1),
+  listings: z.array(
+    z.object({
+      title: z.string().min(1),
+      url: urlSchema,
+      price: z.number().finite().nonnegative().optional(),
+      endsAt: dateSchema.optional(),
+    })
+  ),
+  unsubscribeUrl: urlSchema.optional(),
+});
+
+const savedSearchAlertSchema = z.object({
+  userName: z.string().min(1),
+  queryName: z.string().min(1),
+  resultsCount: z.number().int().nonnegative(),
+  searchUrl: urlSchema,
+  unsubscribeUrl: urlSchema.optional(),
 });
 
 export const EMAIL_EVENT_REGISTRY = [
@@ -137,6 +227,154 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: AuctionWinnerEmailData) => {
       const { subject, html } = getAuctionWinnerEmail(data);
       return { subject, preheader: `You won: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'auction_outbid',
+    displayName: 'Auction: Outbid',
+    description: 'Sent to the previous high bidder when they are outbid.',
+    schema: auctionOutbidSchema,
+    samplePayload: {
+      outbidderName: 'Alex Johnson',
+      listingTitle: 'Blackbuck Trophy Buck',
+      newBidAmount: 9850,
+      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      auctionEndsAt: new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString(),
+    },
+    render: (data: AuctionOutbidEmailData) => {
+      const { subject, html } = getAuctionOutbidEmail(data);
+      return { subject, preheader: `Outbid on: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'user_welcome',
+    displayName: 'User: Welcome',
+    description: 'Sent to a new user after signup (opted-in transactional).',
+    schema: welcomeSchema,
+    samplePayload: {
+      userName: 'Alex',
+      dashboardUrl: 'https://wildlife.exchange/dashboard/notifications',
+    },
+    render: (data: WelcomeEmailData) => {
+      const { subject, html } = getWelcomeEmail(data);
+      return { subject, preheader: `Welcome to Wildlife Exchange`, html };
+    },
+  },
+  {
+    type: 'auction_high_bidder',
+    displayName: 'Auction: High Bidder',
+    description: 'Sent to the current high bidder (you are winning).',
+    schema: auctionHighBidderSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Blackbuck Trophy Buck',
+      yourBidAmount: 9900,
+      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      auctionEndsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+    },
+    render: (data: AuctionHighBidderEmailData) => {
+      const { subject, html } = getAuctionHighBidderEmail(data);
+      return { subject, preheader: `You’re winning: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'auction_ending_soon',
+    displayName: 'Auction: Ending Soon',
+    description: 'Sent when an auction is ending soon (24h/1h/10m/2m thresholds).',
+    schema: auctionEndingSoonSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      threshold: '10m',
+      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      auctionEndsAt: new Date(Date.now() + 1000 * 60 * 10).toISOString(),
+      currentBidAmount: 4500,
+    },
+    render: (data: AuctionEndingSoonEmailData) => {
+      const { subject, html } = getAuctionEndingSoonEmail(data);
+      return { subject, preheader: `Ending soon: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'auction_lost',
+    displayName: 'Auction: Lost',
+    description: 'Sent to a bidder when an auction ends and they did not win (soft landing).',
+    schema: auctionLostSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Blackbuck Trophy Buck',
+      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      finalBidAmount: 11000,
+    },
+    render: (data: AuctionLostEmailData) => {
+      const { subject, html } = getAuctionLostEmail(data);
+      return { subject, preheader: `Auction ended: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'order_delivery_checkin',
+    displayName: 'Order: Delivery Check-in',
+    description: 'Sent to buyer N days after delivery to confirm everything is OK.',
+    schema: deliveryCheckInSchema,
+    samplePayload: {
+      buyerName: 'Alex',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      daysSinceDelivery: 3,
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: DeliveryCheckInEmailData) => {
+      const { subject, html } = getDeliveryCheckInEmail(data);
+      return { subject, preheader: `Quick check-in: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'profile_incomplete_reminder',
+    displayName: 'User: Profile Incomplete',
+    description: 'Reminder to complete profile.',
+    schema: profileIncompleteReminderSchema,
+    samplePayload: {
+      userName: 'Alex',
+      settingsUrl: 'https://wildlife.exchange/dashboard/account',
+      missingFields: ['phone', 'location'],
+    },
+    render: (data: ProfileIncompleteReminderEmailData) => {
+      const { subject, html } = getProfileIncompleteReminderEmail(data);
+      return { subject, preheader: `Finish your profile`, html };
+    },
+  },
+  {
+    type: 'marketing_weekly_digest',
+    displayName: 'Marketing: Weekly Digest',
+    description: 'Opt-in weekly digest email.',
+    schema: weeklyDigestSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listings: [
+        { title: 'Blackbuck Trophy Buck', url: 'https://wildlife.exchange/listing/abc123', price: 9500, endsAt: new Date().toISOString() },
+      ],
+      unsubscribeUrl: 'https://wildlife.exchange/dashboard/settings/notifications',
+    },
+    render: (data: WeeklyDigestEmailData) => {
+      const { subject, html } = getWeeklyDigestEmail(data);
+      return { subject, preheader: `Weekly digest`, html };
+    },
+  },
+  {
+    type: 'marketing_saved_search_alert',
+    displayName: 'Marketing: Saved Search Alert',
+    description: 'Opt-in saved search alerts.',
+    schema: savedSearchAlertSchema,
+    samplePayload: {
+      userName: 'Alex',
+      queryName: 'Whitetail under $12k',
+      resultsCount: 4,
+      searchUrl: 'https://wildlife.exchange/browse?type=auction',
+      unsubscribeUrl: 'https://wildlife.exchange/dashboard/settings/notifications',
+    },
+    render: (data: SavedSearchAlertEmailData) => {
+      const { subject, html } = getSavedSearchAlertEmail(data);
+      return { subject, preheader: `New matches`, html };
     },
   },
 ] as const;

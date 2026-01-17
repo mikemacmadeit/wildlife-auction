@@ -11,7 +11,7 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { ListItem } from '@/components/listings/ListItem';
-import { listActiveListings } from '@/lib/firebase/listings';
+import { listActiveListings, listEndingSoonAuctions, listMostWatchedAuctions } from '@/lib/firebase/listings';
 import { Listing } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,8 @@ type ViewMode = 'card' | 'list';
 
 export default function HomePage() {
   const [listings, setListings] = useState<Listing[]>([]);
+  const [mostWatched, setMostWatched] = useState<Listing[]>([]);
+  const [endingSoon, setEndingSoon] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,8 +55,28 @@ export default function HomePage() {
       try {
         setLoading(true);
         setError(null);
-        const data = await listActiveListings({ limitCount: 12 });
-        setListings(data);
+        const results = await Promise.allSettled([
+          listActiveListings({ limitCount: 12 }),
+          listMostWatchedAuctions({ limitCount: 8 }),
+          listEndingSoonAuctions({ limitCount: 8 }),
+        ]);
+
+        const [dataRes, mwRes, esRes] = results;
+
+        if (dataRes.status === 'fulfilled') setListings(dataRes.value);
+        if (mwRes.status === 'fulfilled') setMostWatched(mwRes.value);
+        if (esRes.status === 'fulfilled') setEndingSoon(esRes.value);
+
+        // Only surface an error if the *primary* listings query failed.
+        if (dataRes.status === 'rejected') {
+          const err = dataRes.reason;
+          console.error('Error fetching listings:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load listings');
+        } else {
+          // Non-blocking: log secondary section failures but keep page usable.
+          if (mwRes.status === 'rejected') console.warn('Most watched unavailable:', mwRes.reason);
+          if (esRes.status === 'rejected') console.warn('Ending soon unavailable:', esRes.reason);
+        }
       } catch (err) {
         console.error('Error fetching listings:', err);
         setError(err instanceof Error ? err.message : 'Failed to load listings');
@@ -144,7 +166,7 @@ export default function HomePage() {
             className="max-w-4xl mx-auto"
           >
             <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
-              <div className="relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
+              <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
                 <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
@@ -344,6 +366,50 @@ export default function HomePage() {
                 ))}
               </AnimatePresence>
             </motion.div>
+          </div>
+        </section>
+      )}
+
+      {/* Most Watched */}
+      {!loading && mostWatched.length > 0 && (
+        <section className="py-12 md:py-16 bg-background border-t border-border/50">
+          <div className="container mx-auto px-4">
+            <div className="flex items-end justify-between gap-4 mb-8">
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">Most Watched</h2>
+                <p className="text-muted-foreground text-base md:text-lg">Social proof that drives liquidity.</p>
+              </div>
+              <Button variant="outline" asChild>
+                <Link href="/browse">Browse</Link>
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {mostWatched.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Ending Soon */}
+      {!loading && endingSoon.length > 0 && (
+        <section className="py-12 md:py-16 bg-background border-t border-border/50">
+          <div className="container mx-auto px-4">
+            <div className="flex items-end justify-between gap-4 mb-8">
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">Ending Soon</h2>
+                <p className="text-muted-foreground text-base md:text-lg">Auctions closing soon—act now.</p>
+              </div>
+              <Button variant="outline" asChild>
+                <Link href="/browse">View all</Link>
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {endingSoon.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
           </div>
         </section>
       )}

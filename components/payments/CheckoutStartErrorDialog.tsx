@@ -24,7 +24,7 @@ export function CheckoutStartErrorDialog(props: {
         <DialogHeader>
           <DialogTitle>Checkout couldn’t be started</DialogTitle>
           <DialogDescription>
-            Your bank declined this transaction. This is common for large purchases. You can contact your bank to authorize the charge, or switch to bank transfer or wire.
+            Your bank declined this transaction. This is common for large purchases. You can contact your bank to authorize the charge, or switch to ACH debit or wire transfer.
           </DialogDescription>
         </DialogHeader>
 
@@ -38,7 +38,7 @@ export function CheckoutStartErrorDialog(props: {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Button variant="outline" onClick={onSwitchBank}>Switch to Bank</Button>
+            <Button variant="outline" onClick={onSwitchBank}>Switch to ACH</Button>
             <Button variant="outline" onClick={onSwitchWire}>Switch to Wire</Button>
             <Button onClick={onRetryCard}>Retry Card</Button>
           </div>

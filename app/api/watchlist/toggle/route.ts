@@ -3,10 +3,11 @@
  *
  * Server-side watchlist toggle used for accurate seller analytics.
  * - Creates/deletes /users/{uid}/watchlist/{listingId}
- * - Updates listings/{listingId}.metrics.favorites (idempotent, never negative)
+ * - Updates listings/{listingId}.watcherCount (authoritative, idempotent, never negative)
+ * - Keeps listings/{listingId}.metrics.favorites in sync for legacy UI surfaces
+ * - Maintains a scalable reverse index: /listings/{listingId}/watchers/{uid}
  *
- * NOTE: Clients can still write watchlist directly via Firestore rules, but the app uses this
- * endpoint to ensure metrics stay correct for seller dashboards.
+ * NOTE: This endpoint uses Admin SDK and is the source of truth for watcher metrics.
  */
 
 import { z } from 'zod';
@@ -65,42 +66,62 @@ export async function POST(request: Request) {
 
     const listingRef = db.collection('listings').doc(listingId);
     const watchRef = db.collection('users').doc(uid).collection('watchlist').doc(listingId);
+    const listingWatcherRef = listingRef.collection('watchers').doc(uid);
 
     const result = await db.runTransaction(async (tx) => {
-      const [listingSnap, watchSnap] = await Promise.all([tx.get(listingRef), tx.get(watchRef)]);
+      const [listingSnap, watchSnap, listingWatcherSnap] = await Promise.all([
+        tx.get(listingRef),
+        tx.get(watchRef),
+        tx.get(listingWatcherRef),
+      ]);
       if (!listingSnap.exists) {
         return { ok: false as const, status: 404 as const, body: { error: 'Listing not found' } };
       }
 
       const listingData: any = listingSnap.data() || {};
-      const currentFavs = Number(listingData?.metrics?.favorites || 0) || 0;
+      const currentCount =
+        typeof listingData?.watcherCount === 'number'
+          ? Number(listingData.watcherCount || 0) || 0
+          : Number(listingData?.metrics?.favorites || 0) || 0;
+
+      const isWatching = watchSnap.exists || listingWatcherSnap.exists;
 
       if (action === 'add') {
-        if (watchSnap.exists) {
-          return { ok: true as const, state: 'unchanged' as const, favorites: currentFavs };
+        if (isWatching) {
+          // Heal partial state (best-effort) without changing counts.
+          if (!watchSnap.exists) tx.set(watchRef, { listingId, createdAt: Timestamp.now() }, { merge: false });
+          if (!listingWatcherSnap.exists) tx.set(listingWatcherRef, { userId: uid, createdAt: Timestamp.now() }, { merge: false });
+          return { ok: true as const, state: 'unchanged' as const, watcherCount: currentCount };
         }
+
         tx.set(watchRef, { listingId, createdAt: Timestamp.now() }, { merge: false });
-        // Use FieldValue.increment for concurrency safety; also return best-effort count.
-        tx.update(listingRef, { 'metrics.favorites': FieldValue.increment(1) });
-        return { ok: true as const, state: 'added' as const, favorites: currentFavs + 1 };
+        tx.set(listingWatcherRef, { userId: uid, createdAt: Timestamp.now() }, { merge: false });
+
+        // Use increment for concurrency safety.
+        tx.update(listingRef, {
+          watcherCount: FieldValue.increment(1),
+          'metrics.favorites': FieldValue.increment(1),
+        });
+        return { ok: true as const, state: 'added' as const, watcherCount: currentCount + 1 };
       }
 
       // action === 'remove'
-      if (!watchSnap.exists) {
-        return { ok: true as const, state: 'unchanged' as const, favorites: currentFavs };
+      if (!isWatching) {
+        return { ok: true as const, state: 'unchanged' as const, watcherCount: currentCount };
       }
-      tx.delete(watchRef);
+      if (watchSnap.exists) tx.delete(watchRef);
+      if (listingWatcherSnap.exists) tx.delete(listingWatcherRef);
 
       // Prevent negative counts by computing new value inside the transaction.
-      const nextFavs = Math.max(currentFavs - 1, 0);
-      tx.update(listingRef, { 'metrics.favorites': nextFavs });
-      return { ok: true as const, state: 'removed' as const, favorites: nextFavs };
+      const next = Math.max(currentCount - 1, 0);
+      tx.update(listingRef, { watcherCount: next, 'metrics.favorites': next });
+      return { ok: true as const, state: 'removed' as const, watcherCount: next };
     });
 
     if ('status' in result) {
       return json(result.body, { status: result.status });
     }
-    return json({ ok: true, state: result.state, favorites: result.favorites });
+    return json({ ok: true, state: result.state, watcherCount: (result as any).watcherCount });
   } catch (e: any) {
     return json({ error: 'Failed to update watchlist', message: e?.message || String(e) }, { status: 500 });
   }

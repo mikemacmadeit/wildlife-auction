@@ -9,49 +9,11 @@
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus } from '@/lib/types';
 import { z } from 'zod';
-
-// Initialize Firebase Admin
-let adminApp: App | undefined;
-let auth: ReturnType<typeof getAuth>;
-let db: ReturnType<typeof getFirestore>;
-
-async function initializeFirebaseAdmin() {
-  if (!adminApp) {
-    if (!getApps().length) {
-      try {
-        const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-          ? {
-              projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-              clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-              privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            }
-          : undefined;
-
-        if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-          adminApp = initializeApp({
-            credential: cert(serviceAccount as any),
-          });
-        } else {
-          adminApp = initializeApp();
-        }
-      } catch (error) {
-        console.error('Firebase Admin initialization error:', error);
-        throw error;
-      }
-    } else {
-      adminApp = getApps()[0];
-    }
-  }
-  auth = getAuth(adminApp);
-  db = getFirestore(adminApp);
-  return { auth, db };
-}
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
 const disputeSchema = z.object({
   reason: z.string().min(1, 'Dispute reason is required').max(200, 'Reason too long'),
@@ -73,7 +35,8 @@ export async function POST(
   { params }: { params: { orderId: string } }
 ) {
   try {
-    const { auth, db } = await initializeFirebaseAdmin();
+    const auth = getAdminAuth();
+    const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
 
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);

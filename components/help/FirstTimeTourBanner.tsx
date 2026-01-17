@@ -21,7 +21,8 @@ export function FirstTimeTourBanner(props: {
     (async () => {
       const state = await getHelpBannerState(uid, helpKey);
       if (cancelled) return;
-      setVisible(state.dismissedTourBanner !== true);
+      // Banner is only for first-time: once tour is seen OR banner dismissed, never show again.
+      setVisible(state.dismissedTourBanner !== true && state.tourSeen !== true);
       setReady(true);
     })();
     return () => {

@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, Star } from 'lucide-react';
+import { MapPin, Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,10 @@ interface ListingCardProps {
 
 export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
   ({ listing, className }, ref) => {
+  // Phase 3A (A4): anon-safe trust signals come from listing.sellerSnapshot (copied at publish time).
+  const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
+  const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
+  const watchers = typeof listing.watcherCount === 'number' ? listing.watcherCount : listing.metrics?.favorites || 0;
 
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
@@ -156,6 +160,28 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 </Badge>
               )}
             </div>
+
+            {/* Social proof (watchers + bids) */}
+            <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5">
+              {watchers > 0 && (
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
+                  <Heart className="h-3 w-3 mr-1" />
+                  {watchers} watching
+                </Badge>
+              )}
+              {(listing.metrics?.bidCount || 0) > 0 && listing.type === 'auction' && (
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  {listing.metrics.bidCount} bids
+                </Badge>
+              )}
+              {(watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) && (
+                <Badge variant="default" className="text-xs shadow-warm">
+                  <Zap className="h-3 w-3 mr-1" />
+                  Trending
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Content */}
@@ -210,9 +236,23 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   {/* Seller Tier badge (Exposure Plans) */}
                   <SellerTierBadge tier={(listing as any).sellerTier} />
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/50 border border-border/40">
-                  <Star className="h-4 w-4 fill-primary/20 text-primary" />
-                  <span className="font-bold text-sm">{listing.seller?.rating ?? 0}</span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {listing.sellerSnapshot?.verified && (
+                    <Badge variant="secondary" className="text-[10px] font-semibold">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Verified
+                    </Badge>
+                  )}
+                  {sellerTxCount !== null && sellerTxCount > 0 && (
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      {sellerTxCount} tx
+                    </Badge>
+                  )}
+                  {sellerBadges.includes('Identity verified') && (
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      ID verified
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>

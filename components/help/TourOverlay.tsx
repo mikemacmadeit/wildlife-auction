@@ -144,8 +144,8 @@ export function TourOverlay(props: {
     const padding = 12;
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
-    const cardW = 360;
-    const cardH = 220;
+    const cardW = Math.min(360, viewportW - 32);
+    const cardH = Math.min(260, viewportH - 32);
 
     const preferred = activeStep.placement || 'bottom';
     let top = rect.top;
@@ -193,7 +193,8 @@ export function TourOverlay(props: {
         className={cn(
           'absolute w-[360px] max-w-[calc(100vw-32px)]',
           'rounded-xl border bg-background shadow-2xl',
-          'p-4 sm:p-5'
+          'p-4 sm:p-5',
+          'max-h-[calc(100vh-32px)] overflow-y-auto'
         )}
         style={{ top: card.top, left: card.left }}
       >

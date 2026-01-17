@@ -212,7 +212,12 @@ export function validateCattle(attributes: CattleAttributes): void {
   }
   
   // Require either age or weightRange
-  if (!attributes.age && !attributes.weightRange) {
+  const hasAge =
+    typeof (attributes as any).age === 'number'
+      ? Number.isFinite((attributes as any).age)
+      : !!String((attributes as any).age || '').trim();
+  const hasWeight = !!String(attributes.weightRange || '').trim();
+  if (!hasAge && !hasWeight) {
     throw new Error('Either age or weight range is required for cattle listings.');
   }
   

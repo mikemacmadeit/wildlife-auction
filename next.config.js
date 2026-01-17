@@ -11,6 +11,17 @@ const nextConfig = {
     // "Cross-Origin-Opener-Policy policy would block the window.closed/window.close call."
     // This is safe for the app and keeps popups working as expected.
     return [
+      // Auth pages are the ones that open third-party popups; be extra permissive here.
+      // In some environments, Chrome can still warn even with `same-origin-allow-popups`;
+      // `unsafe-none` avoids the warning spam without impacting app correctness.
+      {
+        source: '/login',
+        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' }],
+      },
+      {
+        source: '/register',
+        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' }],
+      },
       {
         source: '/:path*',
         headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' }],

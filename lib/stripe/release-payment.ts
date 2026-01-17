@@ -7,6 +7,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { stripe, isStripeConfigured } from './config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
+import { emitEventForUser } from '@/lib/notifications';
 
 export interface ReleasePaymentResult {
   success: boolean;
@@ -14,6 +15,28 @@ export interface ReleasePaymentResult {
   amount?: number;
   error?: string;
   message?: string;
+}
+
+/**
+ * Phase 2.5 / 3A (B2): Shared payout safety gate.
+ *
+ * This is intentionally narrower than full payout *eligibility* (status, buyer confirmation, etc.).
+ * It exists to prevent drift between different "money-moving" code paths:
+ * - manual payout release (`/api/stripe/transfers/release` -> releasePaymentForOrder)
+ * - dispute resolution payouts (`/api/orders/[orderId]/disputes/resolve`)
+ *
+ * Non-negotiable: never release funds while a Stripe chargeback is open / unresolved.
+ */
+export function getPayoutSafetyBlockReason(orderData: any): string | null {
+  const chargebackStatus = orderData?.chargebackStatus as string | undefined;
+  const payoutHoldReason = orderData?.payoutHoldReason as string | undefined;
+  if (payoutHoldReason === 'chargeback') return 'Order payout is held due to chargeback.';
+  if (chargebackStatus && ['open', 'active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(chargebackStatus)) {
+    return 'Order has an active chargeback. Do not release funds until chargeback is resolved.';
+  }
+  if (orderData?.adminHold === true) return 'Order is on admin hold. Remove hold before releasing.';
+  if (orderData?.stripeTransferId) return 'Payment already released (stripeTransferId exists).';
+  return null;
 }
 
 /**
@@ -60,7 +83,9 @@ export async function releasePaymentForOrder(
   const chargebackStatus = orderData.chargebackStatus as string | undefined;
 
   // Check protected transaction dispute status
-  const protectedDisputeStatus = orderData.disputeStatus;
+  // Back-compat / correctness: the codebase historically used both `disputeStatus` and `protectedDisputeStatus`.
+  // Dispute open routes set `protectedDisputeStatus`, so we must gate on both to avoid accidental payout release.
+  const protectedDisputeStatus = orderData.protectedDisputeStatus || orderData.disputeStatus;
   const hasOpenProtectedDispute = protectedDisputeStatus &&
     ['open', 'needs_evidence', 'under_review'].includes(protectedDisputeStatus);
 
@@ -80,10 +105,20 @@ export async function releasePaymentForOrder(
   }
 
   // Block release if there is an active chargeback
-  if (chargebackStatus && ['active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(chargebackStatus)) {
+  // Phase 2D: never release funds while Stripe dispute/chargeback is open.
+  // We normalize to `order.chargebackStatus = 'open' | 'won' | 'lost'` in webhooks, but keep back-compat.
+  if (chargebackStatus && ['open', 'active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(chargebackStatus)) {
     return {
       success: false,
       error: 'Order has an active chargeback. Do not release funds until chargeback is resolved.',
+    };
+  }
+
+  // Defensive gate: also block if an explicit payout hold reason is set for chargebacks.
+  if (payoutHoldReason === 'chargeback') {
+    return {
+      success: false,
+      error: 'Order payout is held due to chargeback. Do not release funds until chargeback is resolved.',
     };
   }
 
@@ -332,35 +367,32 @@ export async function releasePaymentForOrder(
       `[releasePaymentForOrder] Payment released successfully for order ${orderId}: Transfer ${transfer.id} of $${sellerAmount} to ${derivedSellerStripeAccountId}`
     );
 
-    // Send payout notification email to seller
+    // Emit canonical notification event for seller (in-app/email/push handled by scheduled processors)
     try {
-      const sellerDoc = await db.collection('users').doc(orderData.sellerId).get();
-      const sellerEmail = sellerDoc.data()?.email;
-      const sellerName = sellerDoc.data()?.displayName || sellerDoc.data()?.profile?.fullName || 'Seller';
-
       // Get listing title
       const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
       const listingTitle = listingDoc.data()?.title || 'Unknown Listing';
 
-      if (sellerEmail) {
-        const { sendPayoutNotificationEmail } = await import('@/lib/email/sender');
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : 'http://localhost:3000';
-
-        await sendPayoutNotificationEmail(sellerEmail, {
-          sellerName,
+      await emitEventForUser({
+        type: 'Payout.Released',
+        actorId: releasedBy || 'system',
+        entityType: 'order',
+        entityId: orderId,
+        targetUserId: orderData.sellerId,
+        payload: {
+          type: 'Payout.Released',
           orderId,
+          listingId: orderData.listingId,
           listingTitle,
           amount: sellerAmount,
           transferId: transfer.id,
-          payoutDate: new Date(),
-        });
-        console.log(`[releasePaymentForOrder] Payout notification email sent to ${sellerEmail}`);
-      }
+          payoutDate: new Date().toISOString(),
+        },
+        optionalHash: `transfer:${transfer.id}`,
+      });
     } catch (emailError) {
       // Don't fail the release if email fails
-      console.error(`[releasePaymentForOrder] Error sending payout notification email:`, emailError);
+      console.error(`[releasePaymentForOrder] Error emitting payout_released notification event:`, emailError);
     }
 
     return {

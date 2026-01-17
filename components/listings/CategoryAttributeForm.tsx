@@ -213,14 +213,30 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="whitetail-age" className="text-base font-semibold">Age (Optional)</Label>
+          <Label htmlFor="whitetail-age" className="text-base font-semibold">Age (years, optional)</Label>
           <Input
             id="whitetail-age"
-            placeholder="e.g., 3 years, 18 months"
-            value={(attributes as Partial<WhitetailBreederAttributes>).age || ''}
-            onChange={(e) => updateAttribute('age', e.target.value)}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.1"
+            placeholder="e.g., 3 or 5.5"
+            value={(() => {
+              const v = (attributes as Partial<WhitetailBreederAttributes>).age as any;
+              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+            })()}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (!raw) {
+                updateAttribute('age', undefined);
+                return;
+              }
+              const n = Number(raw);
+              updateAttribute('age', Number.isFinite(n) ? n : undefined);
+            }}
             className="min-h-[48px] text-base"
           />
+          <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
         </div>
 
         <div className="space-y-2">
@@ -366,14 +382,30 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="wildlife-age" className="text-base font-semibold">Age (Optional)</Label>
+          <Label htmlFor="wildlife-age" className="text-base font-semibold">Age (years, optional)</Label>
           <Input
             id="wildlife-age"
-            placeholder="e.g., 3 years, 18 months"
-            value={(attributes as Partial<WildlifeAttributes>).age || ''}
-            onChange={(e) => updateAttribute('age', e.target.value)}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.1"
+            placeholder="e.g., 3 or 5.5"
+            value={(() => {
+              const v = (attributes as Partial<WildlifeAttributes>).age as any;
+              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+            })()}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (!raw) {
+                updateAttribute('age', undefined);
+                return;
+              }
+              const n = Number(raw);
+              updateAttribute('age', Number.isFinite(n) ? n : undefined);
+            }}
             className="min-h-[48px] text-base"
           />
+          <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
         </div>
 
         <div className="space-y-2">
@@ -533,14 +565,30 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="cattle-age" className="text-base font-semibold">Age (Optional)</Label>
+          <Label htmlFor="cattle-age" className="text-base font-semibold">Age (years, optional)</Label>
           <Input
             id="cattle-age"
-            placeholder="e.g., 3 years, 18 months"
-            value={(attributes as Partial<CattleAttributes>).age || ''}
-            onChange={(e) => updateAttribute('age', e.target.value)}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.1"
+            placeholder="e.g., 3 or 5.5"
+            value={(() => {
+              const v = (attributes as Partial<CattleAttributes>).age as any;
+              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+            })()}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (!raw) {
+                updateAttribute('age', undefined);
+                return;
+              }
+              const n = Number(raw);
+              updateAttribute('age', Number.isFinite(n) ? n : undefined);
+            }}
             className="min-h-[48px] text-base"
           />
+          <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
         </div>
 
         <div className="space-y-2">
