@@ -170,15 +170,19 @@ export async function createAccountLink(): Promise<{ url: string }> {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    const errorMessage = error.error || 'Failed to create onboarding link';
+    const error = await response.json().catch(() => ({}));
+    const errorMessage = error.error || error.message || 'Failed to create onboarding link';
     // Don't log expected configuration errors
     const isConfigError = errorMessage.includes('Stripe is not configured') || 
                           errorMessage.includes('STRIPE_SECRET_KEY');
     if (!isConfigError) {
       console.error('Failed to create onboarding link:', errorMessage);
     }
-    throw new Error(errorMessage);
+    const err: any = new Error(errorMessage);
+    if (error?.code) err.code = error.code;
+    if (error?.actionUrl) err.actionUrl = error.actionUrl;
+    if (error?.message) err.detailsMessage = error.message;
+    throw err;
   }
 
   return response.json();

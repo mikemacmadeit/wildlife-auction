@@ -94,7 +94,7 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
         ...(actionUrl
           ? {
               action: (
-                <ToastAction altText="Open Stripe onboarding" onClick={() => window.open(actionUrl, '_blank', 'noopener,noreferrer')}>
+                <ToastAction altText="Open Stripe" onClick={() => window.open(actionUrl, '_blank', 'noopener,noreferrer')}>
                   Open Stripe
                 </ToastAction>
               ),

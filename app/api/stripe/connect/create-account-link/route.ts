@@ -8,45 +8,11 @@
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { stripe, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
+import { stripe, isStripeConfigured } from '@/lib/stripe/config';
+import { getSiteUrl } from '@/lib/site-url';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 
-// Initialize Firebase Admin (if not already initialized)
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        }
-      : undefined;
-
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      try {
-        // Try Application Default Credentials (for production)
-        adminApp = initializeApp();
-      } catch {
-        throw new Error('Failed to initialize Firebase Admin SDK');
-      }
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-} else {
-  adminApp = getApps()[0];
-}
-
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
+export const runtime = 'nodejs';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -64,6 +30,23 @@ export async function POST(request: Request) {
     if (!isStripeConfigured() || !stripe) {
       return json(
         { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.' },
+        { status: 503 }
+      );
+    }
+
+    // Lazily initialize Admin SDK inside handler (Netlify-safe)
+    let auth;
+    let db;
+    try {
+      auth = getAdminAuth();
+      db = getAdminDb();
+    } catch (e: any) {
+      return json(
+        {
+          error: 'Server configuration error',
+          code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+          message: e?.message || 'Failed to initialize Firebase Admin SDK',
+        },
         { status: 503 }
       );
     }
@@ -103,7 +86,19 @@ export async function POST(request: Request) {
     }
 
     // Create account link for onboarding
-    const baseUrl = getAppUrl();
+    const baseUrl = getSiteUrl();
+    // Defensive: if this resolves to localhost in production, Stripe may reject it (and it won't work for real sellers).
+    if (baseUrl.includes('localhost') && process.env.NODE_ENV === 'production') {
+      return json(
+        {
+          error: 'App URL not configured',
+          code: 'APP_URL_NOT_CONFIGURED',
+          message:
+            'Set APP_URL (or NEXT_PUBLIC_APP_URL) to your production URL (e.g., https://wildlife.exchange) so Stripe can redirect sellers after onboarding.',
+        },
+        { status: 500 }
+      );
+    }
     const accountLink = await stripe.accountLinks.create({
       account: stripeAccountId,
       refresh_url: `${baseUrl}/seller/payouts?onboarding=restart`,
@@ -117,6 +112,19 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Error creating account link:', error);
+
+    // Provide structured Stripe errors when possible
+    const msg = String(error?.message || '');
+    if (error?.type && msg) {
+      return json(
+        {
+          error: 'Failed to create onboarding link',
+          message: msg,
+          stripe: { type: error?.type, code: error?.code },
+        },
+        { status: 400 }
+      );
+    }
     return json(
       {
         error: 'Failed to create onboarding link',
