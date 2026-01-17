@@ -58,6 +58,33 @@ import { formatCurrency } from '@/lib/utils';
 type FilterType = 'all' | 'pending' | 'compliance';
 type SortType = 'newest' | 'oldest' | 'price-high' | 'price-low';
 
+function toDateSafe(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') {
+    try {
+      const d = value.toDate();
+      if (d instanceof Date) return d;
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof value?.seconds === 'number') {
+    const d = new Date(value.seconds * 1000);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
+function toMillisSafe(value: any): number {
+  const d = toDateSafe(value);
+  return d ? d.getTime() : 0;
+}
+
 export default function AdminListingsPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
@@ -96,18 +123,10 @@ export default function AdminListingsPage() {
         const listing = {
           id: docSnap.id,
           ...data,
-          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' 
-            ? data.createdAt.toDate() 
-            : (data.createdAt instanceof Date ? data.createdAt : new Date()),
-          updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function' 
-            ? data.updatedAt.toDate() 
-            : (data.updatedAt instanceof Date ? data.updatedAt : new Date()),
-          publishedAt: data.publishedAt && typeof data.publishedAt.toDate === 'function' 
-            ? data.publishedAt.toDate() 
-            : (data.publishedAt instanceof Date ? data.publishedAt : undefined),
-          endsAt: data.endsAt && typeof data.endsAt.toDate === 'function' 
-            ? data.endsAt.toDate() 
-            : (data.endsAt instanceof Date ? data.endsAt : undefined),
+          createdAt: toDateSafe(data.createdAt) || new Date(),
+          updatedAt: toDateSafe(data.updatedAt) || new Date(),
+          publishedAt: toDateSafe(data.publishedAt) || undefined,
+          endsAt: toDateSafe(data.endsAt) || undefined,
         } as Listing;
         
         pendingListings.push(listing);
@@ -131,25 +150,17 @@ export default function AdminListingsPage() {
             pendingListings.push({
               id: docSnap.id,
               ...data,
-              createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' 
-                ? data.createdAt.toDate() 
-                : (data.createdAt instanceof Date ? data.createdAt : new Date()),
-              updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function' 
-                ? data.updatedAt.toDate() 
-                : (data.updatedAt instanceof Date ? data.updatedAt : new Date()),
-              publishedAt: data.publishedAt && typeof data.publishedAt.toDate === 'function' 
-                ? data.publishedAt.toDate() 
-                : (data.publishedAt instanceof Date ? data.publishedAt : undefined),
-              endsAt: data.endsAt && typeof data.endsAt.toDate === 'function' 
-                ? data.endsAt.toDate() 
-                : (data.endsAt instanceof Date ? data.endsAt : undefined),
+              createdAt: toDateSafe(data.createdAt) || new Date(),
+              updatedAt: toDateSafe(data.updatedAt) || new Date(),
+              publishedAt: toDateSafe(data.publishedAt) || undefined,
+              endsAt: toDateSafe(data.endsAt) || undefined,
             } as Listing);
           }
         }
       });
       
       // Sort all listings by createdAt descending (newest first)
-      pendingListings.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      pendingListings.sort((a, b) => toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt));
       
       // Load documents for each listing
       const { getDocuments } = await import('@/lib/firebase/documents');
@@ -318,9 +329,9 @@ export default function AdminListingsPage() {
     filtered = [...filtered].sort((a, b) => {
       switch (sortType) {
         case 'newest':
-          return b.createdAt.getTime() - a.createdAt.getTime();
+          return toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt);
         case 'oldest':
-          return a.createdAt.getTime() - b.createdAt.getTime();
+          return toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt);
         case 'price-high':
           const priceA = a.price || a.startingBid || 0;
           const priceB = b.price || b.startingBid || 0;
@@ -654,7 +665,7 @@ export default function AdminListingsPage() {
                               <div className="flex items-center justify-between pt-2 border-t">
                                 <span className="text-xs text-muted-foreground">Created</span>
                                 <span className="text-xs text-foreground/80">
-                                  {formatDistanceToNow(listing.createdAt, { addSuffix: true })}
+                                  {formatDistanceToNow(toDateSafe(listing.createdAt) || new Date(), { addSuffix: true })}
                                 </span>
                               </div>
                               {sellerProfilesMap[listing.sellerId] && (
