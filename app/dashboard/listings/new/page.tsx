@@ -134,6 +134,27 @@ function NewListingPageContent() {
     userProfile?.payoutsEnabled === true &&
     userProfile?.chargesEnabled === true;
 
+  const numberFromInput = (raw: string): number | null => {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const isPositiveMoney = (raw: string): boolean => {
+    const n = numberFromInput(raw);
+    return typeof n === 'number' && n > 0;
+  };
+
+  const isFutureDateString = (raw: string): boolean => {
+    const s = String(raw || '').trim();
+    if (!s) return false;
+    const d = new Date(s);
+    if (!Number.isFinite(d.getTime())) return false;
+    // Give a little buffer so "now" doesn't pass due to clock jitter.
+    return d.getTime() > Date.now() + 60 * 1000;
+  };
+
   const steps = [
     {
       id: 'category',
@@ -986,12 +1007,20 @@ function NewListingPageContent() {
         </div>
       ),
       validate: () => {
-        return !!formData.title &&
-          !!formData.description &&
-          (formData.type === 'fixed' || formData.type === 'classified'
-            ? !!formData.price
-            : !!formData.startingBid) &&
-          (formData.type !== 'auction' || !!formData.endsAt);
+        const titleOk = String(formData.title || '').trim().length > 0;
+        const descOk = String(formData.description || '').trim().length > 0;
+        const cityOk = String(formData.location.city || '').trim().length > 0;
+        const stateOk = String(formData.location.state || '').trim().length > 0;
+
+        const priceOk =
+          formData.type === 'fixed' || formData.type === 'classified'
+            ? isPositiveMoney(formData.price)
+            : isPositiveMoney(formData.startingBid);
+
+        const auctionOk = formData.type !== 'auction' || isFutureDateString(formData.endsAt);
+
+        // Note: ZIP remains optional.
+        return titleOk && descOk && cityOk && stateOk && priceOk && auctionOk;
       },
     },
     {

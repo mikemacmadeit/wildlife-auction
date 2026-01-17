@@ -31,6 +31,92 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
   });
 }
 
+function toDateSafe(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') {
+    try {
+      const d = value.toDate();
+      if (d instanceof Date) return d;
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof value?.seconds === 'number') {
+    const d = new Date(value.seconds * 1000);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
+function validatePublishRequiredFields(listingData: any): { ok: true } | { ok: false; missing: string[]; message: string } {
+  const missing: string[] = [];
+
+  const title = String(listingData?.title || '').trim();
+  const description = String(listingData?.description || '').trim();
+  const type = String(listingData?.type || '').trim();
+  const category = String(listingData?.category || '').trim();
+  const city = String(listingData?.location?.city || '').trim();
+  const state = String(listingData?.location?.state || '').trim();
+
+  if (!category) missing.push('category');
+  if (!type) missing.push('type');
+  if (!title) missing.push('title');
+  if (!description) missing.push('description');
+  if (!city) missing.push('location.city');
+  if (!state) missing.push('location.state');
+
+  const hasPhotos =
+    (Array.isArray(listingData?.photoIds) && listingData.photoIds.length > 0) ||
+    (Array.isArray(listingData?.photos) && listingData.photos.length > 0) ||
+    (Array.isArray(listingData?.images) && listingData.images.length > 0);
+  if (!hasPhotos) missing.push('photos');
+
+  const price = typeof listingData?.price === 'number' ? listingData.price : Number(listingData?.price);
+  const startingBid = typeof listingData?.startingBid === 'number' ? listingData.startingBid : Number(listingData?.startingBid);
+  const reservePrice =
+    listingData?.reservePrice === undefined || listingData?.reservePrice === null
+      ? null
+      : typeof listingData.reservePrice === 'number'
+        ? listingData.reservePrice
+        : Number(listingData.reservePrice);
+
+  if (type === 'fixed' || type === 'classified') {
+    if (!Number.isFinite(price) || price <= 0) missing.push('price');
+  }
+
+  if (type === 'auction') {
+    if (!Number.isFinite(startingBid) || startingBid <= 0) missing.push('startingBid');
+    const endsAt = toDateSafe(listingData?.endsAt);
+    if (!endsAt) {
+      missing.push('endsAt');
+    } else if (endsAt.getTime() <= Date.now() + 60 * 1000) {
+      missing.push('endsAt (must be in the future)');
+    }
+    if (reservePrice !== null) {
+      if (!Number.isFinite(reservePrice) || reservePrice <= 0) missing.push('reservePrice');
+      if (Number.isFinite(reservePrice) && Number.isFinite(startingBid) && reservePrice < startingBid) {
+        missing.push('reservePrice (must be >= startingBid)');
+      }
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      missing,
+      message:
+        'Listing is incomplete or has invalid values. Fix the highlighted fields and try again. ' +
+        '(Drafts can be incomplete; publishing requires all required fields.)',
+    };
+  }
+  return { ok: true };
+}
+
 async function computeWhitetailInternalFlags(db: Firestore, listingData: any): Promise<{
   internalFlags: { duplicatePermitNumber?: boolean; duplicateFacilityId?: boolean };
   internalFlagsNotes: { duplicatePermitNumber?: string; duplicateFacilityId?: string };
@@ -207,6 +293,20 @@ export async function POST(request: Request) {
       );
     } catch (e: any) {
       return json({ error: 'Compliance validation failed', message: e?.message || String(e) }, { status: 400 });
+    }
+
+    // Core publish validation (business rules). Prevent publishing "free" listings (price=0) and other incomplete data.
+    const required = validatePublishRequiredFields(listingData);
+    if (!required.ok) {
+      return json(
+        {
+          error: 'Listing validation failed',
+          code: 'LISTING_VALIDATION_FAILED',
+          message: required.message,
+          missing: required.missing,
+        },
+        { status: 400 }
+      );
     }
 
     // Whitetail seller attestation hard gate
