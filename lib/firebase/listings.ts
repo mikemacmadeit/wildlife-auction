@@ -5,7 +5,6 @@ import {
   getDocs,
   addDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
@@ -21,7 +20,7 @@ import {
   FieldPath,
   deleteField,
 } from 'firebase/firestore';
-import { db } from './config';
+import { auth, db } from './config';
 import { getDocument } from './firestore';
 import { Listing, ListingStatus, ListingType, ListingCategory, ListingAttributes, UserProfile } from '@/lib/types';
 import { ListingDoc } from '@/lib/types/firestore';
@@ -674,26 +673,28 @@ export const unpublishListing = async (uid: string, listingId: string): Promise<
  */
 export const deleteListing = async (uid: string, listingId: string): Promise<void> => {
   try {
-    const listingRef = doc(db, 'listings', listingId);
-    
-    // Verify ownership
-    const listingDoc = await getDoc(listingRef);
-    if (!listingDoc.exists()) {
-      throw new Error('Listing not found');
+    // Preferred path: use server route so deletes always reflect in Firestore AND
+    // we can clean up listing-owned Storage files + listing subcollections (Firestore doesn't cascade delete).
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Authentication required');
     }
-    
-    const listingData = listingDoc.data() as ListingDoc;
-    if (listingData.sellerId !== uid) {
-      throw new Error('Unauthorized: You can only delete your own listings');
+    if (currentUser.uid !== uid) {
+      throw new Error('Invalid user');
     }
 
-    // For safety, prevent deleting listings that are sold or have active bids
-    // You may want to allow deleting sold listings, so this is optional
-    // if (listingData.status === 'sold') {
-    //   throw new Error('Cannot delete sold listings');
-    // }
-
-    await deleteDoc(listingRef);
+    const token = await currentUser.getIdToken();
+    const res = await fetch(`/api/listings/${listingId}/delete`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok !== true) {
+      throw new Error(data?.error || 'Failed to delete listing');
+    }
   } catch (error) {
     console.error('Error deleting listing:', error);
     throw error;
