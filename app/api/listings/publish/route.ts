@@ -406,9 +406,10 @@ export async function POST(request: Request) {
       badges: sellerBadges,
     };
 
-    // Compliance review gating:
-    // - Whitetail breeder: always pending review (status='pending')
-    // - Other categories: can go active
+    // Approval gating:
+    // - Whitetail breeder: always requires compliance review + admin approval
+    // - New/unverified sellers: require admin approval before going live
+    // - Some categories/attributes require compliance review
     const complianceStatus = listingData.complianceStatus || 'none';
     if (complianceStatus === 'rejected') {
       return json(
@@ -417,7 +418,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const needsReview = complianceStatus === 'pending_review' || listingData.category === 'whitetail_breeder';
+    // Default rule: if seller isn't verified yet, send to admin approval queue.
+    // (This matches the expected "new seller listings go to admin first" behavior.)
+    const requiresAdminApproval = sellerVerified !== true;
+
+    const needsReview =
+      requiresAdminApproval ||
+      complianceStatus === 'pending_review' ||
+      listingData.category === 'whitetail_breeder';
 
     // Admin-only guardrails (flags only): compute on submission/publish for whitetail
     const flagUpdate: any = {};
