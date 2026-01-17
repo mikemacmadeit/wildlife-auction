@@ -46,10 +46,11 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 const getStatusBadge = (status: string) => {
   const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
     draft: { variant: 'outline', label: 'Draft' },
+    pending: { variant: 'secondary', label: 'Pending approval' },
     active: { variant: 'default', label: 'Active' },
     expired: { variant: 'secondary', label: 'Expired' },
     sold: { variant: 'secondary', label: 'Sold' },
-    removed: { variant: 'outline', label: 'Removed' },
+    removed: { variant: 'destructive', label: 'Rejected' },
   };
   const config = variants[status] || { variant: 'outline' as const, label: status };
   return <Badge variant={config.variant} className="font-semibold text-xs">{config.label}</Badge>;
@@ -413,7 +414,9 @@ function SellerListingsPageContent() {
         toast({
           title: result?.pendingReview ? 'Submitted for review' : 'Listing published',
           description: result?.pendingReview
-            ? 'Your listing is now pending compliance review.'
+            ? result?.pendingReason === 'admin_approval'
+              ? 'Your listing is pending admin approval.'
+              : 'Your listing is pending compliance review.'
             : 'Your listing is now live.',
         });
 

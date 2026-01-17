@@ -210,67 +210,19 @@ export default function AdminListingsPage() {
     
     try {
       setProcessingId(listingId);
-      const listingRef = doc(db, 'listings', listingId);
-      const listingDocSnap = await getDoc(listingRef);
-      
-      if (!listingDocSnap.exists()) {
-        throw new Error('Listing not found');
-      }
-      
-      const listingData = listingDocSnap.data();
-      
-      // Check if this is a whitetail breeder listing that requires compliance review
-      if (listingData.category === 'whitetail_breeder') {
-        // Check if compliance status is approved
-        if (listingData.complianceStatus !== 'approved') {
-          toast({
-            title: 'Compliance Review Required',
-            description: 'Whitetail breeder listings require compliance review and verified TPWD permit before approval. Please review compliance documents first.',
-            variant: 'destructive',
-          });
-          setProcessingId(null);
-          return;
-        }
-        
-        // Check if TPWD permit document is verified
-        try {
-          const { getDocuments } = await import('@/lib/firebase/documents');
-          const docs = await getDocuments('listing', listingId);
-          const tpwdPermit = docs.find(doc => doc.type === 'TPWD_BREEDER_PERMIT' && doc.status === 'verified');
-          
-          if (!tpwdPermit) {
-            toast({
-              title: 'TPWD Permit Required',
-              description: 'A verified TPWD Breeder Permit document is required before approving whitetail breeder listings.',
-              variant: 'destructive',
-            });
-            setProcessingId(null);
-            return;
-          }
-        } catch (docError) {
-          console.error('Error checking documents:', docError);
-          toast({
-            title: 'Error Checking Documents',
-            description: 'Could not verify compliance documents. Please try again.',
-            variant: 'destructive',
-          });
-          setProcessingId(null);
-          return;
-        }
-      }
-      
-      // Approve the listing
-      await updateDoc(listingRef, {
-        status: 'active' as ListingStatus,
-        complianceStatus: listingData.complianceStatus === 'pending_review' ? 'approved' : listingData.complianceStatus || 'none',
-        approvedBy: user.uid,
-        approvedAt: Timestamp.now(),
-        complianceReviewedBy: listingData.complianceStatus === 'pending_review' ? user.uid : listingData.complianceReviewedBy,
-        complianceReviewedAt: listingData.complianceStatus === 'pending_review' ? Timestamp.now() : listingData.complianceReviewedAt,
-        publishedAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        updatedBy: user.uid,
+
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/listings/${listingId}/approve`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) {
+        throw new Error(data?.message || data?.error || 'Failed to approve listing');
+      }
       
       toast({
         title: '✅ Listing Approved',
@@ -295,15 +247,20 @@ export default function AdminListingsPage() {
     
     try {
       setProcessingId(listingId);
-      const listingRef = doc(db, 'listings', listingId);
-      
-      await updateDoc(listingRef, {
-        status: 'removed' as ListingStatus,
-        rejectedBy: user.uid,
-        rejectedAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        updatedBy: user.uid,
+
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/listings/${listingId}/reject`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: '' }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) {
+        throw new Error(data?.message || data?.error || 'Failed to reject listing');
+      }
       
       toast({
         title: 'Listing Rejected',

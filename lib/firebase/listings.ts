@@ -464,7 +464,10 @@ export const createListingDraft = async (
  * Checks listing limit based on user's subscription plan
  * Enforces compliance review requirements
  */
-export const publishListing = async (uid: string, listingId: string): Promise<{ success: boolean; pendingReview: boolean }> => {
+export const publishListing = async (
+  uid: string,
+  listingId: string
+): Promise<{ success: boolean; pendingReview: boolean; pendingReason?: 'admin_approval' | 'compliance_review' }> => {
   try {
     // Use server-side publish endpoint as the source of truth.
     // This ensures plan limits, compliance gates, and internal whitetail flags cannot be bypassed.
@@ -494,7 +497,11 @@ export const publishListing = async (uid: string, listingId: string): Promise<{ 
     }
 
     if (json?.pendingReview) {
-      return { success: true, pendingReview: true };
+      return {
+        success: true,
+        pendingReview: true,
+        pendingReason: json?.pendingReason === 'admin_approval' ? 'admin_approval' : 'compliance_review',
+      };
     }
     return { success: true, pendingReview: false };
   } catch (error) {

@@ -451,6 +451,7 @@ export async function POST(request: Request) {
         listingId,
         status: 'pending',
         pendingReview: true,
+        pendingReason: requiresAdminApproval ? 'admin_approval' : 'compliance_review',
       });
     }
 
