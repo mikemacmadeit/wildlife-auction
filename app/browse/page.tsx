@@ -22,6 +22,7 @@ import { ListItem } from '@/components/listings/ListItem';
 import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
 import { FilterBottomSheet } from '@/components/navigation/FilterBottomSheet';
+import { MobileBrowseFilterSheet } from '@/components/navigation/MobileBrowseFilterSheet';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Badge } from '@/components/ui/badge';
 import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
@@ -34,6 +35,21 @@ import { getSavedSearch } from '@/lib/firebase/savedSearches';
 import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
 import { BROWSE_EQUIPMENT_CONDITION_OPTIONS, BROWSE_STATES } from '@/components/browse/filters/constants';
 import { buildSavedSearchKeys, upsertSavedSearch } from '@/lib/firebase/savedSearches';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 
@@ -68,6 +84,9 @@ export default function BrowsePage() {
   const [selectedType, setSelectedType] = useState<ListingType | 'all'>('all');
   const [listingStatus, setListingStatus] = useState<'active' | 'sold' | 'ended'>('active');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [priceDialogOpen, setPriceDialogOpen] = useState(false);
+  const [priceMinInput, setPriceMinInput] = useState<string>('');
+  const [priceMaxInput, setPriceMaxInput] = useState<string>('');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -148,6 +167,13 @@ export default function BrowsePage() {
       localStorage.setItem('browse-view-mode', mode);
     }
   };
+
+  // Keep the price dialog inputs in sync with applied filters (when closed)
+  useEffect(() => {
+    if (priceDialogOpen) return;
+    setPriceMinInput(filters.minPrice !== undefined ? String(filters.minPrice) : '');
+    setPriceMaxInput(filters.maxPrice !== undefined ? String(filters.maxPrice) : '');
+  }, [filters.minPrice, filters.maxPrice, priceDialogOpen]);
 
   const handleSaveThisSearch = async () => {
     if (!user?.uid) {
@@ -556,15 +582,7 @@ export default function BrowsePage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
-                  <div className="md:hidden">
-                    <FilterBottomSheet
-                      filters={{
-                        ...(filters || {}),
-                        type: selectedType === 'all' ? undefined : (selectedType as any),
-                      }}
-                      onFiltersChange={handleFilterChange}
-                    />
-                  </div>
+                  {/* Mobile uses eBay-style chip rail + right-side filter sheet (below) */}
                   <div className="hidden md:block lg:hidden">
                     <FilterDialog
                       filters={{
@@ -623,8 +641,8 @@ export default function BrowsePage() {
                   </TabsList>
                 </Tabs>
 
-                {/* Quick filters (eBay-style “Refine”) */}
-                <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
+                {/* Desktop quick filters */}
+                <div className="hidden md:flex items-center gap-2 flex-wrap justify-start md:justify-end">
                   <Button
                     type="button"
                     variant="outline"
@@ -671,10 +689,209 @@ export default function BrowsePage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Mobile: eBay-style one-hand chip rail */}
+              <div className="md:hidden -mx-1">
+                <div
+                  className={cn(
+                    'flex items-center gap-2 px-1',
+                    'overflow-x-auto overflow-y-hidden',
+                    '[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+                  )}
+                >
+                  <MobileBrowseFilterSheet
+                    filters={{
+                      ...(filters || {}),
+                      type: selectedType === 'all' ? undefined : (selectedType as any),
+                    }}
+                    onFiltersChange={handleFilterChange}
+                    className="flex-shrink-0"
+                  />
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                      >
+                        Sort
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={8} className="w-56">
+                      <DropdownMenuItem onSelect={() => setSortBy('newest')}>Newest</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSortBy('oldest')}>Oldest</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => setSortBy('price-low')}>Price: Low to High</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSortBy('price-high')}>Price: High to Low</DropdownMenuItem>
+                      {listingStatus !== 'sold' ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setSortBy('ending-soon')}>Ending soon</DropdownMenuItem>
+                        </>
+                      ) : null}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => setSortBy('featured')}>Featured</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <Button
+                    type="button"
+                    variant={filters.minPrice !== undefined || filters.maxPrice !== undefined ? 'default' : 'outline'}
+                    className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                    onClick={() => setPriceDialogOpen(true)}
+                  >
+                    Price
+                  </Button>
+
+                  {filters.category === 'ranch_equipment' ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant={(filters.healthStatus && filters.healthStatus.length > 0) ? 'default' : 'outline'}
+                          className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                        >
+                          Condition
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" sideOffset={8} className="w-56">
+                        <DropdownMenuItem
+                          onSelect={() => setFilters((p) => ({ ...p, healthStatus: undefined }))}
+                        >
+                          Any condition
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {BROWSE_EQUIPMENT_CONDITION_OPTIONS.map((o) => (
+                          <DropdownMenuItem
+                            key={o.value}
+                            onSelect={() => setFilters((p) => ({ ...p, healthStatus: [o.value] }))}
+                          >
+                            {o.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={filters.location?.state ? 'default' : 'outline'}
+                        className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                      >
+                        Location
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={8} className="w-64 max-h-[360px] overflow-y-auto">
+                      <DropdownMenuItem
+                        onSelect={() => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: undefined } }))}
+                      >
+                        Any state
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {BROWSE_STATES.map((s) => (
+                        <DropdownMenuItem
+                          key={s.value}
+                          onSelect={() => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: s.value } }))}
+                        >
+                          {s.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                      >
+                        {viewMode === 'list' ? 'List' : 'Gallery'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={8} className="w-44">
+                      <DropdownMenuItem onSelect={() => handleViewModeChange('card')}>Gallery</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleViewModeChange('list')}>List</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile: Price dialog (quick chip control) */}
+      <Dialog open={priceDialogOpen} onOpenChange={setPriceDialogOpen}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Price</DialogTitle>
+            <DialogDescription>Set a min/max price range.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="browse-price-min" className="text-sm font-semibold">
+                Min
+              </Label>
+              <Input
+                id="browse-price-min"
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={priceMinInput}
+                onChange={(e) => setPriceMinInput(e.target.value)}
+                className="min-h-[44px]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="browse-price-max" className="text-sm font-semibold">
+                Max
+              </Label>
+              <Input
+                id="browse-price-max"
+                type="number"
+                inputMode="numeric"
+                placeholder="No limit"
+                value={priceMaxInput}
+                onChange={(e) => setPriceMaxInput(e.target.value)}
+                className="min-h-[44px]"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 min-h-[44px]"
+              onClick={() => {
+                setFilters((p) => ({ ...p, minPrice: undefined, maxPrice: undefined }));
+                setPriceDialogOpen(false);
+              }}
+            >
+              Clear
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 min-h-[44px]"
+              onClick={() => {
+                const min = priceMinInput.trim() ? Number(priceMinInput) : undefined;
+                const max = priceMaxInput.trim() ? Number(priceMaxInput) : undefined;
+                setFilters((p) => ({
+                  ...p,
+                  minPrice: Number.isFinite(min as any) && (min as any) > 0 ? (min as any) : undefined,
+                  maxPrice: Number.isFinite(max as any) && (max as any) > 0 ? (max as any) : undefined,
+                }));
+                setPriceDialogOpen(false);
+              }}
+            >
+              Apply
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">

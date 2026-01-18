@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, CheckCircle2 } from 'lucide-react';
+import { MapPin, CheckCircle2, Gavel, Tag } from 'lucide-react';
 import { Listing } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
@@ -22,13 +22,18 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
 
-  const priceDisplay = listing.type === 'auction'
-    ? listing.currentBid
-      ? `$${listing.currentBid.toLocaleString()}`
-      : `Starting: $${listing.startingBid?.toLocaleString() || '0'}`
-    : listing.type === 'fixed'
-    ? `$${listing.price?.toLocaleString() || '0'}`
-    : `$${listing.price?.toLocaleString() || 'Contact'}`;
+  const isAuction = listing.type === 'auction';
+  const isFixed = listing.type === 'fixed';
+  const isClassified = listing.type === 'classified';
+  const bestOfferEnabled = Boolean((listing as any).bestOfferEnabled);
+  const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
+
+  const primaryPrice = useMemo(() => {
+    if (isAuction) return Number(listing.currentBid || listing.startingBid || 0) || 0;
+    if (isFixed) return Number(listing.price || 0) || 0;
+    if (isClassified) return Number(listing.price || 0) || 0;
+    return 0;
+  }, [isAuction, isFixed, isClassified, listing.currentBid, listing.startingBid, listing.price]);
 
   return (
     <motion.div
@@ -41,10 +46,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className="overflow-hidden transition-all duration-300 rounded-xl flex flex-row h-full w-full border border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-          {/* Image - Fixed Width - Smaller on mobile */}
-          <div className="relative w-32 sm:w-40 md:w-64 lg:w-80 h-32 sm:h-40 md:h-56 flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
-            <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-transparent z-10" />
-            {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
+          {/* Image (only overlay is watchlist heart, per spec) */}
+          <div className="relative w-28 sm:w-36 md:w-56 lg:w-72 h-28 sm:h-36 md:h-44 flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             
             {listing.images[0] ? (
               <Image
@@ -52,7 +55,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 alt={listing.title}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
-                sizes="(max-width: 640px) 128px, (max-width: 768px) 160px, (max-width: 1024px) 256px, 320px"
+                sizes="(max-width: 640px) 112px, (max-width: 768px) 144px, (max-width: 1024px) 224px, 288px"
                 unoptimized
                 loading="lazy"
               />
@@ -66,129 +69,103 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
             <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
-            
-            {/* Countdown Timer */}
-            {!sold.isSold && listing.type === 'auction' && listing.endsAt && (
-              <div className="absolute top-2 left-2 z-20">
-                <CountdownTimer
-                  endsAt={listing.endsAt}
-                  variant="badge"
-                  showIcon={true}
-                  pulseWhenEndingSoon={true}
-                  className="text-xs"
-                />
-              </div>
-            )}
-            
-            {/* Type Badge */}
-            <div className="absolute bottom-2 right-2 z-20">
-              <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
-                {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
-              </Badge>
-            </div>
-
-            {sold.isSold && (
-              <div className="absolute bottom-2 left-2 z-20">
-                <Badge className="bg-destructive text-destructive-foreground font-extrabold text-xs shadow-warm">
-                  SOLD
-                </Badge>
-              </div>
-            )}
           </div>
 
           {/* Content - Flexible Width */}
-          <div className="flex-1 flex flex-col p-3 sm:p-4 md:p-6 gap-2 sm:gap-3 md:gap-4">
-            {sold.isSold && (
-              <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
-                <div className="font-semibold">{sold.soldPriceLabel}</div>
-                {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
+          <div className="flex-1 flex flex-col p-3 sm:p-4 md:p-5 gap-2 min-w-0">
+            {/* Top meta row (type + sold) */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Badge variant="outline" className="text-[10px] font-semibold">
+                  {isAuction ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Gavel className="h-3 w-3" /> Auction
+                    </span>
+                  ) : isFixed ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Tag className="h-3 w-3" /> Buy Now
+                    </span>
+                  ) : (
+                    'Classified'
+                  )}
+                </Badge>
+                {sold.isSold ? (
+                  <Badge className="bg-destructive text-destructive-foreground font-extrabold text-[10px]">SOLD</Badge>
+                ) : null}
               </div>
-            )}
-            {/* Title and Location Row */}
-            <div className="flex-1 space-y-2">
-              <h3 className="font-bold text-lg md:text-xl line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">
-                {listing.title}
-              </h3>
-              
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4 flex-shrink-0" />
-                <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
-              </div>
-              
-              {/* Description Preview */}
-              <p className="text-sm text-muted-foreground line-clamp-2 hidden md:block">
-                {listing.description}
-              </p>
-
-              {/* Trust Badges */}
-              <TrustBadges
-                verified={listing.trust?.verified || false}
-                transport={listing.trust?.transportReady || false}
-                size="sm"
-                className="flex-wrap gap-2"
-              />
             </div>
 
-            {/* Bottom Row - Price, Seller, Metadata */}
-            <div className="flex items-center justify-between gap-4 pt-3 border-t border-border/50">
-              {/* Left: Price */}
-              <div className="flex-shrink-0">
-                <div className="text-2xl md:text-3xl font-bold text-primary">
-                  {priceDisplay}
-                </div>
-                {listing.type === 'auction' && listing.reservePrice && (
-                  <div className="text-xs text-muted-foreground font-medium mt-0.5">
-                    Reserve: ${listing.reservePrice.toLocaleString()}
-                  </div>
-                )}
+            {/* Title + location */}
+            <div className="space-y-1 min-w-0">
+              <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300">
+                {listing.title}
+              </h3>
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">
+                <MapPin className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">
+                  {listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}
+                </span>
               </div>
+            </div>
 
-              {/* Middle: Attributes (if available) */}
-              {listing.attributes && (
-                <div className="flex-1 hidden lg:flex items-center gap-4 text-sm text-muted-foreground">
-                  {listing.category === 'cattle_livestock' && (listing.attributes as any).breed && (
-                    <div>
-                      <span className="font-semibold">Breed: </span>
-                      <span>{(listing.attributes as any).breed}</span>
-                    </div>
-                  )}
-                  {(listing.attributes as any).quantity && (
-                    <div>
-                      <span className="font-semibold">Qty: </span>
-                      <span>{(listing.attributes as any).quantity}</span>
-                    </div>
-                  )}
-                  {listing.category === 'cattle_livestock' && (listing.attributes as any).registered && (
-                    <Badge variant="outline" className="text-xs">
-                      Registered
-                    </Badge>
-                  )}
+            {/* Pricing + auction meta (eBay-like) */}
+            <div className="pt-1">
+              {sold.isSold ? (
+                <div className="text-sm">
+                  <div className="font-extrabold">{sold.soldPriceLabel}</div>
+                  {sold.soldDateLabel ? <div className="text-xs text-muted-foreground">{sold.soldDateLabel}</div> : null}
+                </div>
+              ) : isAuction ? (
+                <div className="space-y-1">
+                  <div className="text-lg sm:text-xl font-extrabold text-primary leading-none">
+                    ${primaryPrice.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                    <span>
+                      {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                    </span>
+                    <span>·</span>
+                    <CountdownTimer endsAt={listing.endsAt as any} variant="compact" showIcon={false} pulseWhenEndingSoon={false} className="text-xs" />
+                    <span className="sr-only">left</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-lg sm:text-xl font-extrabold text-primary leading-none">
+                    ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
+                  </div>
+                  {bestOfferEnabled ? <div className="text-xs text-muted-foreground">or Best Offer</div> : null}
                 </div>
               )}
+            </div>
 
-              {/* Right: Seller Info */}
-              <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  {listing.sellerSnapshot?.verified && (
-                    <Badge variant="secondary" className="text-[10px] font-semibold">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
-                  )}
-                  {sellerTxCount !== null && sellerTxCount > 0 && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      {sellerTxCount} tx
-                    </Badge>
-                  )}
-                  {sellerBadges.includes('Identity verified') && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      ID verified
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground font-medium text-right max-w-[180px] truncate">
-                  {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
-                </div>
+            {/* Trust (keep but compact; avoids cramming) */}
+            <div className="pt-1">
+              <TrustBadges verified={listing.trust?.verified || false} transport={listing.trust?.transportReady || false} size="sm" className="flex-wrap gap-2" />
+            </div>
+
+            {/* Seller (small, bottom) */}
+            <div className="mt-auto pt-2 border-t border-border/40 flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground font-medium truncate">
+                {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {listing.sellerSnapshot?.verified ? (
+                  <Badge variant="secondary" className="text-[10px] font-semibold">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Verified
+                  </Badge>
+                ) : null}
+                {sellerTxCount !== null && sellerTxCount > 0 ? (
+                  <Badge variant="outline" className="text-[10px] font-semibold">
+                    {sellerTxCount} tx
+                  </Badge>
+                ) : null}
+                {sellerBadges.includes('Identity verified') ? (
+                  <Badge variant="outline" className="text-[10px] font-semibold">
+                    ID verified
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </div>
