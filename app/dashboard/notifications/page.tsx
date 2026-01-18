@@ -31,6 +31,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
 
 type UiTab = 'all' | 'auctions' | 'orders';
 
@@ -45,6 +46,35 @@ type UserNotification = {
   read?: boolean;
   createdAt?: any;
 };
+
+function toMillisSafe(v: any): number {
+  if (!v) return 0;
+  if (v instanceof Date) return Number.isFinite(v.getTime()) ? v.getTime() : 0;
+  if (typeof v?.toDate === 'function') {
+    try {
+      const d = v.toDate();
+      if (d instanceof Date && Number.isFinite(d.getTime())) return d.getTime();
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof v?.seconds === 'number') return v.seconds * 1000;
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v);
+    return Number.isFinite(d.getTime()) ? d.getTime() : 0;
+  }
+  return 0;
+}
+
+function timeAgo(n: UserNotification): string | null {
+  const ms = toMillisSafe(n.createdAt);
+  if (!ms) return null;
+  try {
+    return formatDistanceToNow(new Date(ms), { addSuffix: true });
+  } catch {
+    return null;
+  }
+}
 
 function categoryFor(n: UserNotification): UiTab {
   const c = String(n.category || '').toLowerCase();
@@ -206,6 +236,21 @@ export default function NotificationsPage() {
   }, [items, tab]);
 
   const unreadCount = useMemo(() => items.filter((n) => n.read !== true).length, [items]);
+  const tabCounts = useMemo(() => {
+    const auctions = items.filter((n) => categoryFor(n) === 'auctions').length;
+    const orders = items.filter((n) => categoryFor(n) === 'orders').length;
+    return {
+      all: items.length,
+      auctions,
+      orders,
+    };
+  }, [items]);
+
+  const tabUnreadCounts = useMemo(() => {
+    const auctions = items.filter((n) => n.read !== true && categoryFor(n) === 'auctions').length;
+    const orders = items.filter((n) => n.read !== true && categoryFor(n) === 'orders').length;
+    return { all: unreadCount, auctions, orders };
+  }, [items, unreadCount]);
 
   const markAllRead = useCallback(async () => {
     if (!user?.uid) return;
@@ -268,26 +313,57 @@ export default function NotificationsPage() {
 
   return (
     <div className="container mx-auto px-4 py-6 md:py-8 max-w-5xl space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center gap-2">
-            <Bell className="h-6 w-6 text-primary" />
-            Notifications
-            {unreadCount > 0 && <Badge variant="secondary">{unreadCount} unread</Badge>}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Fast auction signals. Trust-first order updates. All in one place.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0}>
-            <CheckCheck className="h-4 w-4 mr-2" />
-            Mark all read
-          </Button>
-        </div>
-      </div>
+      <Card className="border-2 border-border/60 overflow-hidden">
+        <CardContent className="p-5 md:p-6">
+          <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+                  <Bell className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
+                    Notifications
+                    {unreadCount > 0 ? (
+                      <Badge variant="secondary" className="font-semibold">
+                        {unreadCount} unread
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-semibold text-muted-foreground">
+                        All caught up
+                      </Badge>
+                    )}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    Auction signals, order updates, messages, and trust alerts—built for speed.
+                  </p>
+                </div>
+              </div>
 
-      <Card className="border-border/60 overflow-hidden">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <Badge variant="secondary" className="font-semibold">
+                  {tabCounts.all} total
+                </Badge>
+                <Badge variant="outline" className="font-semibold">
+                  <Gavel className="h-3 w-3 mr-1" /> {tabCounts.auctions} auctions
+                </Badge>
+                <Badge variant="outline" className="font-semibold">
+                  <ShoppingBag className="h-3 w-3 mr-1" /> {tabCounts.orders} orders
+                </Badge>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0} className="font-semibold min-h-[44px]">
+                <CheckCheck className="h-4 w-4 mr-2" />
+                Mark all read
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-2 border-border/60 overflow-hidden">
         <CardHeader className="pb-4">
           <CardTitle className="text-base">Inbox</CardTitle>
         </CardHeader>
@@ -295,9 +371,39 @@ export default function NotificationsPage() {
           <Tabs value={tab} onValueChange={(v) => setTab(v as UiTab)} className="w-full">
             <div className="px-5 pb-4">
               <TabsList className="grid grid-cols-3 w-full">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="auctions">Auctions</TabsTrigger>
-                <TabsTrigger value="orders">Orders</TabsTrigger>
+                <TabsTrigger value="all" className="font-semibold">
+                  <span className="flex items-center justify-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    All
+                    {tabUnreadCounts.all > 0 ? (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {tabUnreadCounts.all}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="auctions" className="font-semibold">
+                  <span className="flex items-center justify-center gap-2">
+                    <Gavel className="h-4 w-4" />
+                    Auctions
+                    {tabUnreadCounts.auctions > 0 ? (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {tabUnreadCounts.auctions}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="orders" className="font-semibold">
+                  <span className="flex items-center justify-center gap-2">
+                    <ShoppingBag className="h-4 w-4" />
+                    Orders
+                    {tabUnreadCounts.orders > 0 ? (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {tabUnreadCounts.orders}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -305,8 +411,14 @@ export default function NotificationsPage() {
 
             <TabsContent value={tab} className="m-0">
               {filtered.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">
-                  No notifications here yet.
+                <div className="p-10 text-center">
+                  <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center mb-3">
+                    <Bell className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="text-base font-extrabold">Nothing here yet</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    When something important happens, it’ll show up here instantly.
+                  </div>
                 </div>
               ) : (
                 <div className="divide-y">
@@ -317,12 +429,14 @@ export default function NotificationsPage() {
                     const Icon = s.Icon || iconFor(t);
                     const href = n.deepLinkUrl || '';
                     const label = n.linkLabel || 'Open';
+                    const ago = timeAgo(n);
                     return (
                       <div
                         key={n.id}
                         className={cn(
-                          'p-5 flex items-start gap-3 transition-colors hover:bg-muted/30',
-                          isUnread && s.unreadRowClass
+                          'relative p-5 flex items-start gap-3 transition-colors group hover:bg-muted/30',
+                          isUnread && s.unreadRowClass,
+                          isUnread && 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary/50'
                         )}
                       >
                         <div
@@ -338,7 +452,7 @@ export default function NotificationsPage() {
                             <Link
                               href={href}
                               onClick={() => void markClicked(n.id)}
-                              className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40"
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -348,6 +462,7 @@ export default function NotificationsPage() {
                                   <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
                                     {n.body}
                                   </div>
+                                  {ago ? <div className="text-xs text-muted-foreground mt-2">{ago}</div> : null}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {isUnread && (
@@ -366,7 +481,7 @@ export default function NotificationsPage() {
                             <button
                               type="button"
                               onClick={() => void markClicked(n.id)}
-                              className="w-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              className="w-full text-left rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40"
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -376,6 +491,7 @@ export default function NotificationsPage() {
                                   <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
                                     {n.body}
                                   </div>
+                                  {ago ? <div className="text-xs text-muted-foreground mt-2">{ago}</div> : null}
                                 </div>
                                 {isUnread && (
                                   <Badge variant="outline" className={cn('shrink-0 font-semibold', s.newBadgeClass)}>
