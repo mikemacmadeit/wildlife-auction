@@ -272,7 +272,7 @@ function getEmailTemplate(params: {
                           </div>
                         </td>
                         <td align="right" style="vertical-align: middle;">
-                          <a href="${origin}" style="font-family:${fontBody}; font-size: 12px; color:${cOlive}; font-weight: 800; text-decoration:none;">
+                          <a href="${origin}" style="font-family:${fontBody}; font-size: 12px; color:${cParchment}; font-weight: 800; text-decoration:none;">
                             wildlife.exchange
                           </a>
                         </td>
