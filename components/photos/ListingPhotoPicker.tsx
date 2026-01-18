@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Upload, Star, GripVertical, ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Upload, Star, GripVertical, ArrowLeft, ArrowRight, X, Trash2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { listUserPhotos, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
+import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
 
 export type ListingPhotoSnapshot = {
@@ -30,10 +30,15 @@ export function ListingPhotoPicker(props: {
   const { uid, selected, coverPhotoId, max = 8, onChange } = props;
   const { toast } = useToast();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [manageLoading, setManageLoading] = useState(true);
+  const [manageTab, setManageTab] = useState<'active' | 'deleted'>('active');
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [photos, setPhotos] = useState<UserPhotoDoc[]>([]);
+  const [activeUploads, setActiveUploads] = useState<UserPhotoDoc[]>([]);
+  const [deletedUploads, setDeletedUploads] = useState<UserPhotoDoc[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.photoId)), [selected]);
@@ -54,6 +59,24 @@ export function ListingPhotoPicker(props: {
       toast({ title: 'Error', description: e?.message || 'Failed to load uploads.', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshManage = async () => {
+    setManageLoading(true);
+    try {
+      const [a, d] = await Promise.all([
+        listUserPhotos(uid, { includeDeleted: false }),
+        listUserPhotos(uid, { includeDeleted: true }),
+      ]);
+      setActiveUploads(a.filter((p) => p.status !== 'deleted'));
+      setDeletedUploads(d.filter((p) => p.status === 'deleted'));
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to load uploads.', variant: 'destructive' });
+      setActiveUploads([]);
+      setDeletedUploads([]);
+    } finally {
+      setManageLoading(false);
     }
   };
 
@@ -154,8 +177,17 @@ export function ListingPhotoPicker(props: {
                 <Upload className="h-4 w-4 mr-2" />
                 Add photos
               </Button>
-              <Button asChild variant="ghost" size="sm" className="min-h-[40px] font-semibold">
-                <Link href="/dashboard/uploads">Manage uploads</Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-[40px] font-semibold"
+                onClick={() => {
+                  setManageOpen(true);
+                  void refreshManage();
+                }}
+              >
+                Manage uploads
               </Button>
             </div>
           </div>
@@ -191,6 +223,58 @@ export function ListingPhotoPicker(props: {
           )}
         </CardContent>
       </Card>
+
+      {/* Manage uploads modal (no route change; keeps listing flow intact) */}
+      <Dialog
+        open={manageOpen}
+        onOpenChange={(open) => {
+          setManageOpen(open);
+          if (open) void refreshManage();
+        }}
+      >
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Manage uploads</DialogTitle>
+          </DialogHeader>
+
+          <Tabs value={manageTab} onValueChange={(v) => setManageTab(v as any)}>
+            <TabsList className="grid grid-cols-2 w-full sm:w-auto">
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="deleted">Trash</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="active" className="mt-4">
+              <ManageUploadsGrid
+                uid={uid}
+                loading={manageLoading}
+                photos={activeUploads}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onDelete={async (photoId) => {
+                  await softDeleteUserPhoto(uid, photoId);
+                  await refreshManage();
+                  await refresh(); // keep picker library in sync too
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="deleted" className="mt-4">
+              <ManageUploadsGrid
+                uid={uid}
+                loading={manageLoading}
+                photos={deletedUploads}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onRestore={async (photoId) => {
+                  await restoreUserPhoto(uid, photoId);
+                  await refreshManage();
+                  await refresh();
+                }}
+              />
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
 
       {/* Picker dialog: Upload + Library in one place */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
@@ -313,6 +397,131 @@ export function ListingPhotoPicker(props: {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function ManageUploadsGrid(props: {
+  uid: string;
+  loading: boolean;
+  photos: UserPhotoDoc[];
+  selectedIds: Set<string>;
+  onToggleSelect: (p: UserPhotoDoc) => void;
+  onDelete?: (photoId: string) => Promise<void>;
+  onRestore?: (photoId: string) => Promise<void>;
+}) {
+  const { toast } = useToast();
+
+  if (props.loading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="aspect-square rounded-lg border bg-muted/30 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!props.photos.length) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-10 text-center space-y-2">
+          <div className="text-sm font-semibold">No uploads here yet.</div>
+          <div className="text-sm text-muted-foreground">
+            Upload photos once, then reuse them across listings.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      {props.photos.map((p) => {
+        const isSelected = props.selectedIds.has(p.photoId);
+        return (
+          <div key={p.photoId} className="group relative aspect-square rounded-lg overflow-hidden border bg-muted/30">
+            <button
+              type="button"
+              className={cn(
+                'absolute inset-0 z-10',
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                isSelected ? 'ring-2 ring-primary' : ''
+              )}
+              onClick={() => props.onToggleSelect(p)}
+              aria-label={isSelected ? 'Unselect photo' : 'Select photo'}
+            />
+            <Image
+              src={p.downloadUrl}
+              alt="Upload"
+              fill
+              className={cn('object-cover', isSelected && 'opacity-90')}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+              unoptimized
+            />
+
+            <div
+              className={cn(
+                'absolute inset-x-0 bottom-0 z-20 p-2 flex items-center justify-end gap-2',
+                'bg-gradient-to-t from-black/60 via-black/20 to-transparent',
+                'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity'
+              )}
+            >
+              {props.onRestore ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="min-h-[40px] font-semibold"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                      await props.onRestore?.(p.photoId);
+                      toast({ title: 'Restored', description: 'Photo restored.' });
+                    } catch (err: any) {
+                      toast({ title: 'Error', description: err?.message || 'Failed to restore.', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Restore
+                </Button>
+              ) : null}
+
+              {props.onDelete ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  className="min-h-[40px] font-semibold"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                      await props.onDelete?.(p.photoId);
+                      toast({ title: 'Moved to trash', description: 'Photo removed from active uploads.' });
+                    } catch (err: any) {
+                      toast({ title: 'Error', description: err?.message || 'Failed to delete.', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              ) : null}
+            </div>
+
+            {isSelected ? (
+              <div className="absolute top-2 left-2 z-20">
+                <Badge variant="secondary" className="font-semibold">
+                  Selected
+                </Badge>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
