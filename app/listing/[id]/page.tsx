@@ -83,6 +83,16 @@ import {
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
 import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
+import {
+  AmexBadge,
+  ApplePayBadge,
+  AchBadge,
+  GooglePayBadge,
+  LinkBadge,
+  MastercardBadge,
+  VisaBadge,
+  WireBadge,
+} from '@/components/payments/PaymentBrandBadges';
 import { getEligiblePaymentMethods } from '@/lib/payments/gating';
 
 function toDateSafe(value: any): Date | null {
@@ -1286,48 +1296,23 @@ export default function ListingDetailPage() {
                       <div className="min-w-0">
                         <div className="font-semibold">Payments</div>
                         <div className="mt-2 flex items-center gap-2 flex-wrap">
-                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-                            <CreditCard className="h-3 w-3" />
-                            <span className="font-semibold">Card</span>
-                            <span className="text-muted-foreground/70">Visa • MC • AmEx</span>
-                          </div>
-                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-                            <Apple className="h-3 w-3" />
-                            <span className="font-semibold">Apple Pay</span>
-                          </div>
-                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-                            <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true">
-                              <path
-                                fill="currentColor"
-                                d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 2h2v4h-2V7zm0 6h2v4h-2v-4z"
-                              />
-                            </svg>
-                            <span className="font-semibold">Google Pay</span>
-                          </div>
-                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
-                            <Link2 className="h-3 w-3" />
-                            <span className="font-semibold">Link</span>
-                          </div>
-                          <div
-                            className={cn(
-                              'inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground',
-                              !eligiblePaymentMethods.includes('ach_debit') && 'opacity-60'
-                            )}
-                            title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : undefined}
-                          >
-                            <Landmark className="h-3 w-3" />
-                            <span className="font-semibold">Bank (ACH)</span>
-                          </div>
-                          <div
-                            className={cn(
-                              'inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground',
-                              !eligiblePaymentMethods.includes('wire') && 'opacity-60'
-                            )}
-                            title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : undefined}
-                          >
-                            <Banknote className="h-3 w-3" />
-                            <span className="font-semibold">Wire</span>
-                          </div>
+                          {/* Card brands */}
+                          <VisaBadge />
+                          <MastercardBadge />
+                          <AmexBadge />
+                          {/* Wallets */}
+                          <ApplePayBadge />
+                          <GooglePayBadge />
+                          <LinkBadge />
+                          {/* High-ticket rails */}
+                          <AchBadge
+                            disabled={!eligiblePaymentMethods.includes('ach_debit')}
+                            title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : 'Bank (ACH)'}
+                          />
+                          <WireBadge
+                            disabled={!eligiblePaymentMethods.includes('wire')}
+                            title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : 'Wire'}
+                          />
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
