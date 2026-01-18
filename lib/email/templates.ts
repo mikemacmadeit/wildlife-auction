@@ -299,12 +299,13 @@ export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { s
   const subject = `Order Confirmation - ${data.listingTitle}`;
   const preheader = `Order confirmed for ${data.listingTitle}. Funds held in escrow until delivery.`;
   const origin = tryGetOrigin(data.orderUrl);
+  const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Order confirmed
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
-      Hi ${escapeHtml(data.buyerName)} — your payment was received and your funds are held securely until delivery and issue windows are complete.
+      Hi ${escapeHtml(data.buyerName)} — your payment was received. Your funds are held securely while the seller coordinates delivery.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -325,17 +326,35 @@ export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { s
     </table>
 
     <div style="margin: 16px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
-      Here’s what happens next:
+      Here’s what happens next (the eBay-style “what to do now”):
       <ul style="margin: 8px 0 0 18px; padding: 0; color:#5B564A;">
-        <li>Seller prepares delivery</li>
-        <li>Seller marks delivered / in transit</li>
-        <li>You confirm receipt or report an issue within the protection window (if applicable)</li>
-        <li>Admin releases payout once it’s safe</li>
+        <li><strong>Coordinate delivery</strong> with the seller (use in-app messages from the order page).</li>
+        <li><strong>Track status</strong> as the seller marks the order in transit / delivered.</li>
+        <li><strong>Inspect on delivery</strong> and confirm receipt if everything looks right.</li>
+        <li><strong>If there’s an issue</strong>, open a dispute from the order page so we can help.</li>
       </ul>
     </div>
 
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="margin-top: 14px; background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Safety reminder
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
+            Keep all communication and payment inside Wildlife Exchange. We’ll never ask you to pay outside the platform or to share passwords/verification codes.
+          </div>
+        </td>
+      </tr>
+    </table>
+
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.orderUrl, 'View transaction timeline')}
+    </div>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Need help? Visit <a href="${contactUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Contact</a> and include your order ID: <strong>${escapeHtml(data.orderId)}</strong>.
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
@@ -345,6 +364,7 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
   const subject = `Delivery Confirmed - ${data.listingTitle}`;
   const preheader = `Delivery confirmed for ${data.listingTitle}. Review and confirm receipt if everything looks good.`;
   const origin = tryGetOrigin(data.orderUrl);
+  const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Delivery confirmed
@@ -370,11 +390,15 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
     </table>
 
     <div style="margin: 16px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
-      Please inspect your order and confirm receipt when you’re satisfied. If there’s an issue, you can open a dispute within the protection window.
+      Please inspect your order and confirm receipt when you’re satisfied. If something isn’t right, open a dispute from the order page so we can help resolve it.
     </div>
 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.orderUrl, 'View order')}
+    </div>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Tip: Keep photos/notes if there’s an issue. Need help? <a href="${contactUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Contact us</a> with order ID <strong>${escapeHtml(data.orderId)}</strong>.
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
@@ -382,13 +406,13 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
 
 export function getPayoutNotificationEmail(data: PayoutNotificationEmailData): { subject: string; html: string } {
   const subject = `Payout Released - ${data.listingTitle}`;
-  const preheader = `Payout released for ${data.listingTitle}. Funds should arrive in 2–5 business days.`;
+  const preheader = `Payout released for ${data.listingTitle}. Arrival time depends on your bank.`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Payout released
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
-      Hi ${escapeHtml(data.sellerName)} — your payout was released and should arrive in your account within 2–5 business days.
+      Hi ${escapeHtml(data.sellerName)} — your payout was released. Depending on your bank, it may take a few business days to appear.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -410,7 +434,7 @@ export function getPayoutNotificationEmail(data: PayoutNotificationEmailData): {
     </table>
 
     <div style="margin: 16px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
-      Thanks for selling on Wildlife Exchange.
+      This is the final step of the transaction timeline. Keep this email for your records.
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin: null }) };
@@ -418,14 +442,14 @@ export function getPayoutNotificationEmail(data: PayoutNotificationEmailData): {
 
 export function getAuctionWinnerEmail(data: AuctionWinnerEmailData): { subject: string; html: string } {
   const subject = `You Won the Auction - ${data.listingTitle}`;
-  const preheader = `You won ${data.listingTitle}. Complete checkout within 48 hours to secure your purchase.`;
+  const preheader = `You won ${data.listingTitle}. Complete checkout to secure your purchase.`;
   const origin = tryGetOrigin(data.orderUrl);
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       You won the auction
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
-      Hi ${escapeHtml(data.winnerName)} — you’re the winning bidder. Complete checkout within <strong>48 hours</strong> to secure the purchase.
+      Hi ${escapeHtml(data.winnerName)} — you’re the winning bidder. Complete checkout to secure the purchase and start the transaction timeline.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -447,13 +471,17 @@ export function getAuctionWinnerEmail(data: AuctionWinnerEmailData): { subject: 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.orderUrl, 'Complete checkout')}
     </div>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Safety reminder: Only pay through Wildlife Exchange. Never send payment outside the platform.
+    </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getAuctionOutbidEmail(data: AuctionOutbidEmailData): { subject: string; html: string } {
   const subject = `You’ve been outbid — ${data.listingTitle}`;
-  const preheader = `Someone just outbid you. Jump back in before it’s gone.`;
+  const preheader = `You’ve been outbid. Review the current high bid and decide your next move.`;
   const origin = tryGetOrigin(data.listingUrl);
 
   const endsAtLine = data.auctionEndsAt
@@ -490,7 +518,7 @@ export function getAuctionOutbidEmail(data: AuctionOutbidEmailData): { subject: 
     </table>
 
     <div style="margin: 16px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
-      Tip: Strong bidders move fast. If you still want this animal, don’t wait for the last second.
+      Tip: If you’re serious, set a bid you’re comfortable with (and consider using auto-bid if available) instead of trying to time the last second.
     </div>
 
     <div style="margin: 18px 0 0 0;">
@@ -503,7 +531,7 @@ export function getAuctionOutbidEmail(data: AuctionOutbidEmailData): { subject: 
 
 export function getWelcomeEmail(data: WelcomeEmailData): { subject: string; html: string } {
   const subject = `Welcome to Wildlife Exchange`;
-  const preheader = `Your next great deal is one bid away.`;
+  const preheader = `Set up your account once, then bid/buy with confidence.`;
   const origin = tryGetOrigin(data.dashboardUrl);
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -523,11 +551,15 @@ export function getWelcomeEmail(data: WelcomeEmailData): { subject: string; html
           <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
             <div>• Save listings to your watchlist</div>
             <div style="margin-top: 6px;">• Turn on push notifications for instant outbid alerts</div>
-            <div style="margin-top: 6px;">• Complete your profile to streamline checkout</div>
+            <div style="margin-top: 6px;">• Complete your profile to streamline checkout and seller trust</div>
           </div>
         </td>
       </tr>
     </table>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Safety reminder: Keep messaging and payments on-platform—this helps us protect buyers and sellers.
+    </div>
 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.dashboardUrl, 'Go to dashboard')}
@@ -538,7 +570,7 @@ export function getWelcomeEmail(data: WelcomeEmailData): { subject: string; html
 
 export function getAuctionHighBidderEmail(data: AuctionHighBidderEmailData): { subject: string; html: string } {
   const subject = `You’re the high bidder — ${data.listingTitle}`;
-  const preheader = `You’re currently winning. Stay sharp until the clock hits zero.`;
+  const preheader = `You’re currently winning. Keep an eye on the ending time.`;
   const origin = tryGetOrigin(data.listingUrl);
 
   const endsAtLine = data.auctionEndsAt
@@ -574,6 +606,10 @@ export function getAuctionHighBidderEmail(data: AuctionHighBidderEmailData): { s
       </tr>
     </table>
 
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
+      Tip: If you can’t watch the finish, set a maximum you’re comfortable paying so you’re not caught off guard.
+    </div>
+
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.listingUrl, 'Watch the auction')}
     </div>
@@ -584,7 +620,7 @@ export function getAuctionHighBidderEmail(data: AuctionHighBidderEmailData): { s
 
 export function getAuctionEndingSoonEmail(data: AuctionEndingSoonEmailData): { subject: string; html: string } {
   const subject = `Ending soon (${data.threshold}) — ${data.listingTitle}`;
-  const preheader = `This one is coming down to the wire.`;
+  const preheader = `Auction is ending soon. Check the ending time and current bid.`;
   const origin = tryGetOrigin(data.listingUrl);
 
   const currentBidLine =
@@ -621,6 +657,10 @@ export function getAuctionEndingSoonEmail(data: AuctionEndingSoonEmailData): { s
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.listingUrl, 'View auction')}
     </div>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Heads up: bidding can move fast near the end. If you’re planning to bid, don’t wait until the very last moment.
+    </div>
   `;
 
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
@@ -630,6 +670,7 @@ export function getAuctionLostEmail(data: AuctionLostEmailData): { subject: stri
   const subject = `Auction ended — ${data.listingTitle}`;
   const preheader = `That one got away. Keep your watchlist tight—new inventory drops weekly.`;
   const origin = tryGetOrigin(data.listingUrl);
+  const browseUrl = `${origin || 'https://wildlife.exchange'}/browse`;
 
   const finalBidLine =
     typeof data.finalBidAmount === 'number'
@@ -663,7 +704,11 @@ export function getAuctionLostEmail(data: AuctionLostEmailData): { subject: stri
     </table>
 
     <div style="margin: 18px 0 0 0;">
-      ${renderButton(data.listingUrl, 'Browse similar')}
+      ${renderButton(browseUrl, 'Browse active listings')}
+    </div>
+
+    <div style="margin: 12px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Want to review the finished listing? <a href="${data.listingUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">View auction</a>
     </div>
   `;
 
@@ -674,6 +719,7 @@ export function getDeliveryCheckInEmail(data: DeliveryCheckInEmailData): { subje
   const subject = `Quick check-in — ${data.listingTitle}`;
   const preheader = `How did it go? Confirm receipt or report an issue.`;
   const origin = tryGetOrigin(data.orderUrl);
+  const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -701,6 +747,10 @@ export function getDeliveryCheckInEmail(data: DeliveryCheckInEmailData): { subje
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.orderUrl, 'Open order')}
     </div>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      If you need help, <a href="${contactUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">contact us</a> and include order ID <strong>${escapeHtml(data.orderId)}</strong>.
+    </div>
   `;
 
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
@@ -725,7 +775,7 @@ export function getProfileIncompleteReminderEmail(
       Finish your profile
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 12px 0;">
-      Hi ${escapeHtml(data.userName)} — completing your profile helps sellers trust you and speeds up checkout.
+      Hi ${escapeHtml(data.userName)} — completing your profile helps sellers trust you and makes checkout faster. It also helps us reach you quickly if there’s ever an issue with an order.
     </div>
     ${missing}
 
@@ -741,6 +791,7 @@ export function getWeeklyDigestEmail(data: WeeklyDigestEmailData): { subject: st
   const subject = `Weekly digest — fresh auctions & inventory`;
   const preheader = `A quick scan of what’s new (Texas-only).`;
   const origin = data.listings?.[0]?.url ? tryGetOrigin(data.listings[0].url) : null;
+  const browseUrl = `${origin || 'https://wildlife.exchange'}/browse`;
 
   const items = (data.listings || [])
     .slice(0, 12)
@@ -777,6 +828,10 @@ export function getWeeklyDigestEmail(data: WeeklyDigestEmailData): { subject: st
         </td>
       </tr>
     </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(browseUrl, 'Browse all weekly inventory')}
+    </div>
     ${unsub}
   `;
 
@@ -787,6 +842,7 @@ export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { sub
   const subject = `Saved search alert — ${data.queryName}`;
   const preheader = `${data.resultsCount} new match${data.resultsCount === 1 ? '' : 'es'} for your search.`;
   const origin = tryGetOrigin(data.searchUrl);
+  const manageUrl = `${origin || 'https://wildlife.exchange'}/dashboard/saved-searches`;
 
   const unsub = data.unsubscribeUrl
     ? `<div style="margin-top: 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
@@ -806,6 +862,10 @@ export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { sub
 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.searchUrl, 'View results')}
+    </div>
+
+    <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Want to refine this alert? <a href="${manageUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Manage saved searches</a>
     </div>
     ${unsub}
   `;
