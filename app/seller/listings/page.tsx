@@ -70,9 +70,29 @@ const getTypeBadge = (type: string) => {
   );
 };
 
-const formatTimeRemaining = (date?: Date) => {
+const formatTimeRemaining = (date?: any) => {
   if (!date) return null;
-  const minutes = Math.floor((date.getTime() - Date.now()) / (1000 * 60));
+  const d: Date | null =
+    date instanceof Date
+      ? date
+      : typeof date?.toDate === 'function'
+      ? (() => {
+          try {
+            const dd = date.toDate();
+            return dd instanceof Date && Number.isFinite(dd.getTime()) ? dd : null;
+          } catch {
+            return null;
+          }
+        })()
+      : typeof date?.seconds === 'number'
+      ? new Date(date.seconds * 1000)
+      : typeof date === 'string' || typeof date === 'number'
+      ? new Date(date)
+      : null;
+
+  if (!d || !Number.isFinite(d.getTime())) return null;
+
+  const minutes = Math.floor((d.getTime() - Date.now()) / (1000 * 60));
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;

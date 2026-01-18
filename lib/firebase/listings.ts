@@ -122,10 +122,35 @@ export interface CreateListingInput {
 /**
  * Convert Firestore Timestamp to JavaScript Date
  */
-const timestampToDate = (timestamp: Timestamp | Date | undefined): Date | undefined => {
-  if (!timestamp) return undefined;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp instanceof Timestamp) return timestamp.toDate();
+const timestampToDate = (value: any): Date | undefined => {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+
+  // Works for Firestore Timestamp-like values (including some serialized shapes).
+  if (typeof value?.toDate === 'function') {
+    try {
+      const d = value.toDate();
+      if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Firebase client Timestamp instance
+  if (value instanceof Timestamp) return value.toDate();
+
+  // Serialized timestamp shape: { seconds, nanoseconds }
+  if (typeof value?.seconds === 'number') {
+    const d = new Date(value.seconds * 1000);
+    return Number.isFinite(d.getTime()) ? d : undefined;
+  }
+
+  // String/number date
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : undefined;
+  }
+
   return undefined;
 };
 
