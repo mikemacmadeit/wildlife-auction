@@ -40,6 +40,7 @@ import { getUserProfile, updateUserProfile } from '@/lib/firebase/users';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { UserProfile } from '@/lib/types';
+import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 
 export default function AccountPage() {
   const { toast } = useToast();
@@ -48,6 +49,8 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploadPct, setAvatarUploadPct] = useState(0);
   const [stats, setStats] = useState({
     totalListings: 0,
     activeSales: 0,
@@ -99,7 +102,7 @@ export default function AccountPage() {
           setFormData({
             fullName: profile.profile?.fullName || profile.displayName || '',
             email: profile.email || '',
-            phone: profile.phoneNumber || profile.profile?.location?.city || '',
+            phone: profile.phoneNumber || '',
             businessName: profile.profile?.businessName || '',
             bio: profile.profile?.bio || '',
             location: {
@@ -162,12 +165,17 @@ export default function AccountPage() {
 
     try {
       setSaving(true);
+      // Only send the fields we intend to update (avoid spraying the full doc back into Firestore).
       await updateUserProfile(user.uid, {
-        ...userProfile,
         displayName: formData.fullName,
         phoneNumber: formData.phone,
         profile: {
-          ...userProfile.profile,
+          ...(userProfile.profile || {
+            fullName: formData.fullName,
+            location: formData.location,
+            notifications: formData.notifications,
+            preferences: formData.preferences,
+          }),
           fullName: formData.fullName,
           businessName: formData.businessName || undefined,
           bio: formData.bio || undefined,
@@ -175,7 +183,7 @@ export default function AccountPage() {
           notifications: formData.notifications,
           preferences: formData.preferences,
         },
-      });
+      } as any);
 
       setIsEditing(false);
       toast({
@@ -227,6 +235,37 @@ export default function AccountPage() {
       title: 'Changes cancelled',
       description: 'Your changes have been discarded.',
     });
+  };
+
+  const handlePickAvatar = async (file: File) => {
+    if (!file) return;
+    if (!user?.uid) return;
+
+    try {
+      setAvatarUploading(true);
+      setAvatarUploadPct(0);
+
+      const { downloadUrl } = await uploadUserAvatar(file, (pct) => setAvatarUploadPct(pct));
+      await setCurrentUserAvatarUrl(downloadUrl);
+
+      // Refresh local UI state (avoid waiting for a full refetch).
+      setUserProfile((prev) => (prev ? ({ ...prev, photoURL: downloadUrl } as any) : prev));
+
+      toast({
+        title: 'Photo updated',
+        description: 'Your profile photo/logo has been updated.',
+      });
+    } catch (e: any) {
+      console.error('Avatar upload failed', e);
+      toast({
+        title: 'Upload failed',
+        description: e?.message || 'Could not upload your photo. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAvatarUploading(false);
+      setAvatarUploadPct(0);
+    }
   };
 
   const statsData = [
@@ -379,17 +418,41 @@ export default function AccountPage() {
                   {/* Avatar */}
                   <div className="relative group">
                     <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-border/50">
+                      <AvatarImage src={userProfile?.photoURL || user?.photoURL || ''} alt={formData.fullName || 'Profile'} />
                       <AvatarFallback className="text-2xl md:text-3xl font-extrabold bg-primary/10 text-primary">
                         {formData.fullName.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
+
+                    <input
+                      id="account-avatar-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={!isEditing || avatarUploading}
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = '';
+                        if (f) await handlePickAvatar(f);
+                      }}
+                    />
+
                     {isEditing && (
                       <Button
+                        type="button"
                         size="icon"
                         variant="outline"
+                        disabled={avatarUploading}
+                        onClick={() => document.getElementById('account-avatar-input')?.click()}
                         className="absolute bottom-0 right-0 h-10 w-10 rounded-full border-2 border-background bg-card shadow-lg hover:bg-background"
+                        aria-label="Upload profile photo / company logo"
+                        title="Upload profile photo / company logo"
                       >
-                        <Camera className="h-4 w-4" />
+                        {avatarUploading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Camera className="h-4 w-4" />
+                        )}
                       </Button>
                     )}
                   </div>
@@ -422,6 +485,11 @@ export default function AccountPage() {
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
                       {formData.bio}
                     </p>
+                    {isEditing && avatarUploading && (
+                      <div className="text-xs text-muted-foreground font-medium">
+                        Uploading photo… {Math.round(avatarUploadPct)}%
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

@@ -91,13 +91,15 @@ service firebase.storage {
     }
     
     // ============================================
-    // USER PROFILE IMAGES (Future - P1)
+    // USER PROFILE IMAGES (Profile photo / company logo)
     // ============================================
-    // match /users/{userId}/profile/{imageId} {
-    //   allow read: if true; // Public read
-    //   allow write: if isAuthenticated() && request.auth.uid == userId;
-    //   allow delete: if isAuthenticated() && request.auth.uid == userId;
-    // }
+    // Path: users/{uid}/profile/{fileName}
+    // Public read so buyers can see seller avatars on listing pages + seller profiles.
+    match /users/{userId}/profile/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
     
     // Deny all other access
     match /{allPaths=**} {

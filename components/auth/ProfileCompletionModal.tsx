@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { User, Phone, MapPin, Building2 } from 'lucide-react';
+import { User, Phone, MapPin, Building2, Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { updateUserProfile } from '@/lib/firebase/users';
+import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 
 interface ProfileCompletionModalProps {
   open: boolean;
@@ -34,6 +35,9 @@ export function ProfileCompletionModal({
 }: ProfileCompletionModalProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploadPct, setAvatarUploadPct] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     fullName: userDisplayName || '',
     phone: '',
@@ -112,6 +116,11 @@ export function ProfileCompletionModal({
 
       // Update user profile
       await updateUserProfile(userId, updates);
+
+      // Optional: avatar/logo upload (not required to complete profile)
+      if (avatarUrl) {
+        await setCurrentUserAvatarUrl(avatarUrl);
+      }
       
       toast({
         title: 'Profile updated successfully!',
@@ -144,6 +153,62 @@ export function ProfileCompletionModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          {/* Optional: profile photo / logo */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold">Add a profile photo / company logo</div>
+                <div className="text-sm text-muted-foreground">
+                  Optional — helps buyers recognize you faster.
+                </div>
+              </div>
+              <label
+                className={cn(
+                  'inline-flex items-center gap-2 px-3 py-2 rounded-lg border font-semibold text-sm cursor-pointer',
+                  'bg-background hover:bg-muted/30 transition-colors',
+                  (avatarUploading || isLoading) && 'opacity-60 cursor-not-allowed'
+                )}
+              >
+                {avatarUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {avatarUploading ? `${Math.round(avatarUploadPct)}%` : 'Upload'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={avatarUploading || isLoading}
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!f) return;
+                    try {
+                      setAvatarUploading(true);
+                      setAvatarUploadPct(0);
+                      const { downloadUrl } = await uploadUserAvatar(f, (pct) => setAvatarUploadPct(pct));
+                      setAvatarUrl(downloadUrl);
+                      toast({ title: 'Photo ready', description: 'Looks good — we’ll save it when you finish this step.' });
+                    } catch (err: any) {
+                      console.error('Avatar upload failed', err);
+                      toast({
+                        title: 'Upload failed',
+                        description: err?.message || 'Could not upload your photo. Please try again.',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setAvatarUploading(false);
+                      setAvatarUploadPct(0);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {avatarUrl ? (
+              <div className="text-xs text-muted-foreground">
+                Uploaded. You can change it later in <span className="font-semibold text-foreground/80">Account & Settings</span>.
+              </div>
+            ) : null}
+          </div>
+
           {/* Personal Information */}
           <div className="space-y-4">
             <div className="space-y-2">
