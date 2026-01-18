@@ -321,42 +321,6 @@ export default function AccountPage() {
               Manage your profile, preferences, and account security
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {isEditing ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
-                  className="min-h-[44px] font-semibold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="min-h-[44px] font-semibold"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-                className="min-h-[44px] font-semibold gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Edit Profile
-              </Button>
-            )}
-          </div>
         </motion.div>
 
         {/* Stats Cards - Quick Overview */}
@@ -414,7 +378,8 @@ export default function AccountPage() {
             {/* Profile Header Card */}
             <Card className="border-2 border-border/50 bg-card">
               <CardContent className="pt-8 pb-8 px-6">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+                <div className="flex items-start justify-between gap-4 flex-col md:flex-row">
+                  <div className="flex flex-col md:flex-row items-center md:items-start gap-6 flex-1">
                   {/* Avatar */}
                   <div className="relative group">
                     <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-border/50">
@@ -489,6 +454,48 @@ export default function AccountPage() {
                       <div className="text-xs text-muted-foreground font-medium">
                         Uploading photo… {Math.round(avatarUploadPct)}%
                       </div>
+                    )}
+                  </div>
+                  </div>
+
+                  {/* Actions (kept with profile card so it's obvious what you are editing) */}
+                  <div className="w-full md:w-auto flex items-center justify-center md:justify-end gap-3">
+                    {isEditing ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancel}
+                          className="min-h-[44px] font-semibold w-full md:w-auto"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={saving}
+                          className="min-h-[44px] font-semibold w-full md:w-auto"
+                        >
+                          {saving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Changes'
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsEditing(true)}
+                        className="min-h-[44px] font-semibold gap-2 w-full md:w-auto"
+                      >
+                        <Settings className="h-4 w-4" />
+                        Edit Profile
+                      </Button>
                     )}
                   </div>
                 </div>
