@@ -184,7 +184,7 @@ export default function HomePage() {
                 </Link>
               </Button>
               <CreateListingGateButton
-                href="/dashboard/listings/new"
+                href="/dashboard/listings/new?fresh=1"
                 variant="outline"
                 size="lg"
                 className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
@@ -657,7 +657,7 @@ export default function HomePage() {
 
                 {/* IMPORTANT: Don't wrap CreateListingGateButton in another Button (it already renders a Button). */}
                 <CreateListingGateButton
-                  href="/dashboard/listings/new"
+                  href="/dashboard/listings/new?fresh=1"
                   variant="outline"
                   size="lg"
                   className="min-h-[56px] min-w-[220px] text-base font-semibold"

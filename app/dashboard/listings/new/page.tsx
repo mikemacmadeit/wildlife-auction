@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { StepperForm } from '@/components/forms/StepperForm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 
 function NewListingPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -158,12 +159,19 @@ function NewListingPageContent() {
   }, [formData, sellerAttestationAccepted, listingId]);
 
   const autosaveKey = (uid: string | null) => `we:create_listing_autosave:v1:${uid || 'anon'}`;
+  const fresh = searchParams?.get('fresh') === '1';
 
   // Restore autosaved progress (localStorage) on first mount.
   useEffect(() => {
     if (authLoading) return;
     if (typeof window === 'undefined') return;
     if (restoredOnceRef.current) return;
+    // When coming from "start new listing" entry points (e.g. homepage CTA),
+    // do NOT auto-restore a previous draft.
+    if (fresh) {
+      restoredOnceRef.current = true;
+      return;
+    }
     if (hasAnyProgress) return;
 
     const keyUser = autosaveKey(user?.uid || null);
@@ -185,7 +193,7 @@ function NewListingPageContent() {
     } finally {
       restoredOnceRef.current = true;
     }
-  }, [authLoading, hasAnyProgress, user?.uid]);
+  }, [authLoading, hasAnyProgress, user?.uid, fresh]);
 
   // Local autosave (fast, reliable). Runs even if the user isn't signed in yet.
   useEffect(() => {
