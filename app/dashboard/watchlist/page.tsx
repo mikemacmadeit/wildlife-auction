@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SavedSearchesPanel } from '@/components/saved-searches/SavedSearchesPanel';
 import {
   Select,
   SelectContent,
@@ -88,6 +89,7 @@ import {
 type TabType = 'active' | 'ended' | 'sold';
 type SortOption = 'newest' | 'oldest' | 'ending-soon' | 'price-low' | 'price-high' | 'title';
 type ViewMode = 'grid' | 'list';
+type SuperTab = 'watchlist' | 'saved-searches';
 
 interface FilterState {
   category: string;
@@ -112,6 +114,7 @@ export default function WatchlistPage() {
   const [listings, setListings] = useState<ListingWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [superTab, setSuperTab] = useState<SuperTab>('watchlist');
   const [activeTab, setActiveTab] = useState<TabType>('active');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -453,6 +456,27 @@ export default function WatchlistPage() {
 
   return (
     <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+      <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
+        <div className="mb-6 flex items-center justify-end">
+          <TabsList className="grid grid-cols-2 w-full max-w-sm">
+            <TabsTrigger value="watchlist" className="font-semibold">
+              Watchlist
+            </TabsTrigger>
+            <TabsTrigger value="saved-searches" className="font-semibold">
+              Saved searches
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="saved-searches">
+          <Card className="border-2 border-border/50 bg-card">
+            <CardContent className="p-4 sm:p-6">
+              <SavedSearchesPanel variant="tab" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="watchlist">
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
@@ -727,6 +751,8 @@ export default function WatchlistPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

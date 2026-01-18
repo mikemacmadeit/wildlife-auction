@@ -207,24 +207,52 @@ export async function getThreadMessages(threadId: string): Promise<Message[]> {
  */
 export async function getUserThreads(userId: string, role: 'buyer' | 'seller'): Promise<MessageThread[]> {
   const threadsRef = collection(db, 'messageThreads');
-  const threadsQuery = query(
-    threadsRef,
-    where(role === 'buyer' ? 'buyerId' : 'sellerId', '==', userId),
-    orderBy('updatedAt', 'desc'),
-    limit(50)
-  );
+  const field = role === 'buyer' ? 'buyerId' : 'sellerId';
 
-  const snapshot = await getDocs(threadsQuery);
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      lastMessageAt: data.lastMessageAt?.toDate(),
-    } as MessageThread;
-  });
+  // Primary query (fast + correct ordering). Requires a composite index:
+  // - messageThreads: {buyerId|sellerId} ASC + updatedAt DESC (+ __name__ DESC in some cases)
+  try {
+    const threadsQuery = query(threadsRef, where(field, '==', userId), orderBy('updatedAt', 'desc'), limit(50));
+    const snapshot = await getDocs(threadsQuery);
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        lastMessageAt: data.lastMessageAt?.toDate(),
+      } as MessageThread;
+    });
+  } catch (error: any) {
+    const code = String(error?.code || '');
+    const msg = String(error?.message || '');
+    const isMissingIndex =
+      code === 'failed-precondition' ||
+      msg.toLowerCase().includes('requires an index') ||
+      msg.toLowerCase().includes('failed-precondition');
+
+    if (!isMissingIndex) throw error;
+
+    // Fallback: query without orderBy (works without composite index) then sort client-side.
+    // This avoids a hard outage while the index is still building / not deployed.
+    console.warn('[getUserThreads] Missing index for ordered query; using fallback', { field, userId, code });
+    const fallbackQuery = query(threadsRef, where(field, '==', userId), limit(250));
+    const snapshot = await getDocs(fallbackQuery);
+    const threads = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        lastMessageAt: data.lastMessageAt?.toDate(),
+      } as MessageThread;
+    });
+
+    threads.sort((a, b) => (b.updatedAt?.getTime?.() || 0) - (a.updatedAt?.getTime?.() || 0));
+    return threads.slice(0, 50);
+  }
 }
 
 /**
