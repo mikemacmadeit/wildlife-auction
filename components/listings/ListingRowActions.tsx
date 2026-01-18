@@ -76,18 +76,7 @@ const ListingRowActions = memo(function ListingRowActions({
             <Send className="h-4 w-4" />
             Resubmit
           </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              onPromote?.();
-            }}
-            className="flex items-center gap-2 font-semibold"
-          >
-            <TrendingUp className="h-4 w-4" />
-            Promote
-          </DropdownMenuItem>
-        )}
+        ) : null}
 
         <DropdownMenuItem
           onSelect={(e) => {

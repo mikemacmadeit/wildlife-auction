@@ -741,6 +741,34 @@ export const resubmitListing = async (uid: string, listingId: string): Promise<v
 };
 
 /**
+ * Duplicate a listing into a new draft listing.
+ * Server-enforced rules: only owner can duplicate; copied fields are sanitized server-side.
+ */
+export const duplicateListing = async (uid: string, listingId: string): Promise<string> => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Authentication required');
+  if (user.uid !== uid) throw new Error('Invalid user');
+
+  const token = await user.getIdToken();
+  const res = await fetch(`/api/listings/${listingId}/duplicate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok !== true) {
+    const err: any = new Error(data?.message || data?.error || 'Failed to duplicate listing');
+    if (data?.code) err.code = data.code;
+    throw err;
+  }
+  const newId = String(data?.listingId || '').trim();
+  if (!newId) throw new Error('Duplicate succeeded but no listingId was returned');
+  return newId;
+};
+
+/**
  * Get a single listing by ID
  * Returns UI Listing type (Date fields)
  */

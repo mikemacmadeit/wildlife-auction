@@ -28,10 +28,11 @@ import { ListingRowActions } from '@/components/listings/ListingRowActions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { listSellerListings, unpublishListing, deleteListing, publishListing, resubmitListing } from '@/lib/firebase/listings';
+import { listSellerListings, unpublishListing, deleteListing, publishListing, resubmitListing, duplicateListing } from '@/lib/firebase/listings';
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,7 @@ const ListingRow = memo(({
   onPublish,
   onResubmit,
   canResubmit,
+  onDuplicate,
   onPause, 
   onDelete 
 }: { 
@@ -92,6 +94,7 @@ const ListingRow = memo(({
   onPublish: (listing: Listing) => void;
   onResubmit: (listing: Listing) => void;
   canResubmit: (listing: Listing) => boolean;
+  onDuplicate: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
@@ -161,6 +164,7 @@ const ListingRow = memo(({
         onPromote={() => onPublish(listing)}
         onResubmit={() => onResubmit(listing)}
         resubmitDisabled={listing.status === 'removed' ? !canResubmit(listing) : undefined}
+        onDuplicate={() => onDuplicate(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
       />
@@ -175,6 +179,7 @@ const MobileListingCard = memo(({
   onPublish,
   onResubmit,
   canResubmit,
+  onDuplicate,
   onPause, 
   onDelete 
 }: { 
@@ -182,6 +187,7 @@ const MobileListingCard = memo(({
   onPublish: (listing: Listing) => void;
   onResubmit: (listing: Listing) => void;
   canResubmit: (listing: Listing) => boolean;
+  onDuplicate: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
@@ -205,6 +211,7 @@ const MobileListingCard = memo(({
         onPromote={() => onPublish(listing)}
         onResubmit={() => onResubmit(listing)}
         resubmitDisabled={listing.status === 'removed' ? !canResubmit(listing) : undefined}
+        onDuplicate={() => onDuplicate(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
       />
@@ -260,6 +267,7 @@ MobileListingCard.displayName = 'MobileListingCard';
 function SellerListingsPageContent() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
@@ -489,6 +497,31 @@ function SellerListingsPageContent() {
     [refreshListings, toast, user?.uid]
   );
 
+  const handleDuplicate = useCallback(
+    async (listing: Listing) => {
+      if (!user?.uid) return;
+      try {
+        setActionLoading(listing.id);
+        const newId = await duplicateListing(user.uid, listing.id);
+        toast({
+          title: 'Duplicated',
+          description: 'A copy was created as a draft. You can edit and publish it when ready.',
+        });
+        // Best UX: take them straight to the copy.
+        router.push(`/seller/listings/${newId}/edit`);
+      } catch (e: any) {
+        toast({
+          title: 'Error duplicating listing',
+          description: e?.message || 'Failed to duplicate listing. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [router, toast, user?.uid]
+  );
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
@@ -648,6 +681,7 @@ function SellerListingsPageContent() {
                     onPublish={handlePublish}
                     onResubmit={handleResubmit}
                     canResubmit={canResubmit}
+                    onDuplicate={handleDuplicate}
                     onPause={handlePause}
                     onDelete={handleDelete}
                   />
@@ -665,6 +699,7 @@ function SellerListingsPageContent() {
                     onPublish={handlePublish}
                     onResubmit={handleResubmit}
                     canResubmit={canResubmit}
+                    onDuplicate={handleDuplicate}
                     onPause={handlePause}
                     onDelete={handleDelete}
                   />
