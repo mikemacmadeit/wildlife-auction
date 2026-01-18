@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,31 @@ export function CountdownTimer({
   pulseWhenEndingSoon = true,
 }: CountdownTimerProps) {
   // Use endsAt or endDate (endDate is alias for backward compatibility)
-  const endTime = endsAt || endDate;
+  const endTime: any = endsAt || endDate;
+
+  function toMillisSafe(value: any): number | null {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d.getTime();
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d.getTime() : null;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d.getTime() : null;
+    }
+    return null;
+  }
+
+  const endTimeMs = useMemo(() => toMillisSafe(endTime), [endTime]);
 
   // Hooks must be called unconditionally - move before early return
   const [timeRemaining, setTimeRemaining] = useState({
@@ -39,13 +63,12 @@ export function CountdownTimer({
 
   useEffect(() => {
     // Early return inside useEffect if no endTime
-    if (!endTime) return;
+    if (!endTimeMs) return;
     const calculateTime = () => {
-      if (!endTime) return;
+      if (!endTimeMs) return;
       
       const now = Date.now();
-      const end = endTime.getTime();
-      const total = end - now;
+      const total = endTimeMs - now;
 
       if (total <= 0) {
         setIsEnded(true);
@@ -66,10 +89,10 @@ export function CountdownTimer({
     const interval = setInterval(calculateTime, 1000);
 
     return () => clearInterval(interval);
-  }, [endTime, onEnd]);
+  }, [endTimeMs, onEnd]);
 
   // Return null if no end time is provided (after all hooks)
-  if (!endTime) {
+  if (!endTimeMs) {
     return null;
   }
 
