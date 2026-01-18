@@ -213,7 +213,9 @@ export default function SellerOverviewPage() {
     const activeListings = listings.filter((l) => l.status === 'active');
     const auctionsEndingSoon = activeListings.filter((l) => {
       if (l.type !== 'auction' || !l.endsAt) return false;
-      const hoursUntilEnd = (l.endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      const endsAt = toDateSafe((l as any).endsAt);
+      if (!endsAt) return false;
+      const hoursUntilEnd = (endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
       return hoursUntilEnd > 0 && hoursUntilEnd <= 24;
     });
 
@@ -223,7 +225,10 @@ export default function SellerOverviewPage() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const revenue30Days = completedOrders
-      .filter((o) => o.createdAt >= thirtyDaysAgo)
+      .filter((o) => {
+        const createdAt = toDateSafe((o as any).createdAt);
+        return createdAt ? createdAt >= thirtyDaysAgo : false;
+      })
       .reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
 
     const views7Days = activeListings.reduce((sum, l) => sum + (l.metrics?.views || 0), 0);
