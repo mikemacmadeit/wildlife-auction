@@ -1,17 +1,18 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { Order, OrderStatus } from '@/lib/types';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
-import { OrderTimeline } from '@/components/orders/OrderTimeline';
+import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +36,6 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderWithListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [disputeDialogOpen, setDisputeDialogOpen] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeNotes, setDisputeNotes] = useState('');
@@ -238,8 +238,6 @@ export default function OrdersPage() {
       case 'paid':
       case 'paid_held':
         return <Badge variant="default" className="bg-orange-500 text-white">Paid (Held)</Badge>;
-      case 'paid':
-        return <Badge variant="default" className="bg-orange-500 text-white">Paid</Badge>;
       case 'awaiting_bank_transfer':
         return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Bank Transfer</Badge>;
       case 'awaiting_wire':
@@ -304,180 +302,108 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-4 py-6 space-y-6 max-w-6xl">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold mb-2">My Purchases</h1>
           <p className="text-muted-foreground">View your purchase history</p>
         </div>
 
-        {/* Mobile: Card View */}
-        <div className="md:hidden space-y-4" data-tour="orders-list">
+        {/* Unified: Polished order tiles (timeline always visible) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-tour="orders-list">
           {orders.map((order) => (
-            <Card key={order.id}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-base mb-1">{order.listingTitle || 'Unknown listing'}</h3>
-                    <div className="text-sm text-muted-foreground capitalize">{order.listingType || 'unknown'}</div>
+            <Card key={order.id} className="border-border/60 bg-gradient-to-br from-card via-card to-muted/20">
+              <CardContent className="p-4 md:p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link
+                        href={`/dashboard/orders/${order.id}`}
+                        className="font-extrabold text-base md:text-lg leading-tight hover:underline truncate"
+                        title={order.listingTitle || 'Order'}
+                      >
+                        {order.listingTitle || 'Unknown listing'}
+                      </Link>
+                      {getStatusBadge(order.status)}
+                    </div>
+                    <div className="mt-1 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                      <span className="capitalize">{order.listingType || 'unknown'}</span>
+                      <span className="text-muted-foreground/60">•</span>
+                      <span>{order.createdAt.toLocaleDateString()}</span>
+                    </div>
                   </div>
-                  {getStatusIcon(order.status)}
+                  <div className="shrink-0">{getStatusIcon(order.status)}</div>
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Total</div>
-                    <div className="text-lg font-bold">${order.amount.toLocaleString()}</div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount</div>
+                    <div className="text-lg font-extrabold mt-1">${order.amount.toLocaleString()}</div>
                   </div>
-                  {getStatusBadge(order.status)}
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order</div>
+                    <div className="text-sm font-semibold mt-1 truncate" title={order.id}>
+                      #{order.id.slice(0, 8)}
+                    </div>
+                  </div>
                 </div>
+
                 {order.status === 'disputed' && order.disputeReason && (
-                  <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
-                    Dispute: {order.disputeReason}
+                  <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
+                    <div className="font-semibold">Dispute opened</div>
+                    <div className="text-xs mt-1">Reason: {order.disputeReason}</div>
                   </div>
                 )}
-                {canAcceptOrDispute(order) && (
-                  <div className="flex gap-2 pt-2 border-t">
-                    <Button
-                      size="sm"
-                      onClick={() => handleConfirmReceipt(order.id)}
-                      disabled={processingOrderId === order.id}
-                      className="flex-1"
-                    >
-                      {processingOrderId === order.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Confirm Receipt
-                        </>
-                      )}
-                    </Button>
-                    {!isDisputeDeadlinePassed(order) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleOpenDispute(order.id)}
-                        disabled={processingOrderId === order.id}
-                        className="flex-1"
-                      >
-                        <AlertTriangle className="h-4 w-4 mr-2" />
-                        Dispute
-                      </Button>
+
+                <TransactionTimeline
+                  order={order}
+                  role="buyer"
+                  dense
+                  showTitle={false}
+                  className="border border-border/50 bg-background/40"
+                />
+
+                <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                  <div className="flex gap-2">
+                    {canAcceptOrDispute(order) && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirmReceipt(order.id)}
+                          disabled={processingOrderId === order.id}
+                          className="font-semibold"
+                        >
+                          {processingOrderId === order.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Accept
+                        </Button>
+                        {!isDisputeDeadlinePassed(order) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenDispute(order.id)}
+                            disabled={processingOrderId === order.id}
+                            className="font-semibold"
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Dispute
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
-                <div className="text-xs text-muted-foreground">
-                  {order.createdAt.toLocaleDateString()}
+
+                  <Button asChild size="sm" variant="ghost" className="font-semibold">
+                    <Link href={`/dashboard/orders/${order.id}`}>
+                      View order <ArrowRight className="h-4 w-4 ml-1" />
+                    </Link>
+                  </Button>
                 </div>
-                {expandedOrderId === order.id && (
-                  <div className="pt-4 border-t mt-4">
-                    <OrderTimeline order={order} compact={true} />
-                  </div>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
-                >
-                  {expandedOrderId === order.id ? 'Hide Timeline' : 'Show Timeline'}
-                </Button>
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* Desktop: Table View */}
-        <div className="hidden md:block" data-tour="orders-list">
-          <Card>
-            <CardContent className="p-0">
-              <div className="rounded-md border">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-secondary/20">
-                      <th className="h-12 px-4 text-left align-middle font-medium text-sm">Order</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-sm">Type</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-sm">Amount</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-sm">Date</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium text-sm">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((order) => (
-                      <>
-                        <tr key={order.id} className="border-b transition-colors hover:bg-accent/8">
-                          <td className="p-4 align-middle">
-                            <div className="font-medium">{order.listingTitle || 'Unknown listing'}</div>
-                            {order.status === 'disputed' && order.disputeReason && (
-                              <div className="text-xs text-destructive mt-1">
-                                Dispute: {order.disputeReason}
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-4 align-middle text-sm capitalize">{order.listingType || 'unknown'}</td>
-                          <td className="p-4 align-middle font-medium">
-                            ${order.amount.toLocaleString()}
-                          </td>
-                          <td className="p-4 align-middle text-sm text-muted-foreground">
-                            {order.createdAt.toLocaleDateString()}
-                          </td>
-                          <td className="p-4 align-middle">
-                          <div className="space-y-2">
-                            {getStatusBadge(order.status)}
-                            {canAcceptOrDispute(order) && (
-                              <div className="flex gap-2 mt-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleConfirmReceipt(order.id)}
-                                  disabled={processingOrderId === order.id}
-                                  className="text-xs"
-                                >
-                                  {processingOrderId === order.id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    'Accept'
-                                  )}
-                                </Button>
-                                {!isDisputeDeadlinePassed(order) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleOpenDispute(order.id)}
-                                    disabled={processingOrderId === order.id}
-                                    className="text-xs"
-                                  >
-                                    Dispute
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs mt-2"
-                              onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
-                            >
-                              {expandedOrderId === order.id ? 'Hide Timeline' : 'Show Timeline'}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                      {expandedOrderId === order.id && (
-                        <tr key={`${order.id}-timeline`}>
-                          <td colSpan={5} className="p-4">
-                            <OrderTimeline order={order} compact={false} />
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {orders.length === 0 && (

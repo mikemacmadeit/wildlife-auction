@@ -74,8 +74,14 @@ function stepStatusFor(stepRank: number, currentRank: number, blocked: boolean):
   return 'upcoming';
 }
 
-export function TransactionTimeline(props: { order: Order; role: TimelineRole; className?: string }) {
-  const { order, role, className } = props;
+export function TransactionTimeline(props: {
+  order: Order;
+  role: TimelineRole;
+  className?: string;
+  dense?: boolean; // tighter spacing for list views
+  showTitle?: boolean; // hide title row for embedded usage
+}) {
+  const { order, role, className, dense = false, showTitle = true } = props;
 
   const trust = getOrderTrustState(order);
   const issue = getOrderIssueState(order);
@@ -244,20 +250,22 @@ export function TransactionTimeline(props: { order: Order; role: TimelineRole; c
 
   return (
     <Card className={cn('border-border/60', className)}>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-          <div className="text-sm font-semibold">Transaction timeline</div>
-          {issue !== 'none' && (
-            <Badge variant="destructive" className="font-semibold text-xs">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Issue under review
-            </Badge>
-          )}
-        </div>
+      <CardContent className={cn(dense ? 'pt-4 pb-4' : 'pt-6')}>
+        {(showTitle || issue !== 'none') && (
+          <div className={cn('flex items-center justify-between gap-3 flex-wrap', dense ? 'mb-3' : 'mb-4')}>
+            {showTitle ? <div className="text-sm font-semibold">Transaction timeline</div> : <div />}
+            {issue !== 'none' && (
+              <Badge variant="destructive" className="font-semibold text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Issue under review
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Horizontal stepper (scrolls on small screens) */}
-        <div className="overflow-x-auto pb-2">
-          <div className="relative min-w-[760px]">
+        <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
+          <div className={cn('relative', dense ? 'min-w-[640px]' : 'min-w-[760px]')}>
             <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
 
             <div className="flex items-start gap-3">
