@@ -688,6 +688,21 @@ export interface MessageThread {
   sellerUnreadCount?: number;
   flagged?: boolean; // Flagged for admin review
   violationCount?: number; // Total violations detected
+  flagCount?: number;
+  flaggedBy?: string[];
+  flaggedAt?: Date;
+  flaggedReason?: string;
+  flaggedDetails?: string;
+
+  moderationStatus?: 'open' | 'reviewing' | 'resolved' | 'dismissed';
+  adminReviewed?: boolean;
+  adminReviewedBy?: string;
+  adminReviewedAt?: Date;
+  moderationNotes?: Array<{
+    by: string;
+    at: Date;
+    text: string;
+  }>;
   archived?: boolean;
 }
 

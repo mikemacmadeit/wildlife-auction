@@ -450,6 +450,35 @@ service cloud.firestore {
     // MESSAGE THREADS COLLECTION
     // ============================================
     match /messageThreads/{threadId} {
+      function isThreadParticipant() {
+        return isAuthenticated() && (
+          resource.data.buyerId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Fields a normal participant is allowed to change on the thread doc.
+      // Everything else is admin/server controlled.
+      function participantAllowedThreadUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'buyerUnreadCount',
+          'sellerUnreadCount',
+          'unreadCount',
+          'updatedAt',
+          'flagged',
+          'flagCount',
+          'flaggedBy',
+          'flaggedAt',
+          'flaggedReason',
+          'flaggedDetails'
+        ]) &&
+        // Disallow changing core identity fields
+        request.resource.data.buyerId == resource.data.buyerId &&
+        request.resource.data.sellerId == resource.data.sellerId &&
+        request.resource.data.listingId == resource.data.listingId;
+      }
+
       // Allow read: if user is buyer or seller in the thread, OR if admin
       allow read: if isAuthenticated() && (
         resource.data.buyerId == request.auth.uid ||
@@ -465,9 +494,8 @@ service cloud.firestore {
       
       // Allow update: if user is buyer or seller, OR if admin (for flagging)
       allow update: if isAuthenticated() && (
-        resource.data.buyerId == request.auth.uid ||
-        resource.data.sellerId == request.auth.uid ||
-        isAdmin()
+        isAdmin() ||
+        (isThreadParticipant() && participantAllowedThreadUpdate())
       );
       
       // Allow delete: only admin

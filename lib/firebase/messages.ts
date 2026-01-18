@@ -14,6 +14,8 @@ import {
   where,
   orderBy,
   limit,
+  arrayUnion,
+  increment,
   serverTimestamp,
   Timestamp,
   onSnapshot,
@@ -292,10 +294,19 @@ export async function markThreadAsRead(threadId: string, userId: string): Promis
 /**
  * Flag a thread for admin review
  */
-export async function flagThread(threadId: string, userId: string): Promise<void> {
+export async function flagThread(
+  threadId: string,
+  userId: string,
+  opts?: { reason?: string; details?: string }
+): Promise<void> {
   const threadRef = doc(db, 'messageThreads', threadId);
   await updateDoc(threadRef, {
     flagged: true,
+    flagCount: increment(1),
+    flaggedBy: arrayUnion(userId),
+    flaggedAt: serverTimestamp(),
+    flaggedReason: opts?.reason || null,
+    flaggedDetails: opts?.details || null,
     updatedAt: serverTimestamp(),
   });
 }

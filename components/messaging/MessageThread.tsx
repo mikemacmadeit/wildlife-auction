@@ -6,6 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { MessageSquare, Send, AlertTriangle, Flag } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Message, MessageThread } from '@/lib/types';
@@ -36,6 +50,9 @@ export function MessageThreadComponent({
   const [sending, setSending] = useState(false);
   const [isPaid, setIsPaid] = useState(orderStatus === 'paid' || orderStatus === 'completed');
   const [listenError, setListenError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<'spam' | 'harassment' | 'circumvention' | 'scam' | 'other'>('circumvention');
+  const [reportDetails, setReportDetails] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const toDateSafe = (value: any): Date | null => {
@@ -135,11 +152,16 @@ export function MessageThreadComponent({
   const handleFlag = async () => {
     if (!user) return;
     try {
-      await flagThread(thread.id, user.uid);
+      await flagThread(thread.id, user.uid, {
+        reason: reportReason,
+        details: reportDetails.trim() ? reportDetails.trim() : undefined,
+      });
       toast({
         title: 'Thread flagged',
-        description: 'This conversation has been flagged for admin review.',
+        description: 'Thanks — our team will review this conversation.',
       });
+      setReportOpen(false);
+      setReportDetails('');
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -163,10 +185,65 @@ export function MessageThreadComponent({
             <p className="text-sm text-muted-foreground">{listingTitle}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleFlag}>
-          <Flag className="h-4 w-4 mr-2" />
-          Report
-        </Button>
+        <AlertDialog open={reportOpen} onOpenChange={setReportOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Flag className="h-4 w-4 mr-2" />
+              Report
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Report this conversation</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tell us what’s going on. Reports are reviewed by admins.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">Reason</div>
+                <RadioGroup value={reportReason} onValueChange={(v) => setReportReason(v as any)} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="r-circumvention" value="circumvention" />
+                    <Label htmlFor="r-circumvention">Trying to move payment off-platform / share contact info</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="r-scam" value="scam" />
+                    <Label htmlFor="r-scam">Scam / suspicious behavior</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="r-harassment" value="harassment" />
+                    <Label htmlFor="r-harassment">Harassment / abusive messages</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="r-spam" value="spam" />
+                    <Label htmlFor="r-spam">Spam</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem id="r-other" value="other" />
+                    <Label htmlFor="r-other">Other</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">Details (optional)</div>
+                <Textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Add any context that will help our team review…"
+                  className="min-h-[90px]"
+                />
+              </div>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleFlag}>Submit report</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Safety Notice */}
