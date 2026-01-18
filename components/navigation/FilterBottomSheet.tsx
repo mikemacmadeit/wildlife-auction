@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,13 +35,19 @@ export function FilterBottomSheet({
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
 
+  // Sync local filters when external filters change (when sheet is closed)
+  useEffect(() => {
+    if (!open) setLocalFilters(filters);
+  }, [filters, open]);
+
   const handleApply = () => {
     onFiltersChange(localFilters);
     setOpen(false);
   };
 
   const handleReset = () => {
-    const resetFilters: FilterState = {};
+    // Include `type` key (as undefined) so Browse can reliably reset the top tabs to "All".
+    const resetFilters: FilterState = { type: undefined };
     setLocalFilters(resetFilters);
     onFiltersChange(resetFilters);
     setOpen(false);

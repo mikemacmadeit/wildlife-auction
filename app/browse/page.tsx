@@ -479,8 +479,11 @@ export default function BrowsePage() {
   const handleFilterChange = (newFilters: FilterState) => {
     // If user chose a type inside the dialog, sync the browse tabs and remove it from the filter blob.
     const next = { ...newFilters } as any;
-    if (next.type) {
-      setSelectedType(next.type);
+    // IMPORTANT: `type` lives in the top tabs (`selectedType`) but some filter UIs (dialogs)
+    // also allow setting/clearing it. Treat presence of the key as authoritative (including `undefined`).
+    if (Object.prototype.hasOwnProperty.call(next, 'type')) {
+      const t = next.type;
+      setSelectedType(t === 'auction' || t === 'fixed' || t === 'classified' ? t : 'all');
       delete next.type;
     }
     setFilters(next);
@@ -540,10 +543,22 @@ export default function BrowsePage() {
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
                   <div className="md:hidden">
-                    <FilterBottomSheet filters={filters} onFiltersChange={handleFilterChange} />
+                    <FilterBottomSheet
+                      filters={{
+                        ...(filters || {}),
+                        type: selectedType === 'all' ? undefined : (selectedType as any),
+                      }}
+                      onFiltersChange={handleFilterChange}
+                    />
                   </div>
                   <div className="hidden md:block lg:hidden">
-                    <FilterDialog filters={filters} onFiltersChange={handleFilterChange} />
+                    <FilterDialog
+                      filters={{
+                        ...(filters || {}),
+                        type: selectedType === 'all' ? undefined : (selectedType as any),
+                      }}
+                      onFiltersChange={handleFilterChange}
+                    />
                   </div>
                   <Button
                     type="button"

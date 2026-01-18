@@ -61,7 +61,8 @@ export function FilterDialog({
   };
 
   const handleReset = () => {
-    const resetFilters: FilterState = {};
+    // Include `type` key (as undefined) so Browse can reliably reset the top tabs to "All".
+    const resetFilters: FilterState = { type: undefined };
     setLocalFilters(resetFilters);
     onFiltersChange(resetFilters);
     setOpen(false);
