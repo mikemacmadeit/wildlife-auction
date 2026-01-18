@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { collection, doc, onSnapshot, orderBy, query, limit, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/hooks/use-auth';
@@ -51,6 +52,7 @@ function iconFor(tab: UiTab) {
 
 export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [tab, setTab] = useState<UiTab>('all');
   const [items, setItems] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,6 +106,8 @@ export default function NotificationsPage() {
   const markClicked = useCallback(
     async (id: string) => {
       if (!user?.uid) return;
+      // Optimistic UI (feels instant; snapshot will reconcile)
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
       await updateDoc(doc(db, 'users', user.uid, 'notifications', id), {
         clickedAt: serverTimestamp(),
         read: true,
@@ -194,40 +198,62 @@ export default function NotificationsPage() {
                     const t = categoryFor(n);
                     const Icon = iconFor(t);
                     const href = n.deepLinkUrl || '';
+                    const label = n.linkLabel || 'Open';
                     return (
-                      <div key={n.id} className={cn('p-5 flex items-start gap-3', isUnread && 'bg-primary/5')}>
+                      <div
+                        key={n.id}
+                        className={cn(
+                          'p-5 flex items-start gap-3',
+                          isUnread && 'bg-primary/5'
+                        )}
+                      >
                         <div className={cn('h-10 w-10 rounded-xl border flex items-center justify-center', isUnread ? 'bg-primary/15 border-primary/20' : 'bg-muted/30 border-border/60')}>
                           <Icon className={cn('h-5 w-5', isUnread ? 'text-primary' : 'text-muted-foreground')} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
-                                {n.title}
-                              </div>
-                              <div className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
-                                {n.body}
-                              </div>
-                            </div>
-                            {isUnread && <Badge variant="secondary" className="shrink-0">New</Badge>}
-                          </div>
                           {href ? (
-                            <div className="mt-3">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                asChild
-                                onClick={() => {
-                                  void markClicked(n.id);
-                                }}
-                              >
-                                <Link href={href}>
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  {n.linkLabel || 'Open'}
-                                </Link>
-                              </Button>
-                            </div>
-                          ) : null}
+                            <Link
+                              href={href}
+                              onClick={() => void markClicked(n.id)}
+                              className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
+                                    {n.title}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                                    {n.body}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {isUnread && <Badge variant="secondary">New</Badge>}
+                                  <Badge variant="outline" className="hidden sm:inline-flex">
+                                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                                    {label}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void markClicked(n.id)}
+                              className="w-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
+                                    {n.title}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                                    {n.body}
+                                  </div>
+                                </div>
+                                {isUnread && <Badge variant="secondary" className="shrink-0">New</Badge>}
+                              </div>
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
