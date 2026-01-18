@@ -156,8 +156,6 @@ export function Navbar() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="center" className="w-56">
-                        <DropdownMenuLabel>How It Works</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
                         {howItWorksItems.map((it) => (
                           <DropdownMenuItem key={it.href} asChild>
                             <Link href={it.href} className="cursor-pointer">
