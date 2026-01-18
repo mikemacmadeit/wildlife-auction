@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepperForm } from '@/components/forms/StepperForm';
 import { Input } from '@/components/ui/input';
@@ -107,6 +107,187 @@ function NewListingPageContent() {
   const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [payoutsGateOpen, setPayoutsGateOpen] = useState(false);
+
+  // Autosave: local (always) + server (only once we have a draftId).
+  const [autoSaveState, setAutoSaveState] = useState<{
+    status: 'idle' | 'saving' | 'saved' | 'error';
+    lastSavedAtMs?: number;
+  }>({ status: 'idle' });
+  const localSaveTimerRef = useRef<any>(null);
+  const serverSaveTimerRef = useRef<any>(null);
+  const lastServerSaveSigRef = useRef<string>('');
+  const restoredOnceRef = useRef(false);
+
+  const hasAnyProgress = useMemo(() => {
+    return Boolean(
+      formData.type ||
+        formData.category ||
+        formData.title ||
+        formData.description ||
+        (formData.images?.length || 0) > 0 ||
+        (formData.photoIds?.length || 0) > 0
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.type, formData.category, formData.title, formData.description, formData.images?.length, formData.photoIds?.length]);
+
+  const autosaveSig = useMemo(() => {
+    // Only include stable primitives / plain objects (no File handles).
+    return JSON.stringify({
+      category: formData.category,
+      type: formData.type,
+      title: formData.title,
+      description: formData.description,
+      price: formData.price,
+      startingBid: formData.startingBid,
+      reservePrice: formData.reservePrice,
+      endsAt: formData.endsAt,
+      location: formData.location,
+      photoIds: formData.photoIds,
+      coverPhotoId: formData.coverPhotoId,
+      verification: formData.verification,
+      transport: formData.transport,
+      protectedTransactionEnabled: formData.protectedTransactionEnabled,
+      protectedTransactionDays: formData.protectedTransactionDays,
+      bestOffer: formData.bestOffer,
+      attributes: formData.attributes,
+      sellerAttestationAccepted,
+      listingId,
+    });
+  }, [formData, sellerAttestationAccepted, listingId]);
+
+  const autosaveKey = (uid: string | null) => `we:create_listing_autosave:v1:${uid || 'anon'}`;
+
+  // Restore autosaved progress (localStorage) on first mount.
+  useEffect(() => {
+    if (authLoading) return;
+    if (typeof window === 'undefined') return;
+    if (restoredOnceRef.current) return;
+    if (hasAnyProgress) return;
+
+    const keyUser = autosaveKey(user?.uid || null);
+    const keyAnon = autosaveKey(null);
+    const raw = window.localStorage.getItem(keyUser) || window.localStorage.getItem(keyAnon);
+    if (!raw) {
+      restoredOnceRef.current = true;
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as any;
+      if (parsed?.formData) setFormData(parsed.formData);
+      if (typeof parsed?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(parsed.sellerAttestationAccepted);
+      if (typeof parsed?.listingId === 'string' && parsed.listingId.trim()) setListingId(parsed.listingId.trim());
+      if (typeof parsed?.savedAtMs === 'number') setAutoSaveState({ status: 'saved', lastSavedAtMs: parsed.savedAtMs });
+    } catch {
+      // ignore
+    } finally {
+      restoredOnceRef.current = true;
+    }
+  }, [authLoading, hasAnyProgress, user?.uid]);
+
+  // Local autosave (fast, reliable). Runs even if the user isn't signed in yet.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!hasAnyProgress) return;
+
+    if (localSaveTimerRef.current) clearTimeout(localSaveTimerRef.current);
+    localSaveTimerRef.current = setTimeout(() => {
+      try {
+        const savedAtMs = Date.now();
+        window.localStorage.setItem(
+          autosaveKey(user?.uid || null),
+          JSON.stringify({
+            formData,
+            sellerAttestationAccepted,
+            listingId,
+            savedAtMs,
+          })
+        );
+        setAutoSaveState((s) => ({ ...s, status: 'saved', lastSavedAtMs: savedAtMs }));
+      } catch {
+        // ignore
+      }
+    }, 400);
+
+    return () => {
+      if (localSaveTimerRef.current) clearTimeout(localSaveTimerRef.current);
+    };
+  }, [formData, sellerAttestationAccepted, listingId, user?.uid, hasAnyProgress]);
+
+  // Server autosave (debounced). Only updates an existing draft to avoid duplicates.
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!listingId) return;
+    if (!hasAnyProgress) return;
+    // Whitetail drafts are gated on attestation.
+    if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) return;
+
+    // Avoid spamming the network if nothing changed since last successful save.
+    if (autosaveSig === lastServerSaveSigRef.current) return;
+
+    if (serverSaveTimerRef.current) clearTimeout(serverSaveTimerRef.current);
+    serverSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSaveState((s) => ({ ...s, status: 'saving' }));
+
+        const locationData: any = {
+          city: formData.location.city,
+          state: formData.location.state,
+        };
+        if (formData.location.zip && formData.location.zip.trim()) {
+          locationData.zip = formData.location.zip.trim();
+        }
+
+        const listingData: any = {
+          title: formData.title || 'Draft Listing',
+          description: formData.description || '',
+          type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
+          category: formData.category as any,
+          location: locationData,
+          images: formData.images,
+          photoIds: formData.photoIds,
+          photos: formData.photos,
+          coverPhotoId: formData.coverPhotoId,
+          trust: {
+            verified: formData.verification,
+            insuranceAvailable: false,
+            transportReady: formData.transport,
+          },
+          protectedTransactionEnabled: formData.protectedTransactionEnabled,
+          protectedTransactionDays: formData.protectedTransactionDays,
+          ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
+          attributes: formData.attributes as ListingAttributes,
+          ...(formData.category === 'whitetail_breeder' && sellerAttestationAccepted && {
+            sellerAttestationAccepted: true,
+            sellerAttestationAcceptedAt: new Date(),
+          }),
+        };
+
+        if (formData.type === 'fixed' || formData.type === 'classified') {
+          listingData.price = parseFloat(formData.price || '0');
+        } else if (formData.type === 'auction') {
+          listingData.startingBid = parseFloat(formData.startingBid || '0');
+          if (formData.reservePrice) {
+            listingData.reservePrice = parseFloat(formData.reservePrice);
+          }
+          if (formData.endsAt) {
+            listingData.endsAt = new Date(formData.endsAt);
+          }
+        }
+
+        await updateListing(user.uid, listingId, listingData);
+        lastServerSaveSigRef.current = autosaveSig;
+        setAutoSaveState((s) => ({ ...s, status: 'saved', lastSavedAtMs: Date.now() }));
+      } catch {
+        // Best-effort: local autosave still protects the user.
+        setAutoSaveState((s) => ({ ...s, status: 'error' }));
+      }
+    }, 2000);
+
+    return () => {
+      if (serverSaveTimerRef.current) clearTimeout(serverSaveTimerRef.current);
+    };
+  }, [autosaveSig, formData, hasAnyProgress, listingId, sellerAttestationAccepted, user?.uid]);
 
   const refreshUserProfile = async () => {
     if (!user) return;
@@ -1603,7 +1784,7 @@ function NewListingPageContent() {
     }
   };
 
-  const hasFormData = formData.type || formData.category || formData.title || formData.description || formData.images.length > 0;
+  const hasFormData = hasAnyProgress;
 
   return (
     <div className="min-h-screen bg-background">
@@ -1716,6 +1897,17 @@ function NewListingPageContent() {
 
             {/* Right: Actions */}
             <div className="flex items-center gap-2">
+              {hasFormData && (
+                <div className="hidden sm:block text-xs text-muted-foreground mr-2">
+                  {autoSaveState.status === 'saving'
+                    ? 'Saving…'
+                    : autoSaveState.status === 'error'
+                    ? 'Autosave issue (saved locally)'
+                    : autoSaveState.lastSavedAtMs
+                    ? `Saved`
+                    : 'Autosave on'}
+                </div>
+              )}
               {user && hasFormData && (
                 <Button
                   variant="outline"
