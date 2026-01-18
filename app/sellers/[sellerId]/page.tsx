@@ -9,17 +9,23 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ListingCard } from '@/components/listings/ListingCard';
+import { cn } from '@/lib/utils';
+import { Loader2, ArrowLeft, CheckCircle2, MapPin, Sparkles, ShieldCheck, Store, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import type { UserProfile } from '@/lib/types';
 import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { getEffectiveSubscriptionTier } from '@/lib/pricing/subscriptions';
+import type { Listing } from '@/lib/types';
+import { listSellerListings } from '@/lib/firebase/listings';
 
 export default function SellerProfilePage() {
   const params = useParams<{ sellerId: string }>();
@@ -31,6 +37,10 @@ export default function SellerProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeListings, setActiveListings] = useState<Listing[]>([]);
+  const [soldListings, setSoldListings] = useState<Listing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [listingsError, setListingsError] = useState<string | null>(null);
 
   const fromParam = useMemo(() => {
     const raw = searchParams?.get('from');
@@ -81,6 +91,77 @@ export default function SellerProfilePage() {
   const sellerTier = profile ? getEffectiveSubscriptionTier(profile) : 'standard';
   const txCount = profile ? Math.max(Number(profile.verifiedTransactionsCount || 0), Number(profile.completedSalesCount || 0)) : 0;
 
+  const displayName = useMemo(() => {
+    return (
+      profile?.displayName ||
+      profile?.profile?.businessName ||
+      profile?.profile?.fullName ||
+      'Seller'
+    );
+  }, [profile]);
+
+  const locationLabel = useMemo(() => {
+    const city = String(profile?.profile?.location?.city || '').trim();
+    const state = String(profile?.profile?.location?.state || '').trim();
+    if (!city && !state) return null;
+    if (city && state) return `${city}, ${state}`;
+    return city || state;
+  }, [profile]);
+
+  const initials = useMemo(() => {
+    const n = String(displayName || 'S').trim();
+    const parts = n.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] || 'S';
+    const b = parts[1]?.[0] || '';
+    return (a + b).toUpperCase();
+  }, [displayName]);
+
+  const joinedLabel = useMemo(() => {
+    const d = profile?.createdAt instanceof Date ? profile.createdAt : null;
+    if (!d) return null;
+    // Avoid showing nonsense for placeholder dates (publicProfiles fallback can be epoch).
+    if (d.getFullYear() < 2018) return null;
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }, [profile]);
+
+  // Public-facing seller listings (active + sold). No drafts, no PII.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadListings() {
+      if (!sellerId) return;
+      if (!user) return; // keep aligned with page gating
+      setListingsLoading(true);
+      setListingsError(null);
+      try {
+        const [active, sold] = await Promise.all([
+          listSellerListings(sellerId, 'active'),
+          listSellerListings(sellerId, 'sold'),
+        ]);
+
+        const soldSorted = [...sold].sort((a, b) => {
+          const at = a.soldAt ? a.soldAt.getTime() : 0;
+          const bt = b.soldAt ? b.soldAt.getTime() : 0;
+          return bt - at;
+        });
+
+        if (cancelled) return;
+        setActiveListings(active);
+        setSoldListings(soldSorted);
+      } catch (e: any) {
+        if (!cancelled) setListingsError(e?.message || 'Failed to load seller listings');
+      } finally {
+        if (!cancelled) setListingsLoading(false);
+      }
+    }
+
+    // Only load after auth has resolved to avoid flashing sign-in gating.
+    if (!authLoading) void loadListings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, sellerId, user]);
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
@@ -99,8 +180,15 @@ export default function SellerProfilePage() {
           </Button>
           <Card>
             <CardContent className="pt-6">
-              <div className="font-semibold">Sign in required</div>
-              <div className="text-sm text-muted-foreground mt-1">Sign in to view seller trust details.</div>
+              <div className="font-extrabold text-lg">Sign in to view seller profiles</div>
+              <div className="text-sm text-muted-foreground mt-1">
+                Seller trust details and inventory are available to signed-in users.
+              </div>
+              <div className="mt-4">
+                <Button asChild className="font-semibold">
+                  <Link href="/login">Sign in</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -129,54 +217,217 @@ export default function SellerProfilePage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-3xl space-y-6">
-        <Button variant="outline" size="sm" onClick={handleBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl space-y-6 md:space-y-8">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="font-semibold">
+              <Link href="/browse">Browse listings</Link>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="font-semibold"
+              onClick={() => {
+                const el = document.getElementById('seller-listings');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              View inventory
+            </Button>
+          </div>
+        </div>
 
-        <Card className="border-border/60">
-          <CardHeader>
-            <CardTitle className="text-2xl font-extrabold">
-              {profile.displayName || profile.profile?.businessName || profile.profile?.fullName || 'Seller'}
-            </CardTitle>
-            <CardDescription>Trust signals derived from verified on-platform data (no reviews yet).</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <SellerTierBadge tier={sellerTier} />
-              <Badge variant={reputation.level === 'trusted' ? 'default' : 'secondary'} className="font-semibold text-xs capitalize">
-                {reputation.level.replaceAll('_', ' ')}
-              </Badge>
-              {profile.seller?.verified && (
-                <Badge variant="secondary" className="font-semibold text-xs">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Verified seller
-                </Badge>
-              )}
+        {/* Hero */}
+        <Card className="relative overflow-hidden border-border/60">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-background to-amber-500/10" />
+          <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
+
+          <CardContent className="relative p-5 sm:p-7 md:p-8">
+            <div className="flex items-start gap-4 sm:gap-6 flex-col sm:flex-row">
+              {/* Avatar */}
+              <div className="flex items-center gap-4">
+                <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-2xl border-2 border-border/60 bg-background/70 backdrop-blur overflow-hidden shadow-sm">
+                  {profile.photoURL ? (
+                    <Image src={profile.photoURL} alt={displayName} fill className="object-cover" sizes="96px" unoptimized />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-lg sm:text-xl font-extrabold text-primary">
+                      {initials}
+                    </div>
+                  )}
+                </div>
+                <div className="sm:hidden">
+                  <div className="text-2xl font-extrabold leading-tight">{displayName}</div>
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <SellerTierBadge tier={sellerTier} />
+                    <Badge
+                      variant={reputation.level === 'trusted' ? 'default' : 'secondary'}
+                      className="font-semibold text-xs capitalize"
+                    >
+                      {reputation.level.replaceAll('_', ' ')}
+                    </Badge>
+                    {profile.seller?.verified && (
+                      <Badge variant="secondary" className="font-semibold text-xs">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Verified seller
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Title + meta */}
+              <div className="flex-1 min-w-0 space-y-3">
+                <div className="hidden sm:block">
+                  <div className="text-3xl md:text-4xl font-extrabold tracking-tight truncate">{displayName}</div>
+                  <div className="flex items-center gap-2 flex-wrap mt-2">
+                    <SellerTierBadge tier={sellerTier} />
+                    <Badge
+                      variant={reputation.level === 'trusted' ? 'default' : 'secondary'}
+                      className="font-semibold text-xs capitalize"
+                    >
+                      {reputation.level.replaceAll('_', ' ')}
+                    </Badge>
+                    {profile.seller?.verified && (
+                      <Badge variant="secondary" className="font-semibold text-xs">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Verified seller
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
+                  {locationLabel && (
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4" />
+                      <span className="font-semibold text-foreground/80">{locationLabel}</span>
+                    </div>
+                  )}
+                  {joinedLabel && (
+                    <div className="flex items-center gap-1.5">
+                      <Store className="h-4 w-4" />
+                      <span>Member since <span className="font-semibold text-foreground/80">{joinedLabel}</span></span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-foreground">Trust signals you can verify</div>
+                    <div className="text-sm text-muted-foreground">
+                      No fake reviews. Reputation is derived from on-platform actions (transactions, delivery signals, and verified status).
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg border border-border/50 bg-muted/20">
+            {/* Stats */}
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur p-4">
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Active listings
+                </div>
+                <div className="text-2xl font-extrabold mt-1">{activeListings.length}</div>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur p-4">
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  Sold listings
+                </div>
+                <div className="text-2xl font-extrabold mt-1">{soldListings.length}</div>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur p-4">
                 <div className="text-xs text-muted-foreground">Successful transactions</div>
-                <div className="text-lg font-extrabold">{txCount}</div>
+                <div className="text-2xl font-extrabold mt-1">{txCount}</div>
               </div>
-              <div className="p-3 rounded-lg border border-border/50 bg-muted/20">
-                <div className="text-xs text-muted-foreground">Delivery success rate</div>
-                <div className="text-lg font-extrabold">{Math.round(reputation.deliverySuccessRate * 100)}%</div>
+              <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur p-4">
+                <div className="text-xs text-muted-foreground">Delivery success</div>
+                <div className="text-2xl font-extrabold mt-1">{Math.round(reputation.deliverySuccessRate * 100)}%</div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">Badges</div>
-              <div className="flex flex-wrap gap-2">
-                {reputation.badges.map((b) => (
-                  <Badge key={b} variant="outline" className="font-semibold text-xs">
-                    {b}
-                  </Badge>
-                ))}
-              </div>
+            {/* Badges */}
+            <div className="mt-6 flex flex-wrap gap-2">
+              {reputation.badges.map((b) => (
+                <Badge key={b} variant="outline" className="font-semibold text-xs bg-background/50">
+                  {b}
+                </Badge>
+              ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Listings */}
+        <Card id="seller-listings" className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl font-extrabold">Listings</CardTitle>
+            <CardDescription>Inventory currently available and historical sold results.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {listingsLoading ? (
+              <div className="py-10 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : listingsError ? (
+              <div className="py-10 text-center">
+                <div className="font-semibold text-destructive">Couldn’t load listings</div>
+                <div className="text-sm text-muted-foreground mt-1">{listingsError}</div>
+              </div>
+            ) : (
+              <Tabs defaultValue="active" className="w-full">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <TabsList>
+                    <TabsTrigger value="active" className="font-semibold">
+                      Active ({activeListings.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="sold" className="font-semibold">
+                      Sold ({soldListings.length})
+                    </TabsTrigger>
+                  </TabsList>
+                  <div className="text-xs text-muted-foreground">
+                    Sold listings are read-only and shown as market history.
+                  </div>
+                </div>
+
+                <TabsContent value="active" className="mt-4">
+                  {activeListings.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-8 text-center">
+                      <div className="font-semibold">No active listings</div>
+                      <div className="text-sm text-muted-foreground mt-1">Check back soon.</div>
+                    </div>
+                  ) : (
+                    <div className={cn('grid gap-6', 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3')}>
+                      {activeListings.map((l) => (
+                        <ListingCard key={l.id} listing={l} />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="sold" className="mt-4">
+                  {soldListings.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-8 text-center">
+                      <div className="font-semibold">No sold listings yet</div>
+                      <div className="text-sm text-muted-foreground mt-1">When items sell, they’ll appear here as market data.</div>
+                    </div>
+                  ) : (
+                    <div className={cn('grid gap-6', 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3')}>
+                      {soldListings.map((l) => (
+                        <ListingCard key={l.id} listing={l} />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            )}
           </CardContent>
         </Card>
       </div>
