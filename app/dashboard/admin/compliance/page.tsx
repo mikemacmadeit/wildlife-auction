@@ -55,6 +55,33 @@ import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 type TabType = 'listings' | 'orders';
 
 export default function AdminCompliancePage() {
+  const toDateSafe = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    return null;
+  };
+
+  const toMillisSafe = (value: any): number => {
+    const d = toDateSafe(value);
+    return d ? d.getTime() : 0;
+  };
+
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -150,8 +177,8 @@ export default function AdminCompliancePage() {
       }
     }
     
-    // Sort by createdAt descending (newest first)
-    pendingListings.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // Sort by createdAt descending (newest first) - bulletproof against Timestamp-like values
+    pendingListings.sort((a, b) => toMillisSafe((b as any).createdAt) - toMillisSafe((a as any).createdAt));
     
     setListings(pendingListings);
     setListingDocsMap(docsMap);
@@ -517,7 +544,7 @@ export default function AdminCompliancePage() {
                             <div>
                               <p className="text-muted-foreground">Created</p>
                               <p className="font-semibold">
-                                {formatDistanceToNow(listing.createdAt, { addSuffix: true })}
+                                {formatDistanceToNow(toDateSafe((listing as any).createdAt) || new Date(), { addSuffix: true })}
                               </p>
                             </div>
                           </div>

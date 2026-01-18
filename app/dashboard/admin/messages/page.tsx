@@ -13,6 +13,28 @@ import { MessageThread } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function AdminMessagesPage() {
+  const toDateSafe = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    return null;
+  };
+
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,9 +63,9 @@ export default function AdminMessagesPage() {
         return {
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-          lastMessageAt: data.lastMessageAt?.toDate(),
+          createdAt: toDateSafe(data.createdAt) || new Date(),
+          updatedAt: toDateSafe(data.updatedAt) || new Date(),
+          lastMessageAt: toDateSafe(data.lastMessageAt),
         } as MessageThread;
       });
 
@@ -159,14 +181,14 @@ export default function AdminMessagesPage() {
                       <p className="text-muted-foreground">Last Message</p>
                       <p className="font-medium">
                         {thread.lastMessageAt
-                          ? formatDistanceToNow(thread.lastMessageAt, { addSuffix: true })
+                          ? formatDistanceToNow(toDateSafe(thread.lastMessageAt) || new Date(), { addSuffix: true })
                           : 'N/A'}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Updated</p>
                       <p className="font-medium">
-                        {formatDistanceToNow(thread.updatedAt, { addSuffix: true })}
+                        {formatDistanceToNow(toDateSafe(thread.updatedAt) || new Date(), { addSuffix: true })}
                       </p>
                     </div>
                   </div>
