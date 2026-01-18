@@ -243,7 +243,8 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         channels: ['inApp', 'push', 'email'],
         dedupeWindowMs: 1000 * 30,
         rateLimitPerUser: { push: { perHour: 30, perDay: 200 }, email: { perHour: 10, perDay: 40 } },
-        allowDuringQuietHours: false,
+        // Messaging should be immediate; do not delay during quiet hours.
+        allowDuringQuietHours: true,
       };
     case 'Offer.Received':
     case 'Offer.Countered':
