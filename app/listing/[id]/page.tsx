@@ -723,9 +723,21 @@ export default function ListingDetailPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6"
+              className="mb-6 relative"
             >
               <ImageGallery images={listing!.images} title={listing!.title} />
+
+              {/* Watchers (public metric): top-right overlay on the photo */}
+              {watchingCount > 0 ? (
+                <div className="pointer-events-none absolute top-3 right-3 z-20">
+                  <div className="flex items-center gap-1.5 rounded-full bg-card/90 backdrop-blur-sm border border-border/60 shadow-warm px-2.5 py-1.5">
+                    <Heart className="h-4 w-4 text-destructive fill-destructive" />
+                    <span className="text-xs font-extrabold tabular-nums text-foreground">
+                      {watchingCount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </motion.div>
 
             {/* Price - Prominent Display (Mobile only; desktop price lives in the buy box) */}
@@ -1339,13 +1351,7 @@ export default function ListingDetailPage() {
                     {isFavorite(listing!.id) ? 'Watching' : 'Watch This Listing'}
                   </Button>
 
-                  {watchingCount > 0 ? (
-                    <div className="text-xs text-muted-foreground text-center -mt-1">
-                      {watchingCount === 1
-                        ? '1 person is watching this listing.'
-                        : `${watchingCount.toLocaleString()} people are watching this listing.`}
-                    </div>
-                  ) : null}
+                  {/* watcher count is shown on the photo overlay (do not duplicate here) */}
                 </CardContent>
               </Card>
 
