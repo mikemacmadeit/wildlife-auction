@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Upload, Star, GripVertical, ArrowLeft, ArrowRight, X, Trash2, RotateCcw } from 'lucide-react';
+import { Upload, Star, GripVertical, ArrowLeft, ArrowRight, X, Trash2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
@@ -29,7 +29,6 @@ export function ListingPhotoPicker(props: {
 }) {
   const { uid, selected, coverPhotoId, max = 8, onChange } = props;
   const { toast } = useToast();
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [manageLoading, setManageLoading] = useState(true);
@@ -40,7 +39,6 @@ export function ListingPhotoPicker(props: {
   const [activeUploads, setActiveUploads] = useState<UserPhotoDoc[]>([]);
   const [deletedUploads, setDeletedUploads] = useState<UserPhotoDoc[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const uploadIntentRef = useRef<'none' | 'open_picker'>('none');
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.photoId)), [selected]);
 
@@ -149,7 +147,6 @@ export function ListingPhotoPicker(props: {
   };
 
   const startDeviceUpload = () => {
-    uploadIntentRef.current = 'open_picker';
     inputRef.current?.click();
   };
 
@@ -167,12 +164,6 @@ export function ListingPhotoPicker(props: {
           const files = Array.from(e.target.files || []);
           await handleUploadFiles(files);
           e.target.value = '';
-
-          // If the user started upload from the center CTA, open the uploads modal after upload.
-          if (uploadIntentRef.current === 'open_picker') {
-            setPickerOpen(true);
-          }
-          uploadIntentRef.current = 'none';
         }}
       />
 
@@ -301,122 +292,6 @@ export function ListingPhotoPicker(props: {
               />
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      {/* Picker dialog: Upload + Library in one place */}
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Add photos</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="md:col-span-1 border-2 border-dashed">
-              <CardContent
-                className={cn('py-6 text-center space-y-3', uploading && 'opacity-80')}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'copy';
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('image/'));
-                  void handleUploadFiles(files);
-                }}
-              >
-                <div className="text-sm text-muted-foreground">
-                  Drag & drop images here, or choose files.
-                </div>
-                <Button
-                  type="button"
-                  className="min-h-[44px] font-semibold"
-                  disabled={uploading}
-                  onClick={() => {
-                    uploadIntentRef.current = 'none';
-                    inputRef.current?.click();
-                  }}
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading {Math.round(uploadPct)}%
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose files
-                    </>
-                  )}
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  Uploads go to your library for reuse.
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="md:col-span-2 space-y-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="text-sm font-semibold">Your uploads</div>
-                <div className="text-xs text-muted-foreground">
-                  Click to select • {selected.length}/{max} selected
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <div key={i} className="aspect-square rounded-md border bg-muted/30 animate-pulse" />
-                  ))}
-                </div>
-              ) : photos.length ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {photos.map((p) => {
-                    const isSelected = selectedIds.has(p.photoId);
-                    const isCover = coverPhotoId === p.photoId;
-                    return (
-                      <button
-                        key={p.photoId}
-                        type="button"
-                        onClick={() => toggleSelect(p)}
-                        className={cn(
-                          'relative aspect-square rounded-md overflow-hidden border-2 transition',
-                          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                          isSelected ? 'border-primary' : 'border-border/50 hover:border-primary/50'
-                        )}
-                      >
-                        <Image
-                          src={p.downloadUrl}
-                          alt="Upload"
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 160px"
-                          unoptimized
-                        />
-                        {isSelected && <div className="absolute inset-0 bg-primary/15" />}
-                        {isCover && (
-                          <div className="absolute top-1 left-1">
-                            <Badge className="bg-primary text-primary-foreground">Cover</Badge>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed p-6 text-center">
-                  <div className="font-semibold">No uploads yet</div>
-                  <div className="text-sm text-muted-foreground mt-1">Upload photos to start building your library.</div>
-                </div>
-              )}
-
-              <div className="flex justify-end">
-                <Button type="button" variant="outline" className="min-h-[40px] font-semibold" onClick={() => setPickerOpen(false)}>
-                  Done
-                </Button>
-              </div>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
