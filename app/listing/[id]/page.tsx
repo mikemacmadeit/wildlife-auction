@@ -81,6 +81,33 @@ import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/paym
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
 import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
 
+function toDateSafe(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+  if (typeof value?.toDate === 'function') {
+    try {
+      const d = value.toDate();
+      if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof value?.seconds === 'number') {
+    const d = new Date(value.seconds * 1000);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
+function toMillisSafe(value: any): number | null {
+  const d = toDateSafe(value);
+  return d ? d.getTime() : null;
+}
+
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -116,6 +143,11 @@ export default function ListingDetailPage() {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToListing: addToRecentlyViewed } = useRecentlyViewed();
   const isSold = listing?.status === 'sold';
+  const endsAtRaw = (listing as any)?.endsAt;
+  const soldAtRaw = (listing as any)?.soldAt;
+  const endsAtDate = useMemo(() => toDateSafe(endsAtRaw), [endsAtRaw]);
+  const endsAtMs = useMemo(() => (endsAtDate ? endsAtDate.getTime() : null), [endsAtDate]);
+  const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
 
   const similarBrowseUrl = useMemo(() => {
     if (!listing) return '/browse';
@@ -236,8 +268,9 @@ export default function ListingDetailPage() {
       return;
     }
 
-    // Check if auction has ended
-    if (listing!.endsAt && new Date(listing!.endsAt) <= new Date()) {
+    // Check if auction has ended (endsAt may be a Firestore Timestamp shape)
+    const endsAtMs = toMillisSafe((listing as any)?.endsAt);
+    if (endsAtMs && endsAtMs <= Date.now()) {
       toast({
         title: 'Auction ended',
         description: 'This auction has ended. Bidding is no longer available.',
@@ -734,7 +767,7 @@ export default function ListingDetailPage() {
                           {typeof listing!.soldPriceCents === 'number'
                             ? `Sold for $${(Math.round(listing!.soldPriceCents) / 100).toLocaleString()}`
                             : null}
-                          {listing!.soldAt ? ` • Sold on ${format(listing!.soldAt, 'MMM d, yyyy')}` : null}
+                          {soldAtDate ? ` • Sold on ${format(soldAtDate, 'MMM d, yyyy')}` : null}
                         </div>
                       </div>
                       <Badge className="bg-destructive text-destructive-foreground font-extrabold">SOLD</Badge>
@@ -746,7 +779,7 @@ export default function ListingDetailPage() {
                 </Card>
               )}
 
-              {!isSold && listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) > new Date() && (
+              {!isSold && listing!.type === 'auction' && endsAtMs && endsAtMs > Date.now() && (
                 <Card className="border-2 shadow-lg bg-card">
                   <CardHeader className="pb-4 border-b">
                     <CardTitle className="text-lg font-bold">Place Your Bid</CardTitle>
@@ -757,7 +790,7 @@ export default function ListingDetailPage() {
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                         ⏰ Time Remaining
                       </div>
-                      <CountdownTimer endDate={listing!.endsAt} variant="default" />
+                      <CountdownTimer endDate={endsAtDate || undefined} variant="default" />
                     </div>
 
                     <Separator />
@@ -1094,18 +1127,18 @@ export default function ListingDetailPage() {
                       </div>
 
                       {/* Countdown - Very Prominent for Auctions */}
-                      {!isSold && listing!.type === 'auction' && listing!.endsAt && (
+                      {!isSold && listing!.type === 'auction' && endsAtDate && (
                         <div className="space-y-3 pb-4 border-b">
                           <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                             ⏰ Time Remaining
                           </div>
-                          <CountdownTimer endDate={listing!.endsAt} variant="default" />
+                          <CountdownTimer endDate={endsAtDate} variant="default" />
                         </div>
                       )}
 
                       {/* Primary CTA Button - Large & Prominent */}
                       {/* Auction Winner - Complete Purchase */}
-                      {!isSold && listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) <= new Date() && isWinningBidder && (
+                      {!isSold && listing!.type === 'auction' && endsAtMs && endsAtMs <= Date.now() && isWinningBidder && (
                         <div className="space-y-3">
                           <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4 text-center">
                             <div className="flex items-center justify-center gap-2 mb-2">
@@ -1140,7 +1173,7 @@ export default function ListingDetailPage() {
                         </div>
                       )}
                       {/* Auction Active - Place Bid */}
-                      {!isSold && listing!.type === 'auction' && listing!.endsAt && new Date(listing!.endsAt) > new Date() && (
+                      {!isSold && listing!.type === 'auction' && endsAtMs && endsAtMs > Date.now() && (
                         <Dialog open={showBidDialog} onOpenChange={setShowBidDialog}>
                           <DialogTrigger asChild>
                             <Button 
