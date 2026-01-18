@@ -16,7 +16,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Bell, CheckCheck, ExternalLink, Gavel, Package, ShoppingBag } from 'lucide-react';
+import {
+  Loader2,
+  Bell,
+  CheckCheck,
+  ExternalLink,
+  Gavel,
+  ShoppingBag,
+  MessageSquare,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ShieldAlert,
+  DollarSign,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type UiTab = 'all' | 'auctions' | 'orders';
@@ -48,6 +61,89 @@ function iconFor(tab: UiTab) {
   if (tab === 'auctions') return Gavel;
   if (tab === 'orders') return ShoppingBag;
   return Bell;
+}
+
+function styleForNotification(n: UserNotification): {
+  Icon: any;
+  chipClass: string;
+  unreadRowClass: string;
+  newBadgeClass: string;
+} {
+  const type = String(n.type || '').toLowerCase();
+  const category = String(n.category || '').toLowerCase();
+
+  // Messages
+  if (type === 'message_received' || category === 'messages') {
+    return {
+      Icon: MessageSquare,
+      chipClass:
+        'bg-primary/15 border-primary/25 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary',
+      unreadRowClass: 'bg-primary/5',
+      newBadgeClass: 'bg-primary/15 text-primary border-primary/25',
+    };
+  }
+
+  // Listings moderation
+  if (type === 'listing_approved') {
+    return {
+      Icon: CheckCircle2,
+      chipClass:
+        'bg-emerald-500/15 border-emerald-500/25 text-emerald-700 dark:bg-emerald-400/15 dark:border-emerald-400/25 dark:text-emerald-300',
+      unreadRowClass: 'bg-emerald-500/5 dark:bg-emerald-400/10',
+      newBadgeClass: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/25 dark:bg-emerald-400/15 dark:text-emerald-200 dark:border-emerald-400/25',
+    };
+  }
+  if (type === 'listing_rejected') {
+    return {
+      Icon: XCircle,
+      chipClass:
+        'bg-destructive/15 border-destructive/25 text-destructive dark:bg-destructive/20 dark:border-destructive/30',
+      unreadRowClass: 'bg-destructive/5',
+      newBadgeClass: 'bg-destructive/15 text-destructive border-destructive/25',
+    };
+  }
+
+  // Orders / payouts
+  if (type.startsWith('order_') || type.startsWith('payout_') || category === 'orders') {
+    const Icon = type.startsWith('payout_') ? DollarSign : ShoppingBag;
+    return {
+      Icon,
+      chipClass:
+        'bg-sky-500/15 border-sky-500/25 text-sky-700 dark:bg-sky-400/15 dark:border-sky-400/25 dark:text-sky-300',
+      unreadRowClass: 'bg-sky-500/5 dark:bg-sky-400/10',
+      newBadgeClass: 'bg-sky-500/15 text-sky-700 border-sky-500/25 dark:bg-sky-400/15 dark:text-sky-200 dark:border-sky-400/25',
+    };
+  }
+
+  // Auctions
+  if (type.startsWith('auction_') || type.startsWith('bid_') || category === 'auctions') {
+    return {
+      Icon: Gavel,
+      chipClass:
+        'bg-amber-500/15 border-amber-500/25 text-amber-800 dark:bg-amber-400/15 dark:border-amber-400/25 dark:text-amber-300',
+      unreadRowClass: 'bg-amber-500/5 dark:bg-amber-400/10',
+      newBadgeClass: 'bg-amber-500/15 text-amber-800 border-amber-500/25 dark:bg-amber-400/15 dark:text-amber-200 dark:border-amber-400/25',
+    };
+  }
+
+  // Compliance / safety
+  if (type.startsWith('compliance_')) {
+    return {
+      Icon: ShieldAlert,
+      chipClass:
+        'bg-violet-500/15 border-violet-500/25 text-violet-800 dark:bg-violet-400/15 dark:border-violet-400/25 dark:text-violet-300',
+      unreadRowClass: 'bg-violet-500/5 dark:bg-violet-400/10',
+      newBadgeClass: 'bg-violet-500/15 text-violet-800 border-violet-500/25 dark:bg-violet-400/15 dark:text-violet-200 dark:border-violet-400/25',
+    };
+  }
+
+  // Default
+  return {
+    Icon: AlertTriangle,
+    chipClass: 'bg-muted/40 border-border/60 text-foreground/70',
+    unreadRowClass: 'bg-primary/5',
+    newBadgeClass: 'bg-primary/15 text-primary border-primary/25',
+  };
 }
 
 export default function NotificationsPage() {
@@ -196,19 +292,25 @@ export default function NotificationsPage() {
                   {filtered.map((n) => {
                     const isUnread = n.read !== true;
                     const t = categoryFor(n);
-                    const Icon = iconFor(t);
+                    const s = styleForNotification(n);
+                    const Icon = s.Icon || iconFor(t);
                     const href = n.deepLinkUrl || '';
                     const label = n.linkLabel || 'Open';
                     return (
                       <div
                         key={n.id}
                         className={cn(
-                          'p-5 flex items-start gap-3',
-                          isUnread && 'bg-primary/5'
+                          'p-5 flex items-start gap-3 transition-colors hover:bg-muted/30',
+                          isUnread && s.unreadRowClass
                         )}
                       >
-                        <div className={cn('h-10 w-10 rounded-xl border flex items-center justify-center', isUnread ? 'bg-primary/15 border-primary/20' : 'bg-muted/30 border-border/60')}>
-                          <Icon className={cn('h-5 w-5', isUnread ? 'text-primary' : 'text-muted-foreground')} />
+                        <div
+                          className={cn(
+                            'h-10 w-10 rounded-xl border flex items-center justify-center shadow-sm',
+                            isUnread ? s.chipClass : 'bg-muted/30 border-border/60 text-muted-foreground'
+                          )}
+                        >
+                          <Icon className={cn('h-5 w-5', isUnread ? undefined : 'text-muted-foreground')} />
                         </div>
                         <div className="flex-1 min-w-0">
                           {href ? (
@@ -219,15 +321,19 @@ export default function NotificationsPage() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
+                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90')}>
                                     {n.title}
                                   </div>
-                                  <div className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                                  <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
                                     {n.body}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                  {isUnread && <Badge variant="secondary">New</Badge>}
+                                  {isUnread && (
+                                    <Badge variant="outline" className={cn('font-semibold', s.newBadgeClass)}>
+                                      New
+                                    </Badge>
+                                  )}
                                   <Badge variant="outline" className="hidden sm:inline-flex">
                                     <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                                     {label}
@@ -243,14 +349,18 @@ export default function NotificationsPage() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
+                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90')}>
                                     {n.title}
                                   </div>
-                                  <div className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                                  <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
                                     {n.body}
                                   </div>
                                 </div>
-                                {isUnread && <Badge variant="secondary" className="shrink-0">New</Badge>}
+                                {isUnread && (
+                                  <Badge variant="outline" className={cn('shrink-0 font-semibold', s.newBadgeClass)}>
+                                    New
+                                  </Badge>
+                                )}
                               </div>
                             </button>
                           )}
