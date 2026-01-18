@@ -40,6 +40,7 @@ export function ListingPhotoPicker(props: {
   const [activeUploads, setActiveUploads] = useState<UserPhotoDoc[]>([]);
   const [deletedUploads, setDeletedUploads] = useState<UserPhotoDoc[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const uploadIntentRef = useRef<'none' | 'open_picker'>('none');
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.photoId)), [selected]);
 
@@ -147,16 +148,34 @@ export function ListingPhotoPicker(props: {
     }
   };
 
-  const openPicker = (opts?: { autoOpenFileDialog?: boolean }) => {
-    setPickerOpen(true);
-    if (opts?.autoOpenFileDialog) {
-      // Ensure the file chooser works immediately for the common path.
-      setTimeout(() => inputRef.current?.click(), 0);
-    }
+  const startDeviceUpload = () => {
+    uploadIntentRef.current = 'open_picker';
+    inputRef.current?.click();
   };
 
   return (
     <div className="space-y-4">
+      {/* Shared hidden upload input so we can open the OS file picker without opening a modal first */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        disabled={uploading}
+        onChange={async (e) => {
+          const files = Array.from(e.target.files || []);
+          await handleUploadFiles(files);
+          e.target.value = '';
+
+          // If the user started upload from the center CTA, open the uploads modal after upload.
+          if (uploadIntentRef.current === 'open_picker') {
+            setPickerOpen(true);
+          }
+          uploadIntentRef.current = 'none';
+        }}
+      />
+
       {/* Selected (single primary surface) */}
       <Card className="border-2 border-border/50 bg-card">
         <CardContent className="p-4 sm:p-5 space-y-2">
@@ -211,7 +230,7 @@ export function ListingPhotoPicker(props: {
                 <Button
                   type="button"
                   className="min-h-[44px] font-semibold"
-                  onClick={() => openPicker({ autoOpenFileDialog: true })}
+                  onClick={startDeviceUpload}
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Add photos
@@ -224,7 +243,7 @@ export function ListingPhotoPicker(props: {
               <div className="text-sm text-muted-foreground">
                 Listings with 4–8 photos get more buyer interest.
               </div>
-              <Button type="button" className="min-h-[44px] font-semibold" onClick={() => openPicker({ autoOpenFileDialog: true })}>
+              <Button type="button" className="min-h-[44px] font-semibold" onClick={startDeviceUpload}>
                 <Upload className="h-4 w-4 mr-2" />
                 Add photos
               </Button>
@@ -292,20 +311,6 @@ export function ListingPhotoPicker(props: {
             <DialogTitle>Add photos</DialogTitle>
           </DialogHeader>
 
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            disabled={uploading}
-            onChange={async (e) => {
-              const files = Array.from(e.target.files || []);
-              await handleUploadFiles(files);
-              e.target.value = '';
-            }}
-          />
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="md:col-span-1 border-2 border-dashed">
               <CardContent
@@ -323,7 +328,15 @@ export function ListingPhotoPicker(props: {
                 <div className="text-sm text-muted-foreground">
                   Drag & drop images here, or choose files.
                 </div>
-                <Button type="button" className="min-h-[44px] font-semibold" disabled={uploading} onClick={() => inputRef.current?.click()}>
+                <Button
+                  type="button"
+                  className="min-h-[44px] font-semibold"
+                  disabled={uploading}
+                  onClick={() => {
+                    uploadIntentRef.current = 'none';
+                    inputRef.current?.click();
+                  }}
+                >
                   {uploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
