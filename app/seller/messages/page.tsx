@@ -43,6 +43,7 @@ export default function SellerMessagesPage() {
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [otherPartyName, setOtherPartyName] = useState('Buyer');
+  const [otherPartyAvatar, setOtherPartyAvatar] = useState<string | undefined>(undefined);
 
   const loadThreads = useCallback(async () => {
     if (!user?.uid) return;
@@ -126,6 +127,7 @@ export default function SellerMessagesPage() {
         if (cancelled) return;
         setListing(listingData);
         setOtherPartyName(buyerProfile?.displayName || buyerProfile?.profile?.fullName || 'Buyer');
+        setOtherPartyAvatar(buyerProfile?.photoURL || undefined);
       } catch {
         // best-effort
       }
@@ -263,6 +265,7 @@ export default function SellerMessagesPage() {
                 thread={thread}
                 listingTitle={listing?.title || 'Listing'}
                 otherPartyName={otherPartyName}
+                otherPartyAvatar={otherPartyAvatar}
                 orderStatus={undefined}
               />
             )}

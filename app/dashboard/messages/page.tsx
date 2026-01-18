@@ -31,6 +31,7 @@ export default function MessagesPage() {
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [otherPartyName, setOtherPartyName] = useState('Seller');
+  const [otherPartyAvatar, setOtherPartyAvatar] = useState<string | undefined>(undefined);
   const [orderStatus, setOrderStatus] = useState<'pending' | 'paid' | 'completed' | undefined>();
   const [loading, setLoading] = useState(true);
   const [threads, setThreads] = useState<MessageThread[]>([]);
@@ -118,6 +119,7 @@ export default function MessagesPage() {
       // Get other party name
       const otherParty = await getUserProfile(sellerIdParam);
       setOtherPartyName(otherParty?.displayName || otherParty?.email?.split('@')[0] || 'Seller');
+      setOtherPartyAvatar(otherParty?.photoURL || undefined);
 
       // Check order status
       const ordersRef = collection(db, 'orders');
@@ -173,10 +175,19 @@ export default function MessagesPage() {
     markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
     const meta = metaByThreadId[selectedThreadId];
     setOtherPartyName(meta?.sellerName || 'Seller');
+    setOtherPartyAvatar(undefined);
     setOrderStatus(undefined);
-    getListingById(t.listingId)
-      .then((l) => setListing(l))
-      .catch(() => setListing(null));
+
+    Promise.allSettled([
+      getListingById(t.listingId),
+      getUserProfile(t.sellerId),
+    ]).then((results) => {
+      const listingRes = results[0];
+      const sellerRes = results[1];
+      setListing(listingRes.status === 'fulfilled' ? listingRes.value : null);
+      const sellerProfile = sellerRes.status === 'fulfilled' ? sellerRes.value : null;
+      setOtherPartyAvatar(sellerProfile?.photoURL || undefined);
+    });
   }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
 
   if (authLoading || loading) {
@@ -297,6 +308,7 @@ export default function MessagesPage() {
                 thread={thread}
                 listingTitle={listing?.title || 'Listing'}
                 otherPartyName={otherPartyName}
+                otherPartyAvatar={otherPartyAvatar}
                 orderStatus={orderStatus}
               />
             )}
