@@ -50,12 +50,35 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   const steps: TimelineStep[] = [];
   const now = new Date();
 
+  const toDateSafe = (value: any): Date | undefined => {
+    if (!value) return undefined;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : undefined;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d : undefined;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d : undefined;
+    }
+    return undefined;
+  };
+
   // 1. Payment Completed
-  if (order.paidAt) {
+  const paidAt = toDateSafe((order as any).paidAt);
+  if (paidAt) {
     steps.push({
       key: 'payment',
       label: 'Payment Completed',
-      date: order.paidAt,
+      date: paidAt,
       status: 'complete',
       description: `Payment of ${order.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} captured`,
       icon: <CheckCircle2 className="h-4 w-4" />,
@@ -71,8 +94,9 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 2. Dispute Window Deadline
-  if (order.disputeDeadlineAt) {
-    const deadline = order.disputeDeadlineAt;
+  const disputeDeadlineAt = toDateSafe((order as any).disputeDeadlineAt);
+  if (disputeDeadlineAt) {
+    const deadline = disputeDeadlineAt;
     const isPast = deadline.getTime() < now.getTime();
     steps.push({
       key: 'dispute_deadline',
@@ -88,11 +112,12 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 3. In Transit / Delivered (Seller actions)
-  if (order.deliveredAt) {
+  const deliveredAt = toDateSafe((order as any).deliveredAt);
+  if (deliveredAt) {
     steps.push({
       key: 'delivered',
       label: 'Marked Delivered',
-      date: order.deliveredAt,
+      date: deliveredAt,
       status: 'complete',
       description: 'Seller marked order as delivered',
       icon: <Truck className="h-4 w-4" />,
@@ -108,11 +133,12 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 4. Delivery Confirmed (Admin action)
-  if (order.deliveryConfirmedAt) {
+  const deliveryConfirmedAt = toDateSafe((order as any).deliveryConfirmedAt);
+  if (deliveryConfirmedAt) {
     steps.push({
       key: 'delivery_confirmed',
       label: 'Delivery Confirmed',
-      date: order.deliveryConfirmedAt,
+      date: deliveryConfirmedAt,
       status: 'complete',
       description: showAdminFields ? 'Admin confirmed delivery' : 'Delivery confirmed',
       icon: <CheckCircle2 className="h-4 w-4" />,
@@ -120,8 +146,10 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 5. Protection Window (if enabled)
-  if (order.protectedTransactionDaysSnapshot && order.protectionStartAt && order.protectionEndsAt) {
-    const protectionEnds = order.protectionEndsAt;
+  const protectionStartAt = toDateSafe((order as any).protectionStartAt);
+  const protectionEndsAt = toDateSafe((order as any).protectionEndsAt);
+  if (order.protectedTransactionDaysSnapshot && protectionStartAt && protectionEndsAt) {
+    const protectionEnds = protectionEndsAt;
     const isActive = protectionEnds.getTime() > now.getTime();
     const daysRemaining = Math.ceil((protectionEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -139,8 +167,10 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 6. Buyer Accepted Early
-  if (order.buyerAcceptedAt || order.acceptedAt) {
-    const acceptedAt = order.buyerAcceptedAt || order.acceptedAt;
+  const buyerAcceptedAt = toDateSafe((order as any).buyerAcceptedAt);
+  const acceptedAtRaw = toDateSafe((order as any).acceptedAt);
+  if (buyerAcceptedAt || acceptedAtRaw) {
+    const acceptedAt = buyerAcceptedAt || acceptedAtRaw;
     steps.push({
       key: 'buyer_accepted',
       label: 'Buyer Accepted',
@@ -152,7 +182,8 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 7. Dispute Opened
-  if (order.disputeOpenedAt || (order.disputeStatus && order.disputeStatus !== 'none' && order.disputeStatus !== 'cancelled')) {
+  const disputeOpenedAt = toDateSafe((order as any).disputeOpenedAt);
+  if (disputeOpenedAt || (order.disputeStatus && order.disputeStatus !== 'none' && order.disputeStatus !== 'cancelled')) {
     const disputeStatus = order.disputeStatus || 'open';
     const evidenceCount = order.disputeEvidence?.length || 0;
     const isResolved = disputeStatus.startsWith('resolved_');
@@ -161,7 +192,7 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
     steps.push({
       key: 'dispute',
       label: 'Dispute Opened',
-      date: order.disputeOpenedAt,
+      date: disputeOpenedAt,
       status: isResolved || isCancelled ? 'complete' : 'blocked',
       description: isResolved
         ? `Dispute resolved (${disputeStatus.replace('resolved_', '')})`
@@ -202,11 +233,12 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 10. Payout Released
-  if (order.releasedAt && order.stripeTransferId) {
+  const releasedAt = toDateSafe((order as any).releasedAt);
+  if (releasedAt && order.stripeTransferId) {
     steps.push({
       key: 'payout_released',
       label: 'Payout Released',
-      date: order.releasedAt,
+      date: releasedAt,
       status: 'complete',
       description: `Funds released to seller (Transfer: ${order.stripeTransferId.slice(-8)})`,
       icon: <DollarSign className="h-4 w-4" />,
@@ -214,12 +246,13 @@ export function buildOrderTimeline(order: Order, showAdminFields: boolean = fals
   }
 
   // 11. Refunded
-  if (order.refundedAt && order.stripeRefundId) {
+  const refundedAt = toDateSafe((order as any).refundedAt);
+  if (refundedAt && order.stripeRefundId) {
     const isPartial = order.refundAmount && order.refundAmount < order.amount;
     steps.push({
       key: 'refunded',
       label: isPartial ? 'Partial Refund' : 'Refunded',
-      date: order.refundedAt,
+      date: refundedAt,
       status: 'complete',
       description: isPartial
         ? `Partial refund of ${order.refundAmount?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} processed`
@@ -344,7 +377,7 @@ export function OrderTimeline({ order, compact = false, showAdminFields = false 
                         {step.date && (
                           <p className="text-sm text-muted-foreground mb-1">
                             {formatDate(step.date)}
-                            {step.date.getTime() > Date.now() && (
+                            {step.date && step.date.getTime() > Date.now() && (
                               <span className="ml-2">
                                 ({formatDistanceToNow(step.date, { addSuffix: true })})
                               </span>

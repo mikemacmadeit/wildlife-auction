@@ -37,6 +37,28 @@ export function MessageThreadComponent({
   const [isPaid, setIsPaid] = useState(orderStatus === 'paid' || orderStatus === 'completed');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const toDateSafe = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    return null;
+  };
+
   // Subscribe to messages
   useEffect(() => {
     if (!thread.id) return;
@@ -145,6 +167,7 @@ export function MessageThreadComponent({
         ) : (
           messages.map((message) => {
             const isSender = message.senderId === user?.uid;
+            const createdAt = toDateSafe((message as any).createdAt);
             return (
               <div
                 key={message.id}
@@ -171,7 +194,7 @@ export function MessageThreadComponent({
                     </Badge>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    {formatDistanceToNow(message.createdAt, { addSuffix: true })}
+                    {createdAt ? formatDistanceToNow(createdAt, { addSuffix: true }) : '—'}
                   </p>
                 </div>
                 {isSender && (

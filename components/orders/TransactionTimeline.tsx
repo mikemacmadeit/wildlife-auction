@@ -80,10 +80,29 @@ export function TransactionTimeline(props: { order: Order; role: TimelineRole; c
   const trust = getOrderTrustState(order);
   const issue = getOrderIssueState(order);
 
-  const protectionEndsAt = order.protectionEndsAt;
+  const toMillisSafe = (value: any): number | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d.getTime();
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') return value.seconds * 1000;
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d.getTime() : null;
+    }
+    return null;
+  };
+
+  const protectionEndsMs = toMillisSafe((order as any).protectionEndsAt);
   const protectionRemaining =
-    protectionEndsAt && protectionEndsAt.getTime() > Date.now()
-      ? formatDistanceToNowStrict(protectionEndsAt, { addSuffix: true })
+    protectionEndsMs && protectionEndsMs > Date.now()
+      ? formatDistanceToNowStrict(new Date(protectionEndsMs), { addSuffix: true })
       : null;
 
   const blocked = issue !== 'none' || order.adminHold === true || (order as any).payoutHoldReason === 'chargeback';
