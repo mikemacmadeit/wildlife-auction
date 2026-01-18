@@ -65,7 +65,6 @@ import { AutoBidPanel } from '@/components/auction/AutoBidPanel';
 import { EnhancedSellerProfile } from '@/components/listing/EnhancedSellerProfile';
 import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
-import { RelatedListings } from '@/components/listing/RelatedListings';
 import { OfferPanel } from '@/components/offers/OfferPanel';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -717,77 +716,77 @@ export default function ListingDetailPage() {
 
       <div className="container mx-auto px-4 py-4 md:py-6 max-w-7xl">
         {/* eBay-style top header (title/meta/actions above the gallery + buy box) */}
-        <div className="mb-5 md:mb-6">
-          <div className="flex items-start justify-between gap-3 sm:gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                {/* Hide category/type tags on listing detail page (they're implied by context).
-                   Keep fields for filtering + routing elsewhere. */}
-                {listing!.featured && (
-                  <Badge variant="default" className="gap-1 font-medium">
-                    <Sparkles className="h-3 w-3" />
-                    Featured
-                  </Badge>
-                )}
-                {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays && (
-                  <Badge
-                    variant="default"
-                    className="bg-green-600 text-white font-medium gap-1"
-                    title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
-                  >
-                    <Shield className="h-3 w-3" />
-                    Protected {listing!.protectedTransactionDays} Days
-                  </Badge>
-                )}
-              </div>
+        <Card className="mb-5 md:mb-6 border-2 bg-card">
+          <CardContent className="pt-5 pb-5">
+            <div className="flex items-start justify-between gap-3 sm:gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  {listing!.featured ? (
+                    <Badge variant="default" className="gap-1 font-medium">
+                      <Sparkles className="h-3 w-3" />
+                      Featured
+                    </Badge>
+                  ) : null}
+                  {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
+                    <Badge
+                      variant="default"
+                      className="bg-green-600 text-white font-medium gap-1"
+                      title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
+                    >
+                      <Shield className="h-3 w-3" />
+                      Protected {listing!.protectedTransactionDays} Days
+                    </Badge>
+                  ) : null}
+                </div>
 
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight break-words">
-                {listing!.title}
-              </h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight break-words">
+                  {listing!.title}
+                </h1>
 
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {listing!.location?.city || listing!.location?.state ? (
-                  <span>
-                    {listing!.location?.city ? `${listing!.location.city}, ` : ''}
-                    {listing!.location?.state || ''}
-                  </span>
-                ) : null}
-                {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
-                  <span className="capitalize">Condition: {String((listing!.attributes as any).condition).replaceAll('_', ' ')}</span>
-                ) : null}
-                {listing!.type === 'auction' && !isSold && endsAtDate ? (
-                  <span>
-                    Ends{' '}
-                    <span className="font-medium text-foreground">
-                      {format(endsAtDate, 'MMM d, h:mm a')}
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  {listing!.location?.city || listing!.location?.state ? (
+                    <span>
+                      {listing!.location?.city ? `${listing!.location.city}, ` : ''}
+                      {listing!.location?.state || ''}
                     </span>
-                  </span>
-                ) : null}
+                  ) : null}
+                  {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                    <span className="capitalize">Condition: {String((listing!.attributes as any).condition).replaceAll('_', ' ')}</span>
+                  ) : null}
+                  {listing!.type === 'auction' && !isSold && endsAtDate ? (
+                    <span>
+                      Ends{' '}
+                      <span className="font-medium text-foreground">
+                        {format(endsAtDate, 'MMM d, h:mm a')}
+                      </span>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleShare}
+                  className="h-10 w-10"
+                  title="Share listing"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleAddToWatchlist}
+                  className={cn('h-10 w-10', isFavorite(listing!.id) && 'text-destructive border-destructive')}
+                  title={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
+                >
+                  <Heart className={cn('h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
+                </Button>
               </div>
             </div>
-
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleShare}
-                className="h-10 w-10"
-                title="Share listing"
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleAddToWatchlist}
-                className={cn('h-10 w-10', isFavorite(listing!.id) && 'text-destructive border-destructive')}
-                title={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
-              >
-                <Heart className={cn('h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
-              </Button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Main Content Grid - Responsive Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
@@ -1204,11 +1203,6 @@ export default function ListingDetailPage() {
                       >
                         {(listing as any)?.sellerSnapshot?.displayName || (listing as any)?.seller?.name || 'Seller'}
                       </Link>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        <Link href={`/sellers/${listing!.sellerId}`} className="hover:underline underline-offset-4">
-                          Seller&rsquo;s other listings
-                        </Link>
-                      </div>
                     </div>
                     <Button
                       type="button"
