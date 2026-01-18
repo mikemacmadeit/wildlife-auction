@@ -143,9 +143,14 @@ export async function POST(request: Request) {
     console.log('Capabilities:', account.capabilities);
     console.log('============================');
 
-    // Determine onboarding status
+    const chargesEnabled =
+      account.capabilities?.card_payments === 'active' || account.charges_enabled || false;
+    const payoutsEnabled =
+      account.capabilities?.transfers === 'active' || account.payouts_enabled || false;
+
+    // Determine onboarding status (capability-first)
     let onboardingStatus = 'pending';
-    if (account.details_submitted && account.charges_enabled && account.payouts_enabled) {
+    if (account.details_submitted && chargesEnabled && payoutsEnabled) {
       onboardingStatus = 'complete';
     } else if (account.details_submitted) {
       onboardingStatus = 'details_submitted';
@@ -160,8 +165,8 @@ export async function POST(request: Request) {
     // Update user document with current status
     const updateData: any = {
       stripeOnboardingStatus: onboardingStatus,
-      chargesEnabled: account.charges_enabled || false,
-      payoutsEnabled: account.payouts_enabled || false,
+      chargesEnabled,
+      payoutsEnabled,
       stripeDetailsSubmitted: account.details_submitted || false,
       updatedAt: new Date(),
     };
@@ -172,8 +177,8 @@ export async function POST(request: Request) {
       success: true,
       status: {
         onboardingStatus,
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled,
+        chargesEnabled,
+        payoutsEnabled,
         detailsSubmitted: account.details_submitted,
         requirementsDue: requirementsDue,
         requirementsErrors: requirementsErrors,

@@ -394,8 +394,11 @@ export async function POST(request: Request) {
     if (!isPayoutReady && sellerStripeAccountId && !allowUnreadySeller) {
       try {
         const acct = await stripe.accounts.retrieve(String(sellerStripeAccountId));
-        const nextChargesEnabled = !!(acct as any)?.charges_enabled;
-        const nextPayoutsEnabled = !!(acct as any)?.payouts_enabled;
+        // Prefer capabilities for Connect accounts; fall back to legacy booleans.
+        const nextChargesEnabled =
+          (acct as any)?.capabilities?.card_payments === 'active' || !!(acct as any)?.charges_enabled;
+        const nextPayoutsEnabled =
+          (acct as any)?.capabilities?.transfers === 'active' || !!(acct as any)?.payouts_enabled;
         const nextDetailsSubmitted = !!(acct as any)?.details_submitted;
         const nextOnboardingStatus =
           nextDetailsSubmitted && nextChargesEnabled && nextPayoutsEnabled ? 'complete' : nextDetailsSubmitted ? 'details_submitted' : 'pending';

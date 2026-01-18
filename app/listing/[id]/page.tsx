@@ -420,14 +420,9 @@ export default function ListingDetailPage() {
         return;
       }
 
-      if (!sellerProfile.payoutsEnabled) {
-        toast({
-          title: 'Seller Not Ready',
-          description: 'This seller is still setting up payment processing. Please check back later or contact them directly.',
-          variant: 'destructive',
-        });
-        return;
-      }
+      // NOTE: Do not gate on `payoutsEnabled` client-side.
+      // In sandbox (and real Connect onboarding), these flags can be stale until webhook/check-status runs.
+      // The server-side checkout route will refresh readiness from Stripe and return a structured error if truly not ready.
 
       const price = Number(listing!.price || 0);
       setPendingCheckout({ amountUsd: Number.isFinite(price) ? price : 0 });
@@ -490,14 +485,7 @@ export default function ListingDetailPage() {
         return;
       }
 
-      if (!sellerProfile.payoutsEnabled) {
-        toast({
-          title: 'Seller Not Ready',
-          description: 'This seller is still setting up payment processing. Please contact support.',
-          variant: 'destructive',
-        });
-        return;
-      }
+      // NOTE: Do not gate on `payoutsEnabled` client-side (see comment in handleBuyNow).
 
       const amt = Number(winningBidAmount || listing!.currentBid || listing!.startingBid || 0);
       setPendingCheckout({ amountUsd: Number.isFinite(amt) ? amt : 0 });
