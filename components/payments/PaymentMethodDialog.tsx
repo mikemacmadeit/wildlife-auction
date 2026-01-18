@@ -32,16 +32,16 @@ export function PaymentMethodDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg border-2">
+      <DialogContent className="sm:max-w-lg border-2 w-[calc(100vw-2rem)] sm:w-full">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
               <DialogTitle>Choose payment method</DialogTitle>
               <DialogDescription>
                 Pick the best rail for this purchase. Funds are held in escrow once received.
               </DialogDescription>
             </div>
-            <Badge variant="secondary" className="font-mono">
+            <Badge variant="secondary" className="font-mono shrink-0">
               {amountLabel}
             </Badge>
           </div>
@@ -63,20 +63,24 @@ export function PaymentMethodDialog(props: {
               <Button
                 key={opt.key}
                 variant="outline"
-                className="w-full justify-between min-h-[66px] border-2 hover:bg-muted/30 disabled:opacity-60"
+                className="w-full min-h-[66px] border-2 hover:bg-muted/30 disabled:opacity-60 h-auto py-3 px-3 sm:px-4"
                 onClick={() => onSelect(opt.key)}
                 disabled={!isEnabled}
               >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl border bg-background flex items-center justify-center">
-                    <Icon className="h-5 w-5" />
+                <div className="w-full flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl border bg-background flex items-center justify-center shrink-0">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="font-semibold leading-tight break-words">{opt.title}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 break-words">{opt.copy}</div>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <div className="font-semibold">{opt.title}</div>
-                    <div className="text-xs text-muted-foreground">{opt.copy}</div>
-                  </div>
+                  <Badge variant={badge.variant} className="shrink-0">
+                    {badge.text}
+                  </Badge>
                 </div>
-                <Badge variant={badge.variant}>{badge.text}</Badge>
               </Button>
             );
           })}

@@ -32,7 +32,7 @@ export function WireInstructionsDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl border-2">
+      <DialogContent className="sm:max-w-2xl border-2 w-[calc(100vw-2rem)] sm:w-full">
         <DialogHeader>
           <DialogTitle>Wire transfer instructions</DialogTitle>
           <DialogDescription>
@@ -92,7 +92,7 @@ export function WireInstructionsDialog(props: {
                           Copy details
                         </Button>
                       </div>
-                      <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap">
+                      <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap max-h-[220px]">
                         {JSON.stringify(fa.address, null, 2)}
                       </pre>
                     </div>

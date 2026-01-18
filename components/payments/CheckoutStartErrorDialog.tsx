@@ -22,7 +22,7 @@ export function CheckoutStartErrorDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg border-2">
+      <DialogContent className="sm:max-w-lg border-2 w-[calc(100vw-2rem)] sm:w-full">
         <DialogHeader>
           <DialogTitle>Checkout couldn’t be started</DialogTitle>
           <DialogDescription>
@@ -64,7 +64,9 @@ export function CheckoutStartErrorDialog(props: {
                 {showTech ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
               {showTech ? (
-                <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{technicalDetails}</pre>
+                <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground max-h-[30vh] overflow-auto">
+                  {technicalDetails}
+                </pre>
               ) : null}
             </div>
           ) : null}
