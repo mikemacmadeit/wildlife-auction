@@ -244,6 +244,17 @@
   }
 }
 
+/* Make native date/time picker icons readable in dark mode (Chrome/Edge/Safari).
+   This fixes the calendar icon on inputs like <input type="datetime-local" /> in the create-listing flow. */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2);
+  opacity: 0.95;
+}
+
 @layer base {
   * {
     @apply border-border;
