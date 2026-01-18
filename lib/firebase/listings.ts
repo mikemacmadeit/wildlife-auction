@@ -1214,10 +1214,13 @@ export const listMostWatchedAuctions = async (params?: { limitCount?: number }):
         (globalThis as any).__wxWarnedFavoritesIndex === true ? true : false;
       if ((globalThis as any).__wxWarnedFavoritesIndex !== true) {
         (globalThis as any).__wxWarnedFavoritesIndex = true;
-        console.warn('[listMostWatchedAuctions] Missing index for favorites query; using fallback', {
-          code,
-          message: msg,
-        });
+        // Keep production console clean; the UI already falls back successfully.
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[listMostWatchedAuctions] Missing index for favorites query; using fallback', {
+            code,
+            message: msg,
+          });
+        }
       }
 
       const listingsRef = collection(db, 'listings');

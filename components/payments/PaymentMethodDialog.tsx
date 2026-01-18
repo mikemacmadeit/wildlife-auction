@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Landmark, Banknote } from 'lucide-react';
+import { CreditCard, Landmark, Banknote, Apple, Link2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getRecommendationCopy, getRecommendedPaymentMethod } from '@/lib/payments/recommendation';
 import { getEligiblePaymentMethods, type SupportedPaymentMethod } from '@/lib/payments/gating';
@@ -30,6 +30,13 @@ export function PaymentMethodDialog(props: {
   const canUseBankRails = isAuthenticated && isEmailVerified;
   const amountLabel = Number(amountUsd || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
+  const WalletChip = (props: { icon: React.ReactNode; label: string }) => (
+    <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+      {props.icon}
+      <span className="font-semibold">{props.label}</span>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg border-2 w-[calc(100vw-2rem)] sm:w-full">
@@ -51,7 +58,7 @@ export function PaymentMethodDialog(props: {
           {options.map((opt) => {
             const Icon = opt.icon;
             const isRec = opt.key === recommended;
-            const isEnabled = opt.key === 'card' ? true : canUseBankRails;
+            const isEnabled = eligible.includes(opt.key);
             const badge = isRec
               ? { text: 'Recommended', variant: 'default' as const }
               : isEnabled
@@ -75,6 +82,13 @@ export function PaymentMethodDialog(props: {
                     <div className="text-left min-w-0">
                       <div className="font-semibold leading-tight break-words">{opt.title}</div>
                       <div className="text-xs text-muted-foreground mt-0.5 break-words">{opt.copy}</div>
+                      {opt.key === 'card' ? (
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <WalletChip icon={<Apple className="h-3 w-3" />} label="Apple Pay" />
+                          <WalletChip icon={<svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 2h2v4h-2V7zm0 6h2v4h-2v-4z"/></svg>} label="Google Pay" />
+                          <WalletChip icon={<Link2 className="h-3 w-3" />} label="Link" />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <Badge variant={badge.variant} className="shrink-0">

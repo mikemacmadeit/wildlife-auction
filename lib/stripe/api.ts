@@ -303,9 +303,17 @@ export async function createWireIntent(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const errorMessage = error.error || error.message || 'Failed to create wire transfer instructions';
-    throw new Error(errorMessage);
+    const error = await response.json().catch(() => ({} as any));
+    const errorMessage =
+      error.message ||
+      (error.code ? `${error.code}: ${error.error || 'Wire setup failed'}` : undefined) ||
+      error.error ||
+      'Failed to create wire transfer instructions';
+    const err: any = new Error(errorMessage);
+    if (error?.stripe?.requestId) err.requestId = error.stripe.requestId;
+    if (error?.stripe?.code) err.stripeCode = error.stripe.code;
+    if (error?.stripe?.type) err.stripeType = error.stripe.type;
+    throw err;
   }
 
   return response.json();

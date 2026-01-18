@@ -401,9 +401,39 @@ export async function POST(request: Request) {
       instructions,
     });
   } catch (error: any) {
-    console.error('Error creating wire transfer intent:', error);
+    // Surface actionable Stripe errors to the client (without leaking secrets).
+    const stripeErr: any = error?.type || error?.raw ? error : null;
+    const stripePayload = stripeErr
+      ? {
+          type: stripeErr.type || stripeErr.raw?.type,
+          code: stripeErr.code || stripeErr.raw?.code,
+          decline_code: stripeErr.decline_code || stripeErr.raw?.decline_code,
+          message: stripeErr.message || stripeErr.raw?.message,
+          statusCode: stripeErr.statusCode || stripeErr.raw?.statusCode,
+          requestId: stripeErr.requestId || stripeErr.raw?.requestId,
+          doc_url: stripeErr.doc_url || stripeErr.raw?.doc_url,
+        }
+      : null;
+
+    console.error('Error creating wire transfer intent:', {
+      message: String(error?.message || error),
+      stripe: stripePayload || undefined,
+    });
+
+    // Common actionable message for misconfigured bank transfer rails.
+    const looksLikeBankTransferNotEnabled =
+      typeof stripePayload?.message === 'string' &&
+      /customer_balance|bank_transfer|us_bank_transfer|financial_addresses|display_bank_transfer_instructions/i.test(stripePayload.message);
+
     return NextResponse.json(
-      { error: 'Failed to create wire transfer instructions', message: error.message || 'Unknown error' },
+      {
+        error: 'Failed to create wire transfer instructions',
+        message:
+          (looksLikeBankTransferNotEnabled
+            ? 'Wire/Bank transfer is not enabled or not configured on the Stripe account. Please enable Customer Balance → Bank transfer (US bank transfer) in Stripe and try again.'
+            : error?.message) || 'Unknown error',
+        stripe: stripePayload || undefined,
+      },
       { status: 500 }
     );
   }
