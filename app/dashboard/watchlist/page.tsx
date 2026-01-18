@@ -923,15 +923,17 @@ function WatchlistCard({
             )}
 
             {/* Status badges */}
-            <div className="absolute top-2 right-2 flex flex-col gap-2 items-end z-10">
-              <StatusBadge listing={listing} />
+            <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end max-w-[70%]">
+              <div className="max-w-full [&>*]:max-w-full [&>*]:truncate">
+                <StatusBadge listing={listing} />
+              </div>
               {listing.featured && (
-                <Badge variant="default" className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500">
+                <Badge variant="default" className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 max-w-full truncate">
                   <Sparkles className="h-3 w-3 mr-1" />
                   Featured
                 </Badge>
               )}
-              <Badge variant="outline" className="text-xs capitalize bg-background/90 backdrop-blur-sm">
+              <Badge variant="outline" className="text-xs capitalize bg-background/90 backdrop-blur-sm max-w-full truncate">
                 {listing.type}
               </Badge>
             </div>
@@ -981,7 +983,7 @@ function WatchlistCard({
             </div>
 
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0">
                 <div className="text-lg font-bold">{priceDisplay}</div>
                 {listing.type === 'auction' && listing.endsAt && listing.isEnded && (
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -998,20 +1000,21 @@ function WatchlistCard({
 
             {/* Location */}
             {listing.location && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
                 <MapPin className="h-3 w-3" />
-                <span>
+                <span className="min-w-0 truncate">
                   {listing.location.city}, {listing.location.state}
                 </span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-2 pt-3 border-t mt-3">
+          {/* Actions: use a grid so buttons never overlap/cram in tight columns */}
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t mt-3">
             <Button
               variant="ghost"
               size="sm"
-              className="flex-1"
+              className="w-full justify-center whitespace-nowrap"
               onClick={(e) => {
                 e.preventDefault();
                 onRemove();
@@ -1023,14 +1026,14 @@ function WatchlistCard({
               ) : (
                 <>
                   <Heart className="h-4 w-4 mr-2 fill-current text-destructive" />
-                  Remove
+                  <span className="truncate">Remove</span>
                 </>
               )}
             </Button>
-            <Button variant="outline" size="sm" asChild className="flex-1">
+            <Button variant="outline" size="sm" asChild className="w-full justify-center whitespace-nowrap">
               <Link href={`/listing/${listing.id}`}>
                 <ExternalLink className="h-4 w-4 mr-2" />
-                View
+                <span className="truncate">View</span>
               </Link>
             </Button>
           </div>
