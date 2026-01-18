@@ -38,9 +38,14 @@ export const signUp = async (
     });
   }
 
-  // Send email verification
+  // Send email verification (branded server email preferred; Firebase default as fallback)
   if (userCredential.user) {
-    await sendEmailVerification(userCredential.user);
+    try {
+      await resendVerificationEmail();
+    } catch {
+      // Fall back to Firebase's default template if our server route is unavailable.
+      await sendEmailVerification(userCredential.user);
+    }
   }
 
   return userCredential;
@@ -107,9 +112,25 @@ export const resendVerificationEmail = async (): Promise<void> => {
   if (!auth.currentUser) {
     throw new Error('No user is currently signed in');
   }
-  // Ensure users land back on our app after verification.
+
+  // Preferred: send a branded verification email via our server (Admin SDK generates the verification link).
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch('/api/auth/send-verification-email', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.ok) return;
+  } catch {
+    // ignore and fall back below
+  }
+
+  // Fallback: Firebase-managed email (default template)
   const actionCodeSettings = {
-    url: `${getSiteUrl()}/seller/overview?verified=1`,
+    url: `${getSiteUrl()}/dashboard/account?verified=1`,
     handleCodeInApp: false,
   };
   await sendEmailVerification(auth.currentUser, actionCodeSettings as any);

@@ -17,6 +17,8 @@ import { User, Phone, MapPin, Building2, Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { updateUserProfile } from '@/lib/firebase/users';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
+import { useAuth } from '@/hooks/use-auth';
+import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
 
 interface ProfileCompletionModalProps {
   open: boolean;
@@ -34,6 +36,7 @@ export function ProfileCompletionModal({
   onComplete,
 }: ProfileCompletionModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadPct, setAvatarUploadPct] = useState(0);
@@ -153,6 +156,50 @@ export function ProfileCompletionModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          {/* Email verification */}
+          {user?.emailVerified !== true ? (
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2">
+              <div className="font-semibold">Verify your email</div>
+              <div className="text-sm text-muted-foreground">
+                We’ve sent a verification email to <span className="font-semibold text-foreground/80">{userEmail}</span>. Please click the button in that email to verify.
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  className="sm:flex-1"
+                  disabled={isLoading || avatarUploading}
+                  onClick={async () => {
+                    try {
+                      await resendVerificationEmail();
+                      toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                    } catch (e: any) {
+                      toast({ title: 'Could not send email', description: e?.message || 'Please try again.', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  Resend verification email
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:flex-1"
+                  disabled={isLoading || avatarUploading}
+                  onClick={async () => {
+                    try {
+                      await reloadCurrentUser();
+                      toast({ title: 'Account refreshed', description: 'If you verified, your status should update now.' });
+                    } catch (e: any) {
+                      toast({ title: 'Refresh failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  Refresh status
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {/* Optional: profile photo / logo */}
           <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">

@@ -24,6 +24,7 @@ import {
   getWeeklyDigestEmail,
   getSavedSearchAlertEmail,
   getMessageReceivedEmail,
+  getVerifyEmailEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
@@ -40,6 +41,7 @@ import {
   type WeeklyDigestEmailData,
   type SavedSearchAlertEmailData,
   type MessageReceivedEmailData,
+  type VerifyEmailEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -185,6 +187,12 @@ const messageReceivedSchema = z.object({
   listingUrl: urlSchema,
   senderRole: z.enum(['buyer', 'seller']),
   preview: z.string().optional(),
+});
+
+const verifyEmailSchema = z.object({
+  userName: z.string().min(1),
+  verifyUrl: urlSchema,
+  dashboardUrl: urlSchema,
 });
 
 export const EMAIL_EVENT_REGISTRY = [
@@ -454,6 +462,21 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: MessageReceivedEmailData) => {
       const { subject, html } = getMessageReceivedEmail(data);
       return { subject, preheader: `New message — ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'verify_email',
+    displayName: 'User: Verify Email',
+    description: 'Sent to a user to verify their email address.',
+    schema: verifyEmailSchema,
+    samplePayload: {
+      userName: 'Alex',
+      verifyUrl: 'https://wildlife.exchange/__/auth/action?mode=verifyEmail&oobCode=abc123',
+      dashboardUrl: 'https://wildlife.exchange/dashboard/account?verified=1',
+    },
+    render: (data: VerifyEmailEmailData) => {
+      const { subject, html } = getVerifyEmailEmail(data);
+      return { subject, preheader: `Verify your email`, html };
     },
   },
 ] as const;

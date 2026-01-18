@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,11 +45,12 @@ import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profil
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { auth } from '@/lib/firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
-import { resetPassword } from '@/lib/firebase/auth';
+import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
 
 export default function AccountPage() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -167,6 +169,30 @@ export default function AccountPage() {
       fetchUserData();
     }
   }, [user, authLoading, toast]);
+
+  // If the user returns from a verification link with verified=1, refresh auth state and sync Firestore.
+  useEffect(() => {
+    const verified = searchParams?.get('verified');
+    if (!user || authLoading) return;
+    if (verified !== '1') return;
+
+    (async () => {
+      try {
+        await reloadCurrentUser();
+        // Best-effort: sync Firestore for dashboard gating and server checks.
+        await updateUserProfile(user.uid, { emailVerified: auth.currentUser?.emailVerified === true } as any);
+        toast({
+          title: auth.currentUser?.emailVerified ? 'Email verified' : 'Verification pending',
+          description: auth.currentUser?.emailVerified
+            ? 'Thanks — your email is verified.'
+            : 'If you just verified, wait a moment and refresh again.',
+        });
+      } catch (e: any) {
+        toast({ title: 'Could not refresh account', description: e?.message || 'Please try again.', variant: 'destructive' });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user?.uid, authLoading]);
 
   const hasPasswordProvider = useMemo(() => {
     const providers = user?.providerData || [];
@@ -413,6 +439,60 @@ export default function AccountPage() {
             </p>
           </div>
         </motion.div>
+
+        {/* Email verification status */}
+        <Card className={cn('border-2', user?.emailVerified ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-card')}>
+          <CardContent className="pt-5 pb-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <div className="font-bold">Email verification</div>
+                  {user?.emailVerified ? (
+                    <Badge variant="secondary" className="font-semibold">
+                      Verified
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="font-semibold">
+                      Not verified
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {user?.emailVerified
+                    ? 'Your email is verified.'
+                    : 'Please verify your email to unlock messaging, publishing, and checkout.'}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant={user?.emailVerified ? 'outline' : 'default'}
+                  className="min-h-[40px] font-semibold"
+                  onClick={async () => {
+                    try {
+                      if (user?.emailVerified) {
+                        await reloadCurrentUser();
+                        toast({ title: 'Account refreshed', description: 'Your verification status has been refreshed.' });
+                        return;
+                      }
+                      await resendVerificationEmail();
+                      toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                    } catch (e: any) {
+                      toast({
+                        title: 'Could not send verification email',
+                        description: e?.message || 'Please try again.',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                >
+                  {user?.emailVerified ? 'Refresh Status' : 'Resend Verification Email'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Stats Cards - Quick Overview */}
         <motion.div

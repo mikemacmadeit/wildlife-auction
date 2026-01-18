@@ -72,6 +72,12 @@ export interface MessageReceivedEmailData {
   preview?: string;
 }
 
+export interface VerifyEmailEmailData {
+  userName: string;
+  verifyUrl: string;
+  dashboardUrl: string;
+}
+
 export interface AuctionHighBidderEmailData {
   userName: string;
   listingTitle: string;
@@ -1004,6 +1010,35 @@ export function getMessageReceivedEmail(data: MessageReceivedEmailData): { subje
 
     <div style="margin-top: 16px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       Keep communication in-app for the safest experience.
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getVerifyEmailEmail(data: VerifyEmailEmailData): { subject: string; html: string } {
+  const subject = `Verify your email — Wildlife Exchange`;
+  const preheader = `Confirm your email to unlock messaging, publishing, and checkout.`;
+  const origin = tryGetOrigin(data.verifyUrl) || tryGetOrigin(data.dashboardUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Verify your email
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — please confirm your email address to finish setting up your account.
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.verifyUrl, 'Verify email')}
+    </div>
+
+    <div style="margin-top: 14px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      After you verify, you can return to your dashboard:
+      <a href="${data.dashboardUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Open dashboard</a>
+    </div>
+    <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      If you didn’t create this account, you can ignore this email.
     </div>
   `;
 
