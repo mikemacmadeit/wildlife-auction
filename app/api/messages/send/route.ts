@@ -171,7 +171,10 @@ export async function POST(request: Request) {
           threadId,
           listingId,
           listingTitle,
-          threadUrl: `${getSiteUrl()}/dashboard/messages?listingId=${listingId}&sellerId=${threadData.sellerId}`,
+          threadUrl:
+            recipientId === threadData.sellerId
+              ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
+              : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
           senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
           preview: sanitizeResult.sanitizedText.substring(0, 100),
         },

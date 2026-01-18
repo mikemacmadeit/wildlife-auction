@@ -24,6 +24,8 @@ import { useAuth } from '@/hooks/use-auth';
 import type { UserProfile } from '@/lib/types';
 import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -34,6 +36,8 @@ export function EnhancedSellerProfile({
   listing, 
   className 
 }: EnhancedSellerProfileProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const { user } = useAuth();
   const viewerId = user?.uid || null;
   // Derive seller info from listing (using sellerSnapshot or legacy seller field)
@@ -133,7 +137,13 @@ export function EnhancedSellerProfile({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
               <h3 className="text-base font-bold text-foreground truncate">
-                {sellerName}
+                {sellerId ? (
+                  <Link href={`/sellers/${sellerId}`} className="hover:underline">
+                    {sellerName}
+                  </Link>
+                ) : (
+                  sellerName
+                )}
               </h3>
               <SellerTierBadge tier={sellerTier} />
               {sellerProfile && reputation.level === 'trusted' && (
@@ -181,12 +191,33 @@ export function EnhancedSellerProfile({
             variant="outline"
             size="sm"
             className="w-full gap-2 h-9 text-sm font-semibold border-primary/30 hover:border-primary/50 hover:bg-primary/5"
+            onClick={() => {
+              if (!viewerId) {
+                toast({
+                  title: 'Sign in required',
+                  description: 'You must be signed in to message the seller.',
+                  variant: 'destructive',
+                });
+                router.push(`/login?next=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                return;
+              }
+              if (!sellerId) return;
+              if (viewerId === sellerId) {
+                toast({
+                  title: 'Cannot message yourself',
+                  description: 'You cannot message yourself about your own listing.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              router.push(`/dashboard/messages?listingId=${listing.id}&sellerId=${sellerId}`);
+            }}
           >
             <MessageSquare className="h-4 w-4" />
             Message Seller
           </Button>
           <Button asChild variant="outline" size="sm" className="w-full h-9 text-sm font-semibold">
-            <Link href={`/sellers/${sellerId}`}>
+            <Link href={sellerId ? `/sellers/${sellerId}` : '/browse'}>
               View profile
             </Link>
           </Button>

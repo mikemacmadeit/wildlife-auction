@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { db } from '@/lib/firebase/config';
 import { MessageThread, Listing } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function MessagesPage() {
   const { user, loading: authLoading } = useAuth();
@@ -24,15 +25,68 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const listingIdParam = searchParams.get('listingId');
   const sellerIdParam = searchParams.get('sellerId');
+  const threadIdParam = searchParams.get('threadId');
 
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [otherPartyName, setOtherPartyName] = useState('Seller');
   const [orderStatus, setOrderStatus] = useState<'pending' | 'paid' | 'completed' | undefined>();
   const [loading, setLoading] = useState(true);
+  const [threads, setThreads] = useState<MessageThread[]>([]);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [metaByThreadId, setMetaByThreadId] = useState<Record<string, { sellerName: string; listingTitle: string }>>(
+    {}
+  );
+
+  const inboxItems = useMemo(() => {
+    return threads.map((t) => {
+      const unread = typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0;
+      const meta = metaByThreadId[t.id];
+      return {
+        id: t.id,
+        unread,
+        sellerName: meta?.sellerName || 'Seller',
+        listingTitle: meta?.listingTitle || `Listing ${t.listingId.slice(-6)}`,
+        lastMessagePreview: t.lastMessagePreview || '',
+      };
+    });
+  }, [metaByThreadId, threads]);
+
+  const loadInbox = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const data = await getUserThreads(user.uid, 'buyer');
+      setThreads(data);
+      if (!selectedThreadId && data[0]?.id) setSelectedThreadId(data[0].id);
+
+      Promise.allSettled(
+        data.map(async (t) => {
+          const [sellerProfile, listingData] = await Promise.all([
+            getUserProfile(t.sellerId).catch(() => null),
+            getListingById(t.listingId).catch(() => null),
+          ]);
+          return {
+            threadId: t.id,
+            sellerName: sellerProfile?.displayName || sellerProfile?.profile?.fullName || 'Seller',
+            listingTitle: listingData?.title || 'Listing',
+          };
+        })
+      ).then((results) => {
+        const next: Record<string, { sellerName: string; listingTitle: string }> = {};
+        for (const r of results) {
+          if (r.status !== 'fulfilled') continue;
+          next[r.value.threadId] = { sellerName: r.value.sellerName, listingTitle: r.value.listingTitle };
+        }
+        setMetaByThreadId((prev) => ({ ...prev, ...next }));
+      });
+    } catch (e: any) {
+      console.error('[dashboard/messages] Failed to load inbox', e);
+    }
+  }, [selectedThreadId, user?.uid]);
 
   const initializeThread = useCallback(async () => {
-    if (!user || !listingIdParam || !sellerIdParam) return;
+    if (!user) return;
+    if (!listingIdParam || !sellerIdParam) return;
 
     try {
       setLoading(true);
@@ -91,14 +145,36 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
+      // 1) Listing deep-link => create/open thread
       if (listingIdParam && sellerIdParam) {
-        // Create or get thread for this listing
         initializeThread();
-      } else {
-        setLoading(false);
+        return;
       }
+
+      // 2) Inbox mode (optionally with threadId deep link)
+      setLoading(false);
+      void loadInbox();
+      if (threadIdParam) setSelectedThreadId(threadIdParam);
     }
-  }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread]);
+  }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread, loadInbox, threadIdParam]);
+
+  // When selecting a thread from inbox, populate the thread/listing/name for the thread view.
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (listingIdParam && sellerIdParam) return; // handled by initializeThread flow
+    if (!selectedThreadId) return;
+
+    const t = threads.find((x) => x.id === selectedThreadId) || null;
+    if (!t) return;
+
+    setThread(t);
+    const meta = metaByThreadId[selectedThreadId];
+    setOtherPartyName(meta?.sellerName || 'Seller');
+    setOrderStatus(undefined);
+    getListingById(t.listingId)
+      .then((l) => setListing(l))
+      .catch(() => setListing(null));
+  }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
 
   if (authLoading || loading) {
     return (
@@ -127,7 +203,7 @@ export default function MessagesPage() {
     );
   }
 
-  if (!thread || !listing) {
+  if ((listingIdParam && sellerIdParam) && (!thread || !listing)) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl">
@@ -160,14 +236,69 @@ export default function MessagesPage() {
           <h1 className="text-2xl font-bold">Messages</h1>
         </div>
 
-        <Card className="h-[600px] flex flex-col">
-          <MessageThreadComponent
-            thread={thread}
-            listingTitle={listing.title}
-            otherPartyName={otherPartyName}
-            orderStatus={orderStatus}
-          />
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="md:col-span-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold">Inbox</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {inboxItems.length === 0 ? (
+                <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {inboxItems.map((item) => {
+                    const active = selectedThreadId === item.id || thread?.id === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setSelectedThreadId(item.id);
+                          router.replace(`/dashboard/messages?threadId=${item.id}`);
+                        }}
+                        className={cn(
+                          'w-full p-4 text-left hover:bg-muted/30 transition-colors',
+                          active && 'bg-muted/40'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold truncate">{item.sellerName}</div>
+                            <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
+                          </div>
+                          {item.unread > 0 ? (
+                            <Badge variant="destructive" className="h-5 px-2 text-xs font-semibold">
+                              {item.unread}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {item.lastMessagePreview ? (
+                          <div className="text-xs text-muted-foreground truncate mt-2">{item.lastMessagePreview}</div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-2 h-[600px] flex flex-col">
+            {!thread ? (
+              <CardContent className="pt-12 pb-12 text-center">
+                <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50" />
+                <div className="font-semibold">Select a conversation</div>
+                <div className="text-sm text-muted-foreground mt-1">Choose a thread from the inbox.</div>
+              </CardContent>
+            ) : (
+              <MessageThreadComponent
+                thread={thread}
+                listingTitle={listing?.title || 'Listing'}
+                otherPartyName={otherPartyName}
+                orderStatus={orderStatus}
+              />
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );
