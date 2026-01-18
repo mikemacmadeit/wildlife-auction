@@ -367,7 +367,9 @@ export async function processEventDoc(params: {
       payload: eventData.payload,
       test: eventData.test === true,
     });
-    const notifRef = db.collection('users').doc(targetUserId).collection('notifications').doc(eventId);
+    // Some notification types (e.g., Message.Received) intentionally collapse into a stable doc id
+    // so the notification feed doesn't spam users with one row per message.
+    const notifRef = db.collection('users').doc(targetUserId).collection('notifications').doc(notif.id);
     await notifRef.set(notif as any, { merge: true });
   }
 

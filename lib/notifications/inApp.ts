@@ -205,13 +205,19 @@ export function buildInAppNotification(params: {
     case 'Message.Received': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Message.Received' }>;
       return {
+        // Collapse messages to one notification per thread (updates in place + bumps to top).
         ...base,
+        id: `msg_thread:${p.threadId}`,
         type: 'message_received',
         title: 'New message',
         body: `${p.senderRole === 'buyer' ? 'Buyer' : 'Seller'} messaged you about “${p.listingTitle}”.`,
         deepLinkUrl: p.threadUrl,
         linkLabel: 'View message',
-        metadata: { preview: p.preview || '' },
+        // Ensure a previously-read thread becomes "unread" again when new messages arrive.
+        read: false,
+        readAt: null,
+        clickedAt: null,
+        metadata: { preview: p.preview || '', threadId: p.threadId, listingId: p.listingId || null },
       };
     }
     case 'Offer.Received': {

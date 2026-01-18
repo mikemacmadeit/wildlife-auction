@@ -261,7 +261,7 @@ export async function POST(request: Request) {
           .collection('users')
           .doc(recipientId)
           .collection('notifications')
-          .doc(emitRes.eventId)
+          .doc(notif.id)
           .set(notif as any, { merge: true });
       }
     } catch (notifError) {

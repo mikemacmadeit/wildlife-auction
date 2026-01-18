@@ -34,6 +34,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { signOutUser } from '@/lib/firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { NotificationsBell } from '@/components/navigation/NotificationsBell';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -203,6 +204,7 @@ export function Navbar() {
 
             {/* Desktop Actions - User Menu */}
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
+              {user?.uid ? <NotificationsBell userId={user.uid} /> : null}
               <Button
                 asChild
                 size="default"
