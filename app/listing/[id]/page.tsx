@@ -1584,42 +1584,49 @@ export default function ListingDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Location */}
-                  <div>
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      📍 Location
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="font-medium">{listing!.location?.city || 'Unknown'}, {listing!.location?.state || 'Unknown'}</div>
-                        {listing!.location?.zip && (
-                          <div className="text-sm text-muted-foreground">ZIP: {listing!.location.zip}</div>
-                        )}
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Location</div>
+                        <div className="font-semibold mt-1 break-words">
+                          {listing!.location?.city || 'Unknown'}
+                          {listing!.location?.state ? `, ${listing!.location.state}` : ''}
+                        </div>
+                        {listing!.location?.zip ? (
+                          <div className="text-xs text-muted-foreground mt-1">ZIP {listing!.location.zip}</div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
 
-                  {/* Trust Badges */}
-                  <div>
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      🛡️ Trust & Safety
+                  {/* Trust */}
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trust &amp; safety</div>
+                      <Link href="/trust" className="text-xs font-semibold underline underline-offset-4">
+                        Trust &amp; Compliance
+                      </Link>
                     </div>
-                    <TrustBadges
-                      verified={listing!.trust?.verified || false}
-                      transport={listing!.trust?.transportReady || false}
-                      size="md"
-                    />
+                    <div className="mt-2">
+                      <TrustBadges
+                        verified={listing!.trust?.verified || false}
+                        transport={listing!.trust?.transportReady || false}
+                        size="md"
+                        showTooltips={true}
+                        showIcons={false}
+                      />
+                    </div>
                   </div>
 
-                  {/* Compliance Badges (for animal listings) */}
-                  {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(listing!.category) && (
-                    <div className="pt-4 border-t">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        ✅ Compliance Status
+                  {/* Compliance (animals only) */}
+                  {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(listing!.category) ? (
+                    <div className="rounded-lg border bg-muted/20 p-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Compliance</div>
+                      <div className="mt-2">
+                        <ComplianceBadges listing={listing!} variant="inline" />
                       </div>
-                      <ComplianceBadges listing={listing!} />
                     </div>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
 

@@ -14,6 +14,7 @@ interface StatusBadgeProps {
   className?: string;
   showTooltip?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  showIcon?: boolean;
 }
 
 const badgeConfig = {
@@ -57,7 +58,8 @@ export function StatusBadge({
   type, 
   className, 
   showTooltip = true,
-  size = 'md' 
+  size = 'md',
+  showIcon = true,
 }: StatusBadgeProps) {
   const config = badgeConfig[type];
   const sizeStyles = sizeConfig[size];
@@ -72,7 +74,7 @@ export function StatusBadge({
         className
       )}
     >
-      <Icon className={cn(config.iconColor, sizeStyles.icon)} />
+      {showIcon ? <Icon className={cn(config.iconColor, sizeStyles.icon)} /> : null}
       <span className={cn(sizeStyles.text)}>{config.label}</span>
     </div>
   );
@@ -100,6 +102,7 @@ interface TrustBadgesProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
   showTooltips?: boolean;
+  showIcons?: boolean;
 }
 
 export function TrustBadges({
@@ -108,14 +111,15 @@ export function TrustBadges({
   className,
   size = 'md',
   showTooltips = true,
+  showIcons = true,
 }: TrustBadgesProps) {
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       {verified && (
-        <StatusBadge type="verified" size={size} showTooltip={showTooltips} />
+        <StatusBadge type="verified" size={size} showTooltip={showTooltips} showIcon={showIcons} />
       )}
       {transport && (
-        <StatusBadge type="transport" size={size} showTooltip={showTooltips} />
+        <StatusBadge type="transport" size={size} showTooltip={showTooltips} showIcon={showIcons} />
       )}
     </div>
   );
