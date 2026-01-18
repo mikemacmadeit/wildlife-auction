@@ -70,7 +70,6 @@ const baseNavItems: DashboardNavItem[] = [
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
-  { href: '/seller/sales', label: 'Sales & Bids', icon: DollarSign },
   { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
   { href: '/seller/logistics', label: 'Logistics', icon: Truck },
