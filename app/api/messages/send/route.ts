@@ -11,6 +11,8 @@ import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { emitEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
+import { buildInAppNotification } from '@/lib/notifications/inApp';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -69,29 +71,44 @@ export async function POST(request: Request) {
     const senderId = decodedToken.uid;
 
     // Verified email required for messaging (cuts spam + makes contact workflows reliable).
-    if ((decodedToken as any)?.email_verified !== true) {
-      return json(
-        {
-          error: 'Email verification required',
-          code: 'EMAIL_NOT_VERIFIED',
-          message: 'Please verify your email address before sending messages.',
-        },
-        { status: 403 }
-      );
+    const tokenEmailVerified = (decodedToken as any)?.email_verified === true;
+    if (!tokenEmailVerified) {
+      try {
+        const userRecord = await auth.getUser(senderId);
+        if (userRecord?.emailVerified !== true) {
+          return json(
+            {
+              error: 'Email verification required',
+              code: 'EMAIL_NOT_VERIFIED',
+              message: 'Please verify your email address before sending messages.',
+            },
+            { status: 403 }
+          );
+        }
+      } catch {
+        return json(
+          {
+            error: 'Email verification required',
+            code: 'EMAIL_NOT_VERIFIED',
+            message: 'Please verify your email address before sending messages.',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse request body
     const body = await request.json();
-    const { threadId, recipientId, listingId, messageBody } = body;
+    const { threadId, listingId, messageBody } = body;
 
-    if (!threadId || !recipientId || !listingId || !messageBody) {
+    if (!threadId || !listingId || !messageBody) {
       return json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Verify thread exists and user is participant
     const threadRef = db.collection('messageThreads').doc(threadId);
     const threadDoc = await threadRef.get();
-    
+
     if (!threadDoc.exists) {
       return json({ error: 'Thread not found' }, { status: 404 });
     }
@@ -100,6 +117,21 @@ export async function POST(request: Request) {
     if (threadData.buyerId !== senderId && threadData.sellerId !== senderId) {
       return json({ error: 'Unauthorized' }, { status: 403 });
     }
+
+    // Defensive: ensure listingId matches thread.listingId (prevents spoofing / cross-thread injection)
+    if (String(threadData.listingId || '') !== String(listingId || '')) {
+      return json(
+        {
+          error: 'Invalid thread',
+          code: 'LISTING_THREAD_MISMATCH',
+          message: 'This thread does not match the requested listing.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Canonical recipient is always the other party in the thread (never trust client input)
+    const recipientId = senderId === threadData.buyerId ? threadData.sellerId : threadData.buyerId;
 
     // Check order status to determine if contact should be allowed
     let orderStatus: 'pending' | 'paid' | 'completed' | undefined;
@@ -130,7 +162,7 @@ export async function POST(request: Request) {
       recipientId,
       listingId,
       body: sanitizeResult.sanitizedText,
-      createdAt: new Date(),
+      createdAt: Timestamp.now(),
       wasRedacted: sanitizeResult.wasRedacted,
       violationCount: sanitizeResult.violationCount,
       detectedViolations: sanitizeResult.detected,
@@ -142,13 +174,13 @@ export async function POST(request: Request) {
     // Update thread
     const newViolationCount = (threadData.violationCount || 0) + sanitizeResult.violationCount;
     const unreadField = senderId === threadData.buyerId ? 'sellerUnreadCount' : 'buyerUnreadCount';
-    
+
     await threadRef.update({
-      updatedAt: new Date(),
-      lastMessageAt: new Date(),
+      updatedAt: Timestamp.now(),
+      lastMessageAt: Timestamp.now(),
       lastMessagePreview: sanitizeResult.sanitizedText.substring(0, 100),
       [`${senderId === threadData.buyerId ? 'buyer' : 'seller'}UnreadCount`]: 0,
-      [unreadField]: (threadData[unreadField] || 0) + 1,
+      [unreadField]: FieldValue.increment(1),
       violationCount: newViolationCount,
       flagged: newViolationCount >= 3 || threadData.flagged || false,
     });
@@ -160,7 +192,7 @@ export async function POST(request: Request) {
       const listingData = listingDoc.exists ? listingDoc.data() : null;
       const listingTitle = listingData?.title || 'a listing';
 
-      await emitEventForUser({
+      const emitRes = await emitEventForUser({
         type: 'Message.Received',
         actorId: senderId,
         entityType: 'message_thread',
@@ -180,6 +212,38 @@ export async function POST(request: Request) {
         },
         optionalHash: `msg:${messageRef.id}`,
       });
+
+      // Immediately create/merge the in-app notification doc so the recipient sees it right away,
+      // even if the scheduled event processor is delayed/unavailable.
+      if (emitRes?.ok && typeof emitRes.eventId === 'string') {
+        const notif = buildInAppNotification({
+          eventId: emitRes.eventId,
+          eventType: 'Message.Received',
+          category: 'messages',
+          userId: recipientId,
+          actorId: senderId,
+          entityType: 'message_thread',
+          entityId: threadId,
+          payload: {
+            type: 'Message.Received',
+            threadId,
+            listingId,
+            listingTitle,
+            threadUrl:
+              recipientId === threadData.sellerId
+                ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
+                : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
+            senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
+            preview: sanitizeResult.sanitizedText.substring(0, 100),
+          },
+        });
+        await db
+          .collection('users')
+          .doc(recipientId)
+          .collection('notifications')
+          .doc(emitRes.eventId)
+          .set(notif as any, { merge: true });
+      }
     } catch (notifError) {
       // Don't fail message send if notification fails
       console.error('Error emitting message_received notification event:', notifError);

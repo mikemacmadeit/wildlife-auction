@@ -109,10 +109,26 @@ export async function sendMessage(
       return data.messageId as string;
     }
 
-    // Fall through to legacy client-side path only if server route is unavailable.
-    // This preserves backwards compatibility during deploy transitions.
-  } catch {
-    // ignore and fall back below
+    // Fall back ONLY if the server route is unavailable (deploy/config transition).
+    // If the server rejected the request (401/403/400/500), do NOT silently fall back,
+    // because the legacy path cannot create reliable cross-user notifications.
+    if (res.status !== 404 && res.status !== 503) {
+      const msg =
+        typeof data?.message === 'string'
+          ? data.message
+          : typeof data?.error === 'string'
+          ? data.error
+          : 'Failed to send message';
+      const err: any = new Error(msg);
+      if (typeof data?.code === 'string') err.code = data.code;
+      throw err;
+    }
+  } catch (e: any) {
+    // Network error or server route unavailable: fall back below for backwards compatibility.
+    // But if we already have a structured app error, rethrow it.
+    if (e?.code || /EMAIL_NOT_VERIFIED|LISTING_THREAD_MISMATCH/i.test(String(e?.message || ''))) {
+      throw e;
+    }
   }
 
   // Check if order exists and get payment status
