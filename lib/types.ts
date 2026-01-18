@@ -335,6 +335,19 @@ export interface Listing {
   createdBy: string; // Firebase Auth UID
   updatedBy?: string; // Firebase Auth UID
   publishedAt?: Date; // When status changed to 'active'
+
+  // Moderation lifecycle (admin approval / rejection)
+  pendingReason?: 'admin_approval' | 'compliance_review' | null;
+  rejectedAt?: Date | null;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  approvedAt?: Date | null;
+  approvedBy?: string;
+
+  // Resubmission tracking (one resubmit per rejection)
+  resubmittedAt?: Date | null;
+  resubmittedForRejectionAt?: Date | null;
+  resubmissionCount?: number;
   
   // Protected Transaction (Seller-selected protection)
   protectedTransactionEnabled?: boolean;

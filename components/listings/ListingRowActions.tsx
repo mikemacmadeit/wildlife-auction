@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Edit, Pause, TrendingUp, Copy, CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
+import { Edit, Pause, TrendingUp, Copy, MoreVertical, Trash2, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -18,6 +18,8 @@ interface ListingRowActionsProps {
   status: string;
   onPause?: () => void;
   onPromote?: () => void;
+  onResubmit?: () => void;
+  resubmitDisabled?: boolean;
   onDuplicate?: () => void;
   onDelete?: () => void;
 }
@@ -27,6 +29,8 @@ const ListingRowActions = memo(function ListingRowActions({
   status,
   onPause,
   onPromote,
+  onResubmit,
+  resubmitDisabled,
   onDuplicate,
   onDelete,
 }: ListingRowActionsProps) {
@@ -59,16 +63,31 @@ const ListingRowActions = memo(function ListingRowActions({
           </DropdownMenuItem>
         )}
 
-        <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
-            onPromote?.();
-          }}
-          className="flex items-center gap-2 font-semibold"
-        >
-          <TrendingUp className="h-4 w-4" />
-          Promote
-        </DropdownMenuItem>
+        {status === 'removed' ? (
+          <DropdownMenuItem
+            disabled={resubmitDisabled}
+            onSelect={(e) => {
+              e.preventDefault();
+              if (resubmitDisabled) return;
+              onResubmit?.();
+            }}
+            className="flex items-center gap-2 font-semibold"
+          >
+            <Send className="h-4 w-4" />
+            Resubmit
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onPromote?.();
+            }}
+            className="flex items-center gap-2 font-semibold"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Promote
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuItem
           onSelect={(e) => {

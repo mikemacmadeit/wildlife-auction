@@ -273,6 +273,17 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     createdBy: doc.createdBy,
     updatedBy: doc.updatedBy,
     publishedAt: timestampToDate(doc.publishedAt),
+
+    // Moderation lifecycle (admin approval / rejection)
+    pendingReason: (doc as any).pendingReason ?? null,
+    rejectedAt: timestampToDate((doc as any).rejectedAt) || null,
+    rejectedBy: typeof (doc as any).rejectedBy === 'string' ? (doc as any).rejectedBy : undefined,
+    rejectionReason: typeof (doc as any).rejectionReason === 'string' ? (doc as any).rejectionReason : undefined,
+    approvedAt: timestampToDate((doc as any).approvedAt) || null,
+    approvedBy: typeof (doc as any).approvedBy === 'string' ? (doc as any).approvedBy : undefined,
+    resubmittedAt: timestampToDate((doc as any).resubmittedAt) || null,
+    resubmittedForRejectionAt: timestampToDate((doc as any).resubmittedForRejectionAt) || null,
+    resubmissionCount: typeof (doc as any).resubmissionCount === 'number' ? (doc as any).resubmissionCount : undefined,
     // Protected Transaction fields
     protectedTransactionEnabled: doc.protectedTransactionEnabled,
     protectedTransactionDays: doc.protectedTransactionDays,
@@ -701,6 +712,31 @@ export const deleteListing = async (uid: string, listingId: string): Promise<voi
   } catch (error) {
     console.error('Error deleting listing:', error);
     throw error;
+  }
+};
+
+/**
+ * Resubmit a rejected listing for admin approval.
+ * Server-enforced rules: must be rejected, must be edited+saved since rejection, only one resubmit per rejection.
+ */
+export const resubmitListing = async (uid: string, listingId: string): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Authentication required');
+  if (user.uid !== uid) throw new Error('Invalid user');
+
+  const token = await user.getIdToken();
+  const res = await fetch(`/api/listings/${listingId}/resubmit`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok !== true) {
+    const err: any = new Error(data?.message || data?.error || 'Failed to resubmit listing');
+    if (data?.code) err.code = data.code;
+    throw err;
   }
 };
 

@@ -28,7 +28,7 @@ import { ListingRowActions } from '@/components/listings/ListingRowActions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { listSellerListings, unpublishListing, deleteListing, publishListing } from '@/lib/firebase/listings';
+import { listSellerListings, unpublishListing, deleteListing, publishListing, resubmitListing } from '@/lib/firebase/listings';
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -83,11 +83,15 @@ const formatTimeRemaining = (date?: Date) => {
 const ListingRow = memo(({ 
   listing, 
   onPublish,
+  onResubmit,
+  canResubmit,
   onPause, 
   onDelete 
 }: { 
   listing: Listing;
   onPublish: (listing: Listing) => void;
+  onResubmit: (listing: Listing) => void;
+  canResubmit: (listing: Listing) => boolean;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
@@ -155,6 +159,8 @@ const ListingRow = memo(({
         listingId={listing.id}
         status={listing.status}
         onPromote={() => onPublish(listing)}
+        onResubmit={() => onResubmit(listing)}
+        resubmitDisabled={listing.status === 'removed' ? !canResubmit(listing) : undefined}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
       />
@@ -167,11 +173,15 @@ ListingRow.displayName = 'ListingRow';
 const MobileListingCard = memo(({ 
   listing, 
   onPublish,
+  onResubmit,
+  canResubmit,
   onPause, 
   onDelete 
 }: { 
   listing: Listing;
   onPublish: (listing: Listing) => void;
+  onResubmit: (listing: Listing) => void;
+  canResubmit: (listing: Listing) => boolean;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
@@ -193,6 +203,8 @@ const MobileListingCard = memo(({
         listingId={listing.id}
         status={listing.status}
         onPromote={() => onPublish(listing)}
+        onResubmit={() => onResubmit(listing)}
+        resubmitDisabled={listing.status === 'removed' ? !canResubmit(listing) : undefined}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
       />
@@ -434,6 +446,49 @@ function SellerListingsPageContent() {
     [user?.uid, toast, refreshListings, statusFilter]
   );
 
+  const canResubmit = useCallback(
+    (listing: Listing) => {
+      if (listing.status !== 'removed') return false;
+      const rejectedAt = listing.rejectedAt instanceof Date ? listing.rejectedAt : null;
+      const resubmittedForRejectionAt =
+        listing.resubmittedForRejectionAt instanceof Date ? listing.resubmittedForRejectionAt : null;
+      if (!rejectedAt) return false;
+      if (resubmittedForRejectionAt && resubmittedForRejectionAt.getTime() === rejectedAt.getTime()) return false;
+      if (!(listing.updatedAt instanceof Date)) return false;
+      if (listing.updatedAt.getTime() <= rejectedAt.getTime()) return false;
+      if (listing.updatedBy !== user?.uid) return false;
+      return true;
+    },
+    [user?.uid]
+  );
+
+  const handleResubmit = useCallback(
+    async (listing: Listing) => {
+      if (!user?.uid) return;
+      try {
+        setActionLoading(listing.id);
+        await resubmitListing(user.uid, listing.id);
+        toast({
+          title: 'Resubmitted',
+          description: 'Your listing was resubmitted for admin approval.',
+        });
+        await refreshListings();
+      } catch (e: any) {
+        toast({
+          title: 'Couldn’t resubmit yet',
+          description:
+            e?.code === 'MUST_EDIT_BEFORE_RESUBMIT'
+              ? 'Edit and save the listing first, then resubmit.'
+              : e?.message || 'Failed to resubmit listing.',
+          variant: 'destructive',
+        });
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [refreshListings, toast, user?.uid]
+  );
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
@@ -591,6 +646,8 @@ function SellerListingsPageContent() {
                     key={listing.id}
                     listing={listing}
                     onPublish={handlePublish}
+                    onResubmit={handleResubmit}
+                    canResubmit={canResubmit}
                     onPause={handlePause}
                     onDelete={handleDelete}
                   />
@@ -606,6 +663,8 @@ function SellerListingsPageContent() {
                     key={listing.id} 
                     listing={listing}
                     onPublish={handlePublish}
+                    onResubmit={handleResubmit}
+                    canResubmit={canResubmit}
                     onPause={handlePause}
                     onDelete={handleDelete}
                   />

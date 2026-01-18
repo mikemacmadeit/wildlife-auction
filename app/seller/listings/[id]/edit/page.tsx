@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Upload, X, ArrowLeft, Save, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, X, ArrowLeft, Save, Loader2, AlertCircle, Send } from 'lucide-react';
 import { ListingType, ListingCategory, ListingAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -96,6 +96,10 @@ function EditListingPageContent() {
   const [existingDocuments, setExistingDocuments] = useState<any[]>([]);
   const [hasPendingDocument, setHasPendingDocument] = useState(false);
   const [triggerDocumentUpload, setTriggerDocumentUpload] = useState(false);
+  const [fullListing, setFullListing] = useState<any | null>(null);
+  const [initialSignature, setInitialSignature] = useState<string>('');
+  const [hasSavedEditsSinceRejection, setHasSavedEditsSinceRejection] = useState(false);
+  const [isResubmitting, setIsResubmitting] = useState(false);
 
   // Load existing listing data from Firestore
   useEffect(() => {
@@ -134,6 +138,8 @@ function EditListingPageContent() {
           currentBid: listing.currentBid,
           type: listing.type,
         });
+        setFullListing(listing as any);
+        setHasSavedEditsSinceRejection(false);
 
         // Populate form with existing data
         setFormData({
@@ -170,6 +176,33 @@ function EditListingPageContent() {
           },
           attributes: (listing.attributes || {}) as Partial<ListingAttributes>,
         });
+
+        // Used to require a real edit before resubmitting a rejected listing.
+        const sig = JSON.stringify({
+          type: listing.type,
+          category: listing.category,
+          title: listing.title,
+          description: listing.description,
+          price: listing.price ?? null,
+          startingBid: listing.startingBid ?? null,
+          reservePrice: listing.reservePrice ?? null,
+          endsAt: listing.endsAt ? new Date(listing.endsAt).toISOString() : null,
+          location: listing.location,
+          images: listing.images || [],
+          verification: listing.trust?.verified || false,
+          transport: listing.trust?.transportReady || false,
+          protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
+          protectedTransactionDays: listing.protectedTransactionDays || null,
+          bestOffer: {
+            enabled: Boolean(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled),
+            minPrice: listing.bestOfferSettings?.minPrice ?? listing.bestOfferMinPrice ?? null,
+            autoAcceptPrice: listing.bestOfferSettings?.autoAcceptPrice ?? listing.bestOfferAutoAcceptPrice ?? null,
+            allowCounter: listing.bestOfferSettings?.allowCounter !== false,
+            offerExpiryHours: listing.bestOfferSettings?.offerExpiryHours ?? 48,
+          },
+          attributes: listing.attributes || {},
+        });
+        setInitialSignature(sig);
 
         // Load existing documents
         try {
@@ -1239,6 +1272,34 @@ function EditListingPageContent() {
       }
     }
 
+    // Require at least one real change before saving (prevents empty resubmits).
+    const currentSignature = JSON.stringify({
+      type: formData.type,
+      category: formData.category,
+      title: formData.title,
+      description: formData.description,
+      price: formData.price || null,
+      startingBid: formData.startingBid || null,
+      reservePrice: formData.reservePrice || null,
+      endsAt: formData.endsAt || null,
+      location: formData.location,
+      images: formData.images || [],
+      verification: formData.verification,
+      transport: formData.transport,
+      protectedTransactionEnabled: formData.protectedTransactionEnabled,
+      protectedTransactionDays: formData.protectedTransactionDays,
+      bestOffer: formData.bestOffer,
+      attributes: formData.attributes,
+    });
+    if (initialSignature && currentSignature === initialSignature) {
+      toast({
+        title: 'No changes yet',
+        description: 'Make at least one change before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1299,6 +1360,10 @@ function EditListingPageContent() {
       }
       
       await updateListing(user.uid, listingId, updates);
+      setInitialSignature(currentSignature);
+      if (fullListing?.status === 'removed') {
+        setHasSavedEditsSinceRejection(true);
+      }
 
       // Reload documents after save to ensure we have the latest state
       try {
@@ -1376,6 +1441,52 @@ function EditListingPageContent() {
     }
   };
 
+  const isRejected = fullListing?.status === 'removed';
+  const rejectionReason = typeof fullListing?.rejectionReason === 'string' ? fullListing.rejectionReason : '';
+  const rejectedAt: Date | null = fullListing?.rejectedAt instanceof Date ? fullListing.rejectedAt : null;
+  const resubmittedForRejectionAt: Date | null =
+    fullListing?.resubmittedForRejectionAt instanceof Date ? fullListing.resubmittedForRejectionAt : null;
+  const alreadyResubmittedForThisRejection =
+    rejectedAt && resubmittedForRejectionAt && rejectedAt.getTime() === resubmittedForRejectionAt.getTime();
+  const canResubmit = isRejected && hasSavedEditsSinceRejection && !alreadyResubmittedForThisRejection;
+
+  const handleResubmit = async () => {
+    if (!user?.uid) return;
+    setIsResubmitting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/listings/${listingId}/resubmit`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) {
+        const err: any = new Error(data?.message || data?.error || 'Failed to resubmit listing');
+        err.code = data?.code;
+        throw err;
+      }
+      toast({
+        title: 'Resubmitted',
+        description: 'Your listing was resubmitted for admin approval.',
+      });
+      router.push('/seller/listings');
+    } catch (e: any) {
+      toast({
+        title: 'Couldn’t resubmit yet',
+        description:
+          e?.code === 'MUST_EDIT_BEFORE_RESUBMIT'
+            ? 'Please edit and save the listing first, then resubmit.'
+            : e?.message || 'Failed to resubmit listing.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl space-y-6">
@@ -1402,6 +1513,47 @@ function EditListingPageContent() {
             </div>
           </div>
         </div>
+
+        {isRejected && (
+          <Alert className="bg-destructive/10 border-destructive/20">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <AlertDescription className="space-y-2">
+              <div className="font-semibold text-destructive">This listing was rejected</div>
+              {rejectionReason ? (
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">Reason:</span> {rejectionReason}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Make updates to the listing, then resubmit for review.
+                </div>
+              )}
+              {alreadyResubmittedForThisRejection ? (
+                <div className="text-sm text-muted-foreground">
+                  This listing has already been resubmitted and is awaiting review.
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="font-semibold"
+                    disabled={!canResubmit || isResubmitting}
+                    onClick={handleResubmit}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {isResubmitting ? 'Resubmitting…' : 'Resubmit for approval'}
+                  </Button>
+                  {!hasSavedEditsSinceRejection && (
+                    <div className="text-xs text-muted-foreground">
+                      Make at least one change and click <span className="font-semibold">Save</span> first.
+                    </div>
+                  )}
+                </div>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Listing Info Banner */}
         {formData.title && (

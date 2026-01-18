@@ -101,6 +101,19 @@ export interface ListingDoc {
   createdBy: string; // Firebase Auth UID
   updatedBy?: string; // Firebase Auth UID
   publishedAt?: Timestamp; // When status changed to 'active'
+
+  // Moderation lifecycle (admin approval / rejection)
+  pendingReason?: 'admin_approval' | 'compliance_review' | null;
+  rejectedAt?: Timestamp;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  approvedAt?: Timestamp;
+  approvedBy?: string;
+
+  // Resubmission tracking (one resubmit per rejection)
+  resubmittedAt?: Timestamp;
+  resubmittedForRejectionAt?: Timestamp;
+  resubmissionCount?: number;
   
   // Protected Transaction (Seller-selected protection)
   protectedTransactionEnabled?: boolean;
