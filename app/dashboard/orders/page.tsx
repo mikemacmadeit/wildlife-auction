@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +60,7 @@ export default function OrdersPage() {
   const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
   const [pendingCheckoutListingTitle, setPendingCheckoutListingTitle] = useState<string | null>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+  const reconcileAttemptedRef = useRef<Record<string, boolean>>({});
 
   const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
     if (!user) {
@@ -306,6 +307,26 @@ export default function OrdersPage() {
       } catch {
         // If this query fails (rules/transient), still keep polling loadOrders; it may show up anyway.
       }
+
+      // If the webhook pipeline is delayed/misconfigured, attempt a safe, authenticated reconcile once.
+      // This will create the order + listing transition idempotently using the same logic as the webhook handler.
+      if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
+        reconcileAttemptedRef.current[sessionId] = true;
+        try {
+          const token = await user.getIdToken();
+          await fetch('/api/stripe/checkout/reconcile-session', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+          });
+        } catch {
+          // Non-blocking: polling continues; user can still see the “finalizing” row.
+        }
+      }
+
       // IMPORTANT: do not flip the whole page into a loading spinner during background polling.
       await loadOrders({ silent: true });
     }
