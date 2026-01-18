@@ -1208,10 +1208,17 @@ export const listMostWatchedAuctions = async (params?: { limitCount?: number }):
       code === 'failed-precondition' || /requires an index/i.test(msg);
 
     if (looksLikeMissingIndex) {
-      console.warn('[listMostWatchedAuctions] Missing index for favorites query; using fallback', {
-        code,
-        message: msg,
-      });
+      // Avoid spamming the console in production (React may run effects multiple times).
+      // We only need one warning per page load/session to diagnose.
+      (globalThis as any).__wxWarnedFavoritesIndex =
+        (globalThis as any).__wxWarnedFavoritesIndex === true ? true : false;
+      if ((globalThis as any).__wxWarnedFavoritesIndex !== true) {
+        (globalThis as any).__wxWarnedFavoritesIndex = true;
+        console.warn('[listMostWatchedAuctions] Missing index for favorites query; using fallback', {
+          code,
+          message: msg,
+        });
+      }
 
       const listingsRef = collection(db, 'listings');
       const fallbackLimit = Math.max(limitCount * 8, 50); // grab a wider sample then rank

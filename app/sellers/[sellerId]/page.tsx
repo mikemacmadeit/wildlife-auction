@@ -139,8 +139,8 @@ export default function SellerProfilePage() {
         ]);
 
         const soldSorted = [...sold].sort((a, b) => {
-          const at = a.soldAt ? a.soldAt.getTime() : 0;
-          const bt = b.soldAt ? b.soldAt.getTime() : 0;
+          const at = a.soldAt?.getTime?.() ? a.soldAt.getTime() : 0;
+          const bt = b.soldAt?.getTime?.() ? b.soldAt.getTime() : 0;
           return bt - at;
         });
 

@@ -189,7 +189,10 @@ export default function OrdersPage() {
 
   const isDisputeDeadlinePassed = (order: Order): boolean => {
     if (!order.disputeDeadlineAt) return false;
-    return order.disputeDeadlineAt.getTime() < Date.now();
+    const d: any = (order as any).disputeDeadlineAt;
+    const ms =
+      d?.getTime?.() ? d.getTime() : typeof d?.toDate === 'function' ? d.toDate().getTime() : typeof d?.seconds === 'number' ? d.seconds * 1000 : null;
+    return typeof ms === 'number' ? ms < Date.now() : false;
   };
 
   const getStatusIcon = (status: string) => {

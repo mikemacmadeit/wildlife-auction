@@ -37,6 +37,25 @@ type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soo
 
 type ViewMode = 'card' | 'list';
 
+function toMillisSafe(value: any): number | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+  if (typeof value?.toDate === 'function') {
+    try {
+      const d = value.toDate();
+      if (d instanceof Date && Number.isFinite(d.getTime())) return d.getTime();
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof value?.seconds === 'number') return value.seconds * 1000;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d.getTime() : null;
+  }
+  return null;
+}
+
 export default function BrowsePage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -383,7 +402,9 @@ export default function BrowsePage() {
       const dayInMs = 24 * 60 * 60 * 1000;
       result = result.filter((listing) => {
         if (listing.type !== 'auction' || !listing.endsAt) return false;
-        const timeLeft = listing.endsAt.getTime() - now;
+        const endsAtMs = toMillisSafe((listing as any).endsAt);
+        if (!endsAtMs) return false;
+        const timeLeft = endsAtMs - now;
         return timeLeft > 0 && timeLeft <= dayInMs;
       });
     }
@@ -393,7 +414,7 @@ export default function BrowsePage() {
       const now = Date.now();
       const weekInMs = 7 * 24 * 60 * 60 * 1000;
       result = result.filter((listing) => {
-        const listedTime = listing.createdAt.getTime();
+        const listedTime = toMillisSafe((listing as any).createdAt) || 0;
         const timeSinceListing = now - listedTime;
         return timeSinceListing <= weekInMs;
       });
@@ -409,7 +430,9 @@ export default function BrowsePage() {
       return sorted.sort((a, b) => {
         if (a.featured && !b.featured) return -1;
         if (!a.featured && b.featured) return 1;
-        return b.createdAt.getTime() - a.createdAt.getTime();
+        const bt = toMillisSafe((b as any).createdAt) || 0;
+        const at = toMillisSafe((a as any).createdAt) || 0;
+        return bt - at;
       });
     }
     // All other sorts are handled server-side
