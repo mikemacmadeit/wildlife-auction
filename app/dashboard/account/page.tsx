@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -41,6 +41,10 @@ import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { UserProfile } from '@/lib/types';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
+import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { auth } from '@/lib/firebase/config';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { resetPassword } from '@/lib/firebase/auth';
 
 export default function AccountPage() {
   const { toast } = useToast();
@@ -51,6 +55,10 @@ export default function AccountPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadPct, setAvatarUploadPct] = useState(0);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNext, setPwNext] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
   const [stats, setStats] = useState({
     totalListings: 0,
     activeSales: 0,
@@ -159,6 +167,89 @@ export default function AccountPage() {
       fetchUserData();
     }
   }, [user, authLoading, toast]);
+
+  const hasPasswordProvider = useMemo(() => {
+    const providers = user?.providerData || [];
+    return providers.some((p) => p?.providerId === 'password');
+  }, [user?.providerData]);
+
+  const handleUpdatePassword = async () => {
+    if (!user) return;
+
+    // If user doesn't have password provider (Google, etc.), guide them to reset flow.
+    if (!hasPasswordProvider) {
+      try {
+        if (!user.email) throw new Error('No email available for password reset.');
+        await resetPassword(user.email);
+        toast({
+          title: 'Password reset email sent',
+          description: 'Check your inbox for a link to set a password.',
+        });
+      } catch (e: any) {
+        toast({
+          title: 'Couldn’t send reset email',
+          description: e?.message || 'Please try again.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // Validate inputs
+    const current = String(pwCurrent || '');
+    const next = String(pwNext || '');
+    const confirm = String(pwConfirm || '');
+
+    if (!current.trim()) {
+      toast({ title: 'Current password required', description: 'Enter your current password to continue.', variant: 'destructive' });
+      return;
+    }
+    if (next.length < 8) {
+      toast({ title: 'Password too short', description: 'Use at least 8 characters.', variant: 'destructive' });
+      return;
+    }
+    if (next !== confirm) {
+      toast({ title: 'Passwords do not match', description: 'Confirm password must match.', variant: 'destructive' });
+      return;
+    }
+
+    setPwSaving(true);
+    try {
+      const u = auth.currentUser;
+      if (!u || !u.email) throw new Error('No authenticated user found.');
+
+      // Re-authenticate (security best practice; Firebase often requires it).
+      const cred = EmailAuthProvider.credential(u.email, current);
+      await reauthenticateWithCredential(u, cred);
+
+      await updatePassword(u, next);
+
+      setPwCurrent('');
+      setPwNext('');
+      setPwConfirm('');
+
+      toast({ title: 'Password updated', description: 'Your password has been changed successfully.' });
+    } catch (e: any) {
+      const code = String(e?.code || '');
+      const msg = String(e?.message || '');
+
+      if (code.includes('auth/wrong-password')) {
+        toast({ title: 'Wrong password', description: 'Your current password is incorrect.', variant: 'destructive' });
+      } else if (code.includes('auth/too-many-requests')) {
+        toast({ title: 'Too many attempts', description: 'Please wait a bit and try again.', variant: 'destructive' });
+      } else if (code.includes('auth/requires-recent-login')) {
+        toast({
+          title: 'Please re-authenticate',
+          description: 'For security, please sign out and sign back in, then try again.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Update failed', description: msg || 'Could not update password.', variant: 'destructive' });
+      }
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!user || !userProfile) return;
@@ -677,46 +768,94 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword" className="text-sm font-semibold">
-                    Current Password
-                  </Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    className="min-h-[48px] text-base bg-background"
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword" className="text-sm font-semibold">
-                      New Password
-                    </Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      className="min-h-[48px] text-base bg-background"
-                      placeholder="Enter new password"
-                    />
+                {!hasPasswordProvider ? (
+                  <div className="rounded-lg border border-border/50 bg-background/50 p-4 space-y-3">
+                    <div className="font-semibold text-foreground">Password management</div>
+                    <div className="text-sm text-muted-foreground">
+                      You signed in with a provider (e.g. Google). To set/change a password, we’ll email you a secure reset link.
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button className="min-h-[44px] font-semibold" onClick={handleUpdatePassword} disabled={pwSaving}>
+                        {pwSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                        Send password reset email
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-sm font-semibold">
-                      Confirm New Password
-                    </Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      className="min-h-[48px] text-base bg-background"
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-border/50">
-                  <Button className="min-h-[48px] font-semibold">
-                    Update Password
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPassword" className="text-sm font-semibold">
+                        Current Password
+                      </Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        value={pwCurrent}
+                        onChange={(e) => setPwCurrent(e.target.value)}
+                        className="min-h-[48px] text-base bg-background"
+                        placeholder="Enter current password"
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="newPassword" className="text-sm font-semibold">
+                          New Password
+                        </Label>
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          value={pwNext}
+                          onChange={(e) => setPwNext(e.target.value)}
+                          className="min-h-[48px] text-base bg-background"
+                          placeholder="At least 8 characters"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword" className="text-sm font-semibold">
+                          Confirm New Password
+                        </Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          value={pwConfirm}
+                          onChange={(e) => setPwConfirm(e.target.value)}
+                          className="min-h-[48px] text-base bg-background"
+                          placeholder="Confirm new password"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-border/50 flex items-center justify-between gap-3 flex-wrap">
+                      <Button
+                        className="min-h-[48px] font-semibold"
+                        onClick={handleUpdatePassword}
+                        disabled={pwSaving}
+                      >
+                        {pwSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                        Update Password
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-[48px] font-semibold"
+                        onClick={async () => {
+                          try {
+                            if (!user.email) throw new Error('No email available for password reset.');
+                            await resetPassword(user.email);
+                            toast({ title: 'Reset email sent', description: 'Check your inbox for a secure reset link.' });
+                          } catch (e: any) {
+                            toast({ title: 'Couldn’t send reset email', description: e?.message || 'Please try again.', variant: 'destructive' });
+                          }
+                        }}
+                        disabled={pwSaving}
+                      >
+                        Send reset email instead
+                      </Button>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -728,7 +867,13 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
+                <div className="rounded-lg border border-border/50 bg-background/50 p-4">
+                  <div className="font-semibold text-foreground">Coming soon</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Two-factor authentication will be added after we ship the first production payment + compliance milestone.
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50 opacity-60">
                   <div className="flex items-center gap-3">
                     <Shield className="h-5 w-5 text-primary" />
                     <div>
@@ -736,9 +881,9 @@ export default function AccountPage() {
                       <p className="text-sm text-muted-foreground">Use your phone number for two-factor authentication</p>
                     </div>
                   </div>
-                  <Switch />
+                  <Switch disabled />
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50">
+                <div className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50 opacity-60">
                   <div className="flex items-center gap-3">
                     <Shield className="h-5 w-5 text-primary" />
                     <div>
@@ -746,7 +891,7 @@ export default function AccountPage() {
                       <p className="text-sm text-muted-foreground">Use an authenticator app for two-factor authentication</p>
                     </div>
                   </div>
-                  <Switch />
+                  <Switch disabled />
                 </div>
               </CardContent>
             </Card>
@@ -754,33 +899,7 @@ export default function AccountPage() {
 
           {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-6 mt-6">
-            <Card className="border-2 border-border/50 bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Bell className="h-5 w-5" />
-                  Notification Preferences
-                </CardTitle>
-                <CardDescription>
-                  Manage email, push, quiet hours, and category-level controls.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border border-border/50 bg-background/50 p-4">
-                  <p className="text-sm text-muted-foreground">
-                    Notification settings have moved to a dedicated page so they can control in-app, email, and push
-                    notifications consistently across auctions, orders, onboarding, and marketing.
-                  </p>
-                  <div className="mt-4 flex gap-2 flex-wrap">
-                    <Button asChild>
-                      <Link href="/dashboard/settings/notifications">Open notification settings</Link>
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <Link href="/dashboard/notifications">View notifications</Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <NotificationPreferencesPanel embedded />
           </TabsContent>
 
           {/* Preferences Tab */}
