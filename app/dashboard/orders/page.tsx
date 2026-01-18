@@ -61,14 +61,14 @@ export default function OrdersPage() {
   const [pendingCheckoutListingTitle, setPendingCheckoutListingTitle] = useState<string | null>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
     if (!user) {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
       return;
     }
     try {
-      setLoading(true);
-      setError(null);
+      if (!opts?.silent) setLoading(true);
+      if (!opts?.silent) setError(null);
       const userOrders = await getOrdersForUser(user.uid, 'buyer');
 
       const ordersWithListings = await Promise.all(
@@ -96,9 +96,37 @@ export default function OrdersPage() {
       console.error('Error fetching orders:', err);
       setError(err instanceof Error ? err.message : 'Failed to load orders');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [user]);
+
+  // Persist pending checkout state across navigation (prevents “it disappeared when I clicked away”).
+  useEffect(() => {
+    const key = 'we:pending-checkout:v1';
+    if (pendingCheckout) {
+      try {
+        sessionStorage.setItem(key, JSON.stringify(pendingCheckout));
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    // Restore once if present and still fresh.
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as PendingCheckout;
+      if (!parsed?.sessionId || typeof parsed?.createdAtMs !== 'number') return;
+      const ageMs = Date.now() - parsed.createdAtMs;
+      if (ageMs > 2 * 60_000) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+      setPendingCheckout(parsed);
+    } catch {
+      // ignore
+    }
+  }, [pendingCheckout]);
 
   // Stripe checkout redirect safety: verify session_id via server endpoint (never crash page).
   // Also: clean URL after showing the banner once (persist banner through the replace).
@@ -144,8 +172,13 @@ export default function OrdersPage() {
             body: 'The redirect contained an invalid session reference. You can safely refresh and your orders will load normally.',
           };
         } else if (data?.ok === true) {
-          const paymentStatus = String(data?.session?.payment_status || '');
-          const isProcessing = data?.isProcessing === true || paymentStatus === 'unpaid';
+          // NOTE: `/api/stripe/checkout/verify-session` returns flattened fields (not `session.*`).
+          const paymentStatus = String(data?.paymentStatus || '');
+          const isProcessing =
+            data?.isProcessing === true ||
+            paymentStatus === 'processing' ||
+            paymentStatus === 'unpaid' ||
+            paymentStatus === 'requires_action';
           banner = isProcessing
             ? {
                 tone: 'info',
@@ -159,7 +192,8 @@ export default function OrdersPage() {
               };
 
           // Track this session so we can poll for the corresponding Firestore order.
-          const listingIdFromMeta = data?.session?.metadata?.listingId ? String(data.session.metadata.listingId) : null;
+          const listingIdFromMeta =
+            data?.listingId ? String(data.listingId) : data?.metadata?.listingId ? String(data.metadata.listingId) : null;
           setPendingCheckout({
             sessionId,
             listingId: listingIdFromMeta,
@@ -244,7 +278,7 @@ export default function OrdersPage() {
 
     const startedAt = Date.now();
     const maxMs = 90_000;
-    const intervalMs = 3000;
+    const intervalMs = 5000;
     const sessionId = pendingCheckout.sessionId;
 
     async function tick() {
@@ -253,10 +287,15 @@ export default function OrdersPage() {
         if (cancelled) return;
         if (order?.id) {
           // Found it. Refresh list and highlight the new order.
-          await loadOrders();
+          await loadOrders({ silent: true });
           setHighlightOrderId(order.id);
           setPendingCheckout(null);
           setPendingCheckoutListingTitle(null);
+          try {
+            sessionStorage.removeItem('we:pending-checkout:v1');
+          } catch {
+            // ignore
+          }
           try {
             window.setTimeout(() => setHighlightOrderId(null), 12_000);
           } catch {
@@ -267,12 +306,21 @@ export default function OrdersPage() {
       } catch {
         // If this query fails (rules/transient), still keep polling loadOrders; it may show up anyway.
       }
-      await loadOrders();
+      // IMPORTANT: do not flip the whole page into a loading spinner during background polling.
+      await loadOrders({ silent: true });
     }
 
     const handle = window.setInterval(() => {
       if (Date.now() - startedAt > maxMs) {
         window.clearInterval(handle);
+        // Stop polling and clear the pending row after the time budget.
+        setPendingCheckout(null);
+        setPendingCheckoutListingTitle(null);
+        try {
+          sessionStorage.removeItem('we:pending-checkout:v1');
+        } catch {
+          // ignore
+        }
         return;
       }
       void tick();
