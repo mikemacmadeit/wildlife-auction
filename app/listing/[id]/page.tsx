@@ -721,8 +721,8 @@ export default function ListingDetailPage() {
           <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge variant="outline" className="text-sm font-medium">{listing!.category}</Badge>
-                <Badge variant="outline" className="text-sm font-medium capitalize">{listing!.type}</Badge>
+                {/* Hide category/type tags on listing detail page (they're implied by context).
+                   Keep fields for filtering + routing elsewhere. */}
                 {listing!.featured && (
                   <Badge variant="default" className="gap-1 font-medium">
                     <Sparkles className="h-3 w-3" />
