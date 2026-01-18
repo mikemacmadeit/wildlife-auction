@@ -44,6 +44,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/hooks/use-auth';
 import { useAdmin } from '@/hooks/use-admin';
 import { signOutUser } from '@/lib/firebase/auth';
@@ -106,6 +107,8 @@ export default function SellerLayout({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [adminEverTrue, setAdminEverTrue] = useState(false);
+  const [userNavOpen, setUserNavOpen] = useState(true);
+  const [adminNavOpen, setAdminNavOpen] = useState(true);
 
   useEffect(() => {
     // Reset when user changes
@@ -118,6 +121,32 @@ export default function SellerLayout({
   }, [isAdmin]);
 
   const showAdminNav = isAdmin === true || adminEverTrue;
+
+  // Persist admin-only nav grouping collapse state (per device)
+  useEffect(() => {
+    if (!showAdminNav) return;
+    if (typeof window === 'undefined') return;
+    try {
+      const rawUser = window.localStorage.getItem('we:nav:v1:seller:user_open');
+      const rawAdmin = window.localStorage.getItem('we:nav:v1:seller:admin_open');
+      if (rawUser === '0' || rawUser === '1') setUserNavOpen(rawUser === '1');
+      if (rawAdmin === '0' || rawAdmin === '1') setAdminNavOpen(rawAdmin === '1');
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAdminNav]);
+
+  useEffect(() => {
+    if (!showAdminNav) return;
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('we:nav:v1:seller:user_open', userNavOpen ? '1' : '0');
+      window.localStorage.setItem('we:nav:v1:seller:admin_open', adminNavOpen ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }, [showAdminNav, userNavOpen, adminNavOpen]);
 
   const baseNavWithBadges = useMemo(() => {
     return baseNavItems.map((item) => {
@@ -283,56 +312,108 @@ export default function SellerLayout({
         </div>
 
         {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-              {baseNavWithBadges.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    prefetch={true}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold',
-                      'hover:bg-background/50 hover:text-foreground',
-                      'min-h-[44px]',
-                      active && 'bg-primary/10 text-primary border-l-4 border-primary'
-                    )}
-                  >
-                <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                {!sidebarCollapsed && (
-                  <span className="flex-1 flex items-center justify-between">
-                    <span>{item.label}</span>
-                    {item.badge && item.badge > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-          
-          {/* Admin Section */}
-          {showAdminNav && adminNavWithBadges.length > 0 && (
-            <>
-              {!sidebarCollapsed && (
-                <div className="px-3 py-2 mt-2">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {showAdminNav && !sidebarCollapsed ? (
+            <div className="space-y-2">
+              <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
+                <div className="px-3 pt-1">
                   <Separator className="mb-2" />
-                  <div className="px-3 py-1.5">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Admin
-                    </span>
-                  </div>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        'w-full flex items-center justify-between rounded-lg px-2 py-2',
+                        'text-xs font-bold text-muted-foreground uppercase tracking-wider',
+                        'hover:bg-background/50'
+                      )}
+                    >
+                      <span>User</span>
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', userNavOpen ? 'rotate-180' : 'rotate-0')} />
+                    </button>
+                  </CollapsibleTrigger>
                 </div>
-              )}
-              {sidebarCollapsed && (
-                <div className="px-3 py-2 mt-2">
-                  <Separator />
+                <CollapsibleContent className="space-y-1">
+                  {baseNavWithBadges.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        prefetch={true}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold',
+                          'hover:bg-background/50 hover:text-foreground',
+                          'min-h-[44px]',
+                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                        )}
+                      >
+                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        <span className="flex-1 flex items-center justify-between">
+                          <span>{item.label}</span>
+                          {item.badge && item.badge > 0 && (
+                            <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Collapsible open={adminNavOpen} onOpenChange={setAdminNavOpen}>
+                <div className="px-3 pt-1">
+                  <Separator className="mb-2" />
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        'w-full flex items-center justify-between rounded-lg px-2 py-2',
+                        'text-xs font-bold text-muted-foreground uppercase tracking-wider',
+                        'hover:bg-background/50'
+                      )}
+                    >
+                      <span>Admin</span>
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', adminNavOpen ? 'rotate-180' : 'rotate-0')} />
+                    </button>
+                  </CollapsibleTrigger>
                 </div>
-              )}
-              {adminNavWithBadges.map((item) => {
+                <CollapsibleContent className="space-y-1">
+                  {adminNavWithBadges.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        prefetch={true}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold',
+                          'hover:bg-background/50 hover:text-foreground',
+                          'min-h-[44px]',
+                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                        )}
+                      >
+                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        <span className="flex-1 flex items-center justify-between">
+                          <span>{item.label}</span>
+                          {item.badge && item.badge > 0 && (
+                            <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          ) : (
+            <>
+              {baseNavWithBadges.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
@@ -361,6 +442,55 @@ export default function SellerLayout({
                   </Link>
                 );
               })}
+
+              {showAdminNav && adminNavWithBadges.length > 0 && (
+                <>
+                  {!sidebarCollapsed && (
+                    <div className="px-3 py-2 mt-2">
+                      <Separator className="mb-2" />
+                      <div className="px-3 py-1.5">
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                          Admin
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {sidebarCollapsed && (
+                    <div className="px-3 py-2 mt-2">
+                      <Separator />
+                    </div>
+                  )}
+                  {adminNavWithBadges.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        prefetch={true}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold',
+                          'hover:bg-background/50 hover:text-foreground',
+                          'min-h-[44px]',
+                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                        )}
+                      >
+                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        {!sidebarCollapsed && (
+                          <span className="flex-1 flex items-center justify-between">
+                            <span>{item.label}</span>
+                            {item.badge && item.badge > 0 && (
+                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
+                                {item.badge}
+                              </Badge>
+                            )}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
             </>
           )}
         </nav>
@@ -502,45 +632,90 @@ export default function SellerLayout({
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
-                <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-                  {baseNavWithBadges.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
-                          'hover:bg-background/50',
-                          'min-h-[44px]',
-                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
-                        )}
-                      >
-                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                        <span className="flex-1">{item.label}</span>
-                        {item.badge && item.badge > 0 && (
-                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </Link>
-                    );
-                  })}
-                  
-                  {/* Admin Section in Mobile Menu */}
-                  {showAdminNav && adminNavWithBadges.length > 0 && (
+                <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {showAdminNav ? (
                     <>
-                      <div className="px-3 py-2 mt-2">
-                        <Separator className="mb-2" />
-                        <div className="px-3 py-1.5">
-                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                            Admin
-                          </span>
-                        </div>
-                      </div>
-                      {adminNavWithBadges.map((item) => {
+                      <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider hover:bg-background/50"
+                          >
+                            <span>User</span>
+                            <ChevronDown className={cn('h-4 w-4 transition-transform', userNavOpen ? 'rotate-180' : 'rotate-0')} />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-1 pt-1">
+                          {baseNavWithBadges.map((item) => {
+                            const Icon = item.icon;
+                            const active = isActive(item.href);
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={cn(
+                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                                  'hover:bg-background/50',
+                                  'min-h-[44px]',
+                                  active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                                )}
+                              >
+                                <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                                <span className="flex-1">{item.label}</span>
+                                {item.badge && item.badge > 0 && (
+                                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                              </Link>
+                            );
+                          })}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Collapsible open={adminNavOpen} onOpenChange={setAdminNavOpen}>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider hover:bg-background/50"
+                          >
+                            <span>Admin</span>
+                            <ChevronDown className={cn('h-4 w-4 transition-transform', adminNavOpen ? 'rotate-180' : 'rotate-0')} />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-1 pt-1">
+                          {adminNavWithBadges.map((item) => {
+                            const Icon = item.icon;
+                            const active = isActive(item.href);
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={cn(
+                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                                  'hover:bg-background/50',
+                                  'min-h-[44px]',
+                                  active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                                )}
+                              >
+                                <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                                <span className="flex-1">{item.label}</span>
+                                {item.badge && item.badge > 0 && (
+                                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                              </Link>
+                            );
+                          })}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </>
+                  ) : (
+                    <div className="space-y-1">
+                      {baseNavWithBadges.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
                         return (
@@ -565,7 +740,7 @@ export default function SellerLayout({
                           </Link>
                         );
                       })}
-                    </>
+                    </div>
                   )}
                 </nav>
               </div>
