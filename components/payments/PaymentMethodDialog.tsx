@@ -39,7 +39,7 @@ export function PaymentMethodDialog(props: {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <DialogTitle>Choose payment method</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="hidden sm:block">
                 Pick the best rail for this purchase. Funds are held in escrow once received.
               </DialogDescription>
             </div>
@@ -49,7 +49,8 @@ export function PaymentMethodDialog(props: {
           </div>
         </DialogHeader>
 
-        <div className="space-y-3">
+        {/* Compact layout (no scrolling) */}
+        <div className="space-y-2">
           {options.map((opt) => {
             const Icon = opt.icon;
             const isRec = opt.key === recommended;
@@ -66,7 +67,7 @@ export function PaymentMethodDialog(props: {
                 key={opt.key}
                 variant="outline"
                 className={cn(
-                  'w-full min-h-[72px] h-auto py-4 px-3 sm:px-4 text-left border-2 rounded-xl',
+                  'w-full min-h-[56px] h-auto py-3 px-3 sm:px-4 text-left border-2 rounded-xl',
                   'transition-colors',
                   isRec && isEnabled
                     ? 'border-primary/40 bg-primary/5 hover:bg-primary/10'
@@ -81,7 +82,7 @@ export function PaymentMethodDialog(props: {
                   <div className="flex items-start gap-3 min-w-0">
                     <div
                       className={cn(
-                        'h-10 w-10 rounded-xl border flex items-center justify-center shrink-0',
+                        'h-9 w-9 rounded-xl border flex items-center justify-center shrink-0',
                         isRec && isEnabled ? 'bg-primary/10 border-primary/25' : 'bg-muted/20 border-border/60'
                       )}
                     >
@@ -89,9 +90,10 @@ export function PaymentMethodDialog(props: {
                     </div>
                     <div className="text-left min-w-0">
                       <div className="font-semibold leading-tight break-words text-foreground">{opt.title}</div>
-                      <div className="text-xs text-muted-foreground mt-1 break-words">{opt.copy}</div>
+                      {/* On mobile, keep the dialog short (no scroll) */}
+                      <div className="hidden sm:block text-xs text-muted-foreground mt-1 break-words">{opt.copy}</div>
                       {opt.key === 'card' ? (
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <div className="hidden md:flex mt-2 items-center gap-2 flex-wrap">
                           <VisaBadge />
                           <MastercardBadge />
                           <AmexBadge />
@@ -116,10 +118,8 @@ export function PaymentMethodDialog(props: {
             );
           })}
 
-          <div className="text-xs text-muted-foreground rounded-lg border bg-muted/20 p-3">
-            {canUseBankRails
-              ? 'Card payments are fastest; ACH and wire can reduce bank/card declines on larger purchases.'
-              : 'To use ACH or wire, sign in and verify your email address.'}
+          <div className="text-[11px] text-muted-foreground rounded-lg border bg-muted/20 px-3 py-2">
+            {canUseBankRails ? 'Card is fastest. ACH/wire can help on larger purchases.' : 'Sign in + verify email for ACH/wire.'}
           </div>
         </div>
       </DialogContent>
