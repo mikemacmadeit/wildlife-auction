@@ -112,6 +112,27 @@ export default function DashboardLayout({
   // We only show admin items once isAdmin flips true, and we keep them visible thereafter.
   const showAdminNav = isAdmin === true;
 
+  const baseNavWithBadges = useMemo(() => {
+    return baseNavItems.map((item) => {
+      if (item.href === '/seller/messages') {
+        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
+      }
+      if (item.href === '/dashboard/notifications') {
+        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
+      }
+      return item;
+    });
+  }, [unreadMessagesCount, unreadNotificationsCount]);
+
+  const adminNavWithBadges = useMemo(() => {
+    return adminNavItems.map((item) => {
+      if (item.href === '/dashboard/admin/listings') {
+        return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
+      }
+      return item;
+    });
+  }, [pendingApprovalsCount]);
+
   // Real-time badges (unread messages/notifications + pending approvals)
   useEffect(() => {
     if (!user?.uid) {
@@ -177,31 +198,16 @@ export default function DashboardLayout({
   // Use useMemo to ensure it updates when isAdmin changes
   const navItems = useMemo(() => {
     // Always include base items
-    const items = baseNavItems.map((item) => {
-      if (item.href === '/seller/messages') {
-        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
-      }
-      if (item.href === '/dashboard/notifications') {
-        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
-      }
-      return item;
-    });
+    const items = baseNavWithBadges.slice();
     
     // Add admin items as soon as we know the user is admin.
     // Do NOT wait on adminLoading here; it can lag behind isAdmin due to authLoading.
     if (showAdminNav) {
-      items.push(
-        ...adminNavItems.map((item) => {
-          if (item.href === '/dashboard/admin/listings') {
-            return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
-          }
-          return item;
-        })
-      );
+      items.push(...adminNavWithBadges);
     }
     
     return items;
-  }, [showAdminNav, unreadMessagesCount, unreadNotificationsCount, pendingApprovalsCount]);
+  }, [showAdminNav, baseNavWithBadges, adminNavWithBadges]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -308,7 +314,7 @@ export default function DashboardLayout({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {baseNavItems.map((item) => {
+          {baseNavWithBadges.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
@@ -356,7 +362,7 @@ export default function DashboardLayout({
                   <Separator />
                 </div>
               )}
-              {adminNavItems.map((item) => {
+              {adminNavWithBadges.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (

@@ -17,6 +17,7 @@ import {
   X,
   PlusCircle,
   ShoppingBag,
+  Gavel,
   ChevronLeft,
   ChevronRight,
   User,
@@ -26,6 +27,8 @@ import {
   Heart,
   Shield,
   CheckCircle,
+  HeartPulse,
+  Mail,
   Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -49,6 +52,8 @@ import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { subscribeToUnreadCount, subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
+import { db } from '@/lib/firebase/config';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 interface SellerNavItem {
   href: string;
@@ -65,7 +70,8 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/seller/sales', label: 'Sales & Bids', icon: DollarSign },
-  { href: '/dashboard/orders', label: 'Orders', icon: ShoppingBag },
+  { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
+  { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
   { href: '/seller/logistics', label: 'Logistics', icon: Truck },
   { href: '/seller/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
@@ -75,8 +81,15 @@ const baseNavItems: SellerNavItem[] = [
 
 // Admin nav items (only visible to admins)
 const adminNavItems: SellerNavItem[] = [
+  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
+  { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
+  { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
+  { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
+  { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
-  { href: '/dashboard/admin/payouts', label: 'Manage Payouts', icon: Shield },
+  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
+  { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
+  { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
 ];
 
 export default function SellerLayout({
@@ -87,11 +100,46 @@ export default function SellerLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { isAdmin } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+  const [adminEverTrue, setAdminEverTrue] = useState(false);
+
+  useEffect(() => {
+    // Reset when user changes
+    setAdminEverTrue(false);
+    setPendingApprovalsCount(0);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (isAdmin === true) setAdminEverTrue(true);
+  }, [isAdmin]);
+
+  const showAdminNav = isAdmin === true || adminEverTrue;
+
+  const baseNavWithBadges = useMemo(() => {
+    return baseNavItems.map((item) => {
+      if (item.href === '/seller/messages') {
+        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
+      }
+      if (item.href === '/dashboard/notifications') {
+        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
+      }
+      return item;
+    });
+  }, [unreadMessagesCount, unreadNotificationsCount]);
+
+  const adminNavWithBadges = useMemo(() => {
+    return adminNavItems.map((item) => {
+      if (item.href === '/dashboard/admin/listings') {
+        return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
+      }
+      return item;
+    });
+  }, [pendingApprovalsCount]);
 
   // Real-time unread badge for Messages (same source of truth as notifications)
   useEffect(() => {
@@ -122,28 +170,27 @@ export default function SellerLayout({
     }
   }, [user?.uid]);
 
-  // Combine nav items - add admin items if user is admin
-  const navItems = useMemo(() => {
-    if (adminLoading) {
-      return baseNavItems.map((item) =>
-        item.href === '/seller/messages'
-          ? { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined }
-          : item
-      ); // Show base items while loading
+  // Admin badge: pending listing approvals (drops as listings are approved/rejected)
+  useEffect(() => {
+    if (!showAdminNav) return;
+    try {
+      const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
+      const unsub = onSnapshot(
+        qPending,
+        (snap) => setPendingApprovalsCount(snap.size || 0),
+        () => setPendingApprovalsCount(0)
+      );
+      return () => unsub();
+    } catch {
+      setPendingApprovalsCount(0);
+      return;
     }
+  }, [showAdminNav]);
 
-    const withBadges = baseNavItems.map((item) => {
-      if (item.href === '/seller/messages') {
-        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
-      }
-      if (item.href === '/dashboard/notifications') {
-        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
-      }
-      return item;
-    });
-
-    return isAdmin ? [...withBadges, ...adminNavItems] : withBadges;
-  }, [isAdmin, adminLoading, unreadMessagesCount, unreadNotificationsCount]);
+  // Combine nav items - add admin items if user is admin (sticky once detected)
+  const navItems = useMemo(() => {
+    return showAdminNav ? [...baseNavWithBadges, ...adminNavWithBadges] : baseNavWithBadges;
+  }, [showAdminNav, baseNavWithBadges, adminNavWithBadges]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -238,7 +285,7 @@ export default function SellerLayout({
 
         {/* Navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-              {baseNavItems.map((item) => {
+              {baseNavWithBadges.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
@@ -269,7 +316,7 @@ export default function SellerLayout({
           })}
           
           {/* Admin Section */}
-          {!adminLoading && isAdmin && adminNavItems.length > 0 && (
+          {showAdminNav && adminNavWithBadges.length > 0 && (
             <>
               {!sidebarCollapsed && (
                 <div className="px-3 py-2 mt-2">
@@ -286,7 +333,7 @@ export default function SellerLayout({
                   <Separator />
                 </div>
               )}
-              {adminNavItems.map((item) => {
+              {adminNavWithBadges.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
@@ -457,7 +504,7 @@ export default function SellerLayout({
                   </Button>
                 </div>
                 <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-                  {baseNavItems.map((item) => {
+                  {baseNavWithBadges.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.href);
                     return (
@@ -484,7 +531,7 @@ export default function SellerLayout({
                   })}
                   
                   {/* Admin Section in Mobile Menu */}
-                  {!adminLoading && isAdmin && adminNavItems.length > 0 && (
+                  {showAdminNav && adminNavWithBadges.length > 0 && (
                     <>
                       <div className="px-3 py-2 mt-2">
                         <Separator className="mb-2" />
@@ -494,7 +541,7 @@ export default function SellerLayout({
                           </span>
                         </div>
                       </div>
-                      {adminNavItems.map((item) => {
+                      {adminNavWithBadges.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
                         return (
