@@ -23,78 +23,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { FilterState, ListingCategory, ListingType } from '@/lib/types';
+import { FilterState, ListingType } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import {
+  BROWSE_CATEGORIES as categories,
+  BROWSE_TYPES as types,
+  BROWSE_SPECIES as species,
+  BROWSE_STATES as states,
+  BROWSE_QUANTITY_OPTIONS as quantityOptions,
+  BROWSE_HEALTH_STATUS_OPTIONS as healthStatusOptions,
+} from '@/components/browse/filters/constants';
 
 interface FilterDialogProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   className?: string;
 }
-
-const categories: { value: ListingCategory; label: string }[] = [
-  { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
-  { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
-  { value: 'cattle_livestock', label: 'Cattle & Livestock' },
-  { value: 'ranch_equipment', label: 'Ranch Equipment' },
-];
-
-const types: { value: ListingType; label: string }[] = [
-  { value: 'auction', label: 'Auction' },
-  { value: 'fixed', label: 'Fixed Price' },
-  { value: 'classified', label: 'Classified' },
-];
-
-// IMPORTANT: These values should match real stored `attributes.speciesId` values.
-const species: { value: string; label: string }[] = [
-  { value: 'whitetail_deer', label: 'Whitetail Deer' },
-  { value: 'axis', label: 'Axis Deer' },
-  { value: 'fallow', label: 'Fallow Deer' },
-  { value: 'sika', label: 'Sika Deer' },
-  { value: 'blackbuck', label: 'Blackbuck' },
-  { value: 'aoudad', label: 'Aoudad (Barbary Sheep)' },
-  { value: 'nilgai', label: 'Nilgai' },
-  { value: 'scimitar_horned_oryx', label: 'Scimitar-Horned Oryx' },
-  { value: 'addax', label: 'Addax' },
-  { value: 'greater_kudu', label: 'Greater Kudu' },
-  { value: 'red_stag', label: 'Red Stag' },
-  { value: 'zebra', label: 'Zebra' },
-  { value: 'other_exotic', label: 'Other / Exotic' },
-];
-
-const states: { value: string; label: string }[] = [
-  { value: 'TX', label: 'Texas' },
-  { value: 'OK', label: 'Oklahoma' },
-  { value: 'LA', label: 'Louisiana' },
-  { value: 'AR', label: 'Arkansas' },
-  { value: 'NM', label: 'New Mexico' },
-  { value: 'MO', label: 'Missouri' },
-  { value: 'KS', label: 'Kansas' },
-  { value: 'CO', label: 'Colorado' },
-  { value: 'AZ', label: 'Arizona' },
-  { value: 'FL', label: 'Florida' },
-  { value: 'GA', label: 'Georgia' },
-  { value: 'AL', label: 'Alabama' },
-  { value: 'MS', label: 'Mississippi' },
-  { value: 'TN', label: 'Tennessee' },
-  { value: 'KY', label: 'Kentucky' },
-  { value: 'other', label: 'Other States' },
-];
-
-const quantityOptions: { value: 'single' | 'pair' | 'small-group' | 'large-group' | 'lot'; label: string }[] = [
-  { value: 'single', label: 'Single (1)' },
-  { value: 'pair', label: 'Pair (2)' },
-  { value: 'small-group', label: 'Small Group (3-5)' },
-  { value: 'large-group', label: 'Large Group (6-10)' },
-  { value: 'lot', label: 'Lot (11+)' },
-];
-
-const healthStatusOptions: { value: string; label: string }[] = [
-  { value: 'excellent', label: 'Excellent' },
-  { value: 'good', label: 'Good' },
-  { value: 'fair', label: 'Fair' },
-  { value: 'recovering', label: 'Recovering' },
-];
 
 export function FilterDialog({
   filters,

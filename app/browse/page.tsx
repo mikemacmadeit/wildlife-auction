@@ -21,6 +21,7 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
+import { FilterBottomSheet } from '@/components/navigation/FilterBottomSheet';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Badge } from '@/components/ui/badge';
 import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
@@ -30,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { getSavedSearch } from '@/lib/firebase/savedSearches';
+import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 
@@ -471,10 +473,12 @@ export default function BrowsePage() {
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <FilterDialog
-                filters={filters}
-                onFiltersChange={handleFilterChange}
-              />
+              <div className="md:hidden">
+                <FilterBottomSheet filters={filters} onFiltersChange={handleFilterChange} />
+              </div>
+              <div className="hidden md:block lg:hidden">
+                <FilterDialog filters={filters} onFiltersChange={handleFilterChange} />
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -501,8 +505,17 @@ export default function BrowsePage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
-        {/* Results Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+        <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
+          {/* Desktop filter rail */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-[104px]">
+              <BrowseFiltersSidebar value={filters} onChange={handleFilterChange} onClearAll={clearFilters} />
+            </div>
+          </aside>
+
+          <div>
+            {/* Results Header */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">
               {loading
@@ -605,91 +618,93 @@ export default function BrowsePage() {
               </Button>
             </div>
           </div>
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="py-12">
-            <SkeletonListingGrid count={12} />
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && !loading && (
-          <div className="text-center py-12">
-            <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>Retry</Button>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !error && sortedListings.length === 0 && (
-          <Card className="p-12 text-center">
-            <CardContent>
-              <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mb-2">No listings found</h3>
-              <p className="text-muted-foreground mb-4">
-                {activeFilterCount > 0
-                  ? 'Try adjusting your filters or search query.'
-                  : 'Check back soon for new listings.'}
-              </p>
-              {activeFilterCount > 0 && (
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Listings Grid/List */}
-        {!loading && !error && sortedListings.length > 0 && (
-          <>
-            <div
-              className={cn(
-                viewMode === 'card'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                  : 'space-y-4'
-              )}
-            >
-              <AnimatePresence>
-                {sortedListings.map((listing) =>
-                  viewMode === 'card' ? (
-                    listing.featured ? (
-                      <FeaturedListingCard key={listing.id} listing={listing} />
-                    ) : (
-                      <ListingCard key={listing.id} listing={listing} />
-                    )
-                  ) : (
-                    <ListItem key={listing.id} listing={listing} />
-                  )
-                )}
-              </AnimatePresence>
             </div>
-            
-            {/* Load More Button */}
-            {hasMore && (
-              <div className="flex justify-center mt-8">
-                <Button
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  variant="outline"
-                  size="lg"
-                  className="min-w-[200px]"
-                >
-                  {loadingMore ? (
-                    <>
-                      <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                      Loading...
-                    </>
-                  ) : (
-                    'Load More'
-                  )}
-                </Button>
+
+            {/* Loading State */}
+            {loading && (
+              <div className="py-12">
+                <SkeletonListingGrid count={12} />
               </div>
             )}
-          </>
-        )}
+
+            {/* Error State */}
+            {error && !loading && (
+              <div className="text-center py-12">
+                <p className="text-destructive mb-4">{error}</p>
+                <Button onClick={() => window.location.reload()}>Retry</Button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!loading && !error && sortedListings.length === 0 && (
+              <Card className="p-12 text-center">
+                <CardContent>
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">No listings found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {activeFilterCount > 0
+                      ? 'Try adjusting your filters or search query.'
+                      : 'Check back soon for new listings.'}
+                  </p>
+                  {activeFilterCount > 0 && (
+                    <Button variant="outline" onClick={clearFilters}>
+                      Clear Filters
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Listings Grid/List */}
+            {!loading && !error && sortedListings.length > 0 && (
+              <>
+                <div
+                  className={cn(
+                    viewMode === 'card'
+                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+                      : 'space-y-4'
+                  )}
+                >
+                  <AnimatePresence>
+                    {sortedListings.map((listing) =>
+                      viewMode === 'card' ? (
+                        listing.featured ? (
+                          <FeaturedListingCard key={listing.id} listing={listing} />
+                        ) : (
+                          <ListingCard key={listing.id} listing={listing} />
+                        )
+                      ) : (
+                        <ListItem key={listing.id} listing={listing} />
+                      )
+                    )}
+                  </AnimatePresence>
+                </div>
+                
+                {/* Load More Button */}
+                {hasMore && (
+                  <div className="flex justify-center mt-8">
+                    <Button
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                      variant="outline"
+                      size="lg"
+                      className="min-w-[200px]"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Loading...
+                        </>
+                      ) : (
+                        'Load More'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <BottomNav />

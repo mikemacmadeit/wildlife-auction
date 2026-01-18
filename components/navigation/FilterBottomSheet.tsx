@@ -14,27 +14,18 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { FilterState, ListingCategory, ListingType } from '@/lib/types';
+import { FilterState, ListingType } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import {
+  BROWSE_CATEGORIES as categories,
+  BROWSE_TYPES as types,
+} from '@/components/browse/filters/constants';
 
 interface FilterBottomSheetProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   className?: string;
 }
-
-const categories: { value: ListingCategory; label: string }[] = [
-  { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
-  { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
-  { value: 'cattle_livestock', label: 'Cattle & Livestock' },
-  { value: 'ranch_equipment', label: 'Ranch Equipment' },
-];
-
-const types: { value: ListingType; label: string }[] = [
-  { value: 'auction', label: 'Auction' },
-  { value: 'fixed', label: 'Fixed Price' },
-  { value: 'classified', label: 'Classified' },
-];
 
 export function FilterBottomSheet({
   filters,
