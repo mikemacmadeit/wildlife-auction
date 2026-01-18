@@ -42,6 +42,40 @@ function warnPermissionDeniedOnce(context: string, error: any) {
   );
 }
 
+function isPlainObject(value: any): boolean {
+  if (!value) return false;
+  if (typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Convert Firestore Timestamp values into JS Date recursively.
+ * This prevents runtime crashes when UI code calls `.getTime()` or date-fns on Timestamp-like values.
+ */
+function convertTimestampsDeep<T>(value: T): T {
+  // Timestamp (Firebase client)
+  if (value instanceof Timestamp) {
+    return value.toDate() as any;
+  }
+
+  // Arrays
+  if (Array.isArray(value)) {
+    return value.map((v) => convertTimestampsDeep(v)) as any;
+  }
+
+  // Plain objects only (avoid mutating DocumentReference and other SDK objects)
+  if (isPlainObject(value)) {
+    const out: any = {};
+    for (const [k, v] of Object.entries(value as any)) {
+      out[k] = convertTimestampsDeep(v);
+    }
+    return out;
+  }
+
+  return value;
+}
+
 /**
  * Generic function to get a document by ID
  */
@@ -54,7 +88,8 @@ export const getDocument = async <T = DocumentData>(
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as T;
+      const data = convertTimestampsDeep(docSnap.data());
+      return { id: docSnap.id, ...(data as any) } as T;
     }
     return null;
   } catch (error) {
@@ -78,7 +113,7 @@ export const getDocuments = async <T = DocumentData>(
 
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data(),
+      ...(convertTimestampsDeep(doc.data()) as any),
     })) as T[];
   } catch (error) {
     if (isPermissionDenied(error)) warnPermissionDeniedOnce(`getDocuments(${collectionName})`, error);
