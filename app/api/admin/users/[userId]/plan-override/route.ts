@@ -199,7 +199,7 @@ export async function POST(
       success: true,
       userId,
       planOverride: updateData.adminPlanOverride ?? null,
-      message: 'Exposure tier override updated successfully',
+      message: 'Seller tier override updated successfully',
     });
   } catch (error: any) {
     logError('Error setting plan override', error, {

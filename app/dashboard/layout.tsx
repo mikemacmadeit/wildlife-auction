@@ -31,6 +31,7 @@ import {
   HeartPulse,
   Mail,
   Bell,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -82,6 +83,7 @@ const baseNavItems: DashboardNavItem[] = [
 
 // Admin nav items (only visible to admins)
 const adminNavItems: DashboardNavItem[] = [
+  { href: '/dashboard/admin/users', label: 'Users', icon: Users },
   { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
