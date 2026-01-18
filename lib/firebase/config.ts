@@ -1,7 +1,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAnalytics, Analytics, isSupported } from 'firebase/analytics';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, setLogLevel } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // Firebase configuration - MUST use environment variables (no hardcoded secrets!)
@@ -56,6 +56,17 @@ if (typeof window !== 'undefined') {
       host === 'localhost' ||
       host === '127.0.0.1' ||
       host.endsWith('.localhost');
+
+    // Firestore SDK can emit noisy internal warnings in some versions (e.g. BloomFilterError).
+    // In production, keep logs at "error" to avoid spamming the console while still surfacing real failures.
+    // In local dev, keep the default verbosity to help debugging.
+    if (!isLocal) {
+      try {
+        setLogLevel('error');
+      } catch {
+        // ignore
+      }
+    }
     if (isLocal) {
       // eslint-disable-next-line no-console
       console.log('[firebase] client config', {

@@ -144,7 +144,13 @@ export async function checkStripeAccountStatus(): Promise<{
         console.error('Error details:', errorDetails);
       }
     }
-    throw new Error(errorMessage);
+    const err: any = new Error(errorMessage);
+    if (errorDetails?.code) err.code = errorDetails.code;
+    if (errorDetails?.type) err.type = errorDetails.type;
+    if (errorDetails?.stripe?.code) err.stripeCode = errorDetails.stripe.code;
+    if (errorDetails?.stripe?.type) err.stripeType = errorDetails.stripe.type;
+    if (errorDetails?.stripe?.message) err.stripeMessage = errorDetails.stripe.message;
+    throw err;
   }
 
   return response.json();

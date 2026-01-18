@@ -87,7 +87,48 @@ export async function POST(request: Request) {
     }
 
     // Retrieve account from Stripe to get current status
-    const account = await stripe.accounts.retrieve(stripeAccountId);
+    let account: any;
+    try {
+      account = await stripe.accounts.retrieve(stripeAccountId);
+    } catch (e: any) {
+      // Common production misconfig: STRIPE_SECRET_KEY revoked/invalid.
+      // Stripe throws StripePermissionError with code=account_invalid in this case.
+      const stripeCode = e?.code;
+      const stripeType = e?.type;
+      const msg = e?.message || 'Stripe request failed';
+      const isKeyInvalid =
+        stripeCode === 'account_invalid' ||
+        stripeType === 'StripePermissionError' ||
+        String(msg).toLowerCase().includes('application access may have been revoked');
+
+      if (isKeyInvalid) {
+        return json(
+          {
+            error: 'Stripe configuration error',
+            message:
+              'The platform STRIPE_SECRET_KEY is invalid or has been revoked. Update the key in your hosting environment (Netlify) and redeploy.',
+            code: 'STRIPE_KEY_INVALID',
+            stripe: {
+              code: stripeCode,
+              type: stripeType,
+              message: msg,
+            },
+          },
+          { status: 503 }
+        );
+      }
+
+      // For other Stripe errors, return a 502 instead of a generic 500.
+      return json(
+        {
+          error: 'Failed to check account status',
+          message: msg,
+          code: stripeCode,
+          type: stripeType,
+        },
+        { status: 502 }
+      );
+    }
 
     // Log full account status for debugging
     console.log('=== Stripe Account Status ===');
