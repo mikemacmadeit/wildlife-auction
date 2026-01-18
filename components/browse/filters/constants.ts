@@ -67,3 +67,12 @@ export const BROWSE_HEALTH_STATUS_OPTIONS: { value: string; label: string }[] = 
   { value: 'recovering', label: 'Recovering' },
 ];
 
+// Ranch equipment-specific condition options (stored in `attributes.condition`)
+export const BROWSE_EQUIPMENT_CONDITION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'new', label: 'New' },
+  { value: 'excellent', label: 'Excellent' },
+  { value: 'good', label: 'Good' },
+  { value: 'fair', label: 'Fair' },
+  { value: 'for_parts', label: 'For parts' },
+];
+

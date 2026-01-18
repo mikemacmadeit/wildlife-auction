@@ -13,7 +13,7 @@ import type { FilterState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
   BROWSE_CATEGORIES,
-  BROWSE_HEALTH_STATUS_OPTIONS,
+  BROWSE_EQUIPMENT_CONDITION_OPTIONS,
   BROWSE_QUANTITY_OPTIONS,
   BROWSE_SPECIES,
   BROWSE_STATES,
@@ -268,30 +268,34 @@ export function BrowseFiltersSidebar(props: {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">Health notes include</Label>
+              {value.category === 'ranch_equipment' ? (
                 <div className="space-y-2">
-                  {BROWSE_HEALTH_STATUS_OPTIONS.map((h) => {
-                    const checked = (value.healthStatus || []).includes(h.value);
-                    return (
-                      <div key={h.value} className="flex items-center gap-3 min-h-[36px]">
-                        <Checkbox
-                          id={`health-${h.value}`}
-                          checked={checked}
-                          onCheckedChange={(next) => {
-                            const cur = value.healthStatus || [];
-                            const nextArr = next ? Array.from(new Set([...cur, h.value])) : cur.filter((x) => x !== h.value);
-                            onChange({ ...value, healthStatus: nextArr.length ? nextArr : undefined });
-                          }}
-                        />
-                        <Label htmlFor={`health-${h.value}`} className="text-sm font-normal cursor-pointer flex-1">
-                          {h.label}
-                        </Label>
-                      </div>
-                    );
-                  })}
+                  <Label className="text-xs font-semibold text-muted-foreground">Condition</Label>
+                  <div className="space-y-2">
+                    {BROWSE_EQUIPMENT_CONDITION_OPTIONS.map((h) => {
+                      const checked = (value.healthStatus || []).includes(h.value);
+                      return (
+                        <div key={h.value} className="flex items-center gap-3 min-h-[36px]">
+                          <Checkbox
+                            id={`condition-${h.value}`}
+                            checked={checked}
+                            onCheckedChange={(next) => {
+                              const cur = value.healthStatus || [];
+                              const nextArr = next
+                                ? Array.from(new Set([...cur, h.value]))
+                                : cur.filter((x) => x !== h.value);
+                              onChange({ ...value, healthStatus: nextArr.length ? nextArr : undefined });
+                            }}
+                          />
+                          <Label htmlFor={`condition-${h.value}`} className="text-sm font-normal cursor-pointer flex-1">
+                            {h.label}
+                          </Label>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           </AccordionContent>
         </AccordionItem>

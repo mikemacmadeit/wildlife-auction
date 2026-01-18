@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { getSavedSearch } from '@/lib/firebase/savedSearches';
 import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
-import { BROWSE_HEALTH_STATUS_OPTIONS, BROWSE_STATES } from '@/components/browse/filters/constants';
+import { BROWSE_EQUIPMENT_CONDITION_OPTIONS, BROWSE_STATES } from '@/components/browse/filters/constants';
 import { buildSavedSearchKeys, upsertSavedSearch } from '@/lib/firebase/savedSearches';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
@@ -315,6 +315,15 @@ export default function BrowsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType, filters, sortBy, listingStatus]);
 
+  // Animals don't use "condition" on Browse; only Ranch Equipment does.
+  // If the user switches away from Ranch Equipment, clear any stale condition selection so results don't look broken.
+  useEffect(() => {
+    if (filters.category === 'ranch_equipment') return;
+    if (!filters.healthStatus || filters.healthStatus.length === 0) return;
+    setFilters((p) => ({ ...(p || {}), healthStatus: undefined }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.category]);
+
   // Client-side filtering for fields not supported by Firestore
   // (Full-text search, city-level location, metadata fields, etc.)
   const filteredListings = useMemo(() => {
@@ -400,13 +409,18 @@ export default function BrowsePage() {
       });
     }
 
-    // Health status filter (client-side - attributes not indexed)
+    // Condition / health status filter (client-side - attributes not indexed)
     if (filters.healthStatus && filters.healthStatus.length > 0) {
       result = result.filter((listing) =>
         filters.healthStatus!.some((status) => {
           if (listing.attributes) {
             const attrs = listing.attributes as any;
-            return attrs.healthNotes?.toLowerCase().includes(status.toLowerCase());
+            // Ranch equipment uses `attributes.condition` (enum).
+            if (listing.category === 'ranch_equipment') {
+              return String(attrs.condition || '').toLowerCase() === String(status || '').toLowerCase();
+            }
+            // Animals: legacy "health notes include" matching (but UI no longer exposes this on Browse).
+            return attrs.healthNotes?.toLowerCase().includes(String(status).toLowerCase());
           }
           return false;
         })
@@ -707,7 +721,7 @@ export default function BrowsePage() {
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* eBay-ish toolbar: Status, Condition, Location, Sort, View */}
+            {/* eBay-ish toolbar: Status, (Condition for equipment), Location, Sort, View */}
             <Select value={listingStatus} onValueChange={(v) => setListingStatus(v as any)}>
               <SelectTrigger className="w-[150px] min-h-[48px]">
                 <SelectValue placeholder="Status" />
@@ -719,22 +733,24 @@ export default function BrowsePage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={(filters.healthStatus && filters.healthStatus.length ? filters.healthStatus[0] : '__any__') as any}
-              onValueChange={(v) => setFilters((p) => ({ ...p, healthStatus: v === '__any__' ? undefined : [v] }))}
-            >
-              <SelectTrigger className="w-[170px] min-h-[48px]">
-                <SelectValue placeholder="Condition" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__any__">Condition</SelectItem>
-                {BROWSE_HEALTH_STATUS_OPTIONS.map((h) => (
-                  <SelectItem key={h.value} value={h.value}>
-                    {h.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {filters.category === 'ranch_equipment' ? (
+              <Select
+                value={(filters.healthStatus && filters.healthStatus.length ? filters.healthStatus[0] : '__any__') as any}
+                onValueChange={(v) => setFilters((p) => ({ ...p, healthStatus: v === '__any__' ? undefined : [v] }))}
+              >
+                <SelectTrigger className="w-[170px] min-h-[48px]">
+                  <SelectValue placeholder="Condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__any__">Condition</SelectItem>
+                  {BROWSE_EQUIPMENT_CONDITION_OPTIONS.map((h) => (
+                    <SelectItem key={h.value} value={h.value}>
+                      {h.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
 
             <Select
               value={filters.location?.state || '__any__'}

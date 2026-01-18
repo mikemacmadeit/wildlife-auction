@@ -31,7 +31,7 @@ import {
   BROWSE_SPECIES as species,
   BROWSE_STATES as states,
   BROWSE_QUANTITY_OPTIONS as quantityOptions,
-  BROWSE_HEALTH_STATUS_OPTIONS as healthStatusOptions,
+  BROWSE_EQUIPMENT_CONDITION_OPTIONS as equipmentConditionOptions,
 } from '@/components/browse/filters/constants';
 
 interface FilterDialogProps {
@@ -103,6 +103,8 @@ export function FilterDialog({
     localFilters.category === 'wildlife_exotics' ||
     localFilters.category === 'whitetail_breeder';
 
+  const showConditionFilter = localFilters.category === 'ranch_equipment';
+
   // Count active filters
   const activeFilterCount = 
     (filters.category ? 1 : 0) +
@@ -113,7 +115,7 @@ export function FilterDialog({
     (filters.maxPrice ? 1 : 0) +
     (filters.species?.length || 0) +
     (filters.quantity ? 1 : 0) +
-    (filters.healthStatus?.length || 0) +
+    (filters.category === 'ranch_equipment' ? (filters.healthStatus?.length || 0) : 0) +
     (filters.papers ? 1 : 0) +
     (filters.verifiedSeller ? 1 : 0) +
     (filters.transportReady ? 1 : 0) +
@@ -419,27 +421,26 @@ export function FilterDialog({
 
           <Separator />
 
-          {/* Health Status */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Health Status</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {healthStatusOptions.map((status) => (
-                <div key={status.value} className="flex items-center space-x-3 min-h-[44px]">
-                  <Checkbox
-                    id={`health-${status.value}`}
-                    checked={localFilters.healthStatus?.includes(status.value) || false}
-                    onCheckedChange={(checked) => handleHealthStatusChange(status.value, checked as boolean)}
-                  />
-                  <Label
-                    htmlFor={`health-${status.value}`}
-                    className="text-sm font-normal cursor-pointer flex-1"
-                  >
-                    {status.label}
-                  </Label>
-                </div>
-              ))}
+          {/* Condition (Ranch equipment only) */}
+          {localFilters.category === 'ranch_equipment' ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Condition</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {equipmentConditionOptions.map((status) => (
+                  <div key={status.value} className="flex items-center space-x-3 min-h-[44px]">
+                    <Checkbox
+                      id={`condition-${status.value}`}
+                      checked={localFilters.healthStatus?.includes(status.value) || false}
+                      onCheckedChange={(checked) => handleHealthStatusChange(status.value, checked as boolean)}
+                    />
+                    <Label htmlFor={`condition-${status.value}`} className="text-sm font-normal cursor-pointer flex-1">
+                      {status.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <Separator />
 
