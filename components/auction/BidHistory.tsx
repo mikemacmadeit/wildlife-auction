@@ -21,6 +21,28 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const toDateSafe = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d;
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    return null;
+  };
+
   // Subscribe to real-time bids
   useEffect(() => {
     if (!listingId) {
@@ -100,7 +122,8 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
       <CardContent className="space-y-3">
         {sortedBids.map((bid, index) => {
           const isHighestBid = index === 0 && bid.amount === currentBid;
-          const isRecent = Date.now() - bid.timestamp.getTime() < 10 * 60 * 1000; // Within last 10 minutes
+          const bidDate = toDateSafe((bid as any).timestamp);
+          const isRecent = bidDate ? Date.now() - bidDate.getTime() < 10 * 60 * 1000 : false; // Within last 10 minutes
 
           return (
             <motion.div
@@ -148,7 +171,7 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                     <Clock className="h-3 w-3" />
-                    <span>{formatDistanceToNow(bid.timestamp, { addSuffix: true })}</span>
+                    <span>{bidDate ? formatDistanceToNow(bidDate, { addSuffix: true }) : '—'}</span>
                   </div>
                 </div>
               </div>
