@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Loader2, Bell, Mail, Smartphone, ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
   const { embedded = false } = props;
@@ -25,11 +26,30 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
   const [pushEnabling, setPushEnabling] = useState(false);
 
   const [prefs, setPrefs] = useState(() => getDefaultNotificationPreferences());
+  const [savedPrefs, setSavedPrefs] = useState(() => getDefaultNotificationPreferences());
+  const [savedAtMs, setSavedAtMs] = useState<number | null>(null);
 
   const ref = useMemo(() => {
     if (!user?.uid) return null;
     return doc(db, 'users', user.uid, 'notificationPreferences', 'default');
   }, [user?.uid]);
+
+  const toMillisSafe = (value: any): number | null => {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d.getTime();
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') return value.seconds * 1000;
+    return null;
+  };
+
+  const dirty = useMemo(() => JSON.stringify(prefs) !== JSON.stringify(savedPrefs), [prefs, savedPrefs]);
 
   useEffect(() => {
     const load = async () => {
@@ -42,12 +62,22 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
         setLoading(true);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          setPrefs(notificationPreferencesSchema.parse(snap.data() || {}));
+          const data = snap.data() || {};
+          const parsed = notificationPreferencesSchema.parse(data);
+          setPrefs(parsed);
+          setSavedPrefs(parsed);
+          setSavedAtMs(toMillisSafe((data as any).updatedAt));
         } else {
-          setPrefs(getDefaultNotificationPreferences());
+          const next = getDefaultNotificationPreferences();
+          setPrefs(next);
+          setSavedPrefs(next);
+          setSavedAtMs(null);
         }
       } catch {
-        setPrefs(getDefaultNotificationPreferences());
+        const next = getDefaultNotificationPreferences();
+        setPrefs(next);
+        setSavedPrefs(next);
+        setSavedAtMs(null);
       } finally {
         setLoading(false);
       }
@@ -61,7 +91,10 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
     try {
       const parsed = notificationPreferencesSchema.parse(prefs);
       await setDoc(ref, { ...parsed, updatedAt: serverTimestamp() }, { merge: true });
+      setSavedPrefs(parsed);
       toast({ title: 'Saved', description: 'Notification settings updated.' });
+      // Optimistic local "saved at" (serverTimestamp will be authoritative on next load)
+      setSavedAtMs(Date.now());
     } catch (e: any) {
       toast({ title: 'Save failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
@@ -69,20 +102,22 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
     }
   };
 
-  const enablePush = async () => {
-    if (!user) return;
+  const enablePush = async (): Promise<boolean> => {
+    if (!user) return false;
     setPushEnabling(true);
     try {
       const token = await user.getIdToken();
       const res = await enablePushForCurrentDevice({ idToken: token, platform: 'web' });
       if (!res.ok) {
         toast({ title: 'Push not enabled', description: res.error || 'Failed to enable push.', variant: 'destructive' });
-        return;
+        return false;
       }
       toast({ title: 'Push enabled', description: 'This device can now receive push notifications.' });
       setPrefs((p) => ({ ...p, channels: { ...p.channels, push: true } }));
+      return true;
     } catch (e: any) {
       toast({ title: 'Push not enabled', description: e?.message || 'Failed to enable push.', variant: 'destructive' });
+      return false;
     } finally {
       setPushEnabling(false);
     }
@@ -131,11 +166,11 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
         </div>
       ) : null}
 
-      <Card className="border-border/60">
+      <Card className={cn(embedded ? 'border-2 border-border/50 bg-card' : 'border-border/60')}>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            Delivery rules
+            Delivery & schedule
           </CardTitle>
           <CardDescription>Channels and quiet hours apply across all notification types.</CardDescription>
         </CardHeader>
@@ -188,50 +223,57 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
             </div>
             <div className="space-y-2">
               <Label>Channels</Label>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Email</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 p-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">Email</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Recommended for order updates and messages.</div>
                   </div>
                   <Switch
                     checked={prefs.channels.email}
                     onCheckedChange={(v) => setPrefs((p) => ({ ...p, channels: { ...p.channels, email: v } }))}
                   />
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Push</span>
+
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 p-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">Push</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Fastest alerts. Requires browser permission.</div>
                   </div>
                   <Switch
                     checked={prefs.channels.push}
-                    onCheckedChange={(v) => setPrefs((p) => ({ ...p, channels: { ...p.channels, push: v } }))}
+                    disabled={pushEnabling}
+                    onCheckedChange={async (v) => {
+                      if (!v) {
+                        setPrefs((p) => ({ ...p, channels: { ...p.channels, push: false } }));
+                        return;
+                      }
+                      const ok = await enablePush();
+                      if (!ok) {
+                        setPrefs((p) => ({ ...p, channels: { ...p.channels, push: false } }));
+                      }
+                    }}
                   />
                 </div>
-                <Button variant="outline" onClick={enablePush} disabled={pushEnabling}>
-                  {pushEnabling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Enable push on this device
-                </Button>
+
                 <p className="text-xs text-muted-foreground">
-                  Push requires browser permission. If enabled, we’ll send auction signals faster than email.
+                  Tip: If your browser blocks notifications, enable them in browser settings and toggle Push back on.
                 </p>
               </div>
             </div>
           </div>
 
           <Separator />
-
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Save settings
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
-      <Card className="border-border/60">
+      <Card className={cn(embedded ? 'border-2 border-border/50 bg-card' : 'border-border/60')}>
         <CardHeader>
           <CardTitle className="text-base">Categories</CardTitle>
           <CardDescription>Fine-grained controls per category (marketing is opt-in only).</CardDescription>
@@ -246,8 +288,8 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
               ['endingSoon', 'Ending soon (24h/1h/10m/2m)'],
               ['wonLost', 'Won / Lost'],
             ].map(([key, label]) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{label}</span>
+              <div key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
+                <span className="text-sm font-medium text-foreground">{label}</span>
                 <Switch
                   checked={(prefs.categories.auctions as any)[key] === true}
                   onCheckedChange={(v) =>
@@ -268,8 +310,8 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
               ['deliveryCheckIn', 'Delivery check-in reminders'],
               ['payoutReleased', 'Payout released'],
             ].map(([key, label]) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{label}</span>
+              <div key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
+                <span className="text-sm font-medium text-foreground">{label}</span>
                 <Switch
                   checked={(prefs.categories.orders as any)[key] === true}
                   onCheckedChange={(v) =>
@@ -284,8 +326,8 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
 
           <div className="space-y-3">
             <div className="text-sm font-semibold">Messages</div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">New message received</span>
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
+              <span className="text-sm font-medium text-foreground">New message received</span>
               <Switch
                 checked={prefs.categories.messages.messageReceived === true}
                 onCheckedChange={(v) =>
@@ -303,8 +345,8 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
               ['weeklyDigest', 'Weekly digest'],
               ['savedSearchAlerts', 'Saved search alerts'],
             ].map(([key, label]) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{label}</span>
+              <div key={key} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
+                <span className="text-sm font-medium text-foreground">{label}</span>
                 <Switch
                   checked={(prefs.categories.marketing as any)[key] === true}
                   onCheckedChange={(v) =>
@@ -320,11 +362,27 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
 
           <Separator />
 
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Save settings
-            </Button>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs text-muted-foreground">
+              {dirty ? 'You have unsaved changes.' : savedAtMs ? `Saved.` : 'No changes yet.'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving || pushEnabling || !dirty}
+                onClick={() => {
+                  setPrefs(savedPrefs);
+                  toast({ title: 'Reverted', description: 'Changes discarded.' });
+                }}
+              >
+                Discard changes
+              </Button>
+              <Button onClick={save} disabled={saving || pushEnabling || !dirty}>
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save changes
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
