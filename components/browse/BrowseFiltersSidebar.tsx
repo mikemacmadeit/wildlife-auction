@@ -113,11 +113,12 @@ export function BrowseFiltersSidebar(props: {
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground">State</Label>
               <Select
-                value={value.location?.state || ''}
+                value={value.location?.state || '__any__'}
                 onValueChange={(s) => {
+                  const nextState = s === '__any__' ? undefined : s;
                   onChange({
                     ...value,
-                    location: { ...(value.location || {}), state: s || undefined },
+                    location: { ...(value.location || {}), state: nextState },
                   });
                 }}
               >
@@ -125,7 +126,7 @@ export function BrowseFiltersSidebar(props: {
                   <SelectValue placeholder="Any state" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="__any__">Any</SelectItem>
                   {BROWSE_STATES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
@@ -250,14 +251,14 @@ export function BrowseFiltersSidebar(props: {
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-muted-foreground">Quantity</Label>
                 <Select
-                  value={value.quantity || ''}
-                  onValueChange={(q) => onChange({ ...value, quantity: (q || undefined) as any })}
+                  value={value.quantity || '__any__'}
+                  onValueChange={(q) => onChange({ ...value, quantity: (q === '__any__' ? undefined : q) as any })}
                 >
                   <SelectTrigger className="min-h-[44px]">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Any</SelectItem>
+                    <SelectItem value="__any__">Any</SelectItem>
                     {BROWSE_QUANTITY_OPTIONS.map((q) => (
                       <SelectItem key={q.value} value={q.value}>
                         {q.label}
