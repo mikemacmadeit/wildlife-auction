@@ -11,6 +11,7 @@ import { MessageThreadComponent } from '@/components/messaging/MessageThread';
 import { getOrCreateThread, getUserThreads } from '@/lib/firebase/messages';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
+import { markNotificationsAsReadByType } from '@/lib/firebase/notifications';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { MessageThread, Listing } from '@/lib/types';
@@ -168,6 +169,8 @@ export default function MessagesPage() {
     if (!t) return;
 
     setThread(t);
+    // Clear message notification badge when viewing messages (best-effort).
+    markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
     const meta = metaByThreadId[selectedThreadId];
     setOtherPartyName(meta?.sellerName || 'Seller');
     setOrderStatus(undefined);

@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getUserThreads } from '@/lib/firebase/messages';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
+import { markNotificationsAsReadByType } from '@/lib/firebase/notifications';
 import type { Listing, MessageThread } from '@/lib/types';
 import { MessageThreadComponent } from '@/components/messaging/MessageThread';
 
@@ -112,6 +113,10 @@ export default function SellerMessagesPage() {
       }
 
       setThread(t);
+
+      // Clear message notification badge when viewing messages (best-effort).
+      // This is intentionally coarse (all message_received) so the sidebar badge is reliable.
+      markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
 
       try {
         const [listingData, buyerProfile] = await Promise.all([

@@ -79,19 +79,20 @@ export async function markNotificationAsRead(userId: string, notificationId: str
  */
 export async function markAllNotificationsAsRead(userId: string): Promise<void> {
   const notificationsRef = collection(db, 'users', userId, 'notifications');
-  const unreadQuery = query(
-    notificationsRef,
-    where('read', '==', false)
-  );
-  
-  const snapshot = await getDocs(unreadQuery);
-  const batch = snapshot.docs.map(docSnap => 
-    updateDoc(docSnap.ref, {
-      read: true,
-      readAt: serverTimestamp(),
-    })
-  );
-  
+
+  // Backward compatible: some older notification docs may not have `read` set.
+  // We consider `read !== true` as unread and mark them read.
+  const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(250));
+  const snapshot = await getDocs(q);
+  const batch = snapshot.docs
+    .filter((docSnap) => (docSnap.data() as any)?.read !== true)
+    .map((docSnap) =>
+      updateDoc(docSnap.ref, {
+        read: true,
+        readAt: serverTimestamp(),
+      })
+    );
+
   await Promise.all(batch);
 }
 
@@ -126,13 +127,9 @@ export async function getUserNotifications(
  */
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
   const notificationsRef = collection(db, 'users', userId, 'notifications');
-  const unreadQuery = query(
-    notificationsRef,
-    where('read', '==', false)
-  );
-  
-  const snapshot = await getDocs(unreadQuery);
-  return snapshot.size;
+  const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(250));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.filter((d) => (d.data() as any)?.read !== true).length;
 }
 
 /**
@@ -172,15 +169,17 @@ export function subscribeToUnreadCount(
   callback: (count: number) => void
 ): Unsubscribe {
   const notificationsRef = collection(db, 'users', userId, 'notifications');
-  const unreadQuery = query(
-    notificationsRef,
-    where('read', '==', false)
-  );
+
+  // IMPORTANT: We intentionally do NOT query `where('read','==',false)` here.
+  // Some historical notification docs may be missing `read`, which would make the unread badge incorrect.
+  // Instead, we subscribe to the recent feed and count `read !== true` client-side.
+  const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(250));
 
   return onSnapshot(
-    unreadQuery,
+    q,
     (snapshot) => {
-      callback(snapshot.size);
+      const unread = snapshot.docs.filter((d) => (d.data() as any)?.read !== true).length;
+      callback(unread);
     },
     (error) => {
       handleListenerError('subscribeToUnreadCount', error, callback);
@@ -198,16 +197,15 @@ export function subscribeToUnreadCountByType(
   callback: (count: number) => void
 ): Unsubscribe {
   const notificationsRef = collection(db, 'users', userId, 'notifications');
-  const unreadQuery = query(
-    notificationsRef,
-    where('type', '==', type),
-    where('read', '==', false)
-  );
+
+  // Same as subscribeToUnreadCount: we count `read !== true` for migration-safety.
+  const q = query(notificationsRef, where('type', '==', type), limit(250));
 
   return onSnapshot(
-    unreadQuery,
+    q,
     (snapshot) => {
-      callback(snapshot.size);
+      const unread = snapshot.docs.filter((d) => (d.data() as any)?.read !== true).length;
+      callback(unread);
     },
     (error) => {
       handleListenerError('subscribeToUnreadCountByType', error, callback);
@@ -224,19 +222,18 @@ export async function markNotificationsAsReadByType(
   type: NotificationType
 ): Promise<void> {
   const notificationsRef = collection(db, 'users', userId, 'notifications');
-  const unreadQuery = query(
-    notificationsRef,
-    where('type', '==', type),
-    where('read', '==', false)
-  );
 
-  const snapshot = await getDocs(unreadQuery);
-  const batch = snapshot.docs.map((docSnap) =>
-    updateDoc(docSnap.ref, {
-      read: true,
-      readAt: serverTimestamp(),
-    })
-  );
+  // Backward compatible: older docs may not have `read` set.
+  const q = query(notificationsRef, where('type', '==', type), limit(250));
+  const snapshot = await getDocs(q);
+  const batch = snapshot.docs
+    .filter((docSnap) => (docSnap.data() as any)?.read !== true)
+    .map((docSnap) =>
+      updateDoc(docSnap.ref, {
+        read: true,
+        readAt: serverTimestamp(),
+      })
+    );
 
   await Promise.all(batch);
 }
