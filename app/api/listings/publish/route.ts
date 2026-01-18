@@ -293,7 +293,9 @@ export async function POST(request: Request) {
 
     // Check if listing is already active
     if (listingData.status === 'active') {
-      return json({ error: 'Listing is already active' }, { status: 400 });
+      // Idempotency: treat publish as a no-op if it's already active.
+      // This prevents "autosave restored an old listingId" from hard-failing the seller flow.
+      return json({ ok: true, alreadyActive: true }, { status: 200 });
     }
 
     // Defensive compliance validation (server-side)

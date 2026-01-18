@@ -1013,9 +1013,12 @@ export const queryListingsForBrowse = async (
       // Fallback for missing composite index (common during rollout / index build).
       if (error?.code === 'failed-precondition' || String(error?.message || '').includes('requires an index')) {
         console.warn('[queryListingsForBrowse] Missing index; using fallback ordering', error);
-        // Remove all orderBy constraints and apply a safe default.
-        const fallback = constraints.filter((c: any) => (c as any)?.type !== 'orderBy');
-        fallback.push(orderBy('createdAt', 'desc'));
+        // IMPORTANT: do NOT add another orderBy here; that often still requires the same composite index.
+        // Instead, run a where-only query (plus limit) and rely on client-side sorting already present below.
+        const fallback = constraints.filter((c: any) => {
+          const t = (c as any)?.type;
+          return !['orderBy', 'startAfter', 'startAt', 'endAt', 'endBefore', 'limitToLast'].includes(t);
+        });
         const qFallback = query(collection(db, 'listings'), ...fallback);
         querySnapshot = await getDocs(qFallback);
       } else {

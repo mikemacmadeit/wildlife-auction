@@ -34,6 +34,8 @@ import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { cn } from '@/lib/utils';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 // Seller Tiers model: no listing limits.
 
 function NewListingPageContent() {
@@ -1721,6 +1723,22 @@ function NewListingPageContent() {
 
       // Use existing draft listing ID if available, otherwise create new
       let finalListingId = listingId;
+      if (finalListingId) {
+        // Guard: autosave may have restored a listingId that was already published.
+        // In "new listing" flow, we must NOT update an active listing.
+        try {
+          const snap = await getDoc(doc(db, 'listings', finalListingId));
+          const status = snap.exists() ? String((snap.data() as any)?.status || '') : '';
+          if (status && status !== 'draft' && status !== 'pending') {
+            // Treat as stale; create a new draft instead.
+            finalListingId = null;
+          }
+        } catch {
+          // If we can't verify, fail safe by creating a new draft.
+          finalListingId = null;
+        }
+      }
+
       if (!finalListingId) {
         finalListingId = await createListingDraft(user.uid, listingData);
       } else {
@@ -1744,11 +1762,15 @@ function NewListingPageContent() {
           title: 'Submitted for approval',
           description: 'Your listing is in the review queue.',
         });
+        // Clear local autosave so a newly-submitted listing isn't restored as a "new listing" later.
+        clearAutosave();
       } else {
         toast({
           title: 'Listing created successfully!',
           description: 'Your listing has been published and is now live.',
         });
+        // Clear local autosave so a published listing isn't restored as a "new listing" later.
+        clearAutosave();
         // Redirect to seller listings dashboard so they can see their new listing
         router.push('/seller/listings');
       }
@@ -1885,6 +1907,19 @@ function NewListingPageContent() {
       }
 
       let draftId = listingId;
+      if (draftId) {
+        // Guard: don't "save draft" onto an already-active listing restored from autosave.
+        try {
+          const snap = await getDoc(doc(db, 'listings', draftId));
+          const status = snap.exists() ? String((snap.data() as any)?.status || '') : '';
+          if (status && status !== 'draft' && status !== 'pending') {
+            draftId = null;
+          }
+        } catch {
+          draftId = null;
+        }
+      }
+
       if (!draftId) {
         draftId = await createListingDraft(user.uid, listingData);
         setListingId(draftId);
@@ -1977,11 +2012,32 @@ function NewListingPageContent() {
             </Button>
             <Button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const p = resumeDraftPayload;
                 if (p?.formData) setFormData(p.formData);
                 if (typeof p?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(p.sellerAttestationAccepted);
-                if (typeof p?.listingId === 'string' && p.listingId.trim()) setListingId(p.listingId.trim());
+                if (typeof p?.listingId === 'string' && p.listingId.trim()) {
+                  const id = p.listingId.trim();
+                  // If the saved listingId is already active, don't try to publish it again from the "new listing" flow.
+                  try {
+                    const snap = await getDoc(doc(db, 'listings', id));
+                    const status = snap.exists() ? String((snap.data() as any)?.status || '') : '';
+                    if (status === 'active') {
+                      toast({
+                        title: 'That listing is already live',
+                        description: 'Opening it in your listings so you can edit if needed.',
+                      });
+                      clearAutosave();
+                      setResumeDraftOpen(false);
+                      restoredOnceRef.current = true;
+                      router.push(`/seller/listings/${id}/edit`);
+                      return;
+                    }
+                  } catch {
+                    // ignore and fall through
+                  }
+                  setListingId(id);
+                }
                 if (typeof p?.savedAtMs === 'number') setAutoSaveState({ status: 'saved', lastSavedAtMs: p.savedAtMs });
                 setResumeDraftOpen(false);
                 restoredOnceRef.current = true;
