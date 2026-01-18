@@ -202,8 +202,9 @@ export async function handleCheckoutSessionCompleted(
         .get();
       
       if (!buyerState || buyerState !== 'TX') {
-        if (isBankRails) {
-          logWarn('TX-only violation detected for async bank rails (will be handled on async_payment_succeeded)', {
+        // For ANY async flow (e.g., ACH), do NOT attempt refunds here; funds may not be received yet.
+        if (isAsync) {
+          logWarn('TX-only violation detected for async payment (will be handled when payment is confirmed)', {
             requestId,
             route: '/api/stripe/webhook',
             listingId,

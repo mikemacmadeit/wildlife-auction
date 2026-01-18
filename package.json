@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "set NODE_ENV=development&& next dev -p 3000",
     "dev:3001": "next dev -p 3001",
+    "prebuild": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

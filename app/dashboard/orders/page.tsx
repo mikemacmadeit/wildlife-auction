@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,9 +31,16 @@ interface OrderWithListing extends Order {
   listingType?: string;
 }
 
+type CheckoutReturnBanner =
+  | { tone: 'success'; title: string; body: string }
+  | { tone: 'info'; title: string; body: string }
+  | { tone: 'warning'; title: string; body: string };
+
 export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<OrderWithListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +48,112 @@ export default function OrdersPage() {
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeNotes, setDisputeNotes] = useState('');
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [checkoutBanner, setCheckoutBanner] = useState<CheckoutReturnBanner | null>(null);
+
+  // Stripe checkout redirect safety: verify session_id via server endpoint (never crash page).
+  // Also: clean URL after showing the banner once (persist banner through the replace).
+  useEffect(() => {
+    if (!searchParams) return;
+    const sessionId = (searchParams.get('session_id') || '').trim();
+    const storageKey = 'we:checkout-return-banner:v1';
+
+    // If we've already cleaned the URL, resurrect the banner for a short time.
+    if (!sessionId) {
+      try {
+        const raw = sessionStorage.getItem(storageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as any;
+        if (!parsed?.banner || typeof parsed?.ts !== 'number') return;
+        const ageMs = Date.now() - parsed.ts;
+        if (ageMs > 60_000) {
+          sessionStorage.removeItem(storageKey);
+          return;
+        }
+        setCheckoutBanner(parsed.banner as CheckoutReturnBanner);
+        sessionStorage.removeItem(storageKey);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    let cancelled = false;
+    async function run() {
+      try {
+        const res = await fetch(`/api/stripe/checkout/verify-session?session_id=${encodeURIComponent(sessionId)}`, {
+          method: 'GET',
+          headers: { 'content-type': 'application/json' },
+        });
+        const data = await res.json().catch(() => ({} as any));
+
+        let banner: CheckoutReturnBanner;
+        if (res.status === 400) {
+          banner = {
+            tone: 'warning',
+            title: 'Checkout verification failed',
+            body: 'The redirect contained an invalid session reference. You can safely refresh and your orders will load normally.',
+          };
+        } else if (data?.ok === true) {
+          const paymentStatus = String(data?.session?.payment_status || '');
+          const isProcessing = data?.isProcessing === true || paymentStatus === 'unpaid';
+          banner = isProcessing
+            ? {
+                tone: 'info',
+                title: 'Bank payment processing',
+                body: 'Your bank payment is processing. Your order may take a little time to confirm. Check back shortly.',
+              }
+            : {
+                tone: 'success',
+                title: 'Payment confirmed',
+                body: 'Payment confirmed. Your order will appear below shortly.',
+              };
+        } else {
+          const reason = String(data?.reason || '');
+          banner =
+            reason === 'mode_mismatch'
+              ? {
+                  tone: 'warning',
+                  title: 'Checkout environment mismatch',
+                  body: 'We could not verify this checkout session (test vs live mismatch). If needed, retry the purchase in the correct environment.',
+                }
+              : {
+                  tone: 'warning',
+                  title: 'Couldn’t verify checkout session',
+                  body: 'We could not verify this checkout session. Your orders will still load normally. If the payment succeeded, it will appear shortly.',
+                };
+        }
+
+        if (cancelled) return;
+        setCheckoutBanner(banner);
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({ ts: Date.now(), banner }));
+        } catch {
+          // ignore
+        }
+      } catch {
+        if (cancelled) return;
+        const banner: CheckoutReturnBanner = {
+          tone: 'warning',
+          title: 'Checkout verification unavailable',
+          body: 'We could not verify your checkout session right now. Your orders will still load normally.',
+        };
+        setCheckoutBanner(banner);
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({ ts: Date.now(), banner }));
+        } catch {
+          // ignore
+        }
+      } finally {
+        // Clean URL after we’ve captured a banner state.
+        if (!cancelled) router.replace('/dashboard/orders');
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, searchParams]);
 
   // Fetch orders when user is loaded
   useEffect(() => {
@@ -307,6 +421,23 @@ export default function OrdersPage() {
           <h1 className="text-2xl md:text-3xl font-bold mb-2">My Purchases</h1>
           <p className="text-muted-foreground">View your purchase history</p>
         </div>
+
+        {checkoutBanner ? (
+          <Card
+            className={
+              checkoutBanner.tone === 'success'
+                ? 'border-green-500/30 bg-green-500/5'
+                : checkoutBanner.tone === 'info'
+                  ? 'border-blue-500/30 bg-blue-500/5'
+                  : 'border-orange-500/30 bg-orange-500/5'
+            }
+          >
+            <CardContent className="p-4">
+              <div className="font-semibold">{checkoutBanner.title}</div>
+              <div className="text-sm text-muted-foreground mt-1">{checkoutBanner.body}</div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Unified: Polished order tiles (timeline always visible) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-tour="orders-list">
