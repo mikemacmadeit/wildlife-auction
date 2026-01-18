@@ -111,6 +111,7 @@ export default function SellerLayout({
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
+  const [navPrefsLoaded, setNavPrefsLoaded] = useState(false);
 
   useEffect(() => {
     // Reset when user changes
@@ -136,11 +137,14 @@ export default function SellerLayout({
     } catch {
       // ignore
     }
+    // Mark loaded so we don't overwrite saved prefs with defaults on first admin render.
+    setNavPrefsLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAdminNav]);
 
   useEffect(() => {
     if (!showAdminNav) return;
+    if (!navPrefsLoaded) return;
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem('we:nav:v1:seller:user_open', userNavOpen ? '1' : '0');
@@ -148,7 +152,7 @@ export default function SellerLayout({
     } catch {
       // ignore
     }
-  }, [showAdminNav, userNavOpen, adminNavOpen]);
+  }, [showAdminNav, navPrefsLoaded, userNavOpen, adminNavOpen]);
 
   const baseNavWithBadges = useMemo(() => {
     return baseNavItems.map((item) => {

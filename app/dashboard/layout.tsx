@@ -111,6 +111,7 @@ export default function DashboardLayout({
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
+  const [navPrefsLoaded, setNavPrefsLoaded] = useState(false);
 
   // IMPORTANT: Don't gate admin nav rendering on adminLoading/authLoading.
   // We only show admin items once isAdmin flips true, and we keep them visible thereafter.
@@ -230,12 +231,15 @@ export default function DashboardLayout({
     } catch {
       // ignore
     }
+    // Mark loaded so we don't overwrite saved prefs with defaults on first admin render.
+    setNavPrefsLoaded(true);
     // only run when admin nav becomes available
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAdminNav]);
 
   useEffect(() => {
     if (!showAdminNav) return;
+    if (!navPrefsLoaded) return;
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem('we:nav:v1:dashboard:user_open', userNavOpen ? '1' : '0');
@@ -243,7 +247,7 @@ export default function DashboardLayout({
     } catch {
       // ignore
     }
-  }, [showAdminNav, userNavOpen, adminNavOpen]);
+  }, [showAdminNav, navPrefsLoaded, userNavOpen, adminNavOpen]);
 
   const isActive = useCallback(
     (href: string) => {
