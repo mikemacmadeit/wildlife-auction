@@ -33,6 +33,7 @@ import { Separator } from '@/components/ui/separator';
 import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
+import { cn } from '@/lib/utils';
 // Exposure Plans model: no listing limits.
 
 function NewListingPageContent() {
@@ -107,6 +108,7 @@ function NewListingPageContent() {
   const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [payoutsGateOpen, setPayoutsGateOpen] = useState(false);
+  const [validationAttempted, setValidationAttempted] = useState<Record<string, boolean>>({});
 
   // Autosave: local (always) + server (only once we have a draftId).
   const [autoSaveState, setAutoSaveState] = useState<{
@@ -343,6 +345,14 @@ function NewListingPageContent() {
       description: 'Choose what you\'re listing',
       content: (
         <div className="space-y-6" data-tour="listing-category-step">
+          {validationAttempted.category && !formData.category ? (
+            <Alert className="bg-destructive/10 border-destructive/20">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">
+                Please select a category to continue.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
@@ -583,6 +593,14 @@ function NewListingPageContent() {
       description: 'Choose how you want to sell',
       content: (
         <div className="space-y-6">
+          {validationAttempted.type && !formData.type ? (
+            <Alert className="bg-destructive/10 border-destructive/20">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">
+                Please select a listing type to continue.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
@@ -862,8 +880,16 @@ function NewListingPageContent() {
               placeholder="e.g., Registered Texas Longhorn Bull"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="min-h-[48px] text-base"
+              className={cn(
+                "min-h-[48px] text-base",
+                validationAttempted.details &&
+                  String(formData.title || '').trim().length === 0 &&
+                  'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+              )}
             />
+            {validationAttempted.details && String(formData.title || '').trim().length === 0 ? (
+              <div className="text-sm text-destructive">Title is required.</div>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -879,8 +905,16 @@ function NewListingPageContent() {
               placeholder="Provide detailed information about your listing..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="min-h-[120px] text-base"
+              className={cn(
+                "min-h-[120px] text-base",
+                validationAttempted.details &&
+                  String(formData.description || '').trim().length === 0 &&
+                  'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+              )}
             />
+            {validationAttempted.details && String(formData.description || '').trim().length === 0 ? (
+              <div className="text-sm text-destructive">Description is required.</div>
+            ) : null}
           </div>
 
           {formData.type === 'fixed' && (
@@ -899,8 +933,14 @@ function NewListingPageContent() {
                 placeholder="0.00"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="min-h-[48px] text-base"
+                className={cn(
+                  "min-h-[48px] text-base",
+                  validationAttempted.details && !isPositiveMoney(formData.price) && 'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+                )}
               />
+              {validationAttempted.details && !isPositiveMoney(formData.price) ? (
+                <div className="text-sm text-destructive">Price is required.</div>
+              ) : null}
             </div>
           )}
 
@@ -921,8 +961,16 @@ function NewListingPageContent() {
                   placeholder="0.00"
                   value={formData.startingBid}
                   onChange={(e) => setFormData({ ...formData, startingBid: e.target.value })}
-                  className="min-h-[48px] text-base"
+                  className={cn(
+                    "min-h-[48px] text-base",
+                    validationAttempted.details &&
+                      !isPositiveMoney(formData.startingBid) &&
+                      'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+                  )}
                 />
+                {validationAttempted.details && !isPositiveMoney(formData.startingBid) ? (
+                  <div className="text-sm text-destructive">Starting bid is required.</div>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
@@ -961,12 +1009,20 @@ function NewListingPageContent() {
                   type="datetime-local"
                   value={formData.endsAt}
                   onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-                  className="min-h-[48px] text-base"
+                  className={cn(
+                    "min-h-[48px] text-base",
+                    validationAttempted.details &&
+                      !isFutureDateString(formData.endsAt) &&
+                      'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+                  )}
                   min={new Date().toISOString().slice(0, 16)}
                 />
                 <p className="text-xs text-muted-foreground">
                   When should this auction end? Must be in the future.
                 </p>
+                {validationAttempted.details && !isFutureDateString(formData.endsAt) ? (
+                  <div className="text-sm text-destructive">Auction end date/time is required.</div>
+                ) : null}
               </div>
             </>
           )}
@@ -1105,8 +1161,16 @@ function NewListingPageContent() {
                     location: { ...formData.location, city: e.target.value },
                   })
                 }
-                className="min-h-[48px] text-base"
+                className={cn(
+                  "min-h-[48px] text-base",
+                  validationAttempted.details &&
+                    String(formData.location.city || '').trim().length === 0 &&
+                    'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+                )}
               />
+              {validationAttempted.details && String(formData.location.city || '').trim().length === 0 ? (
+                <div className="text-sm text-destructive">City is required.</div>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="state" className="text-base font-semibold">State</Label>
@@ -1136,9 +1200,17 @@ function NewListingPageContent() {
                       location: { ...formData.location, state: e.target.value },
                     })
                   }
-                  className="min-h-[48px] text-base"
+                  className={cn(
+                    "min-h-[48px] text-base",
+                    validationAttempted.details &&
+                      String(formData.location.state || '').trim().length === 0 &&
+                      'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
+                  )}
                 />
               )}
+              {validationAttempted.details && String(formData.location.state || '').trim().length === 0 ? (
+                <div className="text-sm text-destructive">State is required.</div>
+              ) : null}
             </div>
           </div>
 
@@ -1182,23 +1254,37 @@ function NewListingPageContent() {
       description: 'Upload + select photos (required)',
       content: (
         <div className="space-y-4">
+          {validationAttempted.media && formData.photoIds.length === 0 ? (
+            <Alert className="bg-destructive/10 border-destructive/20">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">
+                Please add at least one photo to continue.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {user ? (
-            <ListingPhotoPicker
-              uid={user.uid}
-              selected={formData.photos}
-              coverPhotoId={formData.coverPhotoId}
-              max={8}
-              onChange={({ selected, coverPhotoId }) => {
-                const normalized = selected.map((p, i) => ({ ...p, sortOrder: i }));
-                setFormData((prev) => ({
-                  ...prev,
-                  photos: normalized,
-                  photoIds: normalized.map((p) => p.photoId),
-                  coverPhotoId,
-                  images: normalized.map((p) => p.url),
-                }));
-              }}
-            />
+            <div
+              className={cn(
+                validationAttempted.media && formData.photoIds.length === 0 && 'rounded-xl ring-2 ring-destructive/30'
+              )}
+            >
+              <ListingPhotoPicker
+                uid={user.uid}
+                selected={formData.photos}
+                coverPhotoId={formData.coverPhotoId}
+                max={8}
+                onChange={({ selected, coverPhotoId }) => {
+                  const normalized = selected.map((p, i) => ({ ...p, sortOrder: i }));
+                  setFormData((prev) => ({
+                    ...prev,
+                    photos: normalized,
+                    photoIds: normalized.map((p) => p.photoId),
+                    coverPhotoId,
+                    images: normalized.map((p) => p.url),
+                  }));
+                }}
+              />
+            </div>
           ) : (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center">
@@ -1974,6 +2060,9 @@ function NewListingPageContent() {
             steps={steps} 
             onComplete={handleComplete}
             completeButtonDataTour="listing-publish"
+            onValidationError={(stepId) => {
+              setValidationAttempted((prev) => ({ ...prev, [stepId]: true }));
+            }}
           />
         </div>
       </div>

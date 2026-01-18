@@ -27,6 +27,7 @@ interface StepperFormProps {
   showSaveButton?: boolean; // Whether to show save button on each step
   completeButtonDataTour?: string; // Optional data-tour selector for the final action button
   completeButtonLabel?: string; // Optional label for the final action button (defaults to Publish Listing)
+  onValidationError?: (stepId: string) => void; // Optional callback for highlighting invalid fields in the parent UI
 }
 
 export function StepperForm({
@@ -40,6 +41,7 @@ export function StepperForm({
   showSaveButton = false,
   completeButtonDataTour,
   completeButtonLabel,
+  onValidationError,
 }: StepperFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -53,6 +55,7 @@ export function StepperForm({
     // Validate current step if validator exists
     if (currentStepData.validate && !currentStepData.validate()) {
       const errorMsg = currentStepData.errorMessage || 'Please complete all required fields before continuing.';
+      onValidationError?.(currentStepData.id);
       toast.error('Validation Error', {
         description: errorMsg,
       });
