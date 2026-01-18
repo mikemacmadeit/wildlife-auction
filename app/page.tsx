@@ -189,7 +189,7 @@ export default function HomePage() {
                 size="lg"
                 className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
               >
-                List an Animal
+                Create listing
               </CreateListingGateButton>
             </div>
           </motion.div>

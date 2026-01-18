@@ -33,7 +33,7 @@ export function Footer() {
     () => ({
       marketplace: [
         { href: '/browse', label: 'Browse' },
-        { href: '/dashboard/listings/new', label: 'List an Animal' },
+        { href: '/dashboard/listings/new', label: 'Create listing' },
         { href: '/how-it-works', label: 'How It Works' },
         { href: '/how-it-works/plans', label: 'Seller Tiers' },
         { href: '/field-notes', label: 'Field Notes' },

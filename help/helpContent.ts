@@ -27,11 +27,11 @@ export const HELP_CONTENT: Record<HelpKey, HelpContent> = {
     key: 'public_home',
     title: 'Home',
     oneLiner: 'Discover the marketplace and get to the right place fast: browse, sell, or manage your account.',
-    checklist: ['Browse listings by category', 'Create an account to save listings', 'List an animal or item when you’re ready'],
+    checklist: ['Browse listings by category', 'Create an account to save listings', 'Create a listing when you’re ready'],
     commonMistakes: ['Trying to message or transact before verifying email', 'Skipping profile details (phone + location) if you plan to sell'],
     quickActions: [
       { label: 'Browse listings', href: '/browse' },
-      { label: 'List an animal', href: '/dashboard/listings/new' },
+      { label: 'Create listing', href: '/dashboard/listings/new' },
     ],
   },
   public_browse: {

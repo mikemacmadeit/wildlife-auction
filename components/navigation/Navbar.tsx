@@ -214,8 +214,8 @@ export function Navbar() {
               >
                 <Link href="/dashboard/listings/new">
                   <PlusCircle className="h-3.5 w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
-                  <span className="hidden xl:inline">List an Animal</span>
-                  <span className="xl:hidden">List</span>
+                  <span className="hidden xl:inline">Create listing</span>
+                  <span className="xl:hidden">Create</span>
                 </Link>
               </Button>
               
@@ -415,7 +415,7 @@ export function Navbar() {
                           }}>
                             <Link href="/dashboard/listings/new">
                               <PlusCircle className="h-4 w-4" />
-                              List an Animal
+                              Create listing
                             </Link>
                           </Button>
                         </SheetClose>
@@ -447,7 +447,7 @@ export function Navbar() {
                           }}>
                             <Link href="/dashboard/listings/new">
                               <PlusCircle className="h-4 w-4" />
-                              List an Animal
+                              Create listing
                             </Link>
                           </Button>
                         </SheetClose>
