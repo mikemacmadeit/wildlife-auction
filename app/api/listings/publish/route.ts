@@ -247,6 +247,24 @@ export async function POST(request: Request) {
       );
     }
 
+    // Admin moderation: disable selling (server-authoritative flag on users/{uid}).
+    try {
+      const userSnap = await db.collection('users').doc(userId).get();
+      const userData = userSnap.exists ? (userSnap.data() as any) : null;
+      if (userData?.adminFlags?.sellingDisabled === true) {
+        return json(
+          {
+            error: 'Selling disabled',
+            code: 'SELLING_DISABLED',
+            message: 'Your selling privileges are currently disabled. Please contact support.',
+          },
+          { status: 403 }
+        );
+      }
+    } catch {
+      // If user doc read fails, fail open (do not block publishing).
+    }
+
     // Validate request body
     const body = await request.json();
     const validation = validateRequest(publishListingSchema, body);

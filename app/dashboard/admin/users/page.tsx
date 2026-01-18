@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
@@ -14,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { Loader2, MoreHorizontal, Search, ShieldAlert, Copy, UserX, UserCheck, KeyRound } from 'lucide-react';
+import { Loader2, MoreHorizontal, Search, ShieldAlert, Copy, UserX, UserCheck, KeyRound, ExternalLink, RefreshCw } from 'lucide-react';
 
 type AdminUserRow = {
   uid: string;
@@ -22,13 +23,16 @@ type AdminUserRow = {
   displayName: string | null;
   phoneNumber: string | null;
   role: 'user' | 'admin' | 'super_admin' | null;
-  subscriptionTier: 'standard' | 'priority' | 'premier' | null;
-  adminPlanOverride: string | null;
+  subscriptionTier?: 'standard' | 'priority' | 'premier' | null;
+  adminPlanOverride?: string | null;
   disabled: boolean;
   emailVerified: boolean;
   createdAt: string | null;
   lastSignInAt: string | null;
-  stripeAccountId: string | null;
+  stripeAccountId?: string | null;
+  status?: 'active' | 'disabled' | 'suspended' | 'banned' | null;
+  risk?: { label?: 'low' | 'med' | 'high' | 'unknown' };
+  verification?: { identityVerified?: boolean | null; sellerVerified?: boolean | null };
 };
 
 function roleBadge(role: AdminUserRow['role']) {
@@ -60,10 +64,21 @@ async function safeCopy(text: string) {
 
 export default function AdminUsersPage() {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { isAdmin, isSuperAdmin, loading: adminLoading } = useAdmin();
   const { toast } = useToast();
 
   const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'any' | 'user' | 'admin' | 'super_admin'>('any');
+  const [statusFilter, setStatusFilter] = useState<'any' | 'active' | 'disabled' | 'suspended' | 'banned'>('any');
+  const [verificationFilter, setVerificationFilter] = useState<'any' | 'identityVerified' | 'sellerVerified'>('any');
+  const [riskFilter, setRiskFilter] = useState<'any' | 'low' | 'med' | 'high' | 'unknown'>('any');
+  const [activityFilter, setActivityFilter] = useState<'any' | '24h' | '7d' | '30d'>('any');
+  const [sort, setSort] = useState<'newest' | 'last_activity'>('newest');
+
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasDirectory, setHasDirectory] = useState(true);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,22 +100,65 @@ export default function AdminUsersPage() {
     setError(null);
     try {
       const q = String(opts?.query ?? query).trim();
+
+      // Prefer new directory endpoint (userSummaries-backed). Fallback to legacy lookup if not available yet.
+      if (hasDirectory) {
+        const url = new URL('/api/admin/users/directory', window.location.origin);
+        if (q) url.searchParams.set('q', q.toLowerCase());
+        if (roleFilter !== 'any') url.searchParams.set('role', roleFilter);
+        if (statusFilter !== 'any') url.searchParams.set('status', statusFilter);
+        if (verificationFilter !== 'any') url.searchParams.set('verification', verificationFilter);
+        if (riskFilter !== 'any') url.searchParams.set('risk', riskFilter);
+        if (activityFilter !== 'any') url.searchParams.set('activity', activityFilter);
+        url.searchParams.set('sort', sort);
+        url.searchParams.set('limit', '25');
+        if (cursor) url.searchParams.set('cursor', cursor);
+
+        const res = await fetch(url.toString(), { headers: await authHeader() });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.ok !== true) {
+          // If directory isn't ready (no summaries), fall back.
+          setHasDirectory(false);
+          throw new Error(data?.message || data?.error || 'Directory not available');
+        }
+        const users = Array.isArray(data.users) ? data.users : [];
+        const mapped: AdminUserRow[] = users.map((u: any) => ({
+          uid: String(u.uid || u.id || ''),
+          email: u.email || null,
+          displayName: u.displayName || null,
+          phoneNumber: u.phoneNumber || null,
+          role: (u.role || null) as any,
+          subscriptionTier: u.subscriptionTier ?? null,
+          adminPlanOverride: u.adminPlanOverride ?? null,
+          disabled: !!u.authDisabled,
+          emailVerified: !!u.emailVerified,
+          createdAt: u.createdAt?.toDate?.() ? u.createdAt.toDate().toISOString() : (u.createdAt ? String(u.createdAt) : null),
+          lastSignInAt: u.lastLoginAt?.toDate?.() ? u.lastLoginAt.toDate().toISOString() : (u.lastLoginAt ? String(u.lastLoginAt) : null),
+          stripeAccountId: u.stripe?.accountId ?? null,
+          status: u.status ?? null,
+          risk: u.risk ?? undefined,
+          verification: u.verification ?? undefined,
+        }));
+        setRows(mapped);
+        setNextCursor(typeof data.nextCursor === 'string' ? data.nextCursor : null);
+        return;
+      }
+
       const url = new URL('/api/admin/users/lookup', window.location.origin);
       if (q) url.searchParams.set('query', q);
       url.searchParams.set('limit', '25');
       const res = await fetch(url.toString(), { headers: await authHeader() });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok !== true) {
-        throw new Error(data?.message || data?.error || 'Failed to load users');
-      }
+      if (!res.ok || data?.ok !== true) throw new Error(data?.message || data?.error || 'Failed to load users');
       setRows(Array.isArray(data.users) ? data.users : []);
+      setNextCursor(null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load users');
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [authHeader, isAdmin, query, user]);
+  }, [activityFilter, authHeader, cursor, hasDirectory, isAdmin, query, riskFilter, roleFilter, sort, statusFilter, user, verificationFilter]);
 
   useEffect(() => {
     if (authLoading || adminLoading) return;
@@ -214,7 +272,7 @@ export default function AdminUsersPage() {
         <Card className="border-2 border-border/50 bg-card">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">Lookup</CardTitle>
-            <CardDescription>Search by email (exact or prefix) or UID.</CardDescription>
+            <CardDescription>Search by email, uid, phone (token), or name token. Use filters for faster triage.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -223,7 +281,7 @@ export default function AdminUsersPage() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by email or uid…"
+                  placeholder="Search by email, uid, phone, name…"
                   className="pl-9 min-h-[44px]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void load();
@@ -237,6 +295,8 @@ export default function AdminUsersPage() {
                 variant="outline"
                 onClick={() => {
                   setQuery('');
+                  setCursor(null);
+                  setCursorStack([]);
                   void load({ query: '' });
                 }}
                 disabled={loading || !isAdmin}
@@ -245,6 +305,95 @@ export default function AdminUsersPage() {
                 Clear
               </Button>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Role: Any</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="super_admin">Super admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Status: Any</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="disabled">Disabled</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="banned">Banned</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={verificationFilter} onValueChange={(v: any) => setVerificationFilter(v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Verification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Verification: Any</SelectItem>
+                  <SelectItem value="identityVerified">Identity verified</SelectItem>
+                  <SelectItem value="sellerVerified">Seller verified</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={riskFilter} onValueChange={(v: any) => setRiskFilter(v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Risk" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Risk: Any</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="med">Med</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sort} onValueChange={(v: any) => setSort(v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Sort: Newest</SelectItem>
+                  <SelectItem value="last_activity">Sort: Last activity</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isSuperAdmin && hasDirectory && (
+              <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border bg-muted/20 p-3">
+                <div className="text-sm text-muted-foreground">
+                  If results are empty, backfill `userSummaries` (batched).
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={loading}
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/admin/users/summaries/backfill', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json', ...(await authHeader()) },
+                        body: JSON.stringify({ limit: 25 }),
+                      });
+                      const d = await res.json().catch(() => ({}));
+                      if (!res.ok || d?.ok !== true) throw new Error(d?.message || d?.error || 'Backfill failed');
+                      toast({ title: 'Backfill queued', description: `Updated ${d.updated || 0} summaries.` });
+                      setCursor(null);
+                      setCursorStack([]);
+                      void load({ query: query });
+                    } catch (e: any) {
+                      toast({ title: 'Backfill failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Backfill summaries (25)
+                </Button>
+              </div>
+            )}
 
             {error && (
               <Alert variant="destructive">
@@ -290,7 +439,7 @@ export default function AdminUsersPage() {
                           </div>
                         </TableCell>
                         <TableCell>{roleBadge(r.role)}</TableCell>
-                        <TableCell>{tierBadge(r.subscriptionTier, r.adminPlanOverride)}</TableCell>
+                        <TableCell>{tierBadge((r.subscriptionTier || 'standard') as any, (r.adminPlanOverride || null) as any)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 flex-wrap">
                             {r.disabled ? (
@@ -303,6 +452,11 @@ export default function AdminUsersPage() {
                             ) : (
                               <Badge variant="secondary">Email unverified</Badge>
                             )}
+                            {r.risk?.label ? (
+                              <Badge variant={r.risk.label === 'high' ? 'destructive' : r.risk.label === 'med' ? 'secondary' : 'outline'}>
+                                Risk: {r.risk.label}
+                              </Badge>
+                            ) : null}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -328,11 +482,21 @@ export default function AdminUsersPage() {
                               <DropdownMenuItem
                                 onSelect={(e) => {
                                   e.preventDefault();
+                                  if (!isSuperAdmin) {
+                                    toast({ title: 'Super admin required', description: 'Role changes require super admin.', variant: 'destructive' });
+                                    return;
+                                  }
                                   handleOpenRole(r);
                                 }}
                               >
                                 <ShieldAlert className="h-4 w-4 mr-2" />
                                 Set role…
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/admin/users/${r.uid}`}>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  View dossier
+                                </Link>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -386,6 +550,36 @@ export default function AdminUsersPage() {
                 </TableBody>
               </Table>
             </div>
+
+            {hasDirectory && (
+              <div className="flex items-center justify-between gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  disabled={loading || cursorStack.length === 0}
+                  onClick={() => {
+                    const prev = cursorStack[cursorStack.length - 1];
+                    setCursor(prev || null);
+                    setCursorStack((s) => s.slice(0, -1));
+                    void load();
+                  }}
+                >
+                  Previous
+                </Button>
+                <div className="text-xs text-muted-foreground">Page size: 25</div>
+                <Button
+                  variant="outline"
+                  disabled={loading || !nextCursor}
+                  onClick={() => {
+                    if (!nextCursor) return;
+                    setCursorStack((s) => [...s, cursor || '']);
+                    setCursor(nextCursor);
+                    void load();
+                  }}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

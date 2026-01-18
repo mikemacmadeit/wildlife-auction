@@ -97,6 +97,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // Admin moderation: muted users cannot send messages (server-authoritative).
+    try {
+      const senderDoc = await db.collection('users').doc(senderId).get();
+      const senderData = senderDoc.exists ? (senderDoc.data() as any) : null;
+      if (senderData?.adminFlags?.messagingMuted === true) {
+        return json(
+          {
+            error: 'Messaging restricted',
+            code: 'MESSAGING_MUTED',
+            message: 'Your messaging privileges have been restricted. Please contact support.',
+          },
+          { status: 403 }
+        );
+      }
+    } catch {
+      // If we can't read the sender doc, fail open (do not block messaging).
+    }
+
     // Parse request body
     const body = await request.json();
     const { threadId, listingId, messageBody } = body;
