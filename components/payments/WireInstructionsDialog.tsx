@@ -32,11 +32,11 @@ export function WireInstructionsDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl border-2">
         <DialogHeader>
           <DialogTitle>Wire transfer instructions</DialogTitle>
           <DialogDescription>
-            Send a bank/wire transfer using the details below. **Funds are held in escrow once received**.
+            Send a bank/wire transfer using the details below. Funds are held in escrow once received.
           </DialogDescription>
         </DialogHeader>
 

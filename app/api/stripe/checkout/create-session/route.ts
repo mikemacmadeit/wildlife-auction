@@ -502,17 +502,8 @@ export async function POST(request: Request) {
     const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
-    // Server-side gating (mirrors UI gating): ACH is only allowed above the configured threshold.
-    if (paymentMethod === 'ach_debit' && amount < Math.round(ACH_DEBIT_MIN_TOTAL_USD * 100)) {
-      return NextResponse.json(
-        {
-          error: 'ACH debit is only available for eligible orders',
-          code: 'ACH_NOT_ELIGIBLE',
-          details: { minTotalUsd: ACH_DEBIT_MIN_TOTAL_USD, totalUsd: amount / 100 },
-        },
-        { status: 400 }
-      );
-    }
+    // NOTE: We intentionally do NOT enforce a hard minimum for ACH here.
+    // Stripe + risk controls remain server-side authoritative, but UX should always allow ACH selection.
 
     // Create Stripe Checkout Session with ESCROW (no destination charge)
     // Funds are held in platform account until admin confirms delivery

@@ -521,8 +521,8 @@ export default function ListingDetailPage() {
       if (method !== 'card' && !eligiblePaymentMethods.includes(method as any)) {
         throw new Error(
           method === 'ach_debit'
-            ? 'ACH debit is only available for eligible orders (verified email + minimum total).'
-            : 'Wire transfer is only available for eligible orders (verified email + minimum total).'
+            ? 'ACH debit requires a verified email address.'
+            : 'Wire transfer requires a verified email address.'
         );
       }
       if (method === 'wire') {

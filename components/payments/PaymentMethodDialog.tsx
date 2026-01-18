@@ -26,49 +26,65 @@ export function PaymentMethodDialog(props: {
     { key: 'wire', title: 'Wire transfer', icon: Banknote, copy: getRecommendationCopy('wire', amountUsd) },
   ];
 
-  const options = baseOptions
-    .filter((o) => eligible.includes(o.key))
-    .sort((a, b) => (a.key === recommended ? -1 : b.key === recommended ? 1 : 0));
+  const options = baseOptions.sort((a, b) => (a.key === recommended ? -1 : b.key === recommended ? 1 : 0));
+  const canUseBankRails = isAuthenticated && isEmailVerified;
+  const amountLabel = Number(amountUsd || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg border-2">
         <DialogHeader>
-          <DialogTitle>Choose payment method</DialogTitle>
-          <DialogDescription>
-            Cards (including Apple Pay / Google Pay / Link) are always available. ACH and wire are available for eligible orders.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Choose payment method</DialogTitle>
+              <DialogDescription>
+                Pick the best rail for this purchase. Funds are held in escrow once received.
+              </DialogDescription>
+            </div>
+            <Badge variant="secondary" className="font-mono">
+              {amountLabel}
+            </Badge>
+          </div>
         </DialogHeader>
 
         <div className="space-y-3">
           {options.map((opt) => {
             const Icon = opt.icon;
             const isRec = opt.key === recommended;
+            const isEnabled = opt.key === 'card' ? true : canUseBankRails;
+            const badge = isRec
+              ? { text: 'Recommended', variant: 'default' as const }
+              : isEnabled
+                ? { text: 'Available', variant: 'secondary' as const }
+                : !isAuthenticated
+                  ? { text: 'Sign in', variant: 'secondary' as const }
+                  : { text: 'Verify email', variant: 'secondary' as const };
             return (
               <Button
                 key={opt.key}
                 variant="outline"
-                className="w-full justify-between min-h-[60px]"
+                className="w-full justify-between min-h-[66px] border-2 hover:bg-muted/30 disabled:opacity-60"
                 onClick={() => onSelect(opt.key)}
+                disabled={!isEnabled}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className="h-5 w-5" />
+                  <div className="h-10 w-10 rounded-xl border bg-background flex items-center justify-center">
+                    <Icon className="h-5 w-5" />
+                  </div>
                   <div className="text-left">
                     <div className="font-semibold">{opt.title}</div>
                     <div className="text-xs text-muted-foreground">{opt.copy}</div>
                   </div>
                 </div>
-                {isRec ? (
-                  <Badge className="bg-primary text-primary-foreground">Recommended</Badge>
-                ) : (
-                  <Badge variant="secondary">Available</Badge>
-                )}
+                <Badge variant={badge.variant}>{badge.text}</Badge>
               </Button>
             );
           })}
 
           <div className="text-xs text-muted-foreground">
-            Funds are held in escrow until delivery confirmation and issue windows are complete.
+            {canUseBankRails
+              ? 'Card payments are fastest; ACH and wire can reduce bank/card declines on larger purchases.'
+              : 'To use ACH or wire, sign in and verify your email address.'}
           </div>
         </div>
       </DialogContent>

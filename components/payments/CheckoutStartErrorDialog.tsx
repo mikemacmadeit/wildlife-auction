@@ -22,7 +22,7 @@ export function CheckoutStartErrorDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg border-2">
         <DialogHeader>
           <DialogTitle>Checkout couldn’t be started</DialogTitle>
           <DialogDescription>
@@ -42,9 +42,15 @@ export function CheckoutStartErrorDialog(props: {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Button variant="outline" onClick={onSwitchBank} disabled={!canSwitchBank}>Switch to ACH</Button>
-            <Button variant="outline" onClick={onSwitchWire} disabled={!canSwitchWire}>Switch to Wire</Button>
-            <Button onClick={onRetryCard}>Retry Card</Button>
+            <Button variant="outline" onClick={onSwitchBank} disabled={!canSwitchBank} className="border-2">
+              Switch to ACH
+            </Button>
+            <Button variant="outline" onClick={onSwitchWire} disabled={!canSwitchWire} className="border-2">
+              Switch to Wire
+            </Button>
+            <Button onClick={onRetryCard} className="font-semibold">
+              Retry Card
+            </Button>
           </div>
 
           {technicalDetails ? (

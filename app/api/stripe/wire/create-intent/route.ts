@@ -18,7 +18,6 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { containsProhibitedKeywords } from '@/lib/compliance/validation';
-import { WIRE_TRANSFER_MIN_TOTAL_USD } from '@/lib/payments/constants';
 import { formatWireInstructionsFromPaymentIntent } from '@/lib/stripe/wire';
 
 export const runtime = 'nodejs';
@@ -210,17 +209,8 @@ export async function POST(request: Request) {
 
     const amountCents = Math.round(purchaseAmountUsd * 100);
 
-    // Server-side gating: wire only for high-ticket totals
-    if (amountCents < Math.round(WIRE_TRANSFER_MIN_TOTAL_USD * 100)) {
-      return NextResponse.json(
-        {
-          error: 'Wire transfer is only available for eligible orders',
-          code: 'WIRE_NOT_ELIGIBLE',
-          details: { minTotalUsd: WIRE_TRANSFER_MIN_TOTAL_USD, totalUsd: purchaseAmountUsd },
-        },
-        { status: 400 }
-      );
-    }
+    // NOTE: We intentionally do NOT enforce a hard minimum for wire here.
+    // If product policy changes later, gate it here server-side.
 
     // Prevent buying own listing
     if (listingData.sellerId === buyerId) {
