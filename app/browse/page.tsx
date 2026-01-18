@@ -87,6 +87,14 @@ export default function BrowsePage() {
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
   const [priceMinInput, setPriceMinInput] = useState<string>('');
   const [priceMaxInput, setPriceMaxInput] = useState<string>('');
+  const [saveSearchDialogOpen, setSaveSearchDialogOpen] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState('');
+  const [saveSearchPreview, setSaveSearchPreview] = useState<{
+    hasCriteria: boolean;
+    criteria: FilterState;
+    summary: Array<{ label: string; value: string }>;
+    defaultName: string;
+  } | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -122,8 +130,9 @@ export default function BrowsePage() {
         const criteria = ss.criteria || {};
         const nextType = (criteria as any).type || 'all';
         setSelectedType(nextType);
-        const { type, ...rest } = criteria as any;
+        const { type, query, ...rest } = criteria as any;
         setFilters(rest);
+        setSearchQuery(typeof query === 'string' ? query : '');
         toast({ title: 'Saved search loaded', description: ss.name || 'Criteria applied to Browse.' });
       } catch (e) {
         // ignore
@@ -175,22 +184,77 @@ export default function BrowsePage() {
     setPriceMaxInput(filters.maxPrice !== undefined ? String(filters.maxPrice) : '');
   }, [filters.minPrice, filters.maxPrice, priceDialogOpen]);
 
-  const handleSaveThisSearch = async () => {
+  function buildSaveSearchPreview(): {
+    hasCriteria: boolean;
+    criteria: FilterState;
+    summary: Array<{ label: string; value: string }>;
+    defaultName: string;
+  } {
+    const q = searchQuery?.trim() || '';
+    const criteria: FilterState = {
+      ...(filters || {}),
+      ...(selectedType !== 'all' ? { type: selectedType as any } : {}),
+      ...(q ? { query: q } : {}),
+    };
+
+    const summary: Array<{ label: string; value: string }> = [];
+    if (q) summary.push({ label: 'Query', value: q });
+    if (selectedType !== 'all') summary.push({ label: 'Type', value: String(selectedType) });
+    if (filters.category) summary.push({ label: 'Category', value: String(filters.category) });
+    if (filters.location?.state) summary.push({ label: 'State', value: String(filters.location.state) });
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+      const min = filters.minPrice !== undefined ? `$${Number(filters.minPrice).toLocaleString()}` : 'Any';
+      const max = filters.maxPrice !== undefined ? `$${Number(filters.maxPrice).toLocaleString()}` : 'Any';
+      summary.push({ label: 'Price', value: `${min} – ${max}` });
+    }
+    if (filters.category === 'ranch_equipment' && filters.healthStatus && filters.healthStatus.length) {
+      const opt = BROWSE_EQUIPMENT_CONDITION_OPTIONS.find((o) => o.value === filters.healthStatus![0]);
+      summary.push({ label: 'Condition', value: opt?.label || String(filters.healthStatus[0]) });
+    }
+    if (filters.verifiedSeller) summary.push({ label: 'Verified seller', value: 'Yes' });
+    if (filters.transportReady) summary.push({ label: 'Transport ready', value: 'Yes' });
+    if (filters.endingSoon) summary.push({ label: 'Ending soon', value: 'Within 24h' });
+    if (filters.newlyListed) summary.push({ label: 'Newly listed', value: 'Within 7d' });
+    if (filters.featured) summary.push({ label: 'Featured', value: 'Yes' });
+
+    const hasCriteria =
+      Boolean(q) ||
+      selectedType !== 'all' ||
+      Object.entries(filters || {}).some(([k, v]) => {
+        if (v === undefined || v === null) return false;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.values(v).some(Boolean);
+        if (typeof v === 'boolean') return v === true;
+        return true;
+      });
+
+    const defaultName = q
+      ? `Saved search: ${q.slice(0, 60)}`
+      : `Saved search: ${selectedType === 'all' ? 'All listings' : String(selectedType)}`;
+
+    return { hasCriteria, criteria, summary, defaultName };
+  }
+
+  const openSaveSearchDialog = () => {
     if (!user?.uid) {
       toast({ title: 'Sign in required', description: 'Sign in to save searches and get alerts.' });
       return;
     }
+    const preview = buildSaveSearchPreview();
+    setSaveSearchPreview(preview);
+    setSaveSearchName(preview.defaultName);
+    setSaveSearchDialogOpen(true);
+  };
+
+  const handleConfirmSaveSearch = async () => {
+    if (!user?.uid || !saveSearchPreview) return;
+    if (!saveSearchPreview.hasCriteria) return;
     setSavingSearch(true);
     try {
-      const criteria: FilterState = {
-        ...(filters || {}),
-        ...(selectedType !== 'all' ? { type: selectedType as any } : {}),
-      };
+      const criteria = saveSearchPreview.criteria;
       const id = await upsertSavedSearch(user.uid, {
         data: {
-          name: searchQuery?.trim()
-            ? `Saved search: ${searchQuery.trim().slice(0, 60)}`
-            : `Saved search: ${selectedType === 'all' ? 'All listings' : String(selectedType)}`,
+          name: saveSearchName?.trim() || saveSearchPreview.defaultName,
           criteria,
           alertFrequency: 'instant',
           channels: { inApp: true, email: true, push: false },
@@ -199,8 +263,7 @@ export default function BrowsePage() {
         },
       });
       toast({ title: 'Saved', description: 'Search saved. You can manage it in Saved Searches.' });
-      // Optionally deep-link to edit/manage
-      // router.push(`/dashboard/saved-searches?highlight=${id}`);
+      setSaveSearchDialogOpen(false);
       void id;
     } catch (e: any) {
       toast({ title: 'Save failed', description: e?.message || 'Could not save this search.', variant: 'destructive' });
@@ -526,7 +589,27 @@ export default function BrowsePage() {
       setSelectedType(t === 'auction' || t === 'fixed' || t === 'classified' ? t : 'all');
       delete next.type;
     }
-    setFilters(next);
+    setFilters((prev) => {
+      const out: any = { ...next };
+
+      // Mutual exclusivity: allow only one of (endingSoon, newlyListed) at a time.
+      if (out.endingSoon && out.newlyListed) {
+        const prevEnding = Boolean((prev as any)?.endingSoon);
+        const prevNew = Boolean((prev as any)?.newlyListed);
+
+        // Prefer the one the user likely just toggled on (difference from previous state).
+        const endingChanged = prevEnding !== Boolean(out.endingSoon);
+        const newChanged = prevNew !== Boolean(out.newlyListed);
+
+        if (newChanged && !endingChanged) {
+          out.endingSoon = undefined;
+        } else {
+          out.newlyListed = undefined;
+        }
+      }
+
+      return out;
+    });
   };
 
   const clearFilters = () => {
@@ -645,22 +728,15 @@ export default function BrowsePage() {
                 <div className="hidden md:flex items-center gap-2 flex-wrap justify-start md:justify-end">
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 font-semibold rounded-full"
-                    onClick={handleSaveThisSearch}
-                    disabled={savingSearch}
-                  >
-                    {savingSearch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    Save this search
-                  </Button>
-                  <Button
-                    type="button"
                     variant={filters.endingSoon ? 'default' : 'outline'}
                     size="sm"
                     className="h-10 px-3 font-semibold rounded-full"
                     onClick={() =>
-                      setFilters((prev) => ({ ...prev, endingSoon: prev.endingSoon ? undefined : true }))
+                      setFilters((prev) => ({
+                        ...prev,
+                        endingSoon: prev.endingSoon ? undefined : true,
+                        ...(prev.endingSoon ? {} : { newlyListed: undefined }),
+                      }))
                     }
                   >
                     Ending soon
@@ -671,7 +747,11 @@ export default function BrowsePage() {
                     size="sm"
                     className="h-10 px-3 font-semibold rounded-full"
                     onClick={() =>
-                      setFilters((prev) => ({ ...prev, newlyListed: prev.newlyListed ? undefined : true }))
+                      setFilters((prev) => ({
+                        ...prev,
+                        newlyListed: prev.newlyListed ? undefined : true,
+                        ...(prev.newlyListed ? {} : { endingSoon: undefined }),
+                      }))
                     }
                   >
                     Newly listed
@@ -686,6 +766,17 @@ export default function BrowsePage() {
                     }
                   >
                     Verified
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-3 font-semibold rounded-full"
+                    onClick={openSaveSearchDialog}
+                    disabled={savingSearch}
+                  >
+                    {savingSearch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Save this search
                   </Button>
                 </div>
               </div>
@@ -893,6 +984,94 @@ export default function BrowsePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Save search confirmation */}
+      <Dialog
+        open={saveSearchDialogOpen}
+        onOpenChange={(open) => {
+          setSaveSearchDialogOpen(open);
+          if (!open) {
+            setSaveSearchPreview(null);
+            setSaveSearchName('');
+          }
+        }}
+      >
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Save this search</DialogTitle>
+            <DialogDescription>
+              {saveSearchPreview?.hasCriteria
+                ? 'Review what will be saved, then confirm.'
+                : 'Pick at least one filter or enter a search term before saving.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {saveSearchPreview?.hasCriteria ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="save-search-name" className="text-sm font-semibold">
+                  Name
+                </Label>
+                <Input
+                  id="save-search-name"
+                  value={saveSearchName}
+                  onChange={(e) => setSaveSearchName(e.target.value)}
+                  placeholder="Saved search name"
+                  className="min-h-[44px]"
+                />
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                <div className="text-sm font-semibold mb-2">This will save:</div>
+                <ul className="space-y-1.5 text-sm">
+                  {(saveSearchPreview.summary.length ? saveSearchPreview.summary : [{ label: 'All', value: 'All listings' }]).map((s) => (
+                    <li key={`${s.label}:${s.value}`} className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground">{s.label}</span>
+                      <span className="font-medium text-right">{s.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 min-h-[44px]"
+                  onClick={() => setSaveSearchDialogOpen(false)}
+                  disabled={savingSearch}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1 min-h-[44px]"
+                  onClick={handleConfirmSaveSearch}
+                  disabled={savingSearch}
+                >
+                  {savingSearch ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    'Save search'
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+                Nothing to save yet. Try selecting a Category, Location, Type, or entering a search term in the search bar.
+              </div>
+              <Button type="button" className="w-full min-h-[44px]" onClick={() => setSaveSearchDialogOpen(false)}>
+                Got it
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
         <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
@@ -928,7 +1107,7 @@ export default function BrowsePage() {
                 type="button"
                 variant="link"
                 className="h-auto p-0 text-sm font-semibold"
-                onClick={handleSaveThisSearch}
+                onClick={openSaveSearchDialog}
                 disabled={savingSearch}
               >
                 {savingSearch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}

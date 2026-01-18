@@ -510,6 +510,7 @@ export function FilterDialog({
                     setLocalFilters({
                       ...localFilters,
                       endingSoon: checked ? true : undefined,
+                      ...(checked ? { newlyListed: undefined } : {}),
                     });
                   }}
                 />
@@ -525,6 +526,7 @@ export function FilterDialog({
                     setLocalFilters({
                       ...localFilters,
                       newlyListed: checked ? true : undefined,
+                      ...(checked ? { endingSoon: undefined } : {}),
                     });
                   }}
                 />

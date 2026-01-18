@@ -526,6 +526,12 @@ export interface Order {
 export interface FilterState {
   category?: ListingCategory;
   type?: ListingType;
+  /**
+   * Optional keyword query for Saved Searches.
+   * NOTE: Browse currently stores the live query in component state, not in `filters`.
+   * We keep this here so savedSearch criteria can include the typed query safely.
+   */
+  query?: string;
   location?: {
     state?: string;
     city?: string;

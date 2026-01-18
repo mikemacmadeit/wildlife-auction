@@ -332,7 +332,14 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
                 <Checkbox
                   id="m-endingSoon"
                   checked={Boolean(localFilters.endingSoon)}
-                  onCheckedChange={(checked) => setLocalFilters((p) => ({ ...p, endingSoon: checked ? true : undefined }))}
+                  onCheckedChange={(checked) =>
+                    setLocalFilters((p) => ({
+                      ...p,
+                      endingSoon: checked ? true : undefined,
+                      // Mutual exclusive with newlyListed (eBay-style quick toggle behavior)
+                      ...(checked ? { newlyListed: undefined } : {}),
+                    }))
+                  }
                 />
                 <Label htmlFor="m-endingSoon" className="text-sm font-normal cursor-pointer flex-1">
                   Ending soon
@@ -342,7 +349,14 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
                 <Checkbox
                   id="m-new"
                   checked={Boolean(localFilters.newlyListed)}
-                  onCheckedChange={(checked) => setLocalFilters((p) => ({ ...p, newlyListed: checked ? true : undefined }))}
+                  onCheckedChange={(checked) =>
+                    setLocalFilters((p) => ({
+                      ...p,
+                      newlyListed: checked ? true : undefined,
+                      // Mutual exclusive with endingSoon
+                      ...(checked ? { endingSoon: undefined } : {}),
+                    }))
+                  }
                 />
                 <Label htmlFor="m-new" className="text-sm font-normal cursor-pointer flex-1">
                   Newly listed
