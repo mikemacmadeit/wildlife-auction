@@ -26,6 +26,10 @@ import {
   FileText,
   Eye,
   HelpCircle,
+  Apple,
+  Link2,
+  Landmark,
+  Banknote,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1180,6 +1184,35 @@ export default function ListingDetailPage() {
               {/* Desktop Action Card - Purchase & Bidding */}
               <Card className="border-2 shadow-lg bg-card">
                 <CardContent className="pt-6 space-y-5">
+                  {/* eBay-style: seller line + quick action */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sold by</div>
+                      <Link
+                        href={`/sellers/${listing!.sellerId}`}
+                        className="font-semibold hover:underline underline-offset-4 truncate block"
+                      >
+                        {(listing as any)?.sellerSnapshot?.displayName || (listing as any)?.seller?.name || 'Seller'}
+                      </Link>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        <Link href={`/sellers/${listing!.sellerId}`} className="hover:underline underline-offset-4">
+                          Seller&rsquo;s other listings
+                        </Link>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleContactSeller}
+                      className="h-9 px-3 font-semibold"
+                    >
+                      Contact seller
+                    </Button>
+                  </div>
+
+                  <Separator />
+
                   {/* eBay-style buy box: price-first header */}
                   <div className="space-y-1.5">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -1200,6 +1233,14 @@ export default function ListingDetailPage() {
                     {listing!.type === 'auction' && listing!.startingBid ? (
                       <div className="text-xs text-muted-foreground">
                         Starting bid: ${listing!.startingBid.toLocaleString()}
+                      </div>
+                    ) : null}
+                    {!isSold && listing!.type === 'auction' && endsAtDate ? (
+                      <div className="text-xs text-muted-foreground">
+                        {typeof (listing as any)?.metrics?.bidCount === 'number'
+                          ? `${Number((listing as any).metrics.bidCount).toLocaleString()} bids`
+                          : 'Auction'}{' '}
+                        • Ends in {formatDistanceToNow(endsAtDate)}
                       </div>
                     ) : null}
                     {(listing as any)?.offerReservedByOfferId ? (
@@ -1244,8 +1285,62 @@ export default function ListingDetailPage() {
                       <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div className="min-w-0">
                         <div className="font-semibold">Payments</div>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                            <CreditCard className="h-3 w-3" />
+                            <span className="font-semibold">Card</span>
+                            <span className="text-muted-foreground/70">Visa • MC • AmEx</span>
+                          </div>
+                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                            <Apple className="h-3 w-3" />
+                            <span className="font-semibold">Apple Pay</span>
+                          </div>
+                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                            <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true">
+                              <path
+                                fill="currentColor"
+                                d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 2h2v4h-2V7zm0 6h2v4h-2v-4z"
+                              />
+                            </svg>
+                            <span className="font-semibold">Google Pay</span>
+                          </div>
+                          <div className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                            <Link2 className="h-3 w-3" />
+                            <span className="font-semibold">Link</span>
+                          </div>
+                          <div
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground',
+                              !eligiblePaymentMethods.includes('ach_debit') && 'opacity-60'
+                            )}
+                            title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : undefined}
+                          >
+                            <Landmark className="h-3 w-3" />
+                            <span className="font-semibold">Bank (ACH)</span>
+                          </div>
+                          <div
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] text-muted-foreground',
+                              !eligiblePaymentMethods.includes('wire') && 'opacity-60'
+                            )}
+                            title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : undefined}
+                          >
+                            <Banknote className="h-3 w-3" />
+                            <span className="font-semibold">Wire</span>
+                          </div>
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold">Returns</div>
+                        <div className="text-xs text-muted-foreground">
+                          No returns. If the item/animal isn&rsquo;t as described, you can open a dispute after purchase.
                         </div>
                       </div>
                     </div>
