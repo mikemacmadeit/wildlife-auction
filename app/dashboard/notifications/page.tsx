@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { collection, doc, onSnapshot, orderBy, query, limit, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -152,7 +152,7 @@ export default function NotificationsPage() {
   const [tab, setTab] = useState<UiTab>('all');
   const [items, setItems] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
-  const autoMarkedReadRef = useMemo(() => ({ done: false }), []);
+  const autoMarkedReadRef = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -175,8 +175,8 @@ export default function NotificationsPage() {
         // UX: once user is on the notifications page, clear the sidebar "new" badge by
         // marking the currently loaded unread notifications as read (one-time per visit).
         // This mirrors how inbox pages clear their unread badges.
-        if (!autoMarkedReadRef.done) {
-          autoMarkedReadRef.done = true;
+        if (!autoMarkedReadRef.current) {
+          autoMarkedReadRef.current = true;
           const unread = next.filter((n) => n.read !== true);
           if (unread.length) {
             Promise.all(
