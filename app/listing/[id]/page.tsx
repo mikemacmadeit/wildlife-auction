@@ -79,6 +79,7 @@ import {
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
 import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
+import { getEligiblePaymentMethods } from '@/lib/payments/gating';
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -151,6 +152,22 @@ export default function ListingDetailPage() {
     const n = Number(listing?.watcherCount ?? listing?.metrics?.favorites ?? 0);
     return Number.isFinite(n) ? n : 0;
   }, [listing?.watcherCount, listing?.metrics?.favorites]);
+
+  const checkoutAmountUsd = useMemo(() => {
+    if (pendingCheckout?.amountUsd && Number.isFinite(pendingCheckout.amountUsd)) return pendingCheckout.amountUsd;
+    if (!listing) return 0;
+    if (listing.type === 'fixed') return Number(listing.price || 0) || 0;
+    if (listing.type === 'auction') return Number(winningBidAmount || listing.currentBid || listing.startingBid || 0) || 0;
+    return 0;
+  }, [pendingCheckout?.amountUsd, listing, winningBidAmount]);
+
+  const eligiblePaymentMethods = useMemo(() => {
+    return getEligiblePaymentMethods({
+      totalUsd: checkoutAmountUsd,
+      isAuthenticated: !!user,
+      isEmailVerified: !!user?.emailVerified,
+    });
+  }, [checkoutAmountUsd, user]);
 
   const similarBrowseUrl = useMemo(() => {
     if (!listing) return '/browse';
@@ -387,6 +404,15 @@ export default function ListingDetailPage() {
       return;
     }
 
+    if (user.uid === listing!.sellerId) {
+      toast({
+        title: 'You can’t purchase your own listing',
+        description: 'To test checkout, sign in with a separate buyer account and purchase this listing from that account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // P0: Check listing status (server-side enforced, but UX check here)
     if (listing!.status !== 'active') {
       toast({
@@ -444,6 +470,15 @@ export default function ListingDetailPage() {
       toast({
         title: 'Sign in required',
         description: 'You must be signed in to complete your purchase.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (user.uid === listing!.sellerId) {
+      toast({
+        title: 'You can’t purchase your own listing',
+        description: 'To test checkout, sign in with a separate buyer account and purchase this listing from that account.',
         variant: 'destructive',
       });
       return;
@@ -521,6 +556,14 @@ export default function ListingDetailPage() {
     try {
       setPaymentDialogOpen(false);
       setIsPlacingBid(true);
+      // Client-side eligibility guard for nicer UX (server also enforces).
+      if (method !== 'card' && !eligiblePaymentMethods.includes(method as any)) {
+        throw new Error(
+          method === 'ach_debit'
+            ? 'ACH debit is only available for eligible orders (verified email + minimum total).'
+            : 'Wire transfer is only available for eligible orders (verified email + minimum total).'
+        );
+      }
       if (method === 'wire') {
         const { createWireIntent } = await import('@/lib/stripe/api');
         const out = await createWireIntent(listing.id);
@@ -535,7 +578,7 @@ export default function ListingDetailPage() {
       console.error('Error creating checkout session:', error);
       setCheckoutError({
         attemptedMethod: method,
-        message: 'We couldn’t start checkout. You can retry card or switch to ACH debit / wire.',
+        message: error?.message ? String(error.message) : 'Checkout could not be started.',
         technical: error?.message ? String(error.message) : String(error),
       });
       setCheckoutErrorOpen(true);
@@ -1530,7 +1573,7 @@ export default function ListingDetailPage() {
           setPaymentDialogOpen(open);
           if (!open) setPendingCheckout(null);
         }}
-        amountUsd={pendingCheckout?.amountUsd || 0}
+        amountUsd={checkoutAmountUsd}
         onSelect={handleSelectPaymentMethod}
         isAuthenticated={!!user}
         isEmailVerified={!!user?.emailVerified}
@@ -1545,6 +1588,8 @@ export default function ListingDetailPage() {
         attemptedMethod={checkoutError?.attemptedMethod || 'card'}
         errorMessage={checkoutError?.message || 'Checkout could not be started.'}
         technicalDetails={checkoutError?.technical}
+        canSwitchBank={eligiblePaymentMethods.includes('ach_debit')}
+        canSwitchWire={eligiblePaymentMethods.includes('wire')}
         onRetryCard={() => handleSelectPaymentMethod('card')}
         onSwitchBank={() => handleSelectPaymentMethod('ach_debit')}
         onSwitchWire={() => handleSelectPaymentMethod('wire')}

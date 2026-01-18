@@ -11,11 +11,13 @@ export function CheckoutStartErrorDialog(props: {
   attemptedMethod: PaymentMethodChoice;
   errorMessage: string;
   technicalDetails?: string;
+  canSwitchBank?: boolean;
+  canSwitchWire?: boolean;
   onRetryCard: () => void | Promise<void>;
   onSwitchBank: () => void | Promise<void>;
   onSwitchWire: () => void | Promise<void>;
 }) {
-  const { open, onOpenChange, attemptedMethod, errorMessage, technicalDetails, onRetryCard, onSwitchBank, onSwitchWire } = props;
+  const { open, onOpenChange, attemptedMethod, errorMessage, technicalDetails, canSwitchBank = true, canSwitchWire = true, onRetryCard, onSwitchBank, onSwitchWire } = props;
   const [showTech, setShowTech] = useState(false);
 
   return (
@@ -24,7 +26,9 @@ export function CheckoutStartErrorDialog(props: {
         <DialogHeader>
           <DialogTitle>Checkout couldn’t be started</DialogTitle>
           <DialogDescription>
-            Your bank declined this transaction. This is common for large purchases. You can contact your bank to authorize the charge, or switch to ACH debit or wire transfer.
+            {attemptedMethod === 'card'
+              ? 'Try again with card, or use ACH/wire if available for this order.'
+              : 'Try another payment method.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -38,8 +42,8 @@ export function CheckoutStartErrorDialog(props: {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Button variant="outline" onClick={onSwitchBank}>Switch to ACH</Button>
-            <Button variant="outline" onClick={onSwitchWire}>Switch to Wire</Button>
+            <Button variant="outline" onClick={onSwitchBank} disabled={!canSwitchBank}>Switch to ACH</Button>
+            <Button variant="outline" onClick={onSwitchWire} disabled={!canSwitchWire}>Switch to Wire</Button>
             <Button onClick={onRetryCard}>Retry Card</Button>
           </div>
 
