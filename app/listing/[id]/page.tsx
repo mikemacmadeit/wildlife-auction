@@ -255,10 +255,18 @@ export default function ListingDetailPage() {
 
   const minBidUsd = useMemo(() => {
     if (!listing) return 0;
-    const base = Number(listing.currentBid || listing.startingBid || 0) || 0;
-    if (base <= 0) return Number(listing.startingBid || 0) || 0;
-    const inc = Math.max(base * 0.05, 50);
-    return Math.ceil(base + inc);
+    const starting = Number((listing as any).startingBid ?? 0) || 0;
+    const current = Number((listing as any).currentBid ?? (listing as any).startingBid ?? 0) || 0;
+    const hasAnyBids =
+      Boolean((listing as any).currentBidderId) || Number((listing as any)?.metrics?.bidCount || 0) > 0;
+
+    // Match server behavior:
+    // - First bid can be the starting bid (no increment required)
+    // - Once any bids exist, minimum is current + increment (5% / $50 min), rounded to nearest $1.
+    if (!hasAnyBids) return Math.max(0, starting);
+
+    const inc = Math.max(current * 0.05, 50);
+    return Math.ceil(current + inc);
   }, [listing]);
 
   // Scroll to top when listing ID changes
@@ -402,12 +410,11 @@ export default function ListingDetailPage() {
       return;
     }
 
-    // Validate bid is higher than current bid
-    const currentBid = listing!.currentBid || listing!.startingBid || 0;
-    if (amount <= currentBid) {
+    // Validate minimum bid (matches server rules)
+    if (amount < minBidUsd) {
       toast({
         title: 'Bid too low',
-        description: `Your bid must be higher than the current bid of $${currentBid.toLocaleString()}.`,
+        description: `Enter $${minBidUsd.toLocaleString()} or more.`,
         variant: 'destructive',
       });
       return;
@@ -901,6 +908,8 @@ export default function ListingDetailPage() {
                       </div>
                       <BidIncrementCalculator
                         currentBid={listing!.currentBid || listing!.startingBid || 0}
+                        startingBid={listing!.startingBid || 0}
+                        hasAnyBids={Boolean(listing!.currentBidderId) || Number(listing!.metrics?.bidCount || 0) > 0}
                         onBidChange={(amount) => setBidAmount(amount.toString())}
                       />
                     </div>
@@ -1418,6 +1427,8 @@ export default function ListingDetailPage() {
                               </div>
                               <BidIncrementCalculator
                                 currentBid={listing!.currentBid || listing!.startingBid || 0}
+                                startingBid={listing!.startingBid || 0}
+                                hasAnyBids={Boolean(listing!.currentBidderId) || Number(listing!.metrics?.bidCount || 0) > 0}
                                 onBidChange={(amount) => setBidAmount(amount.toString())}
                               />
                               <AutoBidPanel

@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 interface BidIncrementCalculatorProps {
   currentBid?: number;
   startingBid?: number;
+  hasAnyBids?: boolean;
   onBidChange?: (amount: number) => void;
   className?: string;
 }
@@ -21,6 +22,7 @@ const INCREMENT_PRESETS = [50, 100, 250, 500, 1000, 2500, 5000];
 export function BidIncrementCalculator({
   currentBid,
   startingBid = 0,
+  hasAnyBids = false,
   onBidChange,
   className,
 }: BidIncrementCalculatorProps) {
@@ -32,11 +34,14 @@ export function BidIncrementCalculator({
   
   // Calculate minimum bid (typically 5% increment)
   const minBid = useMemo(() => {
+    // Match server behavior:
+    // - First bid can be the starting bid (no increment required)
+    // - Once any bids exist, minimum is current + increment (5% / $50 min), rounded to nearest $1.
+    if (!hasAnyBids) return startingBid || baseAmount || 0;
     if (baseAmount === 0) return startingBid || 0;
-    // 5% increment with minimum of $50
     const increment = Math.max(baseAmount * 0.05, 50);
     return Math.ceil(baseAmount + increment);
-  }, [baseAmount, startingBid]);
+  }, [baseAmount, startingBid, hasAnyBids]);
 
   const suggestedIncrements = useMemo(() => {
     return INCREMENT_PRESETS.map(preset => {
