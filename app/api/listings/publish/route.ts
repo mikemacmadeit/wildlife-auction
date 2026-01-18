@@ -16,6 +16,8 @@ import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 import { validateListingCompliance } from '@/lib/compliance/validation';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { emitEventToUsers } from '@/lib/notifications';
+import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
@@ -463,6 +465,94 @@ export async function POST(request: Request) {
         sellerSnapshot: publicSellerSnapshot,
         ...flagUpdate,
       });
+
+      // Admin notifications (email + in-app) for review queues.
+      // Non-blocking: listing submission should not fail if notifications fail.
+      try {
+        const origin = 'https://wildlife.exchange';
+        const adminUids = await listAdminRecipientUids(db as any);
+        if (adminUids.length > 0) {
+          const pendingReason: 'admin_approval' | 'compliance_review' | 'unknown' = requiresAdminApproval
+            ? 'admin_approval'
+            : complianceStatus === 'pending_review' || listingData.category === 'whitetail_breeder'
+              ? 'compliance_review'
+              : 'unknown';
+
+          const listingUrl = `${origin}/listing/${listingId}`;
+          const adminQueueUrl = `${origin}/dashboard/admin/listings`;
+          const adminComplianceUrl = `${origin}/dashboard/admin/compliance`;
+
+          await emitEventToUsers({
+            type: 'Admin.Listing.Submitted',
+            actorId: userId,
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserIds: adminUids,
+            payload: {
+              type: 'Admin.Listing.Submitted',
+              listingId,
+              listingTitle: String(listingData?.title || 'Listing'),
+              sellerId: userId,
+              sellerName: displayName,
+              category: String(listingData.category || ''),
+              listingType: String(listingData.type || ''),
+              complianceStatus: String(complianceStatus || 'none'),
+              pendingReason,
+              listingUrl,
+              adminQueueUrl,
+              ...(pendingReason === 'compliance_review' ? { adminComplianceUrl } : {}),
+            },
+          });
+
+          if (pendingReason === 'admin_approval') {
+            await emitEventToUsers({
+              type: 'Admin.Listing.AdminApprovalRequired',
+              actorId: userId,
+              entityType: 'listing',
+              entityId: listingId,
+              targetUserIds: adminUids,
+              payload: {
+                type: 'Admin.Listing.AdminApprovalRequired',
+                listingId,
+              listingTitle: String(listingData?.title || 'Listing'),
+                sellerId: userId,
+                sellerName: displayName,
+                listingUrl,
+                adminQueueUrl,
+              },
+              // Collapse multiple emails for rapid resubmits
+              optionalHash: `admin_listing_admin_approval:${listingId}`,
+            });
+          }
+
+          if (pendingReason === 'compliance_review') {
+            await emitEventToUsers({
+              type: 'Admin.Listing.ComplianceReviewRequired',
+              actorId: userId,
+              entityType: 'listing',
+              entityId: listingId,
+              targetUserIds: adminUids,
+              payload: {
+                type: 'Admin.Listing.ComplianceReviewRequired',
+                listingId,
+              listingTitle: String(listingData?.title || 'Listing'),
+                sellerId: userId,
+                sellerName: displayName,
+                complianceStatus: String(complianceStatus || 'pending_review'),
+                listingUrl,
+                adminComplianceUrl,
+              },
+              optionalHash: `admin_listing_compliance:${listingId}`,
+            });
+          }
+        }
+      } catch (e: any) {
+        logError('Admin notification emit failed (listing submission)', e, {
+          route: '/api/listings/publish',
+          listingId,
+          userId,
+        });
+      }
 
       return json({
         success: true,

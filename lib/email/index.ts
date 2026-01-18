@@ -26,6 +26,12 @@ import {
   getMessageReceivedEmail,
   getVerifyEmailEmail,
   getOfferAcceptedEmail,
+  getAdminListingSubmittedEmail,
+  getAdminListingComplianceReviewEmail,
+  getAdminListingAdminApprovalEmail,
+  getAdminListingApprovedEmail,
+  getAdminListingRejectedEmail,
+  getAdminDisputeOpenedEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
@@ -44,6 +50,12 @@ import {
   type MessageReceivedEmailData,
   type VerifyEmailEmailData,
   type OfferAcceptedEmailData,
+  type AdminListingSubmittedEmailData,
+  type AdminListingComplianceReviewEmailData,
+  type AdminListingAdminApprovalEmailData,
+  type AdminListingApprovedEmailData,
+  type AdminListingRejectedEmailData,
+  type AdminDisputeOpenedEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -202,6 +214,73 @@ const offerAcceptedSchema = z.object({
   listingTitle: z.string().min(1),
   amount: z.number().finite().nonnegative(),
   offerUrl: urlSchema,
+});
+
+const adminListingSubmittedSchema = z.object({
+  adminName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingId: z.string().min(1),
+  sellerId: z.string().min(1),
+  sellerName: z.string().optional(),
+  pendingReason: z.enum(['admin_approval', 'compliance_review', 'unknown']),
+  category: z.string().optional(),
+  listingType: z.string().optional(),
+  complianceStatus: z.string().optional(),
+  listingUrl: urlSchema,
+  adminQueueUrl: urlSchema,
+  adminComplianceUrl: urlSchema.optional(),
+});
+
+const adminListingComplianceReviewSchema = z.object({
+  adminName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingId: z.string().min(1),
+  sellerId: z.string().min(1),
+  sellerName: z.string().optional(),
+  complianceStatus: z.string().optional(),
+  listingUrl: urlSchema,
+  adminComplianceUrl: urlSchema,
+});
+
+const adminListingAdminApprovalSchema = z.object({
+  adminName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingId: z.string().min(1),
+  sellerId: z.string().min(1),
+  sellerName: z.string().optional(),
+  listingUrl: urlSchema,
+  adminQueueUrl: urlSchema,
+});
+
+const adminListingApprovedSchema = z.object({
+  adminName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingId: z.string().min(1),
+  sellerId: z.string().min(1),
+  sellerName: z.string().optional(),
+  listingUrl: urlSchema,
+  adminQueueUrl: urlSchema,
+});
+
+const adminListingRejectedSchema = z.object({
+  adminName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingId: z.string().min(1),
+  sellerId: z.string().min(1),
+  sellerName: z.string().optional(),
+  reason: z.string().optional(),
+  adminQueueUrl: urlSchema,
+});
+
+const adminDisputeOpenedSchema = z.object({
+  adminName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().optional(),
+  listingId: z.string().optional(),
+  buyerId: z.string().min(1),
+  disputeType: z.enum(['order_dispute', 'protected_transaction_dispute']),
+  reason: z.string().min(1),
+  adminOpsUrl: urlSchema,
 });
 
 export const EMAIL_EVENT_REGISTRY = [
@@ -502,6 +581,127 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: OfferAcceptedEmailData) => {
       const { subject, html } = getOfferAcceptedEmail(data);
       return { subject, preheader: `Offer accepted`, html };
+    },
+  },
+  {
+    type: 'admin_listing_submitted',
+    displayName: 'Admin: Listing Submitted',
+    description: 'Sent to admins when a listing is submitted and requires review.',
+    schema: adminListingSubmittedSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      listingId: 'LISTING_123',
+      sellerId: 'SELLER_123',
+      sellerName: 'Jordan Smith',
+      pendingReason: 'compliance_review',
+      category: 'wildlife_exotics',
+      listingType: 'auction',
+      complianceStatus: 'pending_review',
+      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
+      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+      adminComplianceUrl: 'https://wildlife.exchange/dashboard/admin/compliance',
+    },
+    render: (data: AdminListingSubmittedEmailData) => {
+      const { subject, html } = getAdminListingSubmittedEmail(data);
+      return { subject, preheader: `Listing submitted: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'admin_listing_compliance_review',
+    displayName: 'Admin: Listing Compliance Review Required',
+    description: 'Sent to admins when a listing requires compliance review.',
+    schema: adminListingComplianceReviewSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      listingTitle: 'Whitetail Buck (Breeder)',
+      listingId: 'LISTING_234',
+      sellerId: 'SELLER_234',
+      sellerName: 'Kerry Carpenter',
+      complianceStatus: 'pending_review',
+      listingUrl: 'https://wildlife.exchange/listing/LISTING_234',
+      adminComplianceUrl: 'https://wildlife.exchange/dashboard/admin/compliance',
+    },
+    render: (data: AdminListingComplianceReviewEmailData) => {
+      const { subject, html } = getAdminListingComplianceReviewEmail(data);
+      return { subject, preheader: `Compliance review: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'admin_listing_admin_approval',
+    displayName: 'Admin: Listing Approval Required',
+    description: 'Sent to admins when a listing requires admin approval.',
+    schema: adminListingAdminApprovalSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      listingTitle: 'Ranch Equipment: Livestock Trailer',
+      listingId: 'LISTING_345',
+      sellerId: 'SELLER_345',
+      sellerName: 'New Seller',
+      listingUrl: 'https://wildlife.exchange/listing/LISTING_345',
+      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+    },
+    render: (data: AdminListingAdminApprovalEmailData) => {
+      const { subject, html } = getAdminListingAdminApprovalEmail(data);
+      return { subject, preheader: `Approval needed: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'admin_listing_approved',
+    displayName: 'Admin: Listing Approved',
+    description: 'Sent to admins when a listing is approved.',
+    schema: adminListingApprovedSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      listingId: 'LISTING_123',
+      sellerId: 'SELLER_123',
+      sellerName: 'Jordan Smith',
+      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
+      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+    },
+    render: (data: AdminListingApprovedEmailData) => {
+      const { subject, html } = getAdminListingApprovedEmail(data);
+      return { subject, preheader: `Listing approved: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'admin_listing_rejected',
+    displayName: 'Admin: Listing Rejected',
+    description: 'Sent to admins when a listing is rejected.',
+    schema: adminListingRejectedSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      listingId: 'LISTING_123',
+      sellerId: 'SELLER_123',
+      sellerName: 'Jordan Smith',
+      reason: 'Missing required permit documentation.',
+      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+    },
+    render: (data: AdminListingRejectedEmailData) => {
+      const { subject, html } = getAdminListingRejectedEmail(data);
+      return { subject, preheader: `Listing rejected: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'admin_dispute_opened',
+    displayName: 'Admin: Dispute Opened',
+    description: 'Sent to admins when a dispute is opened on an order.',
+    schema: adminDisputeOpenedSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      listingId: 'LISTING_123',
+      buyerId: 'BUYER_123',
+      disputeType: 'protected_transaction_dispute',
+      reason: 'death',
+      adminOpsUrl: 'https://wildlife.exchange/dashboard/admin/ops',
+    },
+    render: (data: AdminDisputeOpenedEmailData) => {
+      const { subject, html } = getAdminDisputeOpenedEmail(data);
+      return { subject, preheader: `Dispute opened: ${data.orderId}`, html };
     },
   },
 ] as const;

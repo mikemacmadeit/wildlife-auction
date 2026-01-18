@@ -44,6 +44,14 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Offer.Accepted',
   'Offer.Declined',
   'Offer.Expired',
+
+  // ADMIN (ops / moderation)
+  'Admin.Listing.Submitted',
+  'Admin.Listing.ComplianceReviewRequired',
+  'Admin.Listing.AdminApprovalRequired',
+  'Admin.Listing.Approved',
+  'Admin.Listing.Rejected',
+  'Admin.Order.DisputeOpened',
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -245,6 +253,67 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       offerUrl: string;
+    }
+  | {
+      type: 'Admin.Listing.Submitted';
+      listingId: string;
+      listingTitle: string;
+      sellerId: string;
+      sellerName?: string;
+      category?: string;
+      listingType?: string;
+      complianceStatus?: string;
+      pendingReason?: 'admin_approval' | 'compliance_review' | 'unknown';
+      listingUrl: string;
+      adminQueueUrl: string;
+      adminComplianceUrl?: string;
+    }
+  | {
+      type: 'Admin.Listing.ComplianceReviewRequired';
+      listingId: string;
+      listingTitle: string;
+      sellerId: string;
+      sellerName?: string;
+      complianceStatus?: string;
+      listingUrl: string;
+      adminComplianceUrl: string;
+    }
+  | {
+      type: 'Admin.Listing.AdminApprovalRequired';
+      listingId: string;
+      listingTitle: string;
+      sellerId: string;
+      sellerName?: string;
+      listingUrl: string;
+      adminQueueUrl: string;
+    }
+  | {
+      type: 'Admin.Listing.Approved';
+      listingId: string;
+      listingTitle: string;
+      sellerId: string;
+      sellerName?: string;
+      listingUrl: string;
+      adminQueueUrl: string;
+    }
+  | {
+      type: 'Admin.Listing.Rejected';
+      listingId: string;
+      listingTitle: string;
+      sellerId: string;
+      sellerName?: string;
+      reason?: string;
+      adminQueueUrl: string;
+    }
+  | {
+      type: 'Admin.Order.DisputeOpened';
+      orderId: string;
+      listingId?: string;
+      listingTitle?: string;
+      buyerId: string;
+      disputeType: 'order_dispute' | 'protected_transaction_dispute';
+      reason: string;
+      adminOpsUrl: string;
     };
 
 // ------------------------

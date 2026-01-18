@@ -244,20 +244,22 @@ export default function AdminCompliancePage() {
     
     try {
       setProcessingId(listingId);
-      const listingRef = doc(db, 'listings', listingId);
-      
-      await updateDoc(listingRef, {
-        complianceStatus: 'approved' as ComplianceStatus,
-        complianceReviewedBy: user.uid,
-        complianceReviewedAt: Timestamp.now(),
-        status: 'active',
-        updatedAt: Timestamp.now(),
-        updatedBy: user.uid,
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/compliance/listings/${listingId}/approve`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
+      const jsonRes = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(jsonRes?.error || jsonRes?.message || `Failed to approve compliance (HTTP ${res.status})`);
+      }
       
       toast({
         title: '✅ Listing Approved',
-        description: 'The listing is now live and visible to buyers.',
+        description: jsonRes?.published ? 'The listing is now live and visible to buyers.' : 'Compliance approved. The listing may still require admin approval to go live.',
       });
       
       await loadPendingListings();
@@ -286,16 +288,19 @@ export default function AdminCompliancePage() {
     
     try {
       setProcessingId(listingId);
-      const listingRef = doc(db, 'listings', listingId);
-      
-      await updateDoc(listingRef, {
-        complianceStatus: 'rejected' as ComplianceStatus,
-        complianceRejectionReason: rejectionReason,
-        complianceReviewedBy: user.uid,
-        complianceReviewedAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        updatedBy: user.uid,
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/compliance/listings/${listingId}/reject`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: rejectionReason }),
       });
+      const jsonRes = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(jsonRes?.error || jsonRes?.message || `Failed to reject compliance (HTTP ${res.status})`);
+      }
       
       toast({
         title: 'Listing Rejected',

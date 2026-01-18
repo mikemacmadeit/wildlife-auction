@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
+import { emitEventToUsers } from '@/lib/notifications';
+import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -78,6 +80,33 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     updatedAt: Timestamp.now(),
     updatedBy: uid,
   });
+
+  // Notify admins (best effort).
+  try {
+    const origin = 'https://wildlife.exchange';
+    const adminUids = await listAdminRecipientUids(db as any);
+    if (adminUids.length > 0) {
+      await emitEventToUsers({
+        type: 'Admin.Listing.Approved',
+        actorId: uid,
+        entityType: 'listing',
+        entityId: listingId,
+        targetUserIds: adminUids,
+        payload: {
+          type: 'Admin.Listing.Approved',
+          listingId,
+          listingTitle: title,
+          sellerId,
+          sellerName: String(listing?.sellerSnapshot?.displayName || sellerId),
+          listingUrl: `${origin}/listing/${listingId}`,
+          adminQueueUrl: `${origin}/dashboard/admin/listings`,
+        },
+        optionalHash: `admin_listing_approved:${listingId}`,
+      });
+    }
+  } catch {
+    // ignore
+  }
 
   // Create in-app notification (server-only).
   const notifRef = db.collection('users').doc(sellerId).collection('notifications').doc();

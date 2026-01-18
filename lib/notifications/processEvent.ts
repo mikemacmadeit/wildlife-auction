@@ -263,6 +263,103 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Admin.Listing.Submitted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Submitted' }>;
+      return {
+        template: 'admin_listing_submitted',
+        templatePayload: {
+          adminName: recipientName,
+          listingTitle: p.listingTitle,
+          listingId: p.listingId,
+          sellerId: p.sellerId,
+          sellerName: p.sellerName || undefined,
+          pendingReason: p.pendingReason || 'unknown',
+          category: p.category || undefined,
+          listingType: p.listingType || undefined,
+          complianceStatus: p.complianceStatus || undefined,
+          listingUrl: p.listingUrl,
+          adminQueueUrl: p.adminQueueUrl,
+          adminComplianceUrl: p.adminComplianceUrl || undefined,
+        },
+      };
+    }
+    case 'Admin.Listing.ComplianceReviewRequired': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.ComplianceReviewRequired' }>;
+      return {
+        template: 'admin_listing_compliance_review',
+        templatePayload: {
+          adminName: recipientName,
+          listingTitle: p.listingTitle,
+          listingId: p.listingId,
+          sellerId: p.sellerId,
+          sellerName: p.sellerName || undefined,
+          complianceStatus: p.complianceStatus || undefined,
+          listingUrl: p.listingUrl,
+          adminComplianceUrl: p.adminComplianceUrl,
+        },
+      };
+    }
+    case 'Admin.Listing.AdminApprovalRequired': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.AdminApprovalRequired' }>;
+      return {
+        template: 'admin_listing_admin_approval',
+        templatePayload: {
+          adminName: recipientName,
+          listingTitle: p.listingTitle,
+          listingId: p.listingId,
+          sellerId: p.sellerId,
+          sellerName: p.sellerName || undefined,
+          listingUrl: p.listingUrl,
+          adminQueueUrl: p.adminQueueUrl,
+        },
+      };
+    }
+    case 'Admin.Listing.Approved': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Approved' }>;
+      return {
+        template: 'admin_listing_approved',
+        templatePayload: {
+          adminName: recipientName,
+          listingTitle: p.listingTitle,
+          listingId: p.listingId,
+          sellerId: p.sellerId,
+          sellerName: p.sellerName || undefined,
+          listingUrl: p.listingUrl,
+          adminQueueUrl: p.adminQueueUrl,
+        },
+      };
+    }
+    case 'Admin.Listing.Rejected': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Rejected' }>;
+      return {
+        template: 'admin_listing_rejected',
+        templatePayload: {
+          adminName: recipientName,
+          listingTitle: p.listingTitle,
+          listingId: p.listingId,
+          sellerId: p.sellerId,
+          sellerName: p.sellerName || undefined,
+          reason: p.reason || undefined,
+          adminQueueUrl: p.adminQueueUrl,
+        },
+      };
+    }
+    case 'Admin.Order.DisputeOpened': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Order.DisputeOpened' }>;
+      return {
+        template: 'admin_dispute_opened',
+        templatePayload: {
+          adminName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle || undefined,
+          listingId: p.listingId || undefined,
+          buyerId: p.buyerId,
+          disputeType: p.disputeType,
+          reason: p.reason,
+          adminOpsUrl: p.adminOpsUrl,
+        },
+      };
+    }
     default:
       return null;
   }

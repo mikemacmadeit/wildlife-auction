@@ -14,6 +14,8 @@ import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { emitEventToUsers } from '@/lib/notifications';
+import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 
 const disputeSchema = z.object({
   reason: z.string().min(1, 'Dispute reason is required').max(200, 'Reason too long'),
@@ -142,6 +144,34 @@ export async function POST(
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
     });
+
+    // Notify admins (email + in-app). Non-blocking.
+    try {
+      const origin = 'https://wildlife.exchange';
+      const adminUids = await listAdminRecipientUids(db as any);
+      if (adminUids.length > 0) {
+        await emitEventToUsers({
+          type: 'Admin.Order.DisputeOpened',
+          actorId: buyerId,
+          entityType: 'order',
+          entityId: orderId,
+          targetUserIds: adminUids,
+          payload: {
+            type: 'Admin.Order.DisputeOpened',
+            orderId,
+            listingId: typeof orderData?.listingId === 'string' ? orderData.listingId : undefined,
+            listingTitle: typeof orderData?.listingTitle === 'string' ? orderData.listingTitle : undefined,
+            buyerId,
+            disputeType: 'order_dispute',
+            reason,
+            adminOpsUrl: `${origin}/dashboard/admin/protected-transactions`,
+          },
+          optionalHash: `admin_dispute_opened:${orderId}`,
+        });
+      }
+    } catch {
+      // ignore
+    }
 
     return json({
       success: true,

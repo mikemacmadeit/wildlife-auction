@@ -14,6 +14,8 @@ import { DisputeReason, DisputeEvidence } from '@/lib/types';
 import { z } from 'zod';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { emitEventToUsers } from '@/lib/notifications';
+import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 
 const disputeSchema = z.object({
   reason: z.enum(['death', 'serious_illness', 'injury', 'escape', 'wrong_animal']),
@@ -208,6 +210,34 @@ export async function POST(
       },
       source: 'buyer_ui',
     });
+
+    // Notify admins (email + in-app). Non-blocking.
+    try {
+      const origin = 'https://wildlife.exchange';
+      const adminUids = await listAdminRecipientUids(db as any);
+      if (adminUids.length > 0) {
+        await emitEventToUsers({
+          type: 'Admin.Order.DisputeOpened',
+          actorId: buyerId,
+          entityType: 'order',
+          entityId: orderId,
+          targetUserIds: adminUids,
+          payload: {
+            type: 'Admin.Order.DisputeOpened',
+            orderId,
+            listingId: typeof orderData?.listingId === 'string' ? orderData.listingId : undefined,
+            listingTitle: typeof orderData?.listingTitle === 'string' ? orderData.listingTitle : undefined,
+            buyerId,
+            disputeType: 'protected_transaction_dispute',
+            reason,
+            adminOpsUrl: `${origin}/dashboard/admin/protected-transactions`,
+          },
+          optionalHash: `admin_dispute_opened:${orderId}`,
+        });
+      }
+    } catch {
+      // ignore
+    }
 
     return json({
       success: true,

@@ -280,6 +280,84 @@ export function buildInAppNotification(params: {
         metadata: { offerId: p.offerId },
       };
     }
+    case 'Admin.Listing.Submitted': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Submitted' }>;
+      const reason =
+        p.pendingReason === 'admin_approval'
+          ? 'admin approval'
+          : p.pendingReason === 'compliance_review'
+            ? 'compliance review'
+            : 'review';
+      return {
+        ...base,
+        type: 'admin_listing_submitted',
+        title: 'New listing submitted',
+        body: `“${p.listingTitle}” needs ${reason}.`,
+        deepLinkUrl: p.adminQueueUrl,
+        linkLabel: 'Open review queue',
+        metadata: { listingId: p.listingId, sellerId: p.sellerId, pendingReason: p.pendingReason || null },
+      };
+    }
+    case 'Admin.Listing.ComplianceReviewRequired': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.ComplianceReviewRequired' }>;
+      return {
+        ...base,
+        type: 'admin_compliance_review',
+        title: 'Compliance review needed',
+        body: `Review compliance for “${p.listingTitle}”.`,
+        deepLinkUrl: p.adminComplianceUrl,
+        linkLabel: 'Open compliance',
+        metadata: { listingId: p.listingId, sellerId: p.sellerId, complianceStatus: p.complianceStatus || null },
+      };
+    }
+    case 'Admin.Listing.AdminApprovalRequired': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.AdminApprovalRequired' }>;
+      return {
+        ...base,
+        type: 'admin_listing_admin_approval',
+        title: 'Admin approval needed',
+        body: `Approve/reject “${p.listingTitle}”.`,
+        deepLinkUrl: p.adminQueueUrl,
+        linkLabel: 'Open approvals',
+        metadata: { listingId: p.listingId, sellerId: p.sellerId },
+      };
+    }
+    case 'Admin.Listing.Approved': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Approved' }>;
+      return {
+        ...base,
+        type: 'admin_listing_approved',
+        title: 'Listing approved',
+        body: `“${p.listingTitle}” was approved.`,
+        deepLinkUrl: p.listingUrl,
+        linkLabel: 'View listing',
+        metadata: { listingId: p.listingId, sellerId: p.sellerId },
+      };
+    }
+    case 'Admin.Listing.Rejected': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Rejected' }>;
+      return {
+        ...base,
+        type: 'admin_listing_rejected',
+        title: 'Listing rejected',
+        body: p.reason ? `“${p.listingTitle}” was rejected: ${p.reason}` : `“${p.listingTitle}” was rejected.`,
+        deepLinkUrl: p.adminQueueUrl,
+        linkLabel: 'Open queue',
+        metadata: { listingId: p.listingId, sellerId: p.sellerId, reason: p.reason || null },
+      };
+    }
+    case 'Admin.Order.DisputeOpened': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Order.DisputeOpened' }>;
+      return {
+        ...base,
+        type: 'admin_dispute_opened',
+        title: 'Dispute opened',
+        body: p.listingTitle ? `Dispute opened for “${p.listingTitle}”.` : `A dispute was opened on an order.`,
+        deepLinkUrl: p.adminOpsUrl,
+        linkLabel: 'Open admin',
+        metadata: { orderId: p.orderId, buyerId: p.buyerId, disputeType: p.disputeType, reason: p.reason },
+      };
+    }
     case 'Auction.BidReceived': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Auction.BidReceived' }>;
       return {

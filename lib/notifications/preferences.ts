@@ -37,6 +37,13 @@ export interface NotificationCategoryPreferences {
   messages: {
     messageReceived: boolean;
   };
+  admin: {
+    listingSubmitted: boolean;
+    complianceReview: boolean;
+    adminApproval: boolean;
+    listingApprovedRejected: boolean;
+    disputes: boolean;
+  };
 }
 
 export interface NotificationPreferencesDoc {
@@ -110,6 +117,21 @@ export const notificationPreferencesSchema = z.object({
           messageReceived: z.boolean().default(true),
         })
         .default({ messageReceived: true }),
+      admin: z
+        .object({
+          listingSubmitted: z.boolean().default(true),
+          complianceReview: z.boolean().default(true),
+          adminApproval: z.boolean().default(true),
+          listingApprovedRejected: z.boolean().default(true),
+          disputes: z.boolean().default(true),
+        })
+        .default({
+          listingSubmitted: true,
+          complianceReview: true,
+          adminApproval: true,
+          listingApprovedRejected: true,
+          disputes: true,
+        }),
     })
     .default({
       auctions: { watchStarted: true, highBidder: true, outbid: true, endingSoon: true, wonLost: true },
@@ -117,6 +139,7 @@ export const notificationPreferencesSchema = z.object({
       onboarding: { welcome: true, profileIncomplete: true },
       marketing: { weeklyDigest: false, savedSearchAlerts: false },
       messages: { messageReceived: true },
+      admin: { listingSubmitted: true, complianceReview: true, adminApproval: true, listingApprovedRejected: true, disputes: true },
     }),
 });
 

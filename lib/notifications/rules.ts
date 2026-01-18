@@ -1,7 +1,7 @@
 import type { NotificationEventPayload, NotificationEventType, NotificationUrgency, NotificationChannel } from './types';
 import type { NotificationPreferencesDoc } from './preferences';
 
-export type NotificationCategory = 'auctions' | 'orders' | 'onboarding' | 'marketing' | 'messages';
+export type NotificationCategory = 'auctions' | 'orders' | 'onboarding' | 'marketing' | 'messages' | 'admin';
 
 export interface EventRule {
   category: NotificationCategory;
@@ -261,6 +261,20 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: type === 'Offer.Accepted' ? { push: { perHour: 10, perDay: 30 }, email: { perHour: 6, perDay: 15 } } : {},
         allowDuringQuietHours: true,
       };
+    case 'Admin.Listing.Submitted':
+    case 'Admin.Listing.ComplianceReviewRequired':
+    case 'Admin.Listing.AdminApprovalRequired':
+    case 'Admin.Listing.Approved':
+    case 'Admin.Listing.Rejected':
+    case 'Admin.Order.DisputeOpened':
+      return {
+        category: 'admin',
+        urgency: type === 'Admin.Order.DisputeOpened' ? 'critical' : 'high',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 5,
+        rateLimitPerUser: { email: { perHour: 30, perDay: 200 } },
+        allowDuringQuietHours: true,
+      };
     default:
       return {
         category: 'orders',
@@ -315,6 +329,15 @@ export function decideChannels(params: {
       }
       case 'messages': {
         return cats.messages.messageReceived;
+      }
+      case 'admin': {
+        if (params.eventType === 'Admin.Listing.Submitted') return cats.admin.listingSubmitted;
+        if (params.eventType === 'Admin.Listing.ComplianceReviewRequired') return cats.admin.complianceReview;
+        if (params.eventType === 'Admin.Listing.AdminApprovalRequired') return cats.admin.adminApproval;
+        if (params.eventType === 'Admin.Listing.Approved' || params.eventType === 'Admin.Listing.Rejected')
+          return cats.admin.listingApprovedRejected;
+        if (params.eventType === 'Admin.Order.DisputeOpened') return cats.admin.disputes;
+        return true;
       }
       default:
         return true;

@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
+import { emitEventToUsers } from '@/lib/notifications';
+import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -108,6 +110,33 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       actorId: uid,
       message: e?.message,
     });
+  }
+
+  // Notify admins (best effort).
+  try {
+    const origin = 'https://wildlife.exchange';
+    const adminUids = await listAdminRecipientUids(db as any);
+    if (adminUids.length > 0) {
+      await emitEventToUsers({
+        type: 'Admin.Listing.Rejected',
+        actorId: uid,
+        entityType: 'listing',
+        entityId: listingId,
+        targetUserIds: adminUids,
+        payload: {
+          type: 'Admin.Listing.Rejected',
+          listingId,
+          listingTitle: title,
+          sellerId,
+          sellerName: String(listing?.sellerSnapshot?.displayName || sellerId),
+          ...(reason ? { reason } : {}),
+          adminQueueUrl: `${origin}/dashboard/admin/listings`,
+        },
+        optionalHash: `admin_listing_rejected:${listingId}`,
+      });
+    }
+  } catch {
+    // ignore
   }
 
   return json({ ok: true });
