@@ -638,6 +638,90 @@ export default function ListingDetailPage() {
       </div>
 
       <div className="container mx-auto px-4 py-4 md:py-6 max-w-7xl">
+        {/* eBay-style top header (title/meta/actions above the gallery + buy box) */}
+        <div className="mb-5 md:mb-6">
+          <div className="flex items-start justify-between gap-3 sm:gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <Badge variant="outline" className="text-sm font-medium">{listing!.category}</Badge>
+                <Badge variant="outline" className="text-sm font-medium capitalize">{listing!.type}</Badge>
+                {listing!.featured && (
+                  <Badge variant="default" className="gap-1 font-medium">
+                    <Sparkles className="h-3 w-3" />
+                    Featured
+                  </Badge>
+                )}
+                {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays && (
+                  <Badge
+                    variant="default"
+                    className="bg-green-600 text-white font-medium gap-1"
+                    title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
+                  >
+                    <Shield className="h-3 w-3" />
+                    Protected {listing!.protectedTransactionDays} Days
+                  </Badge>
+                )}
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight break-words">
+                {listing!.title}
+              </h1>
+
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                {listing!.location?.city || listing!.location?.state ? (
+                  <span>
+                    {listing!.location?.city ? `${listing!.location.city}, ` : ''}
+                    {listing!.location?.state || ''}
+                  </span>
+                ) : null}
+                {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                  <span className="capitalize">Condition: {String((listing!.attributes as any).condition).replaceAll('_', ' ')}</span>
+                ) : null}
+                {listing!.type === 'auction' && !isSold && endsAtDate ? (
+                  <span>
+                    Ends{' '}
+                    <span className="font-medium text-foreground">
+                      {format(endsAtDate, 'MMM d, h:mm a')}
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+
+              <ListingActivityMetrics
+                className="mt-3"
+                variant="inline"
+                views={listing!.metrics?.views || 0}
+                favorites={0}
+                bids={listing!.metrics?.bidCount || 0}
+                watchers={listing!.metrics?.favorites || 0}
+                bidsLastHour={bidsLastHour}
+                inquiries={0}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleShare}
+                className="h-10 w-10"
+                title="Share listing"
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleAddToWatchlist}
+                className={cn('h-10 w-10', isFavorite(listing!.id) && 'text-destructive border-destructive')}
+                title={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
+              >
+                <Heart className={cn('h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Main Content Grid - Responsive Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           {/* Left Column - Main Content (7 columns on desktop, full width on mobile) */}
@@ -651,108 +735,45 @@ export default function ListingDetailPage() {
               <ImageGallery images={listing!.images} title={listing!.title} />
             </motion.div>
 
-            {/* Header Section - Title, Badges, Actions */}
-            <div className="space-y-4">
-            {/* Title Row */}
-            <div className="flex items-start justify-between gap-3 sm:gap-4">
-              <div className="flex-1 min-w-0">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 leading-tight break-words">{listing!.title}</h1>
-                <div className="flex flex-wrap items-center gap-2 mb-4">
-                  <Badge variant="outline" className="text-sm font-medium">{listing!.category}</Badge>
-                  <Badge variant="outline" className="text-sm font-medium capitalize">{listing!.type}</Badge>
-                  {listing!.featured && (
-                    <Badge variant="default" className="gap-1 font-medium">
-                      <Sparkles className="h-3 w-3" />
-                      Featured
-                    </Badge>
-                  )}
-                  {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays && (
-                    <Badge 
-                      variant="default" 
-                      className="bg-green-600 text-white font-medium gap-1"
-                      title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
-                    >
-                      <Shield className="h-3 w-3" />
-                      Protected {listing!.protectedTransactionDays} Days
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Activity Metrics (primary social proof) */}
-                <ListingActivityMetrics
-                  className="max-w-2xl"
-                  views={listing!.metrics?.views || 0}
-                  favorites={0} // avoid duplicating "watching" vs "favorites" until we have a distinct favorites metric
-                  bids={listing!.metrics?.bidCount || 0}
-                  watchers={listing!.metrics?.favorites || 0}
-                  bidsLastHour={bidsLastHour}
-                  inquiries={0}
-                />
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleShare}
-                  className="h-10 w-10"
-                  title="Share listing"
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleAddToWatchlist}
-                  className={cn('h-10 w-10', isFavorite(listing!.id) && 'text-destructive border-destructive')}
-                  title={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
-                >
-                  <Heart className={cn('h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
-                </Button>
-              </div>
-            </div>
-
-            {/* Price - Prominent Display */}
-            <Card className="border-2 bg-gradient-to-br from-primary/5 via-card to-card shadow-lg">
-              <CardContent className="pt-6 pb-6">
-                <div className="space-y-3">
-                  <div className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    {listing!.type === 'auction' ? 'Current Bid' : 'Price'}
-                  </div>
-                  <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
-                    <span className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground">
-                      ${(listing!.type === 'auction' 
-                        ? (listing!.currentBid || listing!.startingBid || 0)
-                        : (listing!.price || 0)).toLocaleString()}
-                    </span>
-                    {listing!.type === 'auction' && listing!.currentBid && (
-                      <span className="text-base text-muted-foreground">
-                        (Current Bid)
+            {/* Price - Prominent Display (Mobile only; desktop price lives in the buy box) */}
+            <div className="lg:hidden">
+              <Card className="border-2 bg-gradient-to-br from-primary/5 via-card to-card shadow-lg">
+                <CardContent className="pt-6 pb-6">
+                  <div className="space-y-3">
+                    <div className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      {listing!.type === 'auction' ? 'Current Bid' : 'Price'}
+                    </div>
+                    <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
+                      <span className="text-3xl sm:text-4xl font-extrabold text-foreground">
+                        ${(listing!.type === 'auction'
+                          ? (listing!.currentBid || listing!.startingBid || 0)
+                          : (listing!.price || 0)).toLocaleString()}
                       </span>
-                    )}
-                  </div>
-                  {listing!.type === 'auction' && listing!.startingBid && (
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                      <span>
-                        Starting: <span className="font-semibold text-foreground">${listing!.startingBid.toLocaleString()}</span>
-                      </span>
-                      {listing!.reservePrice && (
-                        <>
-                          <span className="text-border">•</span>
-                          <span>
-                            Reserve: <span className="font-semibold text-foreground">${listing!.reservePrice.toLocaleString()}</span>
-                          </span>
-                        </>
+                      {listing!.type === 'auction' && listing!.currentBid && (
+                        <span className="text-base text-muted-foreground">(Current Bid)</span>
                       )}
                     </div>
-                  )}
-                  {listing!.type === 'fixed' && listing!.price && (
-                    <div className="text-sm text-muted-foreground">
-                      Fixed price listing
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    {listing!.type === 'auction' && listing!.startingBid && (
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                        <span>
+                          Starting: <span className="font-semibold text-foreground">${listing!.startingBid.toLocaleString()}</span>
+                        </span>
+                        {listing!.reservePrice && (
+                          <>
+                            <span className="text-border">•</span>
+                            <span>
+                              Reserve: <span className="font-semibold text-foreground">${listing!.reservePrice.toLocaleString()}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {listing!.type === 'fixed' && listing!.price && (
+                      <div className="text-sm text-muted-foreground">Fixed price listing</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Bidding Section - Below Price (Mobile Only) */}

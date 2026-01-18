@@ -11,6 +11,7 @@ interface ListingActivityMetricsProps {
   bidsLastHour?: number;
   inquiries?: number;
   className?: string;
+  variant?: 'cards' | 'inline';
 }
 
 export function ListingActivityMetrics({
@@ -20,7 +21,8 @@ export function ListingActivityMetrics({
   watchers = 0,
   bidsLastHour = 0,
   inquiries = 0,
-  className
+  className,
+  variant = 'cards',
 }: ListingActivityMetricsProps) {
   const metrics = [
     {
@@ -90,6 +92,25 @@ export function ListingActivityMetrics({
       hoverBorder: 'hover:border-[hsl(90,18%,35%)]/90 dark:hover:border-primary/70',
     },
   ].filter(m => m.value !== undefined && m.value > 0);
+
+  if (variant === 'inline') {
+    return (
+      <div className={cn('w-full', className)}>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          {metrics.map((m) => {
+            const Icon = m.icon;
+            return (
+              <div key={m.label} className="flex items-center gap-1.5">
+                <Icon className={cn('h-4 w-4', m.iconColor)} />
+                <span className={cn('font-semibold tabular-nums', m.valueColor)}>{m.value.toLocaleString()}</span>
+                <span className="text-muted-foreground">{m.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('w-full', className)}>
