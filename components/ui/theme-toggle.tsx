@@ -15,14 +15,10 @@ export function ThemeToggle({ className }: { className?: string }) {
     const stored = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const initialTheme = stored || 'light'; // Default to light, ignore system preference
     setTheme(initialTheme);
-    
-    // Ensure dark class is removed on initial load
-    document.documentElement.classList.remove('dark');
-    if (initialTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    // IMPORTANT: Never "flip" the class twice (remove then add).
+    // That causes a visible flash (light sand) when this component mounts/remounts.
+    if (initialTheme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   }, []);
 
   const toggleTheme = () => {

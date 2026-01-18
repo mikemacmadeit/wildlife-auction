@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import localFont from 'next/font/local';
+import Script from 'next/script';
 import { ConditionalNavbar } from '@/components/navigation/ConditionalNavbar';
 import { ConditionalFooter } from '@/components/navigation/ConditionalFooter';
 import { Toaster } from '@/components/ui/toaster';
@@ -101,6 +102,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.className} ${foundersGrotesk.variable}`}>
+        {/* Prevent theme flash (FOUC) by applying `.dark` before first paint based on localStorage. */}
+        <Script id="we-theme-init" strategy="beforeInteractive">
+          {`
+            (function () {
+              try {
+                var t = localStorage.getItem('theme');
+                if (t === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+              } catch (e) {}
+            })();
+          `}
+        </Script>
         <Providers>
           {!gateAllowed ? (
             <SiteGateOverlay />
