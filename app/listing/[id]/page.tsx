@@ -132,7 +132,6 @@ export default function ListingDetailPage() {
   const [bidAmount, setBidAmount] = useState('');
   const [selectedInsurance, setSelectedInsurance] = useState<string>('');
   const [showBidDialog, setShowBidDialog] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
@@ -444,7 +443,6 @@ export default function ListingDetailPage() {
       });
 
       setShowBidDialog(false);
-      setShowConfirmDialog(false);
       setBidAmount('');
     } catch (error: any) {
       // Handle specific error messages
@@ -901,57 +899,15 @@ export default function ListingDetailPage() {
 
                     <Separator />
 
-                    {/* Bid Calculator */}
-                    <div className="space-y-3">
-                      <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                        Quick Bid Amounts
-                      </div>
-                      <BidIncrementCalculator
-                        currentBid={listing!.currentBid || listing!.startingBid || 0}
-                        startingBid={listing!.startingBid || 0}
-                        hasAnyBids={Boolean(listing!.currentBidderId) || Number(listing!.metrics?.bidCount || 0) > 0}
-                        onBidChange={(amount) => setBidAmount(amount.toString())}
-                      />
-                    </div>
-
-                    <Separator />
-
-                    {/* Bid Input & Button */}
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="bid-amount-mobile" className="text-sm font-semibold mb-2 block">
-                          Enter Your Bid Amount
-                        </Label>
-                        <Input
-                          id="bid-amount-mobile"
-                          type="number"
-                          value={bidAmount}
-                          onChange={(e) => setBidAmount(e.target.value)}
-                          placeholder="0.00"
-                          className="text-lg h-12"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Minimum bid: ${minBidUsd.toLocaleString()}
-                        </p>
-                      </div>
-                      <AutoBidPanel
-                        auctionId={listing!.id}
-                        currentBidUsd={listing!.currentBid || listing!.startingBid || 0}
-                        currentHighBidderId={listing!.currentBidderId || null}
-                      />
-                      <Button
-                        onClick={() => {
-                          setShowBidDialog(false);
-                          setShowConfirmDialog(true);
-                        }}
-                        className="w-full min-h-[52px] text-base font-bold shadow-lg"
-                        disabled={!bidAmount || isNaN(parseFloat(bidAmount))}
-                        size="lg"
-                      >
-                        <Gavel className="mr-2 h-5 w-5" />
-                        Place Bid
-                      </Button>
-                    </div>
+                    {/* eBay-style: open a compact bid modal (same as desktop) */}
+                    <Button
+                      onClick={() => setShowBidDialog(true)}
+                      className="w-full min-h-[52px] text-base font-bold shadow-lg"
+                      size="lg"
+                    >
+                      <Gavel className="mr-2 h-5 w-5" />
+                      Place bid
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -1406,48 +1362,132 @@ export default function ListingDetailPage() {
                               Place a Bid
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-md">
+                          <DialogContent className="max-w-md border-2">
                             <DialogHeader>
-                              <DialogTitle>Place Your Bid</DialogTitle>
-                              <DialogDescription>
+                              <DialogTitle>Place bid</DialogTitle>
+                              <DialogDescription className="sr-only">
                                 Enter your max bid (proxy bidding). Minimum: ${minBidUsd.toLocaleString()}
                               </DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="bid-amount">Max Bid</Label>
-                                <Input
-                                  id="bid-amount"
-                                  type="number"
-                                  value={bidAmount}
-                                  onChange={(e) => setBidAmount(e.target.value)}
-                                  placeholder="0.00"
-                                  className="mt-1 text-lg"
-                                />
-                              </div>
-                              <BidIncrementCalculator
-                                currentBid={listing!.currentBid || listing!.startingBid || 0}
-                                startingBid={listing!.startingBid || 0}
-                                hasAnyBids={Boolean(listing!.currentBidderId) || Number(listing!.metrics?.bidCount || 0) > 0}
-                                onBidChange={(amount) => setBidAmount(amount.toString())}
-                              />
-                              <AutoBidPanel
-                                auctionId={listing!.id}
-                                currentBidUsd={listing!.currentBid || listing!.startingBid || 0}
-                                currentHighBidderId={listing!.currentBidderId || null}
-                              />
-                              <Button
-                                onClick={() => {
-                                  setShowBidDialog(false);
-                                  setShowConfirmDialog(true);
-                                }}
-                                className="w-full"
-                                disabled={!bidAmount || isNaN(parseFloat(bidAmount))}
-                                size="lg"
-                              >
-                                Continue to Confirmation
-                              </Button>
-                            </div>
+
+                            {(() => {
+                              const currentBid = listing!.currentBid || listing!.startingBid || 0;
+                              const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
+                              const hasAnyBids = Boolean((listing as any)?.currentBidderId) || bidCount > 0;
+                              const current = Number(currentBid) || 0;
+                              const inc = Math.max(current * 0.05, 50);
+                              const q1 = Math.max(0, minBidUsd);
+                              const q2 = Math.ceil(q1 + inc);
+                              const q3 = Math.ceil(q1 + inc * 2);
+                              const timeLeft = endsAtDate ? formatDistanceToNow(endsAtDate) : null;
+
+                              return (
+                                <div className="space-y-4">
+                                  {/* Header summary (eBay-like) */}
+                                  <div className="rounded-lg border bg-muted/20 p-3">
+                                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Current bid</div>
+                                    <div className="text-2xl font-extrabold tracking-tight">
+                                      ${Number(currentBid || 0).toLocaleString()}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      {bidCount.toLocaleString()} bids{timeLeft ? ` • ${timeLeft} left` : ''}
+                                    </div>
+                                  </div>
+
+                                  {/* Quick bids */}
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {[q1, q2, q3].map((amt) => (
+                                        <Button
+                                          key={amt}
+                                          type="button"
+                                          variant="outline"
+                                          className="font-bold"
+                                          onClick={() => setBidAmount(String(amt))}
+                                        >
+                                          Bid ${amt.toLocaleString()}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                    <div className="text-center text-xs text-muted-foreground">or</div>
+                                  </div>
+
+                                  {/* Max bid input */}
+                                  <div className="space-y-2">
+                                    <Label htmlFor="bid-amount" className="text-sm font-semibold">
+                                      Your max bid
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-sm font-semibold text-muted-foreground">$</div>
+                                      <Input
+                                        id="bid-amount"
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={bidAmount}
+                                        onChange={(e) => setBidAmount(e.target.value)}
+                                        placeholder={String(minBidUsd)}
+                                        className="text-lg"
+                                      />
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Enter ${minBidUsd.toLocaleString()} or more.
+                                    </div>
+                                  </div>
+
+                                  <Button
+                                    onClick={handlePlaceBid}
+                                    className="w-full min-h-[48px] text-base font-bold"
+                                    disabled={!bidAmount || isNaN(parseFloat(bidAmount)) || parseFloat(bidAmount) < minBidUsd || isPlacingBid}
+                                    size="lg"
+                                  >
+                                    {isPlacingBid ? 'Placing bid…' : 'Bid'}
+                                  </Button>
+
+                                  {/* Payment & delivery (collapsed by default) */}
+                                  <Accordion type="single" collapsible className="w-full">
+                                    <AccordionItem value="pay">
+                                      <AccordionTrigger className="text-sm">Payment &amp; delivery</AccordionTrigger>
+                                      <AccordionContent className="text-sm">
+                                        <div className="space-y-3">
+                                          <div>
+                                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pay with</div>
+                                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                              <VisaBadge />
+                                              <MastercardBadge />
+                                              <AmexBadge />
+                                              <ApplePayBadge />
+                                              <GooglePayBadge />
+                                              <LinkBadge />
+                                              <AchBadge
+                                                disabled={!eligiblePaymentMethods.includes('ach_debit')}
+                                                title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : 'Bank (ACH)'}
+                                              />
+                                              <WireBadge
+                                                disabled={!eligiblePaymentMethods.includes('wire')}
+                                                title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : 'Wire'}
+                                              />
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery</div>
+                                            <div className="text-xs text-muted-foreground mt-1">
+                                              Delivery / pickup is coordinated with the seller after the auction ends.
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </AccordionContent>
+                                    </AccordionItem>
+                                  </Accordion>
+
+                                  <div className="text-[11px] text-muted-foreground">
+                                    By clicking <span className="font-semibold">Bid</span>, you authorize Wildlife Exchange to bid up to your max bid and,
+                                    if you win, charge your payment method. You agree to our{' '}
+                                    <Link href="/terms" className="underline underline-offset-4">Terms</Link> and acknowledge our{' '}
+                                    <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>.
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </DialogContent>
                         </Dialog>
                       )}
@@ -1925,41 +1965,7 @@ export default function ListingDetailPage() {
 
       <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
 
-      {/* Bid Confirmation Dialog */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Your Bid</DialogTitle>
-            <DialogDescription>
-              You are about to place a bid of ${bidAmount ? parseFloat(bidAmount).toLocaleString() : '0'}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Listing</p>
-              <p className="font-semibold">{listing!.title}</p>
-              <p className="text-sm text-muted-foreground mt-2 mb-1">Your Bid</p>
-              <p className="text-2xl font-bold">${bidAmount ? parseFloat(bidAmount).toLocaleString() : '0'}</p>
-            </div>
-            <Button
-              onClick={handlePlaceBid}
-              className="w-full"
-              disabled={isPlacingBid}
-              size="lg"
-            >
-              {isPlacingBid ? 'Placing Bid...' : 'Confirm Bid'}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-              className="w-full"
-              disabled={isPlacingBid}
-            >
-              Cancel
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* eBay-style bid modal is handled inline in the auction CTA block above */}
     </div>
   );
 }
