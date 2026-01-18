@@ -1,4 +1,4 @@
-## Phase 9 — Exposure Plans (Standard / Priority / Premier)
+## Phase 9 — Seller Tiers (Standard / Priority / Premier)
 
 ### Goal
 - **Flat marketplace fee**: 5% for all sellers and categories (no fee discounts).

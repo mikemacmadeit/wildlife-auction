@@ -1,5 +1,5 @@
 /**
- * Plan Card Component (Exposure Plans)
+ * Plan Card Component (Seller Tiers)
  *
  * Subscriptions are optional and only affect exposure/badges (not fees, not listing limits).
  */
@@ -196,7 +196,7 @@ export function PlanCard({ userProfile, activeListingsCount, onUpdate }: PlanCar
             </div>
             {showUpgrade && (
               <Button asChild size="sm" className="font-semibold" disabled={!!loading}>
-                <Link href="/pricing">View Exposure Plans</Link>
+                <Link href="/pricing">View Seller Tiers</Link>
               </Button>
             )}
           </div>
@@ -238,7 +238,7 @@ export function PlanCard({ userProfile, activeListingsCount, onUpdate }: PlanCar
           )}
 
           <p className="text-xs text-muted-foreground">
-            Seller tier reflects an optional exposure plan and does not indicate regulatory compliance approval.
+            Seller tier reflects an optional placement + styling tier and does not indicate regulatory compliance approval.
           </p>
 
           {/* Action Buttons */}
@@ -334,7 +334,7 @@ export function PlanCard({ userProfile, activeListingsCount, onUpdate }: PlanCar
           <DialogHeader>
             <DialogTitle>Cancel Subscription</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel your subscription? You'll lose exposure plan benefits and revert to Standard.
+              Are you sure you want to cancel your subscription? You'll lose seller tier benefits and revert to Standard.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">

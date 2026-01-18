@@ -55,7 +55,7 @@ export function calculatePlatformFee(amount: number): number {
  * @returns Platform fee in cents
  */
 export function calculatePlatformFeeForPlan(amount: number, _planId: string | null | undefined): number {
-  // Exposure Plans do not affect the marketplace fee; keep it flat.
+  // Seller Tiers do not affect the marketplace fee; keep it flat.
   return calculatePlatformFee(amount);
 }
 

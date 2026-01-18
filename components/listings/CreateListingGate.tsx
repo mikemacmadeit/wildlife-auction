@@ -23,7 +23,7 @@ export function CreateListingGateLink(props: {
       router.push('/login');
       return;
     }
-    // Exposure Plans model: Standard sellers are never blocked from listing.
+    // Seller Tiers model: Standard sellers are never blocked from listing.
     router.push(href);
   }, [href, router, user]);
 

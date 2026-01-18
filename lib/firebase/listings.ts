@@ -1060,7 +1060,7 @@ export const queryListingsForBrowse = async (
       });
     }
 
-    // Exposure Plans: deterministic tier boost without breaking relevance.
+    // Seller Tiers: deterministic tier boost without breaking relevance.
     // Primary: seller tier weight DESC (standard=0, priority=10, premier=20)
     // Secondary: the existing sort choice (createdAt/price/endsAt)
     const getSecondaryKey = (l: Listing): number => {

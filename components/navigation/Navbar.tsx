@@ -68,7 +68,7 @@ export function Navbar() {
 
   const howItWorksItems = [
     { href: '/how-it-works', label: 'Overview' },
-    { href: '/how-it-works/plans', label: 'Exposure Plans' },
+    { href: '/how-it-works/plans', label: 'Seller Tiers' },
     { href: '/how-it-works/trust', label: 'Trust & Compliance' },
   ];
 

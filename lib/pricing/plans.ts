@@ -1,5 +1,5 @@
 /**
- * Exposure Plans (Subscription Model)
+ * Seller Tiers (Subscription Model)
  *
  * IMPORTANT:
  * - Marketplace fee is flat at 5% for all sellers and categories (not tier-based).

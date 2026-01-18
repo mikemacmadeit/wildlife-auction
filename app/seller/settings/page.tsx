@@ -139,7 +139,7 @@ export default function SellerSettingsPage() {
               className="min-h-[44px] font-semibold data-[state=active]:bg-background whitespace-nowrap min-w-[160px] justify-center"
             >
               <CreditCard className="h-4 w-4 mr-2" />
-              Exposure Plans
+              Seller Tiers
             </TabsTrigger>
             <TabsTrigger
               value="business"

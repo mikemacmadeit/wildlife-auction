@@ -1,7 +1,7 @@
 /**
  * POST /api/stripe/subscriptions/create
  * 
- * Create a Stripe subscription for Exposure Plans:
+ * Create a Stripe subscription for Seller Tiers:
  * - Priority Seller ($99/mo)
  * - Premier Seller ($299/mo)
  */

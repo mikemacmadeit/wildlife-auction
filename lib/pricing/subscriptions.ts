@@ -1,5 +1,5 @@
 /**
- * Exposure Plans (Subscription Tiers)
+ * Seller Tiers (Subscription Tiers)
  *
  * Single source of truth for mapping legacy plan fields to the new subscriptionTier:
  * - free  -> standard

@@ -34,7 +34,7 @@ import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { cn } from '@/lib/utils';
-// Exposure Plans model: no listing limits.
+// Seller Tiers model: no listing limits.
 
 function NewListingPageContent() {
   const router = useRouter();
@@ -46,7 +46,7 @@ function NewListingPageContent() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showPendingApprovalModal, setShowPendingApprovalModal] = useState(false);
   const [submittedListingId, setSubmittedListingId] = useState<string | null>(null);
-  // (No listing-limit gating in Exposure Plans model)
+  // (No listing-limit gating in Seller Tiers model)
   const [sellerAttestationAccepted, setSellerAttestationAccepted] = useState(false);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';

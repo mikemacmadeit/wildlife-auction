@@ -87,7 +87,7 @@ export const createUserDocument = async (
       userId: user.uid,
       email: email || '',
       emailVerified,
-      // Exposure Plans default
+      // Seller Tiers default
       subscriptionTier: 'standard',
       profile: {
         fullName: additionalData?.fullName || displayName || '',

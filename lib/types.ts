@@ -270,7 +270,7 @@ export interface Listing {
   };
 
   /**
-   * Seller tier (Exposure Plans).
+   * Seller tier (Seller Tiers).
    * Not stored on listing by default; typically decorated at runtime for browse/ranking + UI badges.
    */
   sellerTier?: 'standard' | 'priority' | 'premier';
@@ -557,8 +557,8 @@ export interface UserProfile {
   superAdmin?: boolean; // Legacy super admin flag (deprecated - use role instead)
   profileComplete?: boolean; // Flag to track if profile completion modal was shown/completed
   /**
-   * Exposure Plans tier (single source of truth).
-   * NOTE: This tier is for exposure/badges only and does NOT imply compliance approval.
+   * Seller tier (single source of truth).
+   * NOTE: This tier is for placement/badges only and does NOT imply compliance approval.
    */
   subscriptionTier?: 'standard' | 'priority' | 'premier';
   /**
@@ -573,7 +573,7 @@ export interface UserProfile {
   subscriptionCancelAtPeriodEnd?: boolean; // Whether subscription is set to cancel at period end
   adminPlanOverride?: string; // Admin override plan (legacy). Maps into subscriptionTier.
   /**
-   * @deprecated Fee overrides are not used in the Exposure Plans model (marketplace fee is flat).
+   * @deprecated Fee overrides are not used in the Seller Tiers model (marketplace fee is flat).
    * Kept only for backward compatibility with older data.
    */
   adminFeeOverride?: number;

@@ -1,7 +1,7 @@
 /**
  * POST /api/listings/publish
  * 
- * Server-side listing publish (Exposure Plans model: NO listing limits)
+ * Server-side listing publish (Seller Tiers model: NO listing limits)
  */
 
 // IMPORTANT:

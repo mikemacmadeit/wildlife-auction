@@ -1,7 +1,7 @@
 /**
  * POST /api/listings/check-limit
  * 
- * Exposure Plans model: listing limits are NOT enforced.
+ * Seller Tiers model: listing limits are NOT enforced.
  * This endpoint is kept for backward compatibility with older clients.
  */
 

@@ -59,8 +59,8 @@ export default function PricingPage() {
       priceLabel: 'Free',
       period: '',
       icon: Gavel,
-      gradient: 'from-secondary to-secondary/90',
-      borderColor: 'border-primary/20',
+      gradient: 'standard',
+      borderColor: 'border-border/50',
       badge: null,
       features: [
         'Unlimited listings',
@@ -79,7 +79,7 @@ export default function PricingPage() {
       priceLabel: `$${PLAN_CONFIG.priority.monthlyPrice}`,
       period: '/month',
       icon: TrendingUp,
-      gradient: 'from-primary to-primary/90',
+      gradient: 'priority',
       borderColor: 'border-primary/30',
       badge: 'Most Popular',
       features: [
@@ -99,8 +99,8 @@ export default function PricingPage() {
       priceLabel: `$${PLAN_CONFIG.premier.monthlyPrice}`,
       period: '/month',
       icon: Crown,
-      gradient: 'from-secondary to-secondary/90',
-      borderColor: 'border-primary/20',
+      gradient: 'premier',
+      borderColor: 'border-amber-500/25',
       badge: null,
       features: [
         'Premier Seller badge',
@@ -211,7 +211,8 @@ export default function PricingPage() {
     <div className="min-h-screen bg-background pb-24 md:pb-4">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-background">
-        <div className="absolute inset-0 bg-secondary/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
+        <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(to_right,hsl(var(--border)/0.25)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.25)_1px,transparent_1px)] [background-size:48px_48px]" />
         
         <div className="relative container mx-auto px-4 py-16 md:py-24 lg:py-32">
           <motion.div
@@ -231,7 +232,7 @@ export default function PricingPage() {
                 <Sparkles className="relative h-12 w-12 md:h-16 md:w-16 text-primary" />
               </div>
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight font-founders">
-                <span className="gradient-text">Exposure Plans</span>
+                <span className="gradient-text-muted">Seller Tiers</span>
               </h1>
             </motion.div>
 
@@ -241,7 +242,7 @@ export default function PricingPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight font-founders"
             >
-              Exposure Plans for sellers
+              Better placement. Better trust signals.
             </motion.h2>
 
             <motion.p
@@ -250,7 +251,7 @@ export default function PricingPage() {
               transition={{ duration: 0.6, delay: 0.6 }}
               className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
             >
-              All sellers pay the same 5% marketplace fee. Plans are optional and provide exposure and seller-tier badges.
+              All sellers pay the same 5% marketplace fee. Seller tiers are optional and improve placement + styling.
             </motion.p>
           </motion.div>
         </div>
@@ -267,7 +268,7 @@ export default function PricingPage() {
         >
           <motion.div variants={itemVariants} className="text-center space-y-3">
             <Badge className="px-4 py-1.5 text-sm font-bold bg-primary/10 border-primary/20 text-primary mb-2">
-              Exposure Plans
+              Seller Tiers
             </Badge>
             <h2 className="text-3xl md:text-5xl font-extrabold text-foreground font-founders">
               Choose Your Plan
@@ -292,9 +293,7 @@ export default function PricingPage() {
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
                       <Badge className={cn(
                         'px-4 py-1.5 text-sm font-bold shadow-lg',
-                        'bg-accent text-accent-foreground',
-                        'text-white border border-yellow-300/50',
-                        'animate-pulse'
+                        'bg-primary text-primary-foreground border border-primary/30'
                       )}>
                         <Sparkles className="h-3 w-3 mr-1 fill-current" />
                         {tier.badge}
@@ -314,9 +313,9 @@ export default function PricingPage() {
                     {/* Decorative gradient background */}
                     <div className={cn(
                       'absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500',
-                      tier.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary/5 via-secondary/5 to-transparent',
-                      tier.gradient === 'from-primary to-primary/90' && 'bg-card/50',
-                      tier.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary/5 via-secondary/5 to-transparent'
+                      tier.gradient === 'standard' && 'bg-gradient-to-br from-muted/40 via-background to-transparent',
+                      tier.gradient === 'priority' && 'bg-gradient-to-br from-primary/10 via-background to-transparent',
+                      tier.gradient === 'premier' && 'bg-gradient-to-br from-amber-500/10 via-background to-transparent'
                     )} />
                     
                     <CardHeader className="relative z-10 pb-4">
@@ -325,11 +324,11 @@ export default function PricingPage() {
                           'w-16 h-16 rounded-2xl flex items-center justify-center',
                           'shadow-lg shadow-primary/20',
                           'group-hover:scale-110 transition-transform duration-300',
-                          tier.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary to-secondary/90',
-                          tier.gradient === 'from-primary to-primary/90' && 'bg-primary text-primary-foreground',
-                          tier.gradient === 'from-secondary to-secondary/90' && 'bg-gradient-to-br from-secondary to-secondary/90'
+                          tier.gradient === 'standard' && 'bg-muted text-foreground',
+                          tier.gradient === 'priority' && 'bg-primary text-primary-foreground',
+                          tier.gradient === 'premier' && 'bg-amber-500 text-amber-950'
                         )}>
-                          <Icon className="h-8 w-8 text-white" />
+                          <Icon className={cn('h-8 w-8', tier.gradient === 'standard' ? 'text-foreground' : 'text-white')} />
                         </div>
                         {tier.badge && !tier.popular && (
                           <Badge variant="outline" className="font-semibold">
@@ -432,7 +431,7 @@ export default function PricingPage() {
               5% marketplace fee
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              All sellers pay the same 5% marketplace fee. Exposure Plans do not change fees.
+              All sellers pay the same 5% marketplace fee. Seller tiers do not change fees.
             </p>
           </motion.div>
 
@@ -572,7 +571,7 @@ export default function PricingPage() {
               },
               {
                 q: 'Can I change my plan later?',
-                a: 'Yes! You can upgrade, downgrade, or cancel your exposure plan at any time. Changes take effect immediately.',
+                a: 'Yes! You can upgrade, downgrade, or cancel your seller tier at any time. Changes take effect immediately.',
               },
               {
                 q: 'What payment methods do you accept?',

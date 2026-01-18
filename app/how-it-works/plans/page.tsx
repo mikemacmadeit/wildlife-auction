@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import PricingPage from '@/app/pricing/page';
 
 export const metadata: Metadata = {
-  title: 'Exposure Plans | Wildlife Exchange',
-  description: 'Learn about Wildlife Exchange seller exposure plans and how tiering affects placement and visibility.',
+  title: 'Seller Tiers | Wildlife Exchange',
+  description: 'Learn about Wildlife Exchange seller tiers and how placement and badges work.',
   alternates: { canonical: '/how-it-works/plans' },
 };
 

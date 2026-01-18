@@ -100,18 +100,18 @@ export default function SellerReputationPage() {
           </p>
         </div>
 
-        {/* Seller Tier (Exposure Plans) */}
+        {/* Seller Tier */}
         <Card className="border-2 border-border/50 bg-card">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-xl font-extrabold">Seller Tier</CardTitle>
                 <CardDescription>
-                  Optional exposure plan tier (does not indicate compliance approval)
+                  Optional placement + badge tier (does not indicate compliance approval)
                 </CardDescription>
               </div>
               <Button asChild variant="outline" className="font-semibold">
-                <Link href="/pricing">View Exposure Plans</Link>
+                <Link href="/pricing">View Seller Tiers</Link>
               </Button>
             </div>
           </CardHeader>
@@ -121,7 +121,7 @@ export default function SellerReputationPage() {
             </Badge>
             <SellerTierBadge tier={tier} />
             <span className="text-xs text-muted-foreground">
-              Seller tier reflects optional exposure benefits only.
+              Seller tier reflects optional placement + styling benefits only.
             </span>
           </CardContent>
         </Card>

@@ -700,7 +700,7 @@ export default function SellerPayoutsPage() {
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
                 <p className="text-sm font-semibold text-foreground mb-1">Transaction Fee</p>
                 <p className="text-2xl font-extrabold text-primary mb-1">5%</p>
-                <p className="text-xs text-muted-foreground">Flat marketplace fee for all sellers (Exposure Plans do not change fees)</p>
+                <p className="text-xs text-muted-foreground">Flat marketplace fee for all sellers (Seller tiers do not change fees)</p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
                 <p className="text-sm font-semibold text-foreground mb-1">Subscription</p>

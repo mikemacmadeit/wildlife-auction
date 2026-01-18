@@ -247,7 +247,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   <span className="text-xs font-semibold text-muted-foreground max-w-[160px] truncate">
                     {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
                   </span>
-                  {/* Seller Tier badge (Exposure Plans) */}
+                  {/* Seller Tier badge (Seller Tiers) */}
                   <SellerTierBadge tier={(listing as any).sellerTier} />
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">

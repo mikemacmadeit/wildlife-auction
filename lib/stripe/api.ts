@@ -692,7 +692,7 @@ export async function adminSetOrderHold(orderId: string, hold: boolean, reason: 
 }
 
 /**
- * Create a Stripe subscription for Exposure Plans (Priority/Premier)
+ * Create a Stripe subscription for Seller Tiers (Priority/Premier)
  */
 export async function createSubscription(planId: 'priority' | 'premier' | 'pro' | 'elite'): Promise<{
   subscriptionId: string;

@@ -1,5 +1,5 @@
 /**
- * Seller Tier Badge (Exposure Plans)
+ * Seller Tier Badge (Seller Tiers)
  * Shows Priority/Premier chips with a disclaimer tooltip.
  */
 
@@ -41,7 +41,7 @@ export function SellerTierBadge(props: {
           </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-[260px] text-xs leading-relaxed">
-          Seller tier reflects an optional exposure plan and does not indicate regulatory compliance approval.
+          Seller tier reflects an optional placement + styling tier and does not indicate regulatory compliance approval.
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

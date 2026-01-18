@@ -405,7 +405,7 @@ export async function handleInvoicePaymentFailed(
     const userDoc = await userRef.get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
-    // Exposure Plans: payment failure reverts the effective tier to Standard unless admin override.
+    // Seller Tiers: payment failure reverts the effective tier to Standard unless admin override.
     const adminOverridePlan = userData?.adminPlanOverride;
     const effectiveTier: SubscriptionTier = adminOverridePlan
       ? mapLegacyPlanToTier(String(adminOverridePlan))
