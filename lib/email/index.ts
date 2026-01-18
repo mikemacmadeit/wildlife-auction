@@ -23,6 +23,7 @@ import {
   getProfileIncompleteReminderEmail,
   getWeeklyDigestEmail,
   getSavedSearchAlertEmail,
+  getMessageReceivedEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
@@ -38,6 +39,7 @@ import {
   type ProfileIncompleteReminderEmailData,
   type WeeklyDigestEmailData,
   type SavedSearchAlertEmailData,
+  type MessageReceivedEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -174,6 +176,15 @@ const savedSearchAlertSchema = z.object({
   resultsCount: z.number().int().nonnegative(),
   searchUrl: urlSchema,
   unsubscribeUrl: urlSchema.optional(),
+});
+
+const messageReceivedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  threadUrl: urlSchema,
+  listingUrl: urlSchema,
+  senderRole: z.enum(['buyer', 'seller']),
+  preview: z.string().optional(),
 });
 
 export const EMAIL_EVENT_REGISTRY = [
@@ -425,6 +436,24 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: SavedSearchAlertEmailData) => {
       const { subject, html } = getSavedSearchAlertEmail(data);
       return { subject, preheader: `New matches`, html };
+    },
+  },
+  {
+    type: 'message_received',
+    displayName: 'Message: New Message',
+    description: 'Sent to the recipient when a new in-app message arrives.',
+    schema: messageReceivedSchema,
+    samplePayload: {
+      userName: 'Jordan',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      threadUrl: 'https://wildlife.exchange/seller/messages?threadId=THREAD_123',
+      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
+      senderRole: 'buyer',
+      preview: 'Hi! Is transport available this week?',
+    },
+    render: (data: MessageReceivedEmailData) => {
+      const { subject, html } = getMessageReceivedEmail(data);
+      return { subject, preheader: `New message — ${data.listingTitle}`, html };
     },
   },
 ] as const;

@@ -166,6 +166,7 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     threadId: baseString,
     listingId: baseString,
     listingTitle: baseString,
+    listingUrl: urlSchema,
     threadUrl: urlSchema,
     senderRole: z.enum(['buyer', 'seller']),
     preview: z.string().optional(),

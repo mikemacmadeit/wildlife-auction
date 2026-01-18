@@ -237,6 +237,20 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Message.Received': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Message.Received' }>;
+      return {
+        template: 'message_received',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          threadUrl: p.threadUrl,
+          listingUrl: p.listingUrl,
+          senderRole: p.senderRole,
+          preview: p.preview || undefined,
+        },
+      };
+    }
     default:
       return null;
   }

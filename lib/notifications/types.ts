@@ -201,6 +201,7 @@ export type NotificationEventPayload =
       threadId: string;
       listingId: string;
       listingTitle: string;
+      listingUrl: string;
       threadUrl: string;
       senderRole: 'buyer' | 'seller';
       preview?: string;

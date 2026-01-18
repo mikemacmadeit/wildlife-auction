@@ -63,6 +63,15 @@ export interface WelcomeEmailData {
   dashboardUrl: string;
 }
 
+export interface MessageReceivedEmailData {
+  userName: string;
+  listingTitle: string;
+  threadUrl: string;
+  listingUrl: string;
+  senderRole: 'buyer' | 'seller';
+  preview?: string;
+}
+
 export interface AuctionHighBidderEmailData {
   userName: string;
   listingTitle: string;
@@ -947,6 +956,55 @@ export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { sub
       Want to refine this alert? <a href="${manageUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Manage saved searches</a>
     </div>
     ${unsub}
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getMessageReceivedEmail(data: MessageReceivedEmailData): { subject: string; html: string } {
+  const subject = `New message — ${data.listingTitle}`;
+  const preheader = data.preview ? data.preview : `You received a new message about ${data.listingTitle}.`;
+  const origin = tryGetOrigin(data.threadUrl) || tryGetOrigin(data.listingUrl);
+  const roleLabel = data.senderRole === 'buyer' ? 'a buyer' : 'a seller';
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      New message
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — you received a new message from ${escapeHtml(roleLabel)} about <strong>${escapeHtml(
+    data.listingTitle
+  )}</strong>.
+    </div>
+
+    ${
+      data.preview
+        ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+            <tr>
+              <td style="padding: 14px 14px;">
+                <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+                  Preview
+                </div>
+                <div style="margin-top: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F; line-height: 1.5;">
+                  ${escapeHtml(data.preview)}
+                </div>
+              </td>
+            </tr>
+          </table>`
+        : ''
+    }
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.threadUrl, 'View message')}
+    </div>
+    <div style="margin: 12px 0 0 0;">
+      ${renderSecondaryButton(data.listingUrl, 'View listing')}
+    </div>
+
+    <div style="margin-top: 16px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Keep communication in-app for the safest experience.
+    </div>
   `;
 
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };

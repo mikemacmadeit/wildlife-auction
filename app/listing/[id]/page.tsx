@@ -676,18 +676,18 @@ export default function ListingDetailPage() {
                       Protected {listing!.protectedTransactionDays} Days
                     </Badge>
                   )}
-                  {/* Social Proof Badges */}
-                  <Badge variant="secondary" className="text-xs">
-                    <Eye className="h-3 w-3 mr-1" />
-                    {listing!.metrics?.views || 0} views
-                  </Badge>
-                  {listing!.metrics?.favorites > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Heart className="h-3 w-3 mr-1" />
-                      {listing!.metrics.favorites} watching
-                    </Badge>
-                  )}
                 </div>
+
+                {/* Activity Metrics (primary social proof) */}
+                <ListingActivityMetrics
+                  className="max-w-2xl"
+                  views={listing!.metrics?.views || 0}
+                  favorites={0} // avoid duplicating "watching" vs "favorites" until we have a distinct favorites metric
+                  bids={listing!.metrics?.bidCount || 0}
+                  watchers={listing!.metrics?.favorites || 0}
+                  bidsLastHour={bidsLastHour}
+                  inquiries={0}
+                />
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Button
@@ -1085,16 +1085,6 @@ export default function ListingDetailPage() {
 
             {/* Seller Profile - Trust & Credibility */}
             <EnhancedSellerProfile listing={listing} />
-
-            {/* Activity Metrics - Social Proof */}
-            <ListingActivityMetrics 
-              views={listing!.metrics?.views || 0}
-              favorites={listing!.metrics?.favorites || 0}
-              bids={listing!.metrics?.bidCount || 0}
-              watchers={listing!.metrics?.favorites || 0}
-              bidsLastHour={bidsLastHour}
-              inquiries={0}
-            />
           </div>
 
           {/* Right Sidebar - Desktop Only (5 columns, Sticky) */}

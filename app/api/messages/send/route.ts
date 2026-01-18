@@ -203,6 +203,7 @@ export async function POST(request: Request) {
           threadId,
           listingId,
           listingTitle,
+          listingUrl: `${getSiteUrl()}/listing/${listingId}`,
           threadUrl:
             recipientId === threadData.sellerId
               ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
@@ -229,6 +230,7 @@ export async function POST(request: Request) {
             threadId,
             listingId,
             listingTitle,
+            listingUrl: `${getSiteUrl()}/listing/${listingId}`,
             threadUrl:
               recipientId === threadData.sellerId
                 ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
