@@ -62,14 +62,13 @@ import { EnhancedSellerProfile } from '@/components/listing/EnhancedSellerProfil
 import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { RelatedListings } from '@/components/listing/RelatedListings';
-import { ListingActivityMetrics } from '@/components/listing/ListingActivityMetrics';
 import { OfferPanel } from '@/components/offers/OfferPanel';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
-import { getWinningBidder, subscribeBidCountSince } from '@/lib/firebase/bids';
+import { getWinningBidder } from '@/lib/firebase/bids';
 import { placeBidServer } from '@/lib/api/bids';
 import {
   Tooltip,
@@ -123,7 +122,6 @@ export default function ListingDetailPage() {
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
-  const [bidsLastHour, setBidsLastHour] = useState<number>(0);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ amountUsd: number } | null>(null);
   const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
@@ -148,6 +146,11 @@ export default function ListingDetailPage() {
   const endsAtDate = useMemo(() => toDateSafe(endsAtRaw), [endsAtRaw]);
   const endsAtMs = useMemo(() => (endsAtDate ? endsAtDate.getTime() : null), [endsAtDate]);
   const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
+
+  const watchingCount = useMemo(() => {
+    const n = Number(listing?.watcherCount ?? listing?.metrics?.favorites ?? 0);
+    return Number.isFinite(n) ? n : 0;
+  }, [listing?.watcherCount, listing?.metrics?.favorites]);
 
   const similarBrowseUrl = useMemo(() => {
     if (!listing) return '/browse';
@@ -211,13 +214,6 @@ export default function ListingDetailPage() {
       unsubscribe();
     };
   }, [listingId, authInitialized, user]);
-
-  // Bid velocity (last hour) for social proof on the listing detail page.
-  useEffect(() => {
-    if (!listingId) return;
-    const since = new Date(Date.now() - 60 * 60_000);
-    return subscribeBidCountSince(listingId, since, setBidsLastHour);
-  }, [listingId]);
 
   // Track recently viewed listing (only when listingId changes)
   useEffect(() => {
@@ -1111,15 +1107,6 @@ export default function ListingDetailPage() {
 
             {/* Seller Profile - Trust & Credibility */}
             <EnhancedSellerProfile listing={listing} />
-
-            {/* Activity / Social proof (premium tile boxes) */}
-            <ListingActivityMetrics
-              className="pt-1"
-              views={listing!.metrics?.views || 0}
-              favorites={listing!.metrics?.favorites || 0}
-              bids={listing!.metrics?.bidCount || 0}
-              bidsLastHour={bidsLastHour}
-            />
           </div>
 
           {/* Right Sidebar - Desktop Only (5 columns, Sticky) */}
@@ -1359,6 +1346,14 @@ export default function ListingDetailPage() {
                     <Heart className={cn('mr-2 h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
                     {isFavorite(listing!.id) ? 'Watching' : 'Watch This Listing'}
                   </Button>
+
+                  {watchingCount > 0 ? (
+                    <div className="text-xs text-muted-foreground text-center -mt-1">
+                      {watchingCount === 1
+                        ? '1 person is watching this listing.'
+                        : `${watchingCount.toLocaleString()} people are watching this listing.`}
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
 
