@@ -43,7 +43,24 @@ export type AuditActionType =
   | 'offer_expired'
   | 'offer_checkout_session_created'
   // Wire / bank transfer rails
-  | 'wire_payment_intent_created';
+  | 'wire_payment_intent_created'
+  // Admin: user management (P0)
+  | 'admin_user_role_changed'
+  | 'admin_user_disabled'
+  | 'admin_user_enabled'
+  | 'admin_user_password_reset_link_created'
+  | 'admin_user_force_logout'
+  | 'admin_user_suspended'
+  | 'admin_user_unsuspended'
+  | 'admin_user_banned'
+  | 'admin_user_unbanned'
+  | 'admin_user_selling_disabled'
+  | 'admin_user_selling_enabled'
+  | 'admin_user_messaging_muted'
+  | 'admin_user_messaging_unmuted'
+  | 'admin_user_risk_updated'
+  | 'admin_user_note_added'
+  | 'admin_user_summaries_backfill';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 
@@ -54,6 +71,7 @@ export interface AuditLog {
   actorUid: string | 'system' | 'webhook';
   actorRole: AuditActorRole;
   actionType: AuditActionType;
+  targetUserId?: string; // For user management actions
   orderId?: string;
   listingId?: string;
   beforeState?: Record<string, any>;
@@ -72,6 +90,7 @@ export async function createAuditLog(
     actorUid: string | 'system' | 'webhook';
     actorRole: AuditActorRole;
     actionType: AuditActionType;
+    targetUserId?: string;
     orderId?: string;
     listingId?: string;
     beforeState?: Record<string, any>;
@@ -91,6 +110,7 @@ export async function createAuditLog(
     actionType: params.actionType,
     source: params.source,
     createdAt: Timestamp.now(),
+    ...(params.targetUserId ? { targetUserId: params.targetUserId } : {}),
     ...(params.orderId ? { orderId: params.orderId } : {}),
     ...(params.listingId ? { listingId: params.listingId } : {}),
     ...(params.beforeState ? { beforeState: params.beforeState } : {}),

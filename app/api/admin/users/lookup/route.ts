@@ -9,6 +9,7 @@
  */
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
+import { buildUserSummary } from '@/lib/admin/userSummary';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -102,6 +103,14 @@ export async function GET(request: Request) {
         lastSignInAt: au?.metadata?.lastSignInTime || null,
         stripeAccountId: doc?.stripeAccountId || null,
       });
+
+      // Best-effort: keep userSummaries warm for admin directory (server-written).
+      try {
+        const summary = buildUserSummary({ uid, authUser: au, userDoc: doc });
+        await db.collection('userSummaries').doc(uid).set(summary as any, { merge: true });
+      } catch {
+        // ignore
+      }
     };
 
     if (!q) {

@@ -556,6 +556,29 @@ service cloud.firestore {
     }
 
     // ============================================
+    // ADMIN USER MANAGEMENT (SERVER-WRITTEN)
+    // ============================================
+    match /userSummaries/{userId} {
+      // Read: admin-only (used by admin directory + dossier)
+      allow read: if isAdmin();
+      // Write: server-side only (Admin SDK)
+      allow write: if false;
+      allow delete: if false;
+    }
+
+    match /adminUserNotes/{userId} {
+      allow read: if isAdmin();
+      allow write: if false;
+      allow delete: if false;
+
+      match /notes/{noteId} {
+        allow read: if isAdmin();
+        allow write: if false;
+        allow delete: if false;
+      }
+    }
+
+    // ============================================
     // NOTIFICATIONS COLLECTION
     // ============================================
     match /notifications/{notificationId} {
