@@ -6,6 +6,38 @@
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
+/**
+ * Firestore Admin SDK rejects `undefined` anywhere in a document (including nested objects).
+ * This helper removes undefined recursively from plain objects and arrays.
+ *
+ * Important: only recurse into *plain objects* to avoid corrupting Firestore special values (e.g. Timestamp).
+ */
+function stripUndefinedDeep<T>(value: T): T {
+  if (value === undefined) return value;
+  if (Array.isArray(value)) {
+    const cleaned = (value as unknown as unknown[])
+      .map((v) => stripUndefinedDeep(v))
+      .filter((v) => v !== undefined);
+    return cleaned as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) {
+      // Do not recurse into class instances like Firestore Timestamp.
+      return value;
+    }
+    const out: any = {};
+    for (const [k, v] of Object.entries(value as any)) {
+      if (v === undefined) continue;
+      const vv = stripUndefinedDeep(v);
+      if (vv === undefined) continue;
+      out[k] = vv;
+    }
+    return out as T;
+  }
+  return value;
+}
+
 export type AuditActionType =
   | 'payout_released_manual'
   | 'payout_released_auto'
@@ -102,6 +134,10 @@ export async function createAuditLog(
   const auditRef = db.collection('auditLogs').doc();
   const auditId = auditRef.id;
 
+  const cleanedBefore = params.beforeState ? stripUndefinedDeep(params.beforeState) : undefined;
+  const cleanedAfter = params.afterState ? stripUndefinedDeep(params.afterState) : undefined;
+  const cleanedMeta = params.metadata ? stripUndefinedDeep(params.metadata) : undefined;
+
   // Firestore Admin SDK rejects `undefined` values. Only include optional fields when present.
   const auditLog: AuditLog = {
     auditId,
@@ -113,9 +149,9 @@ export async function createAuditLog(
     ...(params.targetUserId ? { targetUserId: params.targetUserId } : {}),
     ...(params.orderId ? { orderId: params.orderId } : {}),
     ...(params.listingId ? { listingId: params.listingId } : {}),
-    ...(params.beforeState ? { beforeState: params.beforeState } : {}),
-    ...(params.afterState ? { afterState: params.afterState } : {}),
-    ...(params.metadata ? { metadata: params.metadata } : {}),
+    ...(cleanedBefore ? { beforeState: cleanedBefore } : {}),
+    ...(cleanedAfter ? { afterState: cleanedAfter } : {}),
+    ...(cleanedMeta ? { metadata: cleanedMeta } : {}),
   };
 
   await auditRef.set(auditLog);

@@ -326,10 +326,11 @@ export async function releasePaymentForOrder(
     });
 
     // Create audit log
+    const isManual = !!releasedBy && releasedBy !== 'system';
     await createAuditLog(db, {
       actorUid: releasedBy || 'system',
-      actorRole: releasedBy ? 'admin' : 'system',
-      actionType: releasedBy ? 'payout_released_manual' : 'payout_released_auto',
+      actorRole: isManual ? 'admin' : 'system',
+      actionType: isManual ? 'payout_released_manual' : 'payout_released_auto',
       orderId: orderId,
       listingId: orderData.listingId,
       beforeState,
@@ -344,7 +345,7 @@ export async function releasePaymentForOrder(
         amount: sellerAmount,
         sellerStripeAccountId: derivedSellerStripeAccountId,
       },
-      source: releasedBy ? 'admin_ui' : 'cron',
+      source: isManual ? 'admin_ui' : 'cron',
     });
 
     // Update seller stats (increment completed sales count)

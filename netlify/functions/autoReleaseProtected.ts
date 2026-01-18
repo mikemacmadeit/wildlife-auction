@@ -15,7 +15,7 @@
  */
 
 import { Handler, schedule } from '@netlify/functions';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { releasePaymentForOrder } from '../../lib/stripe/release-payment';
 import { createAuditLog } from '../../lib/audit/logger';
 import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
@@ -34,6 +34,7 @@ const baseHandler: Handler = async (event, context) => {
   logInfo('Auto-release scheduled function triggered', { requestId, route: 'autoReleaseProtected' });
 
   const startTime = Date.now();
+  const timeBudgetMs = 45_000;
   let scannedCount = 0;
   let releasedCount = 0;
   let errorsCount = 0;
@@ -56,7 +57,6 @@ const baseHandler: Handler = async (event, context) => {
     await initializeFirebaseAdmin();
 
     const now = new Date();
-    const nowTimestamp = Timestamp.fromDate(now);
     const hoursAfterDelivery = parseInt(process.env.AUTO_RELEASE_HOURS_AFTER_DELIVERY || '72', 10);
     const maxAmountCents = process.env.AUTO_RELEASE_MAX_AMOUNT_CENTS
       ? parseInt(process.env.AUTO_RELEASE_MAX_AMOUNT_CENTS, 10)
@@ -133,19 +133,23 @@ const baseHandler: Handler = async (event, context) => {
       eligibleCount: eligibleOrders.length,
     });
 
-    // Create audit log for auto-release execution
-    await createAuditLog(db, {
-      actorUid: 'system',
-      actorRole: 'system',
-      actionType: 'auto_release_executed',
-      beforeState: {},
-      afterState: {},
-      metadata: {
-        eligibleOrdersCount: eligibleOrders.length,
-        executionTime: now.toISOString(),
-      },
-      source: 'cron',
-    });
+    // Create audit log for auto-release execution (best-effort; don't block releases if it fails)
+    try {
+      await createAuditLog(db, {
+        actorUid: 'system',
+        actorRole: 'system',
+        actionType: 'auto_release_executed',
+        metadata: {
+          eligibleOrdersCount: eligibleOrders.length,
+          executionTime: now.toISOString(),
+        },
+        source: 'cron',
+      });
+    } catch (e: any) {
+      // Surface as health error and continue.
+      lastError = lastError || String(e?.message || e);
+      logWarn('Auto-release: failed to write audit log', { requestId, route: 'autoReleaseProtected', error: String(e?.message || e) });
+    }
 
     const results: Array<{ orderId: string; success: boolean; error?: string }> = [];
 
