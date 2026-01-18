@@ -134,10 +134,32 @@ export default function WatchlistPage() {
   // Real-time subscriptions
   const subscriptionsRef = useRef<Map<string, () => void>>(new Map());
 
+  function toMillisSafe(value: any): number {
+    if (!value) return 0;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : 0;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        if (d instanceof Date && Number.isFinite(d.getTime())) return d.getTime();
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof value?.seconds === 'number') {
+      const d = new Date(value.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d.getTime() : 0;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d.getTime() : 0;
+    }
+    return 0;
+  }
+
   // Calculate listing statuses
   const enrichListing = useCallback((listing: Listing): ListingWithStatus => {
     const now = Date.now();
-    const endsAt = listing.endsAt ? new Date(listing.endsAt).getTime() : null;
+    const endsAt = listing.endsAt ? toMillisSafe(listing.endsAt) : null;
     const isEnded = endsAt ? now > endsAt : false;
     const isSold = listing.status === 'sold';
     const isExpired = listing.status === 'expired';
@@ -267,14 +289,14 @@ export default function WatchlistPage() {
     result = [...result].sort((a, b) => {
       switch (sortBy) {
         case 'newest':
-          return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+          return toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt);
         case 'oldest':
-          return (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0);
+          return toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt);
         case 'ending-soon':
           if (!a.endsAt && !b.endsAt) return 0;
           if (!a.endsAt) return 1;
           if (!b.endsAt) return -1;
-          return a.endsAt.getTime() - b.endsAt.getTime();
+          return toMillisSafe(a.endsAt) - toMillisSafe(b.endsAt);
         case 'price-low':
           const priceA = a.type === 'auction' ? (a.currentBid || a.startingBid || 0) : (a.price || 0);
           const priceB = b.type === 'auction' ? (b.currentBid || b.startingBid || 0) : (b.price || 0);
