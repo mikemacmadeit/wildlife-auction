@@ -272,8 +272,27 @@ export async function POST(request: Request) {
 
     return json({ ok: true, offerId: result.offerId });
   } catch (error: any) {
-    // Likely missing composite index or misconfigured env; surface clearly.
-    return json({ error: 'Failed to create offer', message: error?.message || 'Unknown error' }, { status: 500 });
+    const msg = String(error?.message || 'Unknown error');
+    const code = String(error?.code || '');
+    const isMissingIndex =
+      code === 'failed-precondition' ||
+      code === '9' ||
+      msg.toLowerCase().includes('requires an index') ||
+      msg.toLowerCase().includes('failed-precondition');
+
+    if (isMissingIndex) {
+      return json(
+        {
+          error: 'Offer system is warming up',
+          code: 'FIRESTORE_INDEX_REQUIRED',
+          message:
+            'The database index needed to create offers is still building or not deployed yet. Please try again in a few minutes.',
+        },
+        { status: 503 }
+      );
+    }
+
+    return json({ error: 'Failed to create offer', message: msg }, { status: 500 });
   }
 }
 

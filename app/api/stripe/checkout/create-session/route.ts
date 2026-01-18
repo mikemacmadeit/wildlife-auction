@@ -369,10 +369,10 @@ export async function POST(request: Request) {
 
     const sellerData = sellerDoc.data()!;
     const sellerStripeAccountId = sellerData.stripeAccountId;
-    const sellerChargesEnabled = sellerData.chargesEnabled ?? false;
-    const sellerPayoutsEnabled = sellerData.payoutsEnabled ?? false;
-    const sellerDetailsSubmitted = sellerData.stripeDetailsSubmitted ?? false;
-    const sellerOnboardingStatus = sellerData.stripeOnboardingStatus || 'not_started';
+    let sellerChargesEnabled = sellerData.chargesEnabled ?? false;
+    let sellerPayoutsEnabled = sellerData.payoutsEnabled ?? false;
+    let sellerDetailsSubmitted = sellerData.stripeDetailsSubmitted ?? false;
+    let sellerOnboardingStatus = sellerData.stripeOnboardingStatus || 'not_started';
     
     const sellerTier = getEffectiveSubscriptionTier(sellerData as any);
     const sellerTierWeight = getTierWeight(sellerTier);
@@ -381,11 +381,57 @@ export async function POST(request: Request) {
     const allowUnreadySeller = request.headers.get('x-allow-unready-seller') === 'true';
     
     // Validate seller payout readiness (unless admin override)
-    const isPayoutReady = sellerStripeAccountId && 
-                          sellerChargesEnabled && 
-                          sellerPayoutsEnabled && 
-                          sellerDetailsSubmitted && 
-                          sellerOnboardingStatus === 'complete';
+    let isPayoutReady =
+      !!sellerStripeAccountId &&
+      !!sellerChargesEnabled &&
+      !!sellerPayoutsEnabled &&
+      !!sellerDetailsSubmitted &&
+      sellerOnboardingStatus === 'complete';
+
+    // If seller has a Stripe account but the cached flags say "not ready",
+    // refresh from Stripe once. This fixes real-world cases where the user completed onboarding
+    // but our stored `chargesEnabled/payoutsEnabled/stripeOnboardingStatus` is stale.
+    if (!isPayoutReady && sellerStripeAccountId && !allowUnreadySeller) {
+      try {
+        const acct = await stripe.accounts.retrieve(String(sellerStripeAccountId));
+        const nextChargesEnabled = !!(acct as any)?.charges_enabled;
+        const nextPayoutsEnabled = !!(acct as any)?.payouts_enabled;
+        const nextDetailsSubmitted = !!(acct as any)?.details_submitted;
+        const nextOnboardingStatus =
+          nextDetailsSubmitted && nextChargesEnabled && nextPayoutsEnabled ? 'complete' : nextDetailsSubmitted ? 'details_submitted' : 'pending';
+
+        // Persist refreshed state (best-effort)
+        await sellerRef.update({
+          chargesEnabled: nextChargesEnabled,
+          payoutsEnabled: nextPayoutsEnabled,
+          stripeDetailsSubmitted: nextDetailsSubmitted,
+          stripeOnboardingStatus: nextOnboardingStatus,
+          updatedAt: Timestamp.now(),
+          updatedBy: 'system',
+        });
+
+        sellerChargesEnabled = nextChargesEnabled;
+        sellerPayoutsEnabled = nextPayoutsEnabled;
+        sellerDetailsSubmitted = nextDetailsSubmitted;
+        sellerOnboardingStatus = nextOnboardingStatus;
+
+        isPayoutReady =
+          !!sellerStripeAccountId &&
+          nextChargesEnabled &&
+          nextPayoutsEnabled &&
+          nextDetailsSubmitted &&
+          nextOnboardingStatus === 'complete';
+      } catch (e: any) {
+        // If Stripe is misconfigured (invalid/revoked key) we will fall back to cached flags.
+        logWarn('Failed to refresh seller Stripe status; using cached flags', {
+          sellerId: listingData.sellerId,
+          sellerStripeAccountId,
+          code: e?.code,
+          type: e?.type,
+          message: e?.message,
+        });
+      }
+    }
 
     if (!isPayoutReady && !allowUnreadySeller) {
       // Log audit event for blocked checkout

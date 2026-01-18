@@ -155,18 +155,12 @@ export const createUserDocument = async (
  */
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
-    // Prefer full profile when allowed (owner/admin). Fall back to public profile if rules deny.
-    try {
-      return await getDocument<UserProfile>('users', userId);
-    } catch (error: any) {
-      const code = String(error?.code || '');
-      const msg = String(error?.message || '');
-      const isPermissionDenied =
-        code === 'permission-denied' ||
-        msg.toLowerCase().includes('missing or insufficient permissions') ||
-        msg.toLowerCase().includes('permission denied');
-      if (!isPermissionDenied) throw error;
+    const currentUid = auth.currentUser?.uid || null;
 
+    // If you are not the owner, do NOT try to read `/users/{uid}` first.
+    // That will correctly be blocked by rules, but it creates noisy console errors and can cause
+    // downstream UI to incorrectly assume "seller not ready" based on a failed fetch.
+    if (currentUid && currentUid !== userId) {
       const pub = await getDocument<PublicProfileDoc>('publicProfiles', userId).catch(() => null);
       if (!pub) return null;
 
@@ -190,6 +184,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
         updatedAt: pub.updatedAt || new Date(),
       } as any;
     }
+
+    // Owner path: full profile is readable.
+    return await getDocument<UserProfile>('users', userId);
   } catch (error) {
     console.error('Error fetching user profile:', error);
     throw error;
