@@ -392,9 +392,9 @@ export default function WatchlistPage() {
         );
       case 'expired':
         return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Expired
+          <Badge variant="outline" className="bg-background/80 backdrop-blur-sm">
+            <Clock className="h-3 w-3 mr-1" />
+            Ended
           </Badge>
         );
       case 'ended':
@@ -949,17 +949,20 @@ function WatchlistCard({
               </div>
             )}
 
-            {/* Overlay for ended/sold listings */}
+            {/* Subtle treatment for ended/sold listings (no big X overlay) */}
             {(listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold') && (
-              <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center z-10">
-                <div className="text-center">
-                  {listing.statusBadge === 'sold' && (
-                    <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-2" />
+              <div className="absolute inset-0 z-10 pointer-events-none">
+                <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background/70 to-transparent" />
+                <div className="absolute bottom-2 left-2">
+                  {listing.statusBadge === 'sold' ? (
+                    <Badge className="bg-destructive text-destructive-foreground font-extrabold tracking-wide">
+                      SOLD
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-background/85 backdrop-blur-sm font-extrabold tracking-wide">
+                      ENDED
+                    </Badge>
                   )}
-                  {(listing.statusBadge === 'ended' || listing.statusBadge === 'expired') && (
-                    <XCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                  )}
-                  <p className="text-sm font-semibold capitalize">{listing.statusBadge}</p>
                 </div>
               </div>
             )}
@@ -1119,13 +1122,20 @@ function WatchlistListItem({
                     <Package className="h-8 w-8 text-muted-foreground" />
                   </div>
                 )}
-                {listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold' ? (
-                  <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center">
-                    {listing.statusBadge === 'sold' ? (
-                      <CheckCircle2 className="h-6 w-6 text-green-600" />
-                    ) : (
-                      <XCircle className="h-6 w-6 text-muted-foreground" />
-                    )}
+                {(listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold') ? (
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/70 to-transparent" />
+                    <div className="absolute bottom-2 left-2">
+                      {listing.statusBadge === 'sold' ? (
+                        <Badge className="bg-destructive text-destructive-foreground font-extrabold tracking-wide">
+                          SOLD
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-background/85 backdrop-blur-sm font-extrabold tracking-wide">
+                          ENDED
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </div>
