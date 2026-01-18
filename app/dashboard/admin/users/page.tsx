@@ -82,6 +82,13 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [lastDiag, setLastDiag] = useState<null | {
+    endpoint: 'directory' | 'lookup';
+    status: number;
+    requestId?: string | null;
+    message?: string | null;
+    url?: string | null;
+  }>(null);
 
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [roleTarget, setRoleTarget] = useState<AdminUserRow | null>(null);
@@ -116,10 +123,27 @@ export default function AdminUsersPage() {
 
         const res = await fetch(url.toString(), { headers: await authHeader() });
         const data = await res.json().catch(() => ({}));
+        const rid = res.headers.get('x-request-id');
+        setLastDiag({
+          endpoint: 'directory',
+          status: res.status,
+          requestId: rid,
+          message: data?.message || data?.error || null,
+          url: url.toString(),
+        });
         if (!res.ok || data?.ok !== true) {
-          // If directory isn't ready (no summaries), fall back.
+          // Log loudly (prod-safe) so admins can diagnose quickly.
+          console.error('[AdminUsers] Directory request failed', {
+            status: res.status,
+            requestId: rid,
+            message: data?.message || data?.error,
+            url: url.toString(),
+          });
+          // If directory isn't ready/available, fall back to legacy lookup.
           setHasDirectory(false);
-          throw new Error(data?.message || data?.error || 'Directory not available');
+          throw new Error(
+            `${data?.message || data?.error || 'Directory not available'}${rid ? ` (requestId: ${rid})` : ''}`
+          );
         }
         const users = Array.isArray(data.users) ? data.users : [];
         const mapped: AdminUserRow[] = users.map((u: any) => ({
@@ -139,6 +163,20 @@ export default function AdminUsersPage() {
           risk: u.risk ?? undefined,
           verification: u.verification ?? undefined,
         }));
+        // If summaries are empty on a fresh env, auto-fallback to legacy lookup so the admin UI isn't blank.
+        const noFilters =
+          !q &&
+          roleFilter === 'any' &&
+          statusFilter === 'any' &&
+          verificationFilter === 'any' &&
+          riskFilter === 'any' &&
+          activityFilter === 'any' &&
+          !cursor;
+        if (mapped.length === 0 && noFilters) {
+          setHasDirectory(false);
+          throw new Error('No user summaries found yet. Falling back to legacy lookup (run Backfill to populate summaries).');
+        }
+
         setRows(mapped);
         setNextCursor(typeof data.nextCursor === 'string' ? data.nextCursor : null);
         return;
@@ -149,7 +187,23 @@ export default function AdminUsersPage() {
       url.searchParams.set('limit', '25');
       const res = await fetch(url.toString(), { headers: await authHeader() });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok !== true) throw new Error(data?.message || data?.error || 'Failed to load users');
+      const rid = res.headers.get('x-request-id');
+      setLastDiag({
+        endpoint: 'lookup',
+        status: res.status,
+        requestId: rid,
+        message: data?.message || data?.error || null,
+        url: url.toString(),
+      });
+      if (!res.ok || data?.ok !== true) {
+        console.error('[AdminUsers] Lookup request failed', {
+          status: res.status,
+          requestId: rid,
+          message: data?.message || data?.error,
+          url: url.toString(),
+        });
+        throw new Error(`${data?.message || data?.error || 'Failed to load users'}${rid ? ` (requestId: ${rid})` : ''}`);
+      }
       setRows(Array.isArray(data.users) ? data.users : []);
       setNextCursor(null);
     } catch (e: any) {
@@ -363,10 +417,10 @@ export default function AdminUsersPage() {
               </Select>
             </div>
 
-            {isSuperAdmin && hasDirectory && (
+            {isSuperAdmin && (
               <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border bg-muted/20 p-3">
                 <div className="text-sm text-muted-foreground">
-                  If results are empty, backfill `userSummaries` (batched).
+                  If results are empty, backfill <span className="font-mono">userSummaries</span> (batched).
                 </div>
                 <Button
                   variant="outline"
@@ -381,6 +435,7 @@ export default function AdminUsersPage() {
                       const d = await res.json().catch(() => ({}));
                       if (!res.ok || d?.ok !== true) throw new Error(d?.message || d?.error || 'Backfill failed');
                       toast({ title: 'Backfill queued', description: `Updated ${d.updated || 0} summaries.` });
+                      setHasDirectory(true);
                       setCursor(null);
                       setCursorStack([]);
                       void load({ query: query });
@@ -397,7 +452,20 @@ export default function AdminUsersPage() {
 
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="space-y-2">
+                  <div>{error}</div>
+                  {lastDiag ? (
+                    <div className="text-xs text-muted-foreground">
+                      Last request: <span className="font-mono">{lastDiag.endpoint}</span> · HTTP {lastDiag.status}
+                      {lastDiag.requestId ? (
+                        <>
+                          {' '}
+                          · requestId: <span className="font-mono">{lastDiag.requestId}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </AlertDescription>
               </Alert>
             )}
 
