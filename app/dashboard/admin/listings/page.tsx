@@ -45,6 +45,7 @@ import {
   CheckCircle2,
   X,
   AlertTriangle,
+  Copy,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, getDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
@@ -594,18 +595,20 @@ export default function AdminListingsPage() {
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-base font-bold line-clamp-1">{listing.title}</h3>
                             <Badge 
-                              variant="default" 
-                              className="text-xs font-bold px-2 py-0.5 bg-primary text-primary-foreground shrink-0"
+                              variant="secondary"
+                              className="text-xs font-semibold px-2 py-0.5 shrink-0"
                             >
-                              {listing.category === 'whitetail_breeder' && '🦌 Whitetail'}
-                              {listing.category === 'wildlife_exotics' && '🦌 Exotics'}
-                              {listing.category === 'cattle_livestock' && '🐄 Cattle'}
-                              {listing.category === 'ranch_equipment' && '🚜 Equipment'}
+                              {listing.category === 'whitetail_breeder' && 'Whitetail Breeder'}
+                              {listing.category === 'wildlife_exotics' && 'Wildlife & Exotics'}
+                              {listing.category === 'cattle_livestock' && 'Cattle & Livestock'}
+                              {listing.category === 'ranch_equipment' && 'Ranch Equipment'}
+                              {!listing.category && 'Listing'}
                             </Badge>
                             <Badge variant="outline" className="text-xs px-2 py-0.5 shrink-0">
-                              {listing.type === 'auction' && '🔨 Auction'}
-                              {listing.type === 'fixed' && '💰 Fixed'}
-                              {listing.type === 'classified' && '📋 Classified'}
+                              {listing.type === 'auction' && 'Auction'}
+                              {listing.type === 'fixed' && 'Buy Now'}
+                              {listing.type === 'classified' && 'Classified'}
+                              {!listing.type && 'Type'}
                             </Badge>
                           </div>
                           
@@ -620,37 +623,54 @@ export default function AdminListingsPage() {
                               }`}
                             >
                               <Clock className="h-3 w-3 mr-1 inline" />
-                              {listing.status === 'pending' && '⏳ '}
-                              {listing.status}
+                              {listing.status === 'pending' ? 'Pending' : listing.status}
                             </Badge>
                             
                             {listing.complianceStatus && listing.complianceStatus !== 'none' && (
                               <Badge 
-                                variant={
-                                  listing.complianceStatus === 'approved' 
-                                    ? 'default' 
-                                    : listing.complianceStatus === 'rejected' || listing.complianceStatus === 'pending_review'
-                                    ? 'destructive'
-                                    : 'secondary'
-                                }
                                 className={`text-xs px-2 py-0.5 ${
-                                  listing.complianceStatus === 'pending_review'
-                                    ? 'bg-destructive text-destructive-foreground border-destructive/50 font-bold'
-                                    : ''
+                                  listing.complianceStatus === 'approved'
+                                    ? 'bg-emerald-600 text-white border-emerald-700/30'
+                                    : listing.complianceStatus === 'rejected'
+                                      ? 'bg-destructive text-destructive-foreground border-destructive/50'
+                                      : listing.complianceStatus === 'pending_review'
+                                        ? 'bg-amber-500/15 text-amber-800 border-amber-600/30 dark:text-amber-200'
+                                        : 'bg-muted/30 text-foreground border-border/50'
                                 }`}
                               >
                                 <Shield className="h-3 w-3 mr-1 inline" />
-                                {listing.complianceStatus === 'pending_review' && '⚠ '}
-                                {listing.complianceStatus === 'pending_review' ? 'Needs Review' : listing.complianceStatus}
+                                {listing.complianceStatus === 'pending_review' ? 'Compliance review' : listing.complianceStatus}
                               </Badge>
                             )}
+
+                            {listing.pendingReason ? (
+                              <Badge variant="outline" className="text-xs px-2 py-0.5">
+                                {listing.pendingReason === 'admin_approval' ? 'Admin approval' : 'Compliance review'}
+                              </Badge>
+                            ) : null}
                           </div>
                         </div>
-                        <Link href={`/listing/${listing.id}`} target="_blank">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0">
-                            <Eye className="h-4 w-4" />
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(listing.id);
+                              toast({ title: 'Copied', description: 'Listing ID copied.' });
+                            }}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy ID
                           </Button>
-                        </Link>
+                          <Link href={`/listing/${listing.id}`} target="_blank">
+                            <Button variant="outline" size="sm" className="h-8">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     </div>
 
@@ -686,6 +706,12 @@ export default function AdminListingsPage() {
                           <Card className="border bg-card">
                             <CardContent className="p-3 space-y-2.5">
                               <div className="flex items-center justify-between pb-2 border-b">
+                                <span className="text-xs text-muted-foreground">Listing</span>
+                                <span className="text-xs font-mono text-foreground/80">
+                                  {listing.id.slice(0, 8)}…{listing.id.slice(-6)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between pb-2 border-b">
                                 <span className="text-xs text-muted-foreground">Price</span>
                                 <span className="text-sm font-bold">
                                   {listing.price 
@@ -719,13 +745,22 @@ export default function AdminListingsPage() {
                                     <div className="flex items-center justify-between">
                                       <span className="text-xs text-muted-foreground">Verified</span>
                                       <Badge 
-                                        variant={sellerProfilesMap[listing.sellerId].verified ? 'default' : 'secondary'}
+                                        variant={
+                                          sellerProfilesMap[listing.sellerId]?.seller?.verified === true ||
+                                          sellerProfilesMap[listing.sellerId]?.seller?.credentials?.identityVerified === true
+                                            ? 'default'
+                                            : 'secondary'
+                                        }
                                         className="text-xs px-1.5 py-0 h-4"
                                       >
-                                        {sellerProfilesMap[listing.sellerId].verified ? (
+                                        {sellerProfilesMap[listing.sellerId]?.seller?.verified === true ||
+                                        sellerProfilesMap[listing.sellerId]?.seller?.credentials?.identityVerified === true ? (
                                           <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
                                         ) : null}
-                                        {sellerProfilesMap[listing.sellerId].verified ? 'Yes' : 'No'}
+                                        {sellerProfilesMap[listing.sellerId]?.seller?.verified === true ||
+                                        sellerProfilesMap[listing.sellerId]?.seller?.credentials?.identityVerified === true
+                                          ? 'Yes'
+                                          : 'No'}
                                       </Badge>
                                     </div>
                                   </div>
@@ -1011,9 +1046,15 @@ export default function AdminListingsPage() {
                               </Button>
                               
                               {listing.category === 'whitetail_breeder' && listing.complianceStatus !== 'approved' && (
-                                <p className="text-xs text-center text-accent px-2 py-1">
-                                  ⚠ Verify TPWD permit first
-                                </p>
+                                <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-2">
+                                  <div className="flex items-start gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                    <div className="text-xs">
+                                      <div className="font-semibold text-foreground">TPWD permit required</div>
+                                      <div className="text-muted-foreground">Approve is disabled until compliance is approved.</div>
+                                    </div>
+                                  </div>
+                                </div>
                               )}
                               
                               <Button
