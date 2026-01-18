@@ -130,7 +130,7 @@ export function StepperForm({
                     allowStepJump && 'cursor-pointer hover:text-foreground transition-colors'
                   )}
                 >
-                  {step.title.split(' ')[0]}
+                  {step.title}
                 </span>
               </div>
             ))}
