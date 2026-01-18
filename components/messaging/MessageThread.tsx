@@ -126,9 +126,9 @@ export function MessageThreadComponent({
 
       {/* Safety Notice */}
       {!isPaid && (
-        <Alert className="m-4 border-orange-200 bg-orange-50">
-          <AlertTriangle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-sm">
+        <Alert className="m-4 border-orange-200 bg-orange-50 text-orange-950 dark:border-orange-900/50 dark:bg-orange-950/25 dark:text-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-700 dark:text-orange-300" />
+          <AlertDescription className="text-sm text-orange-950 dark:text-orange-50">
             <strong>For your safety:</strong> Keep communication and payment on Wildlife Exchange. 
             Contact info unlocks after payment is completed.
           </AlertDescription>
