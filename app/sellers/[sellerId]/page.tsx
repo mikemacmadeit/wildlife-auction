@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,16 +24,40 @@ import { getEffectiveSubscriptionTier } from '@/lib/pricing/subscriptions';
 export default function SellerProfilePage() {
   const params = useParams<{ sellerId: string }>();
   const sellerId = params?.sellerId;
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fromParam = useMemo(() => {
+    const raw = searchParams?.get('from');
+    if (!raw) return null;
+    // Only allow relative app paths to avoid open redirects.
+    if (!raw.startsWith('/')) return null;
+    return raw;
+  }, [searchParams]);
+
+  const handleBack = useMemo(() => {
+    return () => {
+      try {
+        if (typeof window !== 'undefined' && window.history.length > 1) {
+          router.back();
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      router.push(fromParam || '/browse');
+    };
+  }, [fromParam, router]);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!sellerId || !user) return;
+      if (!sellerId) return;
       setLoading(true);
       setError(null);
       try {
@@ -51,7 +75,7 @@ export default function SellerProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, sellerId, user]);
+  }, [authLoading, sellerId]);
 
   const reputation = useMemo(() => getSellerReputation({ profile }), [profile]);
   const sellerTier = profile ? getEffectiveSubscriptionTier(profile) : 'standard';
@@ -69,11 +93,9 @@ export default function SellerProfilePage() {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-8 max-w-3xl space-y-4">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Link>
+          <Button variant="outline" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
           </Button>
           <Card>
             <CardContent className="pt-6">
@@ -90,11 +112,9 @@ export default function SellerProfilePage() {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-8 max-w-3xl space-y-4">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Link>
+          <Button variant="outline" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
           </Button>
           <Card>
             <CardContent className="pt-6">
@@ -110,11 +130,9 @@ export default function SellerProfilePage() {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-3xl space-y-6">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Link>
+        <Button variant="outline" size="sm" onClick={handleBack}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
         </Button>
 
         <Card className="border-border/60">

@@ -44,6 +44,9 @@ export function EnhancedSellerProfile({
   const sellerName = listing.sellerSnapshot?.displayName || listing.seller?.name || 'Unknown Seller';
   const sellerVerified = listing.sellerSnapshot?.verified || listing.seller?.verified || false;
   const sellerId = listing.sellerId;
+  const sellerProfileHref = sellerId
+    ? `/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`
+    : '/browse';
   
   const [sellerStats, setSellerStats] = useState<{
     completedSalesCount: number;
@@ -138,7 +141,7 @@ export function EnhancedSellerProfile({
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
               <h3 className="text-base font-bold text-foreground truncate">
                 {sellerId ? (
-                  <Link href={`/sellers/${sellerId}`} className="hover:underline">
+                  <Link href={sellerProfileHref} className="hover:underline">
                     {sellerName}
                   </Link>
                 ) : (
@@ -217,7 +220,7 @@ export function EnhancedSellerProfile({
             Message Seller
           </Button>
           <Button asChild variant="outline" size="sm" className="w-full h-9 text-sm font-semibold">
-            <Link href={sellerId ? `/sellers/${sellerId}` : '/browse'}>
+            <Link href={sellerProfileHref}>
               View profile
             </Link>
           </Button>
