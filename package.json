@@ -10,6 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:unit": "npx --yes tsx --test",
+    "seed:mock-order": "npx --yes tsx scripts/create-mock-order.ts",
     "postinstall": "node scripts/patch-nextjs.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

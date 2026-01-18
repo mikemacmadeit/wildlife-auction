@@ -10,6 +10,7 @@ import { z } from 'zod';
 import {
   getOrderConfirmationEmail,
   getDeliveryConfirmationEmail,
+  getOrderInTransitEmail,
   getPayoutNotificationEmail,
   getAuctionWinnerEmail,
   getAuctionOutbidEmail,
@@ -18,11 +19,13 @@ import {
   getAuctionEndingSoonEmail,
   getAuctionLostEmail,
   getDeliveryCheckInEmail,
+  getOrderReceivedEmail,
   getProfileIncompleteReminderEmail,
   getWeeklyDigestEmail,
   getSavedSearchAlertEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
+  type OrderInTransitEmailData,
   type PayoutNotificationEmailData,
   type AuctionWinnerEmailData,
   type AuctionOutbidEmailData,
@@ -31,6 +34,7 @@ import {
   type AuctionEndingSoonEmailData,
   type AuctionLostEmailData,
   type DeliveryCheckInEmailData,
+  type OrderReceivedEmailData,
   type ProfileIncompleteReminderEmailData,
   type WeeklyDigestEmailData,
   type SavedSearchAlertEmailData,
@@ -66,6 +70,13 @@ const deliveryConfirmationSchema = z.object({
   orderId: z.string().min(1),
   listingTitle: z.string().min(1),
   deliveryDate: dateSchema,
+  orderUrl: urlSchema,
+});
+
+const orderInTransitSchema = z.object({
+  buyerName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().min(1),
   orderUrl: urlSchema,
 });
 
@@ -131,6 +142,13 @@ const deliveryCheckInSchema = z.object({
   orderUrl: urlSchema,
 });
 
+const orderReceivedSchema = z.object({
+  sellerName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().min(1),
+  orderUrl: urlSchema,
+});
+
 const profileIncompleteReminderSchema = z.object({
   userName: z.string().min(1),
   settingsUrl: urlSchema,
@@ -192,6 +210,22 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: DeliveryConfirmationEmailData) => {
       const { subject, html } = getDeliveryConfirmationEmail(data);
       return { subject, preheader: `Delivery confirmed: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'order_in_transit',
+    displayName: 'Order In Transit',
+    description: 'Sent to buyer when seller marks the order in transit.',
+    schema: orderInTransitSchema,
+    samplePayload: {
+      buyerName: 'Alex Johnson',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: OrderInTransitEmailData) => {
+      const { subject, html } = getOrderInTransitEmail(data);
+      return { subject, preheader: `In transit: ${data.listingTitle}`, html };
     },
   },
   {
@@ -326,6 +360,22 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: DeliveryCheckInEmailData) => {
       const { subject, html } = getDeliveryCheckInEmail(data);
       return { subject, preheader: `Quick check-in: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'order_received',
+    displayName: 'Order: Receipt Confirmed (Seller)',
+    description: 'Sent to seller when buyer confirms receipt.',
+    schema: orderReceivedSchema,
+    samplePayload: {
+      sellerName: 'Jordan',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      orderUrl: 'https://wildlife.exchange/seller/orders/ORD_123456',
+    },
+    render: (data: OrderReceivedEmailData) => {
+      const { subject, html } = getOrderReceivedEmail(data);
+      return { subject, preheader: `Receipt confirmed: ${data.listingTitle}`, html };
     },
   },
   {

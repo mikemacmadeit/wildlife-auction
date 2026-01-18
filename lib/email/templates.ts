@@ -19,6 +19,20 @@ export interface DeliveryConfirmationEmailData {
   orderUrl: string;
 }
 
+export interface OrderInTransitEmailData {
+  buyerName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
+export interface OrderReceivedEmailData {
+  sellerName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
 export interface PayoutNotificationEmailData {
   sellerName: string;
   orderId: string;
@@ -127,6 +141,22 @@ function renderButton(href: string, label: string): string {
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
     <tr>
       <td align="center" bgcolor="#7F8A73" style="border-radius: 12px;">
+        <a href="${href}"
+           style="display:inline-block; padding: 12px 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                  font-size: 14px; font-weight: 800; letter-spacing: 0.2px; color: #22251F; text-decoration: none; border-radius: 12px;">
+          ${escapeHtml(label)}
+        </a>
+      </td>
+    </tr>
+  </table>
+  `.trim();
+}
+
+function renderSecondaryButton(href: string, label: string): string {
+  return `
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
+    <tr>
+      <td align="center" bgcolor="#E2D6C2" style="border-radius: 12px; border: 1px solid rgba(34,37,31,0.18);">
         <a href="${href}"
            style="display:inline-block; padding: 12px 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
                   font-size: 14px; font-weight: 800; letter-spacing: 0.2px; color: #22251F; text-decoration: none; border-radius: 12px;">
@@ -365,6 +395,8 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
   const preheader = `Delivery confirmed for ${data.listingTitle}. Review and confirm receipt if everything looks good.`;
   const origin = tryGetOrigin(data.orderUrl);
   const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
+  const checkInUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}checkin=1`;
+  const issueUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}issue=1`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Delivery confirmed
@@ -394,11 +426,53 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
     </div>
 
     <div style="margin: 18px 0 0 0;">
-      ${renderButton(data.orderUrl, 'View order')}
+      ${renderButton(checkInUrl, 'Yes, delivery arrived')}
+    </div>
+    <div style="margin: 10px 0 0 0;">
+      ${renderSecondaryButton(issueUrl, 'I have an issue')}
     </div>
 
     <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
-      Tip: Keep photos/notes if there’s an issue. Need help? <a href="${contactUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Contact us</a> with order ID <strong>${escapeHtml(data.orderId)}</strong>.
+      Tip: Keep photos/notes if there’s an issue. You can also <a href="${data.orderUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">view the order</a>.
+      Need help? <a href="${contactUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Contact us</a> with order ID <strong>${escapeHtml(data.orderId)}</strong>.
+    </div>
+  `;
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOrderInTransitEmail(data: OrderInTransitEmailData): { subject: string; html: string } {
+  const subject = `In transit — ${data.listingTitle}`;
+  const preheader = `Your order is on the way. View the latest status and messages.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      In transit
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.buyerName)} — the seller marked your order as in transit.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Order
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 16px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
+      For the fastest updates, keep communication inside the order page.
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'View order')}
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
@@ -720,6 +794,8 @@ export function getDeliveryCheckInEmail(data: DeliveryCheckInEmailData): { subje
   const preheader = `How did it go? Confirm receipt or report an issue.`;
   const origin = tryGetOrigin(data.orderUrl);
   const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
+  const checkInUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}checkin=1`;
+  const issueUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}issue=1`;
 
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
@@ -745,7 +821,10 @@ export function getDeliveryCheckInEmail(data: DeliveryCheckInEmailData): { subje
     </table>
 
     <div style="margin: 18px 0 0 0;">
-      ${renderButton(data.orderUrl, 'Open order')}
+      ${renderButton(checkInUrl, 'Yes, delivery arrived')}
+    </div>
+    <div style="margin: 10px 0 0 0;">
+      ${renderSecondaryButton(issueUrl, 'I have an issue')}
     </div>
 
     <div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
@@ -870,5 +949,39 @@ export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { sub
     ${unsub}
   `;
 
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOrderReceivedEmail(data: OrderReceivedEmailData): { subject: string; html: string } {
+  const subject = `Receipt confirmed — ${data.listingTitle}`;
+  const preheader = `The buyer confirmed receipt. Your transaction is moving toward payout release.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Receipt confirmed
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.sellerName)} — the buyer confirmed receipt.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Order
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'View order')}
+    </div>
+  `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }

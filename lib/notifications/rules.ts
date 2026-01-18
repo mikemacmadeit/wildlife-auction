@@ -159,18 +159,18 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
       return {
         category: 'orders',
         urgency: 'normal',
-        channels: ['inApp'],
+        channels: ['inApp', 'email'],
         dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: {},
+        rateLimitPerUser: { email: { perHour: 3, perDay: 8 } },
         allowDuringQuietHours: true,
       };
     case 'Order.InTransit':
       return {
         category: 'orders',
         urgency: 'normal',
-        channels: ['inApp'],
+        channels: ['inApp', 'email'],
         dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: {},
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
     case 'Order.DeliveryConfirmed':

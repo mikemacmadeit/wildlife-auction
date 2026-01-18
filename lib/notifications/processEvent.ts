@@ -123,6 +123,18 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Order.InTransit': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.InTransit' }>;
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
     case 'Order.DeliveryConfirmed': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryConfirmed' }>;
       return {
@@ -145,6 +157,18 @@ function buildEmailJobPayload(params: {
           orderId: p.orderId,
           listingTitle: p.listingTitle,
           daysSinceDelivery: p.daysSinceDelivery,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.Received': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Received' }>;
+      return {
+        template: 'order_received',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,
         },
       };
