@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { getOrdersForUser } from '@/lib/firebase/orders';
+import { getOrderByCheckoutSessionId, getOrdersForUser } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { Order, OrderStatus } from '@/lib/types';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
@@ -36,6 +36,14 @@ type CheckoutReturnBanner =
   | { tone: 'info'; title: string; body: string }
   | { tone: 'warning'; title: string; body: string };
 
+type PendingCheckout = {
+  sessionId: string;
+  listingId?: string | null;
+  paymentStatus?: string | null;
+  isProcessing?: boolean;
+  createdAtMs: number;
+};
+
 export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -49,6 +57,48 @@ export default function OrdersPage() {
   const [disputeNotes, setDisputeNotes] = useState('');
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [checkoutBanner, setCheckoutBanner] = useState<CheckoutReturnBanner | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
+  const [pendingCheckoutListingTitle, setPendingCheckoutListingTitle] = useState<string | null>(null);
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const userOrders = await getOrdersForUser(user.uid, 'buyer');
+
+      const ordersWithListings = await Promise.all(
+        userOrders.map(async (order) => {
+          try {
+            const listing = await getListingById(order.listingId);
+            return {
+              ...order,
+              listingTitle: listing?.title || 'Listing not found',
+              listingType: listing?.type || 'unknown',
+            };
+          } catch (err) {
+            console.error(`Error fetching listing ${order.listingId}:`, err);
+            return {
+              ...order,
+              listingTitle: 'Listing not found',
+              listingType: 'unknown',
+            };
+          }
+        })
+      );
+
+      setOrders(ordersWithListings);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   // Stripe checkout redirect safety: verify session_id via server endpoint (never crash page).
   // Also: clean URL after showing the banner once (persist banner through the replace).
@@ -107,6 +157,16 @@ export default function OrdersPage() {
                 title: 'Payment confirmed',
                 body: 'Payment confirmed. Your order will appear below shortly.',
               };
+
+          // Track this session so we can poll for the corresponding Firestore order.
+          const listingIdFromMeta = data?.session?.metadata?.listingId ? String(data.session.metadata.listingId) : null;
+          setPendingCheckout({
+            sessionId,
+            listingId: listingIdFromMeta,
+            paymentStatus,
+            isProcessing,
+            createdAtMs: Date.now(),
+          });
         } else {
           const reason = String(data?.reason || '');
           banner =
@@ -157,51 +217,75 @@ export default function OrdersPage() {
 
   // Fetch orders when user is loaded
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!user) {
-        setLoading(false);
+    if (!authLoading) {
+      void loadOrders();
+    }
+  }, [authLoading, loadOrders]);
+
+  // If we have a pending checkout session, try to resolve it into a real order (webhook-driven).
+  // This prevents the “I paid and nothing showed up” moment.
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.uid) return;
+    if (!pendingCheckout?.sessionId) return;
+
+    // Best-effort: fetch listing title for the pending row.
+    async function hydrateListingTitle() {
+      const lid = pendingCheckout?.listingId;
+      if (!lid) return;
+      try {
+        const listing = await getListingById(lid);
+        if (!cancelled) setPendingCheckoutListingTitle(listing?.title || 'Recent purchase');
+      } catch {
+        // ignore
+      }
+    }
+    void hydrateListingTitle();
+
+    const startedAt = Date.now();
+    const maxMs = 90_000;
+    const intervalMs = 3000;
+    const sessionId = pendingCheckout.sessionId;
+
+    async function tick() {
+      try {
+        const order = await getOrderByCheckoutSessionId(sessionId);
+        if (cancelled) return;
+        if (order?.id) {
+          // Found it. Refresh list and highlight the new order.
+          await loadOrders();
+          setHighlightOrderId(order.id);
+          setPendingCheckout(null);
+          setPendingCheckoutListingTitle(null);
+          try {
+            window.setTimeout(() => setHighlightOrderId(null), 12_000);
+          } catch {
+            // ignore
+          }
+          return;
+        }
+      } catch {
+        // If this query fails (rules/transient), still keep polling loadOrders; it may show up anyway.
+      }
+      await loadOrders();
+    }
+
+    const handle = window.setInterval(() => {
+      if (Date.now() - startedAt > maxMs) {
+        window.clearInterval(handle);
         return;
       }
+      void tick();
+    }, intervalMs);
 
-      try {
-        setLoading(true);
-        setError(null);
-        const userOrders = await getOrdersForUser(user.uid, 'buyer');
+    // Run once immediately.
+    void tick();
 
-        // Fetch listing details for each order
-        const ordersWithListings = await Promise.all(
-          userOrders.map(async (order) => {
-            try {
-              const listing = await getListingById(order.listingId);
-              return {
-                ...order,
-                listingTitle: listing?.title || 'Listing not found',
-                listingType: listing?.type || 'unknown',
-              };
-            } catch (err) {
-              console.error(`Error fetching listing ${order.listingId}:`, err);
-              return {
-                ...order,
-                listingTitle: 'Listing not found',
-                listingType: 'unknown',
-              };
-            }
-          })
-        );
-
-        setOrders(ordersWithListings);
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load orders');
-      } finally {
-        setLoading(false);
-      }
+    return () => {
+      cancelled = true;
+      window.clearInterval(handle);
     };
-
-    if (!authLoading) {
-      fetchOrders();
-    }
-  }, [user, authLoading]);
+  }, [loadOrders, pendingCheckout, user?.uid]);
 
   const handleConfirmReceipt = async (orderId: string) => {
     if (!user) return;
@@ -439,10 +523,33 @@ export default function OrdersPage() {
           </Card>
         ) : null}
 
-        {/* Unified: Polished order tiles (timeline always visible) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-tour="orders-list">
+        {pendingCheckout ? (
+          <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/20">
+            <CardContent className="p-4 md:p-5 space-y-2">
+              <div className="font-extrabold text-base md:text-lg leading-tight">
+                {pendingCheckoutListingTitle || 'Recent purchase'}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {pendingCheckout.isProcessing
+                  ? 'Bank payment processing — your order will appear as soon as it’s confirmed.'
+                  : 'Finalizing your order — it will appear as soon as we receive confirmation.'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Session: <span className="font-mono">{pendingCheckout.sessionId.slice(0, 18)}…</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* Unified: Polished order tiles (timeline always visible) - stacked list */}
+        <div className="flex flex-col gap-4" data-tour="orders-list">
           {orders.map((order) => (
-            <Card key={order.id} className="border-border/60 bg-gradient-to-br from-card via-card to-muted/20">
+            <Card
+              key={order.id}
+              className={order.id === highlightOrderId
+                ? 'border-primary/50 ring-2 ring-primary/30 bg-gradient-to-br from-card via-card to-muted/20'
+                : 'border-border/60 bg-gradient-to-br from-card via-card to-muted/20'}
+            >
               <CardContent className="p-4 md:p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
