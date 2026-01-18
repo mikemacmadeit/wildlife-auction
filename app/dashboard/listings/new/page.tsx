@@ -110,6 +110,13 @@ function NewListingPageContent() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [payoutsGateOpen, setPayoutsGateOpen] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState<Record<string, boolean>>({});
+  const [resumeDraftOpen, setResumeDraftOpen] = useState(false);
+  const [resumeDraftPayload, setResumeDraftPayload] = useState<{
+    formData: any;
+    sellerAttestationAccepted?: boolean;
+    listingId?: string | null;
+    savedAtMs?: number;
+  } | null>(null);
 
   // Autosave: local (always) + server (only once we have a draftId).
   const [autoSaveState, setAutoSaveState] = useState<{
@@ -183,15 +190,24 @@ function NewListingPageContent() {
     }
 
     try {
+      // IMPORTANT: do not auto-restore silently (it makes "new listing" feel broken).
+      // Instead, prompt the user to resume the prior draft or start fresh.
       const parsed = JSON.parse(raw) as any;
-      if (parsed?.formData) setFormData(parsed.formData);
-      if (typeof parsed?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(parsed.sellerAttestationAccepted);
-      if (typeof parsed?.listingId === 'string' && parsed.listingId.trim()) setListingId(parsed.listingId.trim());
-      if (typeof parsed?.savedAtMs === 'number') setAutoSaveState({ status: 'saved', lastSavedAtMs: parsed.savedAtMs });
+      if (parsed?.formData) {
+        setResumeDraftPayload({
+          formData: parsed.formData,
+          sellerAttestationAccepted: typeof parsed?.sellerAttestationAccepted === 'boolean' ? parsed.sellerAttestationAccepted : undefined,
+          listingId: typeof parsed?.listingId === 'string' ? parsed.listingId.trim() : null,
+          savedAtMs: typeof parsed?.savedAtMs === 'number' ? parsed.savedAtMs : undefined,
+        });
+        setResumeDraftOpen(true);
+      } else {
+        restoredOnceRef.current = true;
+      }
     } catch {
       // ignore
     } finally {
-      restoredOnceRef.current = true;
+      // Do not mark restored until the user chooses an action (resume vs fresh).
     }
   }, [authLoading, hasAnyProgress, user?.uid, fresh]);
 
@@ -1792,6 +1808,18 @@ function NewListingPageContent() {
     );
   }
 
+  const clearAutosave = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(autosaveKey(user?.uid || null));
+      window.localStorage.removeItem(autosaveKey(null));
+      // Also clear the auth-restore buffer if it exists.
+      sessionStorage.removeItem('listingFormData');
+    } catch {
+      // ignore
+    }
+  };
+
   const handleSaveDraft = async () => {
     if (!user) {
       toast({
@@ -1882,6 +1910,89 @@ function NewListingPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Resume draft prompt (prevents "new listing" from being prefilled unexpectedly) */}
+      <Dialog
+        open={resumeDraftOpen}
+        onOpenChange={(open) => {
+          setResumeDraftOpen(open);
+          if (!open) {
+            // If user dismisses, default to start fresh for safety.
+            clearAutosave();
+            setResumeDraftPayload(null);
+            restoredOnceRef.current = true;
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resume your last draft?</DialogTitle>
+            <DialogDescription>
+              We found an autosaved draft. You can resume it, or start a fresh listing.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Category</span>
+              <span className="font-medium">
+                {String(resumeDraftPayload?.formData?.category || '—').replaceAll('_', ' ')}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Type</span>
+              <span className="font-medium">{String(resumeDraftPayload?.formData?.type || '—')}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Title</span>
+              <span className="font-medium text-right truncate max-w-[260px]">
+                {String(resumeDraftPayload?.formData?.title || 'Draft Listing')}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Location</span>
+              <span className="font-medium text-right truncate max-w-[260px]">
+                {String(resumeDraftPayload?.formData?.location?.city || '—')},{' '}
+                {String(resumeDraftPayload?.formData?.location?.state || '—')}
+              </span>
+            </div>
+            {resumeDraftPayload?.savedAtMs ? (
+              <div className="text-xs text-muted-foreground pt-1">
+                Last saved: {new Date(resumeDraftPayload.savedAtMs).toLocaleString()}
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                clearAutosave();
+                setResumeDraftPayload(null);
+                setResumeDraftOpen(false);
+                restoredOnceRef.current = true;
+              }}
+            >
+              Start fresh
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const p = resumeDraftPayload;
+                if (p?.formData) setFormData(p.formData);
+                if (typeof p?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(p.sellerAttestationAccepted);
+                if (typeof p?.listingId === 'string' && p.listingId.trim()) setListingId(p.listingId.trim());
+                if (typeof p?.savedAtMs === 'number') setAutoSaveState({ status: 'saved', lastSavedAtMs: p.savedAtMs });
+                setResumeDraftOpen(false);
+                restoredOnceRef.current = true;
+              }}
+            >
+              Resume draft
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Payouts Gate Dialog (publish blocker, not draft blocker) */}
       <Dialog open={payoutsGateOpen} onOpenChange={setPayoutsGateOpen}>
         <DialogContent className="sm:max-w-2xl">
