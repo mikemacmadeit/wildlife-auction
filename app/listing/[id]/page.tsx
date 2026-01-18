@@ -702,17 +702,6 @@ export default function ListingDetailPage() {
                   </span>
                 ) : null}
               </div>
-
-              <ListingActivityMetrics
-                className="mt-3"
-                variant="inline"
-                views={listing!.metrics?.views || 0}
-                favorites={0}
-                bids={listing!.metrics?.bidCount || 0}
-                watchers={listing!.metrics?.favorites || 0}
-                bidsLastHour={bidsLastHour}
-                inquiries={0}
-              />
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -1122,6 +1111,15 @@ export default function ListingDetailPage() {
 
             {/* Seller Profile - Trust & Credibility */}
             <EnhancedSellerProfile listing={listing} />
+
+            {/* Activity / Social proof (premium tile boxes) */}
+            <ListingActivityMetrics
+              className="pt-1"
+              views={listing!.metrics?.views || 0}
+              favorites={listing!.metrics?.favorites || 0}
+              bids={listing!.metrics?.bidCount || 0}
+              bidsLastHour={bidsLastHour}
+            />
           </div>
 
           {/* Right Sidebar - Desktop Only (5 columns, Sticky) */}
