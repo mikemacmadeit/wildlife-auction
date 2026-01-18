@@ -464,25 +464,31 @@ function SelectedTile(props: {
         <Image src={p.url} alt="Selected" fill className="object-cover" unoptimized />
       </div>
 
+      {/* Top-left: position + cover state (high-contrast, doesn't bleed on light mode) */}
       <div className="absolute top-2 left-2 flex items-center gap-2">
-        <div className="rounded-md bg-black/55 text-white px-2 py-1 text-xs font-semibold flex items-center gap-1">
+        <div className="rounded-md bg-background/85 backdrop-blur border border-border/60 text-foreground px-2 py-1 text-xs font-semibold flex items-center gap-1 shadow-sm">
           <GripVertical className="h-3.5 w-3.5" />
           {idx + 1}/{total}
         </div>
         {props.isCover && (
-          <Badge className="bg-primary text-primary-foreground">
+          <Badge className="bg-primary text-primary-foreground shadow-sm">
             <Star className="h-3.5 w-3.5 mr-1" />
             Cover
           </Badge>
         )}
       </div>
 
+      {/* Top-right: remove */}
       <div className="absolute top-2 right-2">
         <Button
           type="button"
           size="icon"
-          variant="secondary"
-          className="min-h-[36px] min-w-[36px]"
+          variant="outline"
+          className={cn(
+            'min-h-[36px] min-w-[36px]',
+            'bg-background/85 backdrop-blur border-border/60 shadow-sm',
+            'hover:bg-background'
+          )}
           onClick={props.onRemove}
           aria-label="Remove photo"
         >
@@ -490,25 +496,46 @@ function SelectedTile(props: {
         </Button>
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 p-2 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
-        <div className="flex gap-2">
-          <Button type="button" size="icon" variant="secondary" className="min-h-[40px] min-w-[40px]" onClick={props.onMoveLeft} disabled={idx === 0}>
+      {/* Bottom controls: kept inside tile with blurred surface + responsive label */}
+      <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 rounded-md bg-background/85 backdrop-blur border border-border/60 p-1 shadow-sm">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="min-h-[40px] min-w-[40px]"
+            onClick={props.onMoveLeft}
+            disabled={idx === 0}
+            aria-label="Move photo left"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <Button
             type="button"
             size="icon"
-            variant="secondary"
+            variant="ghost"
             className="min-h-[40px] min-w-[40px]"
             onClick={props.onMoveRight}
             disabled={idx === total - 1}
+            aria-label="Move photo right"
           >
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
-        <Button type="button" size="sm" variant="secondary" className="min-h-[40px] font-semibold" onClick={props.onSetCover}>
-          <Star className="h-4 w-4 mr-2" />
-          Set cover
+
+        <Button
+          type="button"
+          size="sm"
+          variant={props.isCover ? 'secondary' : 'outline'}
+          className={cn(
+            'min-h-[40px] font-semibold shadow-sm',
+            'bg-background/85 backdrop-blur border-border/60 hover:bg-background'
+          )}
+          onClick={props.onSetCover}
+          disabled={props.isCover}
+        >
+          <Star className={cn('h-4 w-4', 'sm:mr-2')} />
+          <span className="hidden sm:inline">{props.isCover ? 'Cover' : 'Set cover'}</span>
         </Button>
       </div>
     </div>
