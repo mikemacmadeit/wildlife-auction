@@ -30,9 +30,6 @@ import { getOrdersForUser } from '@/lib/firebase/orders';
 import { Listing, Order, UserProfile } from '@/lib/types';
 import { getUserProfile, isProfileComplete } from '@/lib/firebase/users';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
-import { PLAN_CONFIG, MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
-import { getEffectiveSubscriptionTier, getTierLabel } from '@/lib/pricing/subscriptions';
-import { Crown, Zap, CreditCard, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
@@ -448,6 +445,42 @@ export default function SellerOverviewPage() {
           </div>
         </div>
 
+        {/* KPI Snapshot (always first) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" data-tour="seller-stats">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <Card
+                key={stat.label}
+                className={cn(
+                  'border-2 border-border/50 bg-card hover:border-border/70',
+                  'hover:shadow-sm cursor-pointer group'
+                )}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                    {stat.label}
+                  </CardTitle>
+                  <div
+                    className={cn(
+                      'w-10 h-10 rounded-lg border-2 flex items-center justify-center',
+                      stat.bgColor,
+                      stat.borderColor,
+                      'group-hover:bg-primary/20 group-hover:border-primary/30'
+                    )}
+                  >
+                    <Icon className={cn('h-5 w-5', stat.color)} />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground font-medium">{stat.subtext}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
         {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
         {user && setupChecklist.isComplete !== true && (
           <Card className="border-2 border-border/50 bg-card" data-tour="seller-setup-checklist">
@@ -597,119 +630,9 @@ export default function SellerOverviewPage() {
           </Card>
         )}
 
-        {/* Exposure Plan (Seller Tier) */}
-        {userProfile && (() => {
-          const tier = getEffectiveSubscriptionTier(userProfile);
-          const tierConfig = PLAN_CONFIG[tier];
-          const subscriptionStatus = userProfile.subscriptionStatus;
-          const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
-          const showUpgrade = tier === 'standard' || !isActive;
-
-          const Icon = tier === 'premier' ? Crown : tier === 'priority' ? Zap : CreditCard;
-
-          return (
-            <Card className={cn(
-              'border-2',
-              tier === 'premier'
-                ? 'border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 to-background'
-                : tier === 'priority'
-                ? 'border-primary/30 bg-gradient-to-br from-primary/10 to-background'
-                : 'border-border/50 bg-card'
-            )}>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <Icon className={cn('h-6 w-6', tier === 'standard' ? 'text-muted-foreground' : 'text-primary')} />
-                    <div>
-                      <CardTitle className="text-xl font-extrabold">
-                        {getTierLabel(tier)}
-                      </CardTitle>
-                      <CardDescription className="text-sm flex items-center gap-2 flex-wrap">
-                        <span>Exposure plan (optional)</span>
-                        <span className="text-muted-foreground">•</span>
-                        <span>Marketplace fee: {(MARKETPLACE_FEE_PERCENT * 100).toFixed(0)}%</span>
-                      </CardDescription>
-                    </div>
-                  </div>
-                  {showUpgrade && (
-                    <Button asChild size="sm" className="font-semibold">
-                      <Link href="/pricing">View Exposure Plans</Link>
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-start gap-2 rounded-lg border bg-background/50 p-3">
-                  <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Seller tier reflects an optional exposure plan and <span className="font-semibold">does not</span> indicate regulatory compliance approval.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      Monthly price
-                    </p>
-                    <p className="text-2xl font-extrabold text-foreground">
-                      {tierConfig.monthlyPrice === 0 ? '$0' : `$${tierConfig.monthlyPrice}`}
-                      <span className="text-sm font-bold text-muted-foreground">/mo</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      Browse placement
-                    </p>
-                    <p className="text-2xl font-extrabold text-foreground">
-                      {tier === 'premier' ? 'Top' : tier === 'priority' ? 'High' : 'Normal'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
-
-        {/* Status Snapshot Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" data-tour="seller-stats">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <Card
-                key={stat.label}
-                className={cn(
-                  'border-2 border-border/50 bg-card hover:border-border/70',
-                  'hover:shadow-sm cursor-pointer group'
-                )}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                    {stat.label}
-                  </CardTitle>
-                  <div className={cn(
-                    'w-10 h-10 rounded-lg border-2 flex items-center justify-center',
-                    stat.bgColor,
-                    stat.borderColor,
-                    'group-hover:bg-primary/20 group-hover:border-primary/30'
-                  )}>
-                    <Icon className={cn('h-5 w-5', stat.color)} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
-                    {stat.value}
-                  </div>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    {stat.subtext}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
         {/* Payout Readiness */}
         {user && userProfile && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 gap-6 md:gap-8">
             <div data-tour="seller-payout-readiness">
               <PayoutReadinessCard 
                 userProfile={userProfile} 
@@ -719,25 +642,6 @@ export default function SellerOverviewPage() {
                 }} 
               />
             </div>
-            <Card className="border-2 border-border/50 bg-card" data-tour="seller-exposure-plans">
-              <CardHeader>
-                <CardTitle className="text-xl font-extrabold">Exposure Plans</CardTitle>
-                <CardDescription>
-                  Optional subscriptions that improve placement and add seller-tier badges.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  All sellers pay the same {(MARKETPLACE_FEE_PERCENT * 100).toFixed(0)}% marketplace fee. Plans only affect exposure and styling.
-                </p>
-                <Button asChild className="w-full font-semibold">
-                  <Link href="/pricing">
-                    View Exposure Plans
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         )}
 
