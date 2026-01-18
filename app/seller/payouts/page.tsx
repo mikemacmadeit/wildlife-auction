@@ -21,12 +21,31 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockPayouts, Payout } from '@/lib/seller-mock-data';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
-import { UserProfile } from '@/lib/types';
+import { UserProfile, type Order, type OrderStatus } from '@/lib/types';
 import { createStripeAccount, createAccountLink, checkStripeAccountStatus } from '@/lib/stripe/api';
 import { useToast } from '@/hooks/use-toast';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
+import { getListingById } from '@/lib/firebase/listings';
+
+type PayoutRowStatus = 'available' | 'pending' | 'completed';
+type PayoutRow = {
+  id: string; // orderId
+  orderId: string;
+  listingId: string;
+  listingTitle: string;
+  amount: number;
+  platformFee: number;
+  sellerAmount: number;
+  status: PayoutRowStatus;
+  paidAt?: Date;
+  releaseEligibleAt?: Date;
+  releasedAt?: Date;
+  stripeTransferId?: string;
+  orderStatus?: OrderStatus;
+};
 
 export default function SellerPayoutsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -37,6 +56,8 @@ export default function SellerPayoutsPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [payoutRows, setPayoutRows] = useState<PayoutRow[]>([]);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
 
   const loadUserProfile = useCallback(async () => {
     if (!user) return;
@@ -175,25 +196,16 @@ export default function SellerPayoutsPage() {
   const isPayoutsEnabled = userProfile?.payoutsEnabled === true;
   const onboardingStatus = getOnboardingStatus();
 
-  const availablePayouts = useMemo(() => 
-    mockPayouts.filter((p) => p.status === 'available'),
-    []
-  );
-  const pendingPayouts = useMemo(() => 
-    mockPayouts.filter((p) => p.status === 'pending'),
-    []
-  );
-  const completedPayouts = useMemo(() => 
-    mockPayouts.filter((p) => p.status === 'completed'),
-    []
-  );
+  const availablePayouts = useMemo(() => payoutRows.filter((p) => p.status === 'available'), [payoutRows]);
+  const pendingPayouts = useMemo(() => payoutRows.filter((p) => p.status === 'pending'), [payoutRows]);
+  const completedPayouts = useMemo(() => payoutRows.filter((p) => p.status === 'completed'), [payoutRows]);
 
   const totalAvailable = useMemo(() => 
-    availablePayouts.reduce((sum, p) => sum + p.netAmount, 0),
+    availablePayouts.reduce((sum, p) => sum + p.sellerAmount, 0),
     [availablePayouts]
   );
   const totalPending = useMemo(() => 
-    pendingPayouts.reduce((sum, p) => sum + p.netAmount, 0),
+    pendingPayouts.reduce((sum, p) => sum + p.sellerAmount, 0),
     [pendingPayouts]
   );
 
@@ -215,7 +227,135 @@ export default function SellerPayoutsPage() {
     }).format(amount);
   };
 
-  const PayoutCard = memo(({ payout }: { payout: Payout }) => {
+  // Load real payouts (derived from orders for this seller)
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (authLoading) return;
+      if (!user?.uid) {
+        setPayoutRows([]);
+        return;
+      }
+      setLoadingPayouts(true);
+      try {
+        const ordersRef = collection(db, 'orders');
+        const sellerId = user.uid;
+
+        let docs: any[] = [];
+        try {
+          const q = query(ordersRef, where('sellerId', '==', sellerId), orderBy('updatedAt', 'desc'), limit(200));
+          const snap = await getDocs(q);
+          docs = snap.docs;
+        } catch (e: any) {
+          const code = String(e?.code || '');
+          const msg = String(e?.message || '');
+          const isMissingIndex =
+            code === 'failed-precondition' ||
+            msg.toLowerCase().includes('requires an index') ||
+            msg.toLowerCase().includes('failed-precondition');
+          if (!isMissingIndex) throw e;
+          // Fallback: no orderBy
+          const q = query(ordersRef, where('sellerId', '==', sellerId), limit(200));
+          const snap = await getDocs(q);
+          docs = snap.docs;
+        }
+
+        // Best-effort hydrate listing titles
+        const listingTitleById: Record<string, string> = {};
+        const listingIds = Array.from(new Set(docs.map((d) => String(d.data()?.listingId || '')).filter(Boolean))).slice(0, 80);
+        const listingResults = await Promise.allSettled(listingIds.map((id) => getListingById(id)));
+        listingResults.forEach((r, idx) => {
+          if (r.status !== 'fulfilled') return;
+          const listing = r.value as any;
+          const id = listingIds[idx];
+          if (listing?.title) listingTitleById[id] = String(listing.title);
+        });
+
+        const toDateSafe = (v: any): Date | undefined => {
+          if (!v) return undefined;
+          if (v instanceof Date) return v;
+          if (typeof v?.toDate === 'function') {
+            try {
+              const d = v.toDate();
+              if (d instanceof Date) return d;
+            } catch {
+              // ignore
+            }
+          }
+          if (typeof v?.seconds === 'number') {
+            const d = new Date(v.seconds * 1000);
+            return Number.isFinite(d.getTime()) ? d : undefined;
+          }
+          if (typeof v === 'string' || typeof v === 'number') {
+            const d = new Date(v);
+            return Number.isFinite(d.getTime()) ? d : undefined;
+          }
+          return undefined;
+        };
+
+        const rows: PayoutRow[] = docs
+          .map((docSnap) => {
+            const data = docSnap.data() as any;
+            const orderId = docSnap.id;
+            const listingId = String(data?.listingId || '');
+            const amount = Number(data?.amount || 0);
+            const platformFee = Number(data?.platformFee || 0);
+            const sellerAmount = Number(data?.sellerAmount || Math.max(0, amount - platformFee));
+            const stripeTransferId = typeof data?.stripeTransferId === 'string' ? data.stripeTransferId : undefined;
+            const statusRaw = String(data?.status || '') as OrderStatus;
+
+            const isCompleted = !!stripeTransferId || statusRaw === 'completed';
+            const isAvailable = !isCompleted && statusRaw === 'ready_to_release';
+
+            const status: PayoutRowStatus = isCompleted ? 'completed' : isAvailable ? 'available' : 'pending';
+
+            return {
+              id: orderId,
+              orderId,
+              listingId,
+              listingTitle: listingTitleById[listingId] || 'Listing',
+              amount,
+              platformFee,
+              sellerAmount,
+              status,
+              orderStatus: statusRaw,
+              paidAt: toDateSafe(data?.paidAt),
+              releaseEligibleAt: toDateSafe(data?.releaseEligibleAt),
+              releasedAt: toDateSafe(data?.releasedAt),
+              stripeTransferId,
+            } satisfies PayoutRow;
+          })
+          // keep only orders that represent a real money flow
+          .filter((r) => r.listingId && r.amount > 0 && r.sellerAmount >= 0);
+
+        rows.sort((a, b) => {
+          const aMs = (a.releasedAt || a.releaseEligibleAt || a.paidAt)?.getTime?.() || 0;
+          const bMs = (b.releasedAt || b.releaseEligibleAt || b.paidAt)?.getTime?.() || 0;
+          return bMs - aMs;
+        });
+
+        if (!cancelled) setPayoutRows(rows);
+      } catch (e: any) {
+        if (!cancelled) {
+          console.error('[seller/payouts] Failed to load payouts', e);
+          toast({
+            title: 'Error',
+            description: 'Failed to load payout history. Please try again.',
+            variant: 'destructive',
+          });
+        }
+      } finally {
+        if (!cancelled) setLoadingPayouts(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, toast, user?.uid]);
+
+  const PayoutCard = memo(({ payout }: { payout: PayoutRow }) => {
     const getStatusBadge = () => {
       switch (payout.status) {
         case 'available':
@@ -239,17 +379,17 @@ export default function SellerPayoutsPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Package className="h-4 w-4 text-muted-foreground" />
                     <Link
-                      href={`/listing/${payout.saleId}`}
+                      href={`/listing/${payout.listingId}`}
                       className="font-semibold text-foreground hover:text-primary"
                     >
-                      {payout.saleTitle}
+                      {payout.listingTitle}
                     </Link>
                   </div>
                   {getStatusBadge()}
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-extrabold text-foreground mb-1">
-                    {formatCurrency(payout.netAmount)}
+                    {formatCurrency(payout.sellerAmount)}
                   </div>
                   <div className="text-xs text-muted-foreground font-medium">
                     from {formatCurrency(payout.amount)} sale
@@ -261,37 +401,27 @@ export default function SellerPayoutsPage() {
               <div className="pt-2 border-t border-border/50 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground font-medium">Transaction Fee:</span>
-                  <span className="font-semibold text-foreground">{formatCurrency(payout.fees.transaction)}</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(payout.platformFee)}</span>
                 </div>
-                {payout.fees.subscription > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground font-medium">Subscription:</span>
-                    <span className="font-semibold text-foreground">{formatCurrency(payout.fees.subscription)}</span>
-                  </div>
-                )}
-                {payout.fees.services > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground font-medium">Services:</span>
-                    <span className="font-semibold text-foreground">{formatCurrency(payout.fees.services)}</span>
-                  </div>
-                )}
                 <div className="flex items-center justify-between text-xs pt-2 border-t border-border/50">
                   <span className="font-semibold text-foreground">Total Fees:</span>
-                  <span className="font-bold text-foreground">{formatCurrency(payout.fees.total)}</span>
+                  <span className="font-bold text-foreground">{formatCurrency(payout.platformFee)}</span>
                 </div>
               </div>
 
               {/* Schedule Info */}
-              {payout.status === 'available' && payout.scheduledDate && (
+              {payout.status === 'available' && (payout.releaseEligibleAt || payout.paidAt) && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
                   <Calendar className="h-3 w-3" />
-                  <span>Scheduled: {formatDate(payout.scheduledDate)}</span>
+                  <span>
+                    Eligible: {formatDate(payout.releaseEligibleAt || payout.paidAt)}
+                  </span>
                 </div>
               )}
-              {payout.status === 'completed' && payout.completedDate && (
+              {payout.status === 'completed' && payout.releasedAt && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
                   <CheckCircle2 className="h-3 w-3" />
-                  <span>Completed: {formatDate(payout.completedDate)}</span>
+                  <span>Released: {formatDate(payout.releasedAt)}</span>
                 </div>
               )}
             </div>
