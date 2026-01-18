@@ -305,21 +305,28 @@ export async function flagThread(threadId: string, userId: string): Promise<void
  */
 export function subscribeToThreadMessages(
   threadId: string,
-  callback: (messages: Message[]) => void
+  callback: (messages: Message[]) => void,
+  opts?: { onError?: (error: any) => void }
 ): Unsubscribe {
   const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
   const messagesQuery = query(messagesRef, orderBy('createdAt', 'asc'));
 
-  return onSnapshot(messagesQuery, (snapshot) => {
-    const messages = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        readAt: data.readAt?.toDate(),
-      } as Message;
-    });
-    callback(messages);
-  });
+  return onSnapshot(
+    messagesQuery,
+    (snapshot) => {
+      const messages = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          readAt: data.readAt?.toDate(),
+        } as Message;
+      });
+      callback(messages);
+    },
+    (error) => {
+      opts?.onError?.(error);
+    }
+  );
 }

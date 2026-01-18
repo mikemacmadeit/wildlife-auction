@@ -29,12 +29,13 @@ export function MessageThreadComponent({
   otherPartyAvatar,
   orderStatus,
 }: MessageThreadProps) {
-  const { user } = useAuth();
+  const { user, initialized: authInitialized } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [sending, setSending] = useState(false);
   const [isPaid, setIsPaid] = useState(orderStatus === 'paid' || orderStatus === 'completed');
+  const [listenError, setListenError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const toDateSafe = (value: any): Date | null => {
@@ -62,17 +63,38 @@ export function MessageThreadComponent({
   // Subscribe to messages
   useEffect(() => {
     if (!thread.id) return;
+    if (!authInitialized) return;
+    if (!user?.uid) return;
+    setListenError(null);
 
-    const unsubscribe = subscribeToThreadMessages(thread.id, (newMessages) => {
-      setMessages(newMessages);
-      // Mark as read when viewing
-      if (user) {
-        markThreadAsRead(thread.id, user.uid);
+    const unsubscribe = subscribeToThreadMessages(
+      thread.id,
+      (newMessages) => {
+        setMessages(newMessages);
+        // Mark as read when viewing (best-effort; never crash the listener)
+        void markThreadAsRead(thread.id, user.uid).catch(() => {});
+      },
+      {
+        onError: (err: any) => {
+          const code = String(err?.code || '');
+          const msg = String(err?.message || 'Failed to load messages');
+          if (code === 'permission-denied') {
+            setListenError('You do not have permission to view this conversation.');
+          } else {
+            setListenError('Failed to load messages. Please refresh and try again.');
+          }
+          console.error('[MessageThread] subscribeToThreadMessages error', err);
+          toast({
+            title: 'Messaging error',
+            description: code ? `${msg} (${code})` : msg,
+            variant: 'destructive',
+          });
+        },
       }
-    });
+    );
 
     return () => unsubscribe();
-  }, [thread.id, user]);
+  }, [authInitialized, thread.id, toast, user?.uid]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -99,9 +121,10 @@ export function MessageThreadComponent({
       );
       setMessageInput('');
     } catch (error: any) {
+      const code = typeof error?.code === 'string' ? error.code : '';
       toast({
         title: 'Error sending message',
-        description: error.message || 'Failed to send message',
+        description: code ? `${error.message || 'Failed to send message'} (${code})` : error.message || 'Failed to send message',
         variant: 'destructive',
       });
     } finally {
@@ -159,6 +182,14 @@ export function MessageThreadComponent({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {listenError ? (
+          <Alert className="border-destructive/40 bg-destructive/5 text-destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              {listenError}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />

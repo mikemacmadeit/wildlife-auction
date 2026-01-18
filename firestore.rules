@@ -475,16 +475,19 @@ service cloud.firestore {
       
       // Messages subcollection
       match /messages/{messageId} {
-        // Allow read: if user is sender or recipient, OR if admin
-        allow read: if isAuthenticated() && (
-          resource.data.senderId == request.auth.uid ||
-          resource.data.recipientId == request.auth.uid ||
-          isAdmin()
-        );
+        // Thread participant check (avoid outages when older message docs are missing recipientId, etc.)
+        function isThreadParticipant() {
+          let t = get(/databases/$(database)/documents/messageThreads/$(threadId)).data;
+          return t.buyerId == request.auth.uid || t.sellerId == request.auth.uid || isAdmin();
+        }
+
+        // Allow read: if user is a participant in the parent thread (or admin)
+        allow read: if isAuthenticated() && isThreadParticipant();
         
-        // Allow create: if authenticated and user is sender
-        allow create: if isAuthenticated() && 
-          request.resource.data.senderId == request.auth.uid;
+        // Allow create: if authenticated, user is sender, AND user is a participant in the parent thread
+        allow create: if isAuthenticated() &&
+          request.resource.data.senderId == request.auth.uid &&
+          isThreadParticipant();
         
         // Allow update: only admin (for flagging)
         allow update: if isAdmin();
