@@ -8,8 +8,14 @@
  * - Uses Firebase Admin via `lib/firebase/admin.ts`
  * - Creates:
  *   - a sold listing (minimal required fields)
- *   - a delivered order (with protection window active) so buyer can test confirm-receipt flow
- *   - notification events (Order.Confirmed, Order.InTransit, Order.DeliveryConfirmed) so emailJobs/in-app can be tested
+ *   - a fresh order at the BEGINNING of the flow (paid_held, not yet in transit / delivered)
+ *   - a single notification event (Order.Confirmed) so the starting state feels realistic
+ *
+ * After seeding, you can advance the flow from the UI:
+ * - Seller: Mark in transit → (emits Order.InTransit)
+ * - Seller: Mark delivered
+ * - Buyer: Confirm receipt → (transitions toward ready_to_release)
+ * - Admin: Release payout → (payout released email/in-app)
  */
 
 import fs from 'fs';
@@ -77,10 +83,8 @@ async function main() {
   }
 
   const now = new Date();
-  const deliveredAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const paidAt = new Date(now.getTime() - 15 * 60 * 1000);
   const protectionDays = 7;
-  const protectionStartAt = deliveredAt;
-  const protectionEndsAt = new Date(deliveredAt.getTime() + protectionDays * 24 * 60 * 60 * 1000);
 
   // 1) Create listing
   const listingRef = db.collection('listings').doc();
@@ -109,7 +113,7 @@ async function main() {
     saleType: 'buy_now',
   });
 
-  // 2) Create order (delivered + protection window active)
+  // 2) Create order (start at beginning of flow)
   const orderRef = db.collection('orders').doc();
   const amount = 12500;
   const platformFee = Math.round(amount * 0.05);
@@ -122,15 +126,11 @@ async function main() {
     amount,
     platformFee,
     sellerAmount,
-    status: 'delivered',
+    status: 'paid_held',
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
-    paidAt: Timestamp.fromDate(new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)),
-    deliveredAt: Timestamp.fromDate(deliveredAt),
-    deliveryConfirmedAt: Timestamp.fromDate(deliveredAt),
-    protectionStartAt: Timestamp.fromDate(protectionStartAt),
-    protectionEndsAt: Timestamp.fromDate(protectionEndsAt),
-    payoutHoldReason: 'protection_window',
+    paidAt: Timestamp.fromDate(paidAt),
+    payoutHoldReason: 'none',
     protectedTransactionDaysSnapshot: protectionDays,
     protectedTermsVersion: 'v1',
     lastUpdatedByRole: 'admin',
@@ -160,41 +160,6 @@ async function main() {
       paymentMethod,
     },
     optionalHash: `mock:confirmed:${orderId}`,
-    test: true,
-  });
-
-  await emitEventForUser({
-    type: 'Order.InTransit',
-    actorId: seller.uid,
-    entityType: 'order',
-    entityId: orderId,
-    targetUserId: buyer.uid,
-    payload: {
-      type: 'Order.InTransit',
-      orderId,
-      listingId: listingRef.id,
-      listingTitle: 'Mock Listing — Axis Doe (Breeder Stock)',
-      orderUrl: buyerOrderUrl,
-    },
-    optionalHash: `mock:in_transit:${orderId}`,
-    test: true,
-  });
-
-  await emitEventForUser({
-    type: 'Order.DeliveryConfirmed',
-    actorId: seller.uid,
-    entityType: 'order',
-    entityId: orderId,
-    targetUserId: buyer.uid,
-    payload: {
-      type: 'Order.DeliveryConfirmed',
-      orderId,
-      listingId: listingRef.id,
-      listingTitle: 'Mock Listing — Axis Doe (Breeder Stock)',
-      orderUrl: buyerOrderUrl,
-      deliveryDate: deliveredAt.toISOString(),
-    },
-    optionalHash: `mock:delivered:${orderId}`,
     test: true,
   });
 

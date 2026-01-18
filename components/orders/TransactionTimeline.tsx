@@ -228,6 +228,20 @@ export function TransactionTimeline(props: { order: Order; role: TimelineRole; c
       });
   }, [order, role, trust, rank, blocked, protectionRemaining]);
 
+  const StepDot = (s: TimelineStep) => (
+    <div
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded-full border',
+        s.status === 'done' && 'bg-primary/10 border-primary/30 text-primary',
+        s.status === 'active' && 'bg-primary/15 border-primary/40 text-primary',
+        s.status === 'upcoming' && 'bg-background border-border/50 text-muted-foreground',
+        s.status === 'blocked' && 'bg-destructive/10 border-destructive/30 text-destructive'
+      )}
+    >
+      {s.status === 'done' ? <CheckCircle2 className="h-4 w-4" /> : s.icon}
+    </div>
+  );
+
   return (
     <Card className={cn('border-border/60', className)}>
       <CardContent className="pt-6">
@@ -241,38 +255,39 @@ export function TransactionTimeline(props: { order: Order; role: TimelineRole; c
           )}
         </div>
 
-        <div className="space-y-3">
-          {steps.map((s) => (
-            <div
-              key={s.key}
-              className={cn(
-                'flex items-start gap-3 rounded-lg border p-3',
-                s.status === 'done' && 'border-primary/20 bg-primary/5',
-                s.status === 'active' && 'border-primary/40 bg-primary/10',
-                s.status === 'upcoming' && 'border-border/50 bg-background/40',
-                s.status === 'blocked' && 'border-destructive/30 bg-destructive/5'
-              )}
-            >
-              <div
-                className={cn(
-                  'mt-0.5 flex h-7 w-7 items-center justify-center rounded-full border',
-                  s.status === 'done' && 'bg-primary/10 border-primary/30 text-primary',
-                  s.status === 'active' && 'bg-primary/15 border-primary/40 text-primary',
-                  s.status === 'upcoming' && 'bg-background border-border/50 text-muted-foreground',
-                  s.status === 'blocked' && 'bg-destructive/10 border-destructive/30 text-destructive'
-                )}
-              >
-                {s.status === 'done' ? <CheckCircle2 className="h-4 w-4" /> : s.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold text-sm text-foreground">{s.title}</div>
-                  {s.meta}
+        {/* Horizontal stepper (scrolls on small screens) */}
+        <div className="overflow-x-auto pb-2">
+          <div className="relative min-w-[760px]">
+            <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
+
+            <div className="flex items-start gap-3">
+              {steps.map((s) => (
+                <div key={s.key} className="flex-1 min-w-[190px]">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="z-10">{StepDot(s)}</div>
+
+                    <div
+                      className={cn(
+                        'mt-3 w-full rounded-xl border p-3',
+                        s.status === 'done' && 'border-primary/20 bg-primary/5',
+                        s.status === 'active' && 'border-primary/40 bg-primary/10',
+                        s.status === 'upcoming' && 'border-border/50 bg-background/40',
+                        s.status === 'blocked' && 'border-destructive/30 bg-destructive/5'
+                      )}
+                    >
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <div className="text-sm font-semibold leading-tight">{s.title}</div>
+                        {s.meta}
+                      </div>
+                      {s.description ? (
+                        <div className="text-xs text-muted-foreground mt-1 leading-snug">{s.description}</div>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
-                {s.description && <div className="text-xs text-muted-foreground mt-0.5">{s.description}</div>}
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </CardContent>
     </Card>

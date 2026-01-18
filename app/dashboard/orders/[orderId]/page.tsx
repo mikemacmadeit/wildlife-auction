@@ -136,29 +136,45 @@ export default function BuyerOrderDetailPage() {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-5xl space-y-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="space-y-1">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/orders">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to orders
-              </Link>
-            </Button>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Order</h1>
-            <p className="text-sm text-muted-foreground break-words">
-              {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {trustState && <Badge variant="secondary" className="font-semibold text-xs capitalize">{trustState.replaceAll('_', ' ')}</Badge>}
-            {issueState !== 'none' && (
-              <Badge variant="destructive" className="font-semibold text-xs">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Issue under review
-              </Badge>
-            )}
-          </div>
-        </div>
+        <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/25">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="space-y-2 min-w-[260px]">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/dashboard/orders">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to orders
+                  </Link>
+                </Button>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Order</h1>
+                  <p className="text-sm text-muted-foreground break-words mt-1">
+                    {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {typeof order.amount === 'number' ? (
+                  <Badge variant="secondary" className="font-semibold text-xs">
+                    Total ${order.amount.toLocaleString()}
+                  </Badge>
+                ) : null}
+                {trustState ? (
+                  <Badge variant="secondary" className="font-semibold text-xs capitalize">
+                    {trustState.replaceAll('_', ' ')}
+                  </Badge>
+                ) : null}
+                {issueState !== 'none' && (
+                  <Badge variant="destructive" className="font-semibold text-xs">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Issue under review
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Dialog
           open={checkin}
@@ -223,66 +239,101 @@ export default function BuyerOrderDetailPage() {
 
         <TransactionTimeline order={order} role="buyer" />
 
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Next actions</CardTitle>
-            <CardDescription>These actions reflect the current backend-truth state of this order.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <div className="font-semibold text-sm">Confirm receipt</div>
-                <div className="text-xs text-muted-foreground">Only confirm after delivery is complete.</div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Next actions</CardTitle>
+              <CardDescription>These actions reflect the current backend-truth state of this order.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="font-semibold text-sm">Confirm receipt</div>
+                  <div className="text-xs text-muted-foreground">Only confirm after delivery is complete.</div>
+                </div>
+                <Button
+                  disabled={!canConfirmReceipt || processing !== null}
+                  onClick={async () => {
+                    try {
+                      setProcessing('confirm');
+                      await confirmReceipt(order.id);
+                      toast({ title: 'Receipt confirmed', description: 'Funds remain held until admin release.' });
+                      const refreshed = await getOrderById(order.id);
+                      if (refreshed) setOrder(refreshed);
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: e?.message || 'Failed to confirm receipt', variant: 'destructive' });
+                    } finally {
+                      setProcessing(null);
+                    }
+                  }}
+                >
+                  {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Confirm receipt
+                </Button>
               </div>
-              <Button
-                disabled={!canConfirmReceipt || processing !== null}
-                onClick={async () => {
-                  try {
-                    setProcessing('confirm');
-                    await confirmReceipt(order.id);
-                    toast({ title: 'Receipt confirmed', description: 'Funds remain held until admin release.' });
-                    const refreshed = await getOrderById(order.id);
-                    if (refreshed) setOrder(refreshed);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to confirm receipt', variant: 'destructive' });
-                  } finally {
-                    setProcessing(null);
-                  }
-                }}
-              >
-                {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Confirm receipt
-              </Button>
-            </div>
-            <Separator />
-            <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
-              <div>
-                <div className="font-semibold text-sm">Report an issue</div>
-                <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
+              <Separator />
+              <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
+                <div>
+                  <div className="font-semibold text-sm">Report an issue</div>
+                  <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={!canDispute || processing !== null}
+                  onClick={async () => {
+                    try {
+                      setProcessing('dispute');
+                      await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
+                      toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
+                      const refreshed = await getOrderById(order.id);
+                      if (refreshed) setOrder(refreshed);
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: e?.message || 'Failed to report issue', variant: 'destructive' });
+                    } finally {
+                      setProcessing(null);
+                    }
+                  }}
+                >
+                  {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Report an issue
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                disabled={!canDispute || processing !== null}
-                onClick={async () => {
-                  try {
-                    setProcessing('dispute');
-                    await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
-                    toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
-                    const refreshed = await getOrderById(order.id);
-                    if (refreshed) setOrder(refreshed);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to report issue', variant: 'destructive' });
-                  } finally {
-                    setProcessing(null);
-                  }
-                }}
-              >
-                {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Report an issue
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Order details</CardTitle>
+              <CardDescription>Quick reference links and metadata.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="font-semibold text-sm">Listing</div>
+                  <div className="text-xs text-muted-foreground">{listing?.title || 'Listing'}</div>
+                </div>
+                {listing?.id ? (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/listing/${listing.id}`}>View listing</Link>
+                  </Button>
+                ) : null}
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border/60 p-3 bg-background/40">
+                  <div className="text-xs text-muted-foreground">Status</div>
+                  <div className="text-sm font-semibold mt-0.5">{String(order.status).replaceAll('_', ' ')}</div>
+                </div>
+                <div className="rounded-lg border border-border/60 p-3 bg-background/40">
+                  <div className="text-xs text-muted-foreground">Payment</div>
+                  <div className="text-sm font-semibold mt-0.5">
+                    {String((order as any).paymentMethod || '—').replaceAll('_', ' ')}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
