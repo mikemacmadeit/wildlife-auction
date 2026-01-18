@@ -33,6 +33,7 @@ import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { useRouter } from 'next/navigation';
+import { getEffectiveListingStatus, isAuctionEnded } from '@/lib/listings/effectiveStatus';
 import {
   Dialog,
   DialogContent,
@@ -44,12 +45,13 @@ import {
 import { AlertTriangle, Trash2 } from 'lucide-react';
 
 // Helper functions outside component to prevent recreation on every render
-const getStatusBadge = (status: string) => {
+const getStatusBadge = (params: { status: string; type?: string; ended?: boolean }) => {
+  const { status, type, ended } = params;
   const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
     draft: { variant: 'outline', label: 'Draft' },
     pending: { variant: 'secondary', label: 'Pending approval' },
     active: { variant: 'default', label: 'Active' },
-    expired: { variant: 'secondary', label: 'Expired' },
+    expired: { variant: 'secondary', label: type === 'auction' && ended ? 'Ended' : 'Expired' },
     sold: { variant: 'secondary', label: 'Sold' },
     removed: { variant: 'destructive', label: 'Rejected' },
   };
@@ -93,6 +95,7 @@ const formatTimeRemaining = (date?: any) => {
   if (!d || !Number.isFinite(d.getTime())) return null;
 
   const minutes = Math.floor((d.getTime() - Date.now()) / (1000 * 60));
+  if (minutes <= 0) return 'Ended';
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
@@ -103,6 +106,7 @@ const formatTimeRemaining = (date?: any) => {
 // Memoized Listing Row component for performance
 const ListingRow = memo(({ 
   listing, 
+  effectiveStatus,
   onPublish,
   onResubmit,
   canResubmit,
@@ -111,6 +115,7 @@ const ListingRow = memo(({
   onDelete 
 }: { 
   listing: Listing;
+  effectiveStatus: ListingStatus;
   onPublish: (listing: Listing) => void;
   onResubmit: (listing: Listing) => void;
   canResubmit: (listing: Listing) => boolean;
@@ -133,7 +138,7 @@ const ListingRow = memo(({
         {listing.endsAt && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Calendar className="h-3 w-3" />
-            <span>Ends in {formatTimeRemaining(listing.endsAt)}</span>
+            <span>{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
           </div>
         )}
       </div>
@@ -156,7 +161,13 @@ const ListingRow = memo(({
         <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
       </div>
     </td>
-    <td className="p-4 align-middle">{getStatusBadge(listing.status)}</td>
+    <td className="p-4 align-middle">
+      {getStatusBadge({
+        status: effectiveStatus,
+        type: listing.type,
+        ended: isAuctionEnded(listing),
+      })}
+    </td>
     <td className="p-4 align-middle">
       <div className="flex flex-col gap-1 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
@@ -180,10 +191,10 @@ const ListingRow = memo(({
     <td className="p-4 align-middle">
       <ListingRowActions
         listingId={listing.id}
-        status={listing.status}
+        status={effectiveStatus}
         onPromote={() => onPublish(listing)}
         onResubmit={() => onResubmit(listing)}
-        resubmitDisabled={listing.status === 'removed' ? !canResubmit(listing) : undefined}
+        resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
         onDuplicate={() => onDuplicate(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
@@ -196,6 +207,7 @@ ListingRow.displayName = 'ListingRow';
 // Memoized Mobile Listing Card
 const MobileListingCard = memo(({ 
   listing, 
+  effectiveStatus,
   onPublish,
   onResubmit,
   canResubmit,
@@ -204,6 +216,7 @@ const MobileListingCard = memo(({
   onDelete 
 }: { 
   listing: Listing;
+  effectiveStatus: ListingStatus;
   onPublish: (listing: Listing) => void;
   onResubmit: (listing: Listing) => void;
   canResubmit: (listing: Listing) => boolean;
@@ -222,15 +235,19 @@ const MobileListingCard = memo(({
         </Link>
         <div className="flex items-center gap-2 mb-2">
           {getTypeBadge(listing.type)}
-          {getStatusBadge(listing.status)}
+          {getStatusBadge({
+            status: effectiveStatus,
+            type: listing.type,
+            ended: isAuctionEnded(listing),
+          })}
         </div>
       </div>
       <ListingRowActions
         listingId={listing.id}
-        status={listing.status}
+        status={effectiveStatus}
         onPromote={() => onPublish(listing)}
         onResubmit={() => onResubmit(listing)}
-        resubmitDisabled={listing.status === 'removed' ? !canResubmit(listing) : undefined}
+        resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
         onDuplicate={() => onDuplicate(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
@@ -253,7 +270,7 @@ const MobileListingCard = memo(({
       {listing.endsAt && (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="h-3 w-3" />
-          <span>Ends in {formatTimeRemaining(listing.endsAt)}</span>
+          <span>{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
         </div>
       )}
     </div>
@@ -310,8 +327,9 @@ function SellerListingsPageContent() {
       try {
         setLoading(true);
         setError(null);
-        const status = statusFilter === 'all' ? undefined : statusFilter;
-        const data = await listSellerListings(user.uid, status);
+        // Fetch all statuses so we can derive "ended" (expired) auctions reliably client-side
+        // even when Firestore status is still 'active'.
+        const data = await listSellerListings(user.uid);
         setListings(data);
       } catch (err) {
         console.error('Error fetching listings:', err);
@@ -321,19 +339,22 @@ function SellerListingsPageContent() {
       }
     }
     fetchListings();
-  }, [user?.uid, statusFilter]);
+  }, [user?.uid]);
 
   const filteredListings = useMemo(() => {
     const query = debouncedSearchQuery.toLowerCase();
+    const nowMs = Date.now();
     return listings.filter((listing) => {
+      const effectiveStatus = getEffectiveListingStatus(listing, nowMs);
       const matchesSearch = !query || listing.title.toLowerCase().includes(query);
+      const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
       const matchesType = typeFilter === 'all' || listing.type === typeFilter;
       const matchesLocation = locationFilter === 'all' || 
         `${listing.location?.city || 'Unknown'}, ${listing.location?.state || 'Unknown'}` === locationFilter;
 
-      return matchesSearch && matchesType && matchesLocation;
+      return matchesSearch && matchesStatus && matchesType && matchesLocation;
     });
-  }, [listings, debouncedSearchQuery, typeFilter, locationFilter]);
+  }, [listings, debouncedSearchQuery, statusFilter, typeFilter, locationFilter]);
 
   const handleStatusChange = useCallback((value: string) => {
     setStatusFilter(value as ListingStatus | 'all');
@@ -349,7 +370,7 @@ function SellerListingsPageContent() {
 
   const uniqueLocations = useMemo(() => {
     const locations = new Set(
-      listings.map((l) => `${l.location.city}, ${l.location.state}`)
+      listings.map((l) => `${l.location?.city || 'Unknown'}, ${l.location?.state || 'Unknown'}`)
     );
     return Array.from(locations);
   }, [listings]);
@@ -358,13 +379,12 @@ function SellerListingsPageContent() {
   const refreshListings = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const status = statusFilter === 'all' ? undefined : statusFilter;
-      const data = await listSellerListings(user.uid, status);
+      const data = await listSellerListings(user.uid);
       setListings(data);
     } catch (err) {
       console.error('Error refreshing listings:', err);
     }
-  }, [user?.uid, statusFilter]);
+  }, [user?.uid]);
 
   // Action handlers
   const handlePause = useCallback(async (listing: Listing) => {
@@ -698,6 +718,7 @@ function SellerListingsPageContent() {
                   <ListingRow
                     key={listing.id}
                     listing={listing}
+                    effectiveStatus={getEffectiveListingStatus(listing)}
                     onPublish={handlePublish}
                     onResubmit={handleResubmit}
                     canResubmit={canResubmit}
@@ -716,6 +737,7 @@ function SellerListingsPageContent() {
                   <MobileListingCard 
                     key={listing.id} 
                     listing={listing}
+                    effectiveStatus={getEffectiveListingStatus(listing)}
                     onPublish={handlePublish}
                     onResubmit={handleResubmit}
                     canResubmit={canResubmit}

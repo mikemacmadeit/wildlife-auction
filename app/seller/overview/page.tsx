@@ -29,6 +29,7 @@ import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
 import { Listing, Order, UserProfile } from '@/lib/types';
 import { getUserProfile, isProfileComplete } from '@/lib/firebase/users';
+import { getEffectiveListingStatus } from '@/lib/listings/effectiveStatus';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { useToast } from '@/hooks/use-toast';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
@@ -207,7 +208,8 @@ export default function SellerOverviewPage() {
 
   // Calculate stats from real data
   const stats = useMemo(() => {
-    const activeListings = listings.filter((l) => l.status === 'active');
+    const nowMs = Date.now();
+    const activeListings = listings.filter((l) => getEffectiveListingStatus(l, nowMs) === 'active');
     const auctionsEndingSoon = activeListings.filter((l) => {
       if (l.type !== 'auction' || !l.endsAt) return false;
       const endsAt = toDateSafe((l as any).endsAt);
