@@ -152,6 +152,7 @@ export default function NotificationsPage() {
   const [tab, setTab] = useState<UiTab>('all');
   const [items, setItems] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const autoMarkedReadRef = useMemo(() => ({ done: false }), []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -170,6 +171,26 @@ export default function NotificationsPage() {
         const next = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as UserNotification[];
         setItems(next);
         setLoading(false);
+
+        // UX: once user is on the notifications page, clear the sidebar "new" badge by
+        // marking the currently loaded unread notifications as read (one-time per visit).
+        // This mirrors how inbox pages clear their unread badges.
+        if (!autoMarkedReadRef.done) {
+          autoMarkedReadRef.done = true;
+          const unread = next.filter((n) => n.read !== true);
+          if (unread.length) {
+            Promise.all(
+              unread.map((n) =>
+                updateDoc(doc(db, 'users', user.uid, 'notifications', n.id), {
+                  read: true,
+                  readAt: serverTimestamp(),
+                })
+              )
+            ).catch(() => {
+              // best-effort; ignore failures
+            });
+          }
+        }
       },
       () => {
         setItems([]);
