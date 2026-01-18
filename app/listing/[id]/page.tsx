@@ -1255,87 +1255,89 @@ export default function ListingDetailPage() {
                   </div>
 
                   {/* eBay-style details: condition / location / transport / payments */}
-                  <div className="space-y-2.5 text-sm">
-                    {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                  {listing!.type !== 'auction' ? (
+                    <div className="space-y-2.5 text-sm">
+                      {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-muted-foreground">Condition:</span>
+                          <span className="font-medium capitalize text-right">
+                            {String((listing!.attributes as any).condition).replaceAll('_', ' ')}
+                          </span>
+                        </div>
+                      ) : null}
+
                       <div className="flex items-start justify-between gap-3">
-                        <span className="text-muted-foreground">Condition:</span>
-                        <span className="font-medium capitalize text-right">
-                          {String((listing!.attributes as any).condition).replaceAll('_', ' ')}
+                        <span className="text-muted-foreground">Located in:</span>
+                        <span className="font-medium text-right">
+                          {listing!.location?.city || 'Unknown'}
+                          {listing!.location?.state ? `, ${listing!.location.state}` : ''}
                         </span>
                       </div>
-                    ) : null}
 
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="text-muted-foreground">Located in:</span>
-                      <span className="font-medium text-right">
-                        {listing!.location?.city || 'Unknown'}
-                        {listing!.location?.state ? `, ${listing!.location.state}` : ''}
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold">Delivery / transport</div>
-                        <div className="text-xs text-muted-foreground">
-                          {listing!.trust?.transportReady
-                            ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
-                            : 'Buyer & seller arrange logistics after purchase.'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold">Payments</div>
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
-                          {/* Card brands */}
-                          <VisaBadge />
-                          <MastercardBadge />
-                          <AmexBadge />
-                          {/* Wallets */}
-                          <ApplePayBadge />
-                          <GooglePayBadge />
-                          <LinkBadge />
-                          {/* High-ticket rails */}
-                          <AchBadge
-                            disabled={!eligiblePaymentMethods.includes('ach_debit')}
-                            title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : 'Bank (ACH)'}
-                          />
-                          <WireBadge
-                            disabled={!eligiblePaymentMethods.includes('wire')}
-                            title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : 'Wire'}
-                          />
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold">Returns</div>
-                        <div className="text-xs text-muted-foreground">
-                          No returns. If the item/animal isn&rsquo;t as described, you can open a dispute after purchase.
-                        </div>
-                      </div>
-                    </div>
-
-                    {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
                       <div className="flex items-start gap-2">
-                        <Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="font-semibold">Protected Transaction</div>
+                          <div className="font-semibold">Delivery / transport</div>
                           <div className="text-xs text-muted-foreground">
-                            Enabled ({listing!.protectedTransactionDays} days). Funds release after delivery/acceptance requirements are met.
+                            {listing!.trust?.transportReady
+                              ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
+                              : 'Buyer & seller arrange logistics after purchase.'}
                           </div>
                         </div>
                       </div>
-                    ) : null}
-                  </div>
+
+                      <div className="flex items-start gap-2">
+                        <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-semibold">Payments</div>
+                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            {/* Card brands */}
+                            <VisaBadge />
+                            <MastercardBadge />
+                            <AmexBadge />
+                            {/* Wallets */}
+                            <ApplePayBadge />
+                            <GooglePayBadge />
+                            <LinkBadge />
+                            {/* High-ticket rails */}
+                            <AchBadge
+                              disabled={!eligiblePaymentMethods.includes('ach_debit')}
+                              title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : 'Bank (ACH)'}
+                            />
+                            <WireBadge
+                              disabled={!eligiblePaymentMethods.includes('wire')}
+                              title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : 'Wire'}
+                            />
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-semibold">Returns</div>
+                          <div className="text-xs text-muted-foreground">
+                            No returns. If the item/animal isn&rsquo;t as described, you can open a dispute after purchase.
+                          </div>
+                        </div>
+                      </div>
+
+                      {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
+                        <div className="flex items-start gap-2">
+                          <Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold">Protected Transaction</div>
+                            <div className="text-xs text-muted-foreground">
+                              Enabled ({listing!.protectedTransactionDays} days). Funds release after delivery/acceptance requirements are met.
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   <Separator />
 
@@ -1484,6 +1486,91 @@ export default function ListingDetailPage() {
                     <Heart className={cn('mr-2 h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
                     {isFavorite(listing!.id) ? 'Watching' : 'Watch This Listing'}
                   </Button>
+
+                  {/* For auctions: show details AFTER the urgency/actions block (time remaining + bid + watch). */}
+                  {listing!.type === 'auction' ? (
+                    <>
+                      <Separator />
+                      <div className="space-y-2.5 text-sm">
+                        {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-muted-foreground">Condition:</span>
+                            <span className="font-medium capitalize text-right">
+                              {String((listing!.attributes as any).condition).replaceAll('_', ' ')}
+                            </span>
+                          </div>
+                        ) : null}
+
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-muted-foreground">Located in:</span>
+                          <span className="font-medium text-right">
+                            {listing!.location?.city || 'Unknown'}
+                            {listing!.location?.state ? `, ${listing!.location.state}` : ''}
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold">Delivery / transport</div>
+                            <div className="text-xs text-muted-foreground">
+                              {listing!.trust?.transportReady
+                                ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
+                                : 'Buyer & seller arrange logistics after purchase.'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold">Payments</div>
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <VisaBadge />
+                              <MastercardBadge />
+                              <AmexBadge />
+                              <ApplePayBadge />
+                              <GooglePayBadge />
+                              <LinkBadge />
+                              <AchBadge
+                                disabled={!eligiblePaymentMethods.includes('ach_debit')}
+                                title={!eligiblePaymentMethods.includes('ach_debit') ? 'Requires verified email (and eligibility)' : 'Bank (ACH)'}
+                              />
+                              <WireBadge
+                                disabled={!eligiblePaymentMethods.includes('wire')}
+                                title={!eligiblePaymentMethods.includes('wire') ? 'Requires verified email (and eligibility)' : 'Wire'}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold">Returns</div>
+                            <div className="text-xs text-muted-foreground">
+                              No returns. If the item/animal isn&rsquo;t as described, you can open a dispute after purchase.
+                            </div>
+                          </div>
+                        </div>
+
+                        {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
+                          <div className="flex items-start gap-2">
+                            <Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-semibold">Protected Transaction</div>
+                              <div className="text-xs text-muted-foreground">
+                                Enabled ({listing!.protectedTransactionDays} days). Funds release after delivery/acceptance requirements are met.
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
 
                   {/* watcher count is shown on the photo overlay (do not duplicate here) */}
                 </CardContent>
