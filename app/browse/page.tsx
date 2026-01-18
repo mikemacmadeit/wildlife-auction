@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Sparkles, ArrowUpDown, ArrowUp, ArrowDown, LayoutGrid, List } from 'lucide-react';
+import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -458,48 +458,111 @@ export default function BrowsePage() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-            <div className="flex-1 w-full md:max-w-2xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search listings, breeds, locations..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 min-h-[48px] text-base md:text-sm"
-                />
-              </div>
-            </div>
+          <div className="rounded-2xl border border-border/60 bg-card/70 shadow-sm backdrop-blur-md p-3 sm:p-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                <div className="flex-1 w-full md:max-w-2xl">
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search listings, species, breeds, and locations…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className={cn(
+                        'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
+                        'bg-background/70 border-border/60',
+                        'focus-visible:ring-primary/30 focus-visible:ring-2'
+                      )}
+                    />
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="md:hidden">
-                <FilterBottomSheet filters={filters} onFiltersChange={handleFilterChange} />
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <div className="md:hidden">
+                    <FilterBottomSheet filters={filters} onFiltersChange={handleFilterChange} />
+                  </div>
+                  <div className="hidden md:block lg:hidden">
+                    <FilterDialog filters={filters} onFiltersChange={handleFilterChange} />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearFilters}
+                    disabled={activeFilterCount === 0}
+                    className="min-h-[48px] px-4 font-semibold"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
               </div>
-              <div className="hidden md:block lg:hidden">
-                <FilterDialog filters={filters} onFiltersChange={handleFilterChange} />
+
+              <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
+                {/* Type Tabs */}
+                <Tabs
+                  value={selectedType}
+                  onValueChange={(value) => setSelectedType(value as ListingType | 'all')}
+                  className="w-full md:w-auto"
+                >
+                  <TabsList className="w-full md:w-auto justify-start overflow-x-auto bg-muted/40 rounded-xl p-1 border border-border/50">
+                    <TabsTrigger value="all" className="rounded-lg font-semibold">
+                      All
+                    </TabsTrigger>
+                    <TabsTrigger value="auction" className="rounded-lg font-semibold gap-2">
+                      <Gavel className="h-4 w-4" />
+                      Auctions
+                    </TabsTrigger>
+                    <TabsTrigger value="fixed" className="rounded-lg font-semibold gap-2">
+                      <Tag className="h-4 w-4" />
+                      Fixed Price
+                    </TabsTrigger>
+                    <TabsTrigger value="classified" className="rounded-lg font-semibold gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Classified
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                {/* Quick filters (eBay-style “Refine”) */}
+                <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
+                  <Button
+                    type="button"
+                    variant={filters.endingSoon ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10 px-3 font-semibold rounded-full"
+                    onClick={() =>
+                      setFilters((prev) => ({ ...prev, endingSoon: prev.endingSoon ? undefined : true }))
+                    }
+                  >
+                    Ending soon
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={filters.newlyListed ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10 px-3 font-semibold rounded-full"
+                    onClick={() =>
+                      setFilters((prev) => ({ ...prev, newlyListed: prev.newlyListed ? undefined : true }))
+                    }
+                  >
+                    Newly listed
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={filters.verifiedSeller ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10 px-3 font-semibold rounded-full"
+                    onClick={() =>
+                      setFilters((prev) => ({ ...prev, verifiedSeller: prev.verifiedSeller ? undefined : true }))
+                    }
+                  >
+                    Verified
+                  </Button>
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                disabled={activeFilterCount === 0}
-                className="min-h-[48px] px-4"
-              >
-                Clear
-              </Button>
             </div>
           </div>
-
-          {/* Type Tabs */}
-          <Tabs value={selectedType} onValueChange={(value) => setSelectedType(value as ListingType | 'all')} className="mt-4">
-            <TabsList className="w-full justify-start overflow-x-auto">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="auction">Auctions</TabsTrigger>
-              <TabsTrigger value="fixed">Fixed Price</TabsTrigger>
-              <TabsTrigger value="classified">Classified</TabsTrigger>
-            </TabsList>
-          </Tabs>
         </div>
       </div>
 
