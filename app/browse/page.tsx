@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare } from 'lucide-react';
+import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,6 +32,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { getSavedSearch } from '@/lib/firebase/savedSearches';
 import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
+import { BROWSE_HEALTH_STATUS_OPTIONS, BROWSE_STATES } from '@/components/browse/filters/constants';
+import { buildSavedSearchKeys, upsertSavedSearch } from '@/lib/firebase/savedSearches';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 
@@ -76,6 +78,7 @@ export default function BrowsePage() {
   // View mode with localStorage persistence
   // Initialize to 'card' to ensure server/client consistency
   const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const [savingSearch, setSavingSearch] = useState(false);
 
   // Load from localStorage after hydration (client-side only)
   useEffect(() => {
@@ -143,6 +146,40 @@ export default function BrowsePage() {
     setViewMode(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('browse-view-mode', mode);
+    }
+  };
+
+  const handleSaveThisSearch = async () => {
+    if (!user?.uid) {
+      toast({ title: 'Sign in required', description: 'Sign in to save searches and get alerts.' });
+      return;
+    }
+    setSavingSearch(true);
+    try {
+      const criteria: FilterState = {
+        ...(filters || {}),
+        ...(selectedType !== 'all' ? { type: selectedType as any } : {}),
+      };
+      const id = await upsertSavedSearch(user.uid, {
+        data: {
+          name: searchQuery?.trim()
+            ? `Saved search: ${searchQuery.trim().slice(0, 60)}`
+            : `Saved search: ${selectedType === 'all' ? 'All listings' : String(selectedType)}`,
+          criteria,
+          alertFrequency: 'instant',
+          channels: { inApp: true, email: true, push: false },
+          lastNotifiedAt: null,
+          keys: buildSavedSearchKeys(criteria),
+        },
+      });
+      toast({ title: 'Saved', description: 'Search saved. You can manage it in Saved Searches.' });
+      // Optionally deep-link to edit/manage
+      // router.push(`/dashboard/saved-searches?highlight=${id}`);
+      void id;
+    } catch (e: any) {
+      toast({ title: 'Save failed', description: e?.message || 'Could not save this search.', variant: 'destructive' });
+    } finally {
+      setSavingSearch(false);
     }
   };
 
@@ -528,27 +565,48 @@ export default function BrowsePage() {
                   onValueChange={(value) => setSelectedType(value as ListingType | 'all')}
                   className="w-full md:w-auto"
                 >
-                  <TabsList className="w-full md:w-auto justify-start overflow-x-auto bg-muted/40 rounded-xl p-1 border border-border/50">
-                    <TabsTrigger value="all" className="rounded-lg font-semibold">
+                  {/* No scroll bar needed: 4 tabs always fit */}
+                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-muted/40 rounded-xl p-1 border border-border/50">
+                    <TabsTrigger value="all" className="rounded-lg font-semibold min-w-0">
                       All
                     </TabsTrigger>
-                    <TabsTrigger value="auction" className="rounded-lg font-semibold gap-2">
-                      <Gavel className="h-4 w-4" />
-                      Auctions
+                    <TabsTrigger value="auction" className="rounded-lg font-semibold min-w-0">
+                      <span className="hidden sm:inline-flex items-center gap-2">
+                        <Gavel className="h-4 w-4" />
+                        Auctions
+                      </span>
+                      <span className="sm:hidden">Auction</span>
                     </TabsTrigger>
-                    <TabsTrigger value="fixed" className="rounded-lg font-semibold gap-2">
-                      <Tag className="h-4 w-4" />
-                      Fixed Price
+                    <TabsTrigger value="fixed" className="rounded-lg font-semibold min-w-0">
+                      <span className="hidden sm:inline-flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Fixed Price
+                      </span>
+                      <span className="sm:hidden">Buy Now</span>
                     </TabsTrigger>
-                    <TabsTrigger value="classified" className="rounded-lg font-semibold gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Classified
+                    <TabsTrigger value="classified" className="rounded-lg font-semibold min-w-0">
+                      <span className="hidden sm:inline-flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Classified
+                      </span>
+                      <span className="sm:hidden">Classified</span>
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
 
                 {/* Quick filters (eBay-style “Refine”) */}
                 <div className="flex items-center gap-2 flex-wrap justify-start md:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-3 font-semibold rounded-full"
+                    onClick={handleSaveThisSearch}
+                    disabled={savingSearch}
+                  >
+                    {savingSearch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Save this search
+                  </Button>
                   <Button
                     type="button"
                     variant={filters.endingSoon ? 'default' : 'outline'}
@@ -602,52 +660,83 @@ export default function BrowsePage() {
           <div>
             {/* Results Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 break-words">
               {loading
                 ? 'Loading...'
-                : `${sortedListings.length} ${listingStatus === 'sold' ? 'Sold ' : ''}${
-                    sortedListings.length === 1 ? 'Listing' : 'Listings'
-                  }`}
+                : searchQuery.trim()
+                  ? `${sortedListings.length.toLocaleString()}+ results for ${searchQuery.trim()}`
+                  : `${sortedListings.length} ${listingStatus === 'sold' ? 'Sold ' : ''}${
+                      sortedListings.length === 1 ? 'Listing' : 'Listings'
+                    }`}
             </h1>
-            {activeFilterCount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
-              </p>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeFilterCount > 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Refine results with filters, location, and sort.</p>
+              )}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0 text-sm font-semibold"
+                onClick={handleSaveThisSearch}
+                disabled={savingSearch}
+              >
+                {savingSearch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save this search
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Active / Sold toggle */}
-            <div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-card">
-              <Button
-                type="button"
-                variant={listingStatus === 'active' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setListingStatus('active')}
-                className="h-10 px-3 font-semibold"
-              >
-                Active
-              </Button>
-              <Button
-                type="button"
-                variant={listingStatus === 'sold' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setListingStatus('sold')}
-                className="h-10 px-3 font-semibold"
-              >
-                Sold
-              </Button>
-              <Button
-                type="button"
-                variant={listingStatus === 'ended' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setListingStatus('ended')}
-                className="h-10 px-3 font-semibold"
-              >
-                Ended
-              </Button>
-            </div>
+            {/* eBay-ish toolbar: Status, Condition, Location, Sort, View */}
+            <Select value={listingStatus} onValueChange={(v) => setListingStatus(v as any)}>
+              <SelectTrigger className="w-[150px] min-h-[48px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">All (Active)</SelectItem>
+                <SelectItem value="sold">Sold</SelectItem>
+                <SelectItem value="ended">Ended</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={(filters.healthStatus && filters.healthStatus.length ? filters.healthStatus[0] : '__any__') as any}
+              onValueChange={(v) => setFilters((p) => ({ ...p, healthStatus: v === '__any__' ? undefined : [v] }))}
+            >
+              <SelectTrigger className="w-[170px] min-h-[48px]">
+                <SelectValue placeholder="Condition" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__">Condition</SelectItem>
+                {BROWSE_HEALTH_STATUS_OPTIONS.map((h) => (
+                  <SelectItem key={h.value} value={h.value}>
+                    {h.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.location?.state || '__any__'}
+              onValueChange={(v) => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: v === '__any__' ? undefined : v } }))}
+            >
+              <SelectTrigger className="w-[170px] min-h-[48px]">
+                <SelectValue placeholder="Item Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__">Item Location</SelectItem>
+                {BROWSE_STATES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Sort Dropdown */}
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
