@@ -359,6 +359,7 @@ export default function OrdersPage() {
                   role="buyer"
                   dense
                   showTitle={false}
+                  variant="rail"
                   className="border border-border/50 bg-background/40"
                 />
 

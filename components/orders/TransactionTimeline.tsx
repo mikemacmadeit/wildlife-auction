@@ -30,6 +30,8 @@ export type TimelineRole = 'buyer' | 'seller' | 'admin';
 
 type StepStatus = 'done' | 'active' | 'upcoming' | 'blocked';
 
+type TimelineVariant = 'cards' | 'rail';
+
 interface TimelineStep {
   key: string;
   title: string;
@@ -80,8 +82,9 @@ export function TransactionTimeline(props: {
   className?: string;
   dense?: boolean; // tighter spacing for list views
   showTitle?: boolean; // hide title row for embedded usage
+  variant?: TimelineVariant; // cards (default) or compact horizontal rail
 }) {
-  const { order, role, className, dense = false, showTitle = true } = props;
+  const { order, role, className, dense = false, showTitle = true, variant = 'cards' } = props;
 
   const trust = getOrderTrustState(order);
   const issue = getOrderIssueState(order);
@@ -248,6 +251,42 @@ export function TransactionTimeline(props: {
     </div>
   );
 
+  const Rail = () => (
+    <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
+      <div className={cn('flex items-start gap-3', dense ? 'min-w-[560px]' : 'min-w-[720px]')}>
+        {steps.map((s, idx) => {
+          const isLast = idx === steps.length - 1;
+          const connectorClass =
+            s.status === 'blocked'
+              ? 'bg-destructive/30'
+              : s.status === 'done'
+                ? 'bg-primary/25'
+                : 'bg-border/70';
+          return (
+            <div key={s.key} className="flex-1 min-w-[140px]">
+              <div className="flex items-center gap-3">
+                <div className="shrink-0">{StepDot(s)}</div>
+                {!isLast ? <div className={cn('h-[2px] flex-1 rounded-full', connectorClass)} /> : null}
+              </div>
+              <div className={cn('mt-2', dense ? 'text-[12px]' : 'text-xs')}>
+                <div
+                  className={cn(
+                    'font-semibold leading-tight',
+                    s.status === 'active' && 'text-primary',
+                    s.status === 'blocked' && 'text-destructive'
+                  )}
+                >
+                  {s.title}
+                </div>
+                {s.meta ? <div className="mt-1">{s.meta}</div> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <Card className={cn('border-border/60', className)}>
       <CardContent className={cn(dense ? 'pt-4 pb-4' : 'pt-6')}>
@@ -263,40 +302,44 @@ export function TransactionTimeline(props: {
           </div>
         )}
 
-        {/* Horizontal stepper (scrolls on small screens) */}
-        <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
-          <div className={cn('relative', dense ? 'min-w-[640px]' : 'min-w-[760px]')}>
-            <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
+        {variant === 'rail' ? (
+          <Rail />
+        ) : (
+          /* Horizontal stepper (scrolls on small screens) */
+          <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
+            <div className={cn('relative', dense ? 'min-w-[640px]' : 'min-w-[760px]')}>
+              <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
 
-            <div className="flex items-start gap-3">
-              {steps.map((s) => (
-                <div key={s.key} className="flex-1 min-w-[190px]">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="z-10">{StepDot(s)}</div>
+              <div className="flex items-start gap-3">
+                {steps.map((s) => (
+                  <div key={s.key} className="flex-1 min-w-[190px]">
+                    <div className="flex flex-col items-center text-center">
+                      <div className="z-10">{StepDot(s)}</div>
 
-                    <div
-                      className={cn(
-                        'mt-3 w-full rounded-xl border p-3',
-                        s.status === 'done' && 'border-primary/20 bg-primary/5',
-                        s.status === 'active' && 'border-primary/40 bg-primary/10',
-                        s.status === 'upcoming' && 'border-border/50 bg-background/40',
-                        s.status === 'blocked' && 'border-destructive/30 bg-destructive/5'
-                      )}
-                    >
-                      <div className="flex items-center justify-center gap-2 flex-wrap">
-                        <div className="text-sm font-semibold leading-tight">{s.title}</div>
-                        {s.meta}
+                      <div
+                        className={cn(
+                          'mt-3 w-full rounded-xl border p-3',
+                          s.status === 'done' && 'border-primary/20 bg-primary/5',
+                          s.status === 'active' && 'border-primary/40 bg-primary/10',
+                          s.status === 'upcoming' && 'border-border/50 bg-background/40',
+                          s.status === 'blocked' && 'border-destructive/30 bg-destructive/5'
+                        )}
+                      >
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                          <div className="text-sm font-semibold leading-tight">{s.title}</div>
+                          {s.meta}
+                        </div>
+                        {s.description ? (
+                          <div className="text-xs text-muted-foreground mt-1 leading-snug">{s.description}</div>
+                        ) : null}
                       </div>
-                      {s.description ? (
-                        <div className="text-xs text-muted-foreground mt-1 leading-snug">{s.description}</div>
-                      ) : null}
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
