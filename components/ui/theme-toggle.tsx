@@ -1,36 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function ThemeToggle({ className }: { className?: string }) {
   const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
-    // Force light mode initially - check localStorage only, ignore system preference
-    const stored = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    const initialTheme = stored || 'light'; // Default to light, ignore system preference
-    setTheme(initialTheme);
-    // IMPORTANT: Never "flip" the class twice (remove then add).
-    // That causes a visible flash (light sand) when this component mounts/remounts.
-    if (initialTheme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    const current = theme === 'system' ? (document.documentElement.classList.contains('dark') ? 'dark' : 'light') : theme;
+    setTheme(current === 'light' ? 'dark' : 'light');
   };
 
   if (!mounted) {
@@ -55,7 +41,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       className={cn('min-w-[44px] min-h-[44px]', className)}
       aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
     >
-      {theme === 'light' ? (
+      {(theme === 'light' || (theme === 'system' && !document.documentElement.classList.contains('dark'))) ? (
         <Moon className="h-5 w-5" />
       ) : (
         <Sun className="h-5 w-5" />
