@@ -432,37 +432,13 @@ export default function ListingDetailPage() {
       return;
     }
 
-    // Check if seller has payouts enabled
-    try {
-      const { getUserProfile } = await import('@/lib/firebase/users');
-      const sellerProfile = await getUserProfile(listing!.sellerId);
-      
-      if (!sellerProfile?.stripeAccountId) {
-        toast({
-          title: 'Seller Not Ready',
-          description: 'This seller has not set up payment processing. Please contact them directly.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // NOTE: Do not gate on `payoutsEnabled` client-side.
-      // In sandbox (and real Connect onboarding), these flags can be stale until webhook/check-status runs.
-      // The server-side checkout route will refresh readiness from Stripe and return a structured error if truly not ready.
-
-      const price = Number(listing!.price || 0);
-      setPendingCheckout({ amountUsd: Number.isFinite(price) ? price : 0 });
-      setPaymentDialogOpen(true);
-      return;
-    } catch (error: any) {
-      console.error('Error creating checkout session:', error);
-      toast({
-        title: 'Checkout Failed',
-        description: error.message || 'Failed to start checkout. Please try again.',
-        variant: 'destructive',
-      });
-      setIsPlacingBid(false);
-    }
+    // Do NOT check seller Stripe status client-side.
+    // Buyers cannot read seller `/users/{uid}` (private fields like stripeAccountId), and `publicProfiles`
+    // intentionally excludes Stripe IDs. The server-side checkout route (Admin SDK) is the source of truth.
+    const price = Number(listing!.price || 0);
+    setPendingCheckout({ amountUsd: Number.isFinite(price) ? price : 0 });
+    setPaymentDialogOpen(true);
+    return;
   };
 
   const handleCompleteAuctionPurchase = async () => {
@@ -506,21 +482,6 @@ export default function ListingDetailPage() {
         setIsWinningBidder(false);
         return;
       }
-
-      // Check if seller has payouts enabled
-      const { getUserProfile } = await import('@/lib/firebase/users');
-      const sellerProfile = await getUserProfile(listing!.sellerId);
-      
-      if (!sellerProfile?.stripeAccountId) {
-        toast({
-          title: 'Seller Not Ready',
-          description: 'This seller has not set up payment processing. Please contact support.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // NOTE: Do not gate on `payoutsEnabled` client-side (see comment in handleBuyNow).
 
       const amt = Number(winningBidAmount || listing!.currentBid || listing!.startingBid || 0);
       setPendingCheckout({ amountUsd: Number.isFinite(amt) ? amt : 0 });
