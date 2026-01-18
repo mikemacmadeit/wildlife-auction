@@ -1127,36 +1127,97 @@ export default function ListingDetailPage() {
             <div className="lg:sticky lg:top-20 space-y-6">
 
               {/* Desktop Action Card - Purchase & Bidding */}
-              <Card className="border-2 shadow-xl bg-card">
-                <CardHeader className="pb-4 border-b">
-                  <CardTitle className="text-lg font-bold">Purchase Options</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                      {/* Price Summary */}
-                      <div className="space-y-2 pb-4 border-b">
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            {listing!.type === 'auction' ? 'Current Bid' : 'Price'}
-                          </span>
-                          <span className="text-3xl font-bold">
-                            ${(listing!.type === 'auction' 
-                              ? (listing!.currentBid || listing!.startingBid || 0)
-                              : (listing!.price || 0)).toLocaleString()}
-                          </span>
-                        </div>
-                        {listing!.type === 'auction' && listing!.startingBid && (
-                          <div className="text-xs text-muted-foreground">
-                            Starting: ${listing!.startingBid.toLocaleString()}
-                          </div>
-                        )}
+              <Card className="border-2 shadow-lg bg-card">
+                <CardContent className="pt-6 space-y-5">
+                  {/* eBay-style buy box: price-first header */}
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {listing!.type === 'auction' ? 'Current Bid' : listing!.type === 'fixed' ? 'Price' : 'Asking'}
+                    </div>
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-3xl sm:text-[34px] font-extrabold tracking-tight text-foreground">
+                        ${(
+                          listing!.type === 'auction'
+                            ? (listing!.currentBid || listing!.startingBid || 0)
+                            : (listing!.price || 0)
+                        ).toLocaleString()}
+                      </span>
+                      {listing!.type === 'fixed' && !!((listing as any)?.bestOfferEnabled || (listing as any)?.bestOfferSettings?.enabled) ? (
+                        <span className="text-sm text-muted-foreground">or Best Offer</span>
+                      ) : null}
+                    </div>
+                    {listing!.type === 'auction' && listing!.startingBid ? (
+                      <div className="text-xs text-muted-foreground">
+                        Starting bid: ${listing!.startingBid.toLocaleString()}
                       </div>
+                    ) : null}
+                    {(listing as any)?.offerReservedByOfferId ? (
+                      <div className="text-xs font-semibold text-destructive">
+                        Reserved by an accepted offer
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* eBay-style details: condition / location / transport / payments */}
+                  <div className="space-y-2.5 text-sm">
+                    {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Condition:</span>
+                        <span className="font-medium capitalize text-right">
+                          {String((listing!.attributes as any).condition).replaceAll('_', ' ')}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground">Located in:</span>
+                      <span className="font-medium text-right">
+                        {listing!.location?.city || 'Unknown'}
+                        {listing!.location?.state ? `, ${listing!.location.state}` : ''}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold">Delivery / transport</div>
+                        <div className="text-xs text-muted-foreground">
+                          {listing!.trust?.transportReady
+                            ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
+                            : 'Buyer & seller arrange logistics after purchase.'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold">Payments</div>
+                        <div className="text-xs text-muted-foreground">
+                          Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                        </div>
+                      </div>
+                    </div>
+
+                    {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
+                      <div className="flex items-start gap-2">
+                        <Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-semibold">Protected Transaction</div>
+                          <div className="text-xs text-muted-foreground">
+                            Enabled ({listing!.protectedTransactionDays} days). Funds release after delivery/acceptance requirements are met.
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <Separator />
 
                       {/* Countdown - Very Prominent for Auctions */}
                       {!isSold && listing!.type === 'auction' && endsAtDate && (
-                        <div className="space-y-3 pb-4 border-b">
-                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-                            ⏰ Time Remaining
-                          </div>
+                        <div className="space-y-3">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Time remaining</div>
                           <CountdownTimer endDate={endsAtDate} variant="default" />
                         </div>
                       )}
@@ -1289,81 +1350,6 @@ export default function ListingDetailPage() {
                       {/* Best Offer (Desktop sidebar) */}
                       {!isSold ? <OfferPanel listing={listing!} /> : null}
 
-                      {/* Whitetail Breeder: Transfer & Legal Requirements (high-visibility) */}
-                      {listing!.category === 'whitetail_breeder' && (
-                        <Card className="border border-accent/30 bg-accent/5">
-                          <CardContent className="pt-5 space-y-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-accent" />
-                                <div>
-                                  <div className="font-semibold text-sm">Transfer & Legal Requirements</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Captive-bred breeder deer (TPWD-permitted)
-                                  </div>
-                                </div>
-                              </div>
-                              <Badge variant="outline" className="text-xs">Texas-only</Badge>
-                            </div>
-
-                            <ul className="space-y-2 text-sm">
-                              <li>
-                                <span className="font-semibold">Seller-listed animal:</span>{' '}
-                                This is a live, captive-bred whitetail breeder animal offered by the seller (not Wildlife Exchange).
-                              </li>
-                              <li>
-                                <span className="font-semibold">Payment ≠ legal transfer:</span>{' '}
-                                Payment does <span className="font-semibold">not</span> authorize transfer or movement.
-                              </li>
-                              <li>
-                                <span className="font-semibold">TPWD Transfer Approval required</span>{' '}
-                                before the animal can be legally transferred.
-                                <TooltipProvider>
-                                  <Tooltip delayDuration={200}>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="inline-flex items-center ml-1 align-middle text-muted-foreground hover:text-foreground"
-                                        aria-label="What is Transfer Approval?"
-                                      >
-                                        <HelpCircle className="h-4 w-4" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs">
-                                      <p className="text-xs">
-                                        Transfer Approval is a TPWD-required document for lawful movement/transfer of breeder deer.
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </li>
-                              <li>
-                                <span className="font-semibold">Escrow & payout gating:</span>{' '}
-                                Funds are held in escrow. Payout is released only after delivery/acceptance requirements are met, and (for whitetail breeder sales) after TPWD Transfer Approval is uploaded and verified.
-                              </li>
-                              <li>
-                                <span className="font-semibold">Coordination:</span>{' '}
-                                Buyer and seller coordinate pickup/transfer after approval.
-                              </li>
-                            </ul>
-
-                            <div className="text-xs text-muted-foreground">
-                              <span className="font-semibold">No hunting rights/tags/licenses</span> are included or sold on this platform.
-                              {' '}
-                              <Link href="/trust#whitetail" className="underline underline-offset-4 text-foreground/90 hover:text-foreground">
-                                Learn more
-                              </Link>
-                            </div>
-
-                            <div className="text-xs text-muted-foreground border-t pt-3">
-                              <span className="font-semibold">Marketplace disclaimer:</span>{' '}
-                              Wildlife Exchange is a marketplace platform. Wildlife Exchange does not own, sell, transport, or transfer animals.
-                              Listings are created by independent sellers who are responsible for complying with Texas law.
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-
                   {/* Watch Button - Secondary Action */}
                   <Button
                     variant="outline"
@@ -1375,6 +1361,79 @@ export default function ListingDetailPage() {
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Whitetail Breeder: Transfer & Legal Requirements (separate card so the buy box stays clean) */}
+              {listing!.category === 'whitetail_breeder' && (
+                <Card className="border-2">
+                  <CardContent className="pt-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="font-semibold text-sm">Transfer & Legal Requirements</div>
+                          <div className="text-xs text-muted-foreground">Captive-bred breeder deer (TPWD-permitted)</div>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-xs">Texas-only</Badge>
+                    </div>
+
+                    <ul className="space-y-2 text-sm">
+                      <li>
+                        <span className="font-semibold">Seller-listed animal:</span>{' '}
+                        This is a live, captive-bred whitetail breeder animal offered by the seller (not Wildlife Exchange).
+                      </li>
+                      <li>
+                        <span className="font-semibold">Payment ≠ legal transfer:</span>{' '}
+                        Payment does <span className="font-semibold">not</span> authorize transfer or movement.
+                      </li>
+                      <li>
+                        <span className="font-semibold">TPWD Transfer Approval required</span>{' '}
+                        before the animal can be legally transferred.
+                        <TooltipProvider>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center ml-1 align-middle text-muted-foreground hover:text-foreground"
+                                aria-label="What is Transfer Approval?"
+                              >
+                                <HelpCircle className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-xs">
+                                Transfer Approval is a TPWD-required document for lawful movement/transfer of breeder deer.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </li>
+                      <li>
+                        <span className="font-semibold">Escrow & payout gating:</span>{' '}
+                        Funds are held in escrow. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
+                      </li>
+                      <li>
+                        <span className="font-semibold">Coordination:</span>{' '}
+                        Buyer and seller coordinate pickup/transfer after approval.
+                      </li>
+                    </ul>
+
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-semibold">No hunting rights/tags/licenses</span> are included or sold on this platform.
+                      {' '}
+                      <Link href="/trust#whitetail" className="underline underline-offset-4 text-foreground/90 hover:text-foreground">
+                        Learn more
+                      </Link>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground border-t pt-3">
+                      <span className="font-semibold">Marketplace disclaimer:</span>{' '}
+                      Wildlife Exchange is a marketplace platform. Wildlife Exchange does not own, sell, transport, or transfer animals.
+                      Listings are created by independent sellers who are responsible for complying with Texas law.
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Bid History - For Auctions (Desktop) */}
               {listing!.type === 'auction' && (
