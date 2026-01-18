@@ -251,6 +251,18 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Offer.Accepted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Accepted' }>;
+      return {
+        template: 'offer_accepted',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
+          offerUrl: p.offerUrl,
+        },
+      };
+    }
     default:
       return null;
   }
@@ -294,6 +306,10 @@ function buildPushPayload(eventType: NotificationEventType, payload: Notificatio
     case 'Message.Received': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Message.Received' }>;
       return { title: 'New message', body: p.listingTitle, deepLinkUrl: p.threadUrl, notificationType: 'Message.Received', entityId: p.threadId };
+    }
+    case 'Offer.Accepted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Accepted' }>;
+      return { title: 'Offer accepted', body: `Offer accepted on ${p.listingTitle}`, deepLinkUrl: p.offerUrl, notificationType: 'Offer.Accepted', entityId: p.offerId };
     }
     default:
       return { title: 'Update', body: 'You have a new update.', notificationType: eventType };

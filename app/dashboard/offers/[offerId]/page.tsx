@@ -1,29 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Loader2, ArrowLeft, CheckCircle2, XCircle, Handshake, Clock } from 'lucide-react';
+import { Loader2, Handshake, Clock, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { getOffer, acceptOffer, counterOffer, declineOffer } from '@/lib/offers/api';
-
-type OfferDTO = {
-  offerId: string;
-  listingId: string;
-  listingSnapshot?: { title?: string; type?: string; category?: string };
-  status: string;
-  currentAmount: number;
-  acceptedAmount?: number;
-  lastActorRole?: string;
-  expiresAt?: number | null;
-  history?: Array<{ type: string; actorRole: string; amount?: number; note?: string; createdAt?: number | null }>;
-};
+import { acceptOffer, counterOffer, declineOffer, getOffer, withdrawOffer } from '@/lib/offers/api';
+import { createCheckoutSession } from '@/lib/stripe/api';
 
 function formatTimeLeft(expiresAtMs?: number | null): string {
   if (!expiresAtMs) return '—';
@@ -37,108 +26,132 @@ function formatTimeLeft(expiresAtMs?: number | null): string {
   return `${mins}m`;
 }
 
-export default function SellerOfferDetailPage() {
-  const params = useParams();
+export default function BuyerOfferDetailPage() {
   const router = useRouter();
-  const offerId = params.offerId as string;
+  const params = useParams<{ offerId: string }>();
+  const offerId = params?.offerId;
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [offer, setOffer] = useState<OfferDTO | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [offer, setOffer] = useState<any | null>(null);
+
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!user) return;
+  const load = async () => {
+    if (!offerId) return;
     setLoading(true);
     try {
-      const res = await getOffer(offerId);
-      setOffer(res?.offer as OfferDTO);
+      const res = await getOffer(String(offerId));
+      setOffer(res?.offer || null);
     } catch (e: any) {
       toast({ title: 'Failed to load offer', description: e?.message || 'Please try again.', variant: 'destructive' });
       setOffer(null);
     } finally {
       setLoading(false);
     }
-  }, [offerId, toast, user]);
+  };
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) return;
-    load();
-  }, [authLoading, load, user]);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, offerId]);
 
-  const canAct = useMemo(() => offer?.status === 'open' || offer?.status === 'countered', [offer?.status]);
+  const canWithdraw = useMemo(() => offer?.status === 'open' || offer?.status === 'countered', [offer?.status]);
+  const canRespondToCounter = useMemo(
+    () => offer?.status === 'countered' && offer?.lastActorRole === 'seller',
+    [offer?.status, offer?.lastActorRole]
+  );
+  const canCheckout = useMemo(() => offer?.status === 'accepted', [offer?.status]);
 
-  const accept = async () => {
-    if (!offer) return;
+  const doAccept = async () => {
+    if (!offerId) return;
     setActionLoading(true);
     try {
-      await acceptOffer(offer.offerId);
-      toast({ title: 'Accepted', description: 'Offer accepted and listing reserved.' });
+      await acceptOffer(String(offerId));
+      toast({ title: 'Offer accepted', description: 'You accepted the counter offer.' });
       await load();
     } catch (e: any) {
-      toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
   };
 
-  const decline = async () => {
-    if (!offer) return;
+  const doDecline = async () => {
+    if (!offerId) return;
     setActionLoading(true);
     try {
-      await declineOffer(offer.offerId);
-      toast({ title: 'Declined', description: 'Offer declined.' });
+      await declineOffer(String(offerId));
+      toast({ title: 'Offer declined' });
       await load();
     } catch (e: any) {
-      toast({ title: 'Decline failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const doWithdraw = async () => {
+    if (!offerId) return;
+    setActionLoading(true);
+    try {
+      await withdrawOffer(String(offerId));
+      toast({ title: 'Offer withdrawn' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
   };
 
   const submitCounter = async () => {
-    if (!offer) return;
-    const n = Number(counterAmount);
-    if (!Number.isFinite(n) || n <= 0) {
-      toast({ title: 'Invalid amount', description: 'Enter a valid amount.', variant: 'destructive' });
+    if (!offerId) return;
+    const amount = Number(counterAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: 'Invalid amount', description: 'Enter a valid counter amount.', variant: 'destructive' });
       return;
     }
     setActionLoading(true);
     try {
-      await counterOffer(offer.offerId, n);
-      toast({ title: 'Counter sent', description: 'Your counter offer was sent to the buyer.' });
+      await counterOffer(String(offerId), amount);
+      toast({ title: 'Counter sent' });
       setCounterOpen(false);
-      setCounterAmount('');
       await load();
     } catch (e: any) {
-      toast({ title: 'Counter failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const checkout = async () => {
+    if (!offerId) return;
+    if (!offer?.listingId) return;
+    setActionLoading(true);
+    try {
+      const { url } = await createCheckoutSession(String(offer.listingId), String(offerId));
+      window.location.href = url;
+    } catch (e: any) {
+      toast({ title: 'Checkout failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-  if (!user) {
+  if (!user && !authLoading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>Sign in required</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+      <div className="container mx-auto px-4 md:px-6 py-8">
+        <Card className="border-2">
+          <CardContent className="py-10 text-center space-y-3">
+            <div className="text-lg font-extrabold">Please sign in</div>
             <p className="text-sm text-muted-foreground">You must be signed in to view this offer.</p>
-            <Button asChild className="w-full">
+            <Button asChild className="min-h-[44px] font-semibold">
               <Link href="/login">Go to login</Link>
             </Button>
           </CardContent>
@@ -150,14 +163,14 @@ export default function SellerOfferDetailPage() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" onClick={() => router.push('/seller/offers')} className="min-h-[40px]">
+        <Button variant="outline" onClick={() => router.push('/dashboard/offers')} className="min-h-[40px]">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
       </div>
 
       {loading || !offer ? (
-        <Card>
+        <Card className="border-2">
           <CardContent className="py-10 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </CardContent>
@@ -181,10 +194,16 @@ export default function SellerOfferDetailPage() {
                 </Badge>
               </div>
 
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" className="min-h-[40px]">
+                  <Link href={`/listing/${offer.listingId}`}>View listing</Link>
+                </Button>
+              </div>
+
               <div className="rounded-xl border bg-muted/20 p-4">
                 <div className="text-sm font-semibold mb-2">Offer history</div>
                 <div className="space-y-2">
-                  {(offer.history || []).slice().reverse().map((h, idx) => (
+                  {(offer.history || []).slice().reverse().map((h: any, idx: number) => (
                     <div key={idx} className="text-sm flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <span className="font-semibold capitalize">{h.type}</span>{' '}
@@ -209,36 +228,46 @@ export default function SellerOfferDetailPage() {
               <CardTitle>Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!canAct ? (
-                <div className="text-sm text-muted-foreground">No actions available for this offer.</div>
-              ) : (
+              {canCheckout ? (
+                <Button onClick={checkout} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Checkout at ${(offer.acceptedAmount ?? offer.currentAmount).toLocaleString()}
+                </Button>
+              ) : null}
+
+              {canRespondToCounter ? (
                 <>
-                  <Button onClick={accept} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
-                    {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                  <Button onClick={doAccept} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
+                    {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                     Accept
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => setCounterOpen(true)}
+                    onClick={() => {
+                      setCounterAmount(String(offer.currentAmount));
+                      setCounterOpen(true);
+                    }}
                     disabled={actionLoading}
                     className="w-full min-h-[44px] font-semibold"
                   >
                     Counter
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={decline}
-                    disabled={actionLoading}
-                    className="w-full min-h-[44px] font-semibold"
-                  >
+                  <Button variant="outline" onClick={doDecline} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
                     <XCircle className="h-4 w-4 mr-2" />
                     Decline
                   </Button>
-                  <div className="text-xs text-muted-foreground">
-                    Buyer identity stays private until payment.
-                  </div>
                 </>
-              )}
+              ) : null}
+
+              {canWithdraw ? (
+                <Button variant="outline" onClick={doWithdraw} disabled={actionLoading} className="w-full min-h-[44px] font-semibold">
+                  Withdraw
+                </Button>
+              ) : null}
+
+              {!canCheckout && !canRespondToCounter && !canWithdraw ? (
+                <div className="text-sm text-muted-foreground">No actions available for this offer.</div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

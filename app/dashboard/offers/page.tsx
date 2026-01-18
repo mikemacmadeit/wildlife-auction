@@ -216,13 +216,23 @@ export default function MyOffersPage() {
                     const canRespondToCounter = o.status === 'countered' && o.lastActorRole === 'seller';
                     const canCheckout = o.status === 'accepted';
                     return (
-                      <div key={o.offerId} className="py-4 px-2 rounded-lg hover:bg-muted/30 transition-colors">
+                      <div
+                        key={o.offerId}
+                        className="py-4 px-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          const el = e.target as HTMLElement | null;
+                          if (el?.closest('button, a, input, textarea, select')) return;
+                          router.push(`/dashboard/offers/${o.offerId}`);
+                        }}
+                      >
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="font-semibold truncate">{o.listingSnapshot?.title || 'Listing'}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Seller: <span className="font-medium">Verified Seller</span> · Offer #{o.offerId.slice(0, 8)}
+                            <div className="font-semibold truncate">
+                              <Link href={`/dashboard/offers/${o.offerId}`} className="hover:underline">
+                                {o.listingSnapshot?.title || 'Listing'}
+                              </Link>
                             </div>
+                            <div className="text-xs text-muted-foreground">Offer #{o.offerId.slice(0, 8)}</div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="secondary" className="text-xs">{o.status}</Badge>
@@ -237,6 +247,9 @@ export default function MyOffersPage() {
                         <div className="mt-3 flex flex-col sm:flex-row gap-2">
                           <Button variant="outline" onClick={() => router.push(`/listing/${o.listingId}`)} className="min-h-[40px]">
                             View listing
+                          </Button>
+                          <Button variant="outline" onClick={() => router.push(`/dashboard/offers/${o.offerId}`)} className="min-h-[40px]">
+                            View offer
                           </Button>
 
                           {canCheckout && (

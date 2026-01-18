@@ -148,6 +148,27 @@ export default function ListingDetailPage() {
   const endsAtMs = useMemo(() => (endsAtDate ? endsAtDate.getTime() : null), [endsAtDate]);
   const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
 
+  // Sold comps (price discovery)
+  const [compsWindowDays, setCompsWindowDays] = useState<30 | 90>(90);
+  const [soldComps, setSoldComps] = useState<
+    Array<{
+      listingId: string;
+      title: string;
+      soldAt: string;
+      soldPriceCents: number;
+      location: { city: string; state: string };
+      primaryImageUrl: string;
+      urlSlug?: string;
+    }>
+  >([]);
+  const [soldCompsStats, setSoldCompsStats] = useState<null | {
+    count: number;
+    medianCents: number;
+    p25Cents: number;
+    p75Cents: number;
+  }>(null);
+  const [soldCompsLoading, setSoldCompsLoading] = useState(false);
+
   const watchingCount = useMemo(() => {
     const n = Number(listing?.watcherCount ?? listing?.metrics?.favorites ?? 0);
     return Number.isFinite(n) ? n : 0;
@@ -179,6 +200,45 @@ export default function ListingDetailPage() {
     if ((listing.attributes as any)?.speciesId) p.set('speciesId', String((listing.attributes as any).speciesId));
     return `/browse?${p.toString()}`;
   }, [listing]);
+
+  const soldBrowseUrl = useMemo(() => {
+    if (!listing) return '/browse?status=sold';
+    const p = new URLSearchParams();
+    p.set('status', 'sold');
+    if (listing.category) p.set('category', listing.category);
+    if (listing.location?.state) p.set('state', listing.location.state);
+    if ((listing.attributes as any)?.speciesId) p.set('speciesId', String((listing.attributes as any).speciesId));
+    return `/browse?${p.toString()}`;
+  }, [listing]);
+
+  useEffect(() => {
+    if (!listing?.id) return;
+    if (!listing.category || !listing.location?.state) return;
+
+    let cancelled = false;
+    setSoldCompsLoading(true);
+    fetch(`/api/listings/comps?listingId=${encodeURIComponent(listing.id)}&windowDays=${compsWindowDays}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const comps = Array.isArray(data?.comps) ? data.comps : [];
+        setSoldComps(comps);
+        setSoldCompsStats(data?.stats && typeof data.stats === 'object' ? data.stats : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSoldComps([]);
+        setSoldCompsStats(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSoldCompsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.id, listing?.category, listing?.location?.state, compsWindowDays]);
 
   const minBidUsd = useMemo(() => {
     if (!listing) return 0;
@@ -739,6 +799,126 @@ export default function ListingDetailPage() {
                 </div>
               ) : null}
             </motion.div>
+
+            {/* Recent sold comps (price discovery loop) */}
+            <Card className="border-2">
+              <CardHeader className="pb-4 border-b">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Recent sold comps</CardTitle>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Similar sold listings in {listing!.location?.state}. Use this to price confidently.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={compsWindowDays === 30 ? 'default' : 'outline'}
+                      onClick={() => setCompsWindowDays(30)}
+                      className="min-h-[36px] font-semibold"
+                    >
+                      30d
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={compsWindowDays === 90 ? 'default' : 'outline'}
+                      onClick={() => setCompsWindowDays(90)}
+                      className="min-h-[36px] font-semibold"
+                    >
+                      90d
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-5 space-y-4">
+                {soldCompsStats && typeof soldCompsStats.count === 'number' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    <div className="rounded-lg border bg-muted/20 p-3">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comps</div>
+                      <div className="text-lg font-extrabold">${(soldCompsStats.count || 0).toLocaleString()}</div>
+                    </div>
+                    <div className="rounded-lg border bg-muted/20 p-3">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Median</div>
+                      <div className="text-lg font-extrabold">
+                        ${(Math.round(soldCompsStats.medianCents) / 100).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-muted/20 p-3">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">25th</div>
+                      <div className="text-lg font-extrabold">
+                        ${(Math.round(soldCompsStats.p25Cents) / 100).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-muted/20 p-3">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">75th</div>
+                      <div className="text-lg font-extrabold">
+                        ${(Math.round(soldCompsStats.p75Cents) / 100).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {soldCompsLoading ? (
+                  <div className="text-sm text-muted-foreground">Loading comps…</div>
+                ) : soldComps.length === 0 ? (
+                  <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
+                    Not enough sold data yet for this area. Check back soon.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {soldComps.slice(0, 12).map((c) => (
+                      <Link
+                        key={c.listingId}
+                        href={`/listing/${c.listingId}`}
+                        className="rounded-lg border hover:bg-muted/20 transition-colors overflow-hidden"
+                      >
+                        <div className="flex gap-3 p-3">
+                          <div className="relative h-16 w-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            {c.primaryImageUrl ? (
+                              <Image
+                                src={c.primaryImageUrl}
+                                alt={c.title}
+                                fill
+                                className="object-cover"
+                                sizes="80px"
+                                unoptimized
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold truncate">{c.title}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Sold for{' '}
+                              <span className="font-semibold text-foreground">
+                                ${(Math.round(c.soldPriceCents) / 100).toLocaleString()}
+                              </span>
+                              {c.soldAt ? (
+                                <span>
+                                  {' '}
+                                  • {format(new Date(c.soldAt), 'MMM d, yyyy')}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 truncate">
+                              {(c.location?.city || '').trim() ? `${c.location.city}, ` : ''}
+                              {c.location?.state || ''}
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex justify-between gap-2 flex-wrap">
+                  <Button asChild variant="outline" className="font-semibold">
+                    <Link href={soldBrowseUrl}>View more sold</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Price - Prominent Display (Mobile only; desktop price lives in the buy box) */}
             <div className="lg:hidden">

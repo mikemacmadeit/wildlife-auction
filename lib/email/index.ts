@@ -25,6 +25,7 @@ import {
   getSavedSearchAlertEmail,
   getMessageReceivedEmail,
   getVerifyEmailEmail,
+  getOfferAcceptedEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
@@ -42,6 +43,7 @@ import {
   type SavedSearchAlertEmailData,
   type MessageReceivedEmailData,
   type VerifyEmailEmailData,
+  type OfferAcceptedEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -193,6 +195,13 @@ const verifyEmailSchema = z.object({
   userName: z.string().min(1),
   verifyUrl: urlSchema,
   dashboardUrl: urlSchema,
+});
+
+const offerAcceptedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  amount: z.number().finite().nonnegative(),
+  offerUrl: urlSchema,
 });
 
 export const EMAIL_EVENT_REGISTRY = [
@@ -477,6 +486,22 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: VerifyEmailEmailData) => {
       const { subject, html } = getVerifyEmailEmail(data);
       return { subject, preheader: `Verify your email`, html };
+    },
+  },
+  {
+    type: 'offer_accepted',
+    displayName: 'Offer: Accepted',
+    description: 'Sent when an offer is accepted (high intent).',
+    schema: offerAcceptedSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      amount: 8500,
+      offerUrl: 'https://wildlife.exchange/dashboard/offers/ABC123',
+    },
+    render: (data: OfferAcceptedEmailData) => {
+      const { subject, html } = getOfferAcceptedEmail(data);
+      return { subject, preheader: `Offer accepted`, html };
     },
   },
 ] as const;

@@ -19,15 +19,17 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockSellerStats } from '@/lib/seller-mock-data';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
+import { getSellerReputation } from '@/lib/users/getSellerReputation';
+import type { UserProfile } from '@/lib/types';
 
 export default function SellerReputationPage() {
   const { user } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier>('standard');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,54 +38,53 @@ export default function SellerReputationPage() {
       .then((p) => {
         if (cancelled) return;
         setTier(getEffectiveSubscriptionTier(p));
+        setProfile(p);
       })
       .catch(() => {
-        if (!cancelled) setTier('standard');
+        if (!cancelled) {
+          setTier('standard');
+          setProfile(null);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [user?.uid]);
 
-  const verificationSteps = [
-    { id: 1, label: 'Identity Verification', completed: true },
-    { id: 2, label: 'Business License', completed: true },
-    { id: 3, label: 'Animal Registration', completed: true },
-    { id: 4, label: 'Background Check', completed: false },
-    { id: 5, label: 'References', completed: false },
-  ];
+  const reputation = getSellerReputation({ profile });
+  const completedSales = Number(profile?.completedSalesCount || 0) || 0;
+  const disputeCount = 0; // Not available in current data model; keep honest.
 
-  const completedSteps = verificationSteps.filter((s) => s.completed).length;
-  const progress = (completedSteps / verificationSteps.length) * 100;
+  const completionRate =
+    typeof profile?.completionRate === 'number'
+      ? Math.round(profile.completionRate > 1 ? profile.completionRate : profile.completionRate * 100)
+      : null;
 
-  const stats = [
+  const flags = [
     {
-      label: 'Completion Rate',
-      value: `${mockSellerStats.completionRate}%`,
-      icon: CheckCircle2,
-      color: 'text-primary',
-      description: 'Sales completed successfully',
+      label: 'Email verified',
+      status: typeof profile?.emailVerified === 'boolean' ? (profile.emailVerified ? 'Verified' : 'Not verified yet') : 'Verification data not available yet',
     },
     {
-      label: 'Response Time',
-      value: mockSellerStats.responseTime,
-      icon: Clock,
-      color: 'text-primary',
-      description: 'Average response to messages',
+      label: 'Identity verification',
+      status:
+        typeof (profile as any)?.seller?.credentials?.identityVerified === 'boolean'
+          ? ((profile as any).seller.credentials.identityVerified ? 'Verified' : 'Not verified yet')
+          : 'Verification data not available yet',
     },
     {
-      label: 'Verified Animals',
-      value: mockSellerStats.verifiedAnimals.toString(),
-      icon: Shield,
-      color: 'text-primary',
-      description: 'Animals with verification',
+      label: 'Seller verification',
+      status:
+        typeof (profile as any)?.seller?.verified === 'boolean'
+          ? ((profile as any).seller.verified ? 'Verified' : 'Not verified yet')
+          : 'Verification data not available yet',
     },
     {
-      label: 'Total Sales',
-      value: '12',
-      icon: TrendingUp,
-      color: 'text-primary',
-      description: 'Completed transactions',
+      label: 'Payouts enabled',
+      status:
+        typeof (profile as any)?.payoutsEnabled === 'boolean'
+          ? ((profile as any).payoutsEnabled ? 'Verified' : 'Not verified yet')
+          : 'Verification data not available yet',
     },
   ];
 
@@ -134,100 +135,97 @@ export default function SellerReputationPage() {
               <CardTitle className="text-xl font-extrabold">Seller Verification</CardTitle>
             </div>
             <CardDescription>
-              Complete verification steps to build buyer trust
+              Your current trust signals (no mock data)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Progress Bar */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-foreground">Verification Progress</span>
-                <span className="text-sm font-extrabold text-primary">{completedSteps}/{verificationSteps.length}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-lg border-2 border-border/50 bg-background/40 p-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reputation level</div>
+                <div className="mt-1 text-xl font-extrabold capitalize">{reputation.level}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Derived from account age + transaction history (when available).</div>
               </div>
-              <div className="h-3 bg-background/50 rounded-full overflow-hidden border border-border/50">
-                <div
-                  className="h-full bg-primary"
-                  style={{ width: `${progress}%` }}
-                />
+              <div className="rounded-lg border-2 border-border/50 bg-background/40 p-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Completed sales</div>
+                <div className="mt-1 text-xl font-extrabold">{completedSales.toLocaleString()}</div>
+                <div className="mt-1 text-xs text-muted-foreground">On-platform transactions (if tracked).</div>
+              </div>
+              <div className="rounded-lg border-2 border-border/50 bg-background/40 p-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Disputes</div>
+                <div className="mt-1 text-xl font-extrabold">{disputeCount.toLocaleString()}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Dispute data not available yet.</div>
               </div>
             </div>
 
-            {/* Verification Steps */}
+            <Separator />
+
             <div className="space-y-3">
-              {verificationSteps.map((step, index) => (
-                <div
-                  key={step.id}
-                  className={cn(
-                    'flex items-center gap-3 p-4 rounded-lg border-2',
-                    step.completed
-                      ? 'border-primary/50 bg-primary/5'
-                      : 'border-border/50 bg-background/50'
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                      step.completed
-                        ? 'bg-primary/10 border-primary/30 text-primary'
-                        : 'bg-background border-border/50 text-muted-foreground'
-                    )}
-                  >
-                    {step.completed ? (
-                      <CheckCircle2 className="h-5 w-5" />
-                    ) : (
-                      <span className="text-sm font-extrabold">{step.id}</span>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className={cn(
-                      'font-semibold',
-                      step.completed ? 'text-foreground' : 'text-muted-foreground'
-                    )}>
-                      {step.label}
-                    </p>
-                    {step.completed && (
-                      <p className="text-xs text-muted-foreground mt-0.5">Verified</p>
-                    )}
-                  </div>
-                  {!step.completed && (
-                    <Button variant="outline" size="sm" className="min-h-[36px] font-semibold text-xs">
-                      Complete
-                    </Button>
-                  )}
+              {flags.map((f) => (
+                <div key={f.label} className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/20 p-3">
+                  <div className="text-sm font-semibold">{f.label}</div>
+                  <Badge variant={f.status === 'Verified' ? 'secondary' : f.status === 'Not verified yet' ? 'destructive' : 'outline'} className="font-semibold">
+                    {f.status}
+                  </Badge>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card
-                key={stat.label}
-                className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm"
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                    {stat.label}
-                  </CardTitle>
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
-                    <Icon className={cn('h-5 w-5', stat.color)} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
-                    {stat.value}
-                  </div>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    {stat.description}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
+        {/* Seller stats (real, when available) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Completion rate</CardTitle>
+              <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
+                {completionRate !== null ? `${completionRate}%` : 'Not available yet'}
+              </div>
+              <p className="text-xs text-muted-foreground font-medium">Based on on-platform transactions (if tracked).</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Badges</CardTitle>
+              <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+                <Award className="h-5 w-5 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {reputation.badges.length ? (
+                  reputation.badges.slice(0, 6).map((b) => (
+                    <Badge key={b} variant="outline" className="font-semibold">
+                      {b}
+                    </Badge>
+                  ))
+                ) : (
+                  <Badge variant="outline" className="font-semibold">No badges yet</Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground font-medium">Badges are derived from existing profile fields.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Transactions</CardTitle>
+              <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">
+                {Math.max(Number(profile?.verifiedTransactionsCount || 0), Number(profile?.completedSalesCount || 0)).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground font-medium">Verified transactions count (if tracked).</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Buyer Feedback (Placeholder) */}

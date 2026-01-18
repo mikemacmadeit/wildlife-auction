@@ -78,6 +78,13 @@ export interface VerifyEmailEmailData {
   dashboardUrl: string;
 }
 
+export interface OfferAcceptedEmailData {
+  userName: string;
+  listingTitle: string;
+  amount: number;
+  offerUrl: string;
+}
+
 export interface AuctionHighBidderEmailData {
   userName: string;
   listingTitle: string;
@@ -1039,6 +1046,40 @@ export function getVerifyEmailEmail(data: VerifyEmailEmailData): { subject: stri
     </div>
     <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       If you didn’t create this account, you can ignore this email.
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOfferAcceptedEmail(data: OfferAcceptedEmailData): { subject: string; html: string } {
+  const subject = `Offer accepted — ${data.listingTitle}`;
+  const preheader = `An offer was accepted for $${Number(data.amount).toLocaleString()} — view next steps.`;
+  const origin = tryGetOrigin(data.offerUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Offer accepted
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — an offer was accepted on <span style="font-weight:700; color:#22251F;">${escapeHtml(data.listingTitle)}</span>.
+    </div>
+
+    <div style="margin: 12px 0 0 0; padding: 12px 14px; border: 1px solid #E6E1D6; border-radius: 12px; background: #FBFAF7;">
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; text-transform: uppercase; letter-spacing: .08em; font-weight: 800;">
+        Accepted amount
+      </div>
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 20px; color:#22251F; font-weight: 900; margin-top: 2px;">
+        $${Number(data.amount).toLocaleString()}
+      </div>
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.offerUrl, 'View offer')}
+    </div>
+
+    <div style="margin-top: 12px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Tip: If you’re the buyer, you can proceed to checkout from the offer page. If you’re the seller, you can track the accepted offer there.
     </div>
   `;
 
