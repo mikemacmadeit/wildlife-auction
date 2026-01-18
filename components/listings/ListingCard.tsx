@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
-import { ShareButton } from '@/components/listings/ShareButton';
 import { cn } from '@/lib/utils';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 
@@ -36,20 +35,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
     : listing.type === 'fixed'
     ? `$${listing.price?.toLocaleString() || '0'}`
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
-
-  // Get category display name
-  const getCategoryName = (category: string) => {
-    switch (category) {
-      case 'wildlife_exotics':
-        return 'Wildlife & Exotics';
-      case 'cattle_livestock':
-        return 'Cattle & Livestock';
-      case 'ranch_equipment':
-        return 'Ranch Equipment';
-      default:
-        return category;
-    }
-  };
 
   // Get key attributes to display on card
   const getKeyAttributes = () => {
@@ -129,7 +114,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             {/* Action Buttons - Always visible (watchlist must be easy to find) */}
             <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
-              <ShareButton listingId={listing.id} listingTitle={listing.title} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
             {/* Real-time countdown timer for auctions */}
@@ -144,11 +128,8 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 />
               </div>
             )}
-            {/* Category and Type badges */}
+            {/* Type badge */}
             <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
-              <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
-                {getCategoryName(listing.category)}
-              </Badge>
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>

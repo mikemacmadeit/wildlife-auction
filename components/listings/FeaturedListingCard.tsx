@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
-import { ShareButton } from '@/components/listings/ShareButton';
 import { cn } from '@/lib/utils';
 
 interface FeaturedListingCardProps {
@@ -83,7 +82,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             {/* Action Buttons - Always visible and consistent with browse/home cards */}
             <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
-              <ShareButton listingId={listing.id} listingTitle={listing.title} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
             {listing.images[0] ? (
