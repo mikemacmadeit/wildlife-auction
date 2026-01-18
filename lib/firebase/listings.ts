@@ -1033,6 +1033,23 @@ export const queryListingsForBrowse = async (
       });
     }
 
+    // eBay-style behavior: hide "ended but unsold" auctions from default browse.
+    // If an auction has `endsAt` in the past and isn't sold, it should not appear as an active listing.
+    // (Bidding is already blocked server-side; this is purely browse UX.)
+    const showingActive =
+      (Array.isArray(statuses) && statuses.includes('active')) || (!statuses && status === 'active');
+    if (showingActive) {
+      const nowMs = Date.now();
+      filteredItems = filteredItems.filter((l) => {
+        if (l.status !== 'active') return true;
+        if (l.type !== 'auction') return true;
+        const endMs = l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
+        // If we can't read endsAt, don't hide it.
+        if (!endMs) return true;
+        return endMs > nowMs;
+      });
+    }
+
     // For sold-only mode, sort client-side by soldAt as a stable, backwards-compatible tie-breaker.
     if (soldOnly && (sort === 'newest' || sort === 'oldest')) {
       const dir = sort === 'newest' ? -1 : 1;

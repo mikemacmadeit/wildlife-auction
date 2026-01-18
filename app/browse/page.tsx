@@ -43,7 +43,7 @@ export default function BrowsePage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
   const [filters, setFilters] = useState<FilterState>({});
   const [selectedType, setSelectedType] = useState<ListingType | 'all'>('all');
-  const [listingStatus, setListingStatus] = useState<'active' | 'sold'>('active');
+  const [listingStatus, setListingStatus] = useState<'active' | 'sold' | 'ended'>('active');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,8 +95,8 @@ export default function BrowsePage() {
     if (savedSearchId) return; // Saved search should take precedence.
 
     const status = searchParams.get('status');
-    if (status === 'active' || status === 'sold') {
-      setListingStatus(status);
+    if (status === 'active' || status === 'sold' || status === 'ended') {
+      setListingStatus(status as any);
     }
 
     const type = searchParams.get('type');
@@ -128,7 +128,7 @@ export default function BrowsePage() {
   // Convert UI filters to Firestore query filters
   const getBrowseFilters = (): BrowseFilters => {
     const browseFilters: BrowseFilters = {
-      status: listingStatus,
+      status: listingStatus === 'ended' ? 'expired' : listingStatus,
     };
     
     if (selectedType !== 'all') {
@@ -538,6 +538,15 @@ export default function BrowsePage() {
                 className="h-10 px-3 font-semibold"
               >
                 Sold
+              </Button>
+              <Button
+                type="button"
+                variant={listingStatus === 'ended' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setListingStatus('ended')}
+                className="h-10 px-3 font-semibold"
+              >
+                Ended
               </Button>
             </div>
 
