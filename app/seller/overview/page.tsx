@@ -271,6 +271,23 @@ export default function SellerOverviewPage() {
     ];
   }, [listings, orders]);
 
+  const setupChecklist = useMemo(() => {
+    const profileOk = !!userProfile && isProfileComplete(userProfile);
+    const emailOk = user?.emailVerified === true;
+    const payoutsOk =
+      !!userProfile &&
+      userProfile.stripeOnboardingStatus === 'complete' &&
+      userProfile.payoutsEnabled === true &&
+      userProfile.chargesEnabled === true;
+
+    const steps = [profileOk, emailOk, payoutsOk];
+    const done = steps.filter(Boolean).length;
+    const total = steps.length;
+    const isComplete = done === total;
+
+    return { profileOk, emailOk, payoutsOk, done, total, isComplete };
+  }, [user?.emailVerified, userProfile]);
+
   // Generate alerts from real data
   const alerts = useMemo((): SellerAlert[] => {
     const alertsList: SellerAlert[] = [];
@@ -427,7 +444,7 @@ export default function SellerOverviewPage() {
         </div>
 
         {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
-        {user && (
+        {user && setupChecklist.isComplete !== true && (
           <Card className="border-2 border-border/50 bg-card" data-tour="seller-setup-checklist">
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
@@ -438,27 +455,13 @@ export default function SellerOverviewPage() {
                   </CardDescription>
                 </div>
                 <Badge variant="secondary" className="font-semibold">
-                  {(() => {
-                    const steps = [
-                      !!userProfile && isProfileComplete(userProfile),
-                      user.emailVerified === true,
-                      !!userProfile && userProfile.stripeOnboardingStatus === 'complete' && userProfile.payoutsEnabled === true && userProfile.chargesEnabled === true,
-                    ];
-                    const done = steps.filter(Boolean).length;
-                    return `${done}/${steps.length} complete`;
-                  })()}
+                  {`${setupChecklist.done}/${setupChecklist.total} complete`}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {(() => {
-                const profileOk = !!userProfile && isProfileComplete(userProfile);
-                const emailOk = user.emailVerified === true;
-                const payoutsOk =
-                  !!userProfile &&
-                  userProfile.stripeOnboardingStatus === 'complete' &&
-                  userProfile.payoutsEnabled === true &&
-                  userProfile.chargesEnabled === true;
+                const { profileOk, emailOk, payoutsOk } = setupChecklist;
 
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
