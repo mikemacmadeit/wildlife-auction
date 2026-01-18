@@ -5,13 +5,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2, Gavel, Tag } from 'lucide-react';
-import { Listing } from '@/lib/types';
+import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
+import { BROWSE_SPECIES } from '@/components/browse/filters/constants';
 interface ListItemProps {
   listing: Listing;
 }
@@ -27,6 +28,60 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   const isClassified = listing.type === 'classified';
   const bestOfferEnabled = Boolean((listing as any).bestOfferEnabled);
   const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
+
+  const specs = useMemo(() => {
+    // eBay-style “at a glance” line: Species • Sex • Age
+    const attrs: any = listing.attributes || null;
+    if (!attrs) return null;
+
+    const formatAge = (age: any): string | null => {
+      if (age === null || age === undefined) return null;
+      if (typeof age === 'number' && Number.isFinite(age)) return `${age} yr${age === 1 ? '' : 's'}`;
+      const s = String(age).trim();
+      return s ? s : null;
+    };
+
+    const titleCase = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+    // Wildlife / Whitetail: speciesId + sex + age
+    if (listing.category === 'wildlife_exotics' || listing.category === 'whitetail_breeder') {
+      const speciesId = String((attrs as WildlifeAttributes | WhitetailBreederAttributes).speciesId || '').trim();
+      const sexRaw = String((attrs as WildlifeAttributes | WhitetailBreederAttributes).sex || '').trim();
+      const ageLabel = formatAge((attrs as WildlifeAttributes | WhitetailBreederAttributes).age);
+
+      const speciesLabel =
+        speciesId
+          ? BROWSE_SPECIES.find((s) => s.value === speciesId)?.label ||
+            titleCase(speciesId.replaceAll('_', ' '))
+          : null;
+
+      const sexLabel =
+        sexRaw === 'male' ? 'Male' : sexRaw === 'female' ? 'Female' : sexRaw === 'unknown' ? null : titleCase(sexRaw);
+
+      const parts = [speciesLabel, sexLabel, ageLabel].filter(Boolean) as string[];
+      return parts.length ? parts : null;
+    }
+
+    // Cattle: breed + sex + age (or weight if no age)
+    if (listing.category === 'cattle_livestock') {
+      const c = attrs as CattleAttributes;
+      const breed = c.breed ? String(c.breed).trim() : '';
+      const sexRaw = c.sex ? String(c.sex).trim() : '';
+      const ageLabel = formatAge(c.age) || (c.weightRange ? String(c.weightRange).trim() : null);
+
+      const sexLabel =
+        sexRaw === 'bull' ? 'Bull' :
+        sexRaw === 'cow' ? 'Cow' :
+        sexRaw === 'heifer' ? 'Heifer' :
+        sexRaw === 'steer' ? 'Steer' :
+        sexRaw ? titleCase(sexRaw) : null;
+
+      const parts = [breed || null, sexLabel, ageLabel].filter(Boolean) as string[];
+      return parts.length ? parts : null;
+    }
+
+    return null;
+  }, [listing.attributes, listing.category]);
 
   const primaryPrice = useMemo(() => {
     if (isAuction) return Number(listing.currentBid || listing.startingBid || 0) || 0;
@@ -106,6 +161,18 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                   {listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}
                 </span>
               </div>
+              {specs && specs.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {specs.map((s) => (
+                    <span
+                      key={s}
+                      className="text-[11px] sm:text-xs font-semibold text-muted-foreground rounded-full border border-border/50 bg-muted/20 px-2 py-0.5"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             {/* Pricing + auction meta (eBay-like) */}
