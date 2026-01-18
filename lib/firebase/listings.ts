@@ -1371,7 +1371,8 @@ export const getListingsByIds = async (listingIds: string[]): Promise<Listing[]>
  */
 export const subscribeToListing = (
   listingId: string,
-  callback: (listing: Listing | null) => void
+  callback: (listing: Listing | null) => void,
+  opts?: { onError?: (error: any) => void }
 ): Unsubscribe => {
   const listingRef = doc(db, 'listings', listingId);
   
@@ -1392,6 +1393,11 @@ export const subscribeToListing = (
     },
     (error) => {
       console.error('Error in listing subscription:', error);
+      try {
+        opts?.onError?.(error);
+      } catch {
+        // ignore
+      }
       callback(null);
     }
   );

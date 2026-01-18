@@ -139,7 +139,7 @@ export default function ListingDetailPage() {
     instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
   }>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, initialized: authInitialized } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToListing: addToRecentlyViewed } = useRecentlyViewed();
   const isSold = listing?.status === 'sold';
@@ -176,25 +176,41 @@ export default function ListingDetailPage() {
   // Subscribe to real-time listing updates
   useEffect(() => {
     if (!listingId) return;
+    // IMPORTANT: wait until auth is initialized.
+    // Otherwise, owner-only listings (draft/pending/removed) can incorrectly fail with permission-denied
+    // before the auth token is attached, and we never resubscribe.
+    if (!authInitialized) return;
 
     setLoading(true);
     setError(null);
 
     // Subscribe to real-time updates
-    const unsubscribe = subscribeToListing(listingId, (data) => {
+    const unsubscribe = subscribeToListing(
+      listingId,
+      (data) => {
       if (!data) {
-        setError('Listing not found');
+        setError('Listing not found or you do not have access.');
         setLoading(false);
         return;
       }
       setListing(data);
       setLoading(false);
-    });
+      },
+      {
+        onError: (err: any) => {
+          const code = String(err?.code || '');
+          // If this is an owner-only listing and we are signed out, give a clear message.
+          if (code === 'permission-denied' && !user) {
+            setError('This listing isn’t public yet. Sign in to view your own draft/pending listings.');
+          }
+        },
+      }
+    );
 
     return () => {
       unsubscribe();
     };
-  }, [listingId]);
+  }, [listingId, authInitialized, user]);
 
   // Bid velocity (last hour) for social proof on the listing detail page.
   useEffect(() => {
