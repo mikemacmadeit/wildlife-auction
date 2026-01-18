@@ -79,6 +79,13 @@ export function getAppUrl(): string {
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
+  // Netlify runtime URLs (prefer these; they are set on production + deploy previews)
+  if (process.env.URL) {
+    return process.env.URL;
+  }
+  if (process.env.DEPLOY_PRIME_URL) {
+    return process.env.DEPLOY_PRIME_URL;
+  }
   if (process.env.NETLIFY_URL) {
     return process.env.NETLIFY_URL;
   }
