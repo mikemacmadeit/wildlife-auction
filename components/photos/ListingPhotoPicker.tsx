@@ -147,6 +147,14 @@ export function ListingPhotoPicker(props: {
     }
   };
 
+  const openPicker = (opts?: { autoOpenFileDialog?: boolean }) => {
+    setPickerOpen(true);
+    if (opts?.autoOpenFileDialog) {
+      // Ensure the file chooser works immediately for the common path.
+      setTimeout(() => inputRef.current?.click(), 0);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Selected (single primary surface) */}
@@ -167,18 +175,6 @@ export function ListingPhotoPicker(props: {
             <div className="flex items-center gap-2">
               <Button
                 type="button"
-                className="min-h-[40px] font-semibold"
-                onClick={() => {
-                  setPickerOpen(true);
-                  // Ensure the file chooser works immediately for the common path.
-                  setTimeout(() => inputRef.current?.click(), 0);
-                }}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Add photos
-              </Button>
-              <Button
-                type="button"
                 variant="ghost"
                 size="sm"
                 className="min-h-[40px] font-semibold"
@@ -193,29 +189,42 @@ export function ListingPhotoPicker(props: {
           </div>
 
           {selected.length ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {selected.map((p, idx) => (
-                <SelectedTile
-                  key={p.photoId}
-                  p={p}
-                  idx={idx}
-                  total={selected.length}
-                  isCover={coverPhotoId === p.photoId || (!coverPhotoId && idx === 0)}
-                  onSetCover={() => setCover(p.photoId)}
-                  onMoveLeft={() => idx > 0 && move(idx, idx - 1)}
-                  onMoveRight={() => idx < selected.length - 1 && move(idx, idx + 1)}
-                  onDragMove={(from, to) => move(from, to)}
-                  onRemove={() => removeSelected(p.photoId)}
-                />
-              ))}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {selected.map((p, idx) => (
+                  <SelectedTile
+                    key={p.photoId}
+                    p={p}
+                    idx={idx}
+                    total={selected.length}
+                    isCover={coverPhotoId === p.photoId || (!coverPhotoId && idx === 0)}
+                    onSetCover={() => setCover(p.photoId)}
+                    onMoveLeft={() => idx > 0 && move(idx, idx - 1)}
+                    onMoveRight={() => idx < selected.length - 1 && move(idx, idx + 1)}
+                    onDragMove={(from, to) => move(from, to)}
+                    onRemove={() => removeSelected(p.photoId)}
+                  />
+                ))}
+              </div>
+
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  className="min-h-[44px] font-semibold"
+                  onClick={() => openPicker({ autoOpenFileDialog: true })}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Add photos
+                </Button>
+              </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed p-6 text-center space-y-2">
+            <div className="rounded-lg border border-dashed p-5 text-center space-y-2">
               <div className="font-semibold">Add at least 1 photo</div>
               <div className="text-sm text-muted-foreground">
                 Listings with 4–8 photos get more buyer interest.
               </div>
-              <Button type="button" className="min-h-[44px] font-semibold" onClick={() => setPickerOpen(true)}>
+              <Button type="button" className="min-h-[44px] font-semibold" onClick={() => openPicker({ autoOpenFileDialog: true })}>
                 <Upload className="h-4 w-4 mr-2" />
                 Add photos
               </Button>
