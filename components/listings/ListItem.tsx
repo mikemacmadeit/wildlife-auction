@@ -128,7 +128,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
 
           {/* Content */}
           <div className="flex-1 min-w-0 p-3 sm:p-4 md:p-5">
-            <div className="flex flex-col gap-3 md:grid md:grid-cols-[1fr_240px] md:gap-5 md:items-stretch">
+            <div className="flex flex-col gap-3 md:grid md:grid-cols-[1fr_220px] md:gap-5 md:items-stretch">
               {/* Left: details */}
               <div className="min-w-0 flex flex-col gap-2">
                 {/* Type + sold */}
@@ -149,6 +149,44 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                   {sold.isSold ? (
                     <Badge className="bg-destructive text-destructive-foreground font-extrabold text-[10px]">SOLD</Badge>
                   ) : null}
+                </div>
+
+                {/* Price (move next to photo; seller goes to right column) */}
+                <div className="space-y-0.5">
+                  {sold.isSold ? (
+                    <>
+                      <div className="text-sm sm:text-base font-extrabold">{sold.soldPriceLabel}</div>
+                      {sold.soldDateLabel ? (
+                        <div className="text-xs text-muted-foreground">{sold.soldDateLabel}</div>
+                      ) : null}
+                    </>
+                  ) : isAuction ? (
+                    <>
+                      <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
+                        ${primaryPrice.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                        <span>
+                          {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                        </span>
+                        <span>·</span>
+                        <CountdownTimer
+                          endsAt={listing.endsAt as any}
+                          variant="compact"
+                          showIcon={false}
+                          pulseWhenEndingSoon={false}
+                          className="text-xs"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
+                        ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
+                      </div>
+                      {bestOfferEnabled ? <div className="text-xs text-muted-foreground">or Best Offer</div> : null}
+                    </>
+                  )}
                 </div>
 
                 {/* Title */}
@@ -196,47 +234,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 </div>
               </div>
 
-              {/* Right: price + seller */}
+              {/* Right: less important info (seller, etc.) */}
               <div className="md:border-l md:pl-5 md:border-border/40 flex flex-col gap-3">
-                {/* Price */}
-                <div className="space-y-1">
-                  {sold.isSold ? (
-                    <>
-                      <div className="text-sm font-extrabold">{sold.soldPriceLabel}</div>
-                      {sold.soldDateLabel ? (
-                        <div className="text-xs text-muted-foreground">{sold.soldDateLabel}</div>
-                      ) : null}
-                    </>
-                  ) : isAuction ? (
-                    <>
-                      <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
-                        ${primaryPrice.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                        <span>
-                          {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
-                        </span>
-                        <span>·</span>
-                        <CountdownTimer
-                          endsAt={listing.endsAt as any}
-                          variant="compact"
-                          showIcon={false}
-                          pulseWhenEndingSoon={false}
-                          className="text-xs"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
-                        ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
-                      </div>
-                      {bestOfferEnabled ? <div className="text-xs text-muted-foreground">or Best Offer</div> : null}
-                    </>
-                  )}
-                </div>
-
-                {/* Seller */}
                 <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
                   <div className="text-xs text-muted-foreground font-semibold">Sold by</div>
                   <div className="text-sm font-bold truncate">
