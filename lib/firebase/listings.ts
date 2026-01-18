@@ -888,16 +888,27 @@ export const queryListingsForBrowse = async (
     const statuses = Array.isArray(filters.statuses) && filters.statuses.length ? filters.statuses : null;
     const status = filters.status || 'active';
     const soldOnly = statuses ? statuses.length === 1 && statuses[0] === 'sold' : status === 'sold';
+    // "Ended" browse mode: ended auctions are often still stored as status=active with endsAt in the past.
+    // When the UI requests status='expired', treat it as "ended auctions" and query both active+expired,
+    // then filter to auctions whose endsAt is in the past (and not sold).
+    const endedMode = !statuses && status === 'expired';
     if (statuses) {
       // Firestore supports `in` for up to 10 values.
       constraints.push(where('status', 'in', statuses));
     } else {
-      constraints.push(where('status', '==', status));
+      if (endedMode) {
+        constraints.push(where('status', 'in', ['active', 'expired']));
+      } else {
+        constraints.push(where('status', '==', status));
+      }
     }
     
     // Type filter
     if (filters.type) {
       constraints.push(where('type', '==', filters.type));
+    } else if (endedMode) {
+      // Reduce read noise: ended listings are only relevant for auctions.
+      constraints.push(where('type', '==', 'auction'));
     }
     
     // Category filter
@@ -1047,6 +1058,20 @@ export const queryListingsForBrowse = async (
         // If we can't read endsAt, don't hide it.
         if (!endMs) return true;
         return endMs > nowMs;
+      });
+    }
+
+    // Ended-mode behavior: show ended (unsold) auctions reliably, even if they are still status=active.
+    if (endedMode) {
+      const nowMs = Date.now();
+      filteredItems = filteredItems.filter((l) => {
+        if (l.type !== 'auction') return false;
+        // Sold should be in the Sold tab, not Ended.
+        if (l.soldAt) return false;
+        const endMs = l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
+        // If endsAt is missing but the doc is explicitly expired, include it.
+        if (!endMs) return l.status === 'expired';
+        return endMs <= nowMs;
       });
     }
 
