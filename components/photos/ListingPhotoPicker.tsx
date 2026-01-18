@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Upload, Star, GripVertical, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, Upload, Star, GripVertical, ArrowLeft, ArrowRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { listUserPhotos, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +29,7 @@ export function ListingPhotoPicker(props: {
 }) {
   const { uid, selected, coverPhotoId, max = 8, onChange } = props;
   const { toast } = useToast();
-  const [tab, setTab] = useState<'choose' | 'upload'>(() => (selected.length ? 'choose' : 'upload'));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
@@ -75,11 +76,15 @@ export function ListingPhotoPicker(props: {
     });
   };
 
+  const removeSelected = (photoId: string) => {
+    const next = selected.filter((s) => s.photoId !== photoId).map((x, i) => ({ ...x, sortOrder: i }));
+    const nextCover = coverPhotoId && next.some((x) => x.photoId === coverPhotoId) ? coverPhotoId : next[0]?.photoId;
+    onChange({ selected: next, coverPhotoId: nextCover });
+  };
+
   const toggleSelect = (p: UserPhotoDoc) => {
     if (selectedIds.has(p.photoId)) {
-      const next = selected.filter((s) => s.photoId !== p.photoId).map((x, i) => ({ ...x, sortOrder: i }));
-      const nextCover = coverPhotoId && next.some((x) => x.photoId === coverPhotoId) ? coverPhotoId : next[0]?.photoId;
-      onChange({ selected: next, coverPhotoId: nextCover });
+      removeSelected(p.photoId);
       return;
     }
     if (selected.length >= max) {
@@ -93,194 +98,66 @@ export function ListingPhotoPicker(props: {
     onChange({ selected: next, coverPhotoId: coverPhotoId || p.photoId });
   };
 
+  const handleUploadFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setUploading(true);
+    setUploadPct(0);
+    try {
+      for (const f of files) {
+        const res = await uploadUserPhoto(f, (pct) => setUploadPct(pct));
+        // Auto-select newly uploaded photos until max is reached.
+        if (selected.length < max) {
+          const next = [
+            ...selected,
+            { photoId: res.photoId, url: res.downloadUrl, width: res.width, height: res.height, sortOrder: selected.length },
+          ];
+          onChange({ selected: next.map((x, i) => ({ ...x, sortOrder: i })), coverPhotoId: coverPhotoId || res.photoId });
+        }
+      }
+      await refresh();
+      toast({ title: 'Uploaded', description: 'Photos uploaded to your library.' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Failed to upload.', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      setUploadPct(0);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Selected (single primary surface) */}
       <Card className="border-2 border-border/50 bg-card">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="min-w-0 space-y-1">
+        <CardContent className="p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="text-sm font-extrabold">Photos</div>
+                <div className="text-sm font-extrabold">Selected photos</div>
                 <Badge variant="secondary" className="font-semibold">
-                  Required • Up to {max}
+                  Required • {selected.length}/{max}
                 </Badge>
               </div>
-              <div className="text-sm text-muted-foreground leading-relaxed">
-                Upload once, reuse across listings. Your <span className="font-semibold">first selected photo</span> is the cover.
-              </div>
               <div className="text-xs text-muted-foreground">
-                Tip: drag to reorder on desktop • use arrows on mobile.
+                Your first photo is the cover. Drag to reorder on desktop • arrows on mobile.
               </div>
             </div>
-
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 className="min-h-[40px] font-semibold"
                 onClick={() => {
-                  setTab('upload');
-                  inputRef.current?.click();
+                  setPickerOpen(true);
+                  // Ensure the file chooser works immediately for the common path.
+                  setTimeout(() => inputRef.current?.click(), 0);
                 }}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-[40px] font-semibold"
-                onClick={() => setTab('choose')}
-              >
-                Choose
+                Add photos
               </Button>
               <Button asChild variant="ghost" size="sm" className="min-h-[40px] font-semibold">
-                <Link href="/dashboard/uploads">Uploads</Link>
+                <Link href="/dashboard/uploads">Manage uploads</Link>
               </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {tab === 'choose' ? (
-        <div className="mt-2 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-xs text-muted-foreground">
-              Tap to select. Selected photos appear below.
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Selected: <span className="font-semibold">{selected.length}</span> / {max}
-            </div>
-          </div>
-          {loading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-square rounded-md border bg-muted/30 animate-pulse" />
-              ))}
-            </div>
-          ) : photos.length ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {photos.map((p) => {
-                const isSelected = selectedIds.has(p.photoId);
-                const isCover = coverPhotoId === p.photoId;
-                return (
-                  <button
-                    key={p.photoId}
-                    type="button"
-                    onClick={() => toggleSelect(p)}
-                    className={cn(
-                      'relative aspect-square rounded-md overflow-hidden border-2 transition',
-                      'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                      isSelected ? 'border-primary' : 'border-border/50 hover:border-primary/50'
-                    )}
-                  >
-                    <Image
-                      src={p.downloadUrl}
-                      alt="Upload"
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 160px"
-                      unoptimized
-                    />
-                    {isSelected && <div className="absolute inset-0 bg-primary/15" />}
-                    {isCover && (
-                      <div className="absolute top-1 left-1">
-                        <Badge className="bg-primary text-primary-foreground">Cover</Badge>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="py-10 text-center space-y-3">
-                <div className="font-semibold">No uploads yet</div>
-                <div className="text-sm text-muted-foreground">
-                  Upload your photos once—then reuse them across listings.
-                </div>
-                <Button type="button" className="min-h-[44px] font-semibold" onClick={() => setTab('upload')}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload photos
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      ) : (
-        <div className="mt-2 space-y-4">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            disabled={uploading}
-            onChange={async (e) => {
-              const files = Array.from(e.target.files || []);
-              if (!files.length) return;
-              setUploading(true);
-              setUploadPct(0);
-              try {
-                for (const f of files) {
-                  const res = await uploadUserPhoto(f, (pct) => setUploadPct(pct));
-                  // Auto-select newly uploaded photos until max is reached.
-                  if (selected.length < max) {
-                    const next = [
-                      ...selected,
-                      { photoId: res.photoId, url: res.downloadUrl, width: res.width, height: res.height, sortOrder: selected.length },
-                    ];
-                    onChange({ selected: next.map((x, i) => ({ ...x, sortOrder: i })), coverPhotoId: coverPhotoId || res.photoId });
-                  }
-                }
-                await refresh();
-                toast({ title: 'Uploaded', description: 'Photos uploaded to your library.' });
-                setTab('choose');
-              } catch (err: any) {
-                toast({ title: 'Upload failed', description: err?.message || 'Failed to upload.', variant: 'destructive' });
-              } finally {
-                setUploading(false);
-                setUploadPct(0);
-                e.target.value = '';
-              }
-            }}
-          />
-
-          <Card className="border-2 border-dashed">
-            <CardContent className="py-8 text-center space-y-3">
-              <div className="text-sm text-muted-foreground">
-                Upload photos to your library. We’ll resize and optimize them automatically.
-              </div>
-              <Button
-                type="button"
-                className="min-h-[44px] font-semibold"
-                disabled={uploading}
-                onClick={() => inputRef.current?.click()}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Uploading {Math.round(uploadPct)}%
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose files
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Selected / reorder / cover */}
-      <Card className="border-2 border-border/50 bg-muted/10">
-        <CardContent className="p-4 sm:p-5 space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-extrabold">
-              Selected <span className="text-muted-foreground">({selected.length}/{max})</span>
-            </div>
-            <div className="text-xs text-muted-foreground">Drag (desktop) • Arrows (mobile)</div>
           </div>
 
           {selected.length ? (
@@ -296,14 +173,146 @@ export function ListingPhotoPicker(props: {
                   onMoveLeft={() => idx > 0 && move(idx, idx - 1)}
                   onMoveRight={() => idx < selected.length - 1 && move(idx, idx + 1)}
                   onDragMove={(from, to) => move(from, to)}
+                  onRemove={() => removeSelected(p.photoId)}
                 />
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">Select at least 1 photo to continue.</div>
+            <div className="rounded-lg border border-dashed p-6 text-center space-y-2">
+              <div className="font-semibold">Add at least 1 photo</div>
+              <div className="text-sm text-muted-foreground">
+                Listings with 4–8 photos get more buyer interest.
+              </div>
+              <Button type="button" className="min-h-[44px] font-semibold" onClick={() => setPickerOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Add photos
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Picker dialog: Upload + Library in one place */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Add photos</DialogTitle>
+          </DialogHeader>
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={uploading}
+            onChange={async (e) => {
+              const files = Array.from(e.target.files || []);
+              await handleUploadFiles(files);
+              e.target.value = '';
+            }}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="md:col-span-1 border-2 border-dashed">
+              <CardContent
+                className={cn('py-6 text-center space-y-3', uploading && 'opacity-80')}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('image/'));
+                  void handleUploadFiles(files);
+                }}
+              >
+                <div className="text-sm text-muted-foreground">
+                  Drag & drop images here, or choose files.
+                </div>
+                <Button type="button" className="min-h-[44px] font-semibold" disabled={uploading} onClick={() => inputRef.current?.click()}>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading {Math.round(uploadPct)}%
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose files
+                    </>
+                  )}
+                </Button>
+                <div className="text-xs text-muted-foreground">
+                  Uploads go to your library for reuse.
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="md:col-span-2 space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-sm font-semibold">Your uploads</div>
+                <div className="text-xs text-muted-foreground">
+                  Click to select • {selected.length}/{max} selected
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} className="aspect-square rounded-md border bg-muted/30 animate-pulse" />
+                  ))}
+                </div>
+              ) : photos.length ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {photos.map((p) => {
+                    const isSelected = selectedIds.has(p.photoId);
+                    const isCover = coverPhotoId === p.photoId;
+                    return (
+                      <button
+                        key={p.photoId}
+                        type="button"
+                        onClick={() => toggleSelect(p)}
+                        className={cn(
+                          'relative aspect-square rounded-md overflow-hidden border-2 transition',
+                          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                          isSelected ? 'border-primary' : 'border-border/50 hover:border-primary/50'
+                        )}
+                      >
+                        <Image
+                          src={p.downloadUrl}
+                          alt="Upload"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 160px"
+                          unoptimized
+                        />
+                        {isSelected && <div className="absolute inset-0 bg-primary/15" />}
+                        {isCover && (
+                          <div className="absolute top-1 left-1">
+                            <Badge className="bg-primary text-primary-foreground">Cover</Badge>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <div className="font-semibold">No uploads yet</div>
+                  <div className="text-sm text-muted-foreground mt-1">Upload photos to start building your library.</div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" className="min-h-[40px] font-semibold" onClick={() => setPickerOpen(false)}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -317,6 +326,7 @@ function SelectedTile(props: {
   onMoveLeft: () => void;
   onMoveRight: () => void;
   onDragMove: (from: number, to: number) => void;
+  onRemove: () => void;
 }) {
   const { p, idx, total } = props;
   return (
@@ -359,6 +369,19 @@ function SelectedTile(props: {
             Cover
           </Badge>
         )}
+      </div>
+
+      <div className="absolute top-2 right-2">
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="min-h-[36px] min-w-[36px]"
+          onClick={props.onRemove}
+          aria-label="Remove photo"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 p-2 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
