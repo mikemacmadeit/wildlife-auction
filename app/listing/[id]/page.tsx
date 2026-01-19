@@ -427,19 +427,24 @@ export default function ListingDetailPage() {
         throw new Error(result.error);
       }
 
-      // Success - update local state optimistically
+      // Success - update local state optimistically (proxy bidding aware)
+      const nextBidCount =
+        (listing!.metrics?.bidCount || 0) + (Number.isFinite(result.bidCountDelta) ? result.bidCountDelta : 0);
       setListing({
         ...listing!,
         currentBid: result.newCurrentBid,
+        currentBidderId: result.newBidderId || listing!.currentBidderId,
         metrics: {
           ...listing!.metrics,
-          bidCount: (listing!.metrics.bidCount || 0) + 1,
+          bidCount: nextBidCount,
         },
       });
 
       toast({
         title: 'Bid placed successfully',
-        description: `Your bid of $${amount.toLocaleString()} has been placed.`,
+        description: result.priceMoved
+          ? `Max bid $${amount.toLocaleString()} placed. Current bid is now $${Number(result.newCurrentBid).toLocaleString()}.`
+          : `Max bid $${amount.toLocaleString()} placed. Current bid stays $${Number(result.newCurrentBid).toLocaleString()} (proxy bidding).`,
       });
 
       setShowBidDialog(false);

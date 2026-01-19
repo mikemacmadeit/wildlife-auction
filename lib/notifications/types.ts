@@ -81,8 +81,13 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       listingUrl: string;
+      // Visible current price (may not equal max bid in proxy bidding)
       yourBidAmount: number;
       currentBidAmount: number;
+      // New: user's max bid (helps explain why current price may not move)
+      yourMaxBidAmount?: number;
+      // New: whether the visible price changed due to this action
+      priceMoved?: boolean;
       endsAt?: string;
     }
   | {
@@ -91,6 +96,8 @@ export type NotificationEventPayload =
       listingTitle: string;
       listingUrl: string;
       newHighBidAmount: number;
+      // New: the outbid user's max bid (for proxy bidding clarity)
+      yourMaxBidAmount?: number;
       endsAt?: string;
     }
   | {

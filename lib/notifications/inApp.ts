@@ -54,10 +54,12 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'bid_outbid',
         title: 'You were outbid',
-        body: `Someone placed a higher bid on “${p.listingTitle}”.`,
+        body: p.yourMaxBidAmount
+          ? `You were outbid on “${p.listingTitle}”. Your max bid was $${Number(p.yourMaxBidAmount).toLocaleString()}.`
+          : `Someone placed a higher bid on “${p.listingTitle}”.`,
         deepLinkUrl: p.listingUrl,
         linkLabel: 'Raise bid',
-        metadata: { newHighBidAmount: p.newHighBidAmount },
+        metadata: { newHighBidAmount: p.newHighBidAmount, yourMaxBidAmount: p.yourMaxBidAmount },
       };
     }
     case 'Auction.HighBidder': {
@@ -66,10 +68,17 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'auction_high_bidder',
         title: 'You’re winning',
-        body: `You’re currently the high bidder on “${p.listingTitle}”.`,
+        body: p.yourMaxBidAmount && p.priceMoved === false
+          ? `Max bid set on “${p.listingTitle}”. Current bid is still $${Number(p.currentBidAmount).toLocaleString()}.`
+          : `You’re currently the high bidder on “${p.listingTitle}”.`,
         deepLinkUrl: p.listingUrl,
         linkLabel: 'View auction',
-        metadata: { currentBidAmount: p.currentBidAmount, yourBidAmount: p.yourBidAmount },
+        metadata: {
+          currentBidAmount: p.currentBidAmount,
+          yourBidAmount: p.yourBidAmount,
+          yourMaxBidAmount: p.yourMaxBidAmount,
+          priceMoved: p.priceMoved,
+        },
       };
     }
     case 'Auction.EndingSoon': {

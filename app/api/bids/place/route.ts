@@ -310,7 +310,16 @@ export async function POST(request: Request) {
         newBidderId: newHighBidderId || prevBidderId || bidderId,
       };
 
-      return { newCurrentBid: newCurrentBidCents / 100, bidId: bidWrites[0]?.id || db.collection('bids').doc().id, prevBidderId, newBidderId: newHighBidderId };
+      return {
+        newCurrentBid: newCurrentBidCents / 100,
+        bidId: bidWrites[0]?.id || db.collection('bids').doc().id,
+        prevBidderId,
+        newBidderId: newHighBidderId,
+        bidCountDelta: bidWrites.length,
+        priceMoved,
+        highBidderChanged,
+        yourMaxBid: amountCents / 100,
+      };
     });
 
     // Audit (outside tx)
@@ -366,6 +375,7 @@ export async function POST(request: Request) {
             listingTitle,
             listingUrl,
             newHighBidAmount: result.newCurrentBid,
+            yourMaxBidAmount: undefined,
             ...(endsAtIso ? { endsAt: endsAtIso } : {}),
           },
           optionalHash: `bid:${result.bidId}`,
@@ -386,6 +396,7 @@ export async function POST(request: Request) {
             listingTitle,
             listingUrl,
             newHighBidAmount: result.newCurrentBid,
+            yourMaxBidAmount: result.yourMaxBid,
             ...(endsAtIso ? { endsAt: endsAtIso } : {}),
           },
           optionalHash: `bid:${result.bidId}:immediate`,
@@ -404,6 +415,8 @@ export async function POST(request: Request) {
             listingUrl,
             yourBidAmount: result.newCurrentBid,
             currentBidAmount: result.newCurrentBid,
+            yourMaxBidAmount: result.yourMaxBid,
+            priceMoved: result.priceMoved,
             ...(endsAtIso ? { endsAt: endsAtIso } : {}),
           },
           optionalHash: `bid:${result.bidId}`,

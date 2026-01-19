@@ -4,7 +4,20 @@ import { getIdToken } from 'firebase/auth';
 export async function placeBidServer(params: {
   listingId: string;
   amount: number;
-}): Promise<{ ok: true; newCurrentBid: number; bidId: string } | { ok: false; error: string }> {
+}): Promise<
+  | {
+      ok: true;
+      newCurrentBid: number;
+      bidId: string;
+      bidCountDelta: number;
+      priceMoved: boolean;
+      highBidderChanged: boolean;
+      newBidderId: string | null;
+      prevBidderId: string | null;
+      yourMaxBid: number;
+    }
+  | { ok: false; error: string }
+> {
   const user = auth.currentUser;
   if (!user) {
     return { ok: false, error: 'You must be signed in to place a bid.' };
@@ -24,7 +37,17 @@ export async function placeBidServer(params: {
   if (!res.ok || !data?.ok) {
     return { ok: false, error: data?.error || 'Failed to place bid' };
   }
-  return { ok: true, newCurrentBid: data.newCurrentBid, bidId: data.bidId };
+  return {
+    ok: true,
+    newCurrentBid: Number(data.newCurrentBid || 0) || 0,
+    bidId: String(data.bidId || ''),
+    bidCountDelta: Number(data.bidCountDelta || 0) || 0,
+    priceMoved: Boolean(data.priceMoved),
+    highBidderChanged: Boolean(data.highBidderChanged),
+    newBidderId: data.newBidderId ? String(data.newBidderId) : null,
+    prevBidderId: data.prevBidderId ? String(data.prevBidderId) : null,
+    yourMaxBid: Number(data.yourMaxBid || 0) || params.amount,
+  };
 }
 
 export type MyBidRow = {
