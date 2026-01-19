@@ -390,6 +390,15 @@ export interface Listing {
   // Reserved by accepted offer (server-only)
   offerReservedByOfferId?: string;
   offerReservedAt?: Date;
+
+  /**
+   * Purchase reservation (server-only; prevents double-buy during checkout / async payments).
+   * - Set when a buyer starts checkout (card/ACH/wire) to lock the listing.
+   * - Cleared when checkout expires/cancels, or when the listing is marked sold.
+   */
+  purchaseReservedByOrderId?: string;
+  purchaseReservedAt?: Date;
+  purchaseReservedUntil?: Date;
 }
 
 export interface Bid {

@@ -42,6 +42,7 @@ export async function handleCheckoutSessionCompleted(
 ) {
   try {
     const checkoutSessionId = session.id;
+    const orderIdFromMeta = session.metadata?.orderId;
     const listingId = session.metadata?.listingId;
     const buyerId = session.metadata?.buyerId;
     const sellerId = session.metadata?.sellerId;
@@ -69,20 +70,7 @@ export async function handleCheckoutSessionCompleted(
       return;
     }
 
-    // Secondary idempotency check: Check if order already exists
     const ordersRef = db.collection('orders');
-    const existingOrderQuery = await ordersRef
-      .where('stripeCheckoutSessionId', '==', checkoutSessionId)
-      .get();
-
-    if (!existingOrderQuery.empty) {
-      logInfo('Order already exists for checkout session', {
-        requestId,
-        route: '/api/stripe/webhook',
-        checkoutSessionId,
-      });
-      return;
-    }
 
     // Get payment intent
     const paymentIntentId = typeof session.payment_intent === 'string'
@@ -343,12 +331,39 @@ export async function handleCheckoutSessionCompleted(
     // Check if transfer permit is required (whitetail_breeder)
     const transferPermitRequired = listingCategory === 'whitetail_breeder';
 
-    // Create order in Firestore
+    // Create or update order in Firestore (idempotent).
     const now = new Date();
     const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
     const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
     
-    const orderRef = db.collection('orders').doc();
+    let orderRef = orderIdFromMeta ? db.collection('orders').doc(String(orderIdFromMeta)) : db.collection('orders').doc();
+    let existingOrderData: any | null = null;
+
+    // Prefer explicit orderId from metadata; fall back to checkoutSession lookup.
+    if (orderIdFromMeta) {
+      const snap = await orderRef.get();
+      if (snap.exists) existingOrderData = snap.data() as any;
+    }
+    if (!existingOrderData) {
+      const existingOrderQuery = await ordersRef.where('stripeCheckoutSessionId', '==', checkoutSessionId).limit(1).get();
+      if (!existingOrderQuery.empty) {
+        orderRef = existingOrderQuery.docs[0].ref;
+        existingOrderData = existingOrderQuery.docs[0].data() as any;
+      }
+    }
+
+    // If already fully processed, treat as idempotent.
+    if (existingOrderData && ['paid_held', 'paid', 'completed', 'refunded'].includes(String(existingOrderData.status || ''))) {
+      logInfo('Checkout completed already applied (idempotent)', {
+        requestId,
+        route: '/api/stripe/webhook',
+        checkoutSessionId,
+        orderId: orderRef.id,
+        status: existingOrderData.status,
+      });
+      return;
+    }
+
     const orderStatus: string = paymentConfirmed
       ? 'paid_held'
       : isBankRails
@@ -372,7 +387,7 @@ export async function handleCheckoutSessionCompleted(
       paidAt: isAsync ? null : now,
       disputeDeadlineAt: isAsync ? null : disputeDeadline,
       adminHold: false,
-      createdAt: now,
+      createdAt: existingOrderData?.createdAt || now,
       updatedAt: now,
       lastUpdatedByRole: 'admin',
       protectedTransactionDaysSnapshot: protectedTransactionDays,
@@ -388,7 +403,7 @@ export async function handleCheckoutSessionCompleted(
       platformFeeAmount: platformFee / 100, // Immutable snapshot (matches platformFee)
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
-    await orderRef.set(orderData);
+    await orderRef.set(orderData, { merge: true });
 
     // If this checkout originated from an accepted offer, link offer -> order + session
     if (offerId) {
@@ -455,10 +470,13 @@ export async function handleCheckoutSessionCompleted(
 
     // For async payment methods, reserve the listing (do NOT mark sold until payment is confirmed).
     if (isAsync) {
+      const asyncReserveHours = parseInt(process.env.ASYNC_PAYMENT_RESERVATION_HOURS || '48', 10);
+      const until = Timestamp.fromMillis(Date.now() + Math.max(1, asyncReserveHours) * 60 * 60_000);
       await listingRef.set(
         {
           purchaseReservedByOrderId: orderRef.id,
           purchaseReservedAt: now,
+          purchaseReservedUntil: until,
           updatedAt: now,
         },
         { merge: true }
@@ -469,6 +487,9 @@ export async function handleCheckoutSessionCompleted(
         status: 'sold',
         soldAt: now,
         saleType,
+        purchaseReservedByOrderId: null,
+        purchaseReservedAt: null,
+        purchaseReservedUntil: null,
         updatedAt: now,
       };
       if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
@@ -777,6 +798,99 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
     orderId: orderDoc.id,
     listingId,
     checkoutSessionId,
+  });
+}
+
+/**
+ * Handle checkout.session.expired
+ * Cancels the pending order and clears listing reservation (prevents "stuck reserved" listings).
+ */
+export async function handleCheckoutSessionExpired(
+  db: Firestore,
+  session: Stripe.Checkout.Session,
+  requestId?: string
+) {
+  const checkoutSessionId = session.id;
+  const listingId = session.metadata?.listingId;
+  const orderIdFromMeta = session.metadata?.orderId;
+
+  const ordersRef = db.collection('orders');
+  let orderDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+
+  if (orderIdFromMeta) {
+    const snap = await db.collection('orders').doc(String(orderIdFromMeta)).get();
+    if (snap.exists) {
+      orderDoc = snap as any;
+    }
+  }
+  if (!orderDoc) {
+    const q = await ordersRef.where('stripeCheckoutSessionId', '==', checkoutSessionId).limit(1).get();
+    if (!q.empty) orderDoc = q.docs[0];
+  }
+
+  if (!orderDoc) {
+    logWarn('No order found for checkout.session.expired (nothing to cancel)', {
+      requestId,
+      route: '/api/stripe/webhook',
+      checkoutSessionId,
+      listingId,
+    });
+    return;
+  }
+
+  const data = orderDoc.data() as any;
+  const status = String(data.status || '');
+  // If already paid/held/completed, ignore expired event (defensive).
+  if (status === 'paid_held' || status === 'paid' || status === 'completed') {
+    logInfo('checkout.session.expired received after payment; ignoring', {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId: orderDoc.id,
+      checkoutSessionId,
+      status,
+    });
+    return;
+  }
+
+  const now = new Date();
+  await orderDoc.ref.set({ status: 'cancelled', updatedAt: now }, { merge: true });
+
+  // Clear listing reservation if it matches this order (best-effort).
+  if (listingId) {
+    try {
+      const listingRef = db.collection('listings').doc(String(listingId));
+      const listingSnap = await listingRef.get();
+      if (listingSnap.exists) {
+        const l = listingSnap.data() as any;
+        if (l.purchaseReservedByOrderId === orderDoc.id) {
+          await listingRef.set(
+            {
+              purchaseReservedByOrderId: null,
+              purchaseReservedAt: null,
+              purchaseReservedUntil: null,
+              updatedAt: now,
+            },
+            { merge: true }
+          );
+        }
+      }
+    } catch (e) {
+      logWarn('Failed to clear listing reservation on checkout.session.expired', {
+        requestId,
+        route: '/api/stripe/webhook',
+        orderId: orderDoc.id,
+        listingId,
+        error: String(e),
+      });
+    }
+  }
+
+  logInfo('Checkout session expired: order cancelled and reservation cleared', {
+    requestId,
+    route: '/api/stripe/webhook',
+    orderId: orderDoc.id,
+    checkoutSessionId,
+    listingId,
   });
 }
 

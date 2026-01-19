@@ -510,6 +510,20 @@ export default function ListingDetailPage() {
       return;
     }
 
+    if ((listing as any)?.purchaseReservedByOrderId || (listing as any)?.purchaseReservedUntil) {
+      const until = (listing as any)?.purchaseReservedUntil as any;
+      const untilStr =
+        until instanceof Date && Number.isFinite(until.getTime())
+          ? ` until ${format(until, 'MMM d, h:mm a')}`
+          : '';
+      toast({
+        title: 'Listing reserved',
+        description: `This listing is reserved pending payment confirmation${untilStr}. Please try again later.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Do NOT check seller Stripe status client-side.
     // Buyers cannot read seller `/users/{uid}` (private fields like stripeAccountId), and `publicProfiles`
     // intentionally excludes Stripe IDs. The server-side checkout route (Admin SDK) is the source of truth.

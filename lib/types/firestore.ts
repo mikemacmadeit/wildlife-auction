@@ -156,6 +156,11 @@ export interface ListingDoc {
   // Reserved by accepted offer (server-only)
   offerReservedByOfferId?: string;
   offerReservedAt?: Timestamp;
+
+  // Purchase reservation (server-only; prevents double-buy)
+  purchaseReservedByOrderId?: string | null;
+  purchaseReservedAt?: Timestamp | null;
+  purchaseReservedUntil?: Timestamp | null;
 }
 
 /**

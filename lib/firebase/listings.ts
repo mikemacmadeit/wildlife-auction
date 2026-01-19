@@ -331,6 +331,11 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     // Offer reservation (server-only)
     offerReservedByOfferId: (doc as any).offerReservedByOfferId,
     offerReservedAt: timestampToDate((doc as any).offerReservedAt),
+
+    // Purchase reservation (server-only)
+    purchaseReservedByOrderId: typeof (doc as any).purchaseReservedByOrderId === 'string' ? (doc as any).purchaseReservedByOrderId : undefined,
+    purchaseReservedAt: timestampToDate((doc as any).purchaseReservedAt),
+    purchaseReservedUntil: timestampToDate((doc as any).purchaseReservedUntil),
   };
 }
 
@@ -1057,6 +1062,13 @@ export const queryListingsForBrowse = async (
       const nowMs = Date.now();
       filteredItems = filteredItems.filter((l) => {
         if (l.status !== 'active') return true;
+        // Hide purchase-reserved listings from Active browse (prevents "it can be bought twice" UX).
+        const reservedUntilMs =
+          l.purchaseReservedUntil?.getTime?.() && Number.isFinite(l.purchaseReservedUntil.getTime())
+            ? l.purchaseReservedUntil.getTime()
+            : null;
+        if (reservedUntilMs && reservedUntilMs > nowMs) return false;
+        if (typeof l.purchaseReservedByOrderId === 'string' && l.purchaseReservedByOrderId.trim()) return false;
         if (l.type !== 'auction') return true;
         const endMs = l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
         // If we can't read endsAt, don't hide it.

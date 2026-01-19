@@ -19,6 +19,7 @@ import {
   handleCheckoutSessionCompleted,
   handleCheckoutSessionAsyncPaymentSucceeded,
   handleCheckoutSessionAsyncPaymentFailed,
+  handleCheckoutSessionExpired,
   handleWirePaymentIntentSucceeded,
   handleWirePaymentIntentCanceled,
   handleChargeDisputeCreated,
@@ -257,6 +258,12 @@ export async function POST(request: Request) {
         case 'checkout.session.async_payment_failed': {
           const session = event.data.object as Stripe.Checkout.Session;
           await handleCheckoutSessionAsyncPaymentFailed(adminDb, session, requestId);
+          break;
+        }
+
+        case 'checkout.session.expired': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          await handleCheckoutSessionExpired(adminDb, session, requestId);
           break;
         }
 
