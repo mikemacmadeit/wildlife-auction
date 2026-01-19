@@ -74,7 +74,7 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
   { href: '/seller/logistics', label: 'Logistics', icon: Truck },
-  { href: '/seller/messages', label: 'Messages', icon: MessageSquare },
+  { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
   { href: '/dashboard/account', label: 'Settings', icon: Settings },

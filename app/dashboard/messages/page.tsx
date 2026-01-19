@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ArrowLeft } from 'lucide-react';
 import { MessageThreadComponent } from '@/components/messaging/MessageThread';
-import { getOrCreateThread, getUserThreads } from '@/lib/firebase/messages';
+import { getOrCreateThread, getAllUserThreads } from '@/lib/firebase/messages';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
 import { markNotificationsAsReadByType } from '@/lib/firebase/notifications';
@@ -42,34 +42,38 @@ export default function MessagesPage() {
 
   const inboxItems = useMemo(() => {
     return threads.map((t) => {
-      const unread = typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0;
+      const isBuyer = user?.uid ? t.buyerId === user.uid : true;
+      const unread = isBuyer
+        ? (typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0)
+        : (typeof (t as any).sellerUnreadCount === 'number' ? (t as any).sellerUnreadCount : 0);
       const meta = metaByThreadId[t.id];
       return {
         id: t.id,
         unread,
-        sellerName: meta?.sellerName || 'Seller',
+        sellerName: meta?.sellerName || 'User',
         listingTitle: meta?.listingTitle || `Listing ${t.listingId.slice(-6)}`,
         lastMessagePreview: t.lastMessagePreview || '',
       };
     });
-  }, [metaByThreadId, threads]);
+  }, [metaByThreadId, threads, user?.uid]);
 
   const loadInbox = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const data = await getUserThreads(user.uid, 'buyer');
+      const data = await getAllUserThreads(user.uid);
       setThreads(data);
       if (!selectedThreadId && data[0]?.id) setSelectedThreadId(data[0].id);
 
       Promise.allSettled(
         data.map(async (t) => {
-          const [sellerProfile, listingData] = await Promise.all([
-            getUserProfile(t.sellerId).catch(() => null),
+          const otherPartyId = user.uid === t.buyerId ? t.sellerId : t.buyerId;
+          const [otherProfile, listingData] = await Promise.all([
+            getUserProfile(otherPartyId).catch(() => null),
             getListingById(t.listingId).catch(() => null),
           ]);
           return {
             threadId: t.id,
-            sellerName: sellerProfile?.displayName || sellerProfile?.profile?.fullName || 'Seller',
+            sellerName: otherProfile?.displayName || otherProfile?.profile?.fullName || 'User',
             listingTitle: listingData?.title || 'Listing',
           };
         })
@@ -174,19 +178,19 @@ export default function MessagesPage() {
     // Clear message notification badge when viewing messages (best-effort).
     markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
     const meta = metaByThreadId[selectedThreadId];
-    setOtherPartyName(meta?.sellerName || 'Seller');
+    setOtherPartyName(meta?.sellerName || 'User');
     setOtherPartyAvatar(undefined);
     setOrderStatus(undefined);
 
     Promise.allSettled([
       getListingById(t.listingId),
-      getUserProfile(t.sellerId),
+      getUserProfile(user.uid === t.buyerId ? t.sellerId : t.buyerId),
     ]).then((results) => {
       const listingRes = results[0];
-      const sellerRes = results[1];
+      const otherRes = results[1];
       setListing(listingRes.status === 'fulfilled' ? listingRes.value : null);
-      const sellerProfile = sellerRes.status === 'fulfilled' ? sellerRes.value : null;
-      setOtherPartyAvatar(sellerProfile?.photoURL || undefined);
+      const otherProfile = otherRes.status === 'fulfilled' ? otherRes.value : null;
+      setOtherPartyAvatar(otherProfile?.photoURL || undefined);
     });
   }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
 

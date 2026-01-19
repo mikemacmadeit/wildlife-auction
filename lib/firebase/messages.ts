@@ -274,6 +274,29 @@ export async function getUserThreads(userId: string, role: 'buyer' | 'seller'): 
 }
 
 /**
+ * Get ALL threads for a user (buyer + seller roles merged).
+ * This prevents "missing conversations" when a user starts a thread as a buyer but later views Messages from seller UI (or vice versa).
+ */
+export async function getAllUserThreads(userId: string): Promise<MessageThread[]> {
+  const [asBuyer, asSeller] = await Promise.allSettled([
+    getUserThreads(userId, 'buyer'),
+    getUserThreads(userId, 'seller'),
+  ]);
+
+  const merged: MessageThread[] = [];
+  if (asBuyer.status === 'fulfilled') merged.push(...asBuyer.value);
+  if (asSeller.status === 'fulfilled') merged.push(...asSeller.value);
+
+  // De-dupe by thread id (shouldn't happen, but be defensive)
+  const byId = new Map<string, MessageThread>();
+  for (const t of merged) byId.set(t.id, t);
+  const out = Array.from(byId.values());
+
+  out.sort((a, b) => (b.updatedAt?.getTime?.() || 0) - (a.updatedAt?.getTime?.() || 0));
+  return out.slice(0, 50);
+}
+
+/**
  * Mark thread messages as read
  */
 export async function markThreadAsRead(threadId: string, userId: string): Promise<void> {
