@@ -68,6 +68,7 @@ import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { getSoldSummary } from '@/lib/listings/sold';
 import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
+import { ListItem } from '@/components/listings/ListItem';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -806,16 +807,28 @@ function WatchlistGrid({
       <div className="space-y-4">
         <AnimatePresence mode="popLayout">
           {listings.map((listing, index) => (
-            <WatchlistListItem
+            <motion.div
               key={listing.id}
-              listing={listing}
-              index={index}
-              isSelected={selectedIds.has(listing.id)}
-              onToggleSelect={() => onToggleSelect(listing.id)}
-              onRemove={() => onRemove(listing.id)}
-              isRemoving={removingId === listing.id}
-              StatusBadge={StatusBadge}
-            />
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3, delay: index * 0.02 }}
+              className="relative"
+            >
+              {/* Selection checkbox (watchlist-only) */}
+              <div
+                className="absolute top-2 left-2 z-40"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <Checkbox checked={selectedIds.has(listing.id)} onCheckedChange={() => onToggleSelect(listing.id)} />
+              </div>
+
+              {/* Reuse browse list-view card 1:1 */}
+              <ListItem listing={listing as any} />
+            </motion.div>
           ))}
         </AnimatePresence>
       </div>
@@ -1148,195 +1161,4 @@ function WatchlistCard({
   );
 }
 
-// Watchlist List Item Component (List View)
-function WatchlistListItem({
-  listing,
-  index,
-  isSelected,
-  onToggleSelect,
-  onRemove,
-  isRemoving,
-  StatusBadge,
-}: {
-  listing: ListingWithStatus;
-  index: number;
-  isSelected: boolean;
-  onToggleSelect: () => void;
-  onRemove: () => void;
-  isRemoving: boolean;
-  StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
-}) {
-  const getCategoryName = (category: string) => {
-    switch (category) {
-      case 'wildlife_exotics':
-        return 'Wildlife & Exotics';
-      case 'cattle_livestock':
-        return 'Cattle & Livestock';
-      case 'ranch_equipment':
-        return 'Ranch Equipment';
-      default:
-        return category;
-    }
-  };
-
-  const priceDisplay =
-    listing.type === 'auction'
-      ? listing.currentBid
-        ? formatCurrency(listing.currentBid)
-        : `Starting: ${formatCurrency(listing.startingBid || 0)}`
-      : formatCurrency(listing.price || 0);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ duration: 0.3, delay: index * 0.02 }}
-    >
-      <Card
-        className={cn(
-          'group hover:shadow-md transition-all duration-200 border',
-          isSelected && 'border-primary ring-2 ring-primary/20 bg-primary/5',
-          listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
-            ? 'opacity-75'
-            : ''
-        )}
-      >
-        <CardContent className="p-4">
-          <div className="flex gap-4">
-            {/* Checkbox */}
-            <div className="flex items-start pt-1">
-              <Checkbox checked={isSelected} onCheckedChange={onToggleSelect} />
-            </div>
-
-            {/* Image */}
-            <Link href={`/listing/${listing.id}`} className="flex-shrink-0">
-              <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden bg-muted">
-                {listing.images && listing.images.length > 0 ? (
-                  <Image
-                    src={listing.images[0]}
-                    alt={listing.title}
-                    fill
-                    className={cn(
-                      'object-cover transition-transform duration-200',
-                      listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
-                        ? 'grayscale'
-                        : 'group-hover:scale-105'
-                    )}
-                    sizes="128px"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                )}
-                {(listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold') ? (
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/70 to-transparent" />
-                    <div className="absolute bottom-2 left-2">
-                      {listing.statusBadge === 'sold' ? (
-                        <Badge className="bg-destructive text-destructive-foreground font-extrabold tracking-wide">
-                          SOLD
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-background/85 backdrop-blur-sm font-extrabold tracking-wide">
-                          ENDED
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </Link>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <div className="flex-1 min-w-0">
-                  <Link href={`/listing/${listing.id}`}>
-                    <h3 className="font-semibold text-lg mb-1 line-clamp-1 hover:text-primary transition-colors">
-                      {listing.title}
-                    </h3>
-                  </Link>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm text-muted-foreground">{getCategoryName(listing.category)}</p>
-                    <span className="text-muted-foreground">•</span>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {listing.type}
-                    </Badge>
-                    {listing.featured && (
-                      <>
-                        <span className="text-muted-foreground">•</span>
-                        <Badge variant="default" className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          Featured
-                        </Badge>
-                      </>
-                    )}
-                    <StatusBadge listing={listing} />
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-xl font-bold">{priceDisplay}</div>
-                  {listing.type === 'auction' && listing.endsAt && (
-                    <div className="mt-1">
-                      {listing.isEnded ? (
-                        <p className="text-xs text-muted-foreground">
-                          Ended {format(listing.endsAt, 'MMM d, yyyy')}
-                        </p>
-                      ) : (
-                        <CountdownTimer
-                          endsAt={listing.endsAt}
-                          variant="compact"
-                          showIcon={false}
-                          pulseWhenEndingSoon={true}
-                          className="text-xs"
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {listing.location && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-                  <MapPin className="h-3 w-3" />
-                  <span>
-                    {listing.location.city}, {listing.location.state}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onRemove();
-                  }}
-                  disabled={isRemoving}
-                >
-                  {isRemoving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Heart className="h-4 w-4 mr-2 fill-current text-destructive" />
-                      Remove
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/listing/${listing.id}`}>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View Details
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+// Watchlist list view now reuses `ListItem` (browse list view) for perfect visual parity.
