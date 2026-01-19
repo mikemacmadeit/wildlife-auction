@@ -34,7 +34,7 @@ export function PaymentMethodDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg border-2 w-[calc(100vw-2rem)] sm:w-full bg-background shadow-2xl">
+      <DialogContent className="border-2 bg-background shadow-2xl overflow-x-hidden w-[calc(100vw-2rem)] sm:w-full sm:max-w-3xl lg:max-w-4xl">
         <DialogHeader>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
@@ -43,7 +43,7 @@ export function PaymentMethodDialog(props: {
                 Pick the best rail for this purchase. Funds are held in escrow once received.
               </DialogDescription>
             </div>
-            <Badge variant="secondary" className="font-mono shrink-0">
+            <Badge variant="secondary" className="font-mono shrink-0 max-w-full">
               {amountLabel}
             </Badge>
           </div>

@@ -92,7 +92,7 @@ export function WireInstructionsDialog(props: {
                           Copy details
                         </Button>
                       </div>
-                      <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap max-h-[220px]">
+                      <pre className="mt-2 text-xs overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all max-h-[220px]">
                         {JSON.stringify(fa.address, null, 2)}
                       </pre>
                     </div>

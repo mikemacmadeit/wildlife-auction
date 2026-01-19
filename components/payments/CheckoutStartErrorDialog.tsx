@@ -64,7 +64,7 @@ export function CheckoutStartErrorDialog(props: {
                 {showTech ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
               {showTech ? (
-                <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground max-h-[30vh] overflow-auto">
+                <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-muted-foreground max-h-[30vh] overflow-y-auto overflow-x-hidden">
                   {technicalDetails}
                 </pre>
               ) : null}
