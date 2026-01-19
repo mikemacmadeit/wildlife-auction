@@ -9,6 +9,7 @@ import { getAdminAuth } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
 import { renderEmail } from '@/lib/email';
 import { sendEmailHtml } from '@/lib/email/sender';
+import { getEmailProvider, FROM_EMAIL } from '@/lib/email/config';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -70,7 +71,17 @@ export async function POST(request: Request) {
 
     const sent = await sendEmailHtml(email, rendered.subject, rendered.html);
     if (!sent.success) {
-      return json({ ok: false, error: 'Failed to send email', message: sent.error || 'Send failed' }, { status: 500 });
+      const provider = getEmailProvider();
+      return json(
+        {
+          ok: false,
+          error: 'Failed to send email',
+          message: sent.error || 'Send failed',
+          provider,
+          from: FROM_EMAIL,
+        },
+        { status: 500 }
+      );
     }
 
     return json({ ok: true, sent: true });

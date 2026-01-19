@@ -91,7 +91,10 @@ async function sendTransactionalEmail(params: {
           // eslint-disable-next-line no-console
           console.error('[brevo] transactional send failed', res.status, body);
         }
-        return { success: false, error: 'Failed to send email' };
+        // Provide an actionable message (common cause: sender/domain not verified in Brevo)
+        const msg =
+          (body && (body.message || body.error || body.code)) ? `${body.message || body.error || body.code}` : null;
+        return { success: false, error: msg ? `Brevo send failed: ${msg}` : `Brevo send failed (HTTP ${res.status})` };
       }
 
       return { success: true, messageId: body?.messageId || body?.id };
