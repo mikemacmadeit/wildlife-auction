@@ -55,6 +55,7 @@ import {
   Sparkles,
   AlertCircle,
   TrendingUp,
+  Zap,
   MapPin,
   Calendar,
 } from 'lucide-react';
@@ -64,6 +65,9 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn, formatCurrency } from '@/lib/utils';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
+import { TrustBadges } from '@/components/trust/StatusBadge';
+import { getSoldSummary } from '@/lib/listings/sold';
+import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -856,6 +860,11 @@ function WatchlistCard({
   isRemoving: boolean;
   StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
 }) {
+  const sold = getSoldSummary(listing as any);
+  const watchers =
+    typeof (listing as any).watcherCount === 'number' ? (listing as any).watcherCount : listing.metrics?.favorites || 0;
+  const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
+
   const getCategoryName = (category: string) => {
     switch (category) {
       case 'wildlife_exotics':
@@ -876,6 +885,37 @@ function WatchlistCard({
         : `Starting: ${formatCurrency(listing.startingBid || 0)}`
       : formatCurrency(listing.price || 0);
 
+  const keyAttributes = useMemo(() => {
+    const attrs: any = listing.attributes || null;
+    if (!attrs) return null;
+
+    if (listing.category === 'wildlife_exotics') {
+      const a = attrs as WildlifeAttributes;
+      return [a.speciesId && `Species: ${a.speciesId}`, a.sex && `Sex: ${a.sex}`, a.quantity && `Qty: ${a.quantity}`]
+        .filter(Boolean)
+        .slice(0, 2);
+    }
+
+    if (listing.category === 'cattle_livestock') {
+      const a = attrs as CattleAttributes;
+      return [a.breed && `Breed: ${a.breed}`, a.sex && `Sex: ${a.sex}`, a.registered && 'Registered']
+        .filter(Boolean)
+        .slice(0, 2);
+    }
+
+    if (listing.category === 'ranch_equipment') {
+      const a = attrs as EquipmentAttributes;
+      return [a.equipmentType && a.equipmentType, a.year && `Year: ${a.year}`, a.condition && a.condition]
+        .filter(Boolean)
+        .slice(0, 2);
+    }
+
+    return null;
+  }, [listing.attributes, listing.category]);
+
+  const sellerName = listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller';
+  const sellerVerified = listing.sellerSnapshot?.verified || listing.seller?.verified || false;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -885,15 +925,17 @@ function WatchlistCard({
     >
       <Card
         className={cn(
-          'group hover:shadow-lg transition-all duration-200 border-2 h-full flex flex-col',
+          // Match browse gallery cards
+          'overflow-hidden transition-all duration-300 flex flex-col h-full border border-border/50 bg-card',
+          'hover:border-border/70 hover:shadow-lifted hover:-translate-y-0.5',
           isSelected && 'border-primary ring-2 ring-primary/20',
           listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
             ? 'opacity-75'
-            : 'hover:border-primary/50'
+            : ''
         )}
       >
         {/* Checkbox overlay */}
-        <div className="absolute top-2 left-2 z-10">
+        <div className="absolute top-2 left-2 z-30">
           <Checkbox
             checked={isSelected}
             onCheckedChange={onToggleSelect}
@@ -902,19 +944,24 @@ function WatchlistCard({
         </div>
 
         <Link href={`/listing/${listing.id}`} className="block flex-1">
-          <div className="relative aspect-square overflow-hidden rounded-t-lg bg-muted">
+          <div className="relative aspect-[4/3] w-full bg-muted overflow-hidden rounded-t-xl">
+            {/* Subtle bottom overlay gradient - like browse */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent z-10" />
+            {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
+
             {listing.images && listing.images.length > 0 ? (
               <Image
                 src={listing.images[0]}
                 alt={listing.title}
                 fill
                 className={cn(
-                  'object-cover transition-transform duration-200',
+                  'object-cover transition-transform duration-500 group-hover:scale-110',
                   listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
                     ? 'grayscale'
                     : 'group-hover:scale-105'
                 )}
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                unoptimized
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -922,8 +969,30 @@ function WatchlistCard({
               </div>
             )}
 
-            {/* Status badges */}
-            <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end max-w-[70%]">
+            {/* Heart overlay (matches browse gallery; removes from watchlist) */}
+            <div className="absolute top-2 right-2 z-30" onClick={(e) => e.preventDefault()}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-full bg-card/95 backdrop-blur-sm border border-border/50"
+                onClick={() => onRemove()}
+                disabled={isRemoving}
+                title="Remove from watchlist"
+              >
+                {isRemoving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4 fill-current text-destructive" />}
+              </Button>
+            </div>
+
+            {/* Countdown badge for auctions */}
+            {!sold.isSold && listing.type === 'auction' && listing.endsAt && !listing.isEnded && (
+              <div className="absolute top-2 left-2 z-20">
+                <CountdownTimer endsAt={listing.endsAt} variant="badge" showIcon={true} pulseWhenEndingSoon={true} className="text-xs" />
+              </div>
+            )}
+
+            {/* Type/status/featured bottom-right (matches browse) */}
+            <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end max-w-[70%]">
               <div className="max-w-full [&>*]:max-w-full [&>*]:truncate">
                 <StatusBadge listing={listing} />
               </div>
@@ -933,23 +1002,40 @@ function WatchlistCard({
                   Featured
                 </Badge>
               )}
-              <Badge variant="outline" className="text-xs capitalize bg-background/90 backdrop-blur-sm max-w-full truncate">
-                {listing.type}
+              <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm max-w-full truncate">
+                {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
+              {(listing as any).protectedTransactionEnabled && (listing as any).protectedTransactionDays ? (
+                <Badge variant="default" className="bg-green-600 text-white font-semibold text-xs shadow-warm max-w-full truncate">
+                  Protected {(listing as any).protectedTransactionDays} Days
+                </Badge>
+              ) : null}
             </div>
 
-            {/* Countdown timer for active auctions */}
-            {listing.type === 'auction' && listing.endsAt && !listing.isEnded && (
-              <div className="absolute bottom-2 left-2 right-2 z-10">
-                <CountdownTimer
-                  endsAt={listing.endsAt}
-                  variant="badge"
-                  showIcon={true}
-                  pulseWhenEndingSoon={true}
-                  className="text-xs bg-background/90 backdrop-blur-sm"
-                />
-              </div>
-            )}
+            {/* Social proof bottom-left */}
+            <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5 max-w-[75%]">
+              {sold.isSold && (
+                <Badge className="bg-destructive text-destructive-foreground text-xs shadow-warm">SOLD</Badge>
+              )}
+              {watchers > 0 && (
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
+                  <Heart className="h-3 w-3 mr-1" />
+                  {watchers} watching
+                </Badge>
+              )}
+              {!sold.isSold && listing.type === 'auction' && bidCount > 0 && (
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  {bidCount} bids
+                </Badge>
+              )}
+              {!sold.isSold && (watchers >= 10 || bidCount >= 8) && (
+                <Badge variant="default" className="text-xs shadow-warm">
+                  <Zap className="h-3 w-3 mr-1" />
+                  Trending
+                </Badge>
+              )}
+            </div>
 
             {/* Subtle treatment for ended/sold listings (no big X overlay) */}
             {(listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold') && (
@@ -971,42 +1057,61 @@ function WatchlistCard({
           </div>
         </Link>
 
-        <CardContent className="p-4 flex-1 flex flex-col">
-          <div className="space-y-3 flex-1">
-            <div>
-              <Link href={`/listing/${listing.id}`}>
-                <h3 className="font-semibold text-base mb-1 line-clamp-2 hover:text-primary transition-colors">
-                  {listing.title}
-                </h3>
-              </Link>
-              <p className="text-xs text-muted-foreground">{getCategoryName(listing.category)}</p>
+        <CardContent className="p-4 flex-1 flex flex-col gap-3">
+          {sold.isSold && (
+            <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
+              <div className="font-semibold">{sold.soldPriceLabel}</div>
+              {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
             </div>
+          )}
 
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <div className="text-lg font-bold">{priceDisplay}</div>
-                {listing.type === 'auction' && listing.endsAt && listing.isEnded && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Ended {format(listing.endsAt, 'MMM d, yyyy')}
-                  </p>
-                )}
-                {listing.type === 'auction' && listing.endsAt && !listing.isEnded && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Ends {formatDistanceToNow(listing.endsAt, { addSuffix: true })}
-                  </p>
-                )}
-              </div>
-            </div>
+          <h3 className="font-bold text-base line-clamp-2 leading-snug hover:text-primary transition-colors duration-300">
+            {listing.title}
+          </h3>
 
-            {/* Location */}
-            {listing.location && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                <MapPin className="h-3 w-3" />
-                <span className="min-w-0 truncate">
-                  {listing.location.city}, {listing.location.state}
+          {keyAttributes && keyAttributes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+              {keyAttributes.map((attr: any, idx: number) => (
+                <span key={idx} className="px-2 py-0.5 bg-muted rounded-md">
+                  {attr}
                 </span>
+              ))}
+            </div>
+          )}
+
+          {listing.location && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground min-w-0">
+              <MapPin className="h-4 w-4" />
+              <span className="truncate">
+                {listing.location.city}, {listing.location.state}
+              </span>
+            </div>
+          )}
+
+          <TrustBadges
+            verified={listing.trust?.verified || false}
+            transport={listing.trust?.transportReady || false}
+            size="sm"
+            className="flex-wrap gap-1.5"
+            showIcons={false}
+          />
+
+          <div className="mt-auto pt-3 border-t border-border/50 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                {priceDisplay}
               </div>
-            )}
+            </div>
+            <div className="min-w-0 text-right">
+              <div className="text-xs text-muted-foreground font-semibold">Sold by</div>
+              <div className="text-xs font-semibold truncate">{sellerName}</div>
+              {sellerVerified ? (
+                <Badge variant="secondary" className="text-[10px] font-semibold mt-1">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Verified
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           {/* Actions: use a grid so buttons never overlap/cram in tight columns */}
