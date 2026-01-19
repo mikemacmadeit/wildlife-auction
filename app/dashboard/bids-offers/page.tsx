@@ -177,13 +177,37 @@ export default function BidsOffersPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const [bidsRes, offersRes] = await Promise.all([
+      const [bidsRes, offersRes] = await Promise.allSettled([
         getMyBids({ limit: 100 }),
         getMyOffers({ limit: 100 }),
       ]);
-      if (bidsRes.ok) setBids(bidsRes.bids);
-      else setBids([]);
-      setOffers((offersRes?.offers || []) as OfferRow[]);
+
+      // Bids: never let offers failure blank out bids
+      if (bidsRes.status === 'fulfilled') {
+        if (bidsRes.value.ok) setBids(bidsRes.value.bids);
+        else {
+          setBids([]);
+          toast({ title: 'Bids unavailable', description: bidsRes.value.error || 'Failed to load bids', variant: 'destructive' });
+        }
+      } else {
+        setBids([]);
+        toast({ title: 'Bids unavailable', description: bidsRes.reason?.message || 'Failed to load bids', variant: 'destructive' });
+      }
+
+      // Offers: surface common blocker (email not verified)
+      if (offersRes.status === 'fulfilled') {
+        setOffers((offersRes.value?.offers || []) as OfferRow[]);
+      } else {
+        setOffers([]);
+        const msg = String(offersRes.reason?.message || 'Failed to load offers');
+        toast({
+          title: msg.toLowerCase().includes('verify') ? 'Email verification required' : 'Offers unavailable',
+          description: msg.toLowerCase().includes('verify')
+            ? 'Verify your email to send/receive offers. Go to Settings → Account & Settings → Email verification.'
+            : msg,
+          variant: 'destructive',
+        });
+      }
     } catch (e: any) {
       toast({ title: 'Failed to load', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
