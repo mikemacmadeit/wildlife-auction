@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { getMinIncrementCents } from '@/lib/auctions/proxyBidding';
 
 type OfferRow = {
   offerId: string;
@@ -111,6 +112,15 @@ function timeLeftTone(ms: number | null): string {
   if (ms <= 12 * 60_000) return 'text-destructive font-semibold';
   if (ms <= 60 * 60_000) return 'text-orange-600 font-semibold';
   return '';
+}
+
+function suggestNextMaxUsd(params: { currentHighestBid: number; myMaxBid: number }): number {
+  const currentCents = Math.max(0, Math.round((Number(params.currentHighestBid || 0) || 0) * 100));
+  const myMaxCents = Math.max(0, Math.round((Number(params.myMaxBid || 0) || 0) * 100));
+  // We base this off current visible price; server will be authoritative, but this avoids obvious "too low" bids.
+  const minNext = currentCents + getMinIncrementCents(currentCents);
+  const suggested = Math.max(minNext, myMaxCents + 100);
+  return Math.round(suggested) / 100;
 }
 
 function offerStatusFromRow(o: OfferRow): UnifiedRow['status'] {
@@ -553,7 +563,14 @@ export default function BidsOffersPage() {
                                         currentHighestBid: Number(b.currentHighestBid || 0) || 0,
                                         myMaxBid: Number(b.myMaxBid || 0) || 0,
                                       });
-                                      setRaiseInput(String(Math.max(Number(b.currentHighestBid || 0) || 0, Number(b.myMaxBid || 0) || 0) + 1));
+                                      setRaiseInput(
+                                        String(
+                                          suggestNextMaxUsd({
+                                            currentHighestBid: Number(b.currentHighestBid || 0) || 0,
+                                            myMaxBid: Number(b.myMaxBid || 0) || 0,
+                                          })
+                                        )
+                                      );
                                       setRaiseDialogOpen(true);
                                     }}
                                   >
@@ -645,7 +662,14 @@ export default function BidsOffersPage() {
                                       currentHighestBid: Number(r.currentHighestBid || 0) || 0,
                                       myMaxBid: Number(r.myMaxBid || 0) || 0,
                                     });
-                                    setRaiseInput(String(Math.max(Number(r.currentHighestBid || 0) || 0, Number(r.myMaxBid || 0) || 0) + 1));
+                                    setRaiseInput(
+                                      String(
+                                        suggestNextMaxUsd({
+                                          currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                          myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                        })
+                                      )
+                                    );
                                     setRaiseDialogOpen(true);
                                   }}
                                 >
@@ -661,7 +685,14 @@ export default function BidsOffersPage() {
                                       currentHighestBid: Number(r.currentHighestBid || 0) || 0,
                                       myMaxBid: Number(r.myMaxBid || 0) || 0,
                                     });
-                                    setRaiseInput(String(Math.max(Number(r.currentHighestBid || 0) || 0, Number(r.myMaxBid || 0) || 0) + 1));
+                                    setRaiseInput(
+                                      String(
+                                        suggestNextMaxUsd({
+                                          currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                          myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                        })
+                                      )
+                                    );
                                     setRaiseDialogOpen(true);
                                   }}
                                 >

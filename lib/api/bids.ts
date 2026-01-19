@@ -33,9 +33,26 @@ export async function placeBidServer(params: {
     body: JSON.stringify({ listingId: params.listingId, amount: params.amount }),
   });
 
-  const data = await res.json().catch(() => ({}));
+  let data: any = null;
+  let text: string | null = null;
+  try {
+    const ct = String(res.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('application/json')) {
+      data = await res.json().catch(() => null);
+    } else {
+      text = await res.text().catch(() => null);
+      data = null;
+    }
+  } catch {
+    data = null;
+  }
+
   if (!res.ok || !data?.ok) {
-    return { ok: false, error: data?.error || 'Failed to place bid' };
+    const apiErr =
+      (data && (data.error || data.message)) ||
+      (text ? text.slice(0, 200) : null) ||
+      `Failed to place bid (${res.status})`;
+    return { ok: false, error: String(apiErr) };
   }
   return {
     ok: true,
