@@ -262,6 +262,11 @@ export interface Listing {
     displayName: string;
     verified: boolean;
     /**
+     * Public seller avatar URL (copied at publish time).
+     * Must NOT contain private data; used for browse/listing surfaces without requiring `/users/{uid}` reads.
+     */
+    photoURL?: string;
+    /**
      * Phase 3A (A4): public trust snapshot for anon-safe trust surfaces.
      * These values are copied at publish time (server-side) to avoid requiring reads of /users/{uid}.
      */

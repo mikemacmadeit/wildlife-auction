@@ -26,6 +26,7 @@ import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -60,6 +61,12 @@ export function EnhancedSellerProfile({
 
   const [sellerTier, setSellerTier] = useState<SubscriptionTier>('standard');
   const [sellerProfile, setSellerProfile] = useState<UserProfile | null>(null);
+
+  const sellerPhotoUrl =
+    sellerProfile?.photoURL ||
+    listing.sellerSnapshot?.photoURL ||
+    (listing as any)?.seller?.photoURL ||
+    null;
 
   useEffect(() => {
     if (sellerId) {
@@ -127,9 +134,20 @@ export function EnhancedSellerProfile({
             'bg-primary/10 border border-primary/30',
             'flex items-center justify-center'
           )}>
-            <div className="text-xl font-bold text-primary">
-              {sellerName.charAt(0).toUpperCase()}
-            </div>
+            {sellerPhotoUrl ? (
+              <Image
+                src={sellerPhotoUrl}
+                alt={`${sellerName} profile`}
+                fill
+                className="object-cover rounded-full"
+                sizes="56px"
+                unoptimized
+              />
+            ) : (
+              <div className="text-xl font-bold text-primary">
+                {sellerName.charAt(0).toUpperCase()}
+              </div>
+            )}
             {sellerVerified && (
               <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary border-2 border-background flex items-center justify-center shadow-sm">
                 <CheckCircle2 className="h-3 w-3 text-primary-foreground fill-primary-foreground" />

@@ -421,9 +421,13 @@ export async function POST(request: Request) {
       sellerBadges.push('TPWD permit provided');
     }
 
+    const photoURL =
+      typeof userData?.photoURL === 'string' && userData.photoURL.trim().length > 0 ? String(userData.photoURL) : undefined;
+
     const publicSellerSnapshot = {
       displayName,
       verified: sellerVerified,
+      ...(photoURL ? { photoURL } : {}),
       completedSalesCount,
       badges: sellerBadges,
     };

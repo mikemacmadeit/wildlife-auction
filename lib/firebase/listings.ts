@@ -341,7 +341,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
 function toListingDocInput(
   listingInput: CreateListingInput,
   sellerId: string,
-  sellerSnapshot: { displayName: string; verified: boolean }
+  sellerSnapshot: { displayName: string; verified: boolean; photoURL?: string }
 ): Omit<ListingDoc, 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'publishedAt' | 'status'> {
   // Clean location object - remove undefined zip
   const location: any = {
@@ -423,7 +423,8 @@ const getSellerSnapshot = async (userId: string): Promise<{ displayName: string;
     const userProfile = await getDocument<UserProfile>('users', userId);
     const displayName = userProfile?.displayName || userProfile?.profile?.fullName || userProfile?.email?.split('@')[0] || 'Unknown Seller';
     const verified = userProfile?.seller?.verified || false;
-    return { displayName, verified };
+    const photoURL = typeof userProfile?.photoURL === 'string' && userProfile.photoURL.trim().length > 0 ? userProfile.photoURL : undefined;
+    return { displayName, verified, ...(photoURL ? { photoURL } : {}) };
   } catch (error) {
     console.error('Error fetching seller snapshot:', error);
     return { displayName: 'Unknown Seller', verified: false };

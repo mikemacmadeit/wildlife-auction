@@ -157,10 +157,10 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   try {
     const currentUid = auth.currentUser?.uid || null;
 
-    // If you are not the owner, do NOT try to read `/users/{uid}` first.
-    // That will correctly be blocked by rules, but it creates noisy console errors and can cause
-    // downstream UI to incorrectly assume "seller not ready" based on a failed fetch.
-    if (currentUid && currentUid !== userId) {
+    // If you are not the owner (or signed out), do NOT try to read `/users/{uid}` first.
+    // That will be blocked by rules on public pages and creates noisy console errors.
+    // Use the public profile mirror instead.
+    if (!currentUid || currentUid !== userId) {
       const pub = await getDocument<PublicProfileDoc>('publicProfiles', userId).catch(() => null);
       if (!pub) return null;
 
