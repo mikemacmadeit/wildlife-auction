@@ -8,7 +8,8 @@
 import { usePathname } from 'next/navigation';
 import { EmailCapturePopup } from '@/components/marketing/EmailCapturePopup';
 
-const BLOCKED_PREFIXES = ['/dashboard', '/seller', '/app'];
+// Keep the marketing popup off critical flows (auth + authenticated areas).
+const BLOCKED_PREFIXES = ['/dashboard', '/seller', '/app', '/login', '/register'];
 
 export function PublicEmailCaptureMount() {
   const pathname = usePathname() || '/';
