@@ -133,7 +133,18 @@ export const resendVerificationEmail = async (): Promise<void> => {
     url: `${getSiteUrl()}/dashboard/account?verified=1`,
     handleCodeInApp: false,
   };
-  await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
+  try {
+    await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
+  } catch (e: any) {
+    // If the continue URL/domain isn't authorized in Firebase Auth settings,
+    // fall back to Firebase default behavior (still sends the email).
+    const code = String(e?.code || '');
+    if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+      await sendEmailVerification(auth.currentUser);
+      return;
+    }
+    throw e;
+  }
 };
 
 /**

@@ -31,6 +31,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // Ensure a Firestore `users/{uid}` doc exists for every signed-in user (server-side, rules-independent).
+  // This unblocks admin tooling (Users directory) and keeps `publicProfiles` / `userSummaries` warm.
+  useEffect(() => {
+    if (!initialized) return;
+    if (!user?.uid) return;
+    const key = `we:bootstrap-user:v1:${user.uid}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // ignore storage failures
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        if (cancelled) return;
+        await fetch('/api/auth/bootstrap-user', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        }).catch(() => null);
+      } catch {
+        // best-effort; ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialized, user?.uid]);
+
   return (
     <AuthContext.Provider value={{ user, loading, initialized }}>
       {children}

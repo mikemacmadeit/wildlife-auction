@@ -122,10 +122,18 @@ export async function GET(request: Request) {
         snap = await db.collection('users').limit(limit).get();
       }
 
+      if (snap.empty) {
+        // Firestore user docs may not exist yet (rules/env mismatch). Fall back to Firebase Auth directory.
+        // This keeps admin tools usable even before the Firestore bootstrap/backfill runs.
+        const list = await auth.listUsers(limit);
+        await Promise.all(list.users.map((u: any) => addUser(u.uid, u)));
+        return json({ ok: true, users: results, source: 'auth' });
+      }
+
       const uids = snap.docs.map((d: any) => d.id);
       // Fetch auth records in parallel (bounded by limit<=50)
       await Promise.all(uids.map((uid: string) => addUser(uid)));
-      return json({ ok: true, users: results });
+      return json({ ok: true, users: results, source: 'firestore' });
     }
 
     // Email search
