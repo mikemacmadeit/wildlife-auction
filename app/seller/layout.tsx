@@ -67,7 +67,7 @@ interface SellerNavItem {
 // Base nav items (always visible)
 const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/seller/listings', label: 'Listings', icon: Package },
+  { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
