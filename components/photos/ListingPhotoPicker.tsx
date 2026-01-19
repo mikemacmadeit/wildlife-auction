@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -254,44 +254,50 @@ export function ListingPhotoPicker(props: {
         <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Manage uploads</DialogTitle>
+            <DialogDescription>
+              Upload, reuse, and manage your photo library. Use the tabs to switch between active uploads and trash.
+            </DialogDescription>
           </DialogHeader>
 
-          <Tabs value={manageTab} onValueChange={(v) => setManageTab(v as any)}>
-            <TabsList className="grid grid-cols-2 w-full sm:w-auto">
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="deleted">Trash</TabsTrigger>
-            </TabsList>
+          {/* Defensive: only render tabs while dialog is open to avoid Radix context edge cases during route transitions/prefetch. */}
+          {manageOpen ? (
+            <Tabs value={manageTab} onValueChange={(v) => setManageTab(v as any)}>
+              <TabsList className="grid grid-cols-2 w-full sm:w-auto">
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="deleted">Trash</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="active" className="mt-4">
-              <ManageUploadsGrid
-                uid={uid}
-                loading={manageLoading}
-                photos={activeUploads}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onDelete={async (photoId) => {
-                  await softDeleteUserPhoto(uid, photoId);
-                  await refreshManage();
-                  await refresh(); // keep picker library in sync too
-                }}
-              />
-            </TabsContent>
+              <TabsContent value="active" className="mt-4">
+                <ManageUploadsGrid
+                  uid={uid}
+                  loading={manageLoading}
+                  photos={activeUploads}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onDelete={async (photoId) => {
+                    await softDeleteUserPhoto(uid, photoId);
+                    await refreshManage();
+                    await refresh(); // keep picker library in sync too
+                  }}
+                />
+              </TabsContent>
 
-            <TabsContent value="deleted" className="mt-4">
-              <ManageUploadsGrid
-                uid={uid}
-                loading={manageLoading}
-                photos={deletedUploads}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onRestore={async (photoId) => {
-                  await restoreUserPhoto(uid, photoId);
-                  await refreshManage();
-                  await refresh();
-                }}
-              />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="deleted" className="mt-4">
+                <ManageUploadsGrid
+                  uid={uid}
+                  loading={manageLoading}
+                  photos={deletedUploads}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onRestore={async (photoId) => {
+                    await restoreUserPhoto(uid, photoId);
+                    await refreshManage();
+                    await refresh();
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
