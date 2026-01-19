@@ -16,6 +16,8 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
 import { emitEventForUser } from '@/lib/notifications';
 import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib/auctions/proxyBidding';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -116,8 +118,6 @@ export async function POST(request: Request) {
   if (!listingId) return json({ error: 'listingId is required' }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) return json({ error: 'amount must be a positive number' }, { status: 400 });
 
-  const animalCategories = new Set(['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock']);
-
   try {
     let eventInfo:
       | {
@@ -136,6 +136,12 @@ export async function POST(request: Request) {
       const listingSnap = await tx.get(listingRef);
       if (!listingSnap.exists) throw new BidError({ code: 'LISTING_NOT_FOUND', message: 'Listing not found', status: 404 });
       const listing = listingSnap.data() as any;
+      let listingCategory: string;
+      try {
+        listingCategory = normalizeCategory(listing.category);
+      } catch (e: any) {
+        throw new BidError({ code: 'INVALID_CATEGORY', message: e?.message || 'Invalid listing category', status: 400 });
+      }
 
       if (listing.sellerId === bidderId) throw new BidError({ code: 'OWN_LISTING', message: 'Cannot bid on your own listing', status: 400 });
       if (listing.type !== 'auction') throw new BidError({ code: 'NOT_AUCTION', message: 'Bids can only be placed on auction listings', status: 400 });
@@ -147,7 +153,7 @@ export async function POST(request: Request) {
       }
 
       // TX-only for animals (buyer + listing)
-      if (animalCategories.has(listing.category)) {
+      if (isTexasOnlyCategory(listingCategory as any)) {
         if (listing.location?.state !== 'TX') {
           throw new BidError({ code: 'TX_ONLY_LISTING', message: 'Animal listings must be located in Texas.', status: 400 });
         }

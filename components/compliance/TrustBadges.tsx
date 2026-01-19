@@ -14,6 +14,7 @@ import { getDocuments } from '@/lib/firebase/documents';
 import { useEffect, useState } from 'react';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 import { formatDate } from '@/lib/utils';
+import { isAnimalCategory, isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import {
   Tooltip,
   TooltipContent,
@@ -57,8 +58,7 @@ export function ComplianceBadges({ listing, className, variant = 'inline' }: Tru
     checkDocuments();
   }, [listing.id, listing.category]);
 
-  const animalCategories = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
-  if (!animalCategories.includes(listing.category)) {
+  if (!isAnimalCategory(listing.category as any)) {
     return null; // Only show for animal listings
   }
 
@@ -158,17 +158,30 @@ export function ComplianceBadges({ listing, className, variant = 'inline' }: Tru
 
         {/* Texas-Only Notice */}
         <div className="pt-2 border-t">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-xs">Texas-only</Badge>
-            <span className="text-xs text-muted-foreground">TX residents only.</span>
-          </div>
+          {isTexasOnlyCategory(listing.category as any) ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="text-xs">Texas-only</Badge>
+              <span className="text-xs text-muted-foreground">TX residents only.</span>
+            </div>
+          ) : null}
           {listing.category === 'whitetail_breeder' ? (
             <p className="text-[11px] text-muted-foreground mt-2">
               Payout is released only after delivery/acceptance requirements are met, and after Transfer Approval is uploaded and verified (see Transfer Requirements).
             </p>
           ) : null}
+          {listing.category === 'horse_equestrian' ? (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Horse orders include an in-platform Bill of Sale / written transfer document tied to the order.
+            </p>
+          ) : null}
           <p className="text-[11px] text-muted-foreground mt-2">
-            Learn more: <a className="underline underline-offset-2 hover:text-foreground" href="/trust#whitetail">Trust &amp; Compliance</a>
+            Learn more:{' '}
+            <a
+              className="underline underline-offset-2 hover:text-foreground"
+              href={listing.category === 'horse_equestrian' ? '/trust#horses' : '/trust#whitetail'}
+            >
+              Trust &amp; Compliance
+            </a>
           </p>
         </div>
       </div>

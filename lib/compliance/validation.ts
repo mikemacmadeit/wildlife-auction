@@ -4,7 +4,8 @@
  * Server-side validation for Texas wildlife/livestock compliance
  */
 
-import { ListingCategory, ListingType, ListingAttributes, WhitetailBreederAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, EXOTIC_SPECIES } from '@/lib/types';
+import { ListingCategory, ListingType, ListingAttributes, WhitetailBreederAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, EXOTIC_SPECIES } from '@/lib/types';
+import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 
 // Prohibited keywords that cannot appear in listings
 const PROHIBITED_KEYWORDS = [
@@ -34,9 +35,7 @@ export function containsProhibitedKeywords(text: string): boolean {
  * Validate Texas-only requirement for animal listings
  */
 export function validateTexasOnly(category: ListingCategory, locationState: string): void {
-  const animalCategories: ListingCategory[] = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
-  
-  if (animalCategories.includes(category) && locationState !== 'TX') {
+  if (isTexasOnlyCategory(category) && locationState !== 'TX') {
     throw new Error(`Animal listings must be located in Texas. Current location: ${locationState}`);
   }
 }
@@ -253,6 +252,42 @@ export function validateEquipment(attributes: EquipmentAttributes): void {
 }
 
 /**
+ * Validate horse/equestrian compliance requirements
+ */
+export function validateHorse(attributes: HorseAttributes): void {
+  if (!attributes || typeof attributes !== 'object') {
+    throw new Error('Horse attributes are required.');
+  }
+
+  if (attributes.speciesId !== 'horse') {
+    throw new Error('Horse listings must have speciesId = "horse".');
+  }
+
+  const sex = String((attributes as any).sex || '').trim();
+  if (!sex) {
+    throw new Error('Sex is required for horse listings.');
+  }
+
+  // Registered must be explicitly set
+  if (typeof (attributes as any).registered !== 'boolean') {
+    throw new Error('Registered status is required for horse listings.');
+  }
+
+  if (attributes.registered) {
+    if (!attributes.registrationNumber || String(attributes.registrationNumber).trim() === '') {
+      throw new Error('Registration number is required when the horse is registered.');
+    }
+  }
+
+  // Disclosures must be explicitly true (seller attestation)
+  const d: any = (attributes as any).disclosures || {};
+  if (d.identificationDisclosure !== true) throw new Error('Identification disclosure is required for horse listings.');
+  if (d.healthDisclosure !== true) throw new Error('Health disclosure is required for horse listings.');
+  if (d.transportDisclosure !== true) throw new Error('Transport disclosure is required for horse listings.');
+  if (d.titleOrLienDisclosure !== true) throw new Error('Title/lien disclosure is required for horse listings.');
+}
+
+/**
  * Validate listing compliance based on category
  */
 export function validateListingCompliance(
@@ -284,9 +319,15 @@ export function validateListingCompliance(
     case 'cattle_livestock':
       validateCattle(attributes as CattleAttributes);
       break;
+    case 'horse_equestrian':
+      validateHorse(attributes as HorseAttributes);
+      break;
     case 'ranch_equipment':
       validateEquipment(attributes as EquipmentAttributes);
       break;
+    default:
+      // Fail closed so newly-added/unknown categories cannot bypass compliance.
+      throw new Error(`Unsupported category: ${String(category)}`);
   }
 }
 
@@ -303,6 +344,11 @@ export function requiresComplianceReview(category: ListingCategory, attributes: 
     const exoticsAttrs = attributes as WildlifeAttributes;
     // Requires review if species is 'other_exotic'
     return exoticsAttrs.speciesId === 'other_exotic';
+  }
+
+  if (category === 'horse_equestrian') {
+    // No admin review by default for horses (requirements engine can tighten this later).
+    return false;
   }
   
   // Cattle and equipment don't require review by default

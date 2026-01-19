@@ -26,6 +26,7 @@ import { Listing, ListingStatus, ListingType, ListingCategory, ListingAttributes
 import { ListingDoc } from '@/lib/types/firestore';
 import { validateListingCompliance, requiresComplianceReview } from '@/lib/compliance/validation';
 import { getTierWeight } from '@/lib/pricing/subscriptions';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 
 /**
  * Firestore does not allow `undefined` values anywhere in a document (including nested objects).
@@ -81,6 +82,7 @@ export interface CreateListingInput {
     width?: number;
     height?: number;
     sortOrder?: number;
+    focalPoint?: { x: number; y: number };
   }>;
   coverPhotoId?: string;
   location: {
@@ -169,19 +171,13 @@ function migrateAttributes(doc: ListingDoc & { id: string }): ListingAttributes 
   const oldMetadata = (doc as any).metadata as any;
   const category = (doc as any).category as any;
 
-  // Default category for old listings without category
-  const effectiveCategory: ListingCategory = category || 'wildlife_exotics';
-
-  // Map old categories to new ones
-  let mappedCategory: ListingCategory = effectiveCategory;
-  if (category === 'wildlife' || category === 'horses' || !category) {
-    mappedCategory = 'wildlife_exotics';
-  } else if (category === 'cattle') {
-    mappedCategory = 'cattle_livestock';
-  } else if (category === 'equipment') {
-    mappedCategory = 'ranch_equipment';
-  } else {
-    // For 'land' or 'other', default to wildlife_exotics
+  // Legacy docs may have missing/legacy category values.
+  // For client display and attribute migration we intentionally default missing category to wildlife_exotics,
+  // but we still run the mapping through normalizeCategory so behavior stays centralized/explicit.
+  let mappedCategory: ListingCategory = 'wildlife_exotics';
+  try {
+    mappedCategory = normalizeCategory(category || 'wildlife_exotics');
+  } catch {
     mappedCategory = 'wildlife_exotics';
   }
 
@@ -197,6 +193,29 @@ function migrateAttributes(doc: ListingDoc & { id: string }): ListingAttributes 
       healthDisclosure: true,
       healthNotes: oldMetadata?.healthStatus ? String(oldMetadata.healthStatus) : undefined,
       transportDisclosure: true,
+    } as ListingAttributes;
+  } else if (mappedCategory === 'horse_equestrian') {
+    // Legacy horse listings were previously mapped into wildlife_exotics; migrate into explicit horse schema.
+    return {
+      speciesId: 'horse',
+      sex: 'unknown',
+      age: oldMetadata?.age ? String(oldMetadata.age) : undefined,
+      registered: Boolean(oldMetadata?.papers || false),
+      registrationOrg: oldMetadata?.registrationOrg ? String(oldMetadata.registrationOrg) : undefined,
+      registrationNumber: oldMetadata?.registrationNumber ? String(oldMetadata.registrationNumber) : undefined,
+      identification: {
+        microchip: oldMetadata?.microchip ? String(oldMetadata.microchip) : undefined,
+        brand: oldMetadata?.brand ? String(oldMetadata.brand) : undefined,
+        tattoo: oldMetadata?.tattoo ? String(oldMetadata.tattoo) : undefined,
+        markings: oldMetadata?.markings ? String(oldMetadata.markings) : undefined,
+      },
+      disclosures: {
+        identificationDisclosure: true,
+        healthDisclosure: true,
+        transportDisclosure: true,
+        titleOrLienDisclosure: true,
+      },
+      quantity: Number(oldMetadata?.quantity || 1),
     } as ListingAttributes;
   } else if (mappedCategory === 'cattle_livestock') {
     return {
@@ -238,8 +257,17 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
 
   const attributes = migrateAttributes(doc);
 
+  // Canonicalize category for UI consumption.
+  // Server routes should fail-closed, but UI needs to render legacy docs without crashing.
+  let normalizedCategory: ListingCategory = 'wildlife_exotics';
+  try {
+    normalizedCategory = normalizeCategory((doc as any).category || 'wildlife_exotics');
+  } catch {
+    normalizedCategory = 'wildlife_exotics';
+  }
+
   // Normalize whitetail permit expiration Date from nested Timestamp (if present)
-  if (doc.category === 'whitetail_breeder') {
+  if (normalizedCategory === 'whitetail_breeder') {
     const raw: any = (attributes as any)?.tpwdPermitExpirationDate;
     const d: Date | null = raw?.toDate?.() || (raw instanceof Date ? raw : null);
     if (d) {
@@ -257,6 +285,13 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
             width: typeof p.width === 'number' ? p.width : undefined,
             height: typeof p.height === 'number' ? p.height : undefined,
             sortOrder: typeof p.sortOrder === 'number' ? p.sortOrder : undefined,
+            focalPoint:
+              p?.focalPoint &&
+              typeof p.focalPoint === 'object' &&
+              typeof p.focalPoint.x === 'number' &&
+              typeof p.focalPoint.y === 'number'
+                ? { x: Math.max(0, Math.min(1, p.focalPoint.x)), y: Math.max(0, Math.min(1, p.focalPoint.y)) }
+                : undefined,
           }))
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       : undefined;
@@ -267,7 +302,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     title: doc.title,
     description: doc.description,
     type: doc.type,
-    category: doc.category,
+    category: normalizedCategory,
     status: doc.status,
     price: doc.price,
     currentBid: doc.currentBid,
@@ -1063,12 +1098,13 @@ export const queryListingsForBrowse = async (
       filteredItems = filteredItems.filter((l) => {
         if (l.status !== 'active') return true;
         // Hide purchase-reserved listings from Active browse (prevents "it can be bought twice" UX).
+        // IMPORTANT: only treat a reservation as active if `purchaseReservedUntil > now`.
+        // A stale `purchaseReservedByOrderId` must NOT hide a listing indefinitely.
         const reservedUntilMs =
           l.purchaseReservedUntil?.getTime?.() && Number.isFinite(l.purchaseReservedUntil.getTime())
             ? l.purchaseReservedUntil.getTime()
             : null;
         if (reservedUntilMs && reservedUntilMs > nowMs) return false;
-        if (typeof l.purchaseReservedByOrderId === 'string' && l.purchaseReservedByOrderId.trim()) return false;
         if (l.type !== 'auction') return true;
         const endMs = l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
         // If we can't read endsAt, don't hide it.

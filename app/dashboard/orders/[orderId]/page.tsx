@@ -21,13 +21,33 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import type { Listing, Order } from '@/lib/types';
+import type { ComplianceDocument, Listing, Order } from '@/lib/types';
 import { getOrderById } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
+import { getDocuments } from '@/lib/firebase/documents';
+import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
+
+async function postAuthJson(path: string, body?: any): Promise<any> {
+  const { auth } = await import('@/lib/firebase/config');
+  const user = auth.currentUser;
+  if (!user) throw new Error('Authentication required');
+  const token = await user.getIdToken();
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || json?.error || 'Request failed');
+  return json;
+}
 
 export default function BuyerOrderDetailPage() {
   const params = useParams<{ orderId: string }>();
@@ -39,6 +59,7 @@ export default function BuyerOrderDetailPage() {
   const orderId = params?.orderId;
   const [order, setOrder] = useState<Order | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
+  const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'confirm' | 'dispute' | null>(null);
@@ -56,10 +77,12 @@ export default function BuyerOrderDetailPage() {
         if (o.buyerId !== user.uid) throw new Error('You can only view your own orders.');
 
         const l = await getListingById(o.listingId);
+        const bos = await getDocuments('order', o.id, 'BILL_OF_SALE').catch(() => []);
 
         if (cancelled) return;
         setOrder(o);
         setListing(l || null);
+        setBillOfSaleDocs(bos);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Failed to load order');
       } finally {
@@ -330,6 +353,79 @@ export default function BuyerOrderDetailPage() {
                     {String((order as any).paymentMethod || '—').replaceAll('_', ' ')}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Bill of Sale</CardTitle>
+              <CardDescription>View/download the written transfer. You can also upload a signed copy.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {billOfSaleDocs.length > 0 ? (
+                <div className="space-y-2">
+                  {billOfSaleDocs.slice(0, 3).map((d) => (
+                    <div key={d.id} className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="text-sm">
+                        <div className="font-semibold">Bill of Sale</div>
+                        <div className="text-xs text-muted-foreground break-all">{d.documentUrl}</div>
+                      </div>
+                      <Button asChild variant="outline" size="sm">
+                        <a href={d.documentUrl} target="_blank" rel="noreferrer">
+                          View / Download
+                        </a>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Not available yet. If this order requires a Bill of Sale, it will be generated when checkout is initiated.
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="font-semibold text-sm">Buyer signature confirmation</div>
+                  <div className="text-xs text-muted-foreground">
+                    {order.billOfSaleBuyerSignedAt ? `Signed at ${order.billOfSaleBuyerSignedAt.toLocaleString()}` : 'Not confirmed yet.'}
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={Boolean(order.billOfSaleBuyerSignedAt)}
+                  onClick={async () => {
+                    try {
+                      await postAuthJson(`/api/orders/${order.id}/bill-of-sale/confirm-signed`);
+                      const refreshed = await getOrderById(order.id);
+                      if (refreshed) setOrder(refreshed);
+                      toast({ title: 'Confirmed', description: 'Buyer signature confirmation recorded.' });
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: e?.message || 'Failed to confirm', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  I have signed
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="font-semibold text-sm">Upload signed copy (optional)</div>
+                <DocumentUpload
+                  entityType="order"
+                  entityId={order.id}
+                  documentType="BILL_OF_SALE"
+                  onUploadComplete={async () => {
+                    const bos = await getDocuments('order', order.id, 'BILL_OF_SALE').catch(() => []);
+                    setBillOfSaleDocs(bos);
+                  }}
+                  required={false}
+                />
               </div>
             </CardContent>
           </Card>

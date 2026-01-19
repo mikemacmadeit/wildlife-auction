@@ -75,15 +75,6 @@ export async function POST(request: Request) {
           state: existing?.profile?.location?.state || '',
           zip: existing?.profile?.location?.zip || '',
         },
-        notifications: {
-          ...(existing?.profile?.notifications || {}),
-          email: typeof existing?.profile?.notifications?.email === 'boolean' ? existing.profile.notifications.email : true,
-          sms: typeof existing?.profile?.notifications?.sms === 'boolean' ? existing.profile.notifications.sms : false,
-          bids: typeof existing?.profile?.notifications?.bids === 'boolean' ? existing.profile.notifications.bids : true,
-          messages: typeof existing?.profile?.notifications?.messages === 'boolean' ? existing.profile.notifications.messages : true,
-          promotions:
-            typeof existing?.profile?.notifications?.promotions === 'boolean' ? existing.profile.notifications.promotions : false,
-        },
       },
       createdAt: userSnap.exists ? (existing?.createdAt || now) : now,
       updatedAt: now,

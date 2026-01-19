@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 
 import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
-import { emitEventToUsers } from '@/lib/notifications';
+import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { getSiteUrl } from '@/lib/site-url';
 
 export async function POST(request: Request, ctx: { params: { listingId: string } }) {
   const rl = await requireRateLimit(request);
@@ -49,25 +50,24 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
     updatedBy: actorUid,
   });
 
-  // Seller in-app notification (non-blocking best effort)
+  // Seller notification through canonical pipeline (idempotent, best-effort).
   try {
-    await db
-      .collection('users')
-      .doc(sellerId)
-      .collection('notifications')
-      .doc()
-      .set({
-        userId: sellerId,
-        type: 'compliance_approved',
-        title: 'Compliance approved',
-        body: shouldPublish ? `Your listing “${title}” passed compliance and is now live.` : `Your listing “${title}” passed compliance review.`,
-        read: false,
-        createdAt: now,
-        linkUrl: shouldPublish ? `/listing/${listingId}` : `/seller/listings/${listingId}/edit`,
-        linkLabel: shouldPublish ? 'View listing' : 'View listing',
+    const origin = getSiteUrl();
+    await emitEventForUser({
+      type: 'Listing.ComplianceApproved',
+      actorId: actorUid,
+      entityType: 'listing',
+      entityId: listingId,
+      targetUserId: sellerId,
+      payload: {
+        type: 'Listing.ComplianceApproved',
         listingId,
-        metadata: { complianceStatus: 'approved', status: shouldPublish ? 'active' : listing?.status || 'pending' },
-      });
+        listingTitle: title,
+        listingUrl: `${origin}/listing/${listingId}`,
+        published: shouldPublish,
+      },
+      optionalHash: `compliance_approved:${listingId}`,
+    });
   } catch {
     // ignore
   }
@@ -75,7 +75,7 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
   // Admin notifications: only emit "approved" if the listing actually went live here.
   if (shouldPublish) {
     try {
-      const origin = 'https://wildlife.exchange';
+      const origin = getSiteUrl();
       const adminUids = await listAdminRecipientUids(db as any);
       if (adminUids.length > 0) {
         await emitEventToUsers({

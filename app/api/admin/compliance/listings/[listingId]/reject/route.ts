@@ -9,8 +9,9 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
-import { emitEventToUsers } from '@/lib/notifications';
+import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { getSiteUrl } from '@/lib/site-url';
 
 const bodySchema = z.object({
   reason: z.string().min(1, 'Rejection reason is required').max(500),
@@ -50,32 +51,31 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
     updatedBy: actorUid,
   });
 
-  // Seller in-app notification (best effort)
+  // Seller notification through canonical pipeline (idempotent, best-effort).
   try {
-    await db
-      .collection('users')
-      .doc(sellerId)
-      .collection('notifications')
-      .doc()
-      .set({
-        userId: sellerId,
-        type: 'compliance_rejected',
-        title: 'Compliance rejected',
-        body: `Your listing “${title}” was rejected during compliance review. Reason: ${reason}`,
-        read: false,
-        createdAt: now,
-        linkUrl: `/seller/listings/${listingId}/edit`,
-        linkLabel: 'Edit listing',
+    const origin = getSiteUrl();
+    await emitEventForUser({
+      type: 'Listing.ComplianceRejected',
+      actorId: actorUid,
+      entityType: 'listing',
+      entityId: listingId,
+      targetUserId: sellerId,
+      payload: {
+        type: 'Listing.ComplianceRejected',
         listingId,
-        metadata: { complianceStatus: 'rejected', reason },
-      });
+        listingTitle: title,
+        editUrl: `${origin}/seller/listings/${listingId}/edit`,
+        reason,
+      },
+      optionalHash: `compliance_rejected:${listingId}`,
+    });
   } catch {
     // ignore
   }
 
   // Admin notification (best effort)
   try {
-    const origin = 'https://wildlife.exchange';
+    const origin = getSiteUrl();
     const adminUids = await listAdminRecipientUids(db as any);
     if (adminUids.length > 0) {
       await emitEventToUsers({

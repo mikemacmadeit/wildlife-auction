@@ -173,8 +173,9 @@ export default function OrdersPage() {
             body: 'The redirect contained an invalid session reference. You can safely refresh and your orders will load normally.',
           };
         } else if (data?.ok === true) {
-          // NOTE: `/api/stripe/checkout/verify-session` returns flattened fields (not `session.*`).
-          const paymentStatus = String(data?.paymentStatus || '');
+          // `/api/stripe/checkout/verify-session` returns `{ ok: true, session: {...}, isProcessing }`.
+          const session = (data?.session && typeof data.session === 'object') ? data.session : {};
+          const paymentStatus = String((session as any)?.payment_status || '');
           const isProcessing =
             data?.isProcessing === true ||
             paymentStatus === 'processing' ||
@@ -194,7 +195,7 @@ export default function OrdersPage() {
 
           // Track this session so we can poll for the corresponding Firestore order.
           const listingIdFromMeta =
-            data?.listingId ? String(data.listingId) : data?.metadata?.listingId ? String(data.metadata.listingId) : null;
+            (session as any)?.metadata?.listingId ? String((session as any).metadata.listingId) : null;
           setPendingCheckout({
             sessionId,
             listingId: listingIdFromMeta,
@@ -257,6 +258,50 @@ export default function OrdersPage() {
     }
   }, [authLoading, loadOrders]);
 
+  // Fail-safe: if an order exists but is still pending (common when create-session pre-created the order
+  // and webhook delivery was delayed), attempt a one-time reconcile using the stored checkout session id.
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.uid) return;
+    if (!orders.length) return;
+
+    const candidates = orders
+      .filter((o) => o.status === 'pending' && typeof (o as any).stripeCheckoutSessionId === 'string')
+      .slice(0, 3);
+    if (!candidates.length) return;
+
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        for (const o of candidates) {
+          const sid = String((o as any).stripeCheckoutSessionId || '').trim();
+          if (!sid || !sid.startsWith('cs_')) continue;
+          if (reconcileAttemptedRef.current[sid]) continue;
+          reconcileAttemptedRef.current[sid] = true;
+          await fetch('/api/stripe/checkout/reconcile-session', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ session_id: sid }),
+          }).catch(() => null);
+        }
+        if (cancelled) return;
+        // Refresh silently after reconcile attempts (gives Firestore a moment to update).
+        await loadOrders({ silent: true });
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally key off `orders` so it runs after initial load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, user?.uid]);
+
   // If we have a pending checkout session, try to resolve it into a real order (webhook-driven).
   // This prevents the “I paid and nothing showed up” moment.
   useEffect(() => {
@@ -283,6 +328,25 @@ export default function OrdersPage() {
     const sessionId = pendingCheckout.sessionId;
 
     async function tick() {
+      // If the webhook pipeline is delayed/misconfigured, attempt a safe, authenticated reconcile once.
+      // IMPORTANT: do this even if the order already exists, because create-session pre-creates an order skeleton.
+      if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
+        reconcileAttemptedRef.current[sessionId] = true;
+        try {
+          const token = await user.getIdToken();
+          await fetch('/api/stripe/checkout/reconcile-session', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+          });
+        } catch {
+          // Non-blocking: polling continues; user can still see the “finalizing” row.
+        }
+      }
+
       try {
         const order = await getOrderByCheckoutSessionId(sessionId);
         if (cancelled) return;
@@ -306,25 +370,6 @@ export default function OrdersPage() {
         }
       } catch {
         // If this query fails (rules/transient), still keep polling loadOrders; it may show up anyway.
-      }
-
-      // If the webhook pipeline is delayed/misconfigured, attempt a safe, authenticated reconcile once.
-      // This will create the order + listing transition idempotently using the same logic as the webhook handler.
-      if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
-        reconcileAttemptedRef.current[sessionId] = true;
-        try {
-          const token = await user.getIdToken();
-          await fetch('/api/stripe/checkout/reconcile-session', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ session_id: sessionId }),
-          });
-        } catch {
-          // Non-blocking: polling continues; user can still see the “finalizing” row.
-        }
       }
 
       // IMPORTANT: do not flip the whole page into a loading spinner during background polling.

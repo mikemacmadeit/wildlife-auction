@@ -25,6 +25,8 @@ import { db } from './config';
 import { Bid } from '@/lib/types';
 import { getUserProfile } from './users';
 import { placeBidServer } from '@/lib/api/bids';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 
 /**
  * Bid document as stored in Firestore
@@ -185,9 +187,14 @@ export async function placeBidTx(params: {
         }
       }
 
-      // P0: Texas-only enforcement for animal listings
-      const animalCategories = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
-      if (animalCategories.includes(listingData.category)) {
+      // P0: Texas-only enforcement for configured categories
+      let listingCategory: any;
+      try {
+        listingCategory = normalizeCategory(listingData.category);
+      } catch {
+        throw new Error('Invalid listing category');
+      }
+      if (isTexasOnlyCategory(listingCategory)) {
         // Get bidder profile to check state
         const bidderProfile = await getUserProfile(bidderId);
         const bidderState = bidderProfile?.profile?.location?.state;

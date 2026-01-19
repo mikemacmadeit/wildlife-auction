@@ -66,6 +66,33 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     bidAmount: z.number().finite().nonnegative(),
   }),
   z.object({
+    type: z.literal('Listing.Approved'),
+    listingId: baseString,
+    listingTitle: baseString,
+    listingUrl: urlSchema,
+  }),
+  z.object({
+    type: z.literal('Listing.Rejected'),
+    listingId: baseString,
+    listingTitle: baseString,
+    editUrl: urlSchema,
+    reason: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('Listing.ComplianceApproved'),
+    listingId: baseString,
+    listingTitle: baseString,
+    listingUrl: urlSchema,
+    published: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal('Listing.ComplianceRejected'),
+    listingId: baseString,
+    listingTitle: baseString,
+    editUrl: urlSchema,
+    reason: baseString,
+  }),
+  z.object({
     type: z.literal('Order.Confirmed'),
     orderId: baseString,
     listingId: baseString,

@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2, Gavel, Tag, Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, HorseAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,13 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     (listing as any)?.seller?.photoURL ||
     null;
 
+  const cover = listing.photos?.[0];
+  const coverUrl = cover?.url || listing.images?.[0] || '';
+  const coverObjectPosition =
+    cover?.focalPoint && typeof cover.focalPoint.x === 'number' && typeof cover.focalPoint.y === 'number'
+      ? `${Math.max(0, Math.min(1, cover.focalPoint.x)) * 100}% ${Math.max(0, Math.min(1, cover.focalPoint.y)) * 100}%`
+      : undefined;
+
   const specs = useMemo(() => {
     // eBay-style “at a glance” line: Species • Sex • Age
     const attrs: any = listing.attributes || null;
@@ -110,6 +117,22 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
       return parts.length ? parts : null;
     }
 
+    // Horse: Horse • Sex • Age (and Registered when present)
+    if (listing.category === 'horse_equestrian') {
+      const h = attrs as HorseAttributes;
+      const sexRaw = h.sex ? String(h.sex).trim() : '';
+      const sexLabel =
+        sexRaw === 'stallion' ? 'Stallion' :
+        sexRaw === 'mare' ? 'Mare' :
+        sexRaw === 'gelding' ? 'Gelding' :
+        sexRaw === 'unknown' ? null :
+        sexRaw ? titleCase(sexRaw) : null;
+      const ageLabel = formatAge(h.age);
+      const reg = h.registered ? 'Registered' : null;
+      const parts = ['Horse', sexLabel, ageLabel || reg].filter(Boolean) as string[];
+      return parts.length ? parts : null;
+    }
+
     return null;
   }, [listing.attributes, listing.category]);
 
@@ -139,12 +162,13 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
           {/* Image */}
           <div className="relative w-32 sm:w-44 md:w-full h-32 sm:h-44 md:h-full min-h-[128px] md:min-h-[208px] flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             
-            {listing.images[0] ? (
+            {coverUrl ? (
               <Image
-                src={listing.images[0]}
+                src={coverUrl}
                 alt={listing.title}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
+                style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                 sizes="(max-width: 640px) 128px, (max-width: 768px) 176px, (max-width: 1024px) 288px, 320px"
                 unoptimized
                 loading="lazy"

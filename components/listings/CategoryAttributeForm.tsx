@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ListingCategory, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes, EXOTIC_SPECIES } from '@/lib/types';
+import { ListingCategory, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes, HorseAttributes, EXOTIC_SPECIES } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,7 +21,8 @@ type ListingAttributes =
   | WildlifeAttributes
   | CattleAttributes
   | EquipmentAttributes
-  | WhitetailBreederAttributes;
+  | WhitetailBreederAttributes
+  | HorseAttributes;
 
 interface CategoryAttributeFormProps {
   category: ListingCategory;
@@ -46,6 +47,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
       category === 'whitetail_breeder' ||
       category === 'wildlife_exotics' ||
       category === 'cattle_livestock' ||
+      category === 'horse_equestrian' ||
       category === 'ranch_equipment';
 
     if (!needsQuantity) return;
@@ -64,6 +66,211 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     updateAttribute('registered', false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, currentRegistered]);
+
+  const currentSpeciesId = (attributes as any)?.speciesId;
+  useEffect(() => {
+    if (category !== 'horse_equestrian') return;
+    if (currentSpeciesId === 'horse') return;
+    // Persist fixed speciesId for server-authoritative validation + downstream docs (Bill of Sale).
+    updateAttribute('speciesId', 'horse');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, currentSpeciesId]);
+
+  if (category === 'horse_equestrian') {
+    return (
+      <div className="space-y-4">
+        <Alert className="bg-blue-50 border-blue-200">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Horse / Equestrian:</strong> Provide clear identification and required disclosures. Texas-only transfers apply on this platform.
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">
+            Species <span className="text-destructive">*</span>
+          </Label>
+          <Input value="Horse" disabled className="min-h-[48px] text-base bg-muted" />
+          <p className="text-xs text-muted-foreground">Species is fixed as Horse for this category.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="horse-sex" className="text-base font-semibold">
+            Sex <span className="text-destructive">*</span>
+          </Label>
+          <Select value={(attributes as Partial<HorseAttributes>).sex || 'unknown'} onValueChange={(value) => updateAttribute('sex', value)}>
+            <SelectTrigger id="horse-sex" className={cn('min-h-[48px]', hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="stallion">Stallion</SelectItem>
+              <SelectItem value="mare">Mare</SelectItem>
+              <SelectItem value="gelding">Gelding</SelectItem>
+              <SelectItem value="unknown">Unknown</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasError('Sex') ? <p className="text-sm text-destructive">Sex selection is required</p> : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="horse-age" className="text-base font-semibold">Age (years, optional)</Label>
+          <Input
+            id="horse-age"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.1"
+            placeholder="e.g., 4 or 7.5"
+            value={(() => {
+              const v = (attributes as Partial<HorseAttributes>).age as any;
+              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+            })()}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (!raw) {
+                updateAttribute('age', undefined);
+                return;
+              }
+              const n = Number(raw);
+              updateAttribute('age', Number.isFinite(n) ? n : undefined);
+            }}
+            className="min-h-[48px] text-base"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="horse-registered" className="text-base font-semibold">
+            Registered <span className="text-destructive">*</span>
+          </Label>
+          <div className={cn('flex items-center gap-2 rounded-lg border p-3 bg-background/40', hasError('Registered') ? 'border-destructive border-2' : 'border-border/60')}>
+            <Checkbox
+              id="horse-registered"
+              checked={Boolean((attributes as Partial<HorseAttributes>).registered)}
+              onCheckedChange={(v) => updateAttribute('registered', Boolean(v))}
+            />
+            <Label htmlFor="horse-registered" className="text-sm">
+              This horse is registered with an organization
+            </Label>
+          </div>
+        </div>
+
+        {Boolean((attributes as Partial<HorseAttributes>).registered) ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="horse-reg-org" className="text-base font-semibold">Registration Org (optional)</Label>
+              <Input
+                id="horse-reg-org"
+                placeholder="e.g., AQHA"
+                value={(attributes as any)?.registrationOrg || ''}
+                onChange={(e) => updateAttribute('registrationOrg', e.target.value)}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="horse-reg-number" className="text-base font-semibold">
+                Registration Number <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="horse-reg-number"
+                placeholder="Registration number"
+                value={(attributes as any)?.registrationNumber || ''}
+                onChange={(e) => updateAttribute('registrationNumber', e.target.value)}
+                className={cn('min-h-[48px] text-base', hasError('Registration Number') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+              />
+              {hasError('Registration Number') ? <p className="text-sm text-destructive">Registration number is required when registered.</p> : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">Identification (recommended)</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="horse-microchip" className="text-sm font-semibold">Microchip (optional)</Label>
+              <Input
+                id="horse-microchip"
+                placeholder="Microchip number"
+                value={(attributes as any)?.identification?.microchip || ''}
+                onChange={(e) => updateAttribute('identification', { ...(attributes as any)?.identification, microchip: e.target.value })}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="horse-brand" className="text-sm font-semibold">Brand (optional)</Label>
+              <Input
+                id="horse-brand"
+                placeholder="Brand description"
+                value={(attributes as any)?.identification?.brand || ''}
+                onChange={(e) => updateAttribute('identification', { ...(attributes as any)?.identification, brand: e.target.value })}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="horse-tattoo" className="text-sm font-semibold">Tattoo (optional)</Label>
+              <Input
+                id="horse-tattoo"
+                placeholder="Tattoo"
+                value={(attributes as any)?.identification?.tattoo || ''}
+                onChange={(e) => updateAttribute('identification', { ...(attributes as any)?.identification, tattoo: e.target.value })}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="horse-markings" className="text-sm font-semibold">Markings (optional)</Label>
+              <Input
+                id="horse-markings"
+                placeholder="Markings/description"
+                value={(attributes as any)?.identification?.markings || ''}
+                onChange={(e) => updateAttribute('identification', { ...(attributes as any)?.identification, markings: e.target.value })}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">At least one identifier is strongly recommended (microchip/brand/tattoo/markings).</p>
+        </div>
+
+        <div className={cn('space-y-3 p-4 border rounded-lg bg-muted/50', hasError('Disclosures') ? 'border-destructive border-2' : 'border-border/60')}>
+          <div className="font-semibold text-sm">Required disclosures</div>
+          <div className="space-y-2">
+            {[
+              { key: 'identificationDisclosure', label: 'I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).' },
+              { key: 'healthDisclosure', label: 'I have disclosed any known health issues and represented the horse honestly.' },
+              { key: 'transportDisclosure', label: 'I understand transfers are Texas-only on this platform and transport is my responsibility.' },
+              { key: 'titleOrLienDisclosure', label: 'I disclose any liens/encumbrances (or confirm there are none).' },
+            ].map((d) => (
+              <div key={d.key} className="flex items-start gap-2">
+                <Checkbox
+                  id={`horse-disclosure-${d.key}`}
+                  checked={Boolean((attributes as any)?.disclosures?.[d.key])}
+                  onCheckedChange={(v) =>
+                    updateAttribute('disclosures', { ...(attributes as any)?.disclosures, [d.key]: Boolean(v) })
+                  }
+                />
+                <Label htmlFor={`horse-disclosure-${d.key}`} className="text-sm leading-relaxed">
+                  {d.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="horse-quantity" className="text-base font-semibold">
+            Quantity <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="horse-quantity"
+            type="number"
+            min="1"
+            value={(attributes as any)?.quantity || 1}
+            onChange={(e) => updateAttribute('quantity', parseInt(e.target.value) || 1)}
+            className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+            required
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (category === 'whitetail_breeder') {
     const expStatus = getPermitExpirationStatus(

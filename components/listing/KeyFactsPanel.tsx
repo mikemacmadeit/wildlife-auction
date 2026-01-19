@@ -10,12 +10,13 @@ import {
   Heart,
   Truck,
   Shield,
-  Gavel
+  Gavel,
+  Hash
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes } from '@/lib/types';
 
 interface KeyFactsPanelProps {
   listing: Listing;
@@ -126,6 +127,42 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       icon: Package,
       label: 'Quantity',
       value: `${(listing.attributes as EquipmentAttributes).quantity} ${(listing.attributes as EquipmentAttributes).quantity === 1 ? 'item' : 'items'}`,
+    },
+    // Horse / Equestrian
+    listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).sex && {
+      icon: Package,
+      label: 'Sex',
+      value:
+        (listing.attributes as HorseAttributes).sex === 'stallion' ? 'Stallion' :
+        (listing.attributes as HorseAttributes).sex === 'mare' ? 'Mare' :
+        (listing.attributes as HorseAttributes).sex === 'gelding' ? 'Gelding' : 'Unknown',
+      detail: formatAge((listing.attributes as HorseAttributes).age),
+    },
+    listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).registered !== undefined && {
+      icon: FileText,
+      label: 'Registered',
+      value: (listing.attributes as HorseAttributes).registered ? 'Yes' : 'No',
+      badge: (listing.attributes as HorseAttributes).registered
+        ? { variant: 'default' as const, label: 'Registered', color: 'bg-primary/20 text-primary border-primary/40' }
+        : undefined,
+    },
+    listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).identification && {
+      icon: Hash,
+      label: 'Identification',
+      value: (() => {
+        const id = (listing.attributes as HorseAttributes).identification || {};
+        const parts = [
+          id.microchip ? `Microchip: ${id.microchip}` : null,
+          id.brand ? `Brand: ${id.brand}` : null,
+          id.tattoo ? `Tattoo: ${id.tattoo}` : null,
+        ].filter(Boolean) as string[];
+        return parts.length ? parts.join(' • ') : 'Provided';
+      })(),
+      detail: (() => {
+        const id = (listing.attributes as HorseAttributes).identification || {};
+        const markings = id.markings ? String(id.markings).trim() : '';
+        return markings ? `Markings: ${markings}` : undefined;
+      })(),
     },
     listing.trust?.transportReady && {
       icon: Truck,

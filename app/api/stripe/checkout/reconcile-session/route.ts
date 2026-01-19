@@ -132,20 +132,31 @@ export async function POST(request: Request) {
       return json({ ok: false, reason: 'forbidden', message: 'Forbidden.' }, { status: 403 });
     }
 
-    // Fast path: if order already exists, return it.
+    // If an order already exists, we still may need to reconcile.
+    // Why: the checkout create-session path pre-creates an order skeleton (status=pending) before redirect.
+    // If webhook delivery is delayed/misconfigured, the order can exist while the listing never transitions to sold.
     const adminDb = db as unknown as ReturnType<typeof getFirestore>;
     const existing = await adminDb
       .collection('orders')
       .where('stripeCheckoutSessionId', '==', sessionId)
       .limit(1)
       .get();
-    if (!existing.empty) {
-      const doc = existing.docs[0];
-      return json({ ok: true, idempotent: true, orderId: doc.id });
-    }
+    const existingDoc = existing.empty ? null : existing.docs[0];
+    const existingData = existingDoc ? (existingDoc.data() as any) : null;
+    const existingStatus = existingData ? String(existingData.status || '') : null;
 
-    // Reconcile by reusing the canonical webhook handler (idempotent + includes listing transitions).
-    await handleCheckoutSessionCompleted(adminDb, session as Stripe.Checkout.Session, requestId);
+    // Only skip the handler if we are already in a terminal-ish state.
+    // Otherwise, reuse the canonical webhook handler to ensure listing transitions are applied.
+    const isTerminal =
+      existingStatus === 'paid_held' ||
+      existingStatus === 'paid' ||
+      existingStatus === 'completed' ||
+      existingStatus === 'refunded' ||
+      existingStatus === 'cancelled';
+
+    if (!isTerminal) {
+      await handleCheckoutSessionCompleted(adminDb, session as Stripe.Checkout.Session, requestId);
+    }
 
     // Fetch created order ID (if created)
     const created = await adminDb
@@ -160,9 +171,11 @@ export async function POST(request: Request) {
       route: '/api/stripe/checkout/reconcile-session',
       sessionId,
       orderId,
+      existingStatus: existingStatus || undefined,
+      skipped: isTerminal ? true : false,
     });
 
-    return json({ ok: true, idempotent: false, orderId: orderId || null });
+    return json({ ok: true, idempotent: isTerminal, orderId: orderId || null });
   } catch (e: any) {
     logError('Reconcile failed', e, {
       requestId,

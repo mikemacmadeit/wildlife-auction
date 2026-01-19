@@ -13,6 +13,9 @@ import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
 import { emitEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
+import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 
 function inferEffectivePaymentMethodFromCheckoutSession(
   session: Stripe.Checkout.Session
@@ -144,10 +147,21 @@ export async function handleCheckoutSessionCompleted(
     // P0: AIR-TIGHT TX-ONLY ENFORCEMENT - Verify Stripe address for animal listings
     // IMPORTANT: For async bank rails, do NOT attempt refunds in this handler because
     // `checkout.session.completed` can occur before funds have actually been received.
-    const animalCategories = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
-    const listingCategory = listingData.category;
+    let listingCategory: string;
+    try {
+      listingCategory = normalizeCategory((listingData as any)?.category);
+    } catch (e: any) {
+      logError('Invalid listing category during webhook processing', e, {
+        requestId,
+        route: '/api/stripe/webhook',
+        listingId,
+        rawCategory: (listingData as any)?.category,
+      });
+      // Fail closed: do not proceed to mark sold / release flows if category is invalid.
+      return;
+    }
     
-    if (animalCategories.includes(listingCategory)) {
+    if (isTexasOnlyCategory(listingCategory as any)) {
       // Get buyer state from Stripe session (customer_details or shipping_details)
       let buyerState: string | null = null;
       
@@ -404,6 +418,13 @@ export async function handleCheckoutSessionCompleted(
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
     await orderRef.set(orderData, { merge: true });
+
+    // Server-authoritative: recompute required/provided/missing docs snapshot after checkout completion.
+    try {
+      await recomputeOrderComplianceDocsStatus({ db: db as any, orderId: orderRef.id });
+    } catch {
+      // ignore; best-effort
+    }
 
     // If this checkout originated from an accepted offer, link offer -> order + session
     if (offerId) {

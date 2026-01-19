@@ -506,6 +506,62 @@ function NewListingPageContent() {
             <Card
               role="button"
               tabIndex={0}
+              aria-pressed={formData.category === 'horse_equestrian'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({
+                    ...formData,
+                    category: 'horse_equestrian',
+                    location: { ...formData.location, state: 'TX' }, // Force TX for horses
+                  });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                formData.category === 'horse_equestrian'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+              }`}
+              onClick={() => {
+                setFormData({
+                  ...formData,
+                  category: 'horse_equestrian',
+                  location: { ...formData.location, state: 'TX' }, // Force TX for horses
+                });
+              }}
+            >
+              <CardContent className="p-6 text-center space-y-3">
+                {formData.category === 'horse_equestrian' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-center">
+                  <div
+                    className="w-16 h-16"
+                    style={{
+                      WebkitMaskImage: `url('/images/Horse.png')`,
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: `url('/images/Horse.png')`,
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      backgroundColor: 'hsl(var(--primary))',
+                    }}
+                  />
+                </div>
+                <h3 className="text-lg font-bold">Horse &amp; Equestrian</h3>
+                <p className="text-sm text-muted-foreground">Horses, tack, and equestrian-related listings</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              role="button"
+              tabIndex={0}
               aria-pressed={formData.category === 'cattle_livestock'}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -723,6 +779,21 @@ function NewListingPageContent() {
                 if (!hasAge && !hasWeight) errs.push('Age or Weight Range');
                 return errs;
               }
+              if (formData.category === 'horse_equestrian') {
+                const attrs: any = formData.attributes as any;
+                const errs: string[] = [];
+                if (attrs.speciesId !== 'horse') errs.push('Species');
+                if (!attrs.sex) errs.push('Sex');
+                if (attrs.registered !== true && attrs.registered !== false) errs.push('Registered');
+                if (attrs.registered === true && !String(attrs.registrationNumber || '').trim()) errs.push('Registration Number');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
+                const d = attrs.disclosures || {};
+                if (!d.identificationDisclosure) errs.push('Identification Disclosure');
+                if (!d.healthDisclosure) errs.push('Health Disclosure');
+                if (!d.transportDisclosure) errs.push('Transport Disclosure');
+                if (!d.titleOrLienDisclosure) errs.push('Title/Lien Disclosure');
+                return errs;
+              }
               if (formData.category === 'ranch_equipment') {
                 const attrs = formData.attributes as Partial<EquipmentAttributes>;
                 const errs: string[] = [];
@@ -851,6 +922,29 @@ function NewListingPageContent() {
               : !!String((attrs as any).age || '').trim();
           const hasWeight = !!String(attrs.weightRange || '').trim();
           if (!hasAge && !hasWeight) errors.push('Age or Weight Range');
+          if (errors.length) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
+        }
+        if (formData.category === 'horse_equestrian') {
+          const attrs: any = formData.attributes as any;
+          const errors: string[] = [];
+          if (attrs.speciesId !== 'horse') errors.push('Species');
+          if (!attrs.sex) errors.push('Sex');
+          if (attrs.registered !== true && attrs.registered !== false) errors.push('Registered');
+          if (attrs.registered === true && !String(attrs.registrationNumber || '').trim()) errors.push('Registration Number');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          const d = attrs.disclosures || {};
+          if (!d.identificationDisclosure) errors.push('Identification Disclosure');
+          if (!d.healthDisclosure) errors.push('Health Disclosure');
+          if (!d.transportDisclosure) errors.push('Transport Disclosure');
+          if (!d.titleOrLienDisclosure) errors.push('Title/Lien Disclosure');
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',

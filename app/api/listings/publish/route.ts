@@ -18,6 +18,7 @@ import { validateListingCompliance } from '@/lib/compliance/validation';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
@@ -286,6 +287,21 @@ export async function POST(request: Request) {
 
     const listingData = listingDoc.data()!;
 
+    // Canonicalize category (fail closed if unknown/unsupported).
+    let normalizedCategory: string;
+    try {
+      normalizedCategory = normalizeCategory((listingData as any)?.category);
+    } catch (e: any) {
+      return json(
+        {
+          error: 'Invalid listing category',
+          code: 'INVALID_CATEGORY',
+          message: e?.message || 'Invalid category value',
+        },
+        { status: 400 }
+      );
+    }
+
     // Verify ownership
     if (listingData.sellerId !== userId) {
       return json({ error: 'Unauthorized' }, { status: 403 });
@@ -316,7 +332,7 @@ export async function POST(request: Request) {
             };
 
       validateListingCompliance(
-        listingData.category,
+        normalizedCategory as any,
         listingData.attributes,
         listingData.location?.state,
         listingData.title,
@@ -451,11 +467,11 @@ export async function POST(request: Request) {
     const needsReview =
       requiresAdminApproval ||
       complianceStatus === 'pending_review' ||
-      listingData.category === 'whitetail_breeder';
+      normalizedCategory === 'whitetail_breeder';
 
     // Admin-only guardrails (flags only): compute on submission/publish for whitetail
     const flagUpdate: any = {};
-    if (listingData.category === 'whitetail_breeder') {
+    if (normalizedCategory === 'whitetail_breeder') {
       const { internalFlags, internalFlagsNotes } = await computeWhitetailInternalFlags(db, listingData);
       flagUpdate.internalFlags = internalFlags;
       flagUpdate.internalFlagsNotes = internalFlagsNotes;
@@ -463,6 +479,7 @@ export async function POST(request: Request) {
 
     if (needsReview) {
       await listingRef.update({
+        category: normalizedCategory,
         status: 'pending',
         updatedAt: Timestamp.now(),
         updatedBy: userId,
@@ -500,7 +517,7 @@ export async function POST(request: Request) {
               listingTitle: String(listingData?.title || 'Listing'),
               sellerId: userId,
               sellerName: displayName,
-              category: String(listingData.category || ''),
+              category: String(normalizedCategory || ''),
               listingType: String(listingData.type || ''),
               complianceStatus: String(complianceStatus || 'none'),
               pendingReason,
@@ -571,6 +588,7 @@ export async function POST(request: Request) {
 
     // Publish listing (non-review categories)
     await listingRef.update({
+      category: normalizedCategory,
       status: 'active',
       publishedAt: Timestamp.now(),
       updatedAt: Timestamp.now(),

@@ -191,6 +191,43 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
 
+        {/* Horse / Equestrian Requirements */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              <CardTitle>Horse &amp; Equestrian Requirements</CardTitle>
+            </div>
+            <CardDescription>
+              Texas-only + written transfer (Bill of Sale) in-platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Horse listings require clear identification and disclosures, and include an in-platform Bill of Sale / written transfer document at checkout.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
+                <li>Texas-only transactions (listing location + buyer address)</li>
+                <li>Identification disclosure (microchip/brand/tattoo/markings encouraged)</li>
+                <li>Health disclosure</li>
+                <li>Transport disclosure</li>
+                <li>Title / lien disclosure (seller attestation)</li>
+                <li>Bill of Sale generated and stored with the order</li>
+              </ul>
+            </div>
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                The Bill of Sale is generated server-side and tied to the order so both parties can access it in-platform.
+              </AlertDescription>
+            </Alert>
+            <p className="text-xs text-muted-foreground">
+              Learn more on the <Link className="underline underline-offset-4 hover:text-foreground" href="/trust#horses">Trust &amp; Compliance</Link> page.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Equipment Requirements */}
         <Card>
           <CardHeader>

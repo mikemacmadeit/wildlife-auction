@@ -602,6 +602,7 @@ export default function AdminListingsPage() {
                               {listing.category === 'wildlife_exotics' && 'Wildlife & Exotics'}
                               {listing.category === 'cattle_livestock' && 'Cattle & Livestock'}
                               {listing.category === 'ranch_equipment' && 'Ranch Equipment'}
+                              {listing.category === 'horse_equestrian' && 'Horse & Equestrian'}
                               {!listing.category && 'Listing'}
                             </Badge>
                             <Badge variant="outline" className="text-xs px-2 py-0.5 shrink-0">

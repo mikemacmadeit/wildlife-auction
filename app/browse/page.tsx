@@ -35,6 +35,7 @@ import { getSavedSearch } from '@/lib/firebase/savedSearches';
 import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
 import { BROWSE_EQUIPMENT_CONDITION_OPTIONS, BROWSE_STATES } from '@/components/browse/filters/constants';
 import { buildSavedSearchKeys, upsertSavedSearch } from '@/lib/firebase/savedSearches';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import {
   Dialog,
   DialogContent,
@@ -162,7 +163,13 @@ export default function BrowsePage() {
 
     setFilters((prev) => {
       const next: any = { ...(prev || {}) };
-      if (category) next.category = category;
+      if (category) {
+        try {
+          next.category = normalizeCategory(category);
+        } catch {
+          // Ignore invalid category deep links (fail closed).
+        }
+      }
       if (state) next.location = { ...(next.location || {}), state };
       if (speciesId) next.species = [speciesId];
       return next;

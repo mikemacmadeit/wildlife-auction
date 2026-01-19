@@ -368,10 +368,49 @@ function buildEmailJobPayload(params: {
 async function loadUserPrefs(db: FirebaseFirestore.Firestore, userId: string) {
   const ref = db.collection('users').doc(userId).collection('notificationPreferences').doc('default');
   const snap = await ref.get();
-  if (!snap.exists) return getDefaultNotificationPreferences();
-  const data = snap.data() as any;
-  // Parse with defaults.
-  return notificationPreferencesSchema.parse(data || {});
+  if (snap.exists) {
+    const data = snap.data() as any;
+    // Parse with defaults.
+    return notificationPreferencesSchema.parse(data || {});
+  }
+
+  // One-time migration path (legacy -> canonical):
+  // If `users/{uid}/notificationPreferences/default` is missing but legacy `users/{uid}.profile.notifications.*` exists,
+  // create the canonical doc so the pipeline has ONE source of truth.
+  try {
+    const userSnap = await db.collection('users').doc(userId).get();
+    const user = userSnap.exists ? (userSnap.data() as any) : null;
+    const legacy = user?.profile?.notifications;
+    if (legacy && typeof legacy === 'object') {
+      const bids = typeof legacy.bids === 'boolean' ? legacy.bids : true;
+      const messages = typeof legacy.messages === 'boolean' ? legacy.messages : true;
+      const promotions = typeof legacy.promotions === 'boolean' ? legacy.promotions : false;
+      const email = typeof legacy.email === 'boolean' ? legacy.email : true;
+      const sms = typeof legacy.sms === 'boolean' ? legacy.sms : false;
+
+      const next = notificationPreferencesSchema.parse({
+        channels: { email, push: false, sms },
+        categories: {
+          auctions: {
+            watchStarted: bids,
+            highBidder: bids,
+            outbid: bids,
+            endingSoon: bids,
+            wonLost: bids,
+          },
+          messages: { messageReceived: messages },
+          marketing: { weeklyDigest: promotions, savedSearchAlerts: promotions },
+        },
+      });
+
+      await ref.set({ ...next, updatedAt: FieldValue.serverTimestamp() } as any, { merge: true });
+      return next;
+    }
+  } catch {
+    // If migration fails, fall back to defaults (do not fail the notification pipeline).
+  }
+
+  return getDefaultNotificationPreferences();
 }
 
 async function listUserPushTokens(db: FirebaseFirestore.Firestore, userId: string): Promise<Array<{ token: string; platform?: string }>> {

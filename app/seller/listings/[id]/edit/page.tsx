@@ -287,7 +287,7 @@ function EditListingPageContent() {
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle) are restricted to Texas residents only. Equipment listings can be multi-state.
+              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle, horses) are restricted to Texas residents only. Equipment listings can be multi-state.
             </AlertDescription>
           </Alert>
           <div className="space-y-3">
@@ -369,6 +369,43 @@ function EditListingPageContent() {
                   <p className="text-sm text-muted-foreground">
                     Axis deer, blackbuck, fallow deer, and other exotic species
                   </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all border-2 ${
+                  formData.category === 'horse_equestrian'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  setFormData({
+                    ...formData,
+                    category: 'horse_equestrian',
+                    location: { ...formData.location, state: 'TX' },
+                  });
+                }}
+              >
+                <CardContent className="p-6 text-center space-y-3">
+                  <div className="flex justify-center">
+                    <div
+                      className="w-16 h-16"
+                      style={{
+                        WebkitMaskImage: `url('/images/Horse.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/Horse.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </div>
+                  <h3 className="text-lg font-bold">Horse &amp; Equestrian</h3>
+                  <p className="text-sm text-muted-foreground">Horses, tack, and equestrian-related listings</p>
                 </CardContent>
               </Card>
 

@@ -27,9 +27,29 @@ export async function enablePushForCurrentDevice(params: {
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
     if (!vapidKey) return { ok: false, error: 'Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY' };
 
-    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    let reg: ServiceWorkerRegistration;
+    try {
+      reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error('[push] service worker registration failed', {
+        path: '/firebase-messaging-sw.js',
+        message: e?.message || String(e),
+      });
+      return { ok: false, error: 'Failed to register push service worker (/firebase-messaging-sw.js)' };
+    }
+
     const messaging = getMessaging(app);
-    const fcmToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+    let fcmToken: string;
+    try {
+      fcmToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error('[push] getToken failed', {
+        message: e?.message || String(e),
+      });
+      return { ok: false, error: e?.message || 'Failed to get push token' };
+    }
     if (!fcmToken) return { ok: false, error: 'Failed to get push token' };
 
     const res = await fetch('/api/push/register', {
@@ -41,9 +61,20 @@ export async function enablePushForCurrentDevice(params: {
       body: JSON.stringify({ token: fcmToken, platform: params.platform || 'web' }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.ok) return { ok: false, error: data?.error || 'Failed to register token' };
+    if (!res.ok || !data?.ok) {
+      // eslint-disable-next-line no-console
+      console.error('[push] token registration failed', {
+        status: res.status,
+        error: data?.error || 'Failed to register token',
+        code: data?.code,
+        message: data?.message,
+      });
+      return { ok: false, error: data?.error || `Failed to register token (HTTP ${res.status})` };
+    }
     return { ok: true, tokenId: data.tokenId };
   } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[push] enablePushForCurrentDevice failed', { message: e?.message || String(e) });
     return { ok: false, error: e?.message || 'Failed to enable push' };
   }
 }

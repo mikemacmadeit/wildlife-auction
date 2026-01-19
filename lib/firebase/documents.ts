@@ -39,6 +39,38 @@ export async function uploadDocument(params: {
 }): Promise<string> {
   const { entityType, entityId, type, documentUrl, uploadedBy, permitNumber, issuedBy, issuedAt, expiresAt, metadata } = params;
 
+  // Orders: use server route so compliance status is recomputed and allowlists are enforced centrally.
+  if (entityType === 'order') {
+    const { auth } = await import('./config');
+    const user = auth.currentUser;
+    if (!user) throw new Error('Authentication required');
+    const token = await user.getIdToken();
+
+    const res = await fetch(`/api/orders/${entityId}/documents/upload`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        documentUrl,
+        type,
+        ...(permitNumber ? { permitNumber } : {}),
+        ...(issuedBy ? { issuedBy } : {}),
+        ...(issuedAt ? { issuedAt: issuedAt.toISOString() } : {}),
+        ...(expiresAt ? { expiresAt: expiresAt.toISOString() } : {}),
+        ...(metadata !== undefined ? { metadata } : {}),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json?.message || json?.error || 'Failed to upload order document');
+    }
+    const id = String(json?.documentId || '');
+    if (!id) throw new Error('Upload succeeded but documentId missing');
+    return id;
+  }
+
   console.log('uploadDocument called with:', {
     entityType,
     entityId,

@@ -12,6 +12,7 @@ import { DocumentType } from '@/lib/types';
 import { z } from 'zod';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 
 const bodySchema = z.object({
   documentUrl: z.string().url(),
@@ -85,7 +86,14 @@ export async function POST(
     }
 
     // Validate document type for orders
-    const validOrderDocTypes: DocumentType[] = ['TPWD_TRANSFER_APPROVAL', 'DELIVERY_PROOF', 'HEALTH_CERTIFICATE', 'OTHER'];
+    const validOrderDocTypes: DocumentType[] = [
+      'TPWD_TRANSFER_APPROVAL',
+      'DELIVERY_PROOF',
+      'HEALTH_CERTIFICATE',
+      'TAHC_CVI',
+      'BILL_OF_SALE',
+      'OTHER',
+    ];
     if (!validOrderDocTypes.includes(type as DocumentType)) {
       return json({ error: `Invalid document type for orders. Must be one of: ${validOrderDocTypes.join(', ')}` }, { status: 400 });
     }
@@ -114,6 +122,13 @@ export async function POST(
         transferPermitStatus: 'uploaded',
         updatedAt: Timestamp.now(),
       });
+    }
+
+    // Server-authoritative: recompute document completeness snapshot for this order.
+    try {
+      await recomputeOrderComplianceDocsStatus({ db: db as any, orderId });
+    } catch {
+      // best-effort; do not fail upload
     }
 
     return json({

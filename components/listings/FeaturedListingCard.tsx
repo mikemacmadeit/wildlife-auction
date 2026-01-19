@@ -35,6 +35,12 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
 
   const hasCountdown = !sold.isSold && listing.type === 'auction' && !!listing.endsAt;
+  const cover = listing.photos?.[0];
+  const coverUrl = cover?.url || listing.images?.[0] || '';
+  const coverObjectPosition =
+    cover?.focalPoint && typeof cover.focalPoint.x === 'number' && typeof cover.focalPoint.y === 'number'
+      ? `${Math.max(0, Math.min(1, cover.focalPoint.x)) * 100}% ${Math.max(0, Math.min(1, cover.focalPoint.y)) * 100}%`
+      : undefined;
 
   return (
     <motion.div
@@ -84,12 +90,13 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
-            {listing.images[0] ? (
+            {coverUrl ? (
               <Image
-                src={listing.images[0]}
+                src={coverUrl}
                 alt={listing.title}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
+                style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 unoptimized
                 priority={index < 2}

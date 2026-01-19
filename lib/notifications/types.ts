@@ -19,6 +19,12 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Auction.Lost',
   'Auction.BidReceived',
 
+  // LISTINGS (seller-facing moderation outcomes)
+  'Listing.Approved',
+  'Listing.Rejected',
+  'Listing.ComplianceApproved',
+  'Listing.ComplianceRejected',
+
   // ORDERS / PAYOUTS
   'Order.Confirmed',
   'Order.Received',
@@ -132,6 +138,33 @@ export type NotificationEventPayload =
       listingTitle: string;
       listingUrl: string;
       bidAmount: number;
+    }
+  | {
+      type: 'Listing.Approved';
+      listingId: string;
+      listingTitle: string;
+      listingUrl: string;
+    }
+  | {
+      type: 'Listing.Rejected';
+      listingId: string;
+      listingTitle: string;
+      editUrl: string;
+      reason?: string;
+    }
+  | {
+      type: 'Listing.ComplianceApproved';
+      listingId: string;
+      listingTitle: string;
+      listingUrl: string;
+      published?: boolean;
+    }
+  | {
+      type: 'Listing.ComplianceRejected';
+      listingId: string;
+      listingTitle: string;
+      editUrl: string;
+      reason: string;
     }
   | {
       type: 'Order.Confirmed';

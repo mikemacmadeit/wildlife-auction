@@ -146,6 +146,18 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: {},
         allowDuringQuietHours: true,
       };
+    case 'Listing.Approved':
+    case 'Listing.Rejected':
+    case 'Listing.ComplianceApproved':
+    case 'Listing.ComplianceRejected':
+      return {
+        category: 'admin',
+        urgency: 'normal',
+        channels: ['inApp'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: {},
+        allowDuringQuietHours: true,
+      };
     case 'Order.Confirmed':
       return {
         category: 'orders',
@@ -334,7 +346,12 @@ export function decideChannels(params: {
         if (params.eventType === 'Admin.Listing.Submitted') return cats.admin.listingSubmitted;
         if (params.eventType === 'Admin.Listing.ComplianceReviewRequired') return cats.admin.complianceReview;
         if (params.eventType === 'Admin.Listing.AdminApprovalRequired') return cats.admin.adminApproval;
-        if (params.eventType === 'Admin.Listing.Approved' || params.eventType === 'Admin.Listing.Rejected')
+        if (
+          params.eventType === 'Admin.Listing.Approved' ||
+          params.eventType === 'Admin.Listing.Rejected' ||
+          params.eventType === 'Listing.Approved' ||
+          params.eventType === 'Listing.Rejected'
+        )
           return cats.admin.listingApprovedRejected;
         if (params.eventType === 'Admin.Order.DisputeOpened') return cats.admin.disputes;
         return true;

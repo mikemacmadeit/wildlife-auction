@@ -4,6 +4,7 @@ export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
   { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
   { value: 'cattle_livestock', label: 'Cattle & Livestock' },
+  { value: 'horse_equestrian', label: 'Horse & Equestrian' },
   { value: 'ranch_equipment', label: 'Ranch Equipment' },
 ];
 

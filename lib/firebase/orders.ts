@@ -84,6 +84,20 @@ export interface OrderDoc {
   payoutHoldReason?: 'none' | 'protection_window' | 'dispute_open';
   protectedTransactionDaysSnapshot?: 7 | 14 | null;
   protectedTermsVersion?: string;
+
+  // Bill of Sale / Written Transfer (attestation timestamps; server-authored)
+  billOfSaleGeneratedAt?: Timestamp;
+  billOfSaleBuyerSignedAt?: Timestamp;
+  billOfSaleBuyerSignedBy?: string;
+  billOfSaleSellerSignedAt?: Timestamp;
+  billOfSaleSellerSignedBy?: string;
+
+  // Order document compliance snapshot (server-computed)
+  complianceDocsStatus?: {
+    required: any[];
+    provided: any[];
+    missing: any[];
+  };
 }
 
 /**
@@ -140,6 +154,13 @@ function toOrder(docId: string, data: OrderDoc): Order {
     payoutHoldReason: data.payoutHoldReason,
     protectedTransactionDaysSnapshot: data.protectedTransactionDaysSnapshot,
     protectedTermsVersion: data.protectedTermsVersion,
+
+    billOfSaleGeneratedAt: data.billOfSaleGeneratedAt?.toDate(),
+    billOfSaleBuyerSignedAt: data.billOfSaleBuyerSignedAt?.toDate(),
+    billOfSaleBuyerSignedBy: data.billOfSaleBuyerSignedBy,
+    billOfSaleSellerSignedAt: data.billOfSaleSellerSignedAt?.toDate(),
+    billOfSaleSellerSignedBy: data.billOfSaleSellerSignedBy,
+    complianceDocsStatus: data.complianceDocsStatus as any,
   };
 }
 

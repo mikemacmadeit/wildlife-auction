@@ -6,7 +6,8 @@ export type ListingCategory =
   | 'whitetail_breeder'
   | 'wildlife_exotics' 
   | 'cattle_livestock' 
-  | 'ranch_equipment';
+  | 'ranch_equipment'
+  | 'horse_equestrian';
 
 export type ListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'removed';
 
@@ -134,6 +135,31 @@ export interface CattleAttributes {
   healthNotes?: string; // Optional
 }
 
+export interface HorseAttributes {
+  speciesId: 'horse';
+  sex: 'stallion' | 'mare' | 'gelding' | 'unknown';
+  /**
+   * Age in years (number). Kept as `number | string` for backward compatibility with legacy docs.
+   */
+  age?: number | string;
+  registered: boolean;
+  registrationOrg?: string;
+  registrationNumber?: string;
+  identification: {
+    microchip?: string;
+    brand?: string;
+    tattoo?: string;
+    markings?: string;
+  };
+  disclosures: {
+    identificationDisclosure: boolean;
+    healthDisclosure: boolean;
+    transportDisclosure: boolean;
+    titleOrLienDisclosure: boolean;
+  };
+  quantity: number; // Required, default 1
+}
+
 export type EquipmentType = 
   | 'tractor'
   | 'trailer'
@@ -159,7 +185,12 @@ export interface EquipmentAttributes {
 }
 
 // Union type for category-specific attributes
-export type ListingAttributes = WhitetailBreederAttributes | WildlifeAttributes | CattleAttributes | EquipmentAttributes;
+export type ListingAttributes =
+  | WhitetailBreederAttributes
+  | WildlifeAttributes
+  | CattleAttributes
+  | HorseAttributes
+  | EquipmentAttributes;
 
 // Exotic species controlled list
 export const EXOTIC_SPECIES = [
@@ -244,6 +275,11 @@ export interface Listing {
     width?: number;
     height?: number;
     sortOrder?: number;
+    /**
+     * Focal point used by UI to smart-crop this photo on cards (`object-position`).
+     * Normalized coordinates (0..1).
+     */
+    focalPoint?: { x: number; y: number };
   }>;
   coverPhotoId?: string;
   
@@ -522,6 +558,20 @@ export interface Order {
   // Compliance fields for orders
   transferPermitStatus?: 'none' | 'requested' | 'uploaded' | 'approved' | 'rejected'; // TPWD transfer approval status
   transferPermitRequired?: boolean; // Whether transfer permit is required for this order
+
+  // Bill of Sale / Written Transfer (attestation timestamps; server-authored)
+  billOfSaleGeneratedAt?: Date;
+  billOfSaleBuyerSignedAt?: Date;
+  billOfSaleBuyerSignedBy?: string;
+  billOfSaleSellerSignedAt?: Date;
+  billOfSaleSellerSignedBy?: string;
+
+  // Order document compliance snapshot (server-computed)
+  complianceDocsStatus?: {
+    required: DocumentType[];
+    provided: DocumentType[];
+    missing: DocumentType[];
+  };
 
   // Chargeback tracking (optional; used for payout hold logic)
   /**

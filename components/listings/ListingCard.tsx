@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -66,11 +66,31 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
         attrs.condition && attrs.condition,
       ].filter(Boolean).slice(0, 2);
     }
+
+    if (listing.category === 'horse_equestrian') {
+      const attrs = listing.attributes as HorseAttributes;
+      const sex =
+        attrs.sex === 'stallion' ? 'Stallion' :
+        attrs.sex === 'mare' ? 'Mare' :
+        attrs.sex === 'gelding' ? 'Gelding' :
+        attrs.sex ? String(attrs.sex) : null;
+      return [
+        sex && `Sex: ${sex}`,
+        attrs.registered ? 'Registered' : null,
+        attrs.age !== undefined && attrs.age !== null ? `Age: ${String(attrs.age)}` : null,
+      ].filter(Boolean).slice(0, 2);
+    }
     
     return null;
   };
 
   const keyAttributes = getKeyAttributes();
+  const cover = listing.photos?.[0];
+  const coverUrl = cover?.url || listing.images?.[0] || '';
+  const coverObjectPosition =
+    cover?.focalPoint && typeof cover.focalPoint.x === 'number' && typeof cover.focalPoint.y === 'number'
+      ? `${Math.max(0, Math.min(1, cover.focalPoint.x)) * 100}% ${Math.max(0, Math.min(1, cover.focalPoint.y)) * 100}%`
+      : undefined;
 
   return (
     <motion.div
@@ -95,12 +115,13 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent z-10" />
             {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
             
-            {listing.images[0] ? (
+            {coverUrl ? (
               <Image
-                src={listing.images[0]}
+                src={coverUrl}
                 alt={listing.title}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
+                style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 unoptimized
                 loading="lazy"

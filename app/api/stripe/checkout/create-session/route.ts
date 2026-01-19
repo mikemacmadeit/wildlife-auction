@@ -9,6 +9,7 @@
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { Timestamp } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import Stripe from 'stripe';
 import { stripe, calculatePlatformFee, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
 import { getEffectiveSubscriptionTier, getTierWeight } from '@/lib/pricing/subscriptions';
@@ -20,6 +21,11 @@ import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { containsProhibitedKeywords } from '@/lib/compliance/validation';
 import { ACH_DEBIT_MIN_TOTAL_USD } from '@/lib/payments/constants';
+import { finalizeAuctionIfNeeded } from '@/lib/auctions/finalizeAuction';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/requirements';
+import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
+import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -164,9 +170,24 @@ export async function POST(request: Request) {
 
     const listingData = listingDoc.data()!;
 
-    // If a high-ticket checkout is pending for this listing, block additional checkouts
-    // to avoid double-selling while waiting on bank rails.
-    if (listingData.purchaseReservedByOrderId) {
+    // Canonicalize category (fail closed if unknown/unsupported).
+    let listingCategory: string;
+    try {
+      listingCategory = normalizeCategory((listingData as any)?.category);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: 'Invalid listing category', code: 'INVALID_CATEGORY', message: e?.message || 'Invalid category value' },
+        { status: 400 }
+      );
+    }
+    const categoryReq = getCategoryRequirements(listingCategory as any);
+
+    // If a checkout reservation is still active, block additional checkouts to avoid double-selling.
+    // IMPORTANT: a stale `purchaseReservedByOrderId` must NOT block indefinitely; only treat as reserved if `purchaseReservedUntil > now`.
+    const reservedUntilMs =
+      typeof (listingData as any)?.purchaseReservedUntil?.toMillis === 'function' ? (listingData as any).purchaseReservedUntil.toMillis() : null;
+    const hasReservationId = Boolean((listingData as any)?.purchaseReservedByOrderId);
+    if (hasReservationId && reservedUntilMs && reservedUntilMs > Date.now()) {
       return NextResponse.json(
         { error: 'Listing is reserved pending payment confirmation. Please try again later.' },
         { status: 409 }
@@ -217,12 +238,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Validate listing is active
-    if (listingData.status !== 'active') {
-      return NextResponse.json(
-        { error: 'Listing is not available for purchase' },
-        { status: 400 }
-      );
+    // Validate listing is available for purchase.
+    // Fixed/Classified require status=active.
+    // Auctions may become status=expired after backend finalization.
+    if (listingData.type !== 'auction') {
+      if (listingData.status !== 'active') {
+        return NextResponse.json({ error: 'Listing is not available for purchase' }, { status: 400 });
+      }
+    } else {
+      if (listingData.status !== 'active' && listingData.status !== 'expired') {
+        return NextResponse.json({ error: 'Auction is not available for purchase' }, { status: 400 });
+      }
     }
 
     // If listing is reserved by an accepted offer, block regular checkout
@@ -235,6 +261,7 @@ export async function POST(request: Request) {
 
     // Validate listing type and get purchase amount
     let purchaseAmount: number;
+    let auctionResultSnapshot: any | null = null;
     
     if (offerId) {
       // Accepted offer dictates the price (server authoritative)
@@ -256,47 +283,57 @@ export async function POST(request: Request) {
       }
       purchaseAmount = listingData.price;
     } else if (listingData.type === 'auction') {
-      // Auction listing - get winning bid amount
-      // Verify auction has ended
-      if (listingData.endsAt) {
-        const endsAt = listingData.endsAt.toDate();
-        if (endsAt.getTime() > Date.now()) {
-          return NextResponse.json(
-            { error: 'Auction has not ended yet' },
-            { status: 400 }
-          );
-        }
-      }
-      
-      // Get winning bidder using Admin SDK
-      const bidsRef = db.collection('bids');
-      const winningBidQuery = await bidsRef
-        .where('listingId', '==', listingId)
-        .orderBy('amount', 'desc')
-        .limit(1)
-        .get();
-      
-      if (winningBidQuery.empty) {
+      // Auction listing - winner MUST be verified via AuctionResult (not bids query).
+      // If missing (cron delayed), finalize inline (idempotent).
+      const finalize = await finalizeAuctionIfNeeded({
+        db: db as any,
+        listingId,
+        requestId: request.headers.get('x-request-id') || undefined,
+      });
+      if (!finalize.ok) {
         return NextResponse.json(
-          { error: 'No bids found for this auction' },
-          { status: 400 }
+          {
+            error: 'Auction could not be finalized for checkout',
+            code: finalize.code,
+            message: finalize.message,
+          },
+          { status: 409 }
         );
       }
-      
-      const winningBidDoc = winningBidQuery.docs[0];
-      const winningBidData = winningBidDoc.data();
-      const winningBidderId = winningBidData.bidderId;
-      const winningBidAmount = winningBidData.amount;
-      
-      // Verify buyer is the winning bidder
-      if (winningBidderId !== buyerId) {
-        return NextResponse.json(
-          { error: 'You are not the winning bidder' },
-          { status: 403 }
-        );
+
+      auctionResultSnapshot = finalize.auctionResult as any;
+
+      const status = String(auctionResultSnapshot.status || '');
+      const winnerBidderId = auctionResultSnapshot.winnerBidderId ? String(auctionResultSnapshot.winnerBidderId) : null;
+      const finalPriceCents = typeof auctionResultSnapshot.finalPriceCents === 'number' ? auctionResultSnapshot.finalPriceCents : null;
+      const paymentDueAtMs =
+        typeof auctionResultSnapshot.paymentDueAt?.toMillis === 'function' ? auctionResultSnapshot.paymentDueAt.toMillis() : null;
+
+      if (status !== 'ended_winner_pending_payment') {
+        const msg =
+          status === 'ended_no_bids'
+            ? 'This auction ended with no bids.'
+            : status === 'ended_reserve_not_met'
+              ? 'This auction ended without meeting reserve.'
+              : status === 'ended_unpaid_expired' || status === 'ended_relisted'
+                ? 'The payment window for this auction has expired.'
+                : 'This auction is not available for checkout.';
+        return NextResponse.json({ error: msg, code: 'AUCTION_NOT_PAYABLE', status }, { status: 400 });
       }
-      
-      purchaseAmount = winningBidAmount;
+
+      if (!winnerBidderId || winnerBidderId !== buyerId) {
+        return NextResponse.json({ error: 'You are not the winning bidder', code: 'NOT_AUCTION_WINNER' }, { status: 403 });
+      }
+
+      if (!finalPriceCents || finalPriceCents <= 0) {
+        return NextResponse.json({ error: 'Auction final price is invalid', code: 'INVALID_FINAL_PRICE' }, { status: 400 });
+      }
+
+      if (typeof paymentDueAtMs === 'number' && Number.isFinite(paymentDueAtMs) && paymentDueAtMs <= Date.now()) {
+        return NextResponse.json({ error: 'Payment window expired for this auction', code: 'PAYMENT_WINDOW_EXPIRED' }, { status: 409 });
+      }
+
+      purchaseAmount = finalPriceCents / 100;
     } else {
       return NextResponse.json(
         { error: 'This listing type does not support checkout' },
@@ -313,8 +350,7 @@ export async function POST(request: Request) {
     }
 
     // P0: Texas-only enforcement for animal listings
-    const animalCategories = ['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'];
-    if (animalCategories.includes(listingData.category)) {
+    if (categoryReq.texasOnly) {
       // Verify listing is in Texas
       if (listingData.location?.state !== 'TX') {
         return NextResponse.json(
@@ -510,7 +546,7 @@ export async function POST(request: Request) {
     const baseUrl = getAppUrl();
     
     // P0: Collect address for animal listings (TX-only enforcement)
-    const requiresAddress = animalCategories.includes(listingData.category);
+    const requiresAddress = getCategoryRequirements(listingCategory as any).isAnimal;
     
     // Reserve listing + create an order *before* creating Stripe session (prevents double-buy).
     // NOTE: We create the Firestore order now (status=pending) so the reservation has a stable ID.
@@ -528,7 +564,12 @@ export async function POST(request: Request) {
       const live = listingSnap.data() as any;
 
       // Validate listing availability (server-side authoritative)
-      if (live.status !== 'active') throw new Error('Listing is not available for purchase');
+      if (live.type !== 'auction') {
+        if (live.status !== 'active') throw new Error('Listing is not available for purchase');
+      } else {
+        // Auctions can be status=expired after backend finalization.
+        if (live.status !== 'active' && live.status !== 'expired') throw new Error('Auction is not available for purchase');
+      }
       if (!offerId && live.offerReservedByOfferId) throw new Error('Listing is reserved by an accepted offer');
 
       // Block if purchase reservation is active (or clear if expired)
@@ -540,6 +581,7 @@ export async function POST(request: Request) {
       // Create order skeleton (will be finalized/updated by webhooks)
       tx.set(orderRef, {
         listingId,
+        ...(live.type === 'auction' ? { auctionResultId: listingId } : {}),
         ...(offerId ? { offerId: String(offerId) } : {}),
         buyerId,
         sellerId: live.sellerId,
@@ -549,6 +591,7 @@ export async function POST(request: Request) {
         status: 'pending',
         paymentMethod,
         adminHold: false,
+        ...(live.type === 'auction' && auctionResultSnapshot?.paymentDueAt ? { auctionPaymentDueAt: auctionResultSnapshot.paymentDueAt } : {}),
         createdAt: nowTs,
         updatedAt: nowTs,
         lastUpdatedByRole: 'buyer',
@@ -578,6 +621,100 @@ export async function POST(request: Request) {
         tx.update(offerRef, { checkoutSessionId: lockToken, orderId, updatedAt: nowTs });
       }
     });
+
+    const rollbackReservationBestEffort = async () => {
+      try {
+        await db.runTransaction(async (tx) => {
+          const snap: any = await (tx as any).get(listingRef);
+          if (snap?.exists) {
+            const live = snap.data() as any;
+            if (live.purchaseReservedByOrderId === orderId) {
+              tx.set(
+                listingRef,
+                {
+                  purchaseReservedByOrderId: null,
+                  purchaseReservedAt: null,
+                  purchaseReservedUntil: null,
+                  updatedAt: Timestamp.now(),
+                },
+                { merge: true }
+              );
+            }
+          }
+          tx.set(orderRef, { status: 'cancelled', updatedAt: Timestamp.now() }, { merge: true });
+        });
+      } catch {
+        // ignore rollback failures
+      }
+    };
+
+    // Category-based: ensure Bill of Sale exists (or generate it) before creating a Checkout session.
+    if (categoryReq.requireBillOfSaleAtCheckout) {
+      const buyerSnap = await db.collection('users').doc(buyerId).get();
+      const sellerSnap = await db.collection('users').doc(listingData.sellerId).get();
+      const buyerData = buyerSnap.exists ? (buyerSnap.data() as any) : null;
+      const sellerDataLatest = sellerSnap.exists ? (sellerSnap.data() as any) : null;
+
+      const bucket = getStorage().bucket();
+      const now = nowTs;
+      const bos = await ensureBillOfSaleForOrder({
+        db: db as any,
+        bucket: bucket as any,
+        orderId,
+        listing: {
+          id: listingId,
+          title: String(listingData.title || 'Listing'),
+          category: listingCategory as any,
+          attributes: (listingData as any).attributes || {},
+        },
+        orderAmountUsd: amount / 100,
+        buyer: {
+          uid: buyerId,
+          fullName: String(buyerData?.profile?.fullName || '').trim(),
+          email: String(buyerData?.email || decodedToken.email || '') || null,
+          phoneNumber: String(buyerData?.phoneNumber || '') || null,
+          location: {
+            address: buyerData?.profile?.location?.address || null,
+            city: String(buyerData?.profile?.location?.city || '').trim(),
+            state: String(buyerData?.profile?.location?.state || '').trim(),
+            zip: String(buyerData?.profile?.location?.zip || '').trim(),
+          },
+        },
+        seller: {
+          uid: String(listingData.sellerId),
+          fullName: String(sellerDataLatest?.profile?.fullName || '').trim(),
+          email: String(sellerDataLatest?.email || '') || null,
+          phoneNumber: String(sellerDataLatest?.phoneNumber || '') || null,
+          location: {
+            address: sellerDataLatest?.profile?.location?.address || null,
+            city: String(sellerDataLatest?.profile?.location?.city || '').trim(),
+            state: String(sellerDataLatest?.profile?.location?.state || '').trim(),
+            zip: String(sellerDataLatest?.profile?.location?.zip || '').trim(),
+          },
+        },
+        now,
+      });
+
+      if (!bos.ok) {
+        await rollbackReservationBestEffort();
+        return NextResponse.json(
+          {
+            error: 'Bill of Sale required',
+            code: bos.code,
+            message: bos.message,
+            missing: bos.missing || undefined,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Keep order compliance snapshot current (required docs vs provided docs).
+    try {
+      await recomputeOrderComplianceDocsStatus({ db: db as any, orderId });
+    } catch {
+      // ignore; best-effort
+    }
 
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],
@@ -634,29 +771,7 @@ export async function POST(request: Request) {
       session = await stripe.checkout.sessions.create(sessionConfig);
     } catch (stripeError: any) {
       // Roll back reservation + cancel the order skeleton (best-effort).
-      try {
-        await db.runTransaction(async (tx) => {
-          const snap: any = await (tx as any).get(listingRef);
-          if (snap?.exists) {
-            const live = snap.data() as any;
-            if (live.purchaseReservedByOrderId === orderId) {
-              tx.set(
-                listingRef,
-                {
-                  purchaseReservedByOrderId: null,
-                  purchaseReservedAt: null,
-                  purchaseReservedUntil: null,
-                  updatedAt: Timestamp.now(),
-                },
-                { merge: true }
-              );
-            }
-          }
-          tx.set(orderRef, { status: 'cancelled', updatedAt: Timestamp.now() }, { merge: true });
-        });
-      } catch {
-        // ignore rollback failures
-      }
+      await rollbackReservationBestEffort();
       const msg = String(stripeError?.message || '');
       const lower = msg.toLowerCase();
       if (lower.includes('rejected') || lower.includes('account has been rejected') || lower.includes('cannot create new')) {

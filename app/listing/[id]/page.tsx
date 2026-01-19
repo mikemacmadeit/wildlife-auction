@@ -93,6 +93,7 @@ import {
   WireBadge,
 } from '@/components/payments/PaymentBrandBadges';
 import { getEligiblePaymentMethods } from '@/lib/payments/gating';
+import { isAnimalCategory } from '@/lib/compliance/requirements';
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -159,6 +160,36 @@ export default function ListingDetailPage() {
   const endsAtDate = useMemo(() => toDateSafe(endsAtRaw), [endsAtRaw]);
   const endsAtMs = useMemo(() => (endsAtDate ? endsAtDate.getTime() : null), [endsAtDate]);
   const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
+
+  // Determine winner client-side for UX (server is authoritative at checkout).
+  // This enables the "Complete Purchase" CTA after finalization flips listing.status -> 'expired'.
+  useEffect(() => {
+    if (!listing || listing.type !== 'auction') {
+      setIsWinningBidder(false);
+      setWinningBidAmount(null);
+      return;
+    }
+    if (!user?.uid) {
+      setIsWinningBidder(false);
+      setWinningBidAmount(null);
+      return;
+    }
+    const ended = typeof endsAtMs === 'number' ? endsAtMs <= Date.now() : false;
+    if (!ended) {
+      setIsWinningBidder(false);
+      setWinningBidAmount(null);
+      return;
+    }
+    const winner = listing.currentBidderId && listing.currentBidderId === user.uid;
+    setIsWinningBidder(Boolean(winner));
+    if (winner) {
+      const amt = Number(listing.currentBid || listing.startingBid || 0);
+      setWinningBidAmount(Number.isFinite(amt) ? amt : null);
+    } else {
+      setWinningBidAmount(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing?.id, listing?.type, listing?.currentBidderId, listing?.currentBid, listing?.startingBid, user?.uid, endsAtMs]);
 
   // Sold comps (price discovery)
   const [compsWindowDays, setCompsWindowDays] = useState<30 | 90>(90);
@@ -558,13 +589,25 @@ export default function ListingDetailPage() {
     }
 
     // P0: Check listing status (server-side enforced, but UX check here)
-    if (listing!.status !== 'active' && listing!.status !== 'sold') {
-      toast({
-        title: 'Listing not available',
-        description: `This listing is ${listing!.status} and cannot be purchased.`,
-        variant: 'destructive',
-      });
-      return;
+    // Auctions may be status=expired after backend finalization.
+    if (listing!.type !== 'auction') {
+      if (listing!.status !== 'active' && listing!.status !== 'sold') {
+        toast({
+          title: 'Listing not available',
+          description: `This listing is ${listing!.status} and cannot be purchased.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else {
+      if (listing!.status !== 'active' && listing!.status !== 'sold' && listing!.status !== 'expired') {
+        toast({
+          title: 'Listing not available',
+          description: `This listing is ${listing!.status} and cannot be purchased.`,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     // Verify user is still the winning bidder
@@ -1770,7 +1813,7 @@ export default function ListingDetailPage() {
                   </div>
 
                   {/* Compliance (animals only) */}
-                  {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(listing!.category) ? (
+                  {isAnimalCategory(listing!.category as any) ? (
                     <div className="rounded-lg border bg-muted/20 p-4">
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Compliance</div>
                       <div className="mt-2">

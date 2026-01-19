@@ -8,8 +8,9 @@ export const dynamic = 'force-dynamic';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
-import { emitEventToUsers } from '@/lib/notifications';
+import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { getSiteUrl } from '@/lib/site-url';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -85,26 +86,27 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     ? `Your listing “${title}” was rejected. Reason: ${reason}`
     : `Your listing “${title}” was rejected.`;
 
-  const notifRef = db.collection('users').doc(sellerId).collection('notifications').doc();
+  // Seller notification through canonical pipeline (idempotent).
   try {
-    const metadata: Record<string, any> = { status: 'removed' };
-    if (reason) metadata.reason = reason;
-
-    await notifRef.set({
-      userId: sellerId,
-      type: 'listing_rejected',
-      title: 'Listing rejected',
-      body: bodyText,
-      read: false,
-      createdAt: Timestamp.now(),
-      linkUrl: `/seller/listings/${listingId}/edit`,
-      linkLabel: 'Edit listing',
-      listingId,
-      metadata,
+    const origin = getSiteUrl();
+    await emitEventForUser({
+      type: 'Listing.Rejected',
+      actorId: uid,
+      entityType: 'listing',
+      entityId: listingId,
+      targetUserId: sellerId,
+      payload: {
+        type: 'Listing.Rejected',
+        listingId,
+        listingTitle: title,
+        editUrl: `${origin}/seller/listings/${listingId}/edit`,
+        ...(reason ? { reason } : {}),
+      },
+      optionalHash: `listing_rejected:${listingId}`,
     });
   } catch (e: any) {
     // Notification failures shouldn't block moderation action.
-    console.warn('[admin.listings.reject] Failed to create notification', {
+    console.warn('[admin.listings.reject] Failed to emit event', {
       listingId,
       sellerId,
       actorId: uid,
@@ -114,7 +116,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
 
   // Notify admins (best effort).
   try {
-    const origin = 'https://wildlife.exchange';
+    const origin = getSiteUrl();
     const adminUids = await listAdminRecipientUids(db as any);
     if (adminUids.length > 0) {
       await emitEventToUsers({

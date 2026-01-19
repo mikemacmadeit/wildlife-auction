@@ -8,8 +8,9 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
-import { emitEventToUsers } from '@/lib/notifications';
+import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { getSiteUrl } from '@/lib/site-url';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -83,7 +84,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
 
   // Notify admins (best effort).
   try {
-    const origin = 'https://wildlife.exchange';
+    const origin = getSiteUrl();
     const adminUids = await listAdminRecipientUids(db as any);
     if (adminUids.length > 0) {
       await emitEventToUsers({
@@ -108,20 +109,26 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     // ignore
   }
 
-  // Create in-app notification (server-only).
-  const notifRef = db.collection('users').doc(sellerId).collection('notifications').doc();
-  await notifRef.set({
-    userId: sellerId,
-    type: 'listing_approved',
-    title: 'Listing approved',
-    body: `Your listing “${title}” is now live.`,
-    read: false,
-    createdAt: Timestamp.now(),
-    linkUrl: `/listing/${listingId}`,
-    linkLabel: 'View listing',
-    listingId,
-    metadata: { status: 'active' },
-  });
+  // Seller notification through canonical pipeline (idempotent).
+  try {
+    const origin = getSiteUrl();
+    await emitEventForUser({
+      type: 'Listing.Approved',
+      actorId: uid,
+      entityType: 'listing',
+      entityId: listingId,
+      targetUserId: sellerId,
+      payload: {
+        type: 'Listing.Approved',
+        listingId,
+        listingTitle: title,
+        listingUrl: `${origin}/listing/${listingId}`,
+      },
+      optionalHash: `listing_approved:${listingId}`,
+    });
+  } catch {
+    // Do not block moderation actions on notification failures.
+  }
 
   return json({ ok: true });
 }

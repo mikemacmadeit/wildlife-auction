@@ -67,7 +67,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { getSoldSummary } from '@/lib/listings/sold';
-import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
+import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes } from '@/lib/types';
 import { ListItem } from '@/components/listings/ListItem';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -886,6 +886,8 @@ function WatchlistCard({
         return 'Cattle & Livestock';
       case 'ranch_equipment':
         return 'Ranch Equipment';
+      case 'horse_equestrian':
+        return 'Horse & Equestrian';
       default:
         return category;
     }
@@ -919,6 +921,22 @@ function WatchlistCard({
     if (listing.category === 'ranch_equipment') {
       const a = attrs as EquipmentAttributes;
       return [a.equipmentType && a.equipmentType, a.year && `Year: ${a.year}`, a.condition && a.condition]
+        .filter(Boolean)
+        .slice(0, 2);
+    }
+
+    if (listing.category === 'horse_equestrian') {
+      const a = attrs as HorseAttributes;
+      const sex =
+        a.sex === 'stallion' ? 'Stallion' :
+        a.sex === 'mare' ? 'Mare' :
+        a.sex === 'gelding' ? 'Gelding' :
+        a.sex ? String(a.sex) : null;
+      return [
+        sex && `Sex: ${sex}`,
+        a.registered ? 'Registered' : null,
+        a.age !== undefined && a.age !== null ? `Age: ${String(a.age)}` : null,
+      ]
         .filter(Boolean)
         .slice(0, 2);
     }

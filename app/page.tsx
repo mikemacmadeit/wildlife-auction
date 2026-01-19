@@ -237,7 +237,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 max-w-7xl mx-auto">
             {/* Whitetail Breeder - First priority */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -325,6 +325,43 @@ export default function HomePage() {
                     <h3 className="text-xl font-bold">Ranch Equipment</h3>
                     <p className="text-sm text-muted-foreground">
                       Tractors, skid steers, UTVs, trailers, and ranch equipment
+                    </p>
+                    <Button variant="outline" className="mt-4">
+                      Browse <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Horse & Equestrian */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Link href="/browse?category=horse_equestrian">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div
+                        className="w-24 h-24"
+                        style={{
+                          WebkitMaskImage: `url('/images/Horse.png')`,
+                          WebkitMaskSize: 'contain',
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          maskImage: `url('/images/Horse.png')`,
+                          maskSize: 'contain',
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          backgroundColor: 'hsl(var(--primary))',
+                        }}
+                      />
+                    </div>
+                    <h3 className="text-xl font-bold">Horse &amp; Equestrian</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Horses, tack, and equestrian listings with required transfer paperwork
                     </p>
                     <Button variant="outline" className="mt-4">
                       Browse <ArrowRight className="ml-2 h-4 w-4" />

@@ -117,6 +117,56 @@ export function buildInAppNotification(params: {
         metadata: { finalBidAmount: p.finalBidAmount },
       };
     }
+    case 'Listing.Approved': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Listing.Approved' }>;
+      return {
+        ...base,
+        type: 'listing_approved',
+        title: 'Listing approved',
+        body: `Your listing “${p.listingTitle}” is now live.`,
+        deepLinkUrl: p.listingUrl,
+        linkLabel: 'View listing',
+      };
+    }
+    case 'Listing.Rejected': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Listing.Rejected' }>;
+      const reason = p.reason ? ` Reason: ${p.reason}` : '';
+      return {
+        ...base,
+        type: 'listing_rejected',
+        title: 'Listing rejected',
+        body: `Your listing “${p.listingTitle}” was rejected.${reason}`,
+        deepLinkUrl: p.editUrl,
+        linkLabel: 'Edit listing',
+        ...(p.reason ? { metadata: { reason: p.reason } } : {}),
+      };
+    }
+    case 'Listing.ComplianceApproved': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Listing.ComplianceApproved' }>;
+      return {
+        ...base,
+        type: 'compliance_approved',
+        title: 'Compliance approved',
+        body: p.published
+          ? `Your listing “${p.listingTitle}” passed compliance and is now live.`
+          : `Your listing “${p.listingTitle}” passed compliance review.`,
+        deepLinkUrl: p.listingUrl,
+        linkLabel: 'View listing',
+        metadata: { complianceStatus: 'approved', ...(typeof p.published === 'boolean' ? { published: p.published } : {}) },
+      };
+    }
+    case 'Listing.ComplianceRejected': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Listing.ComplianceRejected' }>;
+      return {
+        ...base,
+        type: 'compliance_rejected',
+        title: 'Compliance rejected',
+        body: `Your listing “${p.listingTitle}” was rejected during compliance review. Reason: ${p.reason}`,
+        deepLinkUrl: p.editUrl,
+        linkLabel: 'Edit listing',
+        metadata: { complianceStatus: 'rejected', reason: p.reason },
+      };
+    }
     case 'Order.Confirmed': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.Confirmed' }>;
       return {

@@ -14,6 +14,33 @@ import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
 const MAX_JOBS_PER_RUN = 50;
 const MAX_ATTEMPTS = 5;
 
+function deadLetterPayload(jobId: string, job: any, error: { code?: string; message: string }) {
+  const safeSnapshot = {
+    template: job?.template,
+    userId: job?.userId,
+    toEmail: job?.toEmail,
+    eventId: job?.eventId,
+    attempts: Number(job?.attempts || 0),
+    lastAttemptAt: job?.lastAttemptAt || null,
+    createdAt: job?.createdAt || null,
+  };
+  return {
+    jobId,
+    kind: 'email',
+    createdAt: Timestamp.now(),
+    userId: typeof job?.userId === 'string' ? job.userId : null,
+    eventId: typeof job?.eventId === 'string' ? job.eventId : null,
+    template: typeof job?.template === 'string' ? job.template : null,
+    toEmail: typeof job?.toEmail === 'string' ? job.toEmail : null,
+    attempts: Number(job?.attempts || 0),
+    error: { code: error.code || null, message: error.message.slice(0, 2000) },
+    snapshot: safeSnapshot,
+    suppressed: false,
+    manualRetryCount: 0,
+    lastManualRetryAt: null,
+  };
+}
+
 function backoffMs(attempt: number): number {
   // exponential-ish: 0s, 30s, 2m, 10m, 30m
   const table = [0, 30_000, 120_000, 600_000, 1_800_000];
@@ -27,6 +54,7 @@ const baseHandler: Handler = async () => {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let requeued = 0;
 
   try {
     const snap = await db
@@ -53,6 +81,11 @@ const baseHandler: Handler = async () => {
           const attempts = Number(cur.attempts || 0);
           if (attempts >= MAX_ATTEMPTS) {
             tx.set(ref, { status: 'failed', error: 'Max attempts reached' }, { merge: true });
+            tx.set(
+              db.collection('emailJobDeadLetters').doc(jobId),
+              deadLetterPayload(jobId, { ...cur, attempts }, { message: 'Max attempts reached' }),
+              { merge: true }
+            );
             return;
           }
 
@@ -90,6 +123,15 @@ const baseHandler: Handler = async () => {
         const template = String(claimed.template || '');
         const payload = claimed.templatePayload;
         const toEmail = String(claimed.toEmail || '');
+        if (!toEmail || !toEmail.includes('@')) {
+          await ref.set({ status: 'failed', error: 'Missing/invalid toEmail' }, { merge: true });
+          await db
+            .collection('emailJobDeadLetters')
+            .doc(jobId)
+            .set(deadLetterPayload(jobId, claimed, { message: 'Missing/invalid toEmail' }), { merge: true });
+          failed++;
+          continue;
+        }
 
         // Engagement stop: if the user already clicked/read the corresponding in-app notification
         // before the delayed email fires, skip sending.
@@ -112,6 +154,10 @@ const baseHandler: Handler = async () => {
         const validated = validatePayload(template as any, payload);
         if (!validated.ok) {
           await ref.set({ status: 'failed', error: 'Invalid template payload' }, { merge: true });
+          await db
+            .collection('emailJobDeadLetters')
+            .doc(jobId)
+            .set(deadLetterPayload(jobId, claimed, { message: 'Invalid template payload' }), { merge: true });
           failed++;
           continue;
         }
@@ -119,26 +165,28 @@ const baseHandler: Handler = async () => {
         const rendered = renderEmail(template as any, validated.data);
         const result = await sendEmailHtml(toEmail, rendered.subject, rendered.html);
         if (!result.success) {
-          await ref.set({ status: 'failed', error: result.error || 'Send failed' }, { merge: true });
-          failed++;
+          // Retry transient send failures.
+          await ref.set({ status: 'queued', error: result.error || 'Send failed' }, { merge: true });
+          requeued++;
           continue;
         }
 
         await ref.set({ status: 'sent', messageId: result.messageId || null }, { merge: true });
         sent++;
       } catch (e: any) {
-        failed++;
+        // Retry unexpected exceptions (network, temporary provider issues, etc.)
         try {
-          await ref.set({ status: 'failed', error: String(e?.message || e) }, { merge: true });
+          await ref.set({ status: 'queued', error: String(e?.message || e) }, { merge: true });
         } catch {}
-        logError('dispatchEmailJobs: send error', e, { jobId });
+        requeued++;
+        logError('dispatchEmailJobs: send error (requeued)', e, { jobId });
       }
     }
 
-    logInfo('dispatchEmailJobs: completed', { scanned, sent, failed, skipped, ms: Date.now() - startedAt });
-    return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, sent, failed, skipped }) };
+    logInfo('dispatchEmailJobs: completed', { scanned, sent, failed, skipped, requeued, ms: Date.now() - startedAt });
+    return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, sent, failed, skipped, requeued }) };
   } catch (e: any) {
-    logError('dispatchEmailJobs: fatal error', e, { scanned, sent, failed, skipped });
+    logError('dispatchEmailJobs: fatal error', e, { scanned, sent, failed, skipped, requeued });
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: e?.message || 'Unknown error' }) };
   }
 };

@@ -7,10 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw } from 'lucide-react';
+import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw, Crop } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
+import { PhotoCropDialog, type FocalPoint } from '@/components/photos/PhotoCropDialog';
 
 export type ListingPhotoSnapshot = {
   photoId: string;
@@ -18,6 +19,11 @@ export type ListingPhotoSnapshot = {
   width?: number;
   height?: number;
   sortOrder?: number;
+  /**
+   * Focal point for smart-cropping on listing cards (0..1 normalized).
+   * This does not modify the underlying image; it only affects how it is positioned when using `object-fit: cover`.
+   */
+  focalPoint?: FocalPoint;
 };
 
 export function ListingPhotoPicker(props: {
@@ -39,8 +45,19 @@ export function ListingPhotoPicker(props: {
   const [activeUploads, setActiveUploads] = useState<UserPhotoDoc[]>([]);
   const [deletedUploads, setDeletedUploads] = useState<UserPhotoDoc[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const cropResolveRef = useRef<null | ((fp: FocalPoint | null) => void)>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropTarget, setCropTarget] = useState<null | { photoId: string; url: string }>(null);
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.photoId)), [selected]);
+
+  const requestCrop = async (target: { photoId: string; url: string }): Promise<FocalPoint | null> => {
+    setCropTarget(target);
+    setCropOpen(true);
+    return await new Promise<FocalPoint | null>((resolve) => {
+      cropResolveRef.current = resolve;
+    });
+  };
 
   const refresh = async () => {
     setLoading(true);
@@ -104,6 +121,11 @@ export function ListingPhotoPicker(props: {
     onChange({ selected: next, coverPhotoId: nextCover });
   };
 
+  const setFocalPoint = (photoId: string, focalPoint: FocalPoint | undefined) => {
+    const next = selected.map((s) => (s.photoId === photoId ? { ...s, focalPoint } : s));
+    onChange({ selected: next, coverPhotoId });
+  };
+
   const toggleSelect = (p: UserPhotoDoc) => {
     if (selectedIds.has(p.photoId)) {
       removeSelected(p.photoId);
@@ -125,15 +147,34 @@ export function ListingPhotoPicker(props: {
     setUploading(true);
     setUploadPct(0);
     try {
+      // IMPORTANT: `selected` is a prop and won't update inside this async loop.
+      // Maintain a working copy so multi-file uploads append correctly.
+      let workingSelected = [...selected];
+      let workingCover = coverPhotoId;
+
       for (const f of files) {
         const res = await uploadUserPhoto(f, (pct) => setUploadPct(pct));
         // Auto-select newly uploaded photos until max is reached.
-        if (selected.length < max) {
-          const next = [
-            ...selected,
-            { photoId: res.photoId, url: res.downloadUrl, width: res.width, height: res.height, sortOrder: selected.length },
-          ];
-          onChange({ selected: next.map((x, i) => ({ ...x, sortOrder: i })), coverPhotoId: coverPhotoId || res.photoId });
+        if (workingSelected.length < max) {
+          const added: ListingPhotoSnapshot = {
+            photoId: res.photoId,
+            url: res.downloadUrl,
+            width: res.width,
+            height: res.height,
+            sortOrder: workingSelected.length,
+          };
+          workingSelected = [...workingSelected, added].map((x, i) => ({ ...x, sortOrder: i }));
+          workingCover = workingCover || res.photoId;
+          onChange({ selected: workingSelected, coverPhotoId: workingCover });
+
+          // Smooth onboarding: if this becomes the cover, prompt the user to set the crop focal point once.
+          if (workingCover === res.photoId) {
+            const fp = await requestCrop({ photoId: res.photoId, url: res.downloadUrl });
+            if (fp) {
+              workingSelected = workingSelected.map((x) => (x.photoId === res.photoId ? { ...x, focalPoint: fp } : x));
+              onChange({ selected: workingSelected, coverPhotoId: workingCover });
+            }
+          }
         }
       }
       await refresh();
@@ -213,6 +254,10 @@ export function ListingPhotoPicker(props: {
                     onMoveRight={() => idx < selected.length - 1 && move(idx, idx + 1)}
                     onDragMove={(from, to) => move(from, to)}
                     onRemove={() => removeSelected(p.photoId)}
+                    onEditCrop={async () => {
+                      const fp = await requestCrop({ photoId: p.photoId, url: p.url });
+                      if (fp) setFocalPoint(p.photoId, fp);
+                    }}
                   />
                 ))}
               </div>
@@ -300,6 +345,32 @@ export function ListingPhotoPicker(props: {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Crop dialog (focal point for listing cards) */}
+      {cropTarget ? (
+        <PhotoCropDialog
+          open={cropOpen}
+          onOpenChange={(open) => {
+            setCropOpen(open);
+            if (!open) {
+              const resolve = cropResolveRef.current;
+              cropResolveRef.current = null;
+              setCropTarget(null);
+              // Resolve as "cancel" if closed without saving.
+              resolve?.(null);
+            }
+          }}
+          imageSrc={cropTarget.url}
+          aspect={4 / 3}
+          onSave={(fp) => {
+            const resolve = cropResolveRef.current;
+            cropResolveRef.current = null;
+            setCropTarget(null);
+            setCropOpen(false);
+            resolve?.(fp);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -439,6 +510,7 @@ function SelectedTile(props: {
   onMoveRight: () => void;
   onDragMove: (from: number, to: number) => void;
   onRemove: () => void;
+  onEditCrop: () => void;
 }) {
   const { p, idx, total } = props;
   return (
@@ -522,16 +594,29 @@ function SelectedTile(props: {
             </Button>
           </div>
 
-          <Button
-            type="button"
-            size="sm"
-            variant={props.isCover ? 'secondary' : 'outline'}
-            className="min-h-[40px] font-semibold"
-            onClick={props.onSetCover}
-            disabled={props.isCover}
-          >
-            {props.isCover ? 'Cover' : 'Set cover'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="min-h-[40px] font-semibold"
+              onClick={props.onEditCrop}
+              title="Adjust how this photo is cropped on listing cards"
+            >
+              <Crop className="h-4 w-4 mr-2" />
+              Crop
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={props.isCover ? 'secondary' : 'outline'}
+              className="min-h-[40px] font-semibold"
+              onClick={props.onSetCover}
+              disabled={props.isCover}
+            >
+              {props.isCover ? 'Cover' : 'Set cover'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

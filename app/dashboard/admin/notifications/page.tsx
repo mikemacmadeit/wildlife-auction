@@ -43,6 +43,9 @@ export default function AdminNotificationsPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [emailJobs, setEmailJobs] = useState<any[]>([]);
   const [pushJobs, setPushJobs] = useState<any[]>([]);
+  const [dlqEvents, setDlqEvents] = useState<any[]>([]);
+  const [dlqEmail, setDlqEmail] = useState<any[]>([]);
+  const [dlqPush, setDlqPush] = useState<any[]>([]);
 
   const [eventType, setEventType] = useState<(typeof NOTIFICATION_EVENT_TYPES)[number]>('Auction.Outbid');
   const [targetUserId, setTargetUserId] = useState('');
@@ -64,17 +67,26 @@ export default function AdminNotificationsPage() {
     setLoading(true);
     try {
       const token = await user.getIdToken();
-      const [eventsRes, emailRes, pushRes] = await Promise.all([
+      const [eventsRes, emailRes, pushRes, dlqEvRes, dlqEmailRes, dlqPushRes] = await Promise.all([
         fetch('/api/admin/notifications/events?limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/jobs?kind=email&limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/jobs?kind=push&limit=100', { headers: { authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/notifications/deadletters?kind=event&limit=100', { headers: { authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/notifications/deadletters?kind=email&limit=100', { headers: { authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/notifications/deadletters?kind=push&limit=100', { headers: { authorization: `Bearer ${token}` } }),
       ]);
       const eventsJson = await eventsRes.json().catch(() => ({}));
       const emailJson = await emailRes.json().catch(() => ({}));
       const pushJson = await pushRes.json().catch(() => ({}));
+      const dlqEvJson = await dlqEvRes.json().catch(() => ({}));
+      const dlqEmailJson = await dlqEmailRes.json().catch(() => ({}));
+      const dlqPushJson = await dlqPushRes.json().catch(() => ({}));
       setEvents(Array.isArray(eventsJson.events) ? eventsJson.events : []);
       setEmailJobs(Array.isArray(emailJson.jobs) ? emailJson.jobs : []);
       setPushJobs(Array.isArray(pushJson.jobs) ? pushJson.jobs : []);
+      setDlqEvents(Array.isArray(dlqEvJson.items) ? dlqEvJson.items : []);
+      setDlqEmail(Array.isArray(dlqEmailJson.items) ? dlqEmailJson.items : []);
+      setDlqPush(Array.isArray(dlqPushJson.items) ? dlqPushJson.items : []);
     } catch (e: any) {
       toast({ title: 'Load failed', description: e?.message || 'Failed to load admin data.', variant: 'destructive' });
     } finally {
@@ -127,6 +139,37 @@ export default function AdminNotificationsPage() {
       setLoading(false);
     }
   }, [entityId, entityType, eventType, load, nonce, payloadText, targetUserId, toast, user]);
+
+  const dlqAction = useCallback(
+    async (params: { kind: 'event' | 'email' | 'push'; id: string; action: 'retry' | 'suppress' }) => {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const token = await user.getIdToken();
+        const reason =
+          params.action === 'suppress'
+            ? window.prompt('Suppress reason (optional):') || undefined
+            : undefined;
+        const res = await fetch('/api/admin/notifications/deadletters', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ...params, ...(reason ? { reason } : {}) }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) {
+          toast({ title: 'Action failed', description: data?.error || 'Failed to update dead letter.', variant: 'destructive' });
+          return;
+        }
+        toast({ title: 'Updated', description: `${params.action} queued for ${params.kind}:${params.id}` });
+        await load();
+      } catch (e: any) {
+        toast({ title: 'Action failed', description: e?.message || 'Failed to update dead letter.', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [load, toast, user]
+  );
 
   if (!adminLoading && !isAdmin) {
     return (
@@ -240,10 +283,11 @@ export default function AdminNotificationsPage() {
           <CardContent className="p-0">
             <Tabs defaultValue="events">
               <div className="px-5 pb-4">
-                <TabsList className="grid grid-cols-3 w-full">
+                <TabsList className="grid grid-cols-4 w-full">
                   <TabsTrigger value="events">Events</TabsTrigger>
                   <TabsTrigger value="email">Email jobs</TabsTrigger>
                   <TabsTrigger value="push">Push jobs</TabsTrigger>
+                  <TabsTrigger value="deadletters">Dead letters</TabsTrigger>
                 </TabsList>
               </div>
               <Separator />
@@ -309,6 +353,100 @@ export default function AdminNotificationsPage() {
                     </div>
                   ))}
                   {pushJobs.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No push jobs yet.</div> : null}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="deadletters" className="m-0">
+                <div className="p-4 space-y-6">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Event dead letters</div>
+                    <div className="rounded-lg border border-border/60 overflow-hidden divide-y">
+                      {dlqEvents.length === 0 ? (
+                        <div className="p-3 text-sm text-muted-foreground">No event dead letters.</div>
+                      ) : (
+                        dlqEvents.map((d) => (
+                          <div key={d.id} className="p-3 text-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-semibold break-words">{d.eventType || d.snapshot?.type || d.id}</div>
+                                <div className="text-xs text-muted-foreground break-words">
+                                  attempts:{d.attempts ?? d.snapshot?.processing?.attempts ?? '?'} · {d.error?.message || d.snapshot?.processing?.error || ''}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button size="sm" variant="outline" onClick={() => dlqAction({ kind: 'event', id: d.id, action: 'retry' })}>
+                                  Retry
+                                </Button>
+                                <Button size="sm" variant="secondary" onClick={() => dlqAction({ kind: 'event', id: d.id, action: 'suppress' })}>
+                                  Suppress
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email job dead letters</div>
+                    <div className="rounded-lg border border-border/60 overflow-hidden divide-y">
+                      {dlqEmail.length === 0 ? (
+                        <div className="p-3 text-sm text-muted-foreground">No email job dead letters.</div>
+                      ) : (
+                        dlqEmail.map((d) => (
+                          <div key={d.id} className="p-3 text-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-semibold break-words">{d.template || d.id}</div>
+                                <div className="text-xs text-muted-foreground break-words">
+                                  to:{d.toEmail || ''} · attempts:{d.attempts ?? '?'} · {d.error?.message || ''}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button size="sm" variant="outline" onClick={() => dlqAction({ kind: 'email', id: d.id, action: 'retry' })}>
+                                  Retry
+                                </Button>
+                                <Button size="sm" variant="secondary" onClick={() => dlqAction({ kind: 'email', id: d.id, action: 'suppress' })}>
+                                  Suppress
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Push job dead letters</div>
+                    <div className="rounded-lg border border-border/60 overflow-hidden divide-y">
+                      {dlqPush.length === 0 ? (
+                        <div className="p-3 text-sm text-muted-foreground">No push job dead letters.</div>
+                      ) : (
+                        dlqPush.map((d) => (
+                          <div key={d.id} className="p-3 text-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-semibold break-words">{d.snapshot?.notificationType || 'Push job'}</div>
+                                <div className="text-xs text-muted-foreground break-words">
+                                  user:{d.userId || ''} · attempts:{d.attempts ?? '?'} · {d.error?.message || ''}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button size="sm" variant="outline" onClick={() => dlqAction({ kind: 'push', id: d.id, action: 'retry' })}>
+                                  Retry
+                                </Button>
+                                <Button size="sm" variant="secondary" onClick={() => dlqAction({ kind: 'push', id: d.id, action: 'suppress' })}>
+                                  Suppress
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
