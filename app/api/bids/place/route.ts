@@ -181,19 +181,8 @@ export async function POST(request: Request) {
         throw new Error('Your maximum bid must be higher than your current maximum bid.');
       }
 
-      tx.set(
-        autoBidRef,
-        {
-          userId: bidderId,
-          maxBidCents: amountCents,
-          enabled: true,
-          ...(autoBidSnap.exists ? {} : { createdAt: now }),
-          updatedAt: now,
-        },
-        { merge: true }
-      );
-
       // Load enabled max bids for this auction (transactional snapshot).
+      // IMPORTANT: Firestore transactions require *all reads* to happen before *any writes*.
       const autoBidsSnap = await tx.get(listingRef.collection('autoBids').where('enabled', '==', true));
       const autoBidSet: AutoBidEntry[] = autoBidsSnap.docs.map((d) => {
         const data = d.data() as any;
@@ -256,6 +245,19 @@ export async function POST(request: Request) {
           );
         }
 
+        // Persist bidder's new max bid AFTER reads are complete.
+        tx.set(
+          autoBidRef,
+          {
+            userId: bidderId,
+            maxBidCents: amountCents,
+            enabled: true,
+            ...(autoBidSnap.exists ? {} : { createdAt: now }),
+            updatedAt: now,
+          },
+          { merge: true }
+        );
+
         for (const w of bidWrites) {
           tx.set(bidsCol.doc(w.id), {
             listingId,
@@ -278,6 +280,18 @@ export async function POST(request: Request) {
         });
       } else {
         // No visible change; only max increased.
+        // Persist bidder's new max bid AFTER reads are complete.
+        tx.set(
+          autoBidRef,
+          {
+            userId: bidderId,
+            maxBidCents: amountCents,
+            enabled: true,
+            ...(autoBidSnap.exists ? {} : { createdAt: now }),
+            updatedAt: now,
+          },
+          { merge: true }
+        );
         tx.update(listingRef, {
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: bidderId,
