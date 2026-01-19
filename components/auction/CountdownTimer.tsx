@@ -96,8 +96,13 @@ export function CountdownTimer({
     return null;
   }
 
-  const isEndingSoon = timeRemaining.total < 24 * 60 * 60 * 1000; // Less than 24 hours
-  const isEndingVerySoon = timeRemaining.total < 60 * 60 * 1000; // Less than 1 hour
+  // Styling thresholds (eBay-style):
+  // - "Ending soon" can be highlighted, but turn RED only when under 12 minutes.
+  const endingSoonMs = 24 * 60 * 60 * 1000; // 24 hours
+  const endingCriticalMs = 12 * 60 * 1000; // 12 minutes
+  const isEndingSoon = timeRemaining.total < endingSoonMs;
+  const isEndingCritical = timeRemaining.total <= endingCriticalMs;
+  const isEndingVerySoon = timeRemaining.total < 60 * 60 * 1000; // Less than 1 hour (still "soon", not necessarily red)
 
   if (isEnded) {
     return (
@@ -112,12 +117,12 @@ export function CountdownTimer({
   if (variant === 'badge') {
     return (
       <motion.div
-        animate={pulseWhenEndingSoon && isEndingVerySoon ? { scale: [1, 1.05, 1] } : {}}
+        animate={pulseWhenEndingSoon && isEndingCritical ? { scale: [1, 1.05, 1] } : {}}
         transition={{ duration: 2, repeat: Infinity }}
         className={cn(
           'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold',
-          isEndingVerySoon && 'bg-destructive/90 text-destructive-foreground',
-          isEndingSoon && !isEndingVerySoon && 'bg-orange-500/90 text-white',
+          isEndingCritical && 'bg-destructive/90 text-destructive-foreground',
+          !isEndingCritical && isEndingSoon && 'bg-orange-500/90 text-white',
           !isEndingSoon && 'bg-card/80 text-foreground border border-border/50',
           className
         )}
@@ -138,11 +143,12 @@ export function CountdownTimer({
     return (
       <div className={cn('flex items-center gap-2 text-sm font-semibold', className)}>
         {showIcon && <Clock className="h-4 w-4" />}
-        <span className={cn(isEndingSoon && 'text-destructive font-bold')}>
+        <span className={cn(isEndingCritical && 'text-destructive font-bold', !isEndingCritical && isEndingSoon && 'text-orange-600 font-bold')}>
           {timeRemaining.days > 0 && `${timeRemaining.days}d `}
           {timeRemaining.hours > 0 && `${timeRemaining.hours}h `}
           {timeRemaining.minutes > 0 && `${timeRemaining.minutes}m `}
-          {timeRemaining.seconds}s
+          {/* eBay-ish: only show seconds when under 1 hour */}
+          {timeRemaining.days === 0 && timeRemaining.hours === 0 ? `${timeRemaining.seconds}s` : ''}
         </span>
       </div>
     );
@@ -151,12 +157,12 @@ export function CountdownTimer({
   // Default variant (detailed breakdown)
   return (
     <motion.div
-      animate={pulseWhenEndingSoon && isEndingVerySoon ? { scale: [1, 1.02, 1] } : {}}
+      animate={pulseWhenEndingSoon && isEndingCritical ? { scale: [1, 1.02, 1] } : {}}
       transition={{ duration: 2, repeat: Infinity }}
       className={cn(
         'flex flex-col gap-2 p-4 rounded-lg border-2',
-        isEndingVerySoon && 'border-destructive bg-destructive/10',
-        isEndingSoon && !isEndingVerySoon && 'border-orange-500/50 bg-orange-500/5',
+        isEndingCritical && 'border-destructive bg-destructive/10',
+        !isEndingCritical && isEndingSoon && 'border-orange-500/50 bg-orange-500/5',
         !isEndingSoon && 'border-border/50 bg-card/50',
         className
       )}
@@ -165,19 +171,19 @@ export function CountdownTimer({
         {showIcon && (
           <Clock className={cn(
             'h-5 w-5',
-            isEndingVerySoon && 'text-destructive',
-            isEndingSoon && !isEndingVerySoon && 'text-orange-500',
+            isEndingCritical && 'text-destructive',
+            !isEndingCritical && isEndingSoon && 'text-orange-500',
             !isEndingSoon && 'text-muted-foreground'
           )} />
         )}
         <span className={cn(
           'text-sm font-bold uppercase tracking-wide',
-          isEndingVerySoon && 'text-destructive',
-          isEndingSoon && !isEndingVerySoon && 'text-orange-500',
+          isEndingCritical && 'text-destructive',
+          !isEndingCritical && isEndingSoon && 'text-orange-500',
           !isEndingSoon && 'text-muted-foreground'
         )}>
-          {isEndingVerySoon && '⚠️ Ending Very Soon!'}
-          {isEndingSoon && !isEndingVerySoon && 'Ending Soon'}
+          {isEndingCritical && '⚠️ Ending Soon'}
+          {!isEndingCritical && isEndingSoon && 'Ending Soon'}
           {!isEndingSoon && 'Time Remaining'}
         </span>
       </div>
@@ -186,7 +192,7 @@ export function CountdownTimer({
         <div className="text-center">
           <div className={cn(
             'text-2xl md:text-3xl font-extrabold',
-            isEndingSoon && 'text-destructive'
+            isEndingCritical && 'text-destructive'
           )}>
             {String(timeRemaining.days).padStart(2, '0')}
           </div>
@@ -195,7 +201,7 @@ export function CountdownTimer({
         <div className="text-center">
           <div className={cn(
             'text-2xl md:text-3xl font-extrabold',
-            isEndingSoon && 'text-destructive'
+            isEndingCritical && 'text-destructive'
           )}>
             {String(timeRemaining.hours).padStart(2, '0')}
           </div>
@@ -204,7 +210,7 @@ export function CountdownTimer({
         <div className="text-center">
           <div className={cn(
             'text-2xl md:text-3xl font-extrabold',
-            isEndingSoon && 'text-destructive'
+            isEndingCritical && 'text-destructive'
           )}>
             {String(timeRemaining.minutes).padStart(2, '0')}
           </div>
@@ -213,7 +219,7 @@ export function CountdownTimer({
         <div className="text-center">
           <div className={cn(
             'text-2xl md:text-3xl font-extrabold animate-pulse',
-            isEndingSoon && 'text-destructive'
+            isEndingCritical && 'text-destructive'
           )}>
             {String(timeRemaining.seconds).padStart(2, '0')}
           </div>

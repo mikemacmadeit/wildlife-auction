@@ -4,7 +4,8 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, CheckCircle2, Gavel, Tag } from 'lucide-react';
+import { MapPin, CheckCircle2, Gavel, Tag, Clock } from 'lucide-react';
+import { format, isToday, isTomorrow } from 'date-fns';
 import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
@@ -28,6 +29,42 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   const isClassified = listing.type === 'classified';
   const bestOfferEnabled = Boolean((listing as any).bestOfferEnabled);
   const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
+
+  const endsAtDate = useMemo(() => {
+    const v: any = (listing as any)?.endsAt;
+    if (!v) return null as Date | null;
+    if (v instanceof Date) return Number.isFinite(v.getTime()) ? v : null;
+    if (typeof v?.toDate === 'function') {
+      try {
+        const d = v.toDate();
+        return d instanceof Date && Number.isFinite(d.getTime()) ? d : null;
+      } catch {
+        return null;
+      }
+    }
+    if (typeof v?.seconds === 'number') {
+      const d = new Date(v.seconds * 1000);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    if (typeof v === 'string' || typeof v === 'number') {
+      const d = new Date(v);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    return null;
+  }, [(listing as any)?.endsAt]);
+
+  const endsLabel = useMemo(() => {
+    if (!endsAtDate) return null;
+    if (isToday(endsAtDate)) return `Today ${format(endsAtDate, 'h:mm a')}`;
+    if (isTomorrow(endsAtDate)) return `Tomorrow ${format(endsAtDate, 'h:mm a')}`;
+    return `${format(endsAtDate, 'EEE, h:mm a')}`;
+  }, [endsAtDate]);
+
+  const sellerPhotoUrl: string | null =
+    (listing as any)?.sellerSnapshot?.photoURL ||
+    (listing as any)?.sellerPhotoURL ||
+    (listing as any)?.seller?.photoURL ||
+    null;
 
   const specs = useMemo(() => {
     // eBay-style “at a glance” line: Species • Sex • Age
@@ -101,6 +138,11 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className="overflow-hidden transition-all duration-300 rounded-xl flex flex-row md:grid md:grid-cols-[288px_1fr] h-full w-full border border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
+          {/* Watchlist heart (top-right corner of the card, not on the image) */}
+          <div className="absolute top-2 right-2 z-30">
+            <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
+          </div>
+
           {/* Image */}
           <div className="relative w-32 sm:w-44 md:w-full h-32 sm:h-44 md:h-full min-h-[128px] md:min-h-[208px] flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             
@@ -126,37 +168,10 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
             <div className="flex flex-col gap-3 md:grid md:grid-cols-[1fr_220px] md:gap-5 md:items-stretch">
               {/* Left: details */}
               <div className="min-w-0 flex flex-col gap-2">
-                {/* Title + top-right actions (list view hierarchy: title first) */}
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300">
-                    {listing.title}
-                  </h3>
-
-                  <div className="flex-shrink-0 flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] font-semibold hidden sm:inline-flex">
-                      {isAuction ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Gavel className="h-3 w-3" /> Auction
-                        </span>
-                      ) : isFixed ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Tag className="h-3 w-3" /> Buy Now
-                        </span>
-                      ) : (
-                        'Classified'
-                      )}
-                    </Badge>
-                    {sold.isSold ? (
-                      <Badge className="bg-destructive text-destructive-foreground font-extrabold text-[10px] hidden sm:inline-flex">
-                        SOLD
-                      </Badge>
-                    ) : null}
-                    <FavoriteButton
-                      listingId={listing.id}
-                      className="bg-card/95 backdrop-blur-sm border border-border/50"
-                    />
-                  </div>
-                </div>
+                {/* Title (top) */}
+                <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300 pr-10">
+                  {listing.title}
+                </h3>
 
                 {/* Location */}
                 <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">
@@ -166,8 +181,14 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                   </span>
                 </div>
 
-                {/* Price, then bid count (no description in list view) */}
-                <div className="space-y-0.5 pt-0.5">
+                {/* Date (closer to title), then price, then bids + time-left row */}
+                {isAuction && !sold.isSold && endsLabel ? (
+                  <div className="text-xs text-muted-foreground">
+                    {endsLabel}
+                  </div>
+                ) : null}
+
+                <div className="space-y-1 pt-0.5">
                   {sold.isSold ? (
                     <>
                       <div className="text-sm sm:text-base font-extrabold">{sold.soldPriceLabel}</div>
@@ -175,23 +196,41 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                         <div className="text-xs text-muted-foreground">{sold.soldDateLabel}</div>
                       ) : null}
                     </>
-                  ) : isAuction ? (
-                    <>
-                      <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
-                        ${primaryPrice.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
-                      </div>
-                    </>
                   ) : (
-                    <>
-                      <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
-                        ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
-                      </div>
-                      {bestOfferEnabled ? <div className="text-xs text-muted-foreground">or Best Offer</div> : null}
-                    </>
+                    <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
+                      ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
+                    </div>
                   )}
+
+                  {isAuction && !sold.isSold ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <span className="font-semibold text-foreground/90">
+                        {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="font-semibold">Time left</span>
+                      </span>
+                      <CountdownTimer
+                        endsAt={listing.endsAt as any}
+                        variant="compact"
+                        showIcon={false}
+                        pulseWhenEndingSoon={false}
+                        className="text-xs"
+                      />
+                      <span>left</span>
+                      {endsAtDate ? (
+                        <span className="text-muted-foreground">
+                          ({format(endsAtDate, 'EEE, h:mm a')})
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {!sold.isSold && !isAuction && bestOfferEnabled ? (
+                    <div className="text-xs text-muted-foreground">or Best Offer</div>
+                  ) : null}
                 </div>
 
                 {/* Specs */}
@@ -221,10 +260,31 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
 
               {/* Right: less important info (seller, etc.) */}
               <div className="md:border-l md:pl-5 md:border-border/40 flex flex-col gap-3">
-                <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
+                <div className="mt-auto rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
                   <div className="text-xs text-muted-foreground font-semibold">Sold by</div>
-                  <div className="text-sm font-bold truncate">
-                    {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-8 w-8 rounded-full border bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
+                      {typeof sellerPhotoUrl === 'string' && sellerPhotoUrl.trim() ? (
+                        <Image
+                          src={sellerPhotoUrl}
+                          alt="Seller profile"
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-muted-foreground">
+                          {(listing.sellerSnapshot?.displayName || listing.seller?.name || 'S')
+                            .trim()
+                            .slice(0, 1)
+                            .toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm font-bold truncate">
+                      {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {listing.sellerSnapshot?.verified ? (
