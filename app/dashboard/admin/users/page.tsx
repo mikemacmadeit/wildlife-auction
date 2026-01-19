@@ -94,6 +94,9 @@ export default function AdminUsersPage() {
   const [roleTarget, setRoleTarget] = useState<AdminUserRow | null>(null);
   const [nextRole, setNextRole] = useState<'user' | 'admin' | 'super_admin'>('user');
   const [reason, setReason] = useState('');
+  const [sendVerifyDialogOpen, setSendVerifyDialogOpen] = useState(false);
+  const [sendVerifyTarget, setSendVerifyTarget] = useState<AdminUserRow | null>(null);
+  const [sendVerifyReason, setSendVerifyReason] = useState('Support: resend verification email');
 
   const authHeader = useCallback(async (): Promise<HeadersInit> => {
     const token = await user?.getIdToken();
@@ -270,6 +273,34 @@ export default function AdminUsersPage() {
       toast({ title: 'Failed', description: e?.message || 'Could not update user', variant: 'destructive' });
     }
   }, [authHeader, load, toast, user]);
+
+  const sendVerificationEmail = useCallback(async () => {
+    if (!user || !sendVerifyTarget) return;
+    const r = sendVerifyReason.trim();
+    if (!r) {
+      toast({ title: 'Reason required', description: 'Please add a short reason.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${sendVerifyTarget.uid}/send-verification-email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ reason: r }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) {
+        throw new Error(data?.message || data?.error || 'Failed to send verification email');
+      }
+      toast({
+        title: data?.alreadyVerified ? 'Already verified' : 'Verification email sent',
+        description: data?.email ? `Sent to ${data.email}.` : 'Sent.',
+      });
+      setSendVerifyDialogOpen(false);
+      setSendVerifyTarget(null);
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e?.message || 'Could not send verification email', variant: 'destructive' });
+    }
+  }, [authHeader, sendVerifyReason, sendVerifyTarget, toast, user]);
 
   const passwordResetLink = useCallback(async (row: AdminUserRow) => {
     if (!user) return;
@@ -576,6 +607,18 @@ export default function AdminUsersPage() {
                                 <KeyRound className="h-4 w-4 mr-2" />
                                 Generate password reset link
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  setSendVerifyTarget(r);
+                                  setSendVerifyReason('Support: resend verification email');
+                                  setSendVerifyDialogOpen(true);
+                                }}
+                                disabled={r.emailVerified === true}
+                              >
+                                <KeyRound className="h-4 w-4 mr-2" />
+                                Send verification email
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               {r.disabled ? (
                                 <DropdownMenuItem
@@ -688,6 +731,35 @@ export default function AdminUsersPage() {
               </Button>
               <Button onClick={handleSetRole} className="font-semibold">
                 Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={sendVerifyDialogOpen} onOpenChange={setSendVerifyDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Send verification email</DialogTitle>
+              <DialogDescription>
+                Sends a verification link to the user’s email using the configured email provider (Brevo/Resend).
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-sm">
+                <div className="font-semibold text-foreground">{sendVerifyTarget?.email || sendVerifyTarget?.uid || 'User'}</div>
+                <div className="text-xs text-muted-foreground">UID: {sendVerifyTarget?.uid}</div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reason</div>
+                <Input value={sendVerifyReason} onChange={(e) => setSendVerifyReason(e.target.value)} className="h-11" />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" onClick={() => setSendVerifyDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => void sendVerificationEmail()} className="font-semibold">
+                Send email
               </Button>
             </DialogFooter>
           </DialogContent>

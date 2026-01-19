@@ -92,7 +92,8 @@ export type AuditActionType =
   | 'admin_user_messaging_unmuted'
   | 'admin_user_risk_updated'
   | 'admin_user_note_added'
-  | 'admin_user_summaries_backfill';
+  | 'admin_user_summaries_backfill'
+  | 'admin_user_verification_email_sent';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 
