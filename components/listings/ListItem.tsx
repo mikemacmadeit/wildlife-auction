@@ -126,29 +126,31 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
             <div className="flex flex-col gap-3 md:grid md:grid-cols-[1fr_220px] md:gap-5 md:items-stretch">
               {/* Left: details */}
               <div className="min-w-0 flex flex-col gap-2">
-                {/* Type + sold */}
+                {/* Title + top-right actions (list view hierarchy: title first) */}
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <Badge variant="outline" className="text-[10px] font-semibold">
-                    {isAuction ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Gavel className="h-3 w-3" /> Auction
-                      </span>
-                    ) : isFixed ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Tag className="h-3 w-3" /> Buy Now
-                      </span>
-                    ) : (
-                      'Classified'
-                    )}
-                  </Badge>
-                  {sold.isSold ? (
-                    <Badge className="bg-destructive text-destructive-foreground font-extrabold text-[10px]">SOLD</Badge>
-                  ) : null}
-                  </div>
+                  <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300">
+                    {listing.title}
+                  </h3>
 
-                  {/* Watchlist heart (top-right corner, NOT over image) */}
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] font-semibold hidden sm:inline-flex">
+                      {isAuction ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Gavel className="h-3 w-3" /> Auction
+                        </span>
+                      ) : isFixed ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Tag className="h-3 w-3" /> Buy Now
+                        </span>
+                      ) : (
+                        'Classified'
+                      )}
+                    </Badge>
+                    {sold.isSold ? (
+                      <Badge className="bg-destructive text-destructive-foreground font-extrabold text-[10px] hidden sm:inline-flex">
+                        SOLD
+                      </Badge>
+                    ) : null}
                     <FavoriteButton
                       listingId={listing.id}
                       className="bg-card/95 backdrop-blur-sm border border-border/50"
@@ -156,8 +158,16 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                   </div>
                 </div>
 
-                {/* Price (move next to photo; seller goes to right column) */}
-                <div className="space-y-0.5">
+                {/* Location */}
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">
+                  <MapPin className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}
+                  </span>
+                </div>
+
+                {/* Price, then bid count (no description in list view) */}
+                <div className="space-y-0.5 pt-0.5">
                   {sold.isSold ? (
                     <>
                       <div className="text-sm sm:text-base font-extrabold">{sold.soldPriceLabel}</div>
@@ -170,18 +180,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                       <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
                         ${primaryPrice.toLocaleString()}
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                        <span>
-                          {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
-                        </span>
-                        <span>·</span>
-                        <CountdownTimer
-                          endsAt={listing.endsAt as any}
-                          variant="compact"
-                          showIcon={false}
-                          pulseWhenEndingSoon={false}
-                          className="text-xs"
-                        />
+                      <div className="text-xs text-muted-foreground">
+                        {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
                       </div>
                     </>
                   ) : (
@@ -192,19 +192,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                       {bestOfferEnabled ? <div className="text-xs text-muted-foreground">or Best Offer</div> : null}
                     </>
                   )}
-                </div>
-
-                {/* Title */}
-                <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300">
-                  {listing.title}
-                </h3>
-
-                {/* Location */}
-                <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">
-                  <MapPin className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    {listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}
-                  </span>
                 </div>
 
                 {/* Specs */}
@@ -219,13 +206,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                       </span>
                     ))}
                   </div>
-                ) : null}
-
-                {/* Description preview (desktop only – uses space without cluttering mobile) */}
-                {listing.description ? (
-                  <p className="hidden md:block text-sm text-muted-foreground line-clamp-2 pt-1">
-                    {listing.description}
-                  </p>
                 ) : null}
 
                 {/* Trust */}
