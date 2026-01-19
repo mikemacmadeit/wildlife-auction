@@ -101,7 +101,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className="overflow-hidden transition-all duration-300 rounded-xl flex flex-row md:grid md:grid-cols-[288px_1fr] h-full w-full border border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-          {/* Image (only overlay is watchlist heart, per spec) */}
+          {/* Image */}
           <div className="relative w-32 sm:w-44 md:w-full h-32 sm:h-44 md:h-full min-h-[128px] md:min-h-[208px] flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             
             {listing.images[0] ? (
@@ -119,11 +119,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 <span className="text-muted-foreground text-sm font-medium">No Image</span>
               </div>
             )}
-            
-            {/* Action Buttons - Always visible (watchlist must be easy to find) */}
-            <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
-              <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
-            </div>
           </div>
 
           {/* Content */}
@@ -132,7 +127,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
               {/* Left: details */}
               <div className="min-w-0 flex flex-col gap-2">
                 {/* Type + sold */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <Badge variant="outline" className="text-[10px] font-semibold">
                     {isAuction ? (
                       <span className="inline-flex items-center gap-1">
@@ -149,6 +145,15 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                   {sold.isSold ? (
                     <Badge className="bg-destructive text-destructive-foreground font-extrabold text-[10px]">SOLD</Badge>
                   ) : null}
+                  </div>
+
+                  {/* Watchlist heart (top-right corner, NOT over image) */}
+                  <div className="flex-shrink-0">
+                    <FavoriteButton
+                      listingId={listing.id}
+                      className="bg-card/95 backdrop-blur-sm border border-border/50"
+                    />
+                  </div>
                 </div>
 
                 {/* Price (move next to photo; seller goes to right column) */}
