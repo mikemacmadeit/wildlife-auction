@@ -18,7 +18,6 @@ import { Loader2, Mail, Sparkles } from 'lucide-react';
 
 const DISMISSED_KEY = 'we_email_capture_dismissed';
 const SUBSCRIBED_KEY = 'we_email_capture_subscribed';
-const DISMISS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 function isEmail(email: string): boolean {
   // Light client-side validation; server is authoritative.
@@ -35,10 +34,10 @@ function shouldSuppressPopup(): boolean {
     const subscribed = window.localStorage.getItem(SUBSCRIBED_KEY);
     if (subscribed === 'true') return true;
     const dismissedAt = window.localStorage.getItem(DISMISSED_KEY);
+    // New behavior: if a user dismisses the popup, do not show it again (ever) on this device.
+    // Back-compat: older versions stored a timestamp; treat any value as dismissed.
     if (!dismissedAt) return false;
-    const t = Number(dismissedAt);
-    if (!Number.isFinite(t)) return false;
-    return Date.now() - t < DISMISS_COOLDOWN_MS;
+    return true;
   } catch {
     return false;
   }
@@ -61,7 +60,7 @@ export function EmailCapturePopup(props: { source?: string }) {
   const markDismissed = useCallback(() => {
     if (!canUseDOM()) return;
     try {
-      window.localStorage.setItem(DISMISSED_KEY, String(Date.now()));
+      window.localStorage.setItem(DISMISSED_KEY, 'true');
     } catch {
       // ignore
     }
