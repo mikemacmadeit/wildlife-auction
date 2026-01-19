@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2, Gavel, Tag, Clock } from 'lucide-react';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format } from 'date-fns';
 import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
@@ -52,13 +52,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     }
     return null;
   }, [(listing as any)?.endsAt]);
-
-  const endsLabel = useMemo(() => {
-    if (!endsAtDate) return null;
-    if (isToday(endsAtDate)) return `Today ${format(endsAtDate, 'h:mm a')}`;
-    if (isTomorrow(endsAtDate)) return `Tomorrow ${format(endsAtDate, 'h:mm a')}`;
-    return `${format(endsAtDate, 'EEE, h:mm a')}`;
-  }, [endsAtDate]);
 
   const sellerPhotoUrl: string | null =
     (listing as any)?.sellerSnapshot?.photoURL ||
@@ -182,12 +175,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 </div>
 
                 {/* Date (closer to title), then price, then bids + time-left row */}
-                {isAuction && !sold.isSold && endsLabel ? (
-                  <div className="text-xs text-muted-foreground">
-                    {endsLabel}
-                  </div>
-                ) : null}
-
                 <div className="space-y-1 pt-0.5">
                   {sold.isSold ? (
                     <>
@@ -220,11 +207,6 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                         className="text-xs"
                       />
                       <span>left</span>
-                      {endsAtDate ? (
-                        <span className="text-muted-foreground">
-                          ({format(endsAtDate, 'EEE, h:mm a')})
-                        </span>
-                      ) : null}
                     </div>
                   ) : null}
 
