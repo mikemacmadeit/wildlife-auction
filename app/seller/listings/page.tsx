@@ -47,16 +47,49 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 // Helper functions outside component to prevent recreation on every render
 const getStatusBadge = (params: { status: string; type?: string; ended?: boolean }) => {
   const { status, type, ended } = params;
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-    draft: { variant: 'outline', label: 'Draft' },
-    pending: { variant: 'secondary', label: 'Pending approval' },
-    active: { variant: 'default', label: 'Active' },
-    expired: { variant: 'secondary', label: type === 'auction' && ended ? 'Ended' : 'Expired' },
-    sold: { variant: 'secondary', label: 'Sold' },
-    removed: { variant: 'destructive', label: 'Rejected' },
+  const variants: Record<
+    string,
+    {
+      label: string;
+      className: string;
+    }
+  > = {
+    draft: {
+      label: 'Draft',
+      className: 'bg-muted/40 text-muted-foreground border-border/60',
+    },
+    pending: {
+      label: 'Pending approval',
+      className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300',
+    },
+    active: {
+      label: 'Active',
+      className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-300',
+    },
+    expired: {
+      label: type === 'auction' && ended ? 'Ended' : 'Expired',
+      className: 'bg-zinc-500/10 text-zinc-700 border-zinc-500/30 dark:text-zinc-300',
+    },
+    sold: {
+      label: 'Sold',
+      className: 'bg-sky-500/10 text-sky-700 border-sky-500/30 dark:text-sky-300',
+    },
+    removed: {
+      label: 'Rejected',
+      className: 'bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-300',
+    },
   };
-  const config = variants[status] || { variant: 'outline' as const, label: status };
-  return <Badge variant={config.variant} className="font-semibold text-xs">{config.label}</Badge>;
+
+  const config = variants[status] || {
+    label: status,
+    className: 'bg-muted/40 text-muted-foreground border-border/60',
+  };
+
+  return (
+    <Badge variant="outline" className={cn('font-semibold text-xs', config.className)}>
+      {config.label}
+    </Badge>
+  );
 };
 
 const getTypeBadge = (type: string) => {
