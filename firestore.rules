@@ -234,7 +234,7 @@ service cloud.firestore {
                        // If category is being changed, it must be to a supported canonical category.
                        (!request.resource.data.diff(resource.data).changedKeys().hasAny(['category']) ||
                         isValidListingCategory(request.resource.data.category))
-                      )) ||
+                      ) ||
                     (isAdmin() && 
                      // Admins can change complianceStatus
                      true);
