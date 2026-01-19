@@ -100,9 +100,9 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
       className="group w-full"
     >
       <Link href={`/listing/${listing.id}`}>
-        <Card className="overflow-hidden transition-all duration-300 rounded-xl flex flex-row md:grid md:grid-cols-[224px_1fr] h-full w-full border border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
+        <Card className="overflow-hidden transition-all duration-300 rounded-xl flex flex-row md:grid md:grid-cols-[288px_1fr] h-full w-full border border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
           {/* Image (only overlay is watchlist heart, per spec) */}
-          <div className="relative w-28 sm:w-36 md:w-full h-28 sm:h-36 md:h-full min-h-[112px] md:min-h-[176px] flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
+          <div className="relative w-32 sm:w-44 md:w-full h-32 sm:h-44 md:h-full min-h-[128px] md:min-h-[208px] flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             
             {listing.images[0] ? (
               <Image
@@ -110,7 +110,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 alt={listing.title}
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
-                sizes="(max-width: 640px) 112px, (max-width: 768px) 144px, (max-width: 1024px) 224px, 288px"
+                sizes="(max-width: 640px) 128px, (max-width: 768px) 176px, (max-width: 1024px) 288px, 320px"
                 unoptimized
                 loading="lazy"
               />
