@@ -20,6 +20,18 @@ import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+class BidError extends Error {
+  code: string;
+  status: number;
+  details?: Record<string, any>;
+  constructor(params: { code: string; message: string; status?: number; details?: Record<string, any> }) {
+    super(params.message);
+    this.code = params.code;
+    this.status = typeof params.status === 'number' ? params.status : 400;
+    this.details = params.details;
+  }
+}
+
 function json(body: any, init?: { status?: number; headers?: Record<string, string> | Headers }) {
   const headers =
     init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : (init?.headers as Record<string, string> | undefined);
@@ -122,29 +134,29 @@ export async function POST(request: Request) {
     const result = await db.runTransaction(async (tx) => {
       const listingRef = db.collection('listings').doc(listingId);
       const listingSnap = await tx.get(listingRef);
-      if (!listingSnap.exists) throw new Error('Listing not found');
+      if (!listingSnap.exists) throw new BidError({ code: 'LISTING_NOT_FOUND', message: 'Listing not found', status: 404 });
       const listing = listingSnap.data() as any;
 
-      if (listing.sellerId === bidderId) throw new Error('Cannot bid on your own listing');
-      if (listing.type !== 'auction') throw new Error('Bids can only be placed on auction listings');
-      if (listing.status !== 'active') throw new Error('Bids can only be placed on active listings');
+      if (listing.sellerId === bidderId) throw new BidError({ code: 'OWN_LISTING', message: 'Cannot bid on your own listing', status: 400 });
+      if (listing.type !== 'auction') throw new BidError({ code: 'NOT_AUCTION', message: 'Bids can only be placed on auction listings', status: 400 });
+      if (listing.status !== 'active') throw new BidError({ code: 'LISTING_NOT_ACTIVE', message: 'Bids can only be placed on active listings', status: 400 });
 
       if (listing.endsAt?.toDate) {
         const endsAt = listing.endsAt.toDate() as Date;
-        if (endsAt.getTime() <= Date.now()) throw new Error('This auction has ended');
+        if (endsAt.getTime() <= Date.now()) throw new BidError({ code: 'AUCTION_ENDED', message: 'This auction has ended', status: 400 });
       }
 
       // TX-only for animals (buyer + listing)
       if (animalCategories.has(listing.category)) {
-        if (listing.location?.state !== 'TX') throw new Error('Animal listings must be located in Texas.');
+        if (listing.location?.state !== 'TX') {
+          throw new BidError({ code: 'TX_ONLY_LISTING', message: 'Animal listings must be located in Texas.', status: 400 });
+        }
 
         const userRef = db.collection('users').doc(bidderId);
         const userSnap = await tx.get(userRef);
         const userData = userSnap.exists ? (userSnap.data() as any) : null;
         const buyerState = userData?.profile?.location?.state;
-        if (buyerState !== 'TX') {
-          throw new Error('Only Texas residents can bid on animal listings.');
-        }
+        if (buyerState !== 'TX') throw new BidError({ code: 'TX_ONLY_BUYER', message: 'Only Texas residents can bid on animal listings.', status: 400 });
       }
 
       const now = Timestamp.now();
@@ -167,7 +179,12 @@ export async function POST(request: Request) {
       const hasAnyBids = Boolean(listing.currentBidderId) || Number(listing?.metrics?.bidCount || 0) > 0;
       const minRequiredCents = hasAnyBids ? currentBidCents + getMinIncrementCents(currentBidCents) : startingBidCents;
       if (amountCents < minRequiredCents) {
-        throw new Error(`Bid must be at least $${(minRequiredCents / 100).toLocaleString()}`);
+        throw new BidError({
+          code: 'BID_TOO_LOW',
+          message: `Bid must be at least $${(minRequiredCents / 100).toLocaleString()}`,
+          status: 400,
+          details: { minRequired: minRequiredCents / 100, minRequiredCents, currentBid: currentBidCents / 100 },
+        });
       }
 
       // Upsert bidder max bid (proxy bidding always uses max bids).
@@ -178,7 +195,12 @@ export async function POST(request: Request) {
       const createdAtMs = existingAutoBid?.createdAt?.toMillis ? existingAutoBid.createdAt.toMillis() : nowMs;
 
       if (existingAutoBid && existingAutoBid.enabled === true && amountCents <= existingMax) {
-        throw new Error('Your maximum bid must be higher than your current maximum bid.');
+        throw new BidError({
+          code: 'MAX_BID_NOT_HIGHER',
+          message: 'Your maximum bid must be higher than your current maximum bid.',
+          status: 400,
+          details: { currentMax: existingMax / 100 },
+        });
       }
 
       // Load enabled max bids for this auction (transactional snapshot).
@@ -426,7 +448,16 @@ export async function POST(request: Request) {
 
     return json({ ok: true, ...result });
   } catch (e: any) {
-    return json({ ok: false, error: e?.message || 'Failed to place bid' }, { status: 400 });
+    const err = e instanceof BidError ? e : null;
+    return json(
+      {
+        ok: false,
+        error: err?.message || e?.message || 'Failed to place bid',
+        code: err?.code || 'BID_FAILED',
+        details: err?.details,
+      },
+      { status: err?.status || 400 }
+    );
   }
 }
 

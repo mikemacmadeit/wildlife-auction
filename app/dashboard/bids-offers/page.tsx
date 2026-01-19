@@ -918,6 +918,16 @@ export default function BidsOffersPage() {
                     toast({ title: 'Invalid amount', description: 'Enter a valid max bid amount.', variant: 'destructive' });
                     return;
                   }
+                  // Client-side guard to avoid avoidable 400s (server is authoritative).
+                  const minAllowed = raiseTarget ? suggestNextMaxUsd({ currentHighestBid: raiseTarget.currentHighestBid, myMaxBid: raiseTarget.myMaxBid }) : 0;
+                  if (minAllowed && amount < minAllowed) {
+                    toast({
+                      title: 'Bid too low',
+                      description: `Enter at least $${Number(minAllowed).toLocaleString()} to raise your max bid.`,
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
                   try {
                     setRaising(true);
                     const res = await placeBidServer({ listingId: raiseTarget.listingId, amount });
