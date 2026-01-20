@@ -1370,7 +1370,9 @@ export default function AdminOpsPage() {
                     />
                   )}
                   <div className="flex-1">
-                    <p className="font-semibold">{selectedOrder.listingTitle || 'Unknown Listing'}</p>
+                    <p className="font-semibold">
+                      {selectedOrder.listingTitle || (selectedOrder as any).listingSnapshot?.title || selectedOrder.listingId || 'Unknown Listing'}
+                    </p>
                     <a
                       href={`/listings/${selectedOrder.listingId}`}
                       target="_blank"
@@ -1491,7 +1493,7 @@ function OrderCard({
               <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
               {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
             </div>
-            <h3 className="font-semibold">{order.listingTitle || 'Unknown Listing'}</h3>
+            <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Buyer: {order.buyerName} ({order.buyerEmail})</p>
               <p>Seller: {order.sellerName} ({order.sellerEmail})</p>
@@ -1566,7 +1568,7 @@ function ProtectedTransactionCard({
                 {order.protectedTransactionDaysSnapshot} Days
               </Badge>
             </div>
-            <h3 className="font-semibold">{order.listingTitle || 'Unknown Listing'}</h3>
+            <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Seller: {order.sellerName} | Buyer: {order.buyerName}</p>
               <p>Amount: {formatCurrency(order.amount)}</p>
@@ -1637,7 +1639,7 @@ function DisputeCard({
               <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
               {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
             </div>
-            <h3 className="font-semibold">{order.listingTitle || 'Unknown Listing'}</h3>
+            <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Buyer: {order.buyerName} | Seller: {order.sellerName}</p>
               <p>Amount: {formatCurrency(order.amount)}</p>
@@ -1696,7 +1698,7 @@ function ReadyToReleaseCard({
               <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
               {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
             </div>
-            <h3 className="font-semibold">{order.listingTitle || 'Unknown Listing'}</h3>
+            <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Seller: {order.sellerName} | Amount: {formatCurrency(order.sellerAmount)}</p>
               <p className="text-green-600 font-medium">Eligible: {eligibleReason}</p>

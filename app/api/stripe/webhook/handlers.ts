@@ -421,6 +421,9 @@ export async function handleCheckoutSessionCompleted(
       listingId,
       buyerId,
       sellerId,
+      // Redundant but useful: some admin UIs use listingTitle for display.
+      // listingSnapshot remains the canonical snapshot for buyer/seller pages.
+      listingTitle: String((listingData as any)?.title || 'Listing'),
       listingSnapshot: {
         listingId,
         title: String((listingData as any)?.title || 'Listing'),

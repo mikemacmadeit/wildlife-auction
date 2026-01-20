@@ -386,6 +386,8 @@ export async function POST(request: Request) {
         listingId,
         buyerId,
         sellerId: listingData.sellerId,
+        // Redundant but useful: admin tooling often uses listingTitle for display.
+        listingTitle: String(l?.title || listingData?.title || 'Listing'),
         listingSnapshot: {
           listingId,
           title: String(l?.title || listingData?.title || 'Listing'),

@@ -92,6 +92,17 @@ export async function GET(request: Request) {
       ...doc.data(),
     }));
 
+    // Airtight display fields: some admin tooling uses `listingTitle` for rendering.
+    // Canonical snapshot is `listingSnapshot.title`, but older orders (or some flows) may not have `listingTitle`.
+    orders = orders.map((o: any) => {
+      const listingTitleFromSnapshot = o?.listingSnapshot?.title ? String(o.listingSnapshot.title) : '';
+      const listingTitle = typeof o?.listingTitle === 'string' && o.listingTitle.trim() ? o.listingTitle.trim() : '';
+      return {
+        ...o,
+        listingTitle: listingTitle || listingTitleFromSnapshot || o?.listingId || 'Unknown Listing',
+      };
+    });
+
     // Server-side filtering based on filter type
     const now = Timestamp.now();
 

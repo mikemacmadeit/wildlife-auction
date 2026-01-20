@@ -636,6 +636,8 @@ export async function POST(request: Request) {
         ...(offerId ? { offerId: String(offerId) } : {}),
         buyerId,
         sellerId: live.sellerId,
+        // Redundant but useful: admin tooling often uses listingTitle for display.
+        listingTitle: String(live?.title || 'Listing'),
         listingSnapshot: {
           listingId,
           title: String(live?.title || 'Listing'),
