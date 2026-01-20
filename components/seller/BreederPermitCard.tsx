@@ -137,7 +137,7 @@ export function BreederPermitCard(props: { className?: string }) {
               TPWD Breeder Permit
             </CardTitle>
             <CardDescription>
-              Upload your breeder permit once. Admin will review and (if approved) you’ll receive a badge shown on your profile and listings.
+              Upload your breeder permit. Admin will review and (if approved) you’ll receive a badge shown on your profile and listings.
             </CardDescription>
           </div>
           {permit?.status ? (
@@ -194,7 +194,7 @@ export function BreederPermitCard(props: { className?: string }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="tpwd-permit-number">Permit number (optional)</Label>
+            <Label htmlFor="tpwd-permit-number">Permit number</Label>
             <Input
               id="tpwd-permit-number"
               value={permitNumber}
@@ -204,7 +204,7 @@ export function BreederPermitCard(props: { className?: string }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tpwd-permit-exp">Expiration date (optional)</Label>
+            <Label htmlFor="tpwd-permit-exp">Expiration date</Label>
             <Input
               id="tpwd-permit-exp"
               type="date"
