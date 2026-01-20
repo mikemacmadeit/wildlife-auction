@@ -24,9 +24,9 @@ export default function MessagesPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const listingIdParam = searchParams.get('listingId');
-  const sellerIdParam = searchParams.get('sellerId');
-  const threadIdParam = searchParams.get('threadId');
+  const listingIdParam = searchParams?.get('listingId');
+  const sellerIdParam = searchParams?.get('sellerId');
+  const threadIdParam = searchParams?.get('threadId');
 
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);

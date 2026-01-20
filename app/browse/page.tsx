@@ -120,7 +120,7 @@ export default function BrowsePage() {
 
   // Deep link: /browse?savedSearchId=... loads criteria for the signed-in user.
   useEffect(() => {
-    const savedSearchId = searchParams.get('savedSearchId');
+    const savedSearchId = searchParams?.get('savedSearchId');
     if (!savedSearchId) return;
     if (!user?.uid) return;
 
@@ -144,22 +144,22 @@ export default function BrowsePage() {
 
   // Public deep links (used by sold listing pages): /browse?status=active&category=...&state=...&type=...&speciesId=...
   useEffect(() => {
-    const savedSearchId = searchParams.get('savedSearchId');
+    const savedSearchId = searchParams?.get('savedSearchId');
     if (savedSearchId) return; // Saved search should take precedence.
 
-    const status = searchParams.get('status');
+    const status = searchParams?.get('status');
     if (status === 'active' || status === 'sold' || status === 'ended') {
       setListingStatus(status as any);
     }
 
-    const type = searchParams.get('type');
+    const type = searchParams?.get('type');
     if (type === 'auction' || type === 'fixed' || type === 'classified' || type === 'all') {
       setSelectedType(type as any);
     }
 
-    const category = searchParams.get('category');
-    const state = searchParams.get('state');
-    const speciesId = searchParams.get('speciesId');
+    const category = searchParams?.get('category');
+    const state = searchParams?.get('state');
+    const speciesId = searchParams?.get('speciesId');
 
     setFilters((prev) => {
       const next: any = { ...(prev || {}) };

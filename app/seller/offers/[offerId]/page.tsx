@@ -38,9 +38,9 @@ function formatTimeLeft(expiresAtMs?: number | null): string {
 }
 
 export default function SellerOfferDetailPage() {
-  const params = useParams();
+  const params = useParams<{ offerId: string }>();
   const router = useRouter();
-  const offerId = params.offerId as string;
+  const offerId = typeof params?.offerId === 'string' ? params.offerId : '';
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 

@@ -124,9 +124,9 @@ function toMillisSafe(value: any): number | null {
 }
 
 export default function ListingDetailPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const listingId = params.id as string;
+  const listingId = typeof params?.id === 'string' ? params.id : '';
   
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);

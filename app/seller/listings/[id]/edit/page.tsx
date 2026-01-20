@@ -40,8 +40,8 @@ import { isAnimalCategory } from '@/lib/compliance/requirements';
 
 function EditListingPageContent() {
   const router = useRouter();
-  const params = useParams();
-  const listingId = params.id as string;
+  const params = useParams<{ id: string }>();
+  const listingId = typeof params?.id === 'string' ? params.id : '';
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
