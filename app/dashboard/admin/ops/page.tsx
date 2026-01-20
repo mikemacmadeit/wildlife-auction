@@ -83,6 +83,8 @@ interface OrderWithDetails extends Order {
   sellerEmail?: string;
 }
 
+// NOTE: Tab value `'escrow'` is a legacy internal filter key meaning "payout holds".
+// It is NOT shown to end users, and is retained to preserve existing API/query wiring.
 type TabType = 'escrow' | 'protected' | 'disputes' | 'ready_to_release';
 
 export default function AdminOpsPage() {

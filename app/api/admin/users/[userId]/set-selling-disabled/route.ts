@@ -3,6 +3,11 @@
  *
  * Admin-only: toggle seller listing/publishing privileges (server-authoritative flag).
  * Enforcement is applied in listing publish route (P0).
+ *
+ * Kill switch (diligence note):
+ * - Who can set: admin/super_admin via `requireAdmin()`.
+ * - What it blocks: listing publish/go-live (seller cannot publish new listings).
+ * - Why it exists: marketplace risk control for fraud/compliance/support escalations.
  */
 import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';

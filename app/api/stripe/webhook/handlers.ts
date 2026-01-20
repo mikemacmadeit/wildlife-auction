@@ -145,9 +145,16 @@ export async function handleCheckoutSessionCompleted(
 
     const listingData = listingDoc.data()!;
     
-    // P0: AIR-TIGHT TX-ONLY ENFORCEMENT - Verify Stripe address for animal listings
+    // P0: AIR-TIGHT TX-ONLY ENFORCEMENT (diligence note)
+    // We enforce TX-only in the money path (checkout + webhook) because it is the most reliable place to prevent interstate misuse:
+    // - Checkout can block based on buyer profile state + listing location.
+    // - Webhook re-verifies based on Stripe-collected billing/shipping signals (source-of-truth for what was provided at payment time).
+    // Async payment rails are handled differently: `checkout.session.completed` can arrive before funds settle, so we avoid premature refunds here.
     // IMPORTANT: For async bank rails, do NOT attempt refunds in this handler because
     // `checkout.session.completed` can occur before funds have actually been received.
+    //
+    // NOT PRESENT BY DESIGN:
+    // - No regulator notification/automation exists in code. Admin review + audit logs support internal workflow only.
     let listingCategory: string;
     try {
       listingCategory = normalizeCategory((listingData as any)?.category);
@@ -348,6 +355,7 @@ export async function handleCheckoutSessionCompleted(
 
     // Create or update order in Firestore (idempotent).
     const now = new Date();
+    // Legacy env var name retained for backward compatibility. This governs the protected-transaction dispute window duration (hours).
     const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
     const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
     
@@ -1171,6 +1179,8 @@ export async function handleWirePaymentIntentSucceeded(
   }
 
   if (listingId) {
+    // IMPORTANT (diligence note): this is the authoritative place where a listing becomes `status: 'sold'`
+    // for the wire-payment path (payment_intent.succeeded for wire rails).
     let listingType: string | null = null;
     try {
       const listingSnap = await db.collection('listings').doc(listingId).get();

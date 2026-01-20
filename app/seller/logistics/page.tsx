@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Truck, CheckCircle2, AlertCircle, Clock, FileCheck } from 'lucide-react';
+import { Search, CheckCircle2, AlertCircle, Clock, FileCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mockSellerListings, SellerListing } from '@/lib/seller-mock-data';
 
@@ -16,7 +16,6 @@ type StatusFilter = 'all' | 'pending' | 'complete' | 'not_requested';
 export default function SellerLogisticsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [verificationFilter, setVerificationFilter] = useState<StatusFilter>('all');
-  const [transportFilter, setTransportFilter] = useState<StatusFilter>('all');
 
   const filteredListings = useMemo(() => {
     let result = [...mockSellerListings];
@@ -41,40 +40,14 @@ export default function SellerLogisticsPage() {
       });
     }
 
-    // Transport filter
-    if (transportFilter !== 'all') {
-      result = result.filter((listing) => {
-        if (transportFilter === 'pending') return listing.transportStatus === 'quote_requested' || listing.transportStatus === 'scheduled';
-        if (transportFilter === 'complete') return listing.transportStatus === 'complete';
-        if (transportFilter === 'not_requested') return listing.transportStatus === 'not_requested';
-        return true;
-      });
-    }
-
     return result;
-  }, [searchQuery, verificationFilter, transportFilter]);
+  }, [searchQuery, verificationFilter]);
 
   const getVerificationBadge = (status: string) => {
     const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon?: React.ReactNode }> = {
       eligible: { variant: 'outline', label: 'Eligible', icon: <CheckCircle2 className="h-3 w-3" /> },
       pending: { variant: 'destructive', label: 'Pending', icon: <Clock className="h-3 w-3" /> },
       verified: { variant: 'secondary', label: 'Verified', icon: <CheckCircle2 className="h-3 w-3" /> },
-      not_requested: { variant: 'outline', label: 'Not Requested', icon: <AlertCircle className="h-3 w-3" /> },
-    };
-    const config = variants[status] || { variant: 'outline' as const, label: status };
-    return (
-      <Badge variant={config.variant} className="font-semibold text-xs gap-1">
-        {config.icon}
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getTransportBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon?: React.ReactNode }> = {
-      quote_requested: { variant: 'destructive', label: 'Quote Requested', icon: <Clock className="h-3 w-3" /> },
-      scheduled: { variant: 'default', label: 'Scheduled', icon: <Truck className="h-3 w-3" /> },
-      complete: { variant: 'secondary', label: 'Complete', icon: <CheckCircle2 className="h-3 w-3" /> },
       not_requested: { variant: 'outline', label: 'Not Requested', icon: <AlertCircle className="h-3 w-3" /> },
     };
     const config = variants[status] || { variant: 'outline' as const, label: status };
@@ -97,26 +70,16 @@ export default function SellerLogisticsPage() {
     return counts;
   }, []);
 
-  const transportCounts = useMemo(() => {
-    const counts = { all: mockSellerListings.length, pending: 0, complete: 0, not_requested: 0 };
-    mockSellerListings.forEach((listing) => {
-      if (listing.transportStatus === 'quote_requested' || listing.transportStatus === 'scheduled') counts.pending++;
-      else if (listing.transportStatus === 'complete') counts.complete++;
-      else if (listing.transportStatus === 'not_requested') counts.not_requested++;
-    });
-    return counts;
-  }, []);
-
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
-            Documents & Delivery
+            Documents & Delivery Status
           </h1>
           <p className="text-base md:text-lg text-muted-foreground">
-            Manage documents and delivery notes for your listings. Wildlife Exchange does not arrange transport.
+            Manage documents and delivery notes for your listings. Wildlife Exchange does not arrange pickup or delivery.
           </p>
         </div>
 
@@ -135,26 +98,13 @@ export default function SellerLogisticsPage() {
             </div>
 
             <Tabs defaultValue="verification" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-auto bg-background border border-border/50 p-1">
+              <TabsList className="grid w-full grid-cols-1 h-auto bg-background border border-border/50 p-1">
                 <TabsTrigger 
                   value="verification" 
                   className="min-h-[44px] font-semibold data-[state=active]:bg-card"
-                  onClick={() => {
-                    setTransportFilter('all');
-                  }}
                 >
                   <FileCheck className="h-4 w-4 mr-2" />
-                  Verification
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="transport" 
-                  className="min-h-[44px] font-semibold data-[state=active]:bg-card"
-                  onClick={() => {
-                    setVerificationFilter('all');
-                  }}
-                >
-                  <Truck className="h-4 w-4 mr-2" />
-                  Transport
+                  Documents
                 </TabsTrigger>
               </TabsList>
 
@@ -195,47 +145,11 @@ export default function SellerLogisticsPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="transport" className="space-y-3 mt-4">
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={transportFilter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransportFilter('all')}
-                    className="text-xs"
-                  >
-                    All ({transportCounts.all})
-                  </Button>
-                  <Button
-                    variant={transportFilter === 'pending' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransportFilter('pending')}
-                    className="text-xs"
-                  >
-                    Pending ({transportCounts.pending})
-                  </Button>
-                  <Button
-                    variant={transportFilter === 'complete' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransportFilter('complete')}
-                    className="text-xs"
-                  >
-                    Complete ({transportCounts.complete})
-                  </Button>
-                  <Button
-                    variant={transportFilter === 'not_requested' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransportFilter('not_requested')}
-                    className="text-xs"
-                  >
-                    Not Requested ({transportCounts.not_requested})
-                  </Button>
-                </div>
-              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        {/* Listings with Logistics Status */}
+        {/* Listings with document status (marketplace workflow; not transport coordination) */}
         {filteredListings.length === 0 ? (
           <Card className="border-2 border-border/50 bg-card">
             <CardContent className="pt-12 pb-12 px-6 text-center">
@@ -301,7 +215,7 @@ export default function SellerLogisticsPage() {
                         {listing.verificationStatus === 'verified' && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3 text-primary" />
-                            Verified and approved
+                            Reviewed (marketplace workflow)
                           </p>
                         )}
                         {listing.verificationStatus === 'eligible' && (
@@ -311,47 +225,7 @@ export default function SellerLogisticsPage() {
                         )}
                       </div>
 
-                      {/* Transport */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Truck className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-semibold text-foreground">Transport</span>
-                          </div>
-                          {getTransportBadge(listing.transportStatus)}
-                        </div>
-                        {listing.transportStatus === 'not_requested' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full min-h-[36px] font-semibold text-xs"
-                          >
-                            Request Quote
-                          </Button>
-                        )}
-                        {listing.transportStatus === 'quote_requested' && (
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            <p>Quote request pending</p>
-                            <Button variant="ghost" size="sm" className="w-full text-xs h-8">
-                              View Status
-                            </Button>
-                          </div>
-                        )}
-                        {listing.transportStatus === 'scheduled' && (
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            <p>Transport scheduled</p>
-                            <Button variant="ghost" size="sm" className="w-full text-xs h-8">
-                              View Details
-                            </Button>
-                          </div>
-                        )}
-                        {listing.transportStatus === 'complete' && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-primary" />
-                            Transport completed
-                          </p>
-                        )}
-                      </div>
+                      {/* Delivery/pickup is arranged by buyer & seller off-platform; no transport tools here by design. */}
                     </div>
                   </div>
                 </CardContent>

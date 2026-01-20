@@ -227,7 +227,7 @@ interface Order {
   status: 'pending_payment' | 'pending_verification' | 'in_transit' | 'completed' | 'cancelled';
   paymentStatus: 'pending' | 'completed' | 'refunded';
   insuranceStatus: 'available' | 'active' | 'not_selected';
-  transportStatus: 'quote_requested' | 'scheduled' | 'complete' | 'not_requested';
+  deliveryStatus: 'details_requested' | 'arranged_off_platform' | 'complete' | 'not_requested';
   createdAt: Date;
   completedAt?: Date;
   invoiceUrl?: string; // Link to generated invoice
@@ -474,7 +474,7 @@ interface Watchlist {
   status: 'pending_payment' | 'pending_verification' | 'in_transit' | 'completed' | 'cancelled';
   paymentStatus: 'pending' | 'completed' | 'refunded';
   insuranceStatus: 'available' | 'active' | 'not_selected';
-  transportStatus: 'quote_requested' | 'scheduled' | 'complete' | 'not_requested';
+  deliveryStatus: 'details_requested' | 'arranged_off_platform' | 'complete' | 'not_requested';
   
   // Additional Info
   invoiceUrl?: string; // Firebase Storage URL

@@ -226,7 +226,7 @@ gcloud firestore import gs://[BUCKET_NAME]/[EXPORT_PATH] \
 
 ### Symptoms
 
-- Funds stuck in escrow after protection window expired
+- Funds stuck in payout hold after protection window expired
 - Orders eligible for release not being released automatically
 
 ### Diagnostic Steps

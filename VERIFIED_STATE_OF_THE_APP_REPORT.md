@@ -9,7 +9,7 @@
 ## 0) EXECUTIVE SUMMARY
 
 ### What This App Is Today
-Wildlife Exchange is a Next.js 14.2.5 marketplace for wildlife, cattle, and ranch equipment. It uses Firebase (Auth + Firestore) for backend, Stripe Connect for payments, and implements an escrow-style payment flow where funds are held in the platform account until admin releases them to sellers. The app includes seller pricing tiers (Free/Pro/Elite), protected transaction disputes, anti-circumvention messaging, and admin operations dashboards.
+Wildlife Exchange is a Next.js 14.2.5 marketplace for wildlife, cattle, and ranch equipment. It uses Firebase (Auth + Firestore) for backend, Stripe Connect for payments, and implements a payout-hold payment flow where funds are held in the platform account until admin releases them to sellers. The app includes seller pricing tiers (Free/Pro/Elite), protected transaction disputes, anti-circumvention messaging, and admin operations dashboards.
 
 ### Top 5 Things That Are Solid
 1. **Escrow Implementation**: Funds flow to platform account first, then manual transfer to seller (verified in `project/app/api/stripe/checkout/create-session/route.ts` line 267: `// NO payment_intent_data.transfer_data`)
@@ -466,7 +466,7 @@ project/
 
 ---
 
-## 3) PAYMENTS / ESCROW (VERIFIED)
+## 3) PAYMENTS / PAYOUT HOLD (VERIFIED)
 
 ### A) Stripe Files Identified
 
@@ -503,7 +503,7 @@ project/
 - **File**: `project/app/api/stripe/checkout/create-session/route.ts`
 - **Action**: Creates Stripe Checkout session
 - **Evidence**: Lines 246-279
-- **Key**: Line 267 comment: `// NO payment_intent_data.transfer_data - funds stay in platform account (escrow)`
+- **Key**: Line 267 comment: `// NO payment_intent_data.transfer_data - funds stay in platform account (payout hold / delayed payout release)`
 - **Result**: Funds go to platform Stripe account, NOT seller account
 
 **Step 2: Payment Captured**
@@ -528,7 +528,7 @@ project/
 - **Result**: Funds transferred from platform to seller, order status updated
 
 **Escrow Confirmation:**
-- **VERIFIED**: This IS escrow
+- **VERIFIED**: This is a payout-hold workflow (delayed payout release)
 - **Evidence**: 
   1. Checkout session has NO `payment_intent_data.transfer_data` (line 267 of create-session)
   2. Funds land in platform account first

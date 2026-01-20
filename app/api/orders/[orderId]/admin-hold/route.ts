@@ -3,6 +3,11 @@
  * 
  * Admin-only endpoint to place or remove admin hold on an order
  * Prevents auto-release even if deadline passed
+ *
+ * Kill switch (diligence note):
+ * - Who can set: admin/super_admin (server-side role check in this handler).
+ * - What it blocks: payout release (manual and scheduled fallback) while `order.adminHold === true`.
+ * - Why it exists: risk control for disputes/chargebacks/compliance review and operational escalation.
  */
 
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.

@@ -7,7 +7,7 @@ Last Updated: $(date)
 ### 1. Escrow Payment Flow ✅
 - **Status**: Complete
 - **Details**: 
-  - Funds are held in platform account (escrow) until admin confirms delivery
+  - Funds are held in platform account (payout hold / delayed payout release) until admin confirms delivery
   - No automatic transfers - all payments require admin approval
   - Updated checkout session to remove destination charges
   - Updated webhook to set order status to 'paid' (not 'completed')

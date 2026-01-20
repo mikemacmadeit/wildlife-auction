@@ -338,7 +338,7 @@ No fields for:
   currency: string;            // Default: 'USD'
   
   // Payment
-  paymentMethod?: string;      // 'credit_card' | 'bank_transfer' | 'escrow'
+  paymentMethod?: string;      // OrderPaymentMethod in code: 'card' | 'ach_debit' | 'bank_transfer' | 'wire' (see lib/types.ts)
   paymentStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
   paymentId?: string;          // Reference to payment processor
   paidAt?: Timestamp;

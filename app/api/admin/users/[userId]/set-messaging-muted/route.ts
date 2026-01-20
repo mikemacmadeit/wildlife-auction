@@ -3,6 +3,11 @@
  *
  * Admin-only: "Mute user" for messaging (blocks sending messages).
  * Tradeoff vs shadow-ban: mute is transparent + simpler; shadow-ban requires complex delivery suppression and can confuse support.
+ *
+ * Kill switch (diligence note):
+ * - Who can set: admin/super_admin via `requireAdmin()`.
+ * - What it blocks: message sending for the muted user (enforced in messaging write paths).
+ * - Why it exists: marketplace abuse prevention (harassment/spam/circumvention).
  */
 import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';

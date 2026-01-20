@@ -2,6 +2,10 @@
  * Audit Logging System
  * 
  * Logs all critical actions for operational visibility and accountability
+ *
+ * NOT PRESENT BY DESIGN (diligence note):
+ * - This repo does not implement TTL/automatic deletion for audit logs.
+ * - Retention and deletion policies are operational/legal decisions and must be enforced via governance and/or external tooling.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -41,6 +45,7 @@ function stripUndefinedDeep<T>(value: T): T {
 export type AuditActionType =
   | 'payout_released_manual'
   | 'payout_released_auto'
+  | 'payout_release_blocked_global_freeze'
   | 'refund_full'
   | 'refund_partial'
   | 'order_refunded_tx_violation'

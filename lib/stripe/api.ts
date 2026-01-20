@@ -645,6 +645,8 @@ export async function runReconciliation(params?: {
 /**
  * Admin-only: Fetch orders with server-side filtering
  */
+// NOTE: filter value `'escrow'` is a legacy internal key meaning "payout holds" (paid funds awaiting delayed payout release).
+// Keep the key for backward compatibility with server-side filtering and admin UI wiring.
 export async function getAdminOrders(filter: 'escrow' | 'protected' | 'disputes' | 'ready_to_release' | 'all' = 'all', limit: number = 100, cursor?: string): Promise<{ orders: any[]; nextCursor: string | null; hasMore: boolean }> {
   const user = auth.currentUser;
   if (!user) {

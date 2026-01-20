@@ -241,7 +241,8 @@ export async function finalizeAuctionIfNeeded(params: {
       }
 
       // Persist listing end state (authoritative). Keep minimal fields, do not rewrite pricing.
-      // IMPORTANT: listing.status currently drives public read behavior; we use 'expired' as "ended auction".
+      // IMPORTANT (diligence note): this is the authoritative setter for "ended auction" listing state.
+      // listing.status currently drives public read behavior; we use `status: 'expired'` to mean "auction ended" (not deleted).
       tx.set(
         listingRef,
         {

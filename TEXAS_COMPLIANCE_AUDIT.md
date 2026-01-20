@@ -102,7 +102,7 @@ type ListingType = 'auction' | 'fixed' | 'classified';
    - For auctions: auction ended, buyer is winning bidder
    - Seller has Stripe Connect account set up (`chargesEnabled`, `payoutsEnabled`, `stripeDetailsSubmitted`)
 3. Creates Stripe Checkout session:
-   - **ESCROW MODEL:** Funds go to platform account (NO `transfer_data` — line 267 comment)
+   - **PAYOUT-HOLD MODEL:** Funds go to platform account (NO `transfer_data` — line 267 comment)
    - Platform fee calculated based on seller's plan (Free: 7%, Pro: 5%, Elite: 4%)
    - Metadata stored: `listingId`, `buyerId`, `sellerId`, `sellerStripeAccountId`, `sellerAmount`, `platformFee`
 
@@ -228,7 +228,7 @@ type ListingType = 'auction' | 'fixed' | 'classified';
    - Review messages flagged for anti-circumvention violations
 
 **Admin Endpoints:**
-- `POST /api/stripe/transfers/release` — Release escrow funds
+- `POST /api/stripe/transfers/release` — Release held funds
 - `POST /api/stripe/refunds/process` — Process refunds
 - `POST /api/orders/[orderId]/confirm-delivery` — Confirm delivery (starts protection window)
 - `POST /api/orders/[orderId]/disputes/resolve` — Resolve disputes
@@ -254,14 +254,14 @@ type ListingType = 'auction' | 'fixed' | 'classified';
 ### Platform Role Analysis
 
 **Current Model:** **MARKETPLACE** (correct)
-- ✅ Funds flow: Buyer → Platform (escrow) → Seller (manual release)
+- ✅ Funds flow: Buyer → Platform (payout hold) → Seller (manual release)
 - ✅ Platform takes fee (4-7%)
 - ✅ Platform does NOT take title/ownership
 - ✅ Sellers create listings, set prices
 - ✅ Platform facilitates transactions only
 
 **Risk Areas:**
-- Platform acts as escrow holder (acceptable for marketplace)
+- Platform acts as payout-hold operator for settlement timing (marketplace workflow)
 - No explicit "marketplace disclaimer" in terms
 - No seller liability disclaimers
 
@@ -273,7 +273,7 @@ type ListingType = 'auction' | 'fixed' | 'classified';
 
 **Proposed Flow:**
 ```
-listed → offer_accepted → escrow → permit_requested → permit_approved → completed
+listed → offer_accepted → payout_hold → permit_requested → permit_approved → completed
 ```
 
 **Implementation:**

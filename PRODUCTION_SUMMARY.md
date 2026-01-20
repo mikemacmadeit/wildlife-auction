@@ -68,7 +68,7 @@
 **YES** - The core functionality is production-ready. The remaining items (email notifications, error monitoring) can be added post-launch without blocking the launch.
 
 ### What's Working
-- ✅ Complete payment flow (escrow → admin approval → payout)
+- ✅ Complete payment flow (payout hold → admin approval → payout)
 - ✅ Auction system with checkout
 - ✅ Refund processing
 - ✅ Admin dashboard for approvals and payouts

@@ -3,7 +3,8 @@
 
 export interface SellerAlert {
   id: string;
-  type: 'auction_ending' | 'transport_request' | 'insurance_pending' | 'message' | 'bid';
+  // Note: platform does not arrange transport. Any delivery/pickup is handled by buyer/seller off-platform.
+  type: 'auction_ending' | 'delivery_details_request' | 'insurance_pending' | 'message' | 'bid';
   priority: 'high' | 'medium' | 'low';
   title: string;
   description: string;
@@ -42,7 +43,7 @@ export interface SellerListing {
   endsAt?: Date;
   verificationStatus: 'eligible' | 'pending' | 'verified' | 'not_requested';
   insuranceStatus: 'available' | 'active' | 'not_selected';
-  transportStatus: 'quote_requested' | 'scheduled' | 'complete' | 'not_requested';
+  deliveryStatus: 'details_requested' | 'arranged_off_platform' | 'complete' | 'not_requested';
 }
 
 export interface Sale {
@@ -57,7 +58,7 @@ export interface Sale {
   status: 'pending_payment' | 'pending_verification' | 'in_transit' | 'completed';
   paymentStatus: 'pending' | 'completed';
   insuranceStatus: 'available' | 'active' | 'not_selected';
-  transportStatus: 'quote_requested' | 'scheduled' | 'complete' | 'not_requested';
+  deliveryStatus: 'details_requested' | 'arranged_off_platform' | 'complete' | 'not_requested';
   createdAt: Date;
 }
 
@@ -116,7 +117,7 @@ export const mockSellerAlerts: SellerAlert[] = [
   },
   {
     id: '2',
-    type: 'transport_request',
+    type: 'delivery_details_request',
     priority: 'medium',
     title: 'Buyer requested delivery details',
     description: 'Axis Deer Herd • Buyer in Dallas, TX',
@@ -206,12 +207,12 @@ export const mockSellerListings: SellerListing[] = [
     endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
     verificationStatus: 'verified',
     insuranceStatus: 'active',
-    transportStatus: 'not_requested',
+    deliveryStatus: 'not_requested',
   },
   {
     id: '2',
     title: 'Axis Deer Herd',
-    description: 'Premium axis deer breeding herd: mature buck with impressive antlers and three proven does. Excellent genetics, established breeders. All health papers current, transport-ready.',
+    description: 'Premium axis deer breeding herd: mature buck with impressive antlers and three proven does. Excellent genetics, established breeders. All health papers current.',
     type: 'fixed',
     category: 'wildlife',
     status: 'active',
@@ -223,7 +224,7 @@ export const mockSellerListings: SellerListing[] = [
     bids: 0,
     verificationStatus: 'pending',
     insuranceStatus: 'available',
-    transportStatus: 'quote_requested',
+    deliveryStatus: 'details_requested',
   },
   {
     id: '3',
@@ -240,7 +241,7 @@ export const mockSellerListings: SellerListing[] = [
     bids: 0,
     verificationStatus: 'verified',
     insuranceStatus: 'not_selected',
-    transportStatus: 'not_requested',
+    deliveryStatus: 'not_requested',
   },
   {
     id: '4',
@@ -257,7 +258,7 @@ export const mockSellerListings: SellerListing[] = [
     bids: 0,
     verificationStatus: 'verified',
     insuranceStatus: 'active',
-    transportStatus: 'complete',
+    deliveryStatus: 'complete',
   },
   {
     id: '5',
@@ -275,7 +276,7 @@ export const mockSellerListings: SellerListing[] = [
     bids: 0,
     verificationStatus: 'not_requested',
     insuranceStatus: 'not_selected',
-    transportStatus: 'not_requested',
+    deliveryStatus: 'not_requested',
   },
 ];
 
@@ -289,7 +290,7 @@ export const mockSales: Sale[] = [
     status: 'pending_payment',
     paymentStatus: 'pending',
     insuranceStatus: 'active',
-    transportStatus: 'not_requested',
+    deliveryStatus: 'not_requested',
     createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
   },
   {
@@ -301,7 +302,7 @@ export const mockSales: Sale[] = [
     status: 'completed',
     paymentStatus: 'completed',
     insuranceStatus: 'active',
-    transportStatus: 'complete',
+    deliveryStatus: 'complete',
     createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
   },
 ];

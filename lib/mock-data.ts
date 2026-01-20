@@ -244,4 +244,4 @@ export const mockListings: Listing[] = [
   },
 ];
 
-// Note: We do not offer insurance products. Protected Transaction provides buyer protection via escrow + dispute window.
+// Note: We do not offer insurance products. Protected Transaction provides buyer protection via a payout hold + dispute window.

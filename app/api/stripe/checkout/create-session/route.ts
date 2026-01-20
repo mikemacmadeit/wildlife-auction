@@ -84,6 +84,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // OPTIONAL (default OFF): platform-wide checkout freeze for emergency operations.
+    // This blocks creation of new Checkout Sessions but does not alter existing orders or payout flows.
+    if (process.env.GLOBAL_CHECKOUT_FREEZE_ENABLED === 'true') {
+      return NextResponse.json(
+        {
+          error: 'Checkout is temporarily paused by platform operations.',
+          code: 'GLOBAL_CHECKOUT_FREEZE',
+          message: 'Checkout is temporarily paused by platform operations.',
+        },
+        { status: 403 }
+      );
+    }
+
     // Rate limiting (before auth to prevent brute force)
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.checkout);
     const rateLimitResult = await rateLimitCheck(request as any);
@@ -784,6 +797,13 @@ export async function POST(request: Request) {
       // ignore; best-effort
     }
 
+    /**
+     * Payments model (evidence-based):
+     * - This code path uses "platform charge + later transfer" (separate charges & transfers).
+     * - We intentionally do NOT set `payment_intent_data.transfer_data` here.
+     *   Funds settle to the platform first, then are released later via an admin-triggered Stripe Transfer.
+     * - This is a settlement/payout-hold workflow and does NOT imply custody of animals/goods or any intermediary role.
+     */
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],
       line_items: [
@@ -805,8 +825,8 @@ export async function POST(request: Request) {
       mode: 'payment',
       success_url: `${baseUrl}/dashboard/orders?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: offerId ? `${baseUrl}/listing/${listingId}?offer=${offerId}` : `${baseUrl}/listing/${listingId}`,
-      // NO payment_intent_data.transfer_data - funds stay in platform account (held for payout release)
-      // Admin will release funds via transfer after delivery confirmation
+      // IMPORTANT: Do not set `payment_intent_data.transfer_data` here.
+      // We hold funds at the platform until payout release conditions are satisfied, then pay sellers via Stripe Transfer.
       metadata: {
         orderId,
         listingId: listingId,

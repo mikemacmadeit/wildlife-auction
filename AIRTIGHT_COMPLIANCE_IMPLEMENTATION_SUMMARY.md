@@ -70,7 +70,7 @@ This final implementation pass makes Texas compliance enforcement **truly airtig
 **Solution:**
 - Created comprehensive Trust & Compliance page
 - Added navigation link
-- Explains badges, compliance workflow, escrow process
+- Explains badges, compliance workflow, payout-hold process
 
 **Files Changed:**
 - `project/app/trust/page.tsx` - NEW

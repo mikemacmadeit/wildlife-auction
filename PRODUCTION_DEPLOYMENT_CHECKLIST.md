@@ -32,7 +32,7 @@
 - [ ] Set `STRIPE_WEBHOOK_SECRET` in production environment
 - [ ] Test webhook delivery in production
 - [ ] Verify Stripe Connect accounts work in live mode
-- [ ] Test escrow payment flow end-to-end
+- [ ] Test payout-hold payment flow end-to-end
 - [ ] Test refund processing
 
 ### Payment Flows
@@ -147,7 +147,7 @@
 - [ ] Test order creation after payment
 - [ ] Test admin payout release
 - [ ] Test refund processing
-- [ ] Verify funds are held in escrow correctly
+- [ ] Verify funds are held for delayed payout release correctly
 
 ### Security Testing
 - [ ] Attempt unauthorized API access

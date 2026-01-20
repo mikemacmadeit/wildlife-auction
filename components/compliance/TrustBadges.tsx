@@ -69,7 +69,22 @@ export function ComplianceBadges({ listing, className, variant = 'inline' }: Tru
 
     switch (listing.complianceStatus) {
       case 'approved':
-        return <Badge className="bg-emerald-600 text-white border-emerald-700/30">Marketplace Review Approved</Badge>;
+        return (
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Badge className="bg-emerald-600 text-white border-emerald-700/30 cursor-help">
+                  Marketplace Review Complete
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs">
+                  Marketplace workflow review only. Not regulator approval.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
       case 'pending_review':
         return (
           <Badge variant="secondary">

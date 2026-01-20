@@ -20,7 +20,7 @@ This implementation makes Texas compliance enforcement **truly airtight** by:
 
 ### 1. `project/app/trust/page.tsx` (NEW)
 - Public-facing Trust & Compliance page
-- Explains trust badges, compliance workflow, escrow process
+- Explains trust badges, compliance workflow, payout-hold process
 - Includes FAQ and contact information
 - **Lines:** ~400
 

@@ -185,7 +185,7 @@ Payment status is checked in:
 
 ### Order Status Flow
 - **'pending'**: Payment not yet completed
-- **'paid'**: Payment completed, funds in escrow (contact info unlocks)
+- **'paid'**: Payment completed, funds held for delayed payout release (contact info unlocks)
 - **'completed'**: Admin released funds to seller (full completion)
 
 ## Seller Stats Tracking
