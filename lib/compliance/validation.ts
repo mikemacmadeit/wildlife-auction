@@ -485,6 +485,14 @@ export function validateListingCompliance(
 /**
  * Check if listing requires compliance review
  */
+const ESA_CITES_OVERLAY_SPECIES = new Set<string>([
+  'scimitar_horned_oryx',
+  'addax',
+  'dama_gazelle',
+  'bongo',
+  'sitatunga',
+]);
+
 export function requiresComplianceReview(category: ListingCategory, attributes: ListingAttributes): boolean {
   if (category === 'whitetail_breeder') {
     // Always requires review for whitetail breeder
@@ -493,8 +501,8 @@ export function requiresComplianceReview(category: ListingCategory, attributes: 
   
   if (category === 'wildlife_exotics') {
     const exoticsAttrs = attributes as WildlifeAttributes;
-    // Requires review if species is 'other_exotic'
-    return exoticsAttrs.speciesId === 'other_exotic';
+    // Requires review if species is 'other_exotic' or ESA/CITES overlay list (policy).
+    return exoticsAttrs.speciesId === 'other_exotic' || ESA_CITES_OVERLAY_SPECIES.has(exoticsAttrs.speciesId);
   }
 
   if (category === 'horse_equestrian') {
