@@ -2,10 +2,11 @@
  * Admin Ops Dashboard - Unified view for managing transaction lifecycle
  * 
  * Tabs:
- * 1. Orders in Escrow - Orders with status='paid' and no transfer ID
- * 2. Protected Transactions - Orders with protected transaction enabled
- * 3. Open Disputes - Orders with open disputes
- * 4. Ready to Release - Orders eligible for payout release
+ * - All Purchases - All orders across statuses (pending/paid/awaiting/wire/refunded/cancelled/etc.)
+ * - Payout holds - Funds received / awaiting payment confirmation and not yet released (legacy key: "escrow")
+ * - Protected Transactions - Orders with protected transaction enabled
+ * - Open Disputes - Orders with open disputes
+ * - Ready to Release - Orders eligible for payout release
  */
 
 'use client';
@@ -86,12 +87,14 @@ interface OrderWithDetails extends Order {
 // NOTE: Tab value `'escrow'` is a legacy internal filter key meaning "payout holds".
 // It is NOT shown to end users, and is retained to preserve existing API/query wiring.
 type TabType = 'escrow' | 'protected' | 'disputes' | 'ready_to_release';
+// Add an explicit "all" view so admins always have a source-of-truth list of purchases.
+type AdminOpsTabType = TabType | 'all';
 
 export default function AdminOpsPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabType>('escrow');
+  const [activeTab, setActiveTab] = useState<AdminOpsTabType>('escrow');
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,10 +126,17 @@ export default function AdminOpsPage() {
     
     setLoading(true);
     try {
-      const result = await getAdminOrders(activeTab === 'escrow' ? 'escrow' : 
-                                          activeTab === 'protected' ? 'protected' :
-                                          activeTab === 'disputes' ? 'disputes' :
-                                          'ready_to_release');
+      const result = await getAdminOrders(
+        activeTab === 'all'
+          ? 'all'
+          : activeTab === 'escrow'
+            ? 'escrow'
+            : activeTab === 'protected'
+              ? 'protected'
+              : activeTab === 'disputes'
+                ? 'disputes'
+                : 'ready_to_release'
+      );
       
       // Enrich orders with listing and user details
       const enrichedOrders = await Promise.all(
@@ -743,35 +753,64 @@ export default function AdminOpsPage() {
       </Card>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AdminOpsTabType)}>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="all">
+            <Package className="h-4 w-4 mr-2" />
+            All Purchases
+          </TabsTrigger>
           <TabsTrigger value="escrow">
             <DollarSign className="h-4 w-4 mr-2" />
-            Payout holds ({orders.filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId).length})
+            Payout holds
           </TabsTrigger>
           <TabsTrigger value="protected">
             <Shield className="h-4 w-4 mr-2" />
-            Protected ({orders.filter(o => o.protectedTransactionDaysSnapshot).length})
+            Protected
           </TabsTrigger>
           <TabsTrigger value="disputes">
             <AlertTriangle className="h-4 w-4 mr-2" />
-            Open Disputes ({orders.filter(o => o.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(o.disputeStatus)).length})
+            Open Disputes
           </TabsTrigger>
           <TabsTrigger value="ready_to_release">
             <CheckCircle className="h-4 w-4 mr-2" />
-            Ready to Release ({orders.filter(o => {
-              if (o.stripeTransferId || o.status === 'completed') return false;
-              if (o.adminHold) return false;
-              if (o.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(o.disputeStatus)) return false;
-              const hasBuyerConfirm = !!(o.buyerConfirmedAt || o.buyerAcceptedAt || o.acceptedAt);
-              const hasDelivery = !!(o.deliveredAt || o.deliveryConfirmedAt);
-              if (!hasBuyerConfirm || !hasDelivery) return false;
-              return o.status === 'ready_to_release' || o.status === 'buyer_confirmed' || o.status === 'accepted';
-            }).length})
+            Ready to Release
           </TabsTrigger>
         </TabsList>
 
         {/* Tab Content */}
+        <TabsContent value="all" className="space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No purchases found</h3>
+                  <p className="text-muted-foreground">Try searching by Order ID, listing title, or buyer/seller email.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {filteredOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onRelease={() => setReleaseDialogOpen(order.id)}
+                  onRefund={() => setRefundDialogOpen(order.id)}
+                  onMarkPaid={() => handleMarkPaid(order.id)}
+                  onView={() => handleViewOrder(order)}
+                  getStatusBadge={getStatusBadge}
+                  getHoldReasonText={getHoldReasonText}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="escrow" className="space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
