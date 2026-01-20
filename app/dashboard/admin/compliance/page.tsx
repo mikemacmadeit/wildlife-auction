@@ -1,14 +1,17 @@
 /**
  * Admin Compliance Dashboard
  * 
- * Two tabs:
- * 1. Listings - Review listings with complianceStatus='pending_review'
- * 2. Orders - Review whitetail_breeder orders requiring TPWD transfer approval
+ * Single compliance hub (operator-friendly):
+ * - Listings: review listings with complianceStatus='pending_review'
+ * - Orders: review whitetail_breeder orders requiring TPWD transfer approval
+ * - Breeder Permits: seller-submitted TPWD breeder permits
+ * - Payout Holds: orders blocked from payout release for compliance reasons (payoutHoldReason)
  */
 
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +40,7 @@ import {
   Search,
   Eye,
   Shield,
+  ShieldAlert,
   AlertCircle,
   Calendar,
   MapPin,
@@ -52,7 +57,7 @@ import { formatCurrency } from '@/lib/utils';
 import { ComplianceDocument } from '@/lib/types';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 
-type TabType = 'listings' | 'orders' | 'breeder_permits';
+type TabType = 'listings' | 'orders' | 'breeder_permits' | 'payout_holds';
 
 type SellerPermit = {
   sellerId: string;
@@ -67,6 +72,31 @@ type SellerPermit = {
   reviewedBy?: string | null;
   updatedAt?: string | null;
 };
+
+type HoldRow = {
+  id: string;
+  status?: string;
+  payoutHoldReason?: string;
+  adminPayoutApproval?: boolean;
+  listingId?: string;
+  buyerId?: string;
+  sellerId?: string;
+  listingSnapshot?: { title?: string; category?: string } | null;
+  complianceDocsStatus?: { missing?: string[] } | null;
+};
+
+const HOLD_REASONS = [
+  'MISSING_TAHC_CVI',
+  'EXOTIC_CERVID_REVIEW_REQUIRED',
+  'ESA_REVIEW_REQUIRED',
+  'OTHER_EXOTIC_REVIEW_REQUIRED',
+] as const;
+
+const REVIEW_REQUIRED = new Set<string>([
+  'EXOTIC_CERVID_REVIEW_REQUIRED',
+  'ESA_REVIEW_REQUIRED',
+  'OTHER_EXOTIC_REVIEW_REQUIRED',
+]);
 
 export default function AdminCompliancePage() {
   const toDateSafe = (value: any): Date | null => {
@@ -99,10 +129,14 @@ export default function AdminCompliancePage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('listings');
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [breederPermits, setBreederPermits] = useState<SellerPermit[]>([]);
+  const [holdRows, setHoldRows] = useState<HoldRow[]>([]);
+  const [approvingHold, setApprovingHold] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -123,6 +157,15 @@ export default function AdminCompliancePage() {
   const [permitDialogOpen, setPermitDialogOpen] = useState(false);
   const [permitRejectionReason, setPermitRejectionReason] = useState('');
 
+  // Allow deep-linking: /dashboard/admin/compliance?tab=payout_holds
+  useEffect(() => {
+    const tab = String(searchParams?.get('tab') || '').trim();
+    if (!tab) return;
+    if (tab === 'listings' || tab === 'orders' || tab === 'breeder_permits' || tab === 'payout_holds') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -130,8 +173,10 @@ export default function AdminCompliancePage() {
         await loadPendingListings();
       } else if (activeTab === 'orders') {
         await loadPendingOrders();
-      } else {
+      } else if (activeTab === 'breeder_permits') {
         await loadBreederPermits();
+      } else {
+        await loadComplianceHolds();
       }
     } catch (error) {
       console.error('Error loading compliance data:', error);
@@ -251,6 +296,36 @@ export default function AdminCompliancePage() {
       throw new Error(jsonRes?.error || jsonRes?.message || `Failed to load breeder permits (HTTP ${res.status})`);
     }
     setBreederPermits(Array.isArray(jsonRes?.permits) ? jsonRes.permits : []);
+  };
+
+  const loadComplianceHolds = async () => {
+    const ordersRef = collection(db, 'orders');
+    // Firestore `in` supports up to 10 values; we use 4.
+    const q = query(ordersRef, where('payoutHoldReason', 'in', [...HOLD_REASONS]), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    const data: HoldRow[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+    setHoldRows(data);
+  };
+
+  const approveHold = async (orderId: string) => {
+    if (!user) return;
+    setApprovingHold((m) => ({ ...m, [orderId]: true }));
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/orders/${orderId}/payout-approval`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ approved: true }),
+      });
+      const jsonRes = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(jsonRes?.error || jsonRes?.message || 'Unable to approve payout');
+      toast({ title: 'Approved', description: `Payout approval set for ${orderId}` });
+      await loadComplianceHolds();
+    } catch (e: any) {
+      toast({ title: 'Approve failed', description: e?.message || 'Unable to approve payout', variant: 'destructive' });
+    } finally {
+      setApprovingHold((m) => ({ ...m, [orderId]: false }));
+    }
   };
 
   const loadListingDocuments = async (listingId: string) => {
@@ -486,13 +561,25 @@ export default function AdminCompliancePage() {
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Compliance Review</h1>
+        <h1 className="text-3xl font-bold mb-2">Compliance</h1>
         <p className="text-muted-foreground">
-          Review listings and orders requiring compliance verification
+          Manage compliance review queues and payout holds in one place.
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          const next = v as TabType;
+          setActiveTab(next);
+          // Keep URL in sync so old links can deep-link to a specific queue.
+          try {
+            router.replace(`/dashboard/admin/compliance?tab=${encodeURIComponent(next)}`);
+          } catch {
+            // ignore
+          }
+        }}
+      >
         <TabsList>
           <TabsTrigger value="listings">
             Listings ({listings.length})
@@ -502,6 +589,9 @@ export default function AdminCompliancePage() {
           </TabsTrigger>
           <TabsTrigger value="breeder_permits">
             Breeder Permits ({breederPermits.length})
+          </TabsTrigger>
+          <TabsTrigger value="payout_holds">
+            Payout Holds ({holdRows.length})
           </TabsTrigger>
         </TabsList>
 
@@ -1025,6 +1115,97 @@ export default function AdminCompliancePage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        <TabsContent value="payout_holds" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-primary" />
+                Compliance payout holds
+              </CardTitle>
+              <CardDescription>
+                Orders blocked for marketplace compliance reasons (docs missing or admin approval required).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <div className="text-sm text-muted-foreground">{holdRows.length} order(s)</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={loadComplianceHolds} disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Refresh
+                  </Button>
+                  <Button asChild variant="secondary">
+                    <Link href="/dashboard/admin/ops">Open Admin Ops</Link>
+                  </Button>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex items-center gap-2 text-muted-foreground py-6">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                </div>
+              ) : holdRows.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-6">No compliance payout holds found.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Listing</TableHead>
+                      <TableHead>Hold reason</TableHead>
+                      <TableHead>Missing</TableHead>
+                      <TableHead>Approval</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {holdRows.map((o) => {
+                      const title = o.listingSnapshot?.title || o.listingId || '—';
+                      const missing = o.complianceDocsStatus?.missing || [];
+                      const reason = String(o.payoutHoldReason || '—');
+                      const canApprove = REVIEW_REQUIRED.has(reason) && o.adminPayoutApproval !== true;
+                      return (
+                        <TableRow key={o.id}>
+                          <TableCell className="font-mono text-xs">{o.id}</TableCell>
+                          <TableCell className="max-w-[360px]">
+                            <div className="truncate">{title}</div>
+                            <div className="text-xs text-muted-foreground truncate">{o.listingSnapshot?.category || ''}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{reason}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {missing.length > 0 ? missing.join(', ') : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {o.adminPayoutApproval ? (
+                              <Badge className="bg-emerald-600 text-white">Approved</Badge>
+                            ) : (
+                              <Badge variant="outline">Not approved</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {canApprove ? (
+                              <Button size="sm" onClick={() => approveHold(o.id)} disabled={!!approvingHold[o.id]}>
+                                {approvingHold[o.id] ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                Approve payout
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href="/dashboard/admin/ops">View</Link>
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

@@ -88,7 +88,6 @@ const adminNavItems: DashboardNavItem[] = [
   { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
-  { href: '/dashboard/admin/compliance-holds', label: 'Compliance Holds', icon: Shield },
   { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
