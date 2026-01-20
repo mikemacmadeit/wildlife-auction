@@ -56,7 +56,7 @@ export function deriveOrderUIState(order: Order): {
     }
   }
 
-  // Delivery + escrow flow
+  // Delivery + payout-hold flow
   if (order.status === 'delivered') {
     return {
       statusKey: 'delivered',
@@ -99,7 +99,7 @@ export function deriveOrderUIState(order: Order): {
   if (order.status === 'paid_held' || order.status === 'paid') {
     return {
       statusKey: 'held',
-      // Badge already communicates "Held (escrow)" — avoid redundant "Paid (held)" copy here.
+      // Badge already communicates "Held (payout)" — avoid redundant "Paid (held)" copy here.
       currentStepLabel: 'Waiting on seller delivery',
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },

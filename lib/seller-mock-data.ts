@@ -118,7 +118,7 @@ export const mockSellerAlerts: SellerAlert[] = [
     id: '2',
     type: 'transport_request',
     priority: 'medium',
-    title: 'Buyer requested transport quote',
+    title: 'Buyer requested delivery details',
     description: 'Axis Deer Herd • Buyer in Dallas, TX',
     listingId: '2',
     listingTitle: 'Axis Deer Herd',

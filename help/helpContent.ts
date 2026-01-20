@@ -46,7 +46,7 @@ export const HELP_CONTENT: Record<HelpKey, HelpContent> = {
     key: 'public_how_it_works',
     title: 'How It Works',
     oneLiner: 'Learn the buyer and seller flow: listings, offers/auctions, and protected transactions.',
-    checklist: ['Understand listing types', 'See how checkout and escrow work', 'Learn what sellers must complete before publishing'],
+    checklist: ['Understand listing types', 'See how checkout and payout holds work', 'Learn what sellers must complete before publishing'],
   },
   seller_overview: {
     key: 'seller_overview',

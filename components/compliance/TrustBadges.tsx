@@ -69,7 +69,7 @@ export function ComplianceBadges({ listing, className, variant = 'inline' }: Tru
 
     switch (listing.complianceStatus) {
       case 'approved':
-        return <Badge className="bg-emerald-600 text-white border-emerald-700/30">Compliance Approved</Badge>;
+        return <Badge className="bg-emerald-600 text-white border-emerald-700/30">Marketplace Review Approved</Badge>;
       case 'pending_review':
         return (
           <Badge variant="secondary">

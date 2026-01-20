@@ -1744,7 +1744,7 @@ function NewListingPageContent() {
               <Label htmlFor="verification" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Professional Verification ($100)</div>
                 <div className="text-sm text-muted-foreground">
-                  We&apos;ll verify your listing details and seller credentials. Builds buyer trust.
+                  Admin review for marketplace workflow completeness. Builds buyer trust.
                 </div>
               </Label>
             </div>
@@ -1766,9 +1766,9 @@ function NewListingPageContent() {
                 }
               />
               <Label htmlFor="transport" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Transport Ready</div>
+                <div className="font-medium mb-1">Delivery details available</div>
                 <div className="text-sm text-muted-foreground">
-                  I can help arrange or coordinate transport for buyers.
+                  Buyer and seller coordinate pickup/delivery details directly. The platform does not arrange transport.
                 </div>
               </Label>
             </div>

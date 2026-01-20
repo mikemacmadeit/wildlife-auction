@@ -22,6 +22,6 @@ export function getRecommendationCopy(method: PaymentMethod, amountDollars: numb
   }
   return isRec
     ? 'Recommended for very large purchases.'
-    : 'Pay by wire/bank transfer. Funds are held in escrow once received.';
+    : 'Pay by wire/bank transfer. Funds are held for payout release once received.';
 }
 

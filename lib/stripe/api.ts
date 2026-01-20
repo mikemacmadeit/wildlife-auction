@@ -324,7 +324,7 @@ export async function createWireIntent(
 }
 
 /**
- * Release escrow payment to seller (Admin only)
+ * Release held funds to seller (Admin only)
  * Creates a Stripe transfer to the seller's connected account
  */
 export async function releasePayment(orderId: string): Promise<{

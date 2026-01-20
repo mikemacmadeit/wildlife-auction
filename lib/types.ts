@@ -590,7 +590,7 @@ export interface Order {
   stripePaymentIntentId?: string;
   stripeTransferId?: string;
   stripeRefundId?: string; // Stripe refund ID
-  sellerStripeAccountId?: string; // Seller's Stripe Connect account ID (for escrow transfers)
+  sellerStripeAccountId?: string; // Seller's Stripe Connect account ID (for admin payout release transfers)
   releasedBy?: string; // Admin UID who released the payment
   releasedAt?: Date; // When payment was released
   refundedBy?: string; // Admin UID who processed the refund
@@ -609,7 +609,7 @@ export interface Order {
   sellerSnapshot?: OrderSellerSnapshot;
   timeline?: OrderTimelineEvent[];
   
-  // Escrow workflow fields
+  // Payout-hold workflow fields
   paymentMethod?: OrderPaymentMethod; // How buyer paid (card vs bank rails)
   paidAt?: Date; // When payment was confirmed/settled into platform (card: immediate; bank/wire: async)
   disputeDeadlineAt?: Date; // Deadline for buyer to dispute

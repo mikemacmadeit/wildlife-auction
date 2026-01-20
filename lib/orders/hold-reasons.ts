@@ -76,7 +76,7 @@ export function getHoldInfo(order: Order): HoldInfo {
     return { reason, nextAction, earliestReleaseDate, canRelease };
   }
 
-  // Check dispute deadline (standard escrow)
+  // Check dispute deadline (standard window)
   if (order.disputeDeadlineAt) {
     const disputeDeadline = new Date(order.disputeDeadlineAt);
     if (disputeDeadline > now) {

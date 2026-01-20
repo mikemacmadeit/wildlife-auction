@@ -5,7 +5,7 @@
  * - notification deep links (`/dashboard/orders/${orderId}`)
  * - post-checkout reassurance
  *
- * This page does NOT change escrow/payout logic. It only renders backend-truth state.
+ * This page does NOT change payout logic. It only renders backend-truth state.
  */
 
 'use client';

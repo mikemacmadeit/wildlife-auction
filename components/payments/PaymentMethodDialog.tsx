@@ -40,7 +40,7 @@ export function PaymentMethodDialog(props: {
             <div className="min-w-0">
               <DialogTitle>Choose payment method</DialogTitle>
               <DialogDescription className="hidden sm:block">
-                Pick the best rail for this purchase. Funds are held in escrow once received.
+                Pick the best rail for this purchase. Funds are held for payout release once received.
               </DialogDescription>
             </div>
             <Badge variant="secondary" className="font-mono shrink-0 max-w-full">

@@ -502,10 +502,10 @@ export async function handleCheckoutSessionCompleted(
           event: {
             id: `FUNDS_HELD:${paymentIntentId}`,
             type: 'FUNDS_HELD',
-            label: 'Funds held (escrow)',
+            label: 'Funds held (payout hold)',
             actor: 'system',
             visibility: 'buyer',
-            meta: { escrow: true },
+            meta: { payoutHold: true },
           },
         });
       }
@@ -840,10 +840,10 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
       event: {
         id: `FUNDS_HELD:${paymentIntentId}`,
         type: 'FUNDS_HELD',
-        label: 'Funds held (escrow)',
+        label: 'Funds held (payout hold)',
         actor: 'system',
         visibility: 'buyer',
-        meta: { escrow: true, paymentMethod: effectivePaymentMethod },
+        meta: { payoutHold: true, paymentMethod: effectivePaymentMethod },
       },
     });
   } catch (e) {
@@ -1154,10 +1154,10 @@ export async function handleWirePaymentIntentSucceeded(
       event: {
         id: `FUNDS_HELD:${paymentIntentId}`,
         type: 'FUNDS_HELD',
-        label: 'Funds held (escrow)',
+        label: 'Funds held (payout hold)',
         actor: 'system',
         visibility: 'buyer',
-        meta: { escrow: true, paymentMethod: 'wire' },
+        meta: { payoutHold: true, paymentMethod: 'wire' },
       },
     });
   } catch (e) {
@@ -1323,7 +1323,7 @@ export async function handleChargeDisputeCreated(
         const before = orderDoc.data() || {};
 
         // Phase 2D (CRITICAL): Normalize chargeback → order safety flags.
-        // We do NOT rewrite escrow logic; we only ensure the data that escrow logic already relies on is present.
+        // We do NOT rewrite payout-hold logic; we only ensure the data that payout-hold logic relies on is present.
         // - chargebackStatus: normalized to 'open' | 'won' | 'lost'
         // - adminHold: true (prevents manual/auto release)
         // - payoutHoldReason: 'chargeback' (explicit UI + safety gate)

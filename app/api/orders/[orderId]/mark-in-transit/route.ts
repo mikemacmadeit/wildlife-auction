@@ -5,7 +5,7 @@
  * - Seller-initiated explicit transition to `status: 'in_transit'`
  * - Emits `Order.InTransit` so buyers get a visible state change
  *
- * NOTE: This does NOT change escrow/payout logic. It only makes an implicit step explicit.
+ * NOTE: This does NOT change payout logic. It only makes an implicit step explicit.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';

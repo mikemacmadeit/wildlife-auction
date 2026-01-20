@@ -113,10 +113,10 @@ export default function SellerLogisticsPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
-            Logistics
+            Documents & Delivery
           </h1>
           <p className="text-base md:text-lg text-muted-foreground">
-            Manage verification and transport for your listings
+            Manage documents and delivery notes for your listings. Wildlife Exchange does not arrange transport.
           </p>
         </div>
 

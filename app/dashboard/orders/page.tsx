@@ -752,7 +752,7 @@ export default function OrdersPage() {
   const getUIStatusBadge = (statusKey: PurchasesStatusKey) => {
     switch (statusKey) {
       case 'held':
-        return <Badge className="bg-orange-500 text-white">Held (escrow)</Badge>;
+        return <Badge className="bg-orange-500 text-white">Held (payout)</Badge>;
       case 'awaiting_permit':
         return <Badge className="bg-purple-600 text-white">Awaiting permit</Badge>;
       case 'in_transit':
@@ -782,7 +782,7 @@ export default function OrdersPage() {
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
-            Funds are held in escrow by Wildlife Exchange and released only after delivery and any required compliance steps
+            Funds are held for payout release and are released only after delivery and any required marketplace compliance steps
             are complete (and no dispute is open).
           </TooltipContent>
         </Tooltip>
@@ -798,7 +798,7 @@ export default function OrdersPage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">My Purchases</h1>
             <p className="text-muted-foreground mt-1">
-              Track escrow holds, compliance milestones, and delivery—exactly who we’re waiting on.
+              Track payout holds, compliance milestones, and delivery—exactly who we’re waiting on.
             </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/60 backdrop-blur px-4 py-3">

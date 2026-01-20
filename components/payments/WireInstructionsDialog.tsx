@@ -36,7 +36,7 @@ export function WireInstructionsDialog(props: {
         <DialogHeader>
           <DialogTitle>Wire transfer instructions</DialogTitle>
           <DialogDescription>
-            Send a bank/wire transfer using the details below. Funds are held in escrow once received.
+            Send a bank/wire transfer using the details below. Funds are held for payout release once received.
           </DialogDescription>
         </DialogHeader>
 

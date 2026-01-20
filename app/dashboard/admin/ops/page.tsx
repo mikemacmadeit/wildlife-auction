@@ -619,7 +619,7 @@ export default function AdminOpsPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Admin Operations Dashboard</h1>
         <p className="text-muted-foreground">
-          Manage escrow, protected transactions, disputes, and payouts
+          Manage payout holds, protected transactions, disputes, and payouts
         </p>
       </div>
 
@@ -745,7 +745,7 @@ export default function AdminOpsPage() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="escrow">
             <DollarSign className="h-4 w-4 mr-2" />
-            Orders in Escrow ({orders.filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId).length})
+            Payout holds ({orders.filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId).length})
           </TabsTrigger>
           <TabsTrigger value="protected">
             <Shield className="h-4 w-4 mr-2" />
@@ -780,7 +780,7 @@ export default function AdminOpsPage() {
               <CardContent className="pt-6">
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Orders in Escrow</h3>
+                  <h3 className="text-lg font-semibold mb-2">No payout holds</h3>
                   <p className="text-muted-foreground">All paid orders have been released or are being processed.</p>
                 </div>
               </CardContent>

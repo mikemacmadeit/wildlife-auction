@@ -211,7 +211,7 @@ export default function TrustPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
-              <CardTitle>Escrow & Payout Release</CardTitle>
+              <CardTitle>Payout Holds & Release</CardTitle>
             </div>
             <CardDescription>
               How payment works and when sellers receive funds
@@ -226,7 +226,7 @@ export default function TrustPage() {
                 <div>
                   <h4 className="font-semibold mb-1">Buyer Pays Platform</h4>
                   <p className="text-sm text-muted-foreground">
-                    Buyer pays via Stripe Checkout. Funds are held in escrow by the platform (not immediately transferred to seller).
+                    Buyer pays via Stripe Checkout. Funds are held for payout release (not immediately transferred to seller).
                   </p>
                 </div>
               </div>
@@ -261,8 +261,8 @@ export default function TrustPage() {
             <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertDescription className="text-green-800 dark:text-green-200">
-                <strong>Protection:</strong> This escrow model ensures compliance documents are verified before funds are released, 
-                protecting both buyers and sellers. Funds are never released without proper verification.
+                <strong>Protection:</strong> This payout-hold workflow helps ensure required marketplace documents are verified before funds are released,
+                protecting both buyers and sellers. “Verified” is for marketplace workflow completeness—not regulator approval.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -383,7 +383,7 @@ export default function TrustPage() {
               </ul>
             </div>
             <p className="text-xs text-muted-foreground">
-              Protection windows are optional and set by sellers. Standard escrow dispute window (72 hours) applies to all transactions.
+              Protection windows are optional and set by sellers. Standard dispute window (72 hours) applies to all transactions.
             </p>
           </CardContent>
         </Card>

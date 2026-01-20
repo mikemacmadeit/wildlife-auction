@@ -1,7 +1,7 @@
 /**
  * POST /api/stripe/transfers/release
  * 
- * Admin-only endpoint to release escrow funds to seller
+ * Admin-only endpoint to release held funds to seller (payout release)
  * Creates a Stripe transfer to the seller's connected account
  */
 

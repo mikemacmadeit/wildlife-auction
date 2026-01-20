@@ -809,7 +809,7 @@ export default function ListingDetailPage() {
                     <Badge
                       variant="default"
                       className="bg-green-600 text-white font-medium gap-1"
-                      title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
+                      title="Protected Transaction: Funds held for payout release until protection period ends or buyer accepts early. Evidence required for disputes."
                     >
                       <Shield className="h-3 w-3" />
                       Protected {listing!.protectedTransactionDays} Days
@@ -1315,10 +1315,10 @@ export default function ListingDetailPage() {
                       <div className="flex items-start gap-2">
                         <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="font-semibold">Delivery / transport</div>
+                          <div className="font-semibold">Delivery / pickup</div>
                           <div className="text-xs text-muted-foreground">
                             {listing!.trust?.transportReady
-                              ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
+                              ? 'Seller has provided delivery/pickup details. Buyer & seller arrange logistics after purchase.'
                               : 'Buyer & seller arrange logistics after purchase.'}
                           </div>
                         </div>
@@ -1748,7 +1748,7 @@ export default function ListingDetailPage() {
                       </li>
                       <li>
                         <span className="font-semibold">Escrow & payout gating:</span>{' '}
-                        Funds are held in escrow. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
+                        Funds are held for payout release. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
                       </li>
                       <li>
                         <span className="font-semibold">Coordination:</span>{' '}
@@ -1901,8 +1901,8 @@ export default function ListingDetailPage() {
                               <Truck className="h-4 w-4 text-primary" />
                               <span>
                                 {listing!.category === 'whitetail_breeder'
-                                  ? 'Seller can help coordinate delivery/transport (buyer & seller arranged)'
-                                  : 'Seller can help arrange transport'}
+                                  ? 'Seller has delivery/pickup details available (buyer & seller arranged)'
+                                  : 'Seller has delivery/pickup details available (buyer & seller arranged)'}
                               </span>
                             </div>
                           )}
