@@ -52,6 +52,7 @@ function NewListingPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showPendingApprovalModal, setShowPendingApprovalModal] = useState(false);
@@ -2015,6 +2016,9 @@ function NewListingPageContent() {
   ];
 
   const handleComplete = async (data: Record<string, unknown>) => {
+    // Hard guard: prevents double click / double submit creating duplicate drafts.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     // Check if user is authenticated - if not, save form data and show auth prompt modal
     if (!user) {
       // Save form data to sessionStorage so we can restore it after authentication
@@ -2022,6 +2026,7 @@ function NewListingPageContent() {
         sessionStorage.setItem('listingFormData', JSON.stringify(formData));
       }
       setShowAuthModal(true);
+      submittingRef.current = false;
       return;
     }
 
@@ -2222,6 +2227,7 @@ function NewListingPageContent() {
       });
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
@@ -2686,6 +2692,7 @@ function NewListingPageContent() {
           <StepperForm 
             steps={steps} 
             onComplete={handleComplete}
+            saving={isSubmitting}
             completeButtonDataTour="listing-publish"
             onValidationError={(stepId) => {
               setValidationAttempted((prev) => ({ ...prev, [stepId]: true }));

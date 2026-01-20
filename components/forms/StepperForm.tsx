@@ -52,6 +52,8 @@ export function StepperForm({
   const isLastStep = currentStep === steps.length - 1;
 
   const handleNext = () => {
+    // Prevent double-submits / double-advances while parent is saving/submitting.
+    if (saving) return;
     // Validate current step if validator exists
     if (currentStepData.validate && !currentStepData.validate()) {
       const errorMsg = currentStepData.errorMessage || 'Please complete all required fields before continuing.';
@@ -203,7 +205,14 @@ export function StepperForm({
           >
             {isLastStep ? (
               <>
-                {completeButtonLabel || 'Publish Listing'}
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Publishing…
+                  </>
+                ) : (
+                  completeButtonLabel || 'Publish Listing'
+                )}
               </>
             ) : (
               <>
@@ -214,6 +223,13 @@ export function StepperForm({
           </Button>
         </div>
       </div>
+
+      {/* Action feedback: subtle loading bar so users don’t click twice */}
+      {saving && isLastStep ? (
+        <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+          <div className="h-full w-1/3 bg-primary animate-pulse" />
+        </div>
+      ) : null}
     </div>
   );
 }
