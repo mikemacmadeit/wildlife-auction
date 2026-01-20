@@ -83,6 +83,10 @@
   - [ ] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (live key: `pk_live_...`)
   - [ ] `STRIPE_WEBHOOK_SECRET` (from Stripe Dashboard)
 
+- [ ] **Upstash (Rate limiting - REQUIRED in production):**
+  - [ ] `UPSTASH_REDIS_REST_URL`
+  - [ ] `UPSTASH_REDIS_REST_TOKEN`
+
 - [ ] **Application:**
   - [ ] `APP_URL` or `NEXT_PUBLIC_APP_URL` (production domain)
   - [ ] `NODE_ENV=production`
@@ -106,6 +110,13 @@
 - [ ] Deploy Firestore rules: `firebase deploy --only firestore:rules`
 - [ ] Deploy Firestore indexes: `firebase deploy --only firestore:indexes`
 - [ ] Verify all indexes are built (may take a few minutes)
+
+### Netlify Scheduled Functions
+- [ ] Confirm scheduled functions are enabled in Netlify
+- [ ] Confirm `aggregateRevenue` runs hourly and writes:
+  - [ ] `adminRevenueAggregates/global`
+  - [ ] `adminRevenueAggState/global`
+  - [ ] `opsHealth/aggregateRevenue`
 
 ### Build & Deploy
 - [ ] Run `npm run build` successfully

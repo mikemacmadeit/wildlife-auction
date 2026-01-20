@@ -11,7 +11,8 @@ This runbook provides procedures for common production operations, incident resp
 3. [Stripe Reconciliation](#stripe-reconciliation)
 4. [Webhook Failure Triage](#webhook-failure-triage)
 5. [AutoRelease Triage](#autorelease-triage)
-6. [Sentry Triage](#sentry-triage)
+6. [Revenue Aggregation Triage](#revenue-aggregation-triage)
+7. [Sentry Triage](#sentry-triage)
 
 ---
 
@@ -256,6 +257,31 @@ gcloud firestore import gs://[BUCKET_NAME]/[EXPORT_PATH] \
 3. Check Netlify Dashboard → Functions → Scheduled Functions
 
 #### Issue: Orders Not Eligible
+
+---
+
+## Revenue Aggregation Triage
+
+### What it does
+
+The scheduled Netlify function `aggregateRevenue` writes admin-only aggregate docs so the admin revenue dashboard can avoid expensive all-time scans.
+
+### Where to look
+
+- Firestore:
+  - `adminRevenueAggregates/global`
+  - `adminRevenueAggState/global`
+  - `opsHealth/aggregateRevenue`
+
+### Common issues
+
+#### Issue: aggregates missing / revenue endpoint falls back to live scans
+
+**Steps**:
+1. Confirm Netlify scheduled functions are enabled and the site is deployed with the latest build.
+2. Confirm Firestore indexes are deployed/built (especially the `orders(paidAt, __name__)` composite index).
+3. Check `opsHealth/aggregateRevenue.lastRunAt` for the last run time.
+4. Check Netlify function logs for `aggregateRevenue`.
 
 **Cause**: Orders don't meet release criteria
 
