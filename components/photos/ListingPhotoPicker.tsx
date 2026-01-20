@@ -513,6 +513,10 @@ function SelectedTile(props: {
   onEditCrop: () => void;
 }) {
   const { p, idx, total } = props;
+  const objectPosition =
+    p.focalPoint && Number.isFinite(p.focalPoint.x) && Number.isFinite(p.focalPoint.y)
+      ? `${Math.round(p.focalPoint.x * 100)}% ${Math.round(p.focalPoint.y * 100)}%`
+      : '50% 50%';
   return (
     <div
       className={cn(
@@ -539,7 +543,14 @@ function SelectedTile(props: {
       }}
     >
       <div className="relative aspect-square">
-        <Image src={p.url} alt="Selected" fill className="object-cover" unoptimized />
+        <Image
+          src={p.url}
+          alt="Selected"
+          fill
+          className="object-cover"
+          style={{ objectPosition }}
+          unoptimized
+        />
       </div>
 
       {/* Controls BELOW the thumbnail (no overlays; easier to read + tap on small tiles) */}
