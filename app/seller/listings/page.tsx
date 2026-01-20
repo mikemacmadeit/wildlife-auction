@@ -86,7 +86,13 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
   };
 
   return (
-    <Badge variant="outline" className={cn('font-semibold text-xs', config.className)}>
+    <Badge
+      variant="outline"
+      className={cn(
+        'font-semibold text-xs whitespace-nowrap truncate max-w-[160px]',
+        config.className
+      )}
+    >
       {config.label}
     </Badge>
   );
@@ -99,7 +105,7 @@ const getTypeBadge = (type: string) => {
     classified: 'Classified',
   };
   return (
-    <Badge variant="outline" className="font-semibold text-xs">
+    <Badge variant="outline" className="font-semibold text-xs whitespace-nowrap truncate max-w-[140px]">
       {labels[type] || type}
     </Badge>
   );
@@ -266,7 +272,7 @@ const MobileListingCard = memo(({
         >
           {listing.title}
         </Link>
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 flex-nowrap min-w-0">
           {getTypeBadge(listing.type)}
           {getStatusBadge({
             status: effectiveStatus,
