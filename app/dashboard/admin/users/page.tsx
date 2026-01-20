@@ -121,7 +121,8 @@ export default function AdminUsersPage() {
         if (riskFilter !== 'any') url.searchParams.set('risk', riskFilter);
         if (activityFilter !== 'any') url.searchParams.set('activity', activityFilter);
         url.searchParams.set('sort', sort);
-        url.searchParams.set('limit', '25');
+        const pageSize = 25;
+        url.searchParams.set('limit', String(pageSize));
         if (cursor) url.searchParams.set('cursor', cursor);
 
         const res = await fetch(url.toString(), { headers: await authHeader() });
@@ -178,6 +179,47 @@ export default function AdminUsersPage() {
         if (mapped.length === 0 && noFilters) {
           setHasDirectory(false);
           throw new Error('No user summaries found yet. Falling back to legacy lookup (run Backfill to populate summaries).');
+        }
+
+        // IMPORTANT: If the directory is only partially populated (common in small/prod environments),
+        // admins can see an incomplete list (only users with userSummaries).
+        // For the default view ONLY (no filters, first page), merge in legacy lookup results.
+        // This also "warms" userSummaries because lookup writes summaries best-effort.
+        if (noFilters && mapped.length > 0 && mapped.length < pageSize) {
+          try {
+            const fallbackUrl = new URL('/api/admin/users/lookup', window.location.origin);
+            fallbackUrl.searchParams.set('query', '');
+            fallbackUrl.searchParams.set('limit', String(pageSize));
+            const r2 = await fetch(fallbackUrl.toString(), { headers: await authHeader() });
+            const j2 = await r2.json().catch(() => ({}));
+            if (r2.ok && j2?.ok === true && Array.isArray(j2?.users)) {
+              const byUid = new Map<string, AdminUserRow>();
+              for (const row of mapped) if (row?.uid) byUid.set(row.uid, row);
+              for (const u of j2.users) {
+                const uid = String(u?.uid || u?.id || '').trim();
+                if (!uid || byUid.has(uid)) continue;
+                byUid.set(uid, {
+                  uid,
+                  email: u?.email || null,
+                  displayName: u?.displayName || null,
+                  phoneNumber: u?.phoneNumber || null,
+                  role: (u?.role || null) as any,
+                  subscriptionTier: u?.subscriptionTier ?? null,
+                  adminPlanOverride: u?.adminPlanOverride ?? null,
+                  disabled: !!u?.disabled,
+                  emailVerified: !!u?.emailVerified,
+                  createdAt: u?.createdAt ? String(u.createdAt) : null,
+                  lastSignInAt: u?.lastSignInAt ? String(u.lastSignInAt) : null,
+                  stripeAccountId: u?.stripeAccountId ?? null,
+                });
+              }
+              setRows(Array.from(byUid.values()));
+              setNextCursor(typeof data.nextCursor === 'string' ? data.nextCursor : null);
+              return;
+            }
+          } catch {
+            // ignore
+          }
         }
 
         setRows(mapped);
