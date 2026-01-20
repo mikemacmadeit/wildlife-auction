@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Handshake, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +40,7 @@ export default function SellerOffersPage() {
   const { toast } = useToast();
 
   const [tab, setTab] = useState<'open' | 'countered' | 'accepted' | 'declined' | 'expired'>('open');
+  const [tabFading, setTabFading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [offers, setOffers] = useState<OfferRow[]>([]);
 
@@ -61,6 +62,12 @@ export default function SellerOffersPage() {
     if (!user) return;
     load();
   }, [authLoading, load, user]);
+
+  useEffect(() => {
+    setTabFading(true);
+    const t = setTimeout(() => setTabFading(false), 140);
+    return () => clearTimeout(t);
+  }, [tab]);
 
   const emptyCopy = useMemo(() => {
     if (tab === 'open') return 'No open offers right now.';
@@ -120,52 +127,52 @@ export default function SellerOffersPage() {
           <TabsTrigger value="declined">Declined</TabsTrigger>
           <TabsTrigger value="expired">Expired</TabsTrigger>
         </TabsList>
+      </Tabs>
 
-        <TabsContent value={tab} className="mt-4">
-          <Card className="border-2">
-            <CardContent className="pt-6">
-              {loading ? (
-                <div className="py-10 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : offers.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">{emptyCopy}</div>
-              ) : (
-                <div className="divide-y">
-                  {offers.map((o) => (
-                    <button
-                      key={o.offerId}
-                      className="w-full text-left py-4 hover:bg-muted/30 transition-colors px-2 rounded-lg"
-                      onClick={() => router.push(`/seller/offers/${o.offerId}`)}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">{o.listingSnapshot?.title || 'Listing'}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Buyer: <span className="font-medium">Verified Buyer</span> · Offer #{o.offerId.slice(0, 8)}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant="secondary" className="text-xs">
-                            {o.status}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            ${Number(o.currentAmount).toLocaleString()}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatTimeLeft(o.expiresAt)}
-                          </Badge>
+      <div className={`mt-4 transition-opacity duration-150 ${tabFading ? 'opacity-70' : 'opacity-100'}`}>
+        <Card className="border-2">
+          <CardContent className="pt-6">
+            {loading ? (
+              <div className="py-10 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : offers.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">{emptyCopy}</div>
+            ) : (
+              <div className="divide-y">
+                {offers.map((o) => (
+                  <button
+                    key={o.offerId}
+                    className="w-full text-left py-4 hover:bg-muted/30 transition-colors px-2 rounded-lg"
+                    onClick={() => router.push(`/seller/offers/${o.offerId}`)}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate">{o.listingSnapshot?.title || 'Listing'}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Buyer: <span className="font-medium">Verified Buyer</span> · Offer #{o.offerId.slice(0, 8)}
                         </div>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="secondary" className="text-xs">
+                          {o.status}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          ${Number(o.currentAmount).toLocaleString()}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatTimeLeft(o.expiresAt)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

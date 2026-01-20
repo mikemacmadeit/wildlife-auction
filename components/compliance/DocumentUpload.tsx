@@ -19,7 +19,7 @@ import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2, Eye, Trash2, E
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { uploadComplianceDocument, DocumentUploadProgress, deleteComplianceDocument } from '@/lib/firebase/storage-documents';
 import { uploadDocument, deleteDocument } from '@/lib/firebase/documents';
-import { DocumentType } from '@/lib/types';
+import { DocumentStatus, DocumentType } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,6 +34,7 @@ interface DocumentUploadProps {
   className?: string;
   existingDocumentUrl?: string; // URL of existing document if already uploaded
   existingDocumentId?: string; // ID of existing document
+  existingDocumentStatus?: DocumentStatus; // status of existing doc if known (e.g. verified/rejected/uploaded)
   onPendingFileChange?: (hasPendingFile: boolean) => void; // Callback when file selection changes
   uploadTrigger?: boolean; // If true, trigger upload automatically
 }
@@ -49,6 +50,7 @@ export function DocumentUpload({
   className,
   existingDocumentUrl,
   existingDocumentId,
+  existingDocumentStatus,
   onPendingFileChange,
   uploadTrigger = false,
 }: DocumentUploadProps): JSX.Element {
@@ -59,8 +61,14 @@ export function DocumentUpload({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(existingDocumentUrl || null);
   const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(existingDocumentId || null);
+  const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(existingDocumentStatus || null);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  useEffect(() => {
+    // Keep in sync if parent refetches a newer status (e.g. admin verified/rejected)
+    if (existingDocumentStatus) setDocumentStatus(existingDocumentStatus);
+  }, [existingDocumentStatus]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -90,6 +98,8 @@ export function DocumentUpload({
     setFile(selectedFile);
     setError(null);
     setUploadedUrl(null);
+    // new file selection implies a new upload attempt
+    setDocumentStatus(null);
     
     // Notify parent that there's a pending file
     if (onPendingFileChange) {
@@ -160,6 +170,7 @@ export function DocumentUpload({
       setUploadProgress(100);
       setUploadedUrl(storageResult.url);
       setCurrentDocumentId(documentId);
+      setDocumentStatus('uploaded');
       setFile(null); // Clear selected file after successful upload
       
       // Clear pending file flag
@@ -207,6 +218,7 @@ export function DocumentUpload({
       setCurrentDocumentId(null);
       setFile(null);
       setError(null);
+      setDocumentStatus(null);
       if (onPendingFileChange) {
         onPendingFileChange(false);
       }
@@ -233,6 +245,7 @@ export function DocumentUpload({
       setCurrentDocumentId(null);
       setFile(null);
       setError(null);
+      setDocumentStatus(null);
       if (onPendingFileChange) {
         onPendingFileChange(false);
       }
@@ -256,6 +269,7 @@ export function DocumentUpload({
     setCurrentDocumentId(null);
     setFile(null);
     setError(null);
+    setDocumentStatus(null);
   };
 
   const getDocumentTypeLabel = (type: DocumentType): string => {
@@ -300,26 +314,82 @@ export function DocumentUpload({
         </div>
       )}
 
-      {/* Show uploaded document status */}
+      {/* Show uploaded document status (uploaded vs verified vs rejected) */}
       {uploadedUrl && !file && (
-        <Card className="border-2 border-green-200 bg-green-50/50">
+        <Card
+          className={
+            documentStatus === 'verified'
+              ? 'border-2 border-green-200 bg-green-50/50'
+              : documentStatus === 'rejected'
+                ? 'border-2 border-red-200 bg-red-50/50'
+                : 'border-2 border-amber-200 bg-amber-50/50'
+          }
+        >
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3 flex-1">
                 <div className="mt-1">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  {documentStatus === 'verified' ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : documentStatus === 'rejected' ? (
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <Loader2 className="h-5 w-5 text-amber-700 animate-spin" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <FileText className="h-4 w-4 text-green-700" />
-                    <span className="font-semibold text-green-900">Document Uploaded</span>
+                    <FileText
+                      className={
+                        documentStatus === 'verified'
+                          ? 'h-4 w-4 text-green-700'
+                          : documentStatus === 'rejected'
+                            ? 'h-4 w-4 text-red-700'
+                            : 'h-4 w-4 text-amber-800'
+                      }
+                    />
+                    <span
+                      className={
+                        documentStatus === 'verified'
+                          ? 'font-semibold text-green-900'
+                          : documentStatus === 'rejected'
+                            ? 'font-semibold text-red-900'
+                            : 'font-semibold text-amber-900'
+                      }
+                    >
+                      {documentStatus === 'verified'
+                        ? 'Verified (marketplace)'
+                        : documentStatus === 'rejected'
+                          ? 'Rejected (needs update)'
+                          : 'Uploaded (awaiting verification)'}
+                    </span>
                   </div>
-                  <p className="text-sm text-green-800 mb-2">
-                    Your {getDocumentTypeLabel(documentType)} has been uploaded successfully. An admin will verify it shortly.
+                  <p
+                    className={
+                      documentStatus === 'verified'
+                        ? 'text-sm text-green-800 mb-2'
+                        : documentStatus === 'rejected'
+                          ? 'text-sm text-red-800 mb-2'
+                          : 'text-sm text-amber-900 mb-2'
+                    }
+                  >
+                    {documentStatus === 'verified'
+                      ? `Your ${getDocumentTypeLabel(documentType)} has been verified as complete for marketplace workflow.`
+                      : documentStatus === 'rejected'
+                        ? `Your ${getDocumentTypeLabel(documentType)} was rejected. Please upload a corrected document.`
+                        : `Your ${getDocumentTypeLabel(documentType)} has been uploaded. An admin will verify it shortly.`}
                   </p>
                   {/* Extract filename from URL if possible */}
                   {uploadedUrl && (
-                    <p className="text-xs text-green-700 mb-3 font-mono bg-green-100 px-2 py-1 rounded inline-block">
+                    <p
+                      className={
+                        documentStatus === 'verified'
+                          ? 'text-xs text-green-700 mb-3 font-mono bg-green-100 px-2 py-1 rounded inline-block'
+                          : documentStatus === 'rejected'
+                            ? 'text-xs text-red-700 mb-3 font-mono bg-red-100 px-2 py-1 rounded inline-block'
+                            : 'text-xs text-amber-900 mb-3 font-mono bg-amber-100 px-2 py-1 rounded inline-block'
+                      }
+                    >
                       {uploadedUrl.split('/').pop()?.split('?')[0] || 'Document file'}
                     </p>
                   )}

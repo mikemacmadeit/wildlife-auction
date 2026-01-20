@@ -22,6 +22,7 @@ import { getOrderById } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
+import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
@@ -351,6 +352,8 @@ export default function SellerOrderDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
         </div>
       </div>
     </div>

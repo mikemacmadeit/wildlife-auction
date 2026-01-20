@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Loader2, Search, ArrowRight, AlertTriangle, Package, Truck, CheckCircle2, Clock } from 'lucide-react';
 import type { Listing, Order } from '@/lib/types';
@@ -53,6 +53,7 @@ export default function SellerSalesPage() {
   const { toast } = useToast();
 
   const [tab, setTab] = useState<TabKey>('needs_action');
+  const [tabFading, setTabFading] = useState(false);
   const [orders, setOrders] = useState<OrderWithListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -85,6 +86,13 @@ export default function SellerSalesPage() {
   useEffect(() => {
     if (!authLoading) void load();
   }, [authLoading, load]);
+
+  // Smooth visual transition when switching in-page tabs (avoid "flash" from unmount/remount).
+  useEffect(() => {
+    setTabFading(true);
+    const t = setTimeout(() => setTabFading(false), 140);
+    return () => clearTimeout(t);
+  }, [tab]);
 
   const filtered = useMemo(() => {
     const q = debounced.trim().toLowerCase();
@@ -181,56 +189,56 @@ export default function SellerSalesPage() {
             <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
             <TabsTrigger value="all">All</TabsTrigger>
           </TabsList>
+        </Tabs>
 
-          <TabsContent value={tab} className="mt-4">
-            {filtered.length === 0 ? (
-              <Card className="border-border/60">
-                <CardContent className="pt-6 text-center text-sm text-muted-foreground">
-                  <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                  No sales found.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {filtered.map((o) => {
-                  const badge = statusBadge(String(o.status || ''));
-                  const title = o.listing?.title || 'Listing';
-                  const total = typeof o.amount === 'number' ? o.amount : null;
-                  return (
-                    <Card key={o.id} className="border-border/60 hover:shadow-sm transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                          <div className="min-w-0">
-                            <div className="font-semibold line-clamp-1">{title}</div>
-                            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-                              <span className="font-mono">Order {o.id}</span>
-                              {o.listing?.id ? (
-                                <Link href={`/listing/${o.listing.id}`} className="underline underline-offset-2">
-                                  View listing
-                                </Link>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant={badge.variant}>{badge.label}</Badge>
-                            {total !== null ? <Badge variant="secondary">${Number(total).toLocaleString()}</Badge> : null}
-                            <Button asChild size="sm">
-                              <Link href={`/seller/orders/${o.id}`}>
-                                View
-                                <ArrowRight className="h-4 w-4 ml-2" />
+        <div className={`mt-4 transition-opacity duration-150 ${tabFading ? 'opacity-70' : 'opacity-100'}`}>
+          {filtered.length === 0 ? (
+            <Card className="border-border/60">
+              <CardContent className="pt-6 text-center text-sm text-muted-foreground">
+                <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                No sales found.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filtered.map((o) => {
+                const badge = statusBadge(String(o.status || ''));
+                const title = o.listing?.title || 'Listing';
+                const total = typeof o.amount === 'number' ? o.amount : null;
+                return (
+                  <Card key={o.id} className="border-border/60 hover:shadow-sm transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="font-semibold line-clamp-1">{title}</div>
+                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                            <span className="font-mono">Order {o.id}</span>
+                            {o.listing?.id ? (
+                              <Link href={`/listing/${o.listing.id}`} className="underline underline-offset-2">
+                                View listing
                               </Link>
-                            </Button>
+                            ) : null}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                          {total !== null ? <Badge variant="secondary">${Number(total).toLocaleString()}</Badge> : null}
+                          <Button asChild size="sm">
+                            <Link href={`/seller/orders/${o.id}`}>
+                              View
+                              <ArrowRight className="h-4 w-4 ml-2" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
