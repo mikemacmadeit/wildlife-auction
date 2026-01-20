@@ -23,9 +23,9 @@ import {
 } from 'lucide-react';
 import { formatDate, formatDistanceToNow } from '@/lib/utils';
 import Link from 'next/link';
-import { getFirestore, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { useToast } from '@/hooks/use-toast';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
 interface AutoReleaseHealth {
   lastRunAt?: Timestamp;
@@ -43,6 +43,46 @@ interface WebhookHealth {
   updatedAt?: Timestamp;
 }
 
+type AdminHealthResponse = {
+  ok: true;
+  now: string;
+  env: { netlifyRuntime: boolean; nodeEnv: string | null };
+  flags: {
+    globalCheckoutFreezeEnabled: boolean;
+    globalPayoutFreezeEnabled: boolean;
+    autoReleaseEnabled: boolean;
+  };
+  config: {
+    firebaseAdmin: { ok: boolean; projectId: string | null };
+    rateLimiting: { requireRedisInProdForSensitiveRoutes: boolean; upstashConfigured: boolean; effectiveInNetlify: boolean };
+    stripe: { configured: boolean; hasSecretKey: boolean; hasPublishableKey: boolean; hasWebhookSecret: boolean };
+    email: { configured: boolean; provider: 'brevo' | 'resend' | 'none' };
+    monitoring: { sentryConfigured: boolean };
+  };
+  opsHealth: {
+    autoReleaseProtected: null | {
+      lastRunAt: string | null;
+      scannedCount: number | null;
+      releasedCount: number | null;
+      errorsCount: number | null;
+      lastError: string | null;
+      updatedAt: string | null;
+    };
+    stripeWebhook: null | {
+      lastWebhookAt: string | null;
+      lastEventType: string | null;
+      lastEventId: string | null;
+      updatedAt: string | null;
+    };
+    aggregateRevenue: null | {
+      lastRunAt: string | null;
+      processed: number | null;
+      durationMs: number | null;
+      updatedAt: string | null;
+    };
+  };
+};
+
 export default function OpsHealthPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
@@ -51,6 +91,7 @@ export default function OpsHealthPage() {
   const [runningAutoRelease, setRunningAutoRelease] = useState(false);
   const [autoReleaseHealth, setAutoReleaseHealth] = useState<AutoReleaseHealth | null>(null);
   const [webhookHealth, setWebhookHealth] = useState<WebhookHealth | null>(null);
+  const [adminHealth, setAdminHealth] = useState<AdminHealthResponse | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const loadHealthData = useCallback(async () => {
@@ -58,6 +99,19 @@ export default function OpsHealthPage() {
 
     setLoading(true);
     try {
+      // Server-side health checks (env/config + opsHealth snapshots)
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/admin/health', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json().catch(() => null);
+        if (res.ok && json?.ok === true) setAdminHealth(json as AdminHealthResponse);
+        else setAdminHealth(null);
+      } catch {
+        setAdminHealth(null);
+      }
+
       // Load auto-release health
       const autoReleaseDoc = await getDoc(doc(db, 'opsHealth', 'autoReleaseProtected'));
       if (autoReleaseDoc.exists()) {
@@ -165,6 +219,13 @@ export default function OpsHealthPage() {
   const autoReleaseStatus = getAutoReleaseStatus();
   const webhookStatus = getWebhookStatus();
 
+  const badgeClassFor = (status: 'healthy' | 'warning' | 'stale' | 'unknown') => {
+    if (status === 'healthy') return 'bg-emerald-600 text-white';
+    if (status === 'warning') return 'bg-amber-600 text-white';
+    if (status === 'stale') return 'bg-red-600 text-white';
+    return 'bg-muted text-foreground';
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header */}
@@ -193,6 +254,87 @@ export default function OpsHealthPage() {
         </div>
       ) : (
         <>
+          {/* Config & Environment */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Environment & Configuration
+              </CardTitle>
+              <CardDescription>
+                Runtime configuration checks (no secrets shown). Use this to diagnose “it works locally but not on Netlify”.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!adminHealth ? (
+                <div className="text-sm text-muted-foreground">
+                  Health API not available yet. Refresh the page.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-lg border bg-muted/10 p-4 space-y-2">
+                    <div className="text-sm font-semibold">Firebase Admin</div>
+                    <div className="text-sm text-muted-foreground">
+                      Project: <span className="font-mono">{adminHealth.config.firebaseAdmin.projectId || 'UNKNOWN'}</span>
+                    </div>
+                    <Badge variant="secondary">OK</Badge>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/10 p-4 space-y-2">
+                    <div className="text-sm font-semibold">Rate limiting (Upstash)</div>
+                    {adminHealth.env.netlifyRuntime && !adminHealth.config.rateLimiting.upstashConfigured ? (
+                      <>
+                        <Badge variant="destructive">FAIL</Badge>
+                        <div className="text-sm text-muted-foreground">
+                          Upstash env vars are missing. Sensitive endpoints will return <span className="font-mono">503</span> in Netlify.
+                        </div>
+                      </>
+                    ) : adminHealth.config.rateLimiting.upstashConfigured ? (
+                      <>
+                        <Badge variant="secondary">OK</Badge>
+                        <div className="text-sm text-muted-foreground">Upstash is configured.</div>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="outline">DEV</Badge>
+                        <div className="text-sm text-muted-foreground">Not in Netlify runtime; in-memory fallback is allowed.</div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/10 p-4 space-y-2">
+                    <div className="text-sm font-semibold">Stripe</div>
+                    {adminHealth.config.stripe.configured ? (
+                      <Badge variant="secondary">OK</Badge>
+                    ) : (
+                      <Badge variant="destructive">FAIL</Badge>
+                    )}
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div>STRIPE_SECRET_KEY: {adminHealth.config.stripe.hasSecretKey ? 'set' : 'missing'}</div>
+                      <div>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: {adminHealth.config.stripe.hasPublishableKey ? 'set' : 'missing'}</div>
+                      <div>STRIPE_WEBHOOK_SECRET: {adminHealth.config.stripe.hasWebhookSecret ? 'set' : 'missing'}</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/10 p-4 space-y-2">
+                    <div className="text-sm font-semibold">Emergency flags</div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={adminHealth.flags.globalCheckoutFreezeEnabled ? 'destructive' : 'outline'}>
+                        Checkout freeze: {adminHealth.flags.globalCheckoutFreezeEnabled ? 'ON' : 'OFF'}
+                      </Badge>
+                      <Badge variant={adminHealth.flags.globalPayoutFreezeEnabled ? 'destructive' : 'outline'}>
+                        Payout freeze: {adminHealth.flags.globalPayoutFreezeEnabled ? 'ON' : 'OFF'}
+                      </Badge>
+                      <Badge variant={adminHealth.flags.autoReleaseEnabled ? 'secondary' : 'outline'}>
+                        Auto-release: {adminHealth.flags.autoReleaseEnabled ? 'ON' : 'OFF'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Auto-Release Health */}
           <Card>
             <CardHeader>
@@ -208,7 +350,7 @@ export default function OpsHealthPage() {
                 </div>
                 <Badge
                   variant={autoReleaseStatus.status === 'healthy' ? 'default' : 'destructive'}
-                  className={`bg-${autoReleaseStatus.color}-500`}
+                  className={badgeClassFor(autoReleaseStatus.status as any)}
                 >
                   {autoReleaseStatus.label}
                 </Badge>
@@ -276,7 +418,7 @@ export default function OpsHealthPage() {
                 </div>
                 <Badge
                   variant={webhookStatus.status === 'healthy' ? 'default' : 'destructive'}
-                  className={`bg-${webhookStatus.color}-500`}
+                  className={badgeClassFor(webhookStatus.status as any)}
                 >
                   {webhookStatus.label}
                 </Badge>
