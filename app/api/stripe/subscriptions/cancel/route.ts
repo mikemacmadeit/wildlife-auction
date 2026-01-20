@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // Rate limiting
-    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
+    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.stripe);
     const rateLimitResult = await rateLimitCheck(request as any);
     if (!rateLimitResult.allowed) {
       return json(rateLimitResult.body, {
