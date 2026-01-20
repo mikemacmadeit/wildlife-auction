@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 interface FeaturedListingCardProps {
   listing: Listing;
@@ -22,6 +23,7 @@ interface FeaturedListingCardProps {
 
 export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCardProps>(
   ({ listing, className, index = 0 }, ref) => {
+  const router = useRouter();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
@@ -205,9 +207,20 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                     </Badge>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground font-medium max-w-[180px] truncate">
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground font-medium max-w-[180px] truncate text-right hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const sellerId = listing.sellerId;
+                    if (!sellerId) return;
+                    router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                  }}
+                  aria-label="View seller profile"
+                >
                   {listing.sellerSnapshot?.displayName || 'Seller'}
-                </div>
+                </button>
               </div>
             </div>
 

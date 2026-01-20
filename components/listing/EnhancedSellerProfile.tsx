@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { Listing } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { getSellerStats } from '@/lib/firebase/sellerStats';
-import { getUserProfile } from '@/lib/firebase/users';
+import { getPublicSellerTrust, getUserProfile } from '@/lib/firebase/users';
 import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { useAuth } from '@/hooks/use-auth';
@@ -28,6 +28,8 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
+import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
+import type { PublicSellerTrust } from '@/lib/types';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -62,6 +64,7 @@ export function EnhancedSellerProfile({
 
   const [sellerTier, setSellerTier] = useState<SubscriptionTier>('standard');
   const [sellerProfile, setSellerProfile] = useState<UserProfile | null>(null);
+  const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
 
   const sellerPhotoUrl =
     sellerProfile?.photoURL ||
@@ -83,6 +86,25 @@ export function EnhancedSellerProfile({
       });
     }
   }, [sellerId, viewerId]);
+
+  // Public seller trust badges (Stripe Verified, TPWD permit, etc.). Safe to load even when logged out.
+  useEffect(() => {
+    let cancelled = false;
+    if (!sellerId) {
+      setPublicTrust(null);
+      return;
+    }
+    getPublicSellerTrust(sellerId)
+      .then((t) => {
+        if (!cancelled) setPublicTrust(t);
+      })
+      .catch(() => {
+        if (!cancelled) setPublicTrust(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +190,7 @@ export function EnhancedSellerProfile({
                 )}
               </h3>
               <SellerTierBadge tier={sellerTier} />
+              <SellerTrustBadges badgeIds={publicTrust?.badgeIds} />
               {sellerProfile && reputation.level === 'trusted' && (
                 <Badge
                   variant="default"

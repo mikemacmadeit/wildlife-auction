@@ -14,6 +14,7 @@ import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
+import { useRouter } from 'next/navigation';
 
 interface ListingCardProps {
   listing: Listing;
@@ -22,6 +23,7 @@ interface ListingCardProps {
 
 export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
   ({ listing, className }, ref) => {
+  const router = useRouter();
   // Phase 3A (A4): anon-safe trust signals come from listing.sellerSnapshot (copied at publish time).
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
@@ -264,9 +266,20 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               </div>
               <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground max-w-[160px] truncate">
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-muted-foreground max-w-[160px] truncate hover:underline"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const sellerId = listing.sellerId;
+                      if (!sellerId) return;
+                      router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                    }}
+                    aria-label="View seller profile"
+                  >
                     {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
-                  </span>
+                  </button>
                   {/* Seller Tier badge (Seller Tiers) */}
                   <SellerTierBadge tier={(listing as any).sellerTier} />
                 </div>

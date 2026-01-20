@@ -14,12 +14,14 @@ import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { BROWSE_SPECIES } from '@/components/browse/filters/constants';
+import { useRouter } from 'next/navigation';
 interface ListItemProps {
   listing: Listing;
 }
 
 export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   ({ listing }, ref) => {
+  const router = useRouter();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
@@ -310,9 +312,20 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                         </span>
                       )}
                     </div>
-                    <div className="text-sm font-bold truncate">
+                    <button
+                      type="button"
+                      className="text-sm font-bold truncate text-left hover:underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const sellerId = listing.sellerId;
+                        if (!sellerId) return;
+                        router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                      }}
+                      aria-label="View seller profile"
+                    >
                       {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
-                    </div>
+                    </button>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {listing.sellerSnapshot?.verified ? (
