@@ -31,6 +31,7 @@ import {
   HeartPulse,
   Mail,
   Bell,
+  HelpCircle,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -92,6 +93,7 @@ const adminNavItems: DashboardNavItem[] = [
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
   { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
+  { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
   { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
 ];

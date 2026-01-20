@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Mail, Shield, ArrowRight } from 'lucide-react';
+import { ContactForm } from '@/components/support/ContactForm';
 
 export const metadata: Metadata = {
   title: 'Contact | Wildlife Exchange',
@@ -23,6 +24,7 @@ export default function ContactPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        <ContactForm />
         <Card>
           <CardHeader>
             <CardTitle>Email Support</CardTitle>

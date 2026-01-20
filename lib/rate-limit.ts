@@ -86,6 +86,8 @@ export const RATE_LIMITS = {
   checkout: { windowMs: 60 * 1000, maxRequests: 5, requireRedisInProd: true }, // 5 requests per minute
   // Messaging (restrict writes/abuse)
   messages: { windowMs: 60 * 1000, maxRequests: 20, requireRedisInProd: true }, // 20 requests per minute
+  // Support/contact form (restrict spam/abuse)
+  support: { windowMs: 60 * 1000, maxRequests: 5, requireRedisInProd: true }, // 5 requests per minute
 } as const;
 
 /**
