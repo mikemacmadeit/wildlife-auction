@@ -35,6 +35,7 @@ import { BreederPermitCard } from '@/components/seller/BreederPermitCard';
 import { useToast } from '@/hooks/use-toast';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
+import type { SellerDashboardData } from '@/lib/seller/getSellerDashboardData';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -47,6 +48,14 @@ const getAlertIcon = (type: string) => {
       return MessageSquare;
     case 'bid':
       return DollarSign;
+    case 'sale_delivery_update':
+      return FileCheck;
+    case 'sale_documents':
+      return FileCheck;
+    case 'sale_issue':
+      return AlertCircle;
+    case 'listings_pending_review':
+      return Clock;
     default:
       return AlertCircle;
   }
@@ -121,7 +130,15 @@ const formatTimeAgo = (date: any) => {
 interface SellerAlert {
   id: string;
   // NOTE: platform does not arrange transport. Any delivery/pickup is handled by buyer/seller off-platform.
-  type: 'auction_ending' | 'delivery_details_request' | 'message' | 'bid';
+  type:
+    | 'auction_ending'
+    | 'delivery_details_request'
+    | 'message'
+    | 'bid'
+    | 'sale_delivery_update'
+    | 'sale_documents'
+    | 'sale_issue'
+    | 'listings_pending_review';
   priority: 'high' | 'medium' | 'low';
   title: string;
   description: string;
@@ -148,6 +165,8 @@ export default function SellerOverviewPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [dashboardData, setDashboardData] = useState<SellerDashboardData | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectingStripe, setConnectingStripe] = useState(false);
@@ -207,6 +226,71 @@ export default function SellerOverviewPage() {
       cancelled = true;
     };
   }, [uid, authLoading]);
+
+  // Seller command-center aggregation (server-side; read-only). This complements the client reads above.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDashboard() {
+      if (!user || authLoading) return;
+      setDashboardLoading(true);
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/seller/dashboard', { headers: { authorization: `Bearer ${token}` } });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          // Non-fatal: overview remains usable.
+          if (!cancelled) setDashboardData(null);
+          return;
+        }
+        if (!cancelled) setDashboardData((json?.data || null) as any);
+      } catch {
+        if (!cancelled) setDashboardData(null);
+      } finally {
+        if (!cancelled) setDashboardLoading(false);
+      }
+    }
+    void loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user]);
+
+  const sellerQueues = useMemo(() => {
+    const pendingReviewListings = listings.filter(
+      (l) => (l.status === 'pending' || (l as any).complianceStatus === 'pending_review') && l.status !== 'removed'
+    );
+
+    const isOpenDispute = (o: any) => ['open', 'needs_evidence', 'under_review'].includes(String(o?.disputeStatus || ''));
+
+    const ordersNeedingDeliveryUpdate = orders.filter((o: any) => {
+      const paidish = ['paid', 'paid_held', 'in_transit'].includes(String(o.status || ''));
+      const hasDelivered = !!o.deliveredAt || !!o.deliveryConfirmedAt;
+      return paidish && !hasDelivered;
+    });
+
+    const ordersNeedingDocs = orders.filter((o: any) => {
+      const missing = Array.isArray(o?.complianceDocsStatus?.missing) ? o.complianceDocsStatus.missing : [];
+      return missing.length > 0 && !['cancelled', 'refunded', 'completed'].includes(String(o.status || ''));
+    });
+
+    const ordersWithIssues = orders.filter((o: any) => {
+      return o.adminHold === true || String(o.status || '') === 'disputed' || isOpenDispute(o);
+    });
+
+    const ordersNeedingAnyActionIds = new Set<string>([
+      ...ordersNeedingDeliveryUpdate.map((o) => o.id),
+      ...ordersNeedingDocs.map((o) => o.id),
+      ...ordersWithIssues.map((o) => o.id),
+    ]);
+
+    return {
+      pendingReviewListingsCount: pendingReviewListings.length,
+      ordersNeedingDeliveryUpdateCount: ordersNeedingDeliveryUpdate.length,
+      ordersNeedingDocsCount: ordersNeedingDocs.length,
+      ordersWithIssuesCount: ordersWithIssues.length,
+      ordersNeedingAnyActionCount: ordersNeedingAnyActionIds.size,
+    };
+  }, [listings, orders]);
 
   // Calculate stats from real data
   const stats = useMemo(() => {
@@ -322,6 +406,84 @@ export default function SellerOverviewPage() {
       }
     });
 
+    // Sales requiring seller action (delivery updates, documents, issues)
+    orders.forEach((order: any) => {
+      const status = String(order?.status || '');
+      const hasDelivered = !!order.deliveredAt || !!order.deliveryConfirmedAt;
+      const paidish = ['paid', 'paid_held', 'in_transit'].includes(status);
+      const missingDocs = Array.isArray(order?.complianceDocsStatus?.missing) ? order.complianceDocsStatus.missing : [];
+      const hasOpenDispute = ['open', 'needs_evidence', 'under_review'].includes(String(order?.disputeStatus || ''));
+      const hasIssue = order.adminHold === true || status === 'disputed' || hasOpenDispute;
+
+      if (hasIssue) {
+        alertsList.push({
+          id: `sale-issue-${order.id}`,
+          type: 'sale_issue',
+          priority: 'high',
+          title: `Sale needs attention`,
+          description:
+            order.adminHold === true
+              ? 'This sale is on admin hold.'
+              : hasOpenDispute || status === 'disputed'
+                ? 'There is an open issue/dispute on this sale.'
+                : 'This sale needs attention.',
+          listingId: order.listingId,
+          listingTitle: order.listingSnapshot?.title,
+          timestamp: new Date(),
+          action: 'view',
+          actionUrl: `/seller/orders/${order.id}`,
+        });
+        return;
+      }
+
+      if (missingDocs.length > 0) {
+        alertsList.push({
+          id: `sale-docs-${order.id}`,
+          type: 'sale_documents',
+          priority: 'high',
+          title: `Upload required documents`,
+          description: `Missing: ${missingDocs.join(', ')}`,
+          listingId: order.listingId,
+          listingTitle: order.listingSnapshot?.title,
+          timestamp: new Date(),
+          action: 'complete',
+          actionUrl: `/seller/orders/${order.id}`,
+        });
+      }
+
+      if (paidish && !hasDelivered) {
+        alertsList.push({
+          id: `sale-delivery-${order.id}`,
+          type: 'sale_delivery_update',
+          priority: 'medium',
+          title: `Update delivery status`,
+          description: status === 'in_transit' ? 'Mark delivered when complete.' : 'Mark in transit / delivered when applicable.',
+          listingId: order.listingId,
+          listingTitle: order.listingSnapshot?.title,
+          timestamp: new Date(),
+          action: 'complete',
+          actionUrl: `/seller/orders/${order.id}`,
+        });
+      }
+    });
+
+    // Aggregate listing pending review signal (avoid spamming per listing)
+    const pendingReviewCount = listings.filter(
+      (l) => l.status === 'pending' || (l as any).complianceStatus === 'pending_review'
+    ).length;
+    if (pendingReviewCount > 0) {
+      alertsList.push({
+        id: `listings-pending-review`,
+        type: 'listings_pending_review',
+        priority: 'low',
+        title: `${pendingReviewCount} listing${pendingReviewCount !== 1 ? 's' : ''} pending review`,
+        description: 'Your listing is waiting on admin/compliance review. No action needed unless we request documents.',
+        timestamp: new Date(),
+        action: 'view',
+        actionUrl: '/seller/listings',
+      });
+    }
+
     // Sort by priority and timestamp
     alertsList.sort((a, b) => {
       const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -331,8 +493,8 @@ export default function SellerOverviewPage() {
       return b.timestamp.getTime() - a.timestamp.getTime();
     });
 
-    return alertsList;
-  }, [listings]);
+    return alertsList.slice(0, 8);
+  }, [listings, orders]);
 
   // Generate activities from real data
   const activities = useMemo((): SellerActivity[] => {
@@ -484,6 +646,115 @@ export default function SellerOverviewPage() {
             );
           })}
         </div>
+
+        {/* Seller command center (additive): most important operational signals for sellers */}
+        <Card className="border-2 border-border/50 bg-card">
+          <CardHeader className="pb-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle className="text-xl font-extrabold">Today</CardTitle>
+                <CardDescription>Fast links + the key things that can block payout.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/seller/sales">Open Sales</Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/seller/payouts">Open Payouts</Link>
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border border-border/60">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sales needing action</div>
+                      <div className="text-2xl font-extrabold mt-1">{sellerQueues.ordersNeedingAnyActionCount}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {sellerQueues.ordersNeedingDocsCount} docs · {sellerQueues.ordersNeedingDeliveryUpdateCount} delivery · {sellerQueues.ordersWithIssuesCount} issues
+                      </div>
+                    </div>
+                    <AlertCircle className="h-5 w-5 text-primary" />
+                  </div>
+                  <Button asChild variant="outline" className="w-full mt-3">
+                    <Link href="/seller/sales">
+                      View sales
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/60">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Listings pending review</div>
+                      <div className="text-2xl font-extrabold mt-1">{sellerQueues.pendingReviewListingsCount}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Admin/compliance review queue</div>
+                    </div>
+                    <Clock className="h-5 w-5 text-primary" />
+                  </div>
+                  <Button asChild variant="outline" className="w-full mt-3">
+                    <Link href="/seller/listings">
+                      View listings
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/60">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Open offers</div>
+                      <div className="text-2xl font-extrabold mt-1">
+                        {dashboardData?.totals?.offers?.open ?? '—'}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {dashboardLoading ? 'Loading…' : 'Review and respond quickly'}
+                      </div>
+                    </div>
+                    <DollarSign className="h-5 w-5 text-primary" />
+                  </div>
+                  <Button asChild variant="outline" className="w-full mt-3">
+                    <Link href="/dashboard/bids-offers">
+                      View offers
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/60">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payouts held (gross)</div>
+                      <div className="text-2xl font-extrabold mt-1">
+                        {typeof dashboardData?.totals?.revenue?.held === 'number'
+                          ? `$${dashboardData.totals.revenue.held.toLocaleString()}`
+                          : '—'}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">Held until timeline + compliance checks complete</div>
+                    </div>
+                    <Shield className="h-5 w-5 text-primary" />
+                  </div>
+                  <Button asChild variant="outline" className="w-full mt-3">
+                    <Link href="/seller/payouts">
+                      View payouts
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
         {user && setupChecklist.isComplete !== true && (
