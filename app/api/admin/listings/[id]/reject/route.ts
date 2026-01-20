@@ -11,6 +11,7 @@ import { isAdminUid } from '@/app/api/admin/notifications/_admin';
 import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
+import { createAuditLog } from '@/lib/audit/logger';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -63,6 +64,13 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   const title = String(listing?.title || 'Listing');
   if (!sellerId) return json({ ok: false, error: 'Listing is missing sellerId' }, { status: 400 });
 
+  const beforeState = {
+    status: listing?.status,
+    rejectionReason: listing?.rejectionReason,
+    rejectedBy: listing?.rejectedBy,
+    rejectedAt: listing?.rejectedAt,
+  };
+
   try {
     await listingRef.update({
       status: 'removed',
@@ -80,6 +88,23 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       message: e?.message,
     });
     return json({ ok: false, error: 'Failed to reject listing', message: e?.message }, { status: 500 });
+  }
+
+  // Audit log (best-effort).
+  try {
+    await createAuditLog(db as any, {
+      actorUid: uid,
+      actorRole: 'admin',
+      actionType: 'admin_listing_rejected',
+      listingId,
+      targetUserId: sellerId,
+      beforeState,
+      afterState: { status: 'removed', rejectedBy: uid, ...(reason ? { rejectionReason: reason } : {}) },
+      metadata: { listingTitle: title, ...(reason ? { reason } : {}) },
+      source: 'admin_ui',
+    });
+  } catch {
+    // ignore
   }
 
   const bodyText = reason

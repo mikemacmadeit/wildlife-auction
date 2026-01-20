@@ -12,6 +12,7 @@ import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
 import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
+import { createAuditLog } from '@/lib/audit/logger';
 
 const bodySchema = z.object({
   reason: z.string().min(1, 'Rejection reason is required').max(500),
@@ -42,6 +43,13 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
   if (!sellerId) return json({ ok: false, error: 'Listing missing sellerId' }, { status: 400 });
 
   const now = Timestamp.now();
+  const beforeState = {
+    complianceStatus: listing?.complianceStatus,
+    complianceRejectionReason: listing?.complianceRejectionReason,
+    complianceReviewedBy: listing?.complianceReviewedBy,
+    complianceReviewedAt: listing?.complianceReviewedAt,
+  };
+
   await ref.update({
     complianceStatus: 'rejected',
     complianceRejectionReason: reason,
@@ -50,6 +58,22 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
     updatedAt: now,
     updatedBy: actorUid,
   });
+
+  try {
+    await createAuditLog(db as any, {
+      actorUid: actorUid,
+      actorRole: 'admin',
+      actionType: 'admin_listing_compliance_rejected',
+      listingId,
+      targetUserId: sellerId,
+      beforeState,
+      afterState: { complianceStatus: 'rejected', complianceRejectionReason: reason },
+      metadata: { listingTitle: title, reason },
+      source: 'admin_ui',
+    });
+  } catch {
+    // ignore
+  }
 
   // Seller notification through canonical pipeline (idempotent, best-effort).
   try {

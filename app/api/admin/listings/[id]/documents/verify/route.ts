@@ -10,6 +10,7 @@
 // Route handlers work fine with standard Web `Request` / `Response`.
 import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, json } from '@/app/api/admin/_util';
+import { createAuditLog } from '@/lib/audit/logger';
 
 export async function POST(
   request: Request,
@@ -55,6 +56,7 @@ export async function POST(
       return json({ error: 'Document not found' }, { status: 404 });
     }
 
+    const beforeState = docSnap.data() as any;
     const updateData: Record<string, any> = {
       status,
       verifiedBy: adminId,
@@ -69,6 +71,32 @@ export async function POST(
     }
 
     await docRef.update(updateData);
+
+    // Audit log (best-effort).
+    try {
+      await createAuditLog(db as any, {
+        actorUid: adminId,
+        actorRole: 'admin',
+        actionType: status === 'verified' ? 'admin_listing_document_verified' : 'admin_listing_document_rejected',
+        listingId,
+        beforeState: {
+          documentId,
+          type: beforeState?.type,
+          status: beforeState?.status,
+          rejectionReason: beforeState?.rejectionReason,
+        },
+        afterState: {
+          documentId,
+          type: beforeState?.type,
+          status,
+          ...(status === 'rejected' ? { rejectionReason: String(rejectionReason || '').trim() } : {}),
+        },
+        metadata: { documentId, type: beforeState?.type },
+        source: 'admin_ui',
+      });
+    } catch {
+      // ignore
+    }
 
     // If TPWD_BREEDER_PERMIT is verified, update listing compliance status
     const docData = docSnap.data()!;

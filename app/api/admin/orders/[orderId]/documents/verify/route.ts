@@ -12,6 +12,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, json } from '@/app/api/admin/_util';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
+import { createAuditLog } from '@/lib/audit/logger';
 
 export async function POST(
   request: Request,
@@ -55,6 +56,8 @@ export async function POST(
       return json({ error: 'Document not found' }, { status: 404 });
     }
 
+    const beforeDoc = documentDoc.data() as any;
+
     // Update document status
     const updateData: any = {
       status,
@@ -70,6 +73,32 @@ export async function POST(
     }
 
     await documentRef.update(updateData);
+
+    // Audit log (best-effort).
+    try {
+      await createAuditLog(db as any, {
+        actorUid: adminId,
+        actorRole: 'admin',
+        actionType: status === 'verified' ? 'admin_order_document_verified' : 'admin_order_document_rejected',
+        orderId,
+        beforeState: {
+          documentId,
+          type: beforeDoc?.type,
+          status: beforeDoc?.status,
+          rejectionReason: beforeDoc?.rejectionReason,
+        },
+        afterState: {
+          documentId,
+          type: beforeDoc?.type,
+          status,
+          ...(status === 'rejected' ? { rejectionReason: String(rejectionReason || '').trim() } : {}),
+        },
+        metadata: { documentId, type: beforeDoc?.type },
+        source: 'admin_ui',
+      });
+    } catch {
+      // ignore
+    }
 
     // If TPWD_TRANSFER_APPROVAL is verified, update order transferPermitStatus
     const documentData = documentDoc.data()!;

@@ -93,7 +93,16 @@ export type AuditActionType =
   | 'admin_user_risk_updated'
   | 'admin_user_note_added'
   | 'admin_user_summaries_backfill'
-  | 'admin_user_verification_email_sent';
+  | 'admin_user_verification_email_sent'
+  // Admin: listing moderation + compliance workflow (policy/audit trail)
+  | 'admin_listing_approved'
+  | 'admin_listing_rejected'
+  | 'admin_listing_compliance_approved'
+  | 'admin_listing_compliance_rejected'
+  | 'admin_listing_document_verified'
+  | 'admin_listing_document_rejected'
+  | 'admin_order_document_verified'
+  | 'admin_order_document_rejected';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 

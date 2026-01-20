@@ -11,6 +11,7 @@ import { isAdminUid } from '@/app/api/admin/notifications/_admin';
 import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
+import { createAuditLog } from '@/lib/audit/logger';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -60,6 +61,13 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   const title = String(listing?.title || 'Listing');
   if (!sellerId) return json({ ok: false, error: 'Listing is missing sellerId' }, { status: 400 });
 
+  const beforeState = {
+    status: listing?.status,
+    complianceStatus: listing?.complianceStatus,
+    approvedBy: listing?.approvedBy,
+    approvedAt: listing?.approvedAt,
+  };
+
   // Whitetail breeder: require compliance approval first.
   if (listing?.category === 'whitetail_breeder' && listing?.complianceStatus !== 'approved') {
     return json(
@@ -81,6 +89,23 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     updatedAt: Timestamp.now(),
     updatedBy: uid,
   });
+
+  // Audit log (best-effort; do not block moderation on audit failures).
+  try {
+    await createAuditLog(db as any, {
+      actorUid: uid,
+      actorRole: 'admin',
+      actionType: 'admin_listing_approved',
+      listingId,
+      targetUserId: sellerId,
+      beforeState,
+      afterState: { status: 'active', approvedBy: uid },
+      metadata: { listingTitle: title },
+      source: 'admin_ui',
+    });
+  } catch {
+    // ignore
+  }
 
   // Notify admins (best effort).
   try {
