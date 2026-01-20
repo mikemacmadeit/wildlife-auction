@@ -273,15 +273,14 @@ service cloud.firestore {
           isAdmin() || isListingOwner()
         );
         
-        // Allow create: authenticated user (app logic ensures ownership)
-        // Similar to storage rules - allows authenticated creates to handle:
-        // 1. Cross-service rules setup
-        // 2. Firestore propagation delays
-        // 3. Document upload flow
-        // The uploadedBy field ensures the document is linked to the correct user
-        allow create: if isAuthenticated() && 
+        // Allow create: listing owner or admin only.
+        // Prevents malicious users from attaching docs to other sellers' listings.
+        // Keep uploadedBy check for auditability and to match existing document shapes.
+        allow create: if (isAdmin() || isListingOwner()) &&
           request.resource.data.status == 'uploaded' &&
-          request.resource.data.uploadedBy == request.auth.uid;
+          request.resource.data.uploadedBy == request.auth.uid &&
+          // Only allow https URLs (basic injection hardening)
+          request.resource.data.documentUrl.matches('^https://.*');
         
         // Allow update: only admin (for verification)
         allow update: if isAdmin() && 
@@ -624,6 +623,19 @@ service cloud.firestore {
       // Only server-side (Admin SDK) can write
       // No client access needed
       allow read, write: if false;
+    }
+
+    // ============================================
+    // ADMIN REVENUE AGGREGATES (SERVER-AUTHORED)
+    // ============================================
+    match /adminRevenueAggregates/{docId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+    match /adminRevenueAggState/{docId} {
+      // Operational state used by scheduled jobs; keep admin-only for debugging.
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
     }
     
     // ============================================
