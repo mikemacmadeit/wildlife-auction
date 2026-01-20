@@ -516,7 +516,17 @@ export type DisputeReason = 'death' | 'serious_illness' | 'injury' | 'escape' | 
 
 export type DisputeStatus = 'none' | 'open' | 'needs_evidence' | 'under_review' | 'resolved_refund' | 'resolved_partial_refund' | 'resolved_release' | 'cancelled';
 
-export type PayoutHoldReason = 'none' | 'protection_window' | 'dispute_open' | 'admin_hold' | 'chargeback';
+export type PayoutHoldReason =
+  | 'none'
+  | 'protection_window'
+  | 'dispute_open'
+  | 'admin_hold'
+  | 'chargeback'
+  // Compliance-driven payout holds (policy-based; written server-side)
+  | 'MISSING_TAHC_CVI'
+  | 'EXOTIC_CERVID_REVIEW_REQUIRED'
+  | 'ESA_REVIEW_REQUIRED'
+  | 'OTHER_EXOTIC_REVIEW_REQUIRED';
 
 export type OrderPaymentMethod = 'card' | 'ach_debit' | 'bank_transfer' | 'wire';
 
@@ -651,6 +661,13 @@ export interface Order {
   protectedDisputeStatus?: DisputeStatus;
   disputeEvidence?: DisputeEvidence[]; // Evidence uploaded for dispute
   payoutHoldReason?: PayoutHoldReason; // Why payout is held
+  /**
+   * Admin-only payout approval for policy-driven holds (exotics/cervids/ESA overlays).
+   * Optional/back-compat: absence means "not approved".
+   */
+  adminPayoutApproval?: boolean;
+  adminPayoutApprovalBy?: string;
+  adminPayoutApprovalAt?: Date;
   protectedTransactionDaysSnapshot?: 7 | 14 | null; // Snapshot of listing protection days at purchase
   protectedTermsVersion?: string; // Snapshot of terms version at purchase
   

@@ -1,6 +1,6 @@
 import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
-import { getRequiredOrderDocuments } from '@/lib/compliance/requirements';
+import { getRequiredOrderDocsForListing } from '@/lib/compliance/policy';
 
 export type ComplianceDocsStatus = {
   required: string[];
@@ -26,7 +26,7 @@ export async function recomputeOrderComplianceDocsStatus(params: {
   const listing = listingSnap.data() as any;
 
   const category = normalizeCategory(listing?.category);
-  const required = getRequiredOrderDocuments(category as any).map(String);
+  const required = getRequiredOrderDocsForListing(category as any, listing?.attributes as any).map(String);
 
   const docsSnap = await db.collection('orders').doc(orderId).collection('documents').get();
   const provided = Array.from(
