@@ -20,17 +20,19 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { MessageSquare, Send, AlertTriangle, Flag } from 'lucide-react';
+import { MessageSquare, Send, AlertTriangle, Flag, Tag } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { Message, MessageThread } from '@/lib/types';
+import { Message, MessageThread, Listing } from '@/lib/types';
 import { subscribeToThreadMessages, sendMessage, markThreadAsRead, flagThread } from '@/lib/firebase/messages';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { OfferFromMessagesDialog } from '@/components/offers/OfferFromMessagesDialog';
 
 interface MessageThreadProps {
   thread: MessageThread;
   listingTitle: string;
+  listing?: Listing | null;
   otherPartyName: string;
   otherPartyAvatar?: string;
   orderStatus?: 'pending' | 'paid' | 'completed';
@@ -39,6 +41,7 @@ interface MessageThreadProps {
 export function MessageThreadComponent({
   thread,
   listingTitle,
+  listing,
   otherPartyName,
   otherPartyAvatar,
   orderStatus,
@@ -53,6 +56,7 @@ export function MessageThreadComponent({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState<'spam' | 'harassment' | 'circumvention' | 'scam' | 'other'>('circumvention');
   const [reportDetails, setReportDetails] = useState('');
+  const [offerOpen, setOfferOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const toDateSafe = (value: any): Date | null => {
@@ -185,14 +189,31 @@ export function MessageThreadComponent({
             <p className="text-sm text-muted-foreground">{listingTitle}</p>
           </div>
         </div>
-        <AlertDialog open={reportOpen} onOpenChange={setReportOpen}>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Flag className="h-4 w-4 mr-2" />
-              Report
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
+        <div className="flex items-center gap-2">
+          {/* Offers entry point (buyer-only). Shows seller store listings where Best Offer is enabled. */}
+          {user?.uid && thread?.buyerId === user.uid ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setOfferOpen(true)}>
+                <Tag className="h-4 w-4 mr-2" />
+                Offer
+              </Button>
+              <OfferFromMessagesDialog
+                open={offerOpen}
+                onOpenChange={setOfferOpen}
+                sellerId={thread.sellerId}
+                sellerName={otherPartyName}
+              />
+            </>
+          ) : null}
+
+          <AlertDialog open={reportOpen} onOpenChange={setReportOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Flag className="h-4 w-4 mr-2" />
+                Report
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Report this conversation</AlertDialogTitle>
               <AlertDialogDescription>
@@ -242,8 +263,9 @@ export function MessageThreadComponent({
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleFlag}>Submit report</AlertDialogAction>
             </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* Safety Notice */}

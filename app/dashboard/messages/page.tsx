@@ -311,6 +311,7 @@ export default function MessagesPage() {
               <MessageThreadComponent
                 thread={thread}
                 listingTitle={listing?.title || 'Listing'}
+                listing={listing}
                 otherPartyName={otherPartyName}
                 otherPartyAvatar={otherPartyAvatar}
                 orderStatus={orderStatus}
