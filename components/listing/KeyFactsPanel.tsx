@@ -218,6 +218,13 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       value: 'Ready',
       badge: { variant: 'outline' as const, label: 'Coordinated', color: '' },
     },
+    listing.trust?.sellerOffersDelivery && {
+      icon: Truck,
+      label: 'Delivery',
+      value: 'Seller offers delivery',
+      detail: 'Buyer & seller coordinate directly (platform does not arrange transport).',
+      badge: { variant: 'outline' as const, label: 'Seller-provided', color: '' },
+    },
   ].filter(Boolean) as Array<{
     icon: React.ComponentType<{ className?: string }>;
     label: string;

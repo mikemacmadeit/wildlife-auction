@@ -379,6 +379,11 @@ export interface Listing {
     verified: boolean;
     insuranceAvailable: boolean;
     transportReady: boolean;
+    /**
+     * Optional: seller indicates they may offer delivery themselves.
+     * Buyer and seller still coordinate directly; the platform does not arrange transport.
+     */
+    sellerOffersDelivery?: boolean;
   };
   
   // Category-specific attributes (replaces old metadata)
@@ -728,6 +733,7 @@ export interface FilterState {
   papers?: boolean; // Has registration/papers
   verifiedSeller?: boolean; // Only verified sellers
   transportReady?: boolean; // Transport-ready listings
+  sellerOffersDelivery?: boolean; // Seller offers delivery (seller-provided; platform does not arrange transport)
   endingSoon?: boolean; // Ending within 24 hours
   newlyListed?: boolean; // Listed within 7 days
   featured?: boolean; // Featured listings only

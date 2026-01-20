@@ -29,7 +29,7 @@ const badgeConfig = {
   transport: {
     icon: Truck,
     label: 'Transport Ready',
-    description: 'Seller can arrange or coordinate transport. Quote available before purchase.',
+    description: 'Buyer and seller coordinate pickup/delivery directly. Wildlife Exchange does not arrange transport.',
     // Olive accent for transport - soft chip
     color: 'text-foreground bg-accent/15 border-accent/30 dark:bg-accent/10 dark:border-accent/25',
     iconColor: 'text-accent dark:text-accent/90',

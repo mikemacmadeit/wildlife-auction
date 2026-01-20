@@ -1317,9 +1317,11 @@ export default function ListingDetailPage() {
                         <div className="min-w-0">
                           <div className="font-semibold">Delivery / pickup</div>
                           <div className="text-xs text-muted-foreground">
-                            {listing!.trust?.transportReady
-                              ? 'Seller has provided delivery/pickup details. Buyer & seller arrange logistics after purchase.'
-                              : 'Buyer & seller arrange logistics after purchase.'}
+                            {listing!.trust?.sellerOffersDelivery
+                              ? 'Seller indicates they may offer delivery. Buyer & seller arrange logistics directly after purchase.'
+                              : listing!.trust?.transportReady
+                              ? 'Seller has provided delivery/pickup details. Buyer & seller arrange logistics directly after purchase.'
+                              : 'Buyer & seller arrange logistics directly after purchase.'}
                           </div>
                         </div>
                       </div>
@@ -1638,9 +1640,11 @@ export default function ListingDetailPage() {
                           <div className="min-w-0">
                             <div className="font-semibold">Delivery / transport</div>
                             <div className="text-xs text-muted-foreground">
-                              {listing!.trust?.transportReady
-                                ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
-                                : 'Buyer & seller arrange logistics after purchase.'}
+                              {listing!.trust?.sellerOffersDelivery
+                                ? 'Seller indicates they may offer delivery. Buyer & seller arrange logistics directly after purchase.'
+                                : listing!.trust?.transportReady
+                                ? 'Seller has provided delivery/pickup details. Buyer & seller arrange logistics directly after purchase.'
+                                : 'Buyer & seller arrange logistics directly after purchase.'}
                             </div>
                           </div>
                         </div>
@@ -1896,13 +1900,13 @@ export default function ListingDetailPage() {
                               ? 'Transfer/pickup details will be coordinated directly with the seller after purchase and required approvals.'
                               : 'Shipping options will be discussed with the seller after purchase.'}
                           </p>
-                          {listing!.trust?.transportReady && (
+                          {(listing!.trust?.transportReady || listing!.trust?.sellerOffersDelivery) && (
                             <div className="flex items-center gap-2">
                               <Truck className="h-4 w-4 text-primary" />
                               <span>
-                                {listing!.category === 'whitetail_breeder'
-                                  ? 'Seller has delivery/pickup details available (buyer & seller arranged)'
-                                  : 'Seller has delivery/pickup details available (buyer & seller arranged)'}
+                                {listing!.trust?.sellerOffersDelivery
+                                  ? 'Seller offers delivery (buyer & seller coordinate directly)'
+                                  : 'Delivery/pickup details available (buyer & seller coordinate directly)'}
                               </span>
                             </div>
                           )}

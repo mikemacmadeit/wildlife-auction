@@ -76,6 +76,7 @@ function NewListingPageContent() {
     coverPhotoId?: string;
     verification: boolean;
     transport: boolean;
+    sellerOffersDelivery: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
     bestOffer: {
@@ -107,6 +108,7 @@ function NewListingPageContent() {
     coverPhotoId: undefined,
     verification: false,
     transport: false,
+    sellerOffersDelivery: false,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
     bestOffer: {
@@ -295,6 +297,7 @@ function NewListingPageContent() {
             verified: formData.verification,
             insuranceAvailable: false,
             transportReady: formData.transport,
+            sellerOffersDelivery: formData.sellerOffersDelivery,
           },
           protectedTransactionEnabled: formData.protectedTransactionEnabled,
           protectedTransactionDays: formData.protectedTransactionDays,
@@ -1774,6 +1777,24 @@ function NewListingPageContent() {
               </Label>
             </div>
           </Card>
+
+          <Card className="p-4">
+            <div className="flex items-start space-x-3 min-h-[44px]">
+              <Checkbox
+                id="seller-offers-delivery"
+                checked={formData.sellerOffersDelivery}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, sellerOffersDelivery: checked as boolean })
+                }
+              />
+              <Label htmlFor="seller-offers-delivery" className="cursor-pointer flex-1">
+                <div className="font-medium mb-1">Seller offers delivery</div>
+                <div className="text-sm text-muted-foreground">
+                  Seller-provided delivery only. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                </div>
+              </Label>
+            </div>
+          </Card>
         </div>
       ),
       validate: () => true, // Verification options are optional
@@ -1823,6 +1844,7 @@ function NewListingPageContent() {
                         )}
                         {formData.verification && <Badge>Verification</Badge>}
                         {formData.transport && <Badge variant="outline">Transport Ready</Badge>}
+                        {formData.sellerOffersDelivery && <Badge variant="outline">Seller offers delivery</Badge>}
                         {formData.protectedTransactionEnabled && (
                           <Badge variant="outline">
                             Protected ({formData.protectedTransactionDays ?? '—'} days)
@@ -1930,6 +1952,7 @@ function NewListingPageContent() {
                 verified: !!formData.verification,
                 insuranceAvailable: false,
                 transportReady: !!formData.transport,
+                sellerOffersDelivery: !!formData.sellerOffersDelivery,
               },
               attributes: (formData.attributes || {}) as any,
               endsAt: formData.endsAt ? new Date(formData.endsAt) : undefined,
@@ -2110,6 +2133,7 @@ function NewListingPageContent() {
           verified: formData.verification,
           insuranceAvailable: false,
           transportReady: formData.transport,
+          sellerOffersDelivery: formData.sellerOffersDelivery,
         },
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
@@ -2332,6 +2356,7 @@ function NewListingPageContent() {
           verified: formData.verification,
           insuranceAvailable: false,
           transportReady: formData.transport,
+          sellerOffersDelivery: formData.sellerOffersDelivery,
         },
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,

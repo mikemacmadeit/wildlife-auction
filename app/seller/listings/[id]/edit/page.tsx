@@ -61,6 +61,7 @@ function EditListingPageContent() {
     images: string[];
     verification: boolean;
     transport: boolean;
+    sellerOffersDelivery: boolean;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
     bestOffer: {
@@ -89,6 +90,7 @@ function EditListingPageContent() {
     images: [],
     verification: false,
     transport: false,
+    sellerOffersDelivery: false,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
     bestOffer: {
@@ -169,6 +171,7 @@ function EditListingPageContent() {
           images: listing.images || [],
           verification: listing.trust?.verified || false,
           transport: listing.trust?.transportReady || false,
+          sellerOffersDelivery: listing.trust?.sellerOffersDelivery || false,
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
@@ -201,6 +204,7 @@ function EditListingPageContent() {
           images: listing.images || [],
           verification: listing.trust?.verified || false,
           transport: listing.trust?.transportReady || false,
+          sellerOffersDelivery: listing.trust?.sellerOffersDelivery || false,
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
@@ -1219,6 +1223,24 @@ function EditListingPageContent() {
             </div>
           </Card>
 
+          <Card className="p-4">
+            <div className="flex items-start space-x-3 min-h-[44px]">
+              <Checkbox
+                id="seller-offers-delivery"
+                checked={formData.sellerOffersDelivery}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, sellerOffersDelivery: checked as boolean })
+                }
+              />
+              <Label htmlFor="seller-offers-delivery" className="cursor-pointer flex-1">
+                <div className="font-medium mb-1">Seller offers delivery</div>
+                <div className="text-sm text-muted-foreground">
+                  Seller-provided delivery only. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                </div>
+              </Label>
+            </div>
+          </Card>
+
           {/* Protected Transaction */}
           <Card className="p-4 border-2">
             <div className="space-y-4">
@@ -1367,6 +1389,9 @@ function EditListingPageContent() {
                 {formData.transport && (
                   <Badge variant="secondary" className="font-semibold">Transport Ready</Badge>
                 )}
+                {formData.sellerOffersDelivery && (
+                  <Badge variant="secondary" className="font-semibold">Seller offers delivery</Badge>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1389,6 +1414,7 @@ function EditListingPageContent() {
         verified: formData.verification,
         insuranceAvailable: false,
         transportReady: formData.transport,
+        sellerOffersDelivery: formData.sellerOffersDelivery,
       },
       attributes: formData.attributes as ListingAttributes,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
