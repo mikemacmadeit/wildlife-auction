@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     type: 'website',
     url: '/field-notes',
   },
+  alternates: {
+    canonical: '/field-notes',
+  },
 };
 
 export default async function FieldNotesIndexPage() {
@@ -32,6 +35,12 @@ export default async function FieldNotesIndexPage() {
               High-signal education on buying, selling, trust, compliance, and payments—written for real-world, high-ticket transactions.
             </p>
             <div className="flex flex-wrap gap-2 pt-2">
+              <Link
+                href="/field-notes/guides"
+                className="text-sm font-semibold text-primary hover:underline underline-offset-4"
+              >
+                Browse Guides →
+              </Link>
               <Link
                 href="/how-it-works"
                 className="text-sm font-semibold text-primary hover:underline underline-offset-4"

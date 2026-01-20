@@ -22,4 +22,7 @@ editorPick: false
 - Keep titles short and specific.
 - Descriptions should be human-readable (Google shows these).
 - `coverImage` should be a path under `public/` so it can be cached and shared.
+- Prefer SEO-friendly guide categories and tags (examples):
+  - `category: "Guides"` with tags like `["payments"]`, `["compliance"]`, `["delivery"]`, `["buying"]`, `["selling"]`
+- Avoid language that implies the platform provides custody, brokerage, transport coordination, or regulatory approval.
 
