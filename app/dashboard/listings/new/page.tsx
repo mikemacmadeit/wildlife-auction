@@ -2213,6 +2213,8 @@ function NewListingPageContent() {
       const publishResult = await publishListing(user.uid, finalListingId);
 
       if (publishResult?.pendingReview) {
+        // Stop the spinner overlay before showing the submitted modal (clean transition).
+        setIsSubmitting(false);
         setSubmittedListingId(finalListingId);
         setShowPendingApprovalModal(true);
         toast({
@@ -2705,6 +2707,19 @@ function NewListingPageContent() {
         )}
         
         <div className="bg-card rounded-lg border border-border/50 shadow-sm p-6 md:p-8">
+          {/* Publish loading overlay: show a centered spinner so users don't double-click Publish */}
+          {isSubmitting ? (
+            <div className="fixed inset-0 z-[100] bg-background/60 backdrop-blur-sm flex items-center justify-center">
+              <div className="rounded-xl border border-border/60 bg-card shadow-lg px-6 py-5 flex flex-col items-center gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <div className="text-sm font-semibold">Publishing…</div>
+                <div className="text-xs text-muted-foreground text-center max-w-[320px]">
+                  Please don’t close this window.
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Better placement: keep the payout callout inside the form container so it feels native to the flow. */}
           {!authLoading && user && !payoutsReady ? (
             <div className="mb-6">
@@ -2718,6 +2733,7 @@ function NewListingPageContent() {
             steps={steps} 
             onComplete={handleComplete}
             saving={isSubmitting}
+            showSavingBar={false}
             completeButtonDataTour="listing-publish"
             onValidationError={(stepId) => {
               setValidationAttempted((prev) => ({ ...prev, [stepId]: true }));

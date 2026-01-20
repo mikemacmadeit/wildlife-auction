@@ -25,6 +25,7 @@ interface StepperFormProps {
   onSave?: () => void | Promise<void>; // Optional save handler for any step (uses parent's formData)
   saving?: boolean; // Loading state for save operation
   showSaveButton?: boolean; // Whether to show save button on each step
+  showSavingBar?: boolean; // Whether to show the subtle bottom loading bar on final submit
   completeButtonDataTour?: string; // Optional data-tour selector for the final action button
   completeButtonLabel?: string; // Optional label for the final action button (defaults to Publish Listing)
   onValidationError?: (stepId: string) => void; // Optional callback for highlighting invalid fields in the parent UI
@@ -39,6 +40,7 @@ export function StepperForm({
   onSave,
   saving = false,
   showSaveButton = false,
+  showSavingBar = true,
   completeButtonDataTour,
   completeButtonLabel,
   onValidationError,
@@ -225,7 +227,7 @@ export function StepperForm({
       </div>
 
       {/* Action feedback: subtle loading bar so users don’t click twice */}
-      {saving && isLastStep ? (
+      {showSavingBar && saving && isLastStep ? (
         <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
           <div className="h-full w-1/3 bg-primary animate-pulse" />
         </div>
