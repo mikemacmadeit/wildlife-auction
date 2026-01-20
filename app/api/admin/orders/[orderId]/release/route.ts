@@ -63,7 +63,14 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     // Release using shared logic (includes buyer-confirm + delivery + hold/dispute/chargeback gates)
     const result = await releasePaymentForOrder(db as any, orderId, adminId);
     if (!result.success) {
-      return json({ error: result.error || 'Failed to release funds' }, { status: 400 });
+      return json(
+        {
+          error: result.error || 'Failed to release funds',
+          holdReasonCode: result.holdReasonCode,
+          missingDocTypes: result.missingDocTypes,
+        },
+        { status: 400 }
+      );
     }
 
     // Audit log (explicit admin action)

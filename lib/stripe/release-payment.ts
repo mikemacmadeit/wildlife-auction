@@ -8,6 +8,9 @@ import { stripe, isStripeConfigured } from './config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { emitEventForUser } from '@/lib/notifications';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { getPayoutHoldRequirements } from '@/lib/compliance/policy';
+import type { DocumentType, ListingAttributes, ListingCategory } from '@/lib/types';
 
 export interface ReleasePaymentResult {
   success: boolean;
@@ -15,6 +18,8 @@ export interface ReleasePaymentResult {
   amount?: number;
   error?: string;
   message?: string;
+  holdReasonCode?: string;
+  missingDocTypes?: DocumentType[];
 }
 
 /**
@@ -180,6 +185,61 @@ export async function releasePaymentForOrder(
           }
         }
       }
+
+      // Phase 2 (policy): enforce required verified docs + (for certain cases) admin approval before payout release.
+      // Keep whitetail breeder logic untouched (gold standard, separately enforced above).
+      const normalizedCategory = normalizeCategory(listingData.category) as ListingCategory;
+      if (normalizedCategory && normalizedCategory !== 'whitetail_breeder') {
+        const req = getPayoutHoldRequirements(normalizedCategory, (listingData.attributes || {}) as ListingAttributes);
+
+        // Required verified documents
+        const requiredVerifiedDocs = req.requiredVerifiedDocs || [];
+        const missingVerifiedDocs: DocumentType[] = [];
+        if (requiredVerifiedDocs.length > 0) {
+          const documentsRef = db.collection('orders').doc(orderId).collection('documents');
+          for (const docType of requiredVerifiedDocs) {
+            const q = await documentsRef
+              .where('type', '==', docType)
+              .where('status', '==', 'verified')
+              .limit(1)
+              .get();
+            if (q.empty) missingVerifiedDocs.push(docType);
+          }
+        }
+
+        if (missingVerifiedDocs.length > 0) {
+          const holdReasonCode = missingVerifiedDocs.includes('TAHC_CVI') ? 'MISSING_TAHC_CVI' : 'MISSING_REQUIRED_DOCS';
+          try {
+            await orderRef.set({ payoutHoldReason: holdReasonCode, updatedAt: Timestamp.now() }, { merge: true });
+          } catch {
+            // best-effort
+          }
+          return {
+            success: false,
+            error: `Missing required verified documents: ${missingVerifiedDocs.join(', ')}`,
+            holdReasonCode,
+            missingDocTypes: missingVerifiedDocs,
+          };
+        }
+
+        // Admin approval requirement (exotic cervids + ESA/CITES overlay species + other_exotic)
+        if (req.requiresAdminApprovalBeforePayout || req.blockPayoutByDefault) {
+          if (orderData.adminPayoutApproval !== true) {
+            const holdReasonCode = req.holdReasonCode || 'ADMIN_APPROVAL_REQUIRED';
+            try {
+              await orderRef.set({ payoutHoldReason: holdReasonCode, updatedAt: Timestamp.now() }, { merge: true });
+            } catch {
+              // best-effort
+            }
+            return {
+              success: false,
+              error: 'Admin approval is required before payout can be released for this transaction.',
+              holdReasonCode,
+              missingDocTypes: [],
+            };
+          }
+        }
+      }
     }
   }
 
@@ -323,6 +383,7 @@ export async function releasePaymentForOrder(
       updatedAt: new Date(),
       releasedBy: releasedBy || 'system',
       releasedAt: new Date(),
+      payoutHoldReason: 'none',
     });
 
     // Create audit log
