@@ -34,6 +34,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function AdminMessagesPage() {
+  const MISSING_INDEX_FLAG_KEY = 'we:admin:missing_index:messageThreads_flagged_updatedAt:v1';
+
   const toDateSafe = (value: any): Date | null => {
     if (!value) return null;
     if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
@@ -85,6 +87,10 @@ export default function AdminMessagesPage() {
       // Fallback below keeps moderation usable while indexes build.
       let snapshot: any;
       try {
+        // If we already detected a missing index in this session, skip the indexed query to avoid spam.
+        const skipIndexed =
+          typeof window !== 'undefined' && window.sessionStorage?.getItem(MISSING_INDEX_FLAG_KEY) === '1';
+        if (skipIndexed) throw Object.assign(new Error('SKIP_INDEXED_QUERY'), { code: 'failed-precondition' });
         const flaggedQuery = query(threadsRef, where('flagged', '==', true), orderBy('updatedAt', 'desc'), limit(50));
         snapshot = await getDocs(flaggedQuery);
       } catch (e: any) {
@@ -95,7 +101,24 @@ export default function AdminMessagesPage() {
           msg.toLowerCase().includes('requires an index') ||
           msg.toLowerCase().includes('failed-precondition');
         if (!isMissingIndex) throw e;
-        console.warn('[admin/messages] Missing index for flagged threads query; using fallback', { code });
+        try {
+          if (typeof window !== 'undefined' && window.sessionStorage) {
+            window.sessionStorage.setItem(MISSING_INDEX_FLAG_KEY, '1');
+          }
+        } catch {
+          // ignore
+        }
+        // Warn once per session (so prod console isn't flooded).
+        try {
+          const warnedKey = `${MISSING_INDEX_FLAG_KEY}:warned`;
+          const alreadyWarned = typeof window !== 'undefined' && window.sessionStorage?.getItem(warnedKey) === '1';
+          if (!alreadyWarned) {
+            console.warn('[admin/messages] Missing index for flagged threads query; using fallback', { code });
+            window.sessionStorage?.setItem(warnedKey, '1');
+          }
+        } catch {
+          // ignore
+        }
         snapshot = await getDocs(query(threadsRef, where('flagged', '==', true), limit(250)));
       }
 

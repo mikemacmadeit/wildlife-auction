@@ -30,7 +30,29 @@ export async function GET(request: Request) {
     q = db.collection('supportTickets').where('status', '==', status).orderBy('createdAt', 'desc').limit(limit);
   }
 
-  const snap = await q.get();
+  let snap: FirebaseFirestore.QuerySnapshot;
+  let usedFallback = false;
+  try {
+    snap = await q.get();
+  } catch (e: any) {
+    const code = String(e?.code || '');
+    const msg = String(e?.message || '');
+    const isMissingIndex =
+      code === 'failed-precondition' ||
+      msg.toLowerCase().includes('requires an index') ||
+      msg.toLowerCase().includes('failed-precondition');
+    if (!isMissingIndex) throw e;
+
+    // Fallback query: avoid composite index requirement while indexes build.
+    // We fetch more, sort server-side, then slice.
+    usedFallback = true;
+    const fallbackLimit = Math.max(limit, 200);
+    let fq = db.collection('supportTickets').limit(fallbackLimit);
+    if (status === 'open' || status === 'resolved') {
+      fq = db.collection('supportTickets').where('status', '==', status).limit(fallbackLimit);
+    }
+    snap = await fq.get();
+  }
   const tickets = snap.docs.map((d) => {
     const data: any = d.data();
     const createdAt = data?.createdAt?.toDate?.() || data?.createdAt || null;
@@ -51,6 +73,15 @@ export async function GET(request: Request) {
     };
   });
 
-  return json({ ok: true, tickets }, { status: 200 });
+  const sorted = [...tickets].sort((a: any, b: any) => {
+    const at = a?.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a?.createdAt || 0).getTime();
+    const bt = b?.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b?.createdAt || 0).getTime();
+    return bt - at;
+  });
+
+  return json(
+    { ok: true, tickets: sorted.slice(0, limit), ...(usedFallback ? { warning: 'missing_index_supportTickets_status_createdAt' } : {}) },
+    { status: 200 }
+  );
 }
 
