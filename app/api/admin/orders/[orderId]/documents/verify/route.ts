@@ -11,6 +11,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, json } from '@/app/api/admin/_util';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 
 export async function POST(
   request: Request,
@@ -94,6 +95,39 @@ export async function POST(
             meta: { documentId },
           },
         });
+      } catch {
+        // best-effort
+      }
+    }
+
+    // If TAHC_CVI is verified/rejected, keep the order's compliance snapshot current and clear/set payout holds (best-effort).
+    if (documentData.type === 'TAHC_CVI') {
+      const orderRef = db.collection('orders').doc(orderId);
+
+      try {
+        const orderSnap = await orderRef.get();
+        const existingHold = orderSnap.exists ? (orderSnap.data() as any)?.payoutHoldReason : null;
+
+        // If CVI is now verified, clear the "missing CVI" hold reason (if it was set).
+        const nextHold =
+          status === 'verified'
+            ? (existingHold === 'MISSING_TAHC_CVI' ? 'none' : existingHold)
+            : 'MISSING_TAHC_CVI';
+
+        await orderRef.set(
+          {
+            payoutHoldReason: nextHold,
+            updatedAt: Timestamp.now(),
+            lastUpdatedByRole: 'admin',
+          },
+          { merge: true }
+        );
+      } catch {
+        // best-effort
+      }
+
+      try {
+        await recomputeOrderComplianceDocsStatus({ db: db as any, orderId });
       } catch {
         // best-effort
       }
