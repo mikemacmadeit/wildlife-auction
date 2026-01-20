@@ -1061,6 +1061,20 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="dog-quantity" className="text-base font-semibold">
+            Quantity <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="dog-quantity"
+            type="number"
+            min="1"
+            value={(attributes as any)?.quantity ?? 1}
+            onChange={(e) => updateAttribute('quantity', e.target.value ? parseInt(e.target.value) : 1)}
+            className={cn('min-h-[48px] text-base', hasError('Quantity') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+          />
+        </div>
+
         <div className={cn('space-y-3 p-4 border rounded-lg bg-muted/50', hasError('Disclosures') ? 'border-destructive border-2' : 'border-border/60')}>
           <div className="font-semibold text-sm">Required disclosures</div>
           {(hasError('Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? (
@@ -1084,20 +1098,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="dog-quantity" className="text-base font-semibold">
-            Quantity <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="dog-quantity"
-            type="number"
-            min="1"
-            value={(attributes as any)?.quantity ?? 1}
-            onChange={(e) => updateAttribute('quantity', e.target.value ? parseInt(e.target.value) : 1)}
-            className={cn('min-h-[48px] text-base', hasError('Quantity') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
-          />
         </div>
       </div>
     );

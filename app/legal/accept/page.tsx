@@ -29,6 +29,12 @@ export default function LegalAcceptPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [docsInitialTab, setDocsInitialTab] = useState<'tos' | 'marketplacePolicies' | 'sellerPolicy' | 'buyerAcknowledgment'>('tos');
+
+  const openDocs = (tab: typeof docsInitialTab) => {
+    setDocsInitialTab(tab);
+    setDocsOpen(true);
+  };
 
   // If already accepted, don’t block.
   useEffect(() => {
@@ -51,7 +57,7 @@ export default function LegalAcceptPage() {
     if (!user) return;
     setError(null);
     if (!opts?.skipAgreedCheck && !agreedInModal) {
-      setDocsOpen(true);
+      openDocs('tos');
       setError('Please read and agree to the Terms in the modal to continue.');
       return;
     }
@@ -116,16 +122,14 @@ export default function LegalAcceptPage() {
         <LegalDocsModal
           open={docsOpen}
           onOpenChange={setDocsOpen}
-          initialTab="tos"
+          initialTab={docsInitialTab}
           agreeAction={{
             onConfirm: () => {
               setAgreedInModal(true);
               setDocsOpen(false);
               setError(null);
-              // Most user-friendly: once they agree, immediately record acceptance and continue.
-              void onAccept({ skipAgreedCheck: true });
             },
-            buttonText: 'I Agree & Continue',
+            buttonText: 'I Agree',
           }}
         />
 
@@ -160,26 +164,26 @@ export default function LegalAcceptPage() {
               <div className="text-sm text-muted-foreground">
                 Open the full Terms and policies in a scrollable modal. Agree inside the modal, then come right back here to continue.
               </div>
-              <Button type="button" variant="outline" className="font-semibold" onClick={() => setDocsOpen(true)}>
+              <Button type="button" variant="outline" className="font-semibold" onClick={() => openDocs('tos')}>
                 Read terms & policies
               </Button>
               <div className="text-xs text-muted-foreground">
                 Optional links (not required):{' '}
-                <Link href="/terms" className="underline underline-offset-4">
+                <button type="button" className="underline underline-offset-4" onClick={() => openDocs('tos')}>
                   Terms
-                </Link>
+                </button>
                 ,{' '}
-                <Link href="/legal/marketplace-policies" className="underline underline-offset-4">
+                <button type="button" className="underline underline-offset-4" onClick={() => openDocs('marketplacePolicies')}>
                   Marketplace
-                </Link>
+                </button>
                 ,{' '}
-                <Link href="/legal/seller-policy" className="underline underline-offset-4">
+                <button type="button" className="underline underline-offset-4" onClick={() => openDocs('sellerPolicy')}>
                   Seller
-                </Link>
+                </button>
                 ,{' '}
-                <Link href="/legal/buyer-acknowledgment" className="underline underline-offset-4">
+                <button type="button" className="underline underline-offset-4" onClick={() => openDocs('buyerAcknowledgment')}>
                   Buyer
-                </Link>
+                </button>
                 .
               </div>
             </div>
@@ -192,7 +196,7 @@ export default function LegalAcceptPage() {
                 </span>
               </div>
               {!agreedInModal ? (
-                <Button type="button" className="font-semibold" onClick={() => setDocsOpen(true)}>
+                <Button type="button" className="font-semibold" onClick={() => openDocs('tos')}>
                   Review & agree
                 </Button>
               ) : null}
