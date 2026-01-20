@@ -25,6 +25,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 import { cn } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { CATTLE_BREED_OPTIONS } from '@/lib/taxonomy/cattle-breeds';
+import { DOG_BREED_OPTIONS } from '@/lib/taxonomy/dog-breeds';
+import { EQUIPMENT_MAKE_OPTIONS } from '@/lib/taxonomy/equipment-makes';
 
 type ListingAttributes =
   | WildlifeAttributes
@@ -751,17 +755,33 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           <Label htmlFor="breed" className="text-base font-semibold">
             Breed <span className="text-destructive">*</span>
           </Label>
-          <Input
-            id="breed"
-            placeholder="e.g., Angus, Hereford, Texas Longhorn"
-            value={(attributes as Partial<CattleAttributes>).breed || ''}
-            onChange={(e) => updateAttribute('breed', e.target.value)}
-            className={cn(
-              'min-h-[48px] text-base',
-              hasError('Breed') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+          <SearchableSelect
+            value={(attributes as any)?.breed || null}
+            onChange={(v) => updateAttribute('breed', v)}
+            options={CATTLE_BREED_OPTIONS}
+            placeholder="Select breed…"
+            searchPlaceholder="Search breeds…"
+            buttonClassName={cn(
+              hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
             )}
-            required
           />
+          {String((attributes as any)?.breed || '') === 'other' ? (
+            <div className="mt-2 space-y-2">
+              <Label htmlFor="cattle-breed-other" className="text-sm font-semibold">
+                Breed (Other) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cattle-breed-other"
+                placeholder="Type the breed"
+                value={(attributes as any)?.breedOther || ''}
+                onChange={(e) => updateAttribute('breedOther', e.target.value)}
+                className={cn(
+                  'min-h-[48px] text-base',
+                  hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+                )}
+              />
+            </div>
+          ) : null}
           {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
         </div>
 
@@ -1005,16 +1025,33 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <Label htmlFor="dog-breed" className="text-base font-semibold">
               Breed <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="dog-breed"
-              placeholder="e.g., Labrador Retriever"
-              value={(attributes as any)?.breed || ''}
-              onChange={(e) => updateAttribute('breed', e.target.value)}
-              className={cn(
-                'min-h-[48px] text-base',
+            <SearchableSelect
+              value={(attributes as any)?.breed || null}
+              onChange={(v) => updateAttribute('breed', v)}
+              options={DOG_BREED_OPTIONS}
+              placeholder="Select breed…"
+              searchPlaceholder="Search breeds…"
+              buttonClassName={cn(
                 hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
               )}
             />
+            {String((attributes as any)?.breed || '') === 'other' ? (
+              <div className="mt-2 space-y-2">
+                <Label htmlFor="dog-breed-other" className="text-sm font-semibold">
+                  Breed (Other) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="dog-breed-other"
+                  placeholder="Type the breed"
+                  value={(attributes as any)?.breedOther || ''}
+                  onChange={(e) => updateAttribute('breedOther', e.target.value)}
+                  className={cn(
+                    'min-h-[48px] text-base',
+                    hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+                  )}
+                />
+              </div>
+            ) : null}
             {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
           </div>
           <div className="space-y-2">
@@ -1220,13 +1257,27 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="make" className="text-base font-semibold">Make (Optional)</Label>
-            <Input
-              id="make"
-              placeholder="e.g., John Deere, Kubota"
-              value={(attributes as Partial<EquipmentAttributes>).make || ''}
-              onChange={(e) => updateAttribute('make', e.target.value)}
-              className="min-h-[48px] text-base"
+            <SearchableSelect
+              value={(attributes as any)?.make || null}
+              onChange={(v) => updateAttribute('make', v)}
+              options={EQUIPMENT_MAKE_OPTIONS}
+              placeholder="Select make…"
+              searchPlaceholder="Search makes…"
             />
+            {String((attributes as any)?.make || '') === 'other' ? (
+              <div className="mt-2 space-y-2">
+                <Label htmlFor="equipment-make-other" className="text-sm font-semibold">
+                  Make (Other)
+                </Label>
+                <Input
+                  id="equipment-make-other"
+                  placeholder="Type the make"
+                  value={(attributes as any)?.makeOther || ''}
+                  onChange={(e) => updateAttribute('makeOther', e.target.value)}
+                  className="min-h-[48px] text-base"
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">

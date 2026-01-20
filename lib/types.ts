@@ -121,7 +121,9 @@ export interface WildlifeAttributes {
 }
 
 export interface CattleAttributes {
-  breed: string; // Required
+  // For filtering, we prefer a controlled value (dropdown), but keep free-text compatible.
+  breed: string; // Required (either a known option value or a free-text value from older docs)
+  breedOther?: string; // Optional: if breed === 'other', allow user to specify
   sex: 'bull' | 'cow' | 'heifer' | 'steer' | 'unknown'; // Required
   /**
    * Age in years (number). Kept as `number | string` for backward compatibility with legacy docs.
@@ -202,6 +204,7 @@ export type EquipmentType =
 export interface EquipmentAttributes {
   equipmentType: EquipmentType; // Required enum
   make?: string;
+  makeOther?: string;
   model?: string;
   year?: number;
   hours?: number;
@@ -216,7 +219,8 @@ export interface SportingWorkingDogAttributes {
   speciesId: 'dog';
   sex: 'male' | 'female' | 'unknown';
   age: number | string;
-  breed: string;
+  breed: string; // Controlled option value or legacy free-text
+  breedOther?: string; // Optional: if breed === 'other', allow user to specify
   trainingDescription?: string;
   identificationDisclosure: boolean;
   healthDisclosure: boolean;

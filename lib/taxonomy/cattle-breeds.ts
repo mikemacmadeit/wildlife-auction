@@ -1,0 +1,40 @@
+import type { SearchableSelectOption } from '@/components/ui/searchable-select';
+
+// Note: This list is intentionally "broad + common" for marketplace filtering.
+// Users can still choose "Other" and type free-text into a separate field if needed.
+export const CATTLE_BREED_OPTIONS: SearchableSelectOption[] = [
+  { value: 'angus', label: 'Angus' },
+  { value: 'black_angus', label: 'Black Angus' },
+  { value: 'red_angus', label: 'Red Angus' },
+  { value: 'hereford', label: 'Hereford' },
+  { value: 'polled_hereford', label: 'Polled Hereford' },
+  { value: 'brahman', label: 'Brahman' },
+  { value: 'brangus', label: 'Brangus' },
+  { value: 'braford', label: 'Braford' },
+  { value: 'beefmaster', label: 'Beefmaster' },
+  { value: 'santa_gertrudis', label: 'Santa Gertrudis' },
+  { value: 'charolais', label: 'Charolais' },
+  { value: 'simmental', label: 'Simmental' },
+  { value: 'limousin', label: 'Limousin' },
+  { value: 'gelbvieh', label: 'Gelbvieh' },
+  { value: 'maine_anjou', label: 'Maine-Anjou' },
+  { value: 'shorthorn', label: 'Shorthorn' },
+  { value: 'longhorn', label: 'Texas Longhorn' },
+  { value: 'salers', label: 'Salers' },
+  { value: 'chianina', label: 'Chianina' },
+  { value: 'belgian_blue', label: 'Belgian Blue' },
+  { value: 'dexter', label: 'Dexter' },
+  { value: 'highland', label: 'Highland' },
+  { value: 'wagyu', label: 'Wagyu' },
+  { value: 'murray_grey', label: 'Murray Grey' },
+  { value: 'chiangus', label: 'ChiAngus' },
+  { value: 'simangus', label: 'SimAngus' },
+  { value: 'commercial_cross', label: 'Commercial / Crossbred' },
+  { value: 'holstein', label: 'Holstein' },
+  { value: 'jersey', label: 'Jersey' },
+  { value: 'brown_swiss', label: 'Brown Swiss' },
+  { value: 'guernsey', label: 'Guernsey' },
+  { value: 'ayrshire', label: 'Ayrshire' },
+  { value: 'other', label: 'Other (not listed)' },
+];
+

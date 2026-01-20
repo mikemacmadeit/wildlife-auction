@@ -236,6 +236,9 @@ export function validateCattle(attributes: CattleAttributes): void {
   if (!attributes.breed || attributes.breed.trim() === '') {
     throw new Error('Breed is required for cattle listings.');
   }
+  if (attributes.breed === 'other' && !String((attributes as any).breedOther || '').trim()) {
+    throw new Error('Breed is required for cattle listings.');
+  }
 
   if (!attributes.sex || String(attributes.sex).trim() === '') {
     throw new Error('Sex is required for cattle listings.');
@@ -396,6 +399,9 @@ export function validateSportingWorkingDogs(attributes: SportingWorkingDogAttrib
   }
 
   if (!String((attributes as any).breed || '').trim()) {
+    throw new Error('Breed is required for Sporting & Working Dogs listings.');
+  }
+  if (String((attributes as any).breed || '') === 'other' && !String((attributes as any).breedOther || '').trim()) {
     throw new Error('Breed is required for Sporting & Working Dogs listings.');
   }
 
