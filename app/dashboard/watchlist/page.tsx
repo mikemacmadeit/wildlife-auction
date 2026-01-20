@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { getListingsByIds, subscribeToListing } from '@/lib/firebase/listings';
@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SavedSearchesPanel } from '@/components/saved-searches/SavedSearchesPanel';
+import { SavedSellersList } from '@/components/watchlist/SavedSellersList';
 import {
   Select,
   SelectContent,
@@ -94,7 +95,7 @@ import {
 type TabType = 'active' | 'ended' | 'sold';
 type SortOption = 'newest' | 'oldest' | 'ending-soon' | 'price-low' | 'price-high' | 'title';
 type ViewMode = 'grid' | 'list';
-type SuperTab = 'watchlist' | 'saved-searches';
+type SuperTab = 'watchlist' | 'saved-sellers' | 'saved-searches';
 
 interface FilterState {
   category: string;
@@ -485,9 +486,12 @@ export default function WatchlistPage() {
     <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
       <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
         <div className="mb-6 flex items-center justify-end">
-          <TabsList className="grid grid-cols-2 w-full max-w-sm">
+          <TabsList className="grid grid-cols-3 w-full max-w-xl">
             <TabsTrigger value="watchlist" className="font-semibold">
-              Watchlist
+              Saved listings
+            </TabsTrigger>
+            <TabsTrigger value="saved-sellers" className="font-semibold">
+              Saved sellers
             </TabsTrigger>
             <TabsTrigger value="saved-searches" className="font-semibold">
               Saved searches
@@ -503,6 +507,10 @@ export default function WatchlistPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="saved-sellers">
+          <SavedSellersList />
+        </TabsContent>
+
         <TabsContent value="watchlist">
       {/* Header */}
       <div className="mb-6">
@@ -510,7 +518,7 @@ export default function WatchlistPage() {
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
               <Heart className="h-8 w-8 text-primary fill-current" />
-              My Watchlist
+              Saved Listings
             </h1>
             <p className="text-muted-foreground">
               {totalCount === 0
@@ -855,16 +863,7 @@ function WatchlistGrid({
   );
 }
 
-// Watchlist Card Component (Grid View)
-function WatchlistCard({
-  listing,
-  index,
-  isSelected,
-  onToggleSelect,
-  onRemove,
-  isRemoving,
-  StatusBadge,
-}: {
+type WatchlistCardProps = {
   listing: ListingWithStatus;
   index: number;
   isSelected: boolean;
@@ -872,7 +871,21 @@ function WatchlistCard({
   onRemove: () => void;
   isRemoving: boolean;
   StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
-}) {
+};
+
+// Watchlist Card Component (Grid View)
+const WatchlistCard = React.forwardRef<HTMLDivElement, WatchlistCardProps>(function WatchlistCard(
+  {
+    listing,
+    index,
+    isSelected,
+    onToggleSelect,
+    onRemove,
+    isRemoving,
+    StatusBadge,
+  },
+  ref
+) {
   const sold = getSoldSummary(listing as any);
   const watchers =
     typeof (listing as any).watcherCount === 'number' ? (listing as any).watcherCount : listing.metrics?.favorites || 0;
@@ -885,9 +898,15 @@ function WatchlistCard({
       case 'cattle_livestock':
         return 'Cattle & Livestock';
       case 'ranch_equipment':
-        return 'Ranch Equipment';
+        return 'Ranch Equipment & Attachments';
+      case 'ranch_vehicles':
+        return 'Ranch Vehicles & Trailers';
       case 'horse_equestrian':
         return 'Horse & Equestrian';
+      case 'sporting_working_dogs':
+        return 'Sporting & Working Dogs';
+      case 'hunting_outfitter_assets':
+        return 'Hunting & Outfitter Assets';
       default:
         return category;
     }
@@ -918,9 +937,16 @@ function WatchlistCard({
         .slice(0, 2);
     }
 
-    if (listing.category === 'ranch_equipment') {
+    if (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles' || listing.category === 'hunting_outfitter_assets') {
       const a = attrs as EquipmentAttributes;
       return [a.equipmentType && a.equipmentType, a.year && `Year: ${a.year}`, a.condition && a.condition]
+        .filter(Boolean)
+        .slice(0, 2);
+    }
+
+    if (listing.category === 'sporting_working_dogs') {
+      const a: any = attrs;
+      return [a.breed && `Breed: ${a.breed}`, a.sex && `Sex: ${a.sex}`, a.quantity && `Qty: ${a.quantity}`]
         .filter(Boolean)
         .slice(0, 2);
     }
@@ -949,6 +975,7 @@ function WatchlistCard({
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9 }}
@@ -1177,6 +1204,8 @@ function WatchlistCard({
       </Card>
     </motion.div>
   );
-}
+});
+
+WatchlistCard.displayName = 'WatchlistCard';
 
 // Watchlist list view now reuses `ListItem` (browse list view) for perfect visual parity.

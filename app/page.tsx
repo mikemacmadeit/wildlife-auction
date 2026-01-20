@@ -174,7 +174,7 @@ export default function HomePage() {
               </h1>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
-              Texas Exotic & Breeder Animal Marketplace
+              Wildlife-first marketplace for Texas livestock, horses &amp; ranch assets
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               <Button asChild size="lg" className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold">
@@ -237,7 +237,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {/* Whitetail Breeder - First priority */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -246,17 +246,16 @@ export default function HomePage() {
             >
               <Link href="/browse?category=whitetail_breeder">
                 <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
-                  <CardContent className="p-8 text-center space-y-4">
-                    <div className="flex justify-center">
-                      <div className="w-24 h-24 icon-primary-color mask-icon-whitetail-breeder" />
-                    </div>
-                    <h3 className="text-xl font-bold">Whitetail Breeder</h3>
-                    <p className="text-sm text-muted-foreground">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-whitetail-breeder flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Whitetail Breeder</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
                       TPWD-permitted breeder deer with verified genetics and health records
-                    </p>
-                    <Button variant="outline" className="mt-4">
-                      Browse <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
@@ -270,17 +269,16 @@ export default function HomePage() {
             >
               <Link href="/browse?category=wildlife_exotics">
                 <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
-                  <CardContent className="p-8 text-center space-y-4">
-                    <div className="flex justify-center">
-                      <div className="w-24 h-24 icon-primary-color mask-icon-fallow" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-fallow flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Wildlife &amp; Exotics</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Axis deer, blackbuck, fallow deer, and other exotic species
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold">Wildlife & Exotics</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Axis deer, blackbuck, fallow deer, and other exotic species
-                    </p>
-                    <Button variant="outline" className="mt-4">
-                      Browse <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
                   </CardContent>
                 </Card>
               </Link>
@@ -294,23 +292,22 @@ export default function HomePage() {
             >
               <Link href="/browse?category=cattle_livestock">
                 <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
-                  <CardContent className="p-8 text-center space-y-4">
-                    <div className="flex justify-center">
-                      <div className="w-24 h-24 icon-primary-color mask-icon-bull" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-bull flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Cattle &amp; Livestock</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Cattle, bulls, cows, heifers, and registered livestock
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold">Cattle & Livestock</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Cattle, bulls, cows, heifers, and registered livestock
-                    </p>
-                    <Button variant="outline" className="mt-4">
-                      Browse <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
                   </CardContent>
                 </Card>
               </Link>
             </motion.div>
 
-            {/* Ranch Equipment */}
+            {/* Ranch Equipment & Attachments */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -318,17 +315,39 @@ export default function HomePage() {
             >
               <Link href="/browse?category=ranch_equipment">
                 <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
-                  <CardContent className="p-8 text-center space-y-4">
-                    <div className="flex justify-center">
-                      <div className="w-24 h-24 icon-primary-color mask-icon-tractor" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-tractor flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Ranch Equipment &amp; Attachments</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Tractors, skid steers, machinery, and attachments/implements (vehicles &amp; trailers listed separately)
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold">Ranch Equipment</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Tractors, skid steers, UTVs, trailers, and ranch equipment
-                    </p>
-                    <Button variant="outline" className="mt-4">
-                      Browse <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Ranch Vehicles & Trailers */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+            >
+              <Link href="/browse?category=ranch_vehicles">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-top-drive flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Ranch Vehicles &amp; Trailers</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Trucks, UTVs/ATVs, and trailers (stock, gooseneck, flatbed, utility)
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
@@ -342,10 +361,10 @@ export default function HomePage() {
             >
               <Link href="/browse?category=horse_equestrian">
                 <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
-                  <CardContent className="p-8 text-center space-y-4">
-                    <div className="flex justify-center">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
                       <div
-                        className="w-24 h-24"
+                        className="w-16 h-16 flex-shrink-0"
                         style={{
                           WebkitMaskImage: `url('/images/Horse.png')`,
                           WebkitMaskSize: 'contain',
@@ -358,14 +377,59 @@ export default function HomePage() {
                           backgroundColor: 'hsl(var(--primary))',
                         }}
                       />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Horse &amp; Equestrian</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Horses, tack, and equestrian listings with required transfer paperwork
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold">Horse &amp; Equestrian</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Horses, tack, and equestrian listings with required transfer paperwork
-                    </p>
-                    <Button variant="outline" className="mt-4">
-                      Browse <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Sporting & Working Dogs */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+            >
+              <Link href="/browse?category=sporting_working_dogs">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-dog flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Sporting &amp; Working Dogs</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Bird dogs, hog dogs, tracking dogs, and other working/sporting dogs
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Hunting & Outfitter Assets */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <Link href="/browse?category=hunting_outfitter_assets">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-hunting-blind flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Hunting &amp; Outfitter Assets</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Camera systems, blinds, and water/well systems
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </Link>

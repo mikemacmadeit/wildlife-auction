@@ -2,6 +2,10 @@
  * Audit Logging System
  * 
  * Logs all critical actions for operational visibility and accountability
+ *
+ * NOT PRESENT BY DESIGN (diligence note):
+ * - This repo does not implement TTL/automatic deletion for audit logs.
+ * - Retention and deletion policies are operational/legal decisions and must be enforced via governance and/or external tooling.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -41,6 +45,7 @@ function stripUndefinedDeep<T>(value: T): T {
 export type AuditActionType =
   | 'payout_released_manual'
   | 'payout_released_auto'
+  | 'payout_release_blocked_global_freeze'
   | 'refund_full'
   | 'refund_partial'
   | 'order_refunded_tx_violation'
@@ -93,7 +98,16 @@ export type AuditActionType =
   | 'admin_user_risk_updated'
   | 'admin_user_note_added'
   | 'admin_user_summaries_backfill'
-  | 'admin_user_verification_email_sent';
+  | 'admin_user_verification_email_sent'
+  // Admin: listing moderation + compliance workflow (policy/audit trail)
+  | 'admin_listing_approved'
+  | 'admin_listing_rejected'
+  | 'admin_listing_compliance_approved'
+  | 'admin_listing_compliance_rejected'
+  | 'admin_listing_document_verified'
+  | 'admin_listing_document_rejected'
+  | 'admin_order_document_verified'
+  | 'admin_order_document_rejected';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 

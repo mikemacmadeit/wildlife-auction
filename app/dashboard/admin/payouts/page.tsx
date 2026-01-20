@@ -99,9 +99,9 @@ export default function AdminPayoutsPage() {
         const data = docSnap.data();
         
         // Filter to only paid/completed orders (client-side filter before processing)
-        // Include all escrow statuses for admin view
-        const escrowStatuses = ['paid', 'paid_held', 'awaiting_bank_transfer', 'awaiting_wire', 'in_transit', 'delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'disputed', 'completed'];
-        if (!escrowStatuses.includes(data.status)) {
+        // Include all payout-hold / payout-related statuses for admin view
+        const payoutStatuses = ['paid', 'paid_held', 'awaiting_bank_transfer', 'awaiting_wire', 'in_transit', 'delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'disputed', 'completed'];
+        if (!payoutStatuses.includes(data.status)) {
           continue;
         }
         

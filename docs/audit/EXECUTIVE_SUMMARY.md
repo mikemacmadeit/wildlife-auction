@@ -13,7 +13,7 @@ Scope: `project/` (Next.js App Router + Netlify Functions + Firebase + Stripe + 
   Evidence: `project/lib/firebase/listings.ts` (`publishListing` -> `POST /api/listings/publish`), `project/app/api/listings/publish/route.ts`.
 - **Best Offer core flows** exist (create/accept/counter/decline/withdraw) and an offer expiry scheduled function exists.  
   Evidence: `project/app/api/offers/*`, `project/netlify/functions/expireOffers.ts`.
-- **Checkout session creation** for fixed/auction, with Best Offer metadata support and escrow-style flow (no destination charge).  
+- **Checkout session creation** for fixed/auction, with Best Offer metadata support and payout-hold flow (no destination charge).
   Evidence: `project/app/api/stripe/checkout/create-session/route.ts`.
 - **Auto-release cron** exists for protected transactions and uses shared payout release logic.  
   Evidence: `project/netlify/functions/autoReleaseProtected.ts`, `project/lib/stripe/release-payment.ts`.

@@ -59,6 +59,18 @@
     mask-image: url("/images/Tractor Icon.png");
     -webkit-mask-image: url("/images/Tractor Icon.png");
   }
+  .mask-icon-dog {
+    mask-image: url("/images/Dog.png");
+    -webkit-mask-image: url("/images/Dog.png");
+  }
+  .mask-icon-hunting-blind {
+    mask-image: url("/images/Hunting blind.png");
+    -webkit-mask-image: url("/images/Hunting blind.png");
+  }
+  .mask-icon-top-drive {
+    mask-image: url("/images/Top Drive.png");
+    -webkit-mask-image: url("/images/Top Drive.png");
+  }
 
   /* Lightweight "prose" styles without adding tailwind-typography */
   .we-prose {

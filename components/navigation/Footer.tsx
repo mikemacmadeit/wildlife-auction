@@ -46,6 +46,9 @@ export function Footer() {
       legal: [
         { href: '/privacy', label: 'Privacy Policy' },
         { href: '/terms', label: 'Terms of Service' },
+        { href: '/legal/marketplace-policies', label: 'Marketplace Policies' },
+        { href: '/legal/seller-policy', label: 'Seller Policy' },
+        { href: '/legal/buyer-acknowledgment', label: 'Buyer Acknowledgment' },
       ],
       support: [{ href: '/contact', label: 'Contact' }],
     }),

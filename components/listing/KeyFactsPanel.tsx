@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 
 interface KeyFactsPanelProps {
   listing: Listing;
@@ -99,20 +99,33 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       label: 'Quantity',
       value: `${(listing.attributes as CattleAttributes).quantity} ${(listing.attributes as CattleAttributes).quantity === 1 ? 'head' : 'head'}`,
     },
-    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).equipmentType && {
+    listing.attributes && (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') && (listing.attributes as EquipmentAttributes).equipmentType && {
       icon: Package,
-      label: 'Type',
+      label: listing.category === 'ranch_vehicles' ? 'Vehicle type' : 'Equipment type',
       value: (listing.attributes as EquipmentAttributes).equipmentType,
       detail: (listing.attributes as EquipmentAttributes).make && (listing.attributes as EquipmentAttributes).model 
         ? `${(listing.attributes as EquipmentAttributes).make} ${(listing.attributes as EquipmentAttributes).model}`
         : undefined,
     },
-    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).year && {
+    listing.attributes && listing.category === 'hunting_outfitter_assets' && (listing.attributes as EquipmentAttributes).equipmentType && {
+      icon: Package,
+      label: 'Asset type',
+      value: (listing.attributes as EquipmentAttributes).equipmentType,
+      detail: (listing.attributes as EquipmentAttributes).make && (listing.attributes as EquipmentAttributes).model
+        ? `${(listing.attributes as EquipmentAttributes).make} ${(listing.attributes as EquipmentAttributes).model}`
+        : undefined,
+    },
+    listing.attributes && (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') && (listing.attributes as EquipmentAttributes).year && {
       icon: Calendar,
       label: 'Year',
       value: `${(listing.attributes as EquipmentAttributes).year}`,
     },
-    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).condition && {
+    listing.attributes && listing.category === 'hunting_outfitter_assets' && (listing.attributes as EquipmentAttributes).year && {
+      icon: Calendar,
+      label: 'Year',
+      value: `${(listing.attributes as EquipmentAttributes).year}`,
+    },
+    listing.attributes && (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') && (listing.attributes as EquipmentAttributes).condition && {
       icon: Package,
       label: 'Condition',
       value: (listing.attributes as EquipmentAttributes).condition === 'new' ? 'New' :
@@ -123,10 +136,45 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         ? { variant: 'default' as const, label: (listing.attributes as EquipmentAttributes).condition === 'new' ? 'New' : 'Excellent', color: 'bg-accent/20 text-accent border-accent/40' }
         : undefined,
     },
-    listing.attributes && listing.category === 'ranch_equipment' && (listing.attributes as EquipmentAttributes).quantity && {
+    listing.attributes && listing.category === 'hunting_outfitter_assets' && (listing.attributes as EquipmentAttributes).condition && {
+      icon: Package,
+      label: 'Condition',
+      value: (listing.attributes as EquipmentAttributes).condition === 'new' ? 'New' :
+             (listing.attributes as EquipmentAttributes).condition === 'excellent' ? 'Excellent' :
+             (listing.attributes as EquipmentAttributes).condition === 'good' ? 'Good' :
+             (listing.attributes as EquipmentAttributes).condition === 'fair' ? 'Fair' : 'For Parts',
+      badge: (listing.attributes as EquipmentAttributes).condition === 'new' || (listing.attributes as EquipmentAttributes).condition === 'excellent'
+        ? { variant: 'default' as const, label: (listing.attributes as EquipmentAttributes).condition === 'new' ? 'New' : 'Excellent', color: 'bg-accent/20 text-accent border-accent/40' }
+        : undefined,
+    },
+    listing.attributes && (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') && (listing.attributes as EquipmentAttributes).quantity && {
       icon: Package,
       label: 'Quantity',
       value: `${(listing.attributes as EquipmentAttributes).quantity} ${(listing.attributes as EquipmentAttributes).quantity === 1 ? 'item' : 'items'}`,
+    },
+    listing.attributes && listing.category === 'hunting_outfitter_assets' && (listing.attributes as EquipmentAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as EquipmentAttributes).quantity} ${(listing.attributes as EquipmentAttributes).quantity === 1 ? 'item' : 'items'}`,
+    },
+    // Sporting / Working Dogs
+    listing.attributes && listing.category === 'sporting_working_dogs' && (listing.attributes as SportingWorkingDogAttributes).breed && {
+      icon: Package,
+      label: 'Breed',
+      value: (listing.attributes as SportingWorkingDogAttributes).breed || '—',
+      detail: formatAge((listing.attributes as SportingWorkingDogAttributes).age),
+    },
+    listing.attributes && listing.category === 'sporting_working_dogs' && (listing.attributes as SportingWorkingDogAttributes).sex && {
+      icon: Package,
+      label: 'Sex',
+      value:
+        (listing.attributes as SportingWorkingDogAttributes).sex === 'male' ? 'Male' :
+        (listing.attributes as SportingWorkingDogAttributes).sex === 'female' ? 'Female' : 'Unknown',
+    },
+    listing.attributes && listing.category === 'sporting_working_dogs' && (listing.attributes as SportingWorkingDogAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as SportingWorkingDogAttributes).quantity} ${(listing.attributes as SportingWorkingDogAttributes).quantity === 1 ? 'dog' : 'dogs'}`,
     },
     // Horse / Equestrian
     listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).sex && {

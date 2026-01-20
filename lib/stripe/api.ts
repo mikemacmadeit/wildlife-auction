@@ -225,7 +225,8 @@ export async function createAccountLink(): Promise<{ url: string }> {
 export async function createCheckoutSession(
   listingId: string,
   offerId?: string,
-  paymentMethod?: 'card' | 'ach_debit'
+  paymentMethod?: 'card' | 'ach_debit',
+  opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
   if (!user) {
@@ -248,6 +249,7 @@ export async function createCheckoutSession(
       listingId,
       ...(offerId ? { offerId } : {}),
       ...(paymentMethod ? { paymentMethod } : {}),
+      ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });
 
@@ -272,7 +274,8 @@ export async function createCheckoutSession(
 
 export async function createWireIntent(
   listingId: string,
-  offerId?: string
+  offerId?: string,
+  opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{
   orderId: string;
   paymentIntentId: string;
@@ -299,6 +302,7 @@ export async function createWireIntent(
     body: JSON.stringify({
       listingId,
       ...(offerId ? { offerId } : {}),
+      ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });
 
@@ -320,7 +324,7 @@ export async function createWireIntent(
 }
 
 /**
- * Release escrow payment to seller (Admin only)
+ * Release held funds to seller (Admin only)
  * Creates a Stripe transfer to the seller's connected account
  */
 export async function releasePayment(orderId: string): Promise<{
@@ -641,6 +645,8 @@ export async function runReconciliation(params?: {
 /**
  * Admin-only: Fetch orders with server-side filtering
  */
+// NOTE: filter value `'escrow'` is a legacy internal key meaning "payout holds" (paid funds awaiting delayed payout release).
+// Keep the key for backward compatibility with server-side filtering and admin UI wiring.
 export async function getAdminOrders(filter: 'escrow' | 'protected' | 'disputes' | 'ready_to_release' | 'all' = 'all', limit: number = 100, cursor?: string): Promise<{ orders: any[]; nextCursor: string | null; hasMore: boolean }> {
   const user = auth.currentUser;
   if (!user) {

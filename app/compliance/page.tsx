@@ -18,7 +18,7 @@ export default function CompliancePage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-4">Compliance & Regulations</h1>
         <p className="text-lg text-muted-foreground">
-          Wildlife Exchange is committed to full compliance with Texas wildlife and livestock regulations.
+          Wildlife Exchange enforces Texas-only animal transactions and marketplace document workflows. Buyers and sellers remain responsible for legal compliance.
         </p>
       </div>
 
@@ -228,22 +228,43 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
 
-        {/* Equipment Requirements */}
+        {/* Ranch Equipment Requirements */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              <CardTitle>Ranch Equipment Requirements</CardTitle>
+              <CardTitle>Ranch Equipment &amp; Attachments</CardTitle>
             </div>
             <CardDescription>
-              Title & VIN Requirements for Vehicles
+              Machinery and attachments (vehicles listed separately)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Equipment listings are multi-state and do not require Texas-only restrictions. However, 
-                vehicles (UTV, ATV, Trailer, Truck) require:
+                Equipment listings are multi-state and do not require Texas-only restrictions. These listings are for tractors, skid steers,
+                ranch machinery, and attachments/implements. Vehicles and trailers are listed under Ranch Vehicles &amp; Trailers.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ranch Vehicles Requirements */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              <CardTitle>Ranch Vehicles &amp; Trailers</CardTitle>
+            </div>
+            <CardDescription>
+              Title &amp; VIN requirements for vehicles
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Ranch vehicles and trailers are multi-state and do not require Texas-only restrictions. For vehicles (UTV, ATV, Trailer, Truck),
+                listings require:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
                 <li>Title status disclosure (has title or not)</li>
@@ -253,12 +274,12 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
 
-        {/* Escrow & Payout */}
+        {/* Payout Holds & Release */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-primary" />
-              <CardTitle>Escrow & Payout Release</CardTitle>
+              <CardTitle>Payout Holds & Release</CardTitle>
             </div>
             <CardDescription>
               How Payment Works
@@ -267,11 +288,11 @@ export default function CompliancePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Wildlife Exchange uses an escrow model to protect both buyers and sellers:
+                Wildlife Exchange uses a payout-hold workflow to protect both buyers and sellers:
               </p>
               <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-4">
                 <li>Buyer pays platform via Stripe Checkout at purchase</li>
-                <li>Funds are held in escrow by the platform</li>
+                <li>Funds are held for payout release by the platform</li>
                 <li>For whitetail breeder orders: Seller must upload TPWD Transfer Approval</li>
                 <li>Admin verifies transfer approval document</li>
                 <li>Admin releases payout to seller via Stripe Transfer</li>
@@ -280,7 +301,7 @@ export default function CompliancePage() {
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                <strong>Protection:</strong> This escrow model ensures compliance documents are verified 
+                <strong>Protection:</strong> This payout-hold workflow helps ensure required marketplace documents are verified
                 before funds are released, protecting both buyers and sellers.
               </AlertDescription>
             </Alert>

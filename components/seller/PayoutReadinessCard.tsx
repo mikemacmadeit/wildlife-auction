@@ -25,6 +25,7 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
   const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [isCheckingPlatform, setIsCheckingPlatform] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [platformBlock, setPlatformBlock] = useState<
     | null
     | {
@@ -312,44 +313,60 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
           )}
         </div>
 
-        {/* Status Details */}
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Connected Account:</span>
-            <span className={hasConnectedAccount ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
-              {hasConnectedAccount ? 'Yes' : 'No'}
-            </span>
+        {isReady ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" className="min-h-[40px]" onClick={() => router.push('/seller/payouts')}>
+                View payouts
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button type="button" variant="ghost" className="min-h-[40px]" onClick={() => setShowDetails((v) => !v)}>
+                {showDetails ? 'Hide details' : 'View details'}
+              </Button>
+            </div>
           </div>
-          {hasConnectedAccount && (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Charges Enabled:</span>
-                <span className={chargesEnabled ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
-                  {chargesEnabled ? 'Yes' : 'No'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Payouts Enabled:</span>
-                <span className={payoutsEnabled ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
-                  {payoutsEnabled ? 'Yes' : 'No'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Details Submitted:</span>
-                <span className={detailsSubmitted ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
-                  {detailsSubmitted ? 'Yes' : 'No'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Onboarding Status:</span>
-                <Badge variant="outline" className="capitalize">
-                  {onboardingStatus === 'complete' ? 'Complete' : 
-                   onboardingStatus === 'pending' ? 'Pending' : 'Not Started'}
-                </Badge>
-              </div>
-            </>
-          )}
-        </div>
+        ) : null}
+
+        {/* Status Details (show when not ready, or if user explicitly expands) */}
+        {(!isReady || showDetails) && (
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Connected Account:</span>
+              <span className={hasConnectedAccount ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+                {hasConnectedAccount ? 'Yes' : 'No'}
+              </span>
+            </div>
+            {hasConnectedAccount && (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Charges Enabled:</span>
+                  <span className={chargesEnabled ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+                    {chargesEnabled ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Payouts Enabled:</span>
+                  <span className={payoutsEnabled ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+                    {payoutsEnabled ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Details Submitted:</span>
+                  <span className={detailsSubmitted ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+                    {detailsSubmitted ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Onboarding Status:</span>
+                  <Badge variant="outline" className="capitalize">
+                    {onboardingStatus === 'complete' ? 'Complete' :
+                     onboardingStatus === 'pending' ? 'Pending' : 'Not Started'}
+                  </Badge>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Action Button */}
         {!isReady && (
@@ -370,12 +387,6 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
               </>
             )}
           </Button>
-        )}
-
-        {isReady && (
-          <p className="text-sm text-muted-foreground">
-            Your account is fully set up and ready to receive payouts from completed sales.
-          </p>
         )}
       </CardContent>
     </Card>

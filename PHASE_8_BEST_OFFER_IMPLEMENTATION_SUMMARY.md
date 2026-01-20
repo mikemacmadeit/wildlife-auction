@@ -202,7 +202,7 @@ Added composite indexes for:
 ### Checkout at accepted price
 - Buyer clicks “Buy at accepted price” → creates Stripe session with `offerId` metadata
 - Complete checkout → order created with `offerId`; offer updated with `orderId`
-- Existing escrow/dispute flows continue unchanged
+- Existing payout-hold/dispute flows continue unchanged
 
 ### Expiration
 - Force an offer to expire (edit `expiresAt` in Firestore) → scheduled job marks `expired`

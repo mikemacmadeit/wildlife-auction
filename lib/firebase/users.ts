@@ -1,7 +1,7 @@
 import { User as FirebaseUser } from 'firebase/auth';
 import { auth } from './config';
 import { getDocument, setDocument, updateDocument } from './firestore';
-import { UserProfile } from '@/lib/types';
+import { PublicSellerTrust, UserProfile } from '@/lib/types';
 
 type PublicProfileDoc = {
   userId: string;
@@ -190,6 +190,31 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   } catch (error) {
     console.error('Error fetching user profile:', error);
     throw error;
+  }
+};
+
+/**
+ * Public seller trust doc (server-authored, public-read).
+ * Safe to fetch for any viewer (including logged-out).
+ */
+export const getPublicSellerTrust = async (userId: string): Promise<PublicSellerTrust | null> => {
+  try {
+    const doc = await getDocument<PublicSellerTrust>('publicSellerTrust', userId).catch(() => null);
+    if (!doc) return null;
+    // Normalize date-ish fields (getDocument already converts top-level timestamps in many paths,
+    // but keep this defensive since this doc may be written by Admin SDK).
+    const out: any = { ...doc };
+    if (out.updatedAt && typeof out.updatedAt?.toDate === 'function') out.updatedAt = out.updatedAt.toDate();
+    if (out?.tpwdBreederPermit?.expiresAt && typeof out.tpwdBreederPermit.expiresAt?.toDate === 'function') {
+      out.tpwdBreederPermit.expiresAt = out.tpwdBreederPermit.expiresAt.toDate();
+    }
+    if (out?.tpwdBreederPermit?.verifiedAt && typeof out.tpwdBreederPermit.verifiedAt?.toDate === 'function') {
+      out.tpwdBreederPermit.verifiedAt = out.tpwdBreederPermit.verifiedAt.toDate();
+    }
+    if (out?.stripe?.updatedAt && typeof out.stripe.updatedAt?.toDate === 'function') out.stripe.updatedAt = out.stripe.updatedAt.toDate();
+    return out as PublicSellerTrust;
+  } catch {
+    return null;
   }
 };
 

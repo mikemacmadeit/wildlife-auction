@@ -33,7 +33,10 @@ service cloud.firestore {
         'wildlife_exotics',
         'cattle_livestock',
         'ranch_equipment',
-        'horse_equestrian'
+        'horse_equestrian',
+        'ranch_vehicles',
+        'hunting_outfitter_assets',
+        'sporting_working_dogs'
       ];
     }
     
@@ -65,7 +68,9 @@ service cloud.firestore {
           'stripeOnboardingStatus',
           'chargesEnabled',
           'payoutsEnabled',
-          'stripeDetailsSubmitted'
+          'stripeDetailsSubmitted',
+          // Legal acceptance is server-authored (non-spoofable)
+          'legal'
         ]) &&
         // If tier is included at create time, it must be Standard
         (
@@ -95,7 +100,9 @@ service cloud.firestore {
           'stripeOnboardingStatus',
           'chargesEnabled',
           'payoutsEnabled',
-          'stripeDetailsSubmitted'
+          'stripeDetailsSubmitted',
+          // Legal acceptance is server-authored (non-spoofable)
+          'legal'
         ]);
       
       // Allow delete: if authenticated and deleting own document
@@ -127,6 +134,16 @@ service cloud.firestore {
         ]);
 
       allow delete: if false;
+    }
+
+    // ============================================
+    // PUBLIC SELLER TRUST (SERVER-AUTHORED)
+    // ============================================
+    // Public, marketplace-safe trust signals (badges) that must NOT be user-editable.
+    // Written only by server code via the Admin SDK (rules are bypassed).
+    match /publicSellerTrust/{userId} {
+      allow read: if true;
+      allow create, update, delete: if false;
     }
 
     // ============================================
@@ -256,15 +273,14 @@ service cloud.firestore {
           isAdmin() || isListingOwner()
         );
         
-        // Allow create: authenticated user (app logic ensures ownership)
-        // Similar to storage rules - allows authenticated creates to handle:
-        // 1. Cross-service rules setup
-        // 2. Firestore propagation delays
-        // 3. Document upload flow
-        // The uploadedBy field ensures the document is linked to the correct user
-        allow create: if isAuthenticated() && 
+        // Allow create: listing owner or admin only.
+        // Prevents malicious users from attaching docs to other sellers' listings.
+        // Keep uploadedBy check for auditability and to match existing document shapes.
+        allow create: if (isAdmin() || isListingOwner()) &&
           request.resource.data.status == 'uploaded' &&
-          request.resource.data.uploadedBy == request.auth.uid;
+          request.resource.data.uploadedBy == request.auth.uid &&
+          // Only allow https URLs (basic injection hardening)
+          request.resource.data.documentUrl.matches('^https://.*');
         
         // Allow update: only admin (for verification)
         allow update: if isAdmin() && 
@@ -359,6 +375,23 @@ service cloud.firestore {
     match /users/{userId}/pushTokens/{tokenId} {
       allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
     }
+
+    // ============================================
+    // SAVED SELLERS (FOLLOW SYSTEM) — SERVER-AUTHORED
+    // ============================================
+    // Following + followers docs are written by server code to keep:
+    // - both directions in sync
+    // - sellerStats.followersCount consistent
+    match /users/{userId}/following/{sellerId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update, delete: if false;
+    }
+
+    match /users/{userId}/followers/{followerId} {
+      // Optional: seller can read their followers list.
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update, delete: if false;
+    }
     
     // ============================================
     // BIDS COLLECTION
@@ -409,6 +442,7 @@ service cloud.firestore {
            'adminHold','adminHoldReason','adminActionNotes',
            'paidAt','disputeDeadlineAt','deliveryConfirmedAt','protectionStartAt','protectionEndsAt','payoutHoldReason',
            'protectedTransactionDaysSnapshot','protectedTermsVersion','chargebackStatus',
+           'listingSnapshot','sellerSnapshot','timeline',
            'billOfSaleGeneratedAt','billOfSaleBuyerSignedAt','billOfSaleBuyerSignedBy','billOfSaleSellerSignedAt','billOfSaleSellerSignedBy',
            'complianceDocsStatus'
          ]) &&
@@ -426,6 +460,7 @@ service cloud.firestore {
            'adminHold','adminHoldReason','adminActionNotes',
            'paidAt','disputeDeadlineAt','deliveryConfirmedAt','protectionStartAt','protectionEndsAt','payoutHoldReason',
            'protectedTransactionDaysSnapshot','protectedTermsVersion','chargebackStatus',
+           'listingSnapshot','sellerSnapshot','timeline',
            'billOfSaleGeneratedAt','billOfSaleBuyerSignedAt','billOfSaleBuyerSignedBy','billOfSaleSellerSignedAt','billOfSaleSellerSignedBy',
            'complianceDocsStatus'
          ]) &&
@@ -588,6 +623,19 @@ service cloud.firestore {
       // Only server-side (Admin SDK) can write
       // No client access needed
       allow read, write: if false;
+    }
+
+    // ============================================
+    // ADMIN REVENUE AGGREGATES (SERVER-AUTHORED)
+    // ============================================
+    match /adminRevenueAggregates/{docId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+    match /adminRevenueAggState/{docId} {
+      // Operational state used by scheduled jobs; keep admin-only for debugging.
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
     }
     
     // ============================================

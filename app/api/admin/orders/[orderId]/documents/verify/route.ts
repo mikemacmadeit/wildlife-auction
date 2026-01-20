@@ -8,76 +8,31 @@
 // In the current environment, dev bundling can attempt to resolve a missing internal Next module
 // (`next/dist/server/web/exports/next-response`) and crash compilation.
 // Route handlers work fine with standard Web `Request` / `Response`.
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-
-// Initialize Firebase Admin
-let adminApp: App;
-if (!getApps().length) {
-  try {
-    const serviceAccount = process.env.FIREBASE_PRIVATE_KEY
-      ? {
-          projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        }
-      : undefined;
-
-    if (serviceAccount?.projectId && serviceAccount?.clientEmail && serviceAccount?.privateKey) {
-      adminApp = initializeApp({
-        credential: cert(serviceAccount as any),
-      });
-    } else {
-      adminApp = initializeApp();
-    }
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
-  }
-} else {
-  adminApp = getApps()[0];
-}
-
-const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
-
-function json(body: any, init?: { status?: number }) {
-  return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json' },
-  });
-}
+import { Timestamp } from 'firebase-admin/firestore';
+import { requireAdmin, json } from '@/app/api/admin/_util';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
+import { createAuditLog } from '@/lib/audit/logger';
 
 export async function POST(
   request: Request,
   { params }: { params: { orderId: string } }
 ) {
   try {
-    // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await auth.verifyIdToken(token);
-    const adminId = decodedToken.uid;
-
-    // Verify admin role
-    const adminUserRef = db.collection('users').doc(adminId);
-    const adminUserDoc = await adminUserRef.get();
-    
-    if (!adminUserDoc.exists) {
-      return json({ error: 'User not found' }, { status: 404 });
+    const admin = await requireAdmin(request);
+    if (!admin.ok) {
+      if (admin.response.status === 401) return json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
+      if (admin.response.status === 403) return json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return admin.response;
     }
 
-    const adminUserData = adminUserDoc.data();
-    const isAdmin = adminUserData?.role === 'admin' || adminUserData?.role === 'super_admin';
-    
-    if (!isAdmin) {
-      return json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
+    const adminId = admin.ctx.actorUid;
+    const db = admin.ctx.db;
 
     const orderId = params.orderId;
 
@@ -101,6 +56,8 @@ export async function POST(
       return json({ error: 'Document not found' }, { status: 404 });
     }
 
+    const beforeDoc = documentDoc.data() as any;
+
     // Update document status
     const updateData: any = {
       status,
@@ -117,6 +74,32 @@ export async function POST(
 
     await documentRef.update(updateData);
 
+    // Audit log (best-effort).
+    try {
+      await createAuditLog(db as any, {
+        actorUid: adminId,
+        actorRole: 'admin',
+        actionType: status === 'verified' ? 'admin_order_document_verified' : 'admin_order_document_rejected',
+        orderId,
+        beforeState: {
+          documentId,
+          type: beforeDoc?.type,
+          status: beforeDoc?.status,
+          rejectionReason: beforeDoc?.rejectionReason,
+        },
+        afterState: {
+          documentId,
+          type: beforeDoc?.type,
+          status,
+          ...(status === 'rejected' ? { rejectionReason: String(rejectionReason || '').trim() } : {}),
+        },
+        metadata: { documentId, type: beforeDoc?.type },
+        source: 'admin_ui',
+      });
+    } catch {
+      // ignore
+    }
+
     // If TPWD_TRANSFER_APPROVAL is verified, update order transferPermitStatus
     const documentData = documentDoc.data()!;
     if (documentData.type === 'TPWD_TRANSFER_APPROVAL' && status === 'verified') {
@@ -125,6 +108,58 @@ export async function POST(
         transferPermitStatus: 'pending_review', // Admin can then approve payout
         updatedAt: Timestamp.now(),
       });
+
+      // Timeline (server-authored, idempotent).
+      try {
+        await appendOrderTimelineEvent({
+          db: db as any,
+          orderId,
+          event: {
+            id: `TRANSFER_PERMIT_APPROVED:${documentId}`,
+            type: 'TRANSFER_PERMIT_APPROVED',
+            label: 'Transfer permit verified',
+            actor: 'admin',
+            visibility: 'buyer',
+            timestamp: Timestamp.now(),
+            meta: { documentId },
+          },
+        });
+      } catch {
+        // best-effort
+      }
+    }
+
+    // If TAHC_CVI is verified/rejected, keep the order's compliance snapshot current and clear/set payout holds (best-effort).
+    if (documentData.type === 'TAHC_CVI') {
+      const orderRef = db.collection('orders').doc(orderId);
+
+      try {
+        const orderSnap = await orderRef.get();
+        const existingHold = orderSnap.exists ? (orderSnap.data() as any)?.payoutHoldReason : null;
+
+        // If CVI is now verified, clear the "missing CVI" hold reason (if it was set).
+        const nextHold =
+          status === 'verified'
+            ? (existingHold === 'MISSING_TAHC_CVI' ? 'none' : existingHold)
+            : 'MISSING_TAHC_CVI';
+
+        await orderRef.set(
+          {
+            payoutHoldReason: nextHold,
+            updatedAt: Timestamp.now(),
+            lastUpdatedByRole: 'admin',
+          },
+          { merge: true }
+        );
+      } catch {
+        // best-effort
+      }
+
+      try {
+        await recomputeOrderComplianceDocsStatus({ db: db as any, orderId });
+      } catch {
+        // best-effort
+      }
     }
 
     return json({

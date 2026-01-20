@@ -3,7 +3,7 @@
  * 
  * Admin-only endpoint to fetch orders with server-side filtering
  * Query params:
- * - filter: 'escrow' | 'protected' | 'disputes' | 'ready_to_release' | 'all'
+ * - filter: 'escrow' | 'protected' | 'disputes' | 'ready_to_release' | 'all'  (legacy key name: "escrow" = payout-hold orders)
  * - limit: number (default 100)
  * - cursor: string (order ID for pagination)
  */
@@ -96,7 +96,7 @@ export async function GET(request: Request) {
     const now = Timestamp.now();
 
     if (filter === 'escrow') {
-      // Orders in escrow/held: paid funds awaiting release OR high-ticket awaiting payment confirmation
+      // Orders held for payout release: paid funds awaiting release OR high-ticket awaiting payment confirmation
       orders = orders.filter((order: any) => {
         const status = order.status as OrderStatus;
         const hasTransfer = !!order.stripeTransferId;

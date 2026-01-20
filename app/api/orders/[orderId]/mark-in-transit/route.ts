@@ -5,7 +5,7 @@
  * - Seller-initiated explicit transition to `status: 'in_transit'`
  * - Emits `Order.InTransit` so buyers get a visible state change
  *
- * NOTE: This does NOT change escrow/payout logic. It only makes an implicit step explicit.
+ * NOTE: This does NOT change payout logic. It only makes an implicit step explicit.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -14,6 +14,7 @@ import { emitEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -87,6 +88,24 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       // Keep a server timestamp as well for audit/ordering if needed in other systems.
       lastStatusChangeAt: Timestamp.now(),
     });
+
+    // Timeline (server-authored, idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId,
+        event: {
+          id: `SELLER_SHIPPED:${orderId}`,
+          type: 'SELLER_SHIPPED',
+          label: 'Seller marked in transit',
+          actor: 'seller',
+          visibility: 'buyer',
+          timestamp: Timestamp.now(),
+        },
+      });
+    } catch {
+      // best-effort
+    }
 
     // Emit canonical notification event for buyer
     try {

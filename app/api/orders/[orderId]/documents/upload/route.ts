@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 const bodySchema = z.object({
   documentUrl: z.string().url(),
@@ -122,6 +123,25 @@ export async function POST(
         transferPermitStatus: 'uploaded',
         updatedAt: Timestamp.now(),
       });
+
+      // Timeline (server-authored, idempotent).
+      try {
+        await appendOrderTimelineEvent({
+          db: db as any,
+          orderId,
+          event: {
+            id: `TRANSFER_PERMIT_SUBMITTED:${docRef.id}`,
+            type: 'TRANSFER_PERMIT_SUBMITTED',
+            label: 'Transfer permit submitted',
+            actor: orderData.buyerId === userId ? 'buyer' : 'seller',
+            visibility: 'buyer',
+            timestamp: Timestamp.now(),
+            meta: { documentId: docRef.id },
+          },
+        });
+      } catch {
+        // best-effort
+      }
     }
 
     // Server-authoritative: recompute document completeness snapshot for this order.

@@ -7,7 +7,7 @@ Scope: **UI/UX only** for `whitetail_breeder` listing detail pages. No enforceme
   - Added **Transfer & Legal Requirements** card (whitetail-only) near Purchase Options:
     - payment ≠ legal transfer
     - TPWD Transfer Approval required (tooltip)
-    - escrow/payout gating explanation
+    - payout-hold/payout gating explanation
     - coordination language (pickup/transfer)
     - explicit marketplace disclaimer (WE not seller/transporter)
     - “No hunting/tags/licenses” note
@@ -28,7 +28,7 @@ Scope: **UI/UX only** for `whitetail_breeder` listing detail pages. No enforceme
   - Added anchor `id="whitetail"` on the TPWD Breeder Permit badge section to support deep links from listings.
 
 ### Acceptance checklist
-- Whitetail listing page clearly states: **payment ≠ transfer**, **Transfer Approval required**, **escrow/payout gated**, **WE is not seller/transporter**.
+- Whitetail listing page clearly states: **payment ≠ transfer**, **Transfer Approval required**, **payout-hold gated**, **WE is not seller/transporter**.
 - Whitetail listing page avoids “shipping” terminology (uses Transfer language).
 - Trust badges clarify permit verification vs transfer approval.
 *** End Patch}"}]}<commentary to=functions.apply_patch  微信上的天天中彩票 to=functions.apply_patch  大发快三计划 freeform code is here: number

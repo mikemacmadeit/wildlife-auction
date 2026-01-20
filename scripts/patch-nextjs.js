@@ -12,24 +12,20 @@ if (fs.existsSync(generateBuildIdPath)) {
   let content = fs.readFileSync(generateBuildIdPath, 'utf8');
   
   // Check if patch is already applied
-  if (content.includes('If generate is not a function')) {
+  if (content.includes('typeof generate !== "function"')) {
     console.log('✓ Next.js patch already applied');
     return;
   }
   
   // Apply the patch
+  // Next.js internal: generateBuildId(generate, fallback) expects `generate` to be a function.
+  // In some environments/configs it may be undefined; in that case, safely fall back to `fallback`.
   const patchedContent = content.replace(
-    /async function generateBuildId\(generate, fallback\) \{\s+let buildId = await generate\(\);/,
+    /async function generateBuildId\(generate, fallback\) \{/,
     `async function generateBuildId(generate, fallback) {
-    // If generate is not a function, use fallback directly
     if (typeof generate !== "function") {
-        let buildId = fallback();
-        while(!buildId || /ad/i.test(buildId)){
-            buildId = fallback();
-        }
-        return buildId;
-    }
-    let buildId = await generate();`
+        generate = fallback;
+    }`
   );
   
   if (content !== patchedContent) {

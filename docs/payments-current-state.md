@@ -21,7 +21,7 @@
       mode: 'payment',
       success_url: `${baseUrl}/dashboard/orders?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: offerId ? `${baseUrl}/listing/${listingId}?offer=${offerId}` : `${baseUrl}/listing/${listingId}`,
-      // NO payment_intent_data.transfer_data - funds stay in platform account (escrow)
+      // NO payment_intent_data.transfer_data - funds stay in platform account (payout hold / delayed payout release)
       // Admin will release funds via transfer after delivery confirmation
       metadata: {
         listingId: listingId,
@@ -112,7 +112,7 @@ Buyer → (Listing page “Buy Now” / “Pay Now”) → `createCheckoutSessio
   - **metadata** snapshot containing `listingId`, `buyerId`, `sellerId`, `sellerStripeAccountId`, `sellerAmount`, `platformFee`, fee snapshot fields
   - **No** `payment_intent_data.transfer_data` or destination settings (funds stay on platform).
 
-Evidence (no destination charges; platform “escrow-like” hold):
+Evidence (no destination charges; platform payout-hold / delayed payout release):
 
 ```434:493:project/app/api/stripe/checkout/create-session/route.ts
     // Calculate fees (flat fee for all sellers/categories; never trust client)
@@ -121,7 +121,7 @@ Evidence (no destination charges; platform “escrow-like” hold):
     const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
-    // Create Stripe Checkout Session with ESCROW (no destination charge)
+    // Create Stripe Checkout Session with payout hold (no destination charge)
     // Funds are held in platform account until admin confirms delivery
     const baseUrl = getAppUrl();
     const requiresAddress = animalCategories.includes(listingData.category);
@@ -129,7 +129,7 @@ Evidence (no destination charges; platform “escrow-like” hold):
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       // ...
-      // NO payment_intent_data.transfer_data - funds stay in platform account (escrow)
+      // NO payment_intent_data.transfer_data - funds stay in platform account (payout hold / delayed payout release)
       // Admin will release funds via transfer after delivery confirmation
       metadata: {
         listingId: listingId,
@@ -342,7 +342,7 @@ In `project/app/api/stripe/webhook/route.ts`, events explicitly handled include:
   - **Evidence**: `project/app/api/stripe/transfers/release/route.ts` and `project/app/api/stripe/refunds/process/route.ts` contain their own `initializeFirebaseAdmin()` logic.
   - **Fix**: Normalize all Stripe routes to use `project/lib/firebase/admin.ts` helpers (same approach as checkout + webhook).
 
-### P1 — No Stripe-side escrow primitives / no delayed capture
+### P1 — No Stripe-side payout-hold primitives / no delayed capture
 
 - **Risk**: Because capture is immediate, your platform is holding customer funds on the platform Stripe balance during the “protection window”. This has operational and compliance implications (refund timing, disputes, negative balances if chargebacks happen after transfer, etc.).
   - **Evidence**: Checkout uses `mode: 'payment'` and “hold” is implemented by delaying transfer (see “D”).
@@ -358,7 +358,7 @@ In `project/app/api/stripe/webhook/route.ts`, events explicitly handled include:
 
 - **Risk**: Checkout is blocked if seller is not payout-ready, which may reduce conversions early on.
   - **Evidence**: `SELLER_NOT_PAYOUT_READY` logic in `project/app/api/stripe/checkout/create-session/route.ts` around `isPayoutReady`.
-  - **Fix**: Consider allowing payment into platform escrow even if seller onboarding incomplete, but prevent release until seller finishes Connect onboarding.
+  - **Fix**: Consider allowing payment into platform payout hold even if seller onboarding incomplete, but prevent release until seller finishes Connect onboarding.
 
 ## H) Gaps for High-Ticket Marketplace ($5k–$100k)
 
@@ -393,7 +393,7 @@ In `project/app/api/stripe/webhook/route.ts`, events explicitly handled include:
 ### P1 (soon)
 
 1) Add ACH/bank rails for high-ticket payments (either Stripe ACH debit, bank transfer, or invoice flow).
-2) Consider a “seller not payout-ready” policy change: allow checkout into escrow but block release until onboarding complete.
+2) Consider a “seller not payout-ready” policy change: allow checkout into payout hold but block release until onboarding complete.
 3) Build a dedicated admin “Escrow Console” page that shows: paid orders, holds, deadlines, disputes, and one-click release/refund.
 
 ### P2 (later)

@@ -33,6 +33,67 @@ export async function getOrCreateThread(
   buyerId: string,
   sellerId: string
 ): Promise<string> {
+  // Preferred path: create/get thread via server endpoint which validates listing↔seller relationship.
+  // buyerId is derived from the auth token server-side; we still keep buyerId in the signature for backwards compatibility.
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('Authentication required');
+  }
+  if (currentUser.uid !== buyerId) {
+    throw new Error('Invalid buyer');
+  }
+
+  try {
+    const token = await currentUser.getIdToken();
+    const res = await fetch('/api/messages/thread', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ listingId, sellerId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.ok && typeof data?.threadId === 'string') {
+      return data.threadId as string;
+    }
+
+    // Only fall back when the server route is unavailable (deploy/config transition).
+    if (res.status !== 404 && res.status !== 503) {
+      const msg =
+        typeof data?.message === 'string'
+          ? data.message
+          : typeof data?.error === 'string'
+          ? data.error
+          : 'Failed to create thread';
+      const err: any = new Error(msg);
+      if (typeof data?.code === 'string') err.code = data.code;
+      throw err;
+    }
+  } catch (e: any) {
+    // Network error or server route unavailable: fall back below for backwards compatibility.
+    // But if we already have a structured app error, rethrow it.
+    if (e?.code || /LISTING_SELLER_MISMATCH/i.test(String(e?.message || ''))) {
+      throw e;
+    }
+  }
+
+  // Fallback (legacy): still validate listing↔seller relationship client-side before creating any thread.
+  try {
+    const listingRef = doc(db, 'listings', listingId);
+    const listingSnap = await getDoc(listingRef);
+    const listing = listingSnap.exists() ? (listingSnap.data() as any) : null;
+    const canonicalSellerId = listing?.sellerId ? String(listing.sellerId) : '';
+    if (!canonicalSellerId || canonicalSellerId !== sellerId) {
+      const err: any = new Error('Invalid listing/seller relationship');
+      err.code = 'LISTING_SELLER_MISMATCH';
+      throw err;
+    }
+  } catch (e: any) {
+    // If we cannot validate, fail closed rather than creating a potentially spoofed thread.
+    throw e;
+  }
+
   // Check if thread already exists
   const threadsRef = collection(db, 'messageThreads');
   const existingThreadQuery = query(

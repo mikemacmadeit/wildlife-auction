@@ -118,8 +118,8 @@ export default function HowItWorksPage() {
     },
     {
       icon: Truck,
-      title: 'Transport Planning',
-      description: 'Coordinate transport with sellers. Plan pickup and delivery in advance. Transport coordination service coming soon.',
+      title: 'Delivery Planning',
+      description: 'Coordinate pickup and delivery details with the seller after purchase. Wildlife Exchange does not provide or arrange transport.',
       color: 'text-primary',
       bgColor: 'bg-primary/10',
       borderColor: 'border-primary/20',
@@ -127,7 +127,7 @@ export default function HowItWorksPage() {
     {
       icon: CreditCard,
       title: 'Secure Transactions',
-      description: 'Clear payment terms. Secure payment processing. Optional escrow for qualified transactions. Full transaction history.',
+      description: 'Clear payment terms. Secure payment processing. Optional payout-hold protection for qualified transactions. Full transaction history.',
       color: 'text-primary',
       bgColor: 'bg-primary/10',
       borderColor: 'border-primary/20',

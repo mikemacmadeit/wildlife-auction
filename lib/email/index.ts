@@ -287,7 +287,7 @@ export const EMAIL_EVENT_REGISTRY = [
   {
     type: 'order_confirmation',
     displayName: 'Order Confirmation',
-    description: 'Sent to buyer after payment is received and escrow begins.',
+    description: 'Sent to buyer after payment is received and the payout-hold workflow begins.',
     schema: orderConfirmationSchema,
     samplePayload: {
       buyerName: 'Alex Johnson',

@@ -49,9 +49,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Order, DisputeStatus, DisputeReason } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { getOrdersForUser } from '@/lib/firebase/orders';
-import { getListingById } from '@/lib/firebase/listings';
-import { getUserProfile } from '@/lib/firebase/users';
 import { releasePayment } from '@/lib/stripe/api';
 import Link from 'next/link';
 
@@ -99,6 +96,8 @@ export default function AdminProtectedTransactionsPage() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
@@ -110,36 +109,81 @@ export default function AdminProtectedTransactionsPage() {
   const [adminNotes, setAdminNotes] = useState('');
   const [markFraudulent, setMarkFraudulent] = useState(false);
 
-  useEffect(() => {
-    const loadOrders = async () => {
-      if (!isAdmin) return;
-      
-      try {
-        setLoading(true);
-        // Get all orders (admin can see all)
-        // In a real implementation, you'd have an admin-only query
-        // For now, we'll fetch from a known seller or use a different approach
-        // This is a placeholder - you may need to create an admin API endpoint
-        
-        // For MVP, we'll show a message that admin needs to use the existing payouts page
-        // or we can create a server-side admin endpoint
-        setOrders([]);
-      } catch (error: any) {
-        console.error('Error loading orders:', error);
-        toast({
-          title: 'Error loading orders',
-          description: error.message || 'Failed to load orders',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
+  const hydrateOrder = (raw: any): OrderWithDetails => {
+    const copy: any = { ...raw };
+    const dateFields = [
+      'createdAt',
+      'updatedAt',
+      'paidAt',
+      'deliveredAt',
+      'deliveryConfirmedAt',
+      'protectionStartAt',
+      'protectionEndsAt',
+      'buyerConfirmedAt',
+      'buyerAcceptedAt',
+      'disputedAt',
+      'disputeOpenedAt',
+    ];
+    for (const k of dateFields) {
+      if (k in copy) {
+        const d = toDateSafe(copy[k]);
+        if (d) copy[k] = d;
       }
-    };
-
-    if (!adminLoading && isAdmin) {
-      loadOrders();
     }
-  }, [isAdmin, adminLoading, toast]);
+    if (Array.isArray(copy?.disputeEvidence)) {
+      copy.disputeEvidence = copy.disputeEvidence.map((e: any) => ({
+        ...e,
+        uploadedAt: toDateSafe(e?.uploadedAt) || e?.uploadedAt,
+      }));
+    }
+    return copy as OrderWithDetails;
+  };
+
+  const loadOrders = async (opts?: { cursor?: string | null; append?: boolean }) => {
+    if (!isAdmin || !user) return;
+    const append = opts?.append === true;
+    const cursorValue = typeof opts?.cursor === 'string' ? opts?.cursor : null;
+
+    try {
+      setLoading(true);
+      const token = await user.getIdToken();
+      const params = new URLSearchParams();
+      params.set('limit', '50');
+      if (cursorValue) params.set('cursor', cursorValue);
+
+      const res = await fetch(`/api/admin/orders/protected?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || 'Failed to load protected transactions');
+      }
+
+      const nextOrders: OrderWithDetails[] = Array.isArray(data?.orders) ? data.orders.map(hydrateOrder) : [];
+      setOrders((prev) => (append ? [...prev, ...nextOrders] : nextOrders));
+      setCursor(typeof data?.nextCursor === 'string' ? data.nextCursor : null);
+      setHasMore(!!data?.nextCursor);
+    } catch (error: any) {
+      console.error('Error loading orders:', error);
+      toast({
+        title: 'Error loading orders',
+        description: error.message || 'Failed to load orders',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminLoading) return;
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
+    if (!user) return;
+    loadOrders({ cursor: null, append: false });
+  }, [isAdmin, adminLoading, user]);
 
   const filteredOrders = useMemo(() => {
     let result = [...orders];
@@ -498,6 +542,14 @@ export default function AdminProtectedTransactionsPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {hasMore && !loading && (
+          <div className="pt-4 flex justify-center">
+            <Button variant="outline" onClick={() => loadOrders({ cursor, append: true })}>
+              Load more
+            </Button>
           </div>
         )}
 

@@ -32,7 +32,7 @@
 - [ ] Set `STRIPE_WEBHOOK_SECRET` in production environment
 - [ ] Test webhook delivery in production
 - [ ] Verify Stripe Connect accounts work in live mode
-- [ ] Test escrow payment flow end-to-end
+- [ ] Test payout-hold payment flow end-to-end
 - [ ] Test refund processing
 
 ### Payment Flows
@@ -83,6 +83,10 @@
   - [ ] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (live key: `pk_live_...`)
   - [ ] `STRIPE_WEBHOOK_SECRET` (from Stripe Dashboard)
 
+- [ ] **Upstash (Rate limiting - REQUIRED in production):**
+  - [ ] `UPSTASH_REDIS_REST_URL`
+  - [ ] `UPSTASH_REDIS_REST_TOKEN`
+
 - [ ] **Application:**
   - [ ] `APP_URL` or `NEXT_PUBLIC_APP_URL` (production domain)
   - [ ] `NODE_ENV=production`
@@ -106,6 +110,13 @@
 - [ ] Deploy Firestore rules: `firebase deploy --only firestore:rules`
 - [ ] Deploy Firestore indexes: `firebase deploy --only firestore:indexes`
 - [ ] Verify all indexes are built (may take a few minutes)
+
+### Netlify Scheduled Functions
+- [ ] Confirm scheduled functions are enabled in Netlify
+- [ ] Confirm `aggregateRevenue` runs hourly and writes:
+  - [ ] `adminRevenueAggregates/global`
+  - [ ] `adminRevenueAggState/global`
+  - [ ] `opsHealth/aggregateRevenue`
 
 ### Build & Deploy
 - [ ] Run `npm run build` successfully
@@ -136,7 +147,7 @@
 - [ ] Test order creation after payment
 - [ ] Test admin payout release
 - [ ] Test refund processing
-- [ ] Verify funds are held in escrow correctly
+- [ ] Verify funds are held for delayed payout release correctly
 
 ### Security Testing
 - [ ] Attempt unauthorized API access

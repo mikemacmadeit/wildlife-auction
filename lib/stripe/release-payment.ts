@@ -8,6 +8,18 @@ import { stripe, isStripeConfigured } from './config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { emitEventForUser } from '@/lib/notifications';
+import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { getPayoutHoldRequirements } from '@/lib/compliance/policy';
+import type { DocumentType, ListingAttributes, ListingCategory } from '@/lib/types';
+
+/**
+ * Diligence note (non-functional):
+ * - This file is the canonical "money-moving" implementation for releasing payouts.
+ * - It enforces payout safety gates (disputes, chargebacks, admin holds) and policy-driven compliance holds.
+ * - It does NOT represent custody of animals/goods and does not create any broker/shipper/intermediary role; it is a settlement hold + delayed payout release workflow.
+ * - There is intentionally NO global "freeze all payouts" kill switch in code today; operations uses per-order `adminHold` and chargeback/dispute safety gates.
+ * - Compliance policy source of truth: `lib/compliance/policy.ts` (required verified docs + admin approval requirements). Do not add new policy gates elsewhere.
+ */
 
 export interface ReleasePaymentResult {
   success: boolean;
@@ -15,6 +27,8 @@ export interface ReleasePaymentResult {
   amount?: number;
   error?: string;
   message?: string;
+  holdReasonCode?: string;
+  missingDocTypes?: DocumentType[];
 }
 
 /**
@@ -70,6 +84,32 @@ export async function releasePaymentForOrder(
   }
 
   const orderData = orderDoc.data()!;
+
+  // OPTIONAL (default OFF): platform-wide payout freeze for emergency operations.
+  // This does NOT affect checkout or order creation; it only blocks payout release attempts.
+  if (process.env.GLOBAL_PAYOUT_FREEZE_ENABLED === 'true') {
+    // Best-effort audit log so ops can prove attempted releases were blocked during freeze.
+    try {
+      await createAuditLog(db as any, {
+        actorUid: (releasedBy || 'system') as any,
+        actorRole: releasedBy && releasedBy !== 'system' ? 'admin' : 'system',
+        actionType: 'payout_release_blocked_global_freeze',
+        source: releasedBy && releasedBy !== 'system' ? 'admin_ui' : 'cron',
+        orderId,
+        listingId: orderData?.listingId,
+        beforeState: { status: orderData?.status || null, stripeTransferId: orderData?.stripeTransferId || null },
+        afterState: { blocked: true },
+        metadata: { message: 'GLOBAL_PAYOUT_FREEZE_ENABLED=true' },
+      });
+    } catch {
+      // best-effort
+    }
+    return {
+      success: false,
+      error: 'Payout releases are temporarily paused by platform operations.',
+      holdReasonCode: 'GLOBAL_PAYOUT_FREEZE',
+    };
+  }
 
   // Validate order status and release eligibility
   const currentStatus = orderData.status as string;
@@ -177,6 +217,62 @@ export async function releasePaymentForOrder(
               transferPermitStatus: 'approved',
               updatedAt: Timestamp.now(),
             });
+          }
+        }
+      }
+
+      // Phase 2 (policy): enforce required verified docs + (for certain cases) admin approval before payout release.
+      // Keep whitetail breeder logic untouched (gold standard, separately enforced above).
+      const normalizedCategory = normalizeCategory(listingData.category) as ListingCategory;
+      if (normalizedCategory && normalizedCategory !== 'whitetail_breeder') {
+        // Policy-driven payout holds live in `lib/compliance/policy.ts` (single source of truth).
+        const req = getPayoutHoldRequirements(normalizedCategory, (listingData.attributes || {}) as ListingAttributes);
+
+        // Required verified documents
+        const requiredVerifiedDocs = req.requiredVerifiedDocs || [];
+        const missingVerifiedDocs: DocumentType[] = [];
+        if (requiredVerifiedDocs.length > 0) {
+          const documentsRef = db.collection('orders').doc(orderId).collection('documents');
+          for (const docType of requiredVerifiedDocs) {
+            const q = await documentsRef
+              .where('type', '==', docType)
+              .where('status', '==', 'verified')
+              .limit(1)
+              .get();
+            if (q.empty) missingVerifiedDocs.push(docType);
+          }
+        }
+
+        if (missingVerifiedDocs.length > 0) {
+          const holdReasonCode = missingVerifiedDocs.includes('TAHC_CVI') ? 'MISSING_TAHC_CVI' : 'MISSING_REQUIRED_DOCS';
+          try {
+            await orderRef.set({ payoutHoldReason: holdReasonCode, updatedAt: Timestamp.now() }, { merge: true });
+          } catch {
+            // best-effort
+          }
+          return {
+            success: false,
+            error: `Missing required verified documents: ${missingVerifiedDocs.join(', ')}`,
+            holdReasonCode,
+            missingDocTypes: missingVerifiedDocs,
+          };
+        }
+
+        // Admin approval requirement (exotic cervids + ESA/CITES overlay species + other_exotic)
+        if (req.requiresAdminApprovalBeforePayout || req.blockPayoutByDefault) {
+          if (orderData.adminPayoutApproval !== true) {
+            const holdReasonCode = req.holdReasonCode || 'ADMIN_APPROVAL_REQUIRED';
+            try {
+              await orderRef.set({ payoutHoldReason: holdReasonCode, updatedAt: Timestamp.now() }, { merge: true });
+            } catch {
+              // best-effort
+            }
+            return {
+              success: false,
+              error: 'Admin approval is required before payout can be released for this transaction.',
+              holdReasonCode,
+              missingDocTypes: [],
+            };
           }
         }
       }
@@ -323,6 +419,7 @@ export async function releasePaymentForOrder(
       updatedAt: new Date(),
       releasedBy: releasedBy || 'system',
       releasedAt: new Date(),
+      payoutHoldReason: 'none',
     });
 
     // Create audit log

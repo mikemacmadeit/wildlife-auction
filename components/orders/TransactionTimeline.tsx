@@ -83,8 +83,9 @@ export function TransactionTimeline(props: {
   dense?: boolean; // tighter spacing for list views
   showTitle?: boolean; // hide title row for embedded usage
   variant?: TimelineVariant; // cards (default) or compact horizontal rail
+  embedded?: boolean; // render without outer Card (for order tiles)
 }) {
-  const { order, role, className, dense = false, showTitle = true, variant = 'cards' } = props;
+  const { order, role, className, dense = false, showTitle = true, variant = 'cards', embedded = false } = props;
 
   const trust = getOrderTrustState(order);
   const issue = getOrderIssueState(order);
@@ -153,6 +154,10 @@ export function TransactionTimeline(props: {
     const hasDelivered = !!order.deliveredAt || !!order.deliveryConfirmedAt || order.status === 'delivered' || order.status === 'buyer_confirmed' || order.status === 'accepted' || order.status === 'ready_to_release' || order.status === 'completed';
     const inProtection = order.payoutHoldReason === 'protection_window' && !!order.deliveryConfirmedAt;
     const readyForPayout = trust === 'ready_for_payout' || order.status === 'ready_to_release';
+    const paymentReleased =
+      order.status === 'completed' ||
+      order.status === 'refunded' ||
+      (typeof order.stripeTransferId === 'string' && order.stripeTransferId.trim().length > 0);
 
     const baseSteps: Array<Omit<TimelineStep, 'status'> & { rank: number; show?: boolean }> = [
       {
@@ -201,15 +206,19 @@ export function TransactionTimeline(props: {
         description: copy.ready,
         icon: <DollarSign className="h-4 w-4" />,
         rank: 6,
-        show: readyForPayout || trust === 'completed',
+        show: readyForPayout || trust === 'completed' || paymentReleased,
       },
       {
-        key: 'completed',
-        title: order.status === 'refunded' ? 'Refunded' : 'Completed',
-        description: order.status === 'refunded' ? 'Payment was refunded.' : copy.completed,
-        icon: order.status === 'refunded' ? <Undo2 className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />,
+        key: 'payout',
+        title: order.status === 'refunded' ? 'Refunded' : 'Payment released',
+        description:
+          order.status === 'refunded'
+            ? 'Payment was refunded.'
+            : 'Escrow released to the seller. Transaction complete.',
+        icon: order.status === 'refunded' ? <Undo2 className="h-4 w-4" /> : <DollarSign className="h-4 w-4" />,
         rank: 7,
-        show: order.status === 'completed' || order.status === 'refunded',
+        // Always show the final step so buyers understand the end-state.
+        show: true,
       },
     ];
 
@@ -232,7 +241,7 @@ export function TransactionTimeline(props: {
                 Ends {protectionRemaining}
               </Badge>
             ) : null,
-          status: stepStatusFor(effectiveRank, currentRank, blocked && s.key !== 'completed'),
+          status: stepStatusFor(effectiveRank, currentRank, blocked && s.key !== 'payout'),
         } as TimelineStep;
       });
   }, [order, role, trust, rank, blocked, protectionRemaining]);
@@ -241,8 +250,9 @@ export function TransactionTimeline(props: {
     <div
       className={cn(
         'flex h-7 w-7 items-center justify-center rounded-full border',
-        s.status === 'done' && 'bg-primary/10 border-primary/30 text-primary',
-        s.status === 'active' && 'bg-primary/15 border-primary/40 text-primary',
+        // Make the active/done step unmistakably visible (high contrast)
+        s.status === 'done' && 'bg-primary border-primary text-primary-foreground shadow-sm',
+        s.status === 'active' && 'bg-primary/95 border-primary text-primary-foreground ring-2 ring-primary/30 shadow-sm',
         s.status === 'upcoming' && 'bg-background border-border/50 text-muted-foreground',
         s.status === 'blocked' && 'bg-destructive/10 border-destructive/30 text-destructive'
       )}
@@ -252,23 +262,62 @@ export function TransactionTimeline(props: {
   );
 
   const Rail = () => (
-    <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
-      <div className={cn('flex items-start gap-3', dense ? 'min-w-[560px]' : 'min-w-[720px]')}>
+    // Keep the rail contained in its box; allow horizontal scroll only.
+    <div className={cn('overflow-x-auto overflow-y-hidden', dense ? 'pb-0.5' : 'pb-2')}>
+      {/* Embedded rails sit inside a padded container already — keep padding tight. */}
+      <div
+        className={cn(
+          'flex items-start',
+          dense ? 'gap-2.5' : 'gap-3',
+          embedded ? 'pr-2' : 'pr-8',
+          // Avoid over-forcing width so it "fits" better inside its box; still scrolls when needed.
+          embedded
+            ? dense
+              ? 'min-w-[440px]'
+              : 'min-w-[640px]'
+            : dense
+              ? 'min-w-[520px]'
+              : 'min-w-[760px]'
+        )}
+      >
         {steps.map((s, idx) => {
           const isLast = idx === steps.length - 1;
-          const connectorClass =
+          const prev = idx > 0 ? steps[idx - 1] : null;
+          const leftConnectorClass =
+            prev?.status === 'blocked'
+              ? 'bg-destructive/30'
+              : prev?.status === 'done'
+                ? 'bg-primary/25'
+                : 'bg-border/70';
+          const rightConnectorClass =
             s.status === 'blocked'
               ? 'bg-destructive/30'
               : s.status === 'done'
                 ? 'bg-primary/25'
                 : 'bg-border/70';
           return (
-            <div key={s.key} className="flex-1 min-w-[140px]">
-              <div className="flex items-center gap-3">
+            <div
+              key={s.key}
+              className={cn(
+                'flex-1',
+                embedded
+                  ? dense
+                    ? 'min-w-[110px]'
+                    : 'min-w-[130px]'
+                  : dense
+                    ? 'min-w-[120px]'
+                    : 'min-w-[140px]',
+                // Give the final step a little breathing room from the scroll edge.
+                isLast && (embedded ? 'pr-3' : 'pr-6')
+              )}
+            >
+              {/* Icon row: icon centered above its label, with connectors on the sides */}
+              <div className="flex items-center w-full">
+                {idx > 0 ? <div className={cn('h-[2px] flex-1 rounded-full', leftConnectorClass)} /> : <div className="flex-1" />}
                 <div className="shrink-0">{StepDot(s)}</div>
-                {!isLast ? <div className={cn('h-[2px] flex-1 rounded-full', connectorClass)} /> : null}
+                {!isLast ? <div className={cn('h-[2px] flex-1 rounded-full', rightConnectorClass)} /> : <div className="flex-1" />}
               </div>
-              <div className={cn('mt-2', dense ? 'text-[12px]' : 'text-xs')}>
+              <div className={cn('mt-2 text-center', dense ? 'text-[12px]' : 'text-xs')}>
                 <div
                   className={cn(
                     'font-semibold leading-tight',
@@ -278,7 +327,7 @@ export function TransactionTimeline(props: {
                 >
                   {s.title}
                 </div>
-                {s.meta ? <div className="mt-1">{s.meta}</div> : null}
+                {s.meta ? <div className="mt-1 flex justify-center">{s.meta}</div> : null}
               </div>
             </div>
           );
@@ -287,60 +336,68 @@ export function TransactionTimeline(props: {
     </div>
   );
 
-  return (
-    <Card className={cn('border-border/60', className)}>
-      <CardContent className={cn(dense ? 'pt-4 pb-4' : 'pt-6')}>
-        {(showTitle || issue !== 'none') && (
-          <div className={cn('flex items-center justify-between gap-3 flex-wrap', dense ? 'mb-3' : 'mb-4')}>
-            {showTitle ? <div className="text-sm font-semibold">Transaction timeline</div> : <div />}
-            {issue !== 'none' && (
-              <Badge variant="destructive" className="font-semibold text-xs">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Issue under review
-              </Badge>
-            )}
-          </div>
-        )}
+  const inner = (
+    <>
+      {(showTitle || issue !== 'none') && (
+        <div className={cn('flex items-center justify-between gap-3 flex-wrap', dense ? 'mb-2' : 'mb-4')}>
+          {showTitle ? <div className="text-sm font-semibold">Transaction timeline</div> : <div />}
+          {issue !== 'none' && (
+            <Badge variant="destructive" className="font-semibold text-xs">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Issue under review
+            </Badge>
+          )}
+        </div>
+      )}
 
-        {variant === 'rail' ? (
-          <Rail />
-        ) : (
-          /* Horizontal stepper (scrolls on small screens) */
-          <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
-            <div className={cn('relative', dense ? 'min-w-[640px]' : 'min-w-[760px]')}>
-              <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
+      {variant === 'rail' ? (
+        <Rail />
+      ) : (
+        /* Horizontal stepper (scrolls on small screens) */
+        <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
+          <div className={cn('relative', dense ? 'min-w-[640px]' : 'min-w-[760px]')}>
+            <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
 
-              <div className="flex items-start gap-3">
-                {steps.map((s) => (
-                  <div key={s.key} className="flex-1 min-w-[190px]">
-                    <div className="flex flex-col items-center text-center">
-                      <div className="z-10">{StepDot(s)}</div>
+            <div className="flex items-start gap-3">
+              {steps.map((s) => (
+                <div key={s.key} className="flex-1 min-w-[190px]">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="z-10">{StepDot(s)}</div>
 
-                      <div
-                        className={cn(
-                          'mt-3 w-full rounded-xl border p-3',
-                          s.status === 'done' && 'border-primary/20 bg-primary/5',
-                          s.status === 'active' && 'border-primary/40 bg-primary/10',
-                          s.status === 'upcoming' && 'border-border/50 bg-background/40',
-                          s.status === 'blocked' && 'border-destructive/30 bg-destructive/5'
-                        )}
-                      >
-                        <div className="flex items-center justify-center gap-2 flex-wrap">
-                          <div className="text-sm font-semibold leading-tight">{s.title}</div>
-                          {s.meta}
-                        </div>
-                        {s.description ? (
-                          <div className="text-xs text-muted-foreground mt-1 leading-snug">{s.description}</div>
-                        ) : null}
+                    <div
+                      className={cn(
+                        'mt-3 w-full rounded-xl border p-3',
+                        s.status === 'done' && 'border-primary/20 bg-primary/5',
+                        s.status === 'active' && 'border-primary/40 bg-primary/10',
+                        s.status === 'upcoming' && 'border-border/50 bg-background/40',
+                        s.status === 'blocked' && 'border-destructive/30 bg-destructive/5'
+                      )}
+                    >
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <div className="text-sm font-semibold leading-tight">{s.title}</div>
+                        {s.meta}
                       </div>
+                      {s.description ? (
+                        <div className="text-xs text-muted-foreground mt-1 leading-snug">{s.description}</div>
+                      ) : null}
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
-        )}
-      </CardContent>
+        </div>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className={cn(className)}>{inner}</div>;
+  }
+
+  return (
+    <Card className={cn('border-border/60', className)}>
+      <CardContent className={cn(dense ? 'pt-4 pb-4' : 'pt-6')}>{inner}</CardContent>
     </Card>
   );
 }

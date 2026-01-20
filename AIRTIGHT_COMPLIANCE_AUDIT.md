@@ -16,7 +16,7 @@
   - Validates listing status === 'active' (line 133)
   - TX-only check via profile state (lines 209-242)
   - Prohibited content re-check (lines 244-251)
-  - Creates session WITHOUT `transfer_data` (escrow model, line 386)
+  - Creates session WITHOUT `transfer_data` (payout-hold model, line 386)
 - **Metadata:** Stores listingId, buyerId, sellerId, sellerStripeAccountId
 
 #### 2. Stripe Webhook Order Creation

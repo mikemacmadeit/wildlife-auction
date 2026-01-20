@@ -25,7 +25,7 @@ Repo scope audited: `project/` (Next.js app + API routes + Netlify scheduled fun
 | Watchlist | `POST project/app/api/watchlist/toggle/route.ts`, `project/hooks/use-favorites.ts` | Real | Firebase Admin + Firestore rules | Implemented | P1 | Rate limit + ensure auth prompt UX acceptable |
 | Best Offer | `project/app/api/offers/*`, `project/components/offers/OfferPanel.tsx`, `netlify/functions/expireOffers.ts` | Real | Firebase Admin + Firestore | Implemented | P1 | Confirm indexes deployed; add email notifications |
 | Auctions / Bidding | `POST project/app/api/bids/place/route.ts`, listing page bidding UI | Real-ish | Firebase Admin + Firestore | Bid placement exists | **P0** | Fix Admin init + add auction closeout/settlement job |
-| Checkout | `POST project/app/api/stripe/checkout/create-session/route.ts` | Real | Stripe + Firebase Admin | Implemented (escrow model) | P0/P1 | Remove module-scope Admin init; add more idempotency + monitoring |
+| Checkout | `POST project/app/api/stripe/checkout/create-session/route.ts` | Real | Stripe + Firebase Admin | Implemented (payout-hold model) | P0/P1 | Remove module-scope Admin init; add more idempotency + monitoring |
 | Stripe Webhooks | `POST project/app/api/stripe/webhook/route.ts` + `handlers.ts` | Real | Stripe + Firebase Admin | Implemented | **P0** | Use `lib/firebase/admin.ts` credentials; harden error handling |
 | Stripe Connect | `project/app/api/stripe/connect/*` | Real | Stripe Connect | Implemented | P0 | Admin init inconsistent; ensure onboarding URLs + status stored |
 | Payouts release | `project/lib/stripe/release-payment.ts`, `api/stripe/transfers/release` + cron | Real | Stripe transfers | Implemented | P1 | Confirm order schema fields always present; ops telemetry |
@@ -171,10 +171,10 @@ Repo scope audited: `project/` (Next.js app + API routes + Netlify scheduled fun
 
 ## 5) Checkout / Payments (Stripe)
 
-### Create session (escrow model)
+### Create session (payout-hold model)
 - `POST /api/stripe/checkout/create-session`:
   - Validates auth token, listing state, auction winning bidder, offer acceptance/reservation.
-  - Uses **escrow model** (funds stay in platform) — explicitly does **not** use `transfer_data`.
+  - Uses **payout-hold model** (funds stay in platform until later payout release) — explicitly does **not** use `transfer_data`.
   - Stores sellerAmount/platformFee in checkout metadata for later transfer.
   - Evidence: `project/app/api/stripe/checkout/create-session/route.ts`.
 
@@ -339,7 +339,7 @@ Repo scope audited: `project/` (Next.js app + API routes + Netlify scheduled fun
      - `autoReleaseProtected`
      - `expireOffers`
 4) **Stripe Connect + Transfers viability**
-   - Confirm platform Stripe account is allowed to hold funds and later transfer (escrow model) and Connect is properly configured.
+   - Confirm platform Stripe account is allowed to hold funds and later transfer (payout-hold model) and Connect is properly configured.
 5) **Admin role claims**
    - Confirm whether Firebase Auth custom claims are set in production; otherwise rules fallback reads will add latency/cost.
 

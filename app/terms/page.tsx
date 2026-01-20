@@ -2,15 +2,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Shield, Gavel, Lock, AlertTriangle, Mail } from 'lucide-react';
+import { Shield, Gavel, AlertTriangle, Mail } from 'lucide-react';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 
 export const metadata: Metadata = {
   title: 'Terms of Service | Wildlife Exchange',
   description:
-    'Terms and conditions for using Wildlife Exchange, including Texas-only animal transaction rules and compliance workflow disclaimers.',
+    'Terms of Service for using Wildlife Exchange, including marketplace-only status, live animal risk, and arbitration.',
 };
 
-const EFFECTIVE_DATE = 'January 2026';
+const EFFECTIVE_DATE = LEGAL_VERSIONS.tos.effectiveDateLabel;
+const VERSION = LEGAL_VERSIONS.tos.version;
 
 export default function TermsPage() {
   return (
@@ -20,15 +22,17 @@ export default function TermsPage() {
           <Gavel className="h-7 w-7 text-primary" />
         </div>
         <h1 className="text-4xl font-bold tracking-tight">Terms of Service</h1>
-        <p className="text-sm text-muted-foreground mt-3">Effective date: {EFFECTIVE_DATE}</p>
+        <p className="text-sm text-muted-foreground mt-3">
+          Effective date: {EFFECTIVE_DATE} • Version: {VERSION}
+        </p>
       </div>
 
       <Alert className="mb-8">
         <Shield className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          <strong>Important:</strong> Wildlife Exchange is a marketplace platform. We do not own animals, do not provide
-          veterinary services, and do not act as a transporter. “Verified” means documents were reviewed as part of our
-          workflow—it does <strong>not</strong> mean a regulator approved a transfer.
+          <strong>Important:</strong> Wildlife Exchange is a technology marketplace only. We are not the seller, dealer, broker,
+          agent, or auctioneer. We do not take title, custody, possession, or control of animals or goods. “Verified” means a document
+          was reviewed for marketplace workflow completeness—it does <strong>not</strong> mean a regulator approved a transfer.
         </AlertDescription>
       </Alert>
 
@@ -50,24 +54,40 @@ export default function TermsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>2) Marketplace role (no agency)</CardTitle>
+            <CardTitle>2) Marketplace-only status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Wildlife Exchange provides a platform to connect buyers and sellers. Unless explicitly stated otherwise,
-              we are not a party to the transaction between buyer and seller.
+              Wildlife Exchange provides software that allows users to list items and communicate with other users. Wildlife Exchange is a
+              technology platform only and is not a seller, dealer, broker, agent, or auctioneer.
             </p>
             <ul className="list-disc ml-5 space-y-1">
-              <li>We do not own, possess, or control listed animals or equipment.</li>
+              <li>We do not take title to any animal or good.</li>
+              <li>We do not inspect, house, handle, transport, or take custody of animals or goods.</li>
               <li>We do not provide veterinary advice or veterinary services.</li>
-              <li>We do not provide transportation or logistics services (unless separately offered in the future).</li>
             </ul>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>3) Eligibility</CardTitle>
+            <CardTitle>3) Contract is between buyer and seller</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Buyers and sellers contract directly with each other. Wildlife Exchange is not a party to the transaction and does not become an
+              owner of, or responsible for, any listed animal or good.
+            </p>
+            <p>
+              Any sale agreement, bill of sale, or transfer documentation is between buyer and seller. Wildlife Exchange may provide tools or
+              templates for convenience but makes no representation about the sufficiency of those documents for any particular transaction.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>4) Eligibility</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>You must be legally able to enter into a binding contract to use the Services.</p>
@@ -79,105 +99,134 @@ export default function TermsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>4) Texas-only animal transactions</CardTitle>
+            <CardTitle>5) Texas-only animal transactions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              <strong>All animal transactions are Texas-only.</strong> Buyers and sellers must comply with applicable
-              Texas laws and regulations. We enforce Texas-only restrictions through our checkout and post-payment
-              verification workflows.
+              <strong>All animal transactions are Texas-only.</strong> Buyers and sellers must comply with applicable Texas laws and regulations.
+              Wildlife Exchange may apply geographic restrictions and workflow checks to support these requirements.
+            </p>
+            <p>Equipment and vehicle listings may be multi-state unless otherwise stated.</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>6) Live Animal Transactions &amp; Assumption of Risk</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Live animals involve inherent risks including (without limitation) stress from handling or transport, acclimation issues,
+              disease exposure, injury, illness, escape, and mortality.
             </p>
             <p>
-              Equipment listings may be available across multiple states unless otherwise stated.
+              Wildlife Exchange makes no representations or warranties regarding the health, viability, genetics, temperament, training, or future
+              performance of any animal. Any representations are made solely by the seller.
+            </p>
+            <p>
+              You acknowledge and assume these inherent risks. You are responsible for your own due diligence, including permits, veterinary records,
+              and facility checks.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>5) Seller responsibilities</CardTitle>
+            <CardTitle>7) Risk of loss transfer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              As between buyer and seller, risk of loss, injury, illness, escape, or death transfers to the buyer upon delivery or pickup (as applicable).
+              Wildlife Exchange bears no responsibility before, during, or after transport.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>8) AS-IS / NO WARRANTIES</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              All listings are provided “AS-IS, WHERE-IS.” To the maximum extent permitted by law, Wildlife Exchange disclaims all warranties,
+              express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
+            </p>
+            <p>
+              Wildlife Exchange does not warrant the quality, health, condition, legality, or transferability of any animal or good listed by sellers.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>9) Transport disclaimer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Wildlife Exchange does not arrange or provide transportation. Any pickup, delivery, shipping, hauling, or other transport is arranged
+              solely between buyer, seller, and/or third-party carriers. Wildlife Exchange is not responsible for transport outcomes.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>10) Seller responsibilities</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p className="font-semibold text-foreground">Accuracy and legality</p>
             <ul className="list-disc ml-5 space-y-1">
               <li>Sellers must provide truthful, complete, and accurate listings and documentation.</li>
-              <li>Sellers are responsible for ensuring their listing and sale comply with all applicable laws.</li>
-              <li>
-                Sellers must not misrepresent permits, registrations, animal identity, health disclosures, or ownership.
-              </li>
+              <li>Sellers are responsible for legal ownership/authority to sell and compliance with all applicable laws.</li>
+              <li>Sellers must not misrepresent permits, registrations, animal identity, health disclosures, or title/lien status.</li>
             </ul>
-
             <p className="font-semibold text-foreground">Whitetail breeder listings</p>
             <ul className="list-disc ml-5 space-y-1">
-              <li>
-                Whitetail deer may only be listed in the <strong>Whitetail Breeder</strong> category.
-              </li>
-              <li>
-                Sellers must upload a TPWD Deer Breeder Permit document for listing review (as required by the platform
-                workflow).
-              </li>
-              <li>
-                “Verified” or “Reviewed” indicates a platform admin reviewed an uploaded document for completeness in
-                our workflow; it does not represent TPWD approval or transfer authorization.
-              </li>
+              <li>Whitetail deer may only be listed in the Whitetail Breeder category.</li>
+              <li>Platform workflows may require permits/records to be uploaded and reviewed before a listing is published or funds are released.</li>
             </ul>
+            <p className="text-xs text-muted-foreground">
+              “Verified” indicates an admin reviewed an uploaded document for marketplace workflow completeness; it does not represent TPWD approval or
+              transfer authorization.
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>6) Buyer responsibilities</CardTitle>
+            <CardTitle>11) Buyer responsibilities</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>Buyers must provide accurate account and payment information.</li>
-              <li>
-                Buyers are responsible for complying with pickup/transfer requirements and applicable laws.
-              </li>
-              <li>
-                Buyers must not attempt to circumvent Texas-only restrictions for animal transactions.
-              </li>
+              <li>Buyers are responsible for inspections, due diligence, and verifying permits/records.</li>
+              <li>Buyers must comply with pickup/transfer requirements and applicable law.</li>
+              <li>Buyers must not attempt to circumvent Texas-only restrictions for animal transactions.</li>
             </ul>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>7) Payments, fees, escrow, and payout release</CardTitle>
+            <CardTitle>12) Payments and platform fees</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>Payments are processed by Stripe. Wildlife Exchange may collect marketplace fees.</p>
             <p>
-              Payments are processed via Stripe. We may collect marketplace fees. We may hold funds in escrow and
-              release payouts according to platform rules, including dispute handling and compliance workflow steps.
+              Wildlife Exchange may hold and release funds based on marketplace workflow rules (for example, dispute windows or required document uploads).
+              This relates to payment settlement only and does not mean Wildlife Exchange takes custody of any animal or good.
             </p>
-
-            <div className="rounded-lg border bg-muted/30 p-4">
-              <div className="flex items-center gap-2 text-foreground font-semibold">
-                <Lock className="h-4 w-4 text-primary" />
-                Whitetail breeder payout gating
-              </div>
-              <p className="mt-2">
-                For whitetail breeder orders, payout release may be blocked until an order-level TPWD Transfer Approval
-                document is uploaded and reviewed per our workflow. Transfer approvals are per-order and do not
-                automatically apply to other transactions.
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Wildlife Exchange is not a regulator. We do not issue transfer approvals and do not guarantee any party
-                is compliant—buyers and sellers are responsible for compliance with TPWD/TAHC rules.
-              </p>
-            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>8) Disputes, refunds, and chargebacks</CardTitle>
+            <CardTitle>13) Disputes, refunds, and chargebacks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
               We may provide dispute tools. Buyers and sellers should attempt to resolve issues promptly. Certain
-              disputes or compliance failures may result in refunds, holds, or other actions consistent with these
-              Terms and our policies.
+              disputes or compliance failures may result in refunds, payment holds, or other actions consistent with these Terms and our policies.
             </p>
             <p>
               Unauthorized chargebacks or abuse may result in account limitation or termination.
@@ -187,7 +236,7 @@ export default function TermsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>9) Prohibited items and prohibited conduct</CardTitle>
+            <CardTitle>14) Prohibited items and prohibited conduct</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <Alert variant="destructive">
@@ -206,7 +255,7 @@ export default function TermsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>10) Content and moderation</CardTitle>
+            <CardTitle>15) Content and moderation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
@@ -218,51 +267,56 @@ export default function TermsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>11) Account termination</CardTitle>
+            <CardTitle>16) Indemnification (critical)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              We may suspend or terminate access if we believe you violate these Terms, create risk for the platform,
-              or engage in abusive or unlawful behavior.
+              Sellers agree to defend, indemnify, and hold harmless Wildlife Exchange and its owners, directors, officers, employees, and contractors
+              from and against any claims arising out of or relating to their listings and transactions, including claims related to animal injury, illness,
+              death, disease, misrepresentation, legality, compliance, title/lien issues, and transport outcomes.
+            </p>
+            <p>
+              All users agree to indemnify and hold Wildlife Exchange harmless from claims arising out of their use of the Services or violation of these Terms.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>12) Disclaimers and limitation of liability</CardTitle>
+            <CardTitle>17) Limitation of liability</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              The Services are provided “as is” and “as available.” To the maximum extent permitted by law, Wildlife
-              Exchange disclaims warranties of merchantability, fitness for a particular purpose, and non-infringement.
+              To the maximum extent permitted by law, Wildlife Exchange will not be liable for indirect, incidental, special, consequential, or punitive
+              damages, or any loss of profits or revenues.
             </p>
             <p>
-              Wildlife Exchange is not responsible for the quality, health, condition, legality, or transferability of
-              any animal or equipment listed by sellers.
-            </p>
-            <p>
-              To the maximum extent permitted by law, Wildlife Exchange will not be liable for indirect, incidental,
-              special, consequential, or punitive damages, or any loss of profits or revenues.
+              To the maximum extent permitted by law, Wildlife Exchange’s total liability for any claim arising out of or relating to the Services will not
+              exceed the fees paid to Wildlife Exchange by you in the twelve (12) months before the event giving rise to the claim.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>13) Indemnification</CardTitle>
+            <CardTitle>18) Arbitration &amp; class action waiver</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              You agree to indemnify and hold Wildlife Exchange harmless from claims arising out of your use of the
-              Services, your listings, your transactions, or your violation of these Terms or applicable law.
+              You agree that disputes arising out of or relating to these Terms or the Services will be resolved by binding arbitration on an individual basis,
+              and you waive the right to participate in any class action or class-wide arbitration.
+            </p>
+            <p>
+              Either party may bring a claim in small claims court if the claim qualifies. Otherwise, arbitration will be administered by a reputable arbitration
+              provider under its consumer/commercial rules as applicable. The arbitrator may award the same damages and relief as a court could award on an
+              individual basis.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>14) Governing law</CardTitle>
+            <CardTitle>19) Governing law</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
@@ -273,7 +327,7 @@ export default function TermsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>15) Contact</CardTitle>
+            <CardTitle>20) Contact</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2 text-foreground">
@@ -290,6 +344,11 @@ export default function TermsPage() {
                 Trust &amp; Compliance
               </Link>
               .
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Related: <Link href="/legal/marketplace-policies" className="underline underline-offset-4">Marketplace Policies</Link>,{' '}
+              <Link href="/legal/seller-policy" className="underline underline-offset-4">Seller Policy</Link>,{' '}
+              <Link href="/legal/buyer-acknowledgment" className="underline underline-offset-4">Buyer Acknowledgment</Link>.
             </p>
           </CardContent>
         </Card>

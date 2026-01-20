@@ -182,7 +182,7 @@ Priority order:
 3. Dispute open/needs_evidence/under_review
 4. Protection window active (if protected transaction)
 5. Delivery not confirmed
-6. Dispute deadline not passed (standard escrow)
+6. Dispute deadline not passed (standard dispute window; payout-hold flow)
 7. Ready to release (all checks passed)
 
 ## Environment Variables

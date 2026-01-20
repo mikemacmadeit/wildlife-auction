@@ -117,6 +117,28 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
       return parts.length ? parts : null;
     }
 
+    // Ranch equipment / vehicles / hunting assets: type • year • condition
+    if (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles' || listing.category === 'hunting_outfitter_assets') {
+      const e: any = attrs;
+      const typeLabel = e.equipmentType ? String(e.equipmentType).trim() : null;
+      const yearLabel = e.year !== undefined && e.year !== null ? `Year: ${String(e.year)}` : null;
+      const condLabel = e.condition ? String(e.condition).trim() : null;
+      const parts = [typeLabel, yearLabel || condLabel].filter(Boolean) as string[];
+      return parts.length ? parts : null;
+    }
+
+    // Sporting/Working Dogs: breed • sex • age
+    if (listing.category === 'sporting_working_dogs') {
+      const d: any = attrs;
+      const breedLabel = d.breed ? String(d.breed).trim() : null;
+      const sexRaw = d.sex ? String(d.sex).trim() : '';
+      const sexLabel =
+        sexRaw === 'male' ? 'Male' : sexRaw === 'female' ? 'Female' : sexRaw === 'unknown' ? null : titleCase(sexRaw);
+      const ageLabel = formatAge(d.age);
+      const parts = [breedLabel, sexLabel, ageLabel].filter(Boolean) as string[];
+      return parts.length ? parts : null;
+    }
+
     // Horse: Horse • Sex • Age (and Registered when present)
     if (listing.category === 'horse_equestrian') {
       const h = attrs as HorseAttributes;

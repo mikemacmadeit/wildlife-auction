@@ -1,7 +1,7 @@
 # Admin Ops Dashboard - Implementation Summary
 
 ## Overview
-A unified Admin Operations Dashboard has been created to manage the entire transaction lifecycle. The dashboard provides 4 main views (tabs) for admins to monitor and manage orders in escrow, protected transactions, open disputes, and orders ready for payout release.
+A unified Admin Operations Dashboard has been created to manage the entire transaction lifecycle. The dashboard provides 4 main views (tabs) for admins to monitor and manage orders in payout hold (legacy filter key: `escrow`), protected transactions, open disputes, and orders ready for payout release.
 
 ## Files Created/Modified
 

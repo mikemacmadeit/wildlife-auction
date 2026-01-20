@@ -416,7 +416,7 @@ function getEmailTemplate(params: {
 
 export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { subject: string; html: string } {
   const subject = `Order Confirmation - ${data.listingTitle}`;
-  const preheader = `Order confirmed for ${data.listingTitle}. Funds held in escrow until delivery.`;
+  const preheader = `Order confirmed for ${data.listingTitle}. Funds held for payout release until delivery.`;
   const origin = tryGetOrigin(data.orderUrl);
   const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
   const content = `

@@ -16,7 +16,7 @@ import {
   CheckCircle2,
   ArrowRight,
   MessageSquare,
-  Truck,
+  FileCheck,
   Shield,
   Calendar,
   Activity,
@@ -40,8 +40,8 @@ const getAlertIcon = (type: string) => {
   switch (type) {
     case 'auction_ending':
       return Clock;
-    case 'transport_request':
-      return Truck;
+    case 'delivery_details_request':
+      return FileCheck;
     case 'message':
       return MessageSquare;
     case 'bid':
@@ -119,7 +119,8 @@ const formatTimeAgo = (date: any) => {
 
 interface SellerAlert {
   id: string;
-  type: 'auction_ending' | 'transport_request' | 'message' | 'bid';
+  // NOTE: platform does not arrange transport. Any delivery/pickup is handled by buyer/seller off-platform.
+  type: 'auction_ending' | 'delivery_details_request' | 'message' | 'bid';
   priority: 'high' | 'medium' | 'low';
   title: string;
   description: string;

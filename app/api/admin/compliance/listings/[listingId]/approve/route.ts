@@ -14,6 +14,7 @@ import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
 import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
+import { createAuditLog } from '@/lib/audit/logger';
 
 export async function POST(request: Request, ctx: { params: { listingId: string } }) {
   const rl = await requireRateLimit(request);
@@ -41,6 +42,13 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
   const now = Timestamp.now();
   const shouldPublish = listing?.status === 'pending' && sellerVerified && !isWhitetail;
 
+  const beforeState = {
+    status: listing?.status,
+    complianceStatus: listing?.complianceStatus,
+    complianceReviewedBy: listing?.complianceReviewedBy,
+    complianceReviewedAt: listing?.complianceReviewedAt,
+  };
+
   await ref.update({
     complianceStatus: 'approved',
     complianceReviewedBy: actorUid,
@@ -49,6 +57,22 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
     updatedAt: now,
     updatedBy: actorUid,
   });
+
+  try {
+    await createAuditLog(db as any, {
+      actorUid: actorUid,
+      actorRole: 'admin',
+      actionType: 'admin_listing_compliance_approved',
+      listingId,
+      targetUserId: sellerId,
+      beforeState,
+      afterState: { complianceStatus: 'approved', ...(shouldPublish ? { status: 'active' } : {}) },
+      metadata: { listingTitle: title, published: shouldPublish },
+      source: 'admin_ui',
+    });
+  } catch {
+    // ignore
+  }
 
   // Seller notification through canonical pipeline (idempotent, best-effort).
   try {

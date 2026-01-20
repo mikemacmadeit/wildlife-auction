@@ -79,13 +79,12 @@ export default function MyOffersPage() {
   }, [tab]);
 
   const checkout = async (o: OfferRow) => {
-    setActionLoading(true);
     try {
-      const { url } = await createCheckoutSession(o.listingId, o.offerId);
-      window.location.href = url;
+      // Checkout now requires a buyer acknowledgment for animal categories (server-enforced).
+      // The listing page contains the required acknowledgment flow and will route into checkout safely.
+      router.push(`/listing/${o.listingId}`);
     } catch (e: any) {
       toast({ title: 'Checkout failed', description: e?.message || 'Please try again.', variant: 'destructive' });
-      setActionLoading(false);
     }
   };
 

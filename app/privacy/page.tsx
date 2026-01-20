@@ -112,7 +112,7 @@ export default function PrivacyPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>Provide and improve marketplace features (listings, messaging, orders, and payouts).</li>
-              <li>Process transactions and support escrow/payout release workflows.</li>
+              <li>Process transactions and support payout-hold / payout-release workflows.</li>
               <li>Fraud prevention, abuse prevention, and security monitoring.</li>
               <li>Support compliance workflows (e.g., document review and order status gating when applicable).</li>
               <li>Customer support and communications about your account and transactions.</li>

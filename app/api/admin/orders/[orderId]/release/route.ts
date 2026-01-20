@@ -10,6 +10,8 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 import { releasePaymentForOrder } from '@/lib/stripe/release-payment';
 import { createAuditLog } from '@/lib/audit/logger';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { Timestamp } from 'firebase-admin/firestore';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -61,7 +63,14 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     // Release using shared logic (includes buyer-confirm + delivery + hold/dispute/chargeback gates)
     const result = await releasePaymentForOrder(db as any, orderId, adminId);
     if (!result.success) {
-      return json({ error: result.error || 'Failed to release funds' }, { status: 400 });
+      return json(
+        {
+          error: result.error || 'Failed to release funds',
+          holdReasonCode: result.holdReasonCode,
+          missingDocTypes: result.missingDocTypes,
+        },
+        { status: 400 }
+      );
     }
 
     // Audit log (explicit admin action)
@@ -75,6 +84,25 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       metadata: { transferId: result.transferId, amount: result.amount },
       source: 'admin_ui',
     });
+
+    // Timeline (server-authored, idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId,
+        event: {
+          id: `FUNDS_RELEASED:${result.transferId}`,
+          type: 'FUNDS_RELEASED',
+          label: 'Funds released to seller',
+          actor: 'admin',
+          visibility: 'buyer',
+          timestamp: Timestamp.now(),
+          meta: { transferId: result.transferId, amount: result.amount },
+        },
+      });
+    } catch {
+      // best-effort
+    }
 
     return json({
       success: true,

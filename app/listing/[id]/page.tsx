@@ -94,6 +94,7 @@ import {
 } from '@/components/payments/PaymentBrandBadges';
 import { getEligiblePaymentMethods } from '@/lib/payments/gating';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
+import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -150,6 +151,8 @@ export default function ListingDetailPage() {
     paymentIntentId: string;
     instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
   }>(null);
+  const [animalAckOpen, setAnimalAckOpen] = useState(false);
+  const [animalRiskAcked, setAnimalRiskAcked] = useState(false);
   const { toast } = useToast();
   const { user, initialized: authInitialized } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -224,6 +227,11 @@ export default function ListingDetailPage() {
     if (listing.type === 'auction') return Number(winningBidAmount || listing.currentBid || listing.startingBid || 0) || 0;
     return 0;
   }, [pendingCheckout?.amountUsd, listing, winningBidAmount]);
+
+  const isAnimalListing = useMemo(() => {
+    if (!listing?.category) return false;
+    return isAnimalCategory(listing.category as any);
+  }, [listing?.category]);
 
   const eligiblePaymentMethods = useMemo(() => {
     return getEligiblePaymentMethods({
@@ -625,7 +633,8 @@ export default function ListingDetailPage() {
 
       const amt = Number(winningBidAmount || listing!.currentBid || listing!.startingBid || 0);
       setPendingCheckout({ amountUsd: Number.isFinite(amt) ? amt : 0 });
-      setPaymentDialogOpen(true);
+      if (isAnimalListing && !animalRiskAcked) setAnimalAckOpen(true);
+      else setPaymentDialogOpen(true);
       return;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
@@ -667,12 +676,14 @@ export default function ListingDetailPage() {
       }
       if (method === 'wire') {
         const { createWireIntent } = await import('@/lib/stripe/api');
-        const out = await createWireIntent(listing.id);
+        const out = await createWireIntent(listing.id, undefined, { buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined });
         setWireData(out);
         setWireDialogOpen(true);
       } else {
         const { createCheckoutSession } = await import('@/lib/stripe/api');
-        const { url } = await createCheckoutSession(listing.id, undefined, method);
+        const { url } = await createCheckoutSession(listing.id, undefined, method, {
+          buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
+        });
         window.location.href = url;
       }
     } catch (error: any) {
@@ -798,7 +809,7 @@ export default function ListingDetailPage() {
                     <Badge
                       variant="default"
                       className="bg-green-600 text-white font-medium gap-1"
-                      title="Protected Transaction: Funds held in escrow until protection period ends or buyer accepts early. Evidence required for disputes."
+                      title="Protected Transaction: Funds held for payout release until protection period ends or buyer accepts early. Evidence required for disputes."
                     >
                       <Shield className="h-3 w-3" />
                       Protected {listing!.protectedTransactionDays} Days
@@ -817,7 +828,7 @@ export default function ListingDetailPage() {
                       {listing!.location?.state || ''}
                     </span>
                   ) : null}
-                  {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                  {(listing!.category === 'ranch_equipment' || listing!.category === 'ranch_vehicles') && (listing!.attributes as any)?.condition ? (
                     <span className="capitalize">Condition: {String((listing!.attributes as any).condition).replaceAll('_', ' ')}</span>
                   ) : null}
                   {listing!.type === 'auction' && !isSold && endsAtDate ? (
@@ -1150,7 +1161,7 @@ export default function ListingDetailPage() {
                       )}
                     </div>
                   )}
-                  {listing!.category === 'ranch_equipment' && (
+                  {(listing!.category === 'ranch_equipment' || listing!.category === 'ranch_vehicles') && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {(listing!.attributes as EquipmentAttributes).equipmentType && (
                         <div>
@@ -1284,7 +1295,7 @@ export default function ListingDetailPage() {
                   {/* eBay-style details: condition / location / transport / payments */}
                   {listing!.type !== 'auction' ? (
                     <div className="space-y-2.5 text-sm">
-                      {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                      {(listing!.category === 'ranch_equipment' || listing!.category === 'ranch_vehicles') && (listing!.attributes as any)?.condition ? (
                         <div className="flex items-start justify-between gap-3">
                           <span className="text-muted-foreground">Condition:</span>
                           <span className="font-medium capitalize text-right">
@@ -1304,10 +1315,10 @@ export default function ListingDetailPage() {
                       <div className="flex items-start gap-2">
                         <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="font-semibold">Delivery / transport</div>
+                          <div className="font-semibold">Delivery / pickup</div>
                           <div className="text-xs text-muted-foreground">
                             {listing!.trust?.transportReady
-                              ? 'Seller can help coordinate transport. Buyer & seller arrange logistics after purchase.'
+                              ? 'Seller has provided delivery/pickup details. Buyer & seller arrange logistics after purchase.'
                               : 'Buyer & seller arrange logistics after purchase.'}
                           </div>
                         </div>
@@ -1605,7 +1616,7 @@ export default function ListingDetailPage() {
                     <>
                       <Separator />
                       <div className="space-y-2.5 text-sm">
-                        {listing!.category === 'ranch_equipment' && (listing!.attributes as any)?.condition ? (
+                        {(listing!.category === 'ranch_equipment' || listing!.category === 'ranch_vehicles') && (listing!.attributes as any)?.condition ? (
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-muted-foreground">Condition:</span>
                             <span className="font-medium capitalize text-right">
@@ -1737,7 +1748,7 @@ export default function ListingDetailPage() {
                       </li>
                       <li>
                         <span className="font-semibold">Escrow & payout gating:</span>{' '}
-                        Funds are held in escrow. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
+                        Funds are held for payout release. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
                       </li>
                       <li>
                         <span className="font-semibold">Coordination:</span>{' '}
@@ -1832,6 +1843,47 @@ export default function ListingDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {isAnimalCategory(listing!.category as any) ? (
+                    <div className="mb-4 rounded-lg border bg-amber-50/40 dark:bg-amber-950/10 p-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Animal listing disclaimer
+                      </div>
+                      <ul className="mt-2 list-disc ml-5 text-sm text-muted-foreground space-y-1">
+                        <li>Wildlife Exchange does not take custody, possession, or control of animals.</li>
+                        <li>Health and legality representations are made solely by the seller.</li>
+                        <li>Risk transfers upon delivery or pickup; buyer and seller handle logistics.</li>
+                      </ul>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        See{' '}
+                        <Link href="/legal/buyer-acknowledgment" className="underline underline-offset-4">
+                          Buyer Acknowledgment
+                        </Link>{' '}
+                        and{' '}
+                        <Link href="/terms" className="underline underline-offset-4">
+                          Terms
+                        </Link>
+                        .
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-4 rounded-lg border bg-muted/20 p-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Equipment / vehicles disclaimer
+                      </div>
+                      <ul className="mt-2 list-disc ml-5 text-sm text-muted-foreground space-y-1">
+                        <li>Listings are “AS-IS, WHERE-IS.” Wildlife Exchange provides no warranties.</li>
+                        <li>Buyer and seller handle inspection, title/VIN verification, liens, and transfer paperwork.</li>
+                      </ul>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        See{' '}
+                        <Link href="/legal/marketplace-policies" className="underline underline-offset-4">
+                          Marketplace Policies
+                        </Link>
+                        .
+                      </div>
+                    </div>
+                  )}
+
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="shipping">
                       <AccordionTrigger className="text-sm">
@@ -1849,8 +1901,8 @@ export default function ListingDetailPage() {
                               <Truck className="h-4 w-4 text-primary" />
                               <span>
                                 {listing!.category === 'whitetail_breeder'
-                                  ? 'Seller can help coordinate delivery/transport (buyer & seller arranged)'
-                                  : 'Seller can help arrange transport'}
+                                  ? 'Seller has delivery/pickup details available (buyer & seller arranged)'
+                                  : 'Seller has delivery/pickup details available (buyer & seller arranged)'}
                               </span>
                             </div>
                           )}
@@ -1997,6 +2049,16 @@ export default function ListingDetailPage() {
       </div>
 
       {/* High-ticket: Choose payment method (shown only when amount >= $20k) */}
+      <AnimalRiskAcknowledgmentDialog
+        open={animalAckOpen}
+        onOpenChange={setAnimalAckOpen}
+        onConfirm={() => {
+          setAnimalRiskAcked(true);
+          setAnimalAckOpen(false);
+          setPaymentDialogOpen(true);
+        }}
+      />
+
       <PaymentMethodDialog
         open={paymentDialogOpen}
         onOpenChange={(open) => {

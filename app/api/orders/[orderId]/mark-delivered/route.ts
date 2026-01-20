@@ -13,6 +13,7 @@ import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 const markDeliveredSchema = z.object({
   deliveryProofUrls: z.array(z.string().url()).optional(),
@@ -128,6 +129,25 @@ export async function POST(
     }
 
     await orderRef.update(updateData);
+
+    // Timeline (server-authored, idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId,
+        event: {
+          id: `DELIVERED:${orderId}`,
+          type: 'DELIVERED',
+          label: 'Seller marked delivered',
+          actor: 'seller',
+          visibility: 'buyer',
+          timestamp: Timestamp.fromDate(now),
+          ...(deliveryProofUrls?.length ? { meta: { deliveryProofUrlsCount: deliveryProofUrls.length } } : {}),
+        },
+      });
+    } catch {
+      // best-effort
+    }
 
     return json({
       success: true,

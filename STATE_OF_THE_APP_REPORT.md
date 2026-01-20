@@ -9,17 +9,17 @@
 ## 0) Executive Summary
 
 ### What This App Is Today (One Paragraph)
-Wildlife Exchange is a Texas-focused marketplace for wildlife/exotics, cattle/livestock, and ranch equipment. It's a Next.js 14.2.5 application using Firebase (Auth + Firestore) for backend, Stripe for payments, and Resend for email notifications. The platform supports three listing types (auction, fixed-price, classified), implements true escrow with protected transactions (7/14-day seller-backed protection), includes in-platform messaging with anti-circumvention safeguards, and provides admin tools for order management, dispute resolution, and payout release. The app uses Stripe Connect for seller payouts, implements role-based access control (admin/super_admin), and includes category-specific listing attributes with migration support for legacy data.
+Wildlife Exchange is a Texas-focused marketplace for wildlife/exotics, cattle/livestock, and ranch equipment. It's a Next.js 14.2.5 application using Firebase (Auth + Firestore) for backend, Stripe for payments, and Resend for email notifications. The platform supports three listing types (auction, fixed-price, classified), implements a payout-hold workflow with protected transactions (7/14-day seller-backed protection), includes in-platform messaging with anti-circumvention safeguards, and provides admin tools for order management, dispute resolution, and payout release. The app uses Stripe Connect for seller payouts, implements role-based access control (admin/super_admin), and includes category-specific listing attributes with migration support for legacy data.
 
 ### Top 5 Things That Are Solid
 1. **True Escrow Implementation**: Funds are held in platform account (not immediately transferred), with gating rules for release based on buyer acceptance, dispute deadlines, and protection windows. Payout release logic in `project/app/api/stripe/transfers/release/route.ts` is comprehensive and prevents double-releases.
 2. **Webhook Security**: Stripe webhook signature verification is properly implemented in `project/app/api/stripe/webhook/route.ts` (lines 88-109), using raw body and `stripe.webhooks.constructEvent()`.
 3. **Anti-Circumvention Protections**: Message sanitization (`project/lib/safety/sanitizeMessage.ts`), contact masking until payment, payment enforcement (no manual "mark as sold" without transaction), and reputation tracking tied to on-platform completions.
-4. **Admin Operations Dashboard**: Unified Admin Ops page (`project/app/dashboard/admin/ops/page.tsx`) with tabs for escrow, protected transactions, disputes, and ready-to-release orders. Server-side filtering via `project/app/api/admin/orders/route.ts`.
+4. **Admin Operations Dashboard**: Unified Admin Ops page (`project/app/dashboard/admin/ops/page.tsx`) with tabs for payout holds (legacy filter key: `escrow`), protected transactions, disputes, and ready-to-release orders. Server-side filtering via `project/app/api/admin/orders/route.ts`.
 5. **Type Safety & Validation**: Comprehensive Zod schemas (`project/lib/validation/api-schemas.ts`), TypeScript types (`project/lib/types.ts`), and single source of truth for pricing (`project/lib/pricing/plans.ts`).
 
 ### Top 5 Biggest Risks / Blockers for Production
-1. **No Automated Background Jobs**: Auto-release of protected transactions requires manual admin action. No cron/scheduled job system to automatically release funds when protection windows expire. Risk: Funds stuck in escrow, poor seller experience.
+1. **No Automated Background Jobs**: Auto-release of protected transactions requires manual admin action. No cron/scheduled job system to automatically release funds when protection windows expire. Risk: Funds stuck in payout hold, poor seller experience.
 2. **In-Memory Rate Limiting**: Rate limiting (`project/lib/rate-limit.ts`) uses in-memory store that resets on server restart. No Redis/persistent store. Risk: Rate limits don't persist across deployments, vulnerable to distributed attacks.
 3. **No Audit Logging**: No centralized audit log for admin actions (payout releases, refunds, dispute resolutions). Risk: Compliance issues, inability to trace who did what and when.
 4. **No Automated Auction Winner Notification**: When auctions end, winning bidders are not automatically notified. UI shows "You won" badge (`project/app/listing/[id]/page.tsx` line 86-87 checks `isWinningBidder`), but no email/notification sent. Risk: Lost sales, poor UX.
@@ -282,7 +282,7 @@ project/
   stripeRefundId?: string;  // Set when refunded
   // Escrow fields
   paidAt?: Timestamp;
-  disputeDeadlineAt?: Timestamp;  // Standard escrow dispute deadline (72 hours default)
+  disputeDeadlineAt?: Timestamp;  // Standard dispute deadline (72 hours default)
   deliveredAt?: Timestamp;
   acceptedAt?: Timestamp;
   disputedAt?: Timestamp;
@@ -683,13 +683,13 @@ project/
 
 ### Confirm: "This IS Escrow"
 
-**YES, this is TRUE ESCROW:**
+**YES, this is a payout-hold workflow:**
 - Funds are held in platform account (not immediately transferred to seller)
 - Release is gated by buyer acceptance, dispute deadlines, or protection windows
 - Admin-controlled release (not automatic)
 - Prevents double-release (checks `stripeTransferId`)
 
-**However, it's MANUAL escrow:**
+**However, payout release is manual:**
 - No automated release when protection window expires
 - Requires admin to manually trigger release
 - Risk: Funds can get stuck if admin doesn't act
@@ -716,7 +716,7 @@ project/
 **File**: `project/app/api/stripe/webhook/route.ts`
 
 1. **`account.updated`** (lines 113-116): Updates user's `stripeAccountStatus` in Firestore
-2. **`checkout.session.completed`** (lines 119-122): Creates order, sets escrow fields, sends email
+2. **`checkout.session.completed`** (lines 119-122): Creates order, sets payout-hold fields, sends email
 
 **NOT HANDLED** (but should be):
 - `payment_intent.succeeded` (redundant with `checkout.session.completed` but good for idempotency)
@@ -831,7 +831,7 @@ project/
 **Status**: ❌ **NOT FOUND**
 - **Missing**: 
   - Automated release of protected transactions when `protectionEndsAt` passes
-  - Automated release of standard escrow when `disputeDeadlineAt` passes (optional)
+  - Automated release after dispute deadline when `disputeDeadlineAt` passes (optional)
   - Cleanup of expired listings (mark as `'expired'`)
   - Auction end processing (notify winners, create orders)
 - **Recommendation**: Use Netlify Functions with cron trigger, or external scheduler (EasyCron, cron-job.org)
@@ -923,7 +923,7 @@ project/
 ### Firestore Rules Weaknesses
 
 1. **Bid Privacy**: Rules allow any authenticated user to read bids for a listing (intentional for transparency, but `bidderId` is exposed). **Risk**: Low (bidder ID is masked in UI, but could be extracted from Firestore)
-2. **Order Status Updates**: Buyer can update `status` to `'accepted'` or `'disputed'`, but rules don't validate status transitions. **Risk**: Medium (buyer could set status to `'completed'` to bypass escrow, but API route enforces transitions)
+2. **Order Status Updates**: Buyer can update `status` to `'accepted'` or `'disputed'`, but rules don't validate status transitions. **Risk**: Medium (buyer could set status to `'completed'` to bypass payout hold, but API route enforces transitions)
 3. **Admin Role Check**: Rules use `get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'` - if user document is compromised, privilege escalation possible. **Risk**: Medium
 
 ### API Endpoints Missing Auth Checks
@@ -1227,7 +1227,7 @@ The following expected components were **NOT FOUND** in the codebase:
 ## Conclusion
 
 Wildlife Exchange is a **well-architected marketplace** with solid foundations:
-- ✅ True escrow implementation
+- ✅ Payout-hold implementation
 - ✅ Comprehensive anti-circumvention protections
 - ✅ Strong type safety and validation
 - ✅ Admin operations dashboard

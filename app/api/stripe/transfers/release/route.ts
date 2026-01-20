@@ -1,7 +1,7 @@
 /**
  * POST /api/stripe/transfers/release
  * 
- * Admin-only endpoint to release escrow funds to seller
+ * Admin-only endpoint to release held funds to seller (payout release)
  * Creates a Stripe transfer to the seller's connected account
  */
 
@@ -110,7 +110,14 @@ export async function POST(request: Request) {
     const result = await releasePaymentForOrder(db, orderId, adminId);
 
     if (!result.success) {
-      return json({ error: result.error || 'Failed to release payment' }, { status: 400 });
+      return json(
+        {
+          error: result.error || 'Failed to release payment',
+          holdReasonCode: result.holdReasonCode,
+          missingDocTypes: result.missingDocTypes,
+        },
+        { status: 400 }
+      );
     }
 
     return json({

@@ -8,6 +8,7 @@ import { Redis } from '@upstash/redis';
 // Redis client (initialized lazily)
 let redisClient: Redis | null = null;
 let redisInitialized = false;
+let redisAvailable = false;
 
 // In-memory fallback store
 interface RateLimitStore {
@@ -38,15 +39,18 @@ function initializeRedis(): Redis | null {
         url: redisUrl,
         token: redisToken,
       });
+      redisAvailable = true;
       console.log('[rate-limit] Redis initialized successfully');
       return redisClient;
     } catch (error) {
       console.error('[rate-limit] Failed to initialize Redis:', error);
       console.warn('[rate-limit] Falling back to in-memory rate limiting');
+      redisAvailable = false;
       return null;
     }
   } else {
     console.warn('[rate-limit] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not set, using in-memory rate limiting');
+    redisAvailable = false;
     return null;
   }
 }
@@ -57,6 +61,15 @@ function initializeRedis(): Redis | null {
 export interface RateLimitConfig {
   windowMs: number; // Time window in milliseconds
   maxRequests: number; // Maximum requests per window
+  /**
+   * If true, and running in the Netlify runtime, rate limiting must use Redis.
+   * This avoids the ineffective in-memory fallback in serverless environments.
+   *
+   * Behavior:
+   * - Local/dev (NETLIFY not set): fallback to in-memory is allowed.
+   * - Netlify runtime (NETLIFY set): returns 503 if Redis env vars are missing/unavailable.
+   */
+  requireRedisInProd?: boolean;
 }
 
 /**
@@ -66,11 +79,13 @@ export const RATE_LIMITS = {
   // General API routes
   default: { windowMs: 60 * 1000, maxRequests: 60 }, // 60 requests per minute
   // Stripe operations (more restrictive)
-  stripe: { windowMs: 60 * 1000, maxRequests: 20 }, // 20 requests per minute
+  stripe: { windowMs: 60 * 1000, maxRequests: 20, requireRedisInProd: true }, // 20 requests per minute
   // Admin operations (very restrictive)
-  admin: { windowMs: 60 * 1000, maxRequests: 10 }, // 10 requests per minute
+  admin: { windowMs: 60 * 1000, maxRequests: 10, requireRedisInProd: true }, // 10 requests per minute
   // Checkout (very restrictive - prevent abuse)
-  checkout: { windowMs: 60 * 1000, maxRequests: 5 }, // 5 requests per minute
+  checkout: { windowMs: 60 * 1000, maxRequests: 5, requireRedisInProd: true }, // 5 requests per minute
+  // Messaging (restrict writes/abuse)
+  messages: { windowMs: 60 * 1000, maxRequests: 20, requireRedisInProd: true }, // 20 requests per minute
 } as const;
 
 /**
@@ -97,12 +112,24 @@ export async function checkRateLimit(
   request: Request,
   config: RateLimitConfig,
   userId?: string
-): Promise<{ allowed: true } | { allowed: false; retryAfter: number }> {
+): Promise<{ allowed: true } | { allowed: false; retryAfter: number; status?: number; error?: string }> {
   const key = getRateLimitKey(request, userId);
   const now = Date.now();
   
   // Try Redis first
   const redis = initializeRedis();
+
+  // In serverless production (Netlify), in-memory rate limiting is not durable.
+  // For sensitive endpoints, fail closed if Redis isn't configured.
+  const isNetlifyRuntime = String(process.env.NETLIFY || '').toLowerCase() === 'true' || !!process.env.NETLIFY;
+  if (!redis && config.requireRedisInProd && isNetlifyRuntime) {
+    return {
+      allowed: false,
+      status: 503,
+      error: 'Rate limiting is not configured on this environment.',
+      retryAfter: Math.ceil(config.windowMs / 1000),
+    };
+  }
   
   if (redis) {
     try {
@@ -178,9 +205,9 @@ export function rateLimitMiddleware(
     
     return {
       allowed: false,
-      status: 429,
+      status: result.status ?? 429,
       body: {
-        error: 'Too many requests. Please try again later.',
+        error: result.error || 'Too many requests. Please try again later.',
         retryAfter: result.retryAfter,
       },
     };

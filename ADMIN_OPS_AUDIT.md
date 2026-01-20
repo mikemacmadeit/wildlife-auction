@@ -67,7 +67,7 @@ type OrderStatus = 'pending' | 'paid' | 'in_transit' | 'delivered' | 'accepted' 
 - `disputeReasonV2?: DisputeReason` - Protected transaction dispute reason (enum)
 - `disputeNotes?: string` - Additional dispute details
 
-## 4. ESCROW & PAYOUT RELEASE FLOW
+## 4. PAYOUT HOLD & PAYOUT RELEASE FLOW (legacy filter key: `escrow`)
 
 ### Endpoint: `POST /api/stripe/transfers/release`
 - **Location:** `project/app/api/stripe/transfers/release/route.ts`
@@ -81,7 +81,7 @@ type OrderStatus = 'pending' | 'paid' | 'in_transit' | 'delivered' | 'accepted' 
 ### Eligibility Rules (from `transfers/release/route.ts`):
 1. **Always allow if:** `status === 'accepted'`
 2. **If protected transaction:** Check `protectionEndsAt` has passed, status in `['paid', 'in_transit', 'delivered']`
-3. **If standard escrow:** Check `disputeDeadlineAt` has passed, status in `['paid', 'in_transit', 'delivered']`
+3. **If standard dispute window (payout-hold flow):** Check `disputeDeadlineAt` has passed, status in `['paid', 'in_transit', 'delivered']`
 4. **Never allow if:** `status === 'disputed'` OR `adminHold === true`
 
 ## 5. REFUND FLOW
@@ -117,7 +117,7 @@ type DisputeStatus = 'none' | 'open' | 'needs_evidence' | 'under_review' | 'reso
 
 ## 7. HOW TO DETERMINE ORDER STATES
 
-### "In Escrow":
+### "In Payout Hold" (legacy label: "escrow"):
 - `status === 'paid'` AND (`stripeTransferId` is null/undefined OR `status !== 'completed'`)
 
 ### "Protected Transaction":
@@ -140,7 +140,7 @@ type DisputeStatus = 'none' | 'open' | 'needs_evidence' | 'under_review' | 'reso
 
 ### What Needs to Be Built:
 1. **Unified Admin Ops Dashboard** (`/dashboard/admin/ops`) with 4 tabs:
-   - Orders in Escrow
+   - Orders in Payout Hold (legacy filter key: `escrow`)
    - Protected Transactions
    - Open Disputes
    - Ready to Release

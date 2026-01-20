@@ -17,6 +17,11 @@ export const createCheckoutSessionSchema = z.object({
    * - ach_debit: US bank account (ACH) via Stripe Checkout
    */
   paymentMethod: z.enum(['card', 'ach_debit', 'ach']).optional(),
+  /**
+   * Buyer acknowledgment required for animal categories.
+   * Server will enforce when listing category is an animal category.
+   */
+  buyerAcksAnimalRisk: z.boolean().optional(),
 });
 
 /**
@@ -25,6 +30,11 @@ export const createCheckoutSessionSchema = z.object({
 export const createWireIntentSchema = z.object({
   listingId: z.string().min(1, 'Listing ID is required').max(100),
   offerId: z.string().max(100).optional(),
+  /**
+   * Buyer acknowledgment required for animal categories.
+   * Server will enforce when listing category is an animal category.
+   */
+  buyerAcksAnimalRisk: z.boolean().optional(),
 });
 
 /**

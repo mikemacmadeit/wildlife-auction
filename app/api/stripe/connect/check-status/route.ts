@@ -6,6 +6,7 @@
  */
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { computePublicSellerTrustFromUser } from '@/lib/seller/badges';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -172,6 +173,25 @@ export async function POST(request: Request) {
     };
 
     await userRef.update(updateData);
+
+    // Update public seller trust badges (server-authored; public read).
+    try {
+      const trustRef = db.collection('publicSellerTrust').doc(userId);
+      const trustDoc = computePublicSellerTrustFromUser({
+        userId,
+        userDoc: userData || null,
+        stripe: {
+          onboardingStatus,
+          chargesEnabled,
+          payoutsEnabled,
+          detailsSubmitted: account.details_submitted || false,
+          hasPendingRequirements,
+        },
+      });
+      await trustRef.set(trustDoc as any, { merge: true });
+    } catch (e) {
+      console.error('Failed to update publicSellerTrust', e);
+    }
 
     return json({
       success: true,
