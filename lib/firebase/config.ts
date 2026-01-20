@@ -6,11 +6,24 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // Firebase configuration - MUST use environment variables (no hardcoded secrets!)
 // All values must be set via environment variables for security
+function normalizeStorageBucket(input: string | undefined, projectId: string | undefined): string | undefined {
+  const bucket = input?.trim();
+  if (!bucket) return input;
+  const pid = projectId?.trim();
+  if (!pid) return bucket;
+
+  // Common misconfig: using the hosting domain `*.firebasestorage.app` as the bucket ID.
+  // The canonical default bucket ID is typically `${projectId}.appspot.com`.
+  if (bucket === `${pid}.firebasestorage.app`) return `${pid}.appspot.com`;
+
+  return bucket;
+}
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  storageBucket: normalizeStorageBucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID),
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,

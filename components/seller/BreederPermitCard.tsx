@@ -237,7 +237,11 @@ export function BreederPermitCard(props: { className?: string }) {
         ) : null}
 
         <div className="flex items-center gap-2">
-          <Button onClick={handleSubmit} disabled={!canSubmit}>
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-muted disabled:text-muted-foreground"
+          >
             {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
             Submit for review
           </Button>
