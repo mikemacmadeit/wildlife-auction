@@ -21,6 +21,7 @@ import {
   Calendar,
   Activity,
   Loader2,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -167,9 +168,24 @@ export default function SellerOverviewPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [dashboardData, setDashboardData] = useState<SellerDashboardData | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [hideBreederPermitOnOverview, setHideBreederPermitOnOverview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectingStripe, setConnectingStripe] = useState(false);
+
+  const breederPermitDismissKey = (sellerId: string) => `we:ui:dismissed:breeder_permit_overview:v1:${sellerId}`;
+
+  // Allow sellers who will never need a TPWD breeder permit to dismiss the card on Overview only.
+  useEffect(() => {
+    if (!uid) return;
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(breederPermitDismissKey(uid));
+      setHideBreederPermitOnOverview(raw === '1');
+    } catch {
+      // ignore
+    }
+  }, [uid]);
 
   // Fetch listings and orders
   useEffect(() => {
@@ -921,7 +937,36 @@ export default function SellerOverviewPage() {
         )}
 
         {/* Seller-level compliance (whitetail breeders): TPWD breeder permit */}
-        <BreederPermitCard />
+        {uid && !hideBreederPermitOnOverview ? (
+          <div className="relative">
+            <div className="absolute right-2 top-2 z-10">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Hide breeder permit card"
+                onClick={() => {
+                  setHideBreederPermitOnOverview(true);
+                  if (typeof window !== 'undefined') {
+                    try {
+                      window.localStorage.setItem(breederPermitDismissKey(uid), '1');
+                    } catch {
+                      // ignore
+                    }
+                  }
+                  toast({
+                    title: 'Hidden',
+                    description: 'Breeder permit card hidden on Overview.',
+                  });
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <BreederPermitCard />
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           {/* Action Required Panel */}
