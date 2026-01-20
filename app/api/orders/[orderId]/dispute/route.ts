@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 const disputeSchema = z.object({
   reason: z.string().min(1, 'Dispute reason is required').max(200, 'Reason too long'),
@@ -145,6 +146,25 @@ export async function POST(
       lastUpdatedByRole: 'buyer',
     });
 
+    // Timeline (server-authored, idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId,
+        event: {
+          id: `DISPUTE_OPENED:${orderId}`,
+          type: 'DISPUTE_OPENED',
+          label: 'Dispute opened',
+          actor: 'buyer',
+          visibility: 'buyer',
+          timestamp: Timestamp.fromDate(now),
+          meta: { reason },
+        },
+      });
+    } catch {
+      // best-effort
+    }
+
     // Notify admins (email + in-app). Non-blocking.
     try {
       const origin = 'https://wildlife.exchange';
@@ -160,7 +180,12 @@ export async function POST(
             type: 'Admin.Order.DisputeOpened',
             orderId,
             listingId: typeof orderData?.listingId === 'string' ? orderData.listingId : undefined,
-            listingTitle: typeof orderData?.listingTitle === 'string' ? orderData.listingTitle : undefined,
+            listingTitle:
+              typeof orderData?.listingSnapshot?.title === 'string'
+                ? orderData.listingSnapshot.title
+                : typeof orderData?.listingTitle === 'string'
+                  ? orderData.listingTitle
+                  : undefined,
             buyerId,
             disputeType: 'order_dispute',
             reason,

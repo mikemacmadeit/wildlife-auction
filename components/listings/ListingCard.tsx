@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +58,16 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
       ].filter(Boolean).slice(0, 2);
     }
     
-    if (listing.category === 'ranch_equipment') {
+    if (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') {
+      const attrs = listing.attributes as EquipmentAttributes;
+      return [
+        attrs.equipmentType && attrs.equipmentType,
+        attrs.year && `Year: ${attrs.year}`,
+        attrs.condition && attrs.condition,
+      ].filter(Boolean).slice(0, 2);
+    }
+
+    if (listing.category === 'hunting_outfitter_assets') {
       const attrs = listing.attributes as EquipmentAttributes;
       return [
         attrs.equipmentType && attrs.equipmentType,
@@ -78,6 +87,15 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
         sex && `Sex: ${sex}`,
         attrs.registered ? 'Registered' : null,
         attrs.age !== undefined && attrs.age !== null ? `Age: ${String(attrs.age)}` : null,
+      ].filter(Boolean).slice(0, 2);
+    }
+
+    if (listing.category === 'sporting_working_dogs') {
+      const attrs = listing.attributes as SportingWorkingDogAttributes;
+      return [
+        attrs.breed ? `Breed: ${attrs.breed}` : null,
+        attrs.sex ? `Sex: ${attrs.sex}` : null,
+        attrs.quantity ? `Qty: ${attrs.quantity}` : null,
       ].filter(Boolean).slice(0, 2);
     }
     

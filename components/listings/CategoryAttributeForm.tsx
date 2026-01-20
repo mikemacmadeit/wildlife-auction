@@ -6,7 +6,16 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ListingCategory, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes, HorseAttributes, EXOTIC_SPECIES } from '@/lib/types';
+import {
+  ListingCategory,
+  WildlifeAttributes,
+  CattleAttributes,
+  EquipmentAttributes,
+  WhitetailBreederAttributes,
+  HorseAttributes,
+  SportingWorkingDogAttributes,
+  EXOTIC_SPECIES,
+} from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,7 +31,8 @@ type ListingAttributes =
   | CattleAttributes
   | EquipmentAttributes
   | WhitetailBreederAttributes
-  | HorseAttributes;
+  | HorseAttributes
+  | SportingWorkingDogAttributes;
 
 interface CategoryAttributeFormProps {
   category: ListingCategory;
@@ -48,7 +58,10 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
       category === 'wildlife_exotics' ||
       category === 'cattle_livestock' ||
       category === 'horse_equestrian' ||
-      category === 'ranch_equipment';
+      category === 'sporting_working_dogs' ||
+      category === 'hunting_outfitter_assets' ||
+      category === 'ranch_equipment' ||
+      category === 'ranch_vehicles';
 
     if (!needsQuantity) return;
     if (typeof currentQuantity === 'number' && Number.isFinite(currentQuantity) && currentQuantity >= 1) return;
@@ -75,6 +88,14 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     updateAttribute('speciesId', 'horse');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, currentSpeciesId]);
+
+  useEffect(() => {
+    if (category !== 'sporting_working_dogs') return;
+    if (currentSpeciesId === 'dog') return;
+    updateAttribute('speciesId', 'dog');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, currentSpeciesId]);
+
 
   if (category === 'horse_equestrian') {
     return (
@@ -935,16 +956,195 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     );
   }
 
-  if (category === 'ranch_equipment') {
+  if (category === 'sporting_working_dogs') {
+    return (
+      <div className="space-y-4">
+        <Alert className="bg-blue-50 border-blue-200">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Sporting &amp; Working Dogs:</strong> Texas-only transfers apply on this platform. Provide accurate details and required disclosures.
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">
+            Species <span className="text-destructive">*</span>
+          </Label>
+          <Input value="Dog" disabled className="min-h-[48px] text-base bg-muted" />
+          <p className="text-xs text-muted-foreground">Species is fixed as Dog for this category.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dog-sex" className="text-base font-semibold">
+            Sex <span className="text-destructive">*</span>
+          </Label>
+          <Select
+            value={(attributes as Partial<SportingWorkingDogAttributes>).sex || 'unknown'}
+            onValueChange={(value) => updateAttribute('sex', value)}
+          >
+            <SelectTrigger
+              id="dog-sex"
+              className={cn(
+                'min-h-[48px]',
+                hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+              )}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+              <SelectItem value="unknown">Unknown</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasError('Sex') ? <p className="text-sm text-destructive">Sex selection is required</p> : null}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="dog-breed" className="text-base font-semibold">
+              Breed <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="dog-breed"
+              placeholder="e.g., Labrador Retriever"
+              value={(attributes as any)?.breed || ''}
+              onChange={(e) => updateAttribute('breed', e.target.value)}
+              className={cn(
+                'min-h-[48px] text-base',
+                hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+              )}
+            />
+            {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dog-age" className="text-base font-semibold">
+              Age <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="dog-age"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.1"
+              placeholder="e.g., 1.5"
+              value={(() => {
+                const v = (attributes as Partial<SportingWorkingDogAttributes>).age as any;
+                return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+              })()}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (!raw) {
+                  updateAttribute('age', undefined);
+                  return;
+                }
+                const n = Number(raw);
+                updateAttribute('age', Number.isFinite(n) ? n : undefined);
+              }}
+              className={cn(
+                'min-h-[48px] text-base',
+                hasError('Age') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+              )}
+            />
+            {hasError('Age') ? <p className="text-sm text-destructive">Age is required</p> : null}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dog-training" className="text-base font-semibold">Training / Notes (optional)</Label>
+          <Textarea
+            id="dog-training"
+            placeholder="Training level, titles, work history, temperament, etc."
+            value={(attributes as any)?.trainingDescription || ''}
+            onChange={(e) => updateAttribute('trainingDescription', e.target.value)}
+            className="min-h-[120px] text-base"
+          />
+        </div>
+
+        <div className={cn('space-y-3 p-4 border rounded-lg bg-muted/50', hasError('Disclosures') ? 'border-destructive border-2' : 'border-border/60')}>
+          <div className="font-semibold text-sm">Required disclosures</div>
+          {(hasError('Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? (
+            <p className="text-sm text-destructive">All disclosures are required</p>
+          ) : null}
+          <div className="space-y-2">
+            {[
+              { key: 'identificationDisclosure', label: 'I have accurately disclosed identification details (if applicable).' },
+              { key: 'healthDisclosure', label: 'I have disclosed any known health issues and represented the dog honestly.' },
+              { key: 'transportDisclosure', label: 'I understand transfers are Texas-only on this platform and transport is my responsibility.' },
+            ].map((d) => (
+              <div key={d.key} className="flex items-start gap-2">
+                <Checkbox
+                  id={`dog-disclosure-${d.key}`}
+                  checked={Boolean((attributes as any)?.[d.key])}
+                  onCheckedChange={(v) => updateAttribute(d.key, Boolean(v))}
+                />
+                <Label htmlFor={`dog-disclosure-${d.key}`} className="text-sm leading-relaxed">
+                  {d.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dog-quantity" className="text-base font-semibold">
+            Quantity <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="dog-quantity"
+            type="number"
+            min="1"
+            value={(attributes as any)?.quantity ?? 1}
+            onChange={(e) => updateAttribute('quantity', e.target.value ? parseInt(e.target.value) : 1)}
+            className={cn('min-h-[48px] text-base', hasError('Quantity') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (category === 'ranch_equipment' || category === 'ranch_vehicles' || category === 'hunting_outfitter_assets') {
     const equipmentType = (attributes as Partial<EquipmentAttributes>).equipmentType;
     const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
     const requiresTitle = equipmentType && vehiclesRequiringTitle.includes(equipmentType.toLowerCase());
+    const legacyVehicleTypes = ['truck', 'utv', 'atv', 'trailer'];
+    const legacyVehicleSelected =
+      category === 'ranch_equipment' &&
+      typeof equipmentType === 'string' &&
+      legacyVehicleTypes.includes(equipmentType.toLowerCase());
 
     return (
       <div className="space-y-4">
+        {category === 'ranch_vehicles' ? (
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Ranch Vehicles &amp; Trailers:</strong> Ranch-use vehicles and transport equipment (trucks, UTVs, stock trailers, goosenecks, flatbeds, utility trailers).
+            </AlertDescription>
+          </Alert>
+        ) : category === 'hunting_outfitter_assets' ? (
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Hunting &amp; Outfitter Assets:</strong> Property assets like camera systems, blinds, and water/well systems (not vehicles).
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Ranch Equipment &amp; Attachments:</strong> Tractors, skid steers, machinery, and attachments/implements. Vehicles and trailers are listed separately under Ranch Vehicles &amp; Trailers.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="space-y-2">
           <Label htmlFor="equipment-type" className="text-base font-semibold">
-            Equipment Type <span className="text-destructive">*</span>
+            {category === 'ranch_vehicles'
+              ? 'Vehicle / Trailer Type'
+              : category === 'hunting_outfitter_assets'
+                ? 'Asset Type'
+                : 'Equipment / Attachment Type'}{' '}
+            <span className="text-destructive">*</span>
           </Label>
           <Select
             value={equipmentType || ''}
@@ -960,15 +1160,59 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               <SelectValue placeholder="Select equipment type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="tractor">Tractor</SelectItem>
-              <SelectItem value="trailer">Trailer</SelectItem>
-              <SelectItem value="utv">UTV</SelectItem>
-              <SelectItem value="atv">ATV</SelectItem>
-              <SelectItem value="skidsteer">Skid Steer</SelectItem>
-              <SelectItem value="implement">Implement</SelectItem>
-              <SelectItem value="feeder">Feeder</SelectItem>
-              <SelectItem value="fencing">Fencing</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
+              {category === 'ranch_vehicles' ? (
+                <>
+                  <SelectItem value="truck">Truck</SelectItem>
+                  <SelectItem value="utv">UTV</SelectItem>
+                  <SelectItem value="atv">ATV</SelectItem>
+                  <SelectItem value="stock_trailer">Stock Trailer</SelectItem>
+                  <SelectItem value="gooseneck_trailer">Gooseneck Trailer</SelectItem>
+                  <SelectItem value="flatbed_trailer">Flatbed Trailer</SelectItem>
+                  <SelectItem value="utility_trailer">Utility Trailer</SelectItem>
+                  <SelectItem value="dump_trailer">Dump Trailer</SelectItem>
+                  <SelectItem value="horse_trailer">Horse Trailer</SelectItem>
+                  <SelectItem value="equipment_trailer">Equipment Trailer</SelectItem>
+                  <SelectItem value="trailer">Trailer (other)</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </>
+              ) : category === 'hunting_outfitter_assets' ? (
+                <>
+                  <SelectItem value="camera_system">Camera System</SelectItem>
+                  <SelectItem value="surveillance_system">Surveillance System</SelectItem>
+                  <SelectItem value="thermal_optics">Thermal / Optics</SelectItem>
+                  <SelectItem value="blind">Blind (tower / box / enclosure)</SelectItem>
+                  <SelectItem value="water_system">Water / Well System</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="tractor">Tractor</SelectItem>
+                  <SelectItem value="skidsteer">Skid Steer</SelectItem>
+                  <SelectItem value="attachment">Attachment</SelectItem>
+                  <SelectItem value="implement">Implement</SelectItem>
+                  <SelectItem value="baler">Baler</SelectItem>
+                  <SelectItem value="brush_cutter">Brush Cutter</SelectItem>
+                  <SelectItem value="shredder">Shredder</SelectItem>
+                  <SelectItem value="plow">Plow</SelectItem>
+                  <SelectItem value="disc">Disc</SelectItem>
+                  <SelectItem value="sprayer">Sprayer</SelectItem>
+                  <SelectItem value="post_hole_digger">Post Hole Digger</SelectItem>
+                  <SelectItem value="auger">Auger</SelectItem>
+                  <SelectItem value="grapple">Grapple</SelectItem>
+                  <SelectItem value="bucket">Bucket</SelectItem>
+                  <SelectItem value="forks">Forks</SelectItem>
+                  <SelectItem value="feeder">Feeder</SelectItem>
+                  <SelectItem value="fencing">Fencing</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  {legacyVehicleSelected ? (
+                    <>
+                      <SelectItem value="truck">Truck (legacy — consider moving to Vehicles)</SelectItem>
+                      <SelectItem value="utv">UTV (legacy — consider moving to Vehicles)</SelectItem>
+                      <SelectItem value="atv">ATV (legacy — consider moving to Vehicles)</SelectItem>
+                      <SelectItem value="trailer">Trailer (legacy — consider moving to Vehicles)</SelectItem>
+                    </>
+                  ) : null}
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>

@@ -5,7 +5,10 @@ export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
   { value: 'cattle_livestock', label: 'Cattle & Livestock' },
   { value: 'horse_equestrian', label: 'Horse & Equestrian' },
-  { value: 'ranch_equipment', label: 'Ranch Equipment' },
+  { value: 'sporting_working_dogs', label: 'Sporting & Working Dogs' },
+  { value: 'hunting_outfitter_assets', label: 'Hunting & Outfitter Assets' },
+  { value: 'ranch_equipment', label: 'Ranch Equipment & Attachments' },
+  { value: 'ranch_vehicles', label: 'Ranch Vehicles & Trailers' },
 ];
 
 export const BROWSE_TYPES: { value: ListingType; label: string }[] = [

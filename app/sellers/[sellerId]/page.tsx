@@ -19,13 +19,15 @@ import { ListingCard } from '@/components/listings/ListingCard';
 import { cn } from '@/lib/utils';
 import { Loader2, ArrowLeft, CheckCircle2, MapPin, Sparkles, ShieldCheck, Store, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { getUserProfile } from '@/lib/firebase/users';
-import type { UserProfile } from '@/lib/types';
+import { getPublicSellerTrust, getUserProfile } from '@/lib/firebase/users';
+import type { PublicSellerTrust, UserProfile } from '@/lib/types';
 import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { getEffectiveSubscriptionTier } from '@/lib/pricing/subscriptions';
 import type { Listing } from '@/lib/types';
 import { listSellerListings } from '@/lib/firebase/listings';
+import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
+import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
 
 export default function SellerProfilePage() {
   const params = useParams<{ sellerId: string }>();
@@ -35,6 +37,7 @@ export default function SellerProfilePage() {
   const { user, loading: authLoading } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeListings, setActiveListings] = useState<Listing[]>([]);
@@ -75,6 +78,9 @@ export default function SellerProfilePage() {
         if (!p) throw new Error('Seller not found');
         if (cancelled) return;
         setProfile(p);
+        // Load public trust signals (badges). Public read, server-authored.
+        const t = await getPublicSellerTrust(sellerId);
+        if (!cancelled) setPublicTrust(t);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Failed to load seller profile');
       } finally {
@@ -270,13 +276,11 @@ export default function SellerProfilePage() {
                     >
                       {reputation.level.replaceAll('_', ' ')}
                     </Badge>
-                    {profile.seller?.verified && (
-                      <Badge variant="secondary" className="font-semibold text-xs">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Verified seller
-                      </Badge>
-                    )}
                   </div>
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <SellerTrustBadges badgeIds={publicTrust?.badgeIds} />
+                      {sellerId ? <SaveSellerButton sellerId={sellerId} size="sm" /> : null}
+                    </div>
                 </div>
               </div>
 
@@ -292,12 +296,9 @@ export default function SellerProfilePage() {
                     >
                       {reputation.level.replaceAll('_', ' ')}
                     </Badge>
-                    {profile.seller?.verified && (
-                      <Badge variant="secondary" className="font-semibold text-xs">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Verified seller
-                      </Badge>
-                    )}
+                  </div>
+                  <div className="mt-3">
+                    <SellerTrustBadges badgeIds={publicTrust?.badgeIds} />
                   </div>
                 </div>
 

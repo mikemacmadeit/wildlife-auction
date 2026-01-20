@@ -26,6 +26,7 @@ import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { listingId, offerId, paymentMethod: paymentMethodRaw } = validation.data as any;
+    const { listingId, offerId, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
     // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
     const normalizedPaymentMethod =
       paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');
@@ -181,6 +182,21 @@ export async function POST(request: Request) {
       );
     }
     const categoryReq = getCategoryRequirements(listingCategory as any);
+
+    // Animal categories require an explicit buyer acknowledgment (server-authoritative).
+    if (categoryReq.isAnimal) {
+      if (buyerAcksAnimalRisk !== true) {
+        return NextResponse.json(
+          {
+            error: 'Buyer acknowledgment required',
+            code: 'BUYER_ACK_REQUIRED',
+            message:
+              'Before purchasing an animal listing, you must acknowledge live-animal risk, seller-only representations, and that the platform does not take custody.',
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // If a checkout reservation is still active, block additional checkouts to avoid double-selling.
     // IMPORTANT: a stale `purchaseReservedByOrderId` must NOT block indefinitely; only treat as reserved if `purchaseReservedUntil > now`.
@@ -563,6 +579,28 @@ export async function POST(request: Request) {
       if (!listingSnap?.exists) throw new Error('Listing not found');
       const live = listingSnap.data() as any;
 
+      // Build public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
+      const photos = Array.isArray(live?.photos) ? live.photos : [];
+      const sortedPhotos = photos.length
+        ? [...photos].sort((a: any, b: any) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
+        : [];
+      const coverPhotoUrl =
+        (sortedPhotos.find((p: any) => typeof p?.url === 'string' && p.url.trim())?.url as string | undefined) ||
+        (Array.isArray(live?.images) ? (live.images.find((u: any) => typeof u === 'string' && u.trim()) as string | undefined) : undefined);
+
+      const city = live?.location?.city ? String(live.location.city) : '';
+      const state = live?.location?.state ? String(live.location.state) : '';
+      const locationLabel = city && state ? `${city}, ${state}` : state || '';
+
+      const sellerDisplayName =
+        String(live?.sellerSnapshot?.displayName || '').trim() ||
+        String(live?.sellerSnapshot?.name || '').trim() ||
+        'Seller';
+      const sellerPhotoURL =
+        typeof live?.sellerSnapshot?.photoURL === 'string' && live.sellerSnapshot.photoURL.trim()
+          ? String(live.sellerSnapshot.photoURL)
+          : undefined;
+
       // Validate listing availability (server-side authoritative)
       if (live.type !== 'auction') {
         if (live.status !== 'active') throw new Error('Listing is not available for purchase');
@@ -585,12 +623,42 @@ export async function POST(request: Request) {
         ...(offerId ? { offerId: String(offerId) } : {}),
         buyerId,
         sellerId: live.sellerId,
+        listingSnapshot: {
+          listingId,
+          title: String(live?.title || 'Listing'),
+          type: live?.type ? String(live.type) : undefined,
+          category: live?.category ? String(live.category) : undefined,
+          ...(coverPhotoUrl ? { coverPhotoUrl: String(coverPhotoUrl) } : {}),
+          ...(locationLabel ? { locationLabel } : {}),
+        },
+        sellerSnapshot: {
+          sellerId: String(live?.sellerId || ''),
+          displayName: sellerDisplayName,
+          ...(sellerPhotoURL ? { photoURL: sellerPhotoURL } : {}),
+        },
         amount: amount / 100,
         platformFee: platformFee / 100,
         sellerAmount: sellerAmount / 100,
         status: 'pending',
         paymentMethod,
         adminHold: false,
+        timeline: [
+          {
+            id: `ORDER_PLACED:${orderId}`,
+            type: 'ORDER_PLACED',
+            label: 'Order placed',
+            timestamp: nowTs,
+            actor: 'buyer',
+            visibility: 'buyer',
+          },
+        ],
+        ...(categoryReq.isAnimal
+          ? {
+              buyerAcksAnimalRisk: true,
+              buyerAcksAnimalRiskAt: nowTs,
+              buyerAcksAnimalRiskVersion: LEGAL_VERSIONS.buyerAcknowledgment.version,
+            }
+          : {}),
         ...(live.type === 'auction' && auctionResultSnapshot?.paymentDueAt ? { auctionPaymentDueAt: auctionResultSnapshot.paymentDueAt } : {}),
         createdAt: nowTs,
         updatedAt: nowTs,

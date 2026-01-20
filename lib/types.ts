@@ -5,9 +5,12 @@ export type ListingType = 'auction' | 'fixed' | 'classified';
 export type ListingCategory = 
   | 'whitetail_breeder'
   | 'wildlife_exotics' 
+  | 'horse_equestrian'
   | 'cattle_livestock' 
   | 'ranch_equipment'
-  | 'horse_equestrian';
+  | 'ranch_vehicles'
+  | 'hunting_outfitter_assets'
+  | 'sporting_working_dogs';
 
 export type ListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'removed';
 
@@ -163,12 +166,37 @@ export interface HorseAttributes {
 export type EquipmentType = 
   | 'tractor'
   | 'trailer'
+  | 'stock_trailer'
+  | 'gooseneck_trailer'
+  | 'flatbed_trailer'
+  | 'utility_trailer'
+  | 'dump_trailer'
+  | 'horse_trailer'
+  | 'equipment_trailer'
   | 'utv'
   | 'atv'
+  | 'truck'
   | 'skidsteer'
+  | 'attachment'
   | 'implement'
+  | 'baler'
+  | 'brush_cutter'
+  | 'shredder'
+  | 'plow'
+  | 'disc'
+  | 'sprayer'
+  | 'post_hole_digger'
+  | 'auger'
+  | 'grapple'
+  | 'bucket'
+  | 'forks'
   | 'feeder'
   | 'fencing'
+  | 'blind'
+  | 'camera_system'
+  | 'surveillance_system'
+  | 'thermal_optics'
+  | 'water_system'
   | 'other';
 
 export interface EquipmentAttributes {
@@ -184,12 +212,25 @@ export interface EquipmentAttributes {
   quantity: number; // Required, default 1
 }
 
+export interface SportingWorkingDogAttributes {
+  speciesId: 'dog';
+  sex: 'male' | 'female' | 'unknown';
+  age: number | string;
+  breed: string;
+  trainingDescription?: string;
+  identificationDisclosure: boolean;
+  healthDisclosure: boolean;
+  transportDisclosure: boolean;
+  quantity: number; // Required, default 1
+}
+
 // Union type for category-specific attributes
 export type ListingAttributes =
   | WhitetailBreederAttributes
   | WildlifeAttributes
   | CattleAttributes
   | HorseAttributes
+  | SportingWorkingDogAttributes
   | EquipmentAttributes;
 
 // Exotic species controlled list
@@ -485,6 +526,56 @@ export interface DisputeEvidence {
   uploadedAt: Date;
 }
 
+// ============================================
+// ORDER SNAPSHOTS (FAST PURCHASES LIST VIEW)
+// ============================================
+export interface OrderListingSnapshot {
+  listingId: string;
+  title: string;
+  type?: ListingType;
+  category?: ListingCategory;
+  coverPhotoUrl?: string;
+  locationLabel?: string; // e.g. "Uvalde, TX"
+}
+
+export interface OrderSellerSnapshot {
+  sellerId: string;
+  displayName: string;
+  photoURL?: string;
+}
+
+// ============================================
+// ORDER TIMELINE (SERVER-AUTHORED)
+// ============================================
+export type OrderTimelineActor = 'system' | 'buyer' | 'seller' | 'admin' | 'tpwd' | 'facility';
+export type OrderTimelineVisibility = 'buyer' | 'seller' | 'internal';
+
+export type OrderTimelineEventType =
+  | 'ORDER_PLACED'
+  | 'CHECKOUT_SESSION_CREATED'
+  | 'PAYMENT_AUTHORIZED'
+  | 'FUNDS_HELD'
+  | 'COMPLIANCE_REQUIRED'
+  | 'TRANSFER_PERMIT_REQUESTED'
+  | 'TRANSFER_PERMIT_SUBMITTED'
+  | 'TRANSFER_PERMIT_APPROVED'
+  | 'SELLER_SHIPPED'
+  | 'DELIVERED'
+  | 'BUYER_CONFIRMED'
+  | 'FUNDS_RELEASED'
+  | 'DISPUTE_OPENED'
+  | 'DISPUTE_RESOLVED';
+
+export interface OrderTimelineEvent {
+  id: string; // deterministic for idempotency
+  type: OrderTimelineEventType;
+  label: string;
+  timestamp: Date;
+  actor: OrderTimelineActor;
+  visibility?: OrderTimelineVisibility;
+  meta?: Record<string, any>;
+}
+
 export interface Order {
   id: string;
   listingId: string;
@@ -509,6 +600,14 @@ export interface Order {
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
+
+  /**
+   * Public-safe snapshots for fast order list rendering.
+   * Written server-side at order creation (checkout create-session / webhook / wire intent).
+   */
+  listingSnapshot?: OrderListingSnapshot;
+  sellerSnapshot?: OrderSellerSnapshot;
+  timeline?: OrderTimelineEvent[];
   
   // Escrow workflow fields
   paymentMethod?: OrderPaymentMethod; // How buyer paid (card vs bank rails)
@@ -696,6 +795,19 @@ export interface UserProfile {
   chargesEnabled?: boolean; // Can accept payments
   payoutsEnabled?: boolean; // Can receive payouts
   stripeDetailsSubmitted?: boolean; // Has submitted required details
+
+  // Public-ish seller stats (non-sensitive). Some fields are derived server-side.
+  sellerStats?: {
+    followersCount?: number;
+  };
+
+  // Legal acceptance (server-authored)
+  legal?: {
+    tos?: { version: string; acceptedAt: Date };
+    marketplacePolicies?: { version: string; acceptedAt: Date };
+    buyerAcknowledgment?: { version: string; acceptedAt: Date };
+    sellerPolicy?: { version: string; acceptedAt: Date };
+  };
   
   createdAt: Date;
   updatedAt: Date;
@@ -706,6 +818,53 @@ export interface UserProfile {
   totalListingsCount?: number; // Total listings created
   completionRate?: number; // completedSalesCount / totalListingsCount (percentage)
   verifiedTransactionsCount?: number; // Same as completedSalesCount for now
+}
+
+// ============================================
+// SAVED SELLERS (FOLLOW SYSTEM)
+// ============================================
+export interface SavedSellerDoc {
+  sellerId: string;
+  followedAt: Date;
+
+  sellerUsername: string; // e.g. "double7ranch" (may be empty if not set)
+  sellerDisplayName: string;
+  sellerPhotoURL?: string;
+
+  ratingAverage: number;
+  ratingCount: number;
+  positivePercent: number;
+  itemsSold: number;
+}
+
+// ============================================
+// PUBLIC SELLER TRUST (BADGES)
+// ============================================
+export type SellerBadgeId =
+  | 'verified_seller' // Stripe Verified (payouts enabled)
+  | 'stripe_payouts_enabled'
+  | 'stripe_payments_enabled'
+  | 'identity_verified'
+  | 'tpwd_breeder_permit_verified';
+
+export interface PublicSellerTrust {
+  userId: string;
+  badgeIds: SellerBadgeId[];
+  // Optional structured detail for specific badges (all public-safe)
+  tpwdBreederPermit?: {
+    status: 'verified' | 'rejected';
+    verifiedAt?: Date;
+    expiresAt?: Date;
+  };
+  stripe?: {
+    onboardingStatus?: 'not_started' | 'pending' | 'complete' | string;
+    payoutsEnabled?: boolean;
+    chargesEnabled?: boolean;
+    detailsSubmitted?: boolean;
+    hasPendingRequirements?: boolean;
+    updatedAt?: Date;
+  };
+  updatedAt: Date;
 }
 
 // Message Thread Types

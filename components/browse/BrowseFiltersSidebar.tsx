@@ -268,7 +268,9 @@ export function BrowseFiltersSidebar(props: {
                 </Select>
               </div>
 
-              {value.category === 'ranch_equipment' ? (
+              {value.category === 'ranch_equipment' ||
+              value.category === 'ranch_vehicles' ||
+              value.category === 'hunting_outfitter_assets' ? (
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground">Condition</Label>
                   <div className="space-y-2">

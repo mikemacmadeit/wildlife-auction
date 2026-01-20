@@ -340,10 +340,20 @@ export default function TrustPage() {
               </div>
 
               <div className="p-4 border rounded-lg">
-                <h4 className="font-semibold mb-2">Ranch Equipment Listings</h4>
+                <h4 className="font-semibold mb-2">Ranch Equipment &amp; Attachments</h4>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-2">
                   <li>Seller creates listing</li>
-                  <li>Vehicles (UTV/ATV/Trailer): Require title/VIN information</li>
+                  <li>Includes machinery, attachments, and implements (not vehicles)</li>
+                  <li>Auto-approved (goes <Badge variant="outline">Active</Badge>)</li>
+                  <li>Multi-state allowed (no TX-only restriction)</li>
+                </ol>
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-semibold mb-2">Ranch Vehicles &amp; Trailers</h4>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-2">
+                  <li>Seller creates listing</li>
+                  <li>Vehicles (UTV/ATV/Trailer/Truck): Require title/VIN information</li>
                   <li>Auto-approved (goes <Badge variant="outline">Active</Badge>)</li>
                   <li>Multi-state allowed (no TX-only restriction)</li>
                 </ol>

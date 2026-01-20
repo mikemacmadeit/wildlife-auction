@@ -225,7 +225,8 @@ export async function createAccountLink(): Promise<{ url: string }> {
 export async function createCheckoutSession(
   listingId: string,
   offerId?: string,
-  paymentMethod?: 'card' | 'ach_debit'
+  paymentMethod?: 'card' | 'ach_debit',
+  opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
   if (!user) {
@@ -248,6 +249,7 @@ export async function createCheckoutSession(
       listingId,
       ...(offerId ? { offerId } : {}),
       ...(paymentMethod ? { paymentMethod } : {}),
+      ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });
 
@@ -272,7 +274,8 @@ export async function createCheckoutSession(
 
 export async function createWireIntent(
   listingId: string,
-  offerId?: string
+  offerId?: string,
+  opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{
   orderId: string;
   paymentIntentId: string;
@@ -299,6 +302,7 @@ export async function createWireIntent(
     body: JSON.stringify({
       listingId,
       ...(offerId ? { offerId } : {}),
+      ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });
 

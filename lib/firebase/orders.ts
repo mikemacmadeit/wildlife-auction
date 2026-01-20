@@ -16,7 +16,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from './config';
-import { Order } from '@/lib/types';
+import type { Order, OrderListingSnapshot, OrderSellerSnapshot } from '@/lib/types';
 
 /**
  * Order document as stored in Firestore
@@ -98,12 +98,48 @@ export interface OrderDoc {
     provided: any[];
     missing: any[];
   };
+
+  /**
+   * Public-safe snapshots (server-authored) to avoid N+1 listing reads
+   * on purchases/sales list views.
+   */
+  listingSnapshot?: OrderListingSnapshot;
+  sellerSnapshot?: OrderSellerSnapshot;
+  timeline?: Array<{
+    id: string;
+    type: any;
+    label: string;
+    timestamp: Timestamp | any;
+    actor: any;
+    visibility?: any;
+    meta?: any;
+  }>;
 }
 
 /**
  * Convert Firestore OrderDoc to UI Order type
  */
 function toOrder(docId: string, data: OrderDoc): Order {
+  const timeline =
+    Array.isArray(data.timeline)
+      ? data.timeline
+          .map((e: any) => ({
+            id: String(e?.id || ''),
+            type: String(e?.type || ''),
+            label: String(e?.label || ''),
+            timestamp:
+              typeof e?.timestamp?.toDate === 'function'
+                ? e.timestamp.toDate()
+                : e?.timestamp instanceof Date
+                  ? e.timestamp
+                  : new Date(0),
+            actor: String(e?.actor || 'system'),
+            visibility: e?.visibility ? String(e.visibility) : undefined,
+            meta: e?.meta && typeof e.meta === 'object' ? e.meta : undefined,
+          }))
+          .filter((e: any) => e.id && e.type && e.label)
+      : undefined;
+
   return {
     id: docId,
     listingId: data.listingId,
@@ -161,6 +197,9 @@ function toOrder(docId: string, data: OrderDoc): Order {
     billOfSaleSellerSignedAt: data.billOfSaleSellerSignedAt?.toDate(),
     billOfSaleSellerSignedBy: data.billOfSaleSellerSignedBy,
     complianceDocsStatus: data.complianceDocsStatus as any,
+    listingSnapshot: data.listingSnapshot,
+    sellerSnapshot: data.sellerSnapshot,
+    timeline: timeline as any,
   };
 }
 

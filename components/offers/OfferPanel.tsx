@@ -14,6 +14,8 @@ import { Loader2, Handshake, Clock, CheckCircle2, XCircle, RefreshCw, DollarSign
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
 import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
+import { isAnimalCategory } from '@/lib/compliance/requirements';
+import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
 
 type OfferDTO = {
   offerId: string;
@@ -61,6 +63,10 @@ export function OfferPanel(props: { listing: Listing }) {
     paymentIntentId: string;
     instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
   }>(null);
+  const [animalAckOpen, setAnimalAckOpen] = useState(false);
+  const [animalRiskAcked, setAnimalRiskAcked] = useState(false);
+
+  const isAnimalListing = useMemo(() => isAnimalCategory(listing.category as any), [listing.category]);
 
   const eligible = useMemo(() => {
     const enabled = !!(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled);
@@ -196,7 +202,8 @@ export function OfferPanel(props: { listing: Listing }) {
     try {
       const purchaseAmount = Number(offer.acceptedAmount ?? offer.currentAmount);
       setPendingCheckoutAmount(Number.isFinite(purchaseAmount) ? purchaseAmount : 0);
-      setPaymentDialogOpen(true);
+      if (isAnimalListing && !animalRiskAcked) setAnimalAckOpen(true);
+      else setPaymentDialogOpen(true);
       setLoading(false);
       return;
     } catch (e: any) {
@@ -211,11 +218,13 @@ export function OfferPanel(props: { listing: Listing }) {
     setLoading(true);
     try {
       if (method === 'wire') {
-        const out = await createWireIntent(listing.id, offer.offerId);
+        const out = await createWireIntent(listing.id, offer.offerId, { buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined });
         setWireData(out);
         setWireDialogOpen(true);
       } else {
-        const { url } = await createCheckoutSession(listing.id, offer.offerId, method);
+        const { url } = await createCheckoutSession(listing.id, offer.offerId, method, {
+          buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
+        });
         window.location.href = url;
       }
     } catch (e: any) {
@@ -244,6 +253,16 @@ export function OfferPanel(props: { listing: Listing }) {
 
   return (
     <div className="rounded-2xl border bg-card p-4 sm:p-5 space-y-3">
+      <AnimalRiskAcknowledgmentDialog
+        open={animalAckOpen}
+        onOpenChange={setAnimalAckOpen}
+        onConfirm={() => {
+          setAnimalRiskAcked(true);
+          setAnimalAckOpen(false);
+          setPaymentDialogOpen(true);
+        }}
+      />
+
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">

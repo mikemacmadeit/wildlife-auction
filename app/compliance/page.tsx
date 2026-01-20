@@ -228,22 +228,43 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
 
-        {/* Equipment Requirements */}
+        {/* Ranch Equipment Requirements */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              <CardTitle>Ranch Equipment Requirements</CardTitle>
+              <CardTitle>Ranch Equipment &amp; Attachments</CardTitle>
             </div>
             <CardDescription>
-              Title & VIN Requirements for Vehicles
+              Machinery and attachments (vehicles listed separately)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Equipment listings are multi-state and do not require Texas-only restrictions. However, 
-                vehicles (UTV, ATV, Trailer, Truck) require:
+                Equipment listings are multi-state and do not require Texas-only restrictions. These listings are for tractors, skid steers,
+                ranch machinery, and attachments/implements. Vehicles and trailers are listed under Ranch Vehicles &amp; Trailers.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ranch Vehicles Requirements */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              <CardTitle>Ranch Vehicles &amp; Trailers</CardTitle>
+            </div>
+            <CardDescription>
+              Title &amp; VIN requirements for vehicles
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Ranch vehicles and trailers are multi-state and do not require Texas-only restrictions. For vehicles (UTV, ATV, Trailer, Truck),
+                listings require:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
                 <li>Title status disclosure (has title or not)</li>

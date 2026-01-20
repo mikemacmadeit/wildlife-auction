@@ -17,7 +17,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, ArrowLeft, Save, Loader2, AlertCircle, Send } from 'lucide-react';
-import { ListingType, ListingCategory, ListingAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes } from '@/lib/types';
+import {
+  ListingType,
+  ListingCategory,
+  ListingAttributes,
+  WildlifeAttributes,
+  CattleAttributes,
+  EquipmentAttributes,
+  WhitetailBreederAttributes,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +36,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
+import { isAnimalCategory } from '@/lib/compliance/requirements';
 
 function EditListingPageContent() {
   const router = useRouter();
@@ -100,6 +109,7 @@ function EditListingPageContent() {
   const [initialSignature, setInitialSignature] = useState<string>('');
   const [hasSavedEditsSinceRejection, setHasSavedEditsSinceRejection] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
+  const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
 
   // Load existing listing data from Firestore
   useEffect(() => {
@@ -202,6 +212,7 @@ function EditListingPageContent() {
           },
           attributes: listing.attributes || {},
         });
+        setSellerAnimalAttestationAccepted((listing as any)?.sellerAnimalAttestationAccepted === true);
         setInitialSignature(sig);
 
         // Load existing documents
@@ -287,7 +298,7 @@ function EditListingPageContent() {
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle, horses) are restricted to Texas residents only. Equipment listings can be multi-state.
+              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle, horses, dogs) are restricted to Texas residents only. Equipment/asset listings can be multi-state.
             </AlertDescription>
           </Alert>
           <div className="space-y-3">
@@ -308,28 +319,34 @@ function EditListingPageContent() {
                   });
                 }}
               >
-                <CardContent className="p-6 text-center space-y-3">
-                  <div className="flex justify-center">
-                    <div 
-                      className="w-16 h-16"
-                      style={{
-                        WebkitMaskImage: `url('/images/whitetail breeder icon.png')`,
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskImage: `url('/images/whitetail breeder icon.png')`,
-                        maskSize: 'contain',
-                        maskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        backgroundColor: 'hsl(var(--primary))'
-                      }}
-                    />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-12 h-12"
+                        style={{
+                          WebkitMaskImage: `url('/images/whitetail breeder icon.png')`,
+                          WebkitMaskSize: 'contain',
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          maskImage: `url('/images/whitetail breeder icon.png')`,
+                          maskSize: 'contain',
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          backgroundColor: 'hsl(var(--primary))',
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Whitetail Breeder</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        TPWD-permitted whitetail deer breeding facilities
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-start md:justify-center">
+                        <Badge variant="outline" className="text-[11px]">TPWD Required</Badge>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold">Whitetail Breeder</h3>
-                  <p className="text-sm text-muted-foreground">
-                    TPWD-permitted whitetail deer breeding facilities
-                  </p>
-                  <Badge variant="outline" className="text-xs">TPWD Required</Badge>
                 </CardContent>
               </Card>
 
@@ -348,27 +365,31 @@ function EditListingPageContent() {
                   });
                 }}
               >
-                <CardContent className="p-6 text-center space-y-3">
-                  <div className="flex justify-center">
-                    <div 
-                      className="w-16 h-16"
-                      style={{
-                        WebkitMaskImage: `url('/images/Fallow Icon.png')`,
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskImage: `url('/images/Fallow Icon.png')`,
-                        maskSize: 'contain',
-                        maskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        backgroundColor: 'hsl(var(--primary))'
-                      }}
-                    />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-12 h-12"
+                        style={{
+                          WebkitMaskImage: `url('/images/Fallow Icon.png')`,
+                          WebkitMaskSize: 'contain',
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          maskImage: `url('/images/Fallow Icon.png')`,
+                          maskSize: 'contain',
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          backgroundColor: 'hsl(var(--primary))',
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Wildlife &amp; Exotics</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Axis deer, blackbuck, fallow deer, and other exotic species
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold">Wildlife & Exotics</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Axis deer, blackbuck, fallow deer, and other exotic species
-                  </p>
                 </CardContent>
               </Card>
 
@@ -387,25 +408,59 @@ function EditListingPageContent() {
                   });
                 }}
               >
-                <CardContent className="p-6 text-center space-y-3">
-                  <div className="flex justify-center">
-                    <div
-                      className="w-16 h-16"
-                      style={{
-                        WebkitMaskImage: `url('/images/Horse.png')`,
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskImage: `url('/images/Horse.png')`,
-                        maskSize: 'contain',
-                        maskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        backgroundColor: 'hsl(var(--primary))',
-                      }}
-                    />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-12 h-12"
+                        style={{
+                          WebkitMaskImage: `url('/images/Horse.png')`,
+                          WebkitMaskSize: 'contain',
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          maskImage: `url('/images/Horse.png')`,
+                          maskSize: 'contain',
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          backgroundColor: 'hsl(var(--primary))',
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Horse &amp; Equestrian</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">Horses, tack, and equestrian-related listings</p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold">Horse &amp; Equestrian</h3>
-                  <p className="text-sm text-muted-foreground">Horses, tack, and equestrian-related listings</p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all border-2 ${
+                  formData.category === 'sporting_working_dogs'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  setFormData({
+                    ...formData,
+                    category: 'sporting_working_dogs',
+                    location: { ...formData.location, state: 'TX' },
+                  });
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 icon-primary-color mask-icon-dog" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Sporting &amp; Working Dogs</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Bird dogs, hog dogs, tracking dogs, and other working/sporting dogs
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -424,27 +479,61 @@ function EditListingPageContent() {
                   });
                 }}
               >
-                <CardContent className="p-6 text-center space-y-3">
-                  <div className="flex justify-center">
-                    <div 
-                      className="w-16 h-16"
-                      style={{
-                        WebkitMaskImage: `url('/images/Bull Icon.png')`,
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskImage: `url('/images/Bull Icon.png')`,
-                        maskSize: 'contain',
-                        maskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        backgroundColor: 'hsl(var(--primary))'
-                      }}
-                    />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-12 h-12"
+                        style={{
+                          WebkitMaskImage: `url('/images/Bull Icon.png')`,
+                          WebkitMaskSize: 'contain',
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          maskImage: `url('/images/Bull Icon.png')`,
+                          maskSize: 'contain',
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          backgroundColor: 'hsl(var(--primary))',
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Cattle &amp; Livestock</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Cattle, bulls, cows, heifers, and registered livestock
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold">Cattle & Livestock</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Cattle, bulls, cows, heifers, and registered livestock
-                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all border-2 ${
+                  formData.category === 'hunting_outfitter_assets'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  setFormData({
+                    ...formData,
+                    category: 'hunting_outfitter_assets',
+                    // Assets can be multi-state, so don't force TX
+                  });
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 icon-primary-color mask-icon-hunting-blind" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Hunting &amp; Outfitter Assets</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Camera systems, blinds, and water/well systems
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -463,27 +552,61 @@ function EditListingPageContent() {
                   });
                 }}
               >
-                <CardContent className="p-6 text-center space-y-3">
-                  <div className="flex justify-center">
-                    <div 
-                      className="w-16 h-16"
-                      style={{
-                        WebkitMaskImage: `url('/images/Tractor Icon.png')`,
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskRepeat: 'no-repeat',
-                        WebkitMaskPosition: 'center',
-                        maskImage: `url('/images/Tractor Icon.png')`,
-                        maskSize: 'contain',
-                        maskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        backgroundColor: 'hsl(var(--primary))'
-                      }}
-                    />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-12 h-12"
+                        style={{
+                          WebkitMaskImage: `url('/images/Tractor Icon.png')`,
+                          WebkitMaskSize: 'contain',
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          maskImage: `url('/images/Tractor Icon.png')`,
+                          maskSize: 'contain',
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          backgroundColor: 'hsl(var(--primary))',
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Ranch Equipment &amp; Attachments</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Tractors, skid steers, machinery, and attachments/implements (vehicles &amp; trailers listed separately)
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold">Ranch Equipment</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Tractors, skid steers, UTVs, trailers, and ranch equipment
-                  </p>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all border-2 ${
+                  formData.category === 'ranch_vehicles'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  setFormData({
+                    ...formData,
+                    category: 'ranch_vehicles',
+                    // Vehicles can be multi-state, so don't force TX
+                  });
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 icon-primary-color mask-icon-top-drive" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Ranch Vehicles &amp; Trailers</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Trucks, UTVs/ATVs, and trailers (stock, gooseneck, flatbed, utility)
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -910,11 +1033,43 @@ function EditListingPageContent() {
       title: 'Specifications',
       description: 'Provide category-specific details',
       content: formData.category ? (
-        <CategoryAttributeForm
-          category={formData.category}
-          attributes={formData.attributes}
-          onChange={(attrs) => setFormData({ ...formData, attributes: attrs })}
-        />
+        <div className="space-y-4">
+          <CategoryAttributeForm
+            category={formData.category}
+            attributes={formData.attributes}
+            onChange={(attrs) => setFormData({ ...formData, attributes: attrs })}
+          />
+
+          {formData.category &&
+            isAnimalCategory(formData.category as any) &&
+            formData.category !== 'whitetail_breeder' && (
+              <div
+                className={`space-y-3 p-4 border rounded-lg ${
+                  !sellerAnimalAttestationAccepted ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'
+                }`}
+              >
+                <Label className="text-base font-semibold">
+                  Seller acknowledgment <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="seller-animal-attestation-edit"
+                    checked={sellerAnimalAttestationAccepted}
+                    onCheckedChange={(checked) => setSellerAnimalAttestationAccepted(checked === true)}
+                  />
+                  <Label htmlFor="seller-animal-attestation-edit" className="cursor-pointer flex-1">
+                    <div className="font-medium">
+                      I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
+                      Wildlife Exchange does not take custody of animals.
+                    </div>
+                  </Label>
+                </div>
+                {!sellerAnimalAttestationAccepted ? (
+                  <p className="text-sm text-destructive">You must accept this acknowledgment to publish an animal listing.</p>
+                ) : null}
+              </div>
+            )}
+        </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
           Please select a category first
@@ -922,6 +1077,14 @@ function EditListingPageContent() {
       ),
       validate: () => {
         if (!formData.category) return false;
+        if (formData.category !== 'whitetail_breeder' && isAnimalCategory(formData.category as any) && !sellerAnimalAttestationAccepted) {
+          toast({
+            title: 'Seller acknowledgment required',
+            description: 'Please accept the seller acknowledgment for animal listings.',
+            variant: 'destructive',
+          });
+          return false;
+        }
         if (formData.category === 'whitetail_breeder') {
           const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
           return !!(
@@ -1232,6 +1395,15 @@ function EditListingPageContent() {
       protectedTransactionDays: formData.protectedTransactionDays,
     };
 
+    if (
+      formData.category &&
+      isAnimalCategory(formData.category as any) &&
+      formData.category !== 'whitetail_breeder'
+    ) {
+      updates.sellerAnimalAttestationAccepted = sellerAnimalAttestationAccepted === true;
+      updates.sellerAnimalAttestationAcceptedAt = sellerAnimalAttestationAccepted ? new Date() : null;
+    }
+
     // Add pricing based on type
     if (formData.type === 'fixed' || formData.type === 'classified') {
       updates.price = parseFloat(formData.price || '0');
@@ -1327,6 +1499,7 @@ function EditListingPageContent() {
       protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,
       attributes: formData.attributes,
+      sellerAnimalAttestationAccepted: sellerAnimalAttestationAccepted ? true : false,
     });
     if (initialSignature && currentSignature === initialSignature) {
       toast({
@@ -1437,6 +1610,21 @@ function EditListingPageContent() {
       toast({
         title: 'Authentication required',
         description: 'You must be signed in to update listings.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      listingData?.status === 'draft' &&
+      formData.category &&
+      isAnimalCategory(formData.category as any) &&
+      formData.category !== 'whitetail_breeder' &&
+      !sellerAnimalAttestationAccepted
+    ) {
+      toast({
+        title: 'Seller acknowledgment required',
+        description: 'Please accept the seller acknowledgment before publishing an animal listing.',
         variant: 'destructive',
       });
       return;

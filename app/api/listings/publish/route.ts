@@ -19,6 +19,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { getCategoryRequirements } from '@/lib/compliance/requirements';
 
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
@@ -368,6 +369,23 @@ export async function POST(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    // Animal categories: require seller acknowledgment (server-authoritative).
+    // NOTE: whitetail uses a stricter, category-specific attestation above.
+    const req = getCategoryRequirements(normalizedCategory as any);
+    if (req.isAnimal && normalizedCategory !== 'whitetail_breeder') {
+      if (listingData.sellerAnimalAttestationAccepted !== true) {
+        return json(
+          {
+            error: 'Seller acknowledgment required',
+            code: 'SELLER_ANIMAL_ACK_REQUIRED',
+            message:
+              'Before publishing an animal listing, you must acknowledge that you are solely responsible for representations, permits, and compliance, and that Wildlife Exchange does not take custody of animals.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Get user (for seller tier snapshot)

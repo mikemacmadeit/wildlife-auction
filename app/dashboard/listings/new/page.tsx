@@ -21,7 +21,14 @@ import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
 import { ListingPhotoPicker, type ListingPhotoSnapshot } from '@/components/photos/ListingPhotoPicker';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ListingAttributes, WildlifeAttributes, CattleAttributes, EquipmentAttributes, WhitetailBreederAttributes } from '@/lib/types';
+import {
+  ListingAttributes,
+  WildlifeAttributes,
+  CattleAttributes,
+  EquipmentAttributes,
+  WhitetailBreederAttributes,
+  SportingWorkingDogAttributes,
+} from '@/lib/types';
 import { AlertCircle } from 'lucide-react';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -36,6 +43,7 @@ import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { cn } from '@/lib/utils';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { isAnimalCategory } from '@/lib/compliance/requirements';
 // Seller Tiers model: no listing limits.
 
 function NewListingPageContent() {
@@ -50,6 +58,7 @@ function NewListingPageContent() {
   const [submittedListingId, setSubmittedListingId] = useState<string | null>(null);
   // (No listing-limit gating in Seller Tiers model)
   const [sellerAttestationAccepted, setSellerAttestationAccepted] = useState(false);
+  const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';
     type: ListingType | '';
@@ -76,7 +85,7 @@ function NewListingPageContent() {
       offerExpiryHours: number;
     };
     // Union (not intersection): attributes vary by category.
-    attributes: Partial<WildlifeAttributes | CattleAttributes | EquipmentAttributes | WhitetailBreederAttributes>;
+    attributes: Partial<WildlifeAttributes | CattleAttributes | SportingWorkingDogAttributes | EquipmentAttributes | WhitetailBreederAttributes>;
   }>({
     category: '',
     type: '',
@@ -116,6 +125,7 @@ function NewListingPageContent() {
   const [resumeDraftPayload, setResumeDraftPayload] = useState<{
     formData: any;
     sellerAttestationAccepted?: boolean;
+    sellerAnimalAttestationAccepted?: boolean;
     listingId?: string | null;
     savedAtMs?: number;
   } | null>(null);
@@ -163,9 +173,10 @@ function NewListingPageContent() {
       bestOffer: formData.bestOffer,
       attributes: formData.attributes,
       sellerAttestationAccepted,
+      sellerAnimalAttestationAccepted,
       listingId,
     });
-  }, [formData, sellerAttestationAccepted, listingId]);
+  }, [formData, sellerAttestationAccepted, sellerAnimalAttestationAccepted, listingId]);
 
   const autosaveKey = (uid: string | null) => `we:create_listing_autosave:v1:${uid || 'anon'}`;
   const fresh = searchParams?.get('fresh') === '1';
@@ -199,6 +210,8 @@ function NewListingPageContent() {
         setResumeDraftPayload({
           formData: parsed.formData,
           sellerAttestationAccepted: typeof parsed?.sellerAttestationAccepted === 'boolean' ? parsed.sellerAttestationAccepted : undefined,
+          sellerAnimalAttestationAccepted:
+            typeof parsed?.sellerAnimalAttestationAccepted === 'boolean' ? parsed.sellerAnimalAttestationAccepted : undefined,
           listingId: typeof parsed?.listingId === 'string' ? parsed.listingId.trim() : null,
           savedAtMs: typeof parsed?.savedAtMs === 'number' ? parsed.savedAtMs : undefined,
         });
@@ -227,6 +240,7 @@ function NewListingPageContent() {
           JSON.stringify({
             formData,
             sellerAttestationAccepted,
+            sellerAnimalAttestationAccepted,
             listingId,
             savedAtMs,
           })
@@ -240,7 +254,7 @@ function NewListingPageContent() {
     return () => {
       if (localSaveTimerRef.current) clearTimeout(localSaveTimerRef.current);
     };
-  }, [formData, sellerAttestationAccepted, listingId, user?.uid, hasAnyProgress]);
+  }, [formData, sellerAttestationAccepted, sellerAnimalAttestationAccepted, listingId, user?.uid, hasAnyProgress]);
 
   // Server autosave (debounced). Only updates an existing draft to avoid duplicates.
   useEffect(() => {
@@ -289,6 +303,13 @@ function NewListingPageContent() {
             sellerAttestationAccepted: true,
             sellerAttestationAcceptedAt: new Date(),
           }),
+          ...(formData.category &&
+            isAnimalCategory(formData.category as any) &&
+            formData.category !== 'whitetail_breeder' &&
+            sellerAnimalAttestationAccepted && {
+              sellerAnimalAttestationAccepted: true,
+              sellerAnimalAttestationAcceptedAt: new Date(),
+            }),
         };
 
         if (formData.type === 'fixed' || formData.type === 'classified') {
@@ -315,7 +336,7 @@ function NewListingPageContent() {
     return () => {
       if (serverSaveTimerRef.current) clearTimeout(serverSaveTimerRef.current);
     };
-  }, [autosaveSig, formData, hasAnyProgress, listingId, sellerAttestationAccepted, user?.uid]);
+  }, [autosaveSig, formData, hasAnyProgress, listingId, sellerAttestationAccepted, sellerAnimalAttestationAccepted, user?.uid]);
 
   const refreshUserProfile = async () => {
     if (!user) return;
@@ -382,7 +403,7 @@ function NewListingPageContent() {
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle) are restricted to Texas residents only. Equipment listings can be multi-state.
+              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle, horses, dogs) are restricted to Texas residents only. Equipment/asset listings can be multi-state.
             </AlertDescription>
           </Alert>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -413,7 +434,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-6 text-center space-y-3">
+              <CardContent className="p-4">
                 {formData.category === 'whitetail_breeder' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -421,27 +442,33 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex justify-center">
-                  <div 
-                    className="w-16 h-16"
-                    style={{
-                      WebkitMaskImage: `url('/images/whitetail breeder icon.png')`,
-                      WebkitMaskSize: 'contain',
-                      WebkitMaskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                      maskImage: `url('/images/whitetail breeder icon.png')`,
-                      maskSize: 'contain',
-                      maskRepeat: 'no-repeat',
-                      maskPosition: 'center',
-                      backgroundColor: 'hsl(var(--primary))'
-                    }}
-                  />
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div
+                      className="w-12 h-12"
+                      style={{
+                        WebkitMaskImage: `url('/images/whitetail breeder icon.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/whitetail breeder icon.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Whitetail Breeder</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      TPWD-permitted whitetail deer breeding facilities
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-start md:justify-center">
+                      <Badge variant="outline" className="text-[11px]">TPWD Required</Badge>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">Whitetail Breeder</h3>
-                <p className="text-sm text-muted-foreground">
-                  TPWD-permitted whitetail deer breeding facilities
-                </p>
-                <Badge variant="outline" className="text-xs">TPWD Required</Badge>
               </CardContent>
             </Card>
 
@@ -472,7 +499,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-6 text-center space-y-3">
+              <CardContent className="p-4">
                 {formData.category === 'wildlife_exotics' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -480,26 +507,30 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex justify-center">
-                  <div 
-                    className="w-16 h-16"
-                    style={{
-                      WebkitMaskImage: `url('/images/Fallow Icon.png')`,
-                      WebkitMaskSize: 'contain',
-                      WebkitMaskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                      maskImage: `url('/images/Fallow Icon.png')`,
-                      maskSize: 'contain',
-                      maskRepeat: 'no-repeat',
-                      maskPosition: 'center',
-                      backgroundColor: 'hsl(var(--primary))'
-                    }}
-                  />
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div
+                      className="w-12 h-12"
+                      style={{
+                        WebkitMaskImage: `url('/images/Fallow Icon.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/Fallow Icon.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Wildlife &amp; Exotics</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Axis deer, blackbuck, fallow deer, and other exotic species
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">Wildlife & Exotics</h3>
-                <p className="text-sm text-muted-foreground">
-                  Axis deer, blackbuck, fallow deer, and other exotic species
-                </p>
               </CardContent>
             </Card>
 
@@ -513,6 +544,7 @@ function NewListingPageContent() {
                   setFormData({
                     ...formData,
                     category: 'horse_equestrian',
+                    attributes: { ...(formData.attributes as any), speciesId: 'horse' },
                     location: { ...formData.location, state: 'TX' }, // Force TX for horses
                   });
                 }
@@ -526,11 +558,12 @@ function NewListingPageContent() {
                 setFormData({
                   ...formData,
                   category: 'horse_equestrian',
+                  attributes: { ...(formData.attributes as any), speciesId: 'horse' },
                   location: { ...formData.location, state: 'TX' }, // Force TX for horses
                 });
               }}
             >
-              <CardContent className="p-6 text-center space-y-3">
+              <CardContent className="p-4">
                 {formData.category === 'horse_equestrian' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -538,24 +571,79 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex justify-center">
-                  <div
-                    className="w-16 h-16"
-                    style={{
-                      WebkitMaskImage: `url('/images/Horse.png')`,
-                      WebkitMaskSize: 'contain',
-                      WebkitMaskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                      maskImage: `url('/images/Horse.png')`,
-                      maskSize: 'contain',
-                      maskRepeat: 'no-repeat',
-                      maskPosition: 'center',
-                      backgroundColor: 'hsl(var(--primary))',
-                    }}
-                  />
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div
+                      className="w-12 h-12"
+                      style={{
+                        WebkitMaskImage: `url('/images/Horse.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/Horse.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Horse &amp; Equestrian</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">Horses, tack, and equestrian-related listings</p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">Horse &amp; Equestrian</h3>
-                <p className="text-sm text-muted-foreground">Horses, tack, and equestrian-related listings</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'sporting_working_dogs'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({
+                    ...formData,
+                    category: 'sporting_working_dogs',
+                    attributes: { ...(formData.attributes as any), speciesId: 'dog' },
+                    location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                formData.category === 'sporting_working_dogs'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+              }`}
+              onClick={() => {
+                setFormData({
+                  ...formData,
+                  category: 'sporting_working_dogs',
+                  attributes: { ...(formData.attributes as any), speciesId: 'dog' },
+                  location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                });
+              }}
+            >
+              <CardContent className="p-4">
+                {formData.category === 'sporting_working_dogs' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 icon-primary-color mask-icon-dog" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Sporting &amp; Working Dogs</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Bird dogs, hog dogs, tracking dogs, and other working/sporting dogs
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -586,7 +674,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-6 text-center space-y-3">
+              <CardContent className="p-4">
                 {formData.category === 'cattle_livestock' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -594,26 +682,69 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex justify-center">
-                  <div 
-                    className="w-16 h-16"
-                    style={{
-                      WebkitMaskImage: `url('/images/Bull Icon.png')`,
-                      WebkitMaskSize: 'contain',
-                      WebkitMaskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                      maskImage: `url('/images/Bull Icon.png')`,
-                      maskSize: 'contain',
-                      maskRepeat: 'no-repeat',
-                      maskPosition: 'center',
-                      backgroundColor: 'hsl(var(--primary))'
-                    }}
-                  />
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div
+                      className="w-12 h-12"
+                      style={{
+                        WebkitMaskImage: `url('/images/Bull Icon.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/Bull Icon.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Cattle &amp; Livestock</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Cattle, bulls, cows, heifers, and registered livestock
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">Cattle & Livestock</h3>
-                <p className="text-sm text-muted-foreground">
-                  Cattle, bulls, cows, heifers, and registered livestock
-                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'hunting_outfitter_assets'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({ ...formData, category: 'hunting_outfitter_assets' });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                formData.category === 'hunting_outfitter_assets'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+              }`}
+              onClick={() => setFormData({ ...formData, category: 'hunting_outfitter_assets' })}
+            >
+              <CardContent className="p-4">
+                {formData.category === 'hunting_outfitter_assets' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 icon-primary-color mask-icon-hunting-blind" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Hunting &amp; Outfitter Assets</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Camera systems, blinds, and water/well systems
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -634,7 +765,7 @@ function NewListingPageContent() {
               }`}
               onClick={() => setFormData({ ...formData, category: 'ranch_equipment' })}
             >
-              <CardContent className="p-6 text-center space-y-3">
+              <CardContent className="p-4">
                 {formData.category === 'ranch_equipment' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -642,26 +773,69 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex justify-center">
-                  <div 
-                    className="w-16 h-16"
-                    style={{
-                      WebkitMaskImage: `url('/images/Tractor Icon.png')`,
-                      WebkitMaskSize: 'contain',
-                      WebkitMaskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                      maskImage: `url('/images/Tractor Icon.png')`,
-                      maskSize: 'contain',
-                      maskRepeat: 'no-repeat',
-                      maskPosition: 'center',
-                      backgroundColor: 'hsl(var(--primary))'
-                    }}
-                  />
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div
+                      className="w-12 h-12"
+                      style={{
+                        WebkitMaskImage: `url('/images/Tractor Icon.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/Tractor Icon.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Ranch Equipment &amp; Attachments</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Tractors, skid steers, machinery, and attachments/implements (vehicles &amp; trailers listed separately)
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">Ranch Equipment</h3>
-                <p className="text-sm text-muted-foreground">
-                  Tractors, skid steers, UTVs, trailers, and ranch equipment
-                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'ranch_vehicles'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({ ...formData, category: 'ranch_vehicles' });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                formData.category === 'ranch_vehicles'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+              }`}
+              onClick={() => setFormData({ ...formData, category: 'ranch_vehicles' })}
+            >
+              <CardContent className="p-4">
+                {formData.category === 'ranch_vehicles' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 icon-primary-color mask-icon-top-drive" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Ranch Vehicles &amp; Trailers</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Trucks, UTVs/ATVs, and trailers (stock, gooseneck, flatbed, utility)
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -794,7 +968,24 @@ function NewListingPageContent() {
                 if (!d.titleOrLienDisclosure) errs.push('Title/Lien Disclosure');
                 return errs;
               }
-              if (formData.category === 'ranch_equipment') {
+              if (formData.category === 'sporting_working_dogs') {
+                const attrs = formData.attributes as Partial<SportingWorkingDogAttributes>;
+                const errs: string[] = [];
+                if ((attrs as any).speciesId !== 'dog') errs.push('Species');
+                if (!attrs.breed?.trim()) errs.push('Breed');
+                const hasAge =
+                  typeof (attrs as any).age === 'number'
+                    ? Number.isFinite((attrs as any).age)
+                    : !!String((attrs as any).age || '').trim();
+                if (!hasAge) errs.push('Age');
+                if (!attrs.sex) errs.push('Sex');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
+                if (!attrs.identificationDisclosure) errs.push('Identification Disclosure');
+                if (!attrs.healthDisclosure) errs.push('Health Disclosure');
+                if (!attrs.transportDisclosure) errs.push('Transport Disclosure');
+                return errs;
+              }
+              if (formData.category === 'ranch_equipment' || formData.category === 'ranch_vehicles' || formData.category === 'hunting_outfitter_assets') {
                 const attrs = formData.attributes as Partial<EquipmentAttributes>;
                 const errs: string[] = [];
                 const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
@@ -836,6 +1027,38 @@ function NewListingPageContent() {
               )}
             </div>
           )}
+
+          {formData.category &&
+            isAnimalCategory(formData.category as any) &&
+            formData.category !== 'whitetail_breeder' && (
+              <div
+                className={`space-y-3 p-4 border rounded-lg ${
+                  !sellerAnimalAttestationAccepted ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'
+                }`}
+              >
+                <Label className="text-base font-semibold">
+                  Seller acknowledgment <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="seller-animal-attestation"
+                    checked={sellerAnimalAttestationAccepted}
+                    onCheckedChange={(checked) => setSellerAnimalAttestationAccepted(checked === true)}
+                  />
+                  <Label htmlFor="seller-animal-attestation" className="cursor-pointer flex-1">
+                    <div className="font-medium">
+                      I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
+                      Wildlife Exchange does not take custody of animals.
+                    </div>
+                  </Label>
+                </div>
+                {!sellerAnimalAttestationAccepted && (
+                  <p className="text-sm text-destructive">
+                    You must accept this acknowledgment to publish an animal listing.
+                  </p>
+                )}
+              </div>
+            )}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
@@ -897,6 +1120,14 @@ function NewListingPageContent() {
           if (!attrs.animalIdDisclosure) errors.push('Animal Identification Disclosure');
           if (!attrs.healthDisclosure) errors.push('Health Disclosure');
           if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
+          if (!sellerAnimalAttestationAccepted) {
+            toast({
+              title: 'Seller acknowledgment required',
+              description: 'Please accept the seller acknowledgment for animal listings.',
+              variant: 'destructive',
+            });
+            return false;
+          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -922,6 +1153,14 @@ function NewListingPageContent() {
               : !!String((attrs as any).age || '').trim();
           const hasWeight = !!String(attrs.weightRange || '').trim();
           if (!hasAge && !hasWeight) errors.push('Age or Weight Range');
+          if (!sellerAnimalAttestationAccepted) {
+            toast({
+              title: 'Seller acknowledgment required',
+              description: 'Please accept the seller acknowledgment for animal listings.',
+              variant: 'destructive',
+            });
+            return false;
+          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -945,6 +1184,47 @@ function NewListingPageContent() {
           if (!d.healthDisclosure) errors.push('Health Disclosure');
           if (!d.transportDisclosure) errors.push('Transport Disclosure');
           if (!d.titleOrLienDisclosure) errors.push('Title/Lien Disclosure');
+          if (!sellerAnimalAttestationAccepted) {
+            toast({
+              title: 'Seller acknowledgment required',
+              description: 'Please accept the seller acknowledgment for animal listings.',
+              variant: 'destructive',
+            });
+            return false;
+          }
+          if (errors.length) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
+        }
+        if (formData.category === 'sporting_working_dogs') {
+          const attrs: any = formData.attributes as any;
+          const errors: string[] = [];
+          if (attrs.speciesId !== 'dog') errors.push('Species');
+          if (!String(attrs.breed || '').trim()) errors.push('Breed');
+          const hasAge =
+            typeof attrs.age === 'number'
+              ? Number.isFinite(attrs.age)
+              : !!String(attrs.age || '').trim();
+          if (!hasAge) errors.push('Age');
+          if (!attrs.sex) errors.push('Sex');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
+          if (!attrs.healthDisclosure) errors.push('Health Disclosure');
+          if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
+          if (!sellerAnimalAttestationAccepted) {
+            toast({
+              title: 'Seller acknowledgment required',
+              description: 'Please accept the seller acknowledgment for animal listings.',
+              variant: 'destructive',
+            });
+            return false;
+          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -966,6 +1246,32 @@ function NewListingPageContent() {
           if (requiresTitle) {
             if (!attrs.hasTitle) errors.push('Has Title');
             if (!attrs.vinOrSerial?.trim()) errors.push('VIN or Serial Number');
+          }
+          if (errors.length) {
+            toast({
+              title: 'Missing Required Fields',
+              description: `Please complete: ${errors.join(', ')}`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
+        }
+        if (formData.category === 'ranch_vehicles' || formData.category === 'hunting_outfitter_assets') {
+          const attrs = formData.attributes as Partial<EquipmentAttributes>;
+          const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
+          const requiresTitle = attrs.equipmentType && vehiclesRequiringTitle.includes(String(attrs.equipmentType).toLowerCase());
+          const errors: string[] = [];
+          if (!attrs.equipmentType) errors.push('Equipment Type');
+          if (!attrs.condition) errors.push('Condition');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (requiresTitle) {
+            if (!attrs.hasTitle) errors.push('Has Title');
+            if (!attrs.vinOrSerial?.trim()) errors.push('VIN or Serial Number');
+          }
+          if (formData.category === 'hunting_outfitter_assets' && attrs.equipmentType === 'camera_system') {
+            if (!String(attrs.make || '').trim()) errors.push('Make');
+            if (!String(attrs.model || '').trim()) errors.push('Model');
           }
           if (errors.length) {
             toast({
@@ -1729,6 +2035,15 @@ function NewListingPageContent() {
       return;
     }
 
+    if (formData.category && isAnimalCategory(formData.category as any) && formData.category !== 'whitetail_breeder' && !sellerAnimalAttestationAccepted) {
+      toast({
+        title: 'Seller acknowledgment required',
+        description: 'Please accept the seller acknowledgment before publishing an animal listing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate photos
     if (formData.photoIds.length === 0) {
       toast({
@@ -1761,6 +2076,10 @@ function NewListingPageContent() {
         locationData.zip = formData.location.zip.trim();
       }
 
+      const normalizedAttributes: any = { ...(formData.attributes as any) };
+      if (formData.category === 'horse_equestrian') normalizedAttributes.speciesId = 'horse';
+      if (formData.category === 'sporting_working_dogs') normalizedAttributes.speciesId = 'dog';
+
       const listingData = {
         title: formData.title,
         description: formData.description,
@@ -1781,12 +2100,18 @@ function NewListingPageContent() {
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
         ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
-        attributes: formData.attributes as ListingAttributes,
+        attributes: normalizedAttributes as ListingAttributes,
         // Whitetail-only seller attestation
         ...(formData.category === 'whitetail_breeder' && {
           sellerAttestationAccepted: sellerAttestationAccepted === true,
           sellerAttestationAcceptedAt: sellerAttestationAccepted ? new Date() : undefined,
         }),
+        ...(formData.category &&
+          isAnimalCategory(formData.category as any) &&
+          formData.category !== 'whitetail_breeder' && {
+            sellerAnimalAttestationAccepted: sellerAnimalAttestationAccepted === true,
+            sellerAnimalAttestationAcceptedAt: sellerAnimalAttestationAccepted ? new Date() : undefined,
+          }),
       } as any;
 
       // Add pricing based on type
@@ -1965,6 +2290,10 @@ function NewListingPageContent() {
         locationData.zip = formData.location.zip.trim();
       }
 
+      const normalizedAttributes: any = { ...(formData.attributes as any) };
+      if (formData.category === 'horse_equestrian') normalizedAttributes.speciesId = 'horse';
+      if (formData.category === 'sporting_working_dogs') normalizedAttributes.speciesId = 'dog';
+
       const listingData = {
         title: formData.title || 'Draft Listing',
         description: formData.description || '',
@@ -1980,12 +2309,19 @@ function NewListingPageContent() {
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
         ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
-        attributes: formData.attributes as ListingAttributes,
+        attributes: normalizedAttributes as ListingAttributes,
         // Whitetail-only seller attestation (draft creation requires it)
         ...(formData.category === 'whitetail_breeder' && {
           sellerAttestationAccepted: true,
           sellerAttestationAcceptedAt: new Date(),
         }),
+        ...(formData.category &&
+          isAnimalCategory(formData.category as any) &&
+          formData.category !== 'whitetail_breeder' &&
+          sellerAnimalAttestationAccepted && {
+            sellerAnimalAttestationAccepted: true,
+            sellerAnimalAttestationAcceptedAt: new Date(),
+          }),
       } as any;
 
       if (formData.type === 'fixed' || formData.type === 'classified') {
@@ -2110,6 +2446,7 @@ function NewListingPageContent() {
                 const p = resumeDraftPayload;
                 if (p?.formData) setFormData(p.formData);
                 if (typeof p?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(p.sellerAttestationAccepted);
+                if (typeof p?.sellerAnimalAttestationAccepted === 'boolean') setSellerAnimalAttestationAccepted(p.sellerAnimalAttestationAccepted);
                 if (typeof p?.listingId === 'string' && p.listingId.trim()) {
                   const id = p.listingId.trim();
                   // If the saved listingId is already active, don't try to publish it again from the "new listing" flow.

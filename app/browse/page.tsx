@@ -214,7 +214,13 @@ export default function BrowsePage() {
       const max = filters.maxPrice !== undefined ? `$${Number(filters.maxPrice).toLocaleString()}` : 'Any';
       summary.push({ label: 'Price', value: `${min} – ${max}` });
     }
-    if (filters.category === 'ranch_equipment' && filters.healthStatus && filters.healthStatus.length) {
+    if (
+      (filters.category === 'ranch_equipment' ||
+        filters.category === 'ranch_vehicles' ||
+        filters.category === 'hunting_outfitter_assets') &&
+      filters.healthStatus &&
+      filters.healthStatus.length
+    ) {
       const opt = BROWSE_EQUIPMENT_CONDITION_OPTIONS.find((o) => o.value === filters.healthStatus![0]);
       summary.push({ label: 'Condition', value: opt?.label || String(filters.healthStatus[0]) });
     }
@@ -411,10 +417,15 @@ export default function BrowsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType, filters, sortBy, listingStatus]);
 
-  // Animals don't use "condition" on Browse; only Ranch Equipment does.
-  // If the user switches away from Ranch Equipment, clear any stale condition selection so results don't look broken.
+  // Animals don't use "condition" on Browse; only equipment-like categories do.
+  // If the user switches away, clear any stale condition selection so results don't look broken.
   useEffect(() => {
-    if (filters.category === 'ranch_equipment') return;
+    if (
+      filters.category === 'ranch_equipment' ||
+      filters.category === 'ranch_vehicles' ||
+      filters.category === 'hunting_outfitter_assets'
+    )
+      return;
     if (!filters.healthStatus || filters.healthStatus.length === 0) return;
     setFilters((p) => ({ ...(p || {}), healthStatus: undefined }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -511,8 +522,12 @@ export default function BrowsePage() {
         filters.healthStatus!.some((status) => {
           if (listing.attributes) {
             const attrs = listing.attributes as any;
-            // Ranch equipment uses `attributes.condition` (enum).
-            if (listing.category === 'ranch_equipment') {
+            // Equipment-like categories use `attributes.condition` (enum).
+            if (
+              listing.category === 'ranch_equipment' ||
+              listing.category === 'ranch_vehicles' ||
+              listing.category === 'hunting_outfitter_assets'
+            ) {
               return String(attrs.condition || '').toLowerCase() === String(status || '').toLowerCase();
             }
             // Animals: legacy "health notes include" matching (but UI no longer exposes this on Browse).
@@ -842,7 +857,9 @@ export default function BrowsePage() {
                     Price
                   </Button>
 
-                  {filters.category === 'ranch_equipment' ? (
+                  {filters.category === 'ranch_equipment' ||
+                  filters.category === 'ranch_vehicles' ||
+                  filters.category === 'hunting_outfitter_assets' ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -1136,7 +1153,9 @@ export default function BrowsePage() {
               </SelectContent>
             </Select>
 
-            {filters.category === 'ranch_equipment' ? (
+            {filters.category === 'ranch_equipment' ||
+            filters.category === 'ranch_vehicles' ||
+            filters.category === 'hunting_outfitter_assets' ? (
               <Select
                 value={(filters.healthStatus && filters.healthStatus.length ? filters.healthStatus[0] : '__any__') as any}
                 onValueChange={(v) => setFilters((p) => ({ ...p, healthStatus: v === '__any__' ? undefined : [v] }))}

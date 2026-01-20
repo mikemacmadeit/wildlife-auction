@@ -16,6 +16,7 @@ import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 function inferEffectivePaymentMethodFromCheckoutSession(
   session: Stripe.Checkout.Session
@@ -384,10 +385,47 @@ export async function handleCheckoutSessionCompleted(
         ? (effectivePaymentMethod === 'wire' ? 'awaiting_wire' : 'awaiting_bank_transfer')
         : 'pending';
 
+    // Public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
+    const photos = Array.isArray((listingData as any)?.photos) ? ((listingData as any).photos as any[]) : [];
+    const sortedPhotos = photos.length
+      ? [...photos].sort((a: any, b: any) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
+      : [];
+    const coverPhotoUrl =
+      (sortedPhotos.find((p: any) => typeof p?.url === 'string' && p.url.trim())?.url as string | undefined) ||
+      (Array.isArray((listingData as any)?.images)
+        ? (((listingData as any).images as any[]).find((u: any) => typeof u === 'string' && u.trim()) as string | undefined)
+        : undefined);
+
+    const city = (listingData as any)?.location?.city ? String((listingData as any).location.city) : '';
+    const state = (listingData as any)?.location?.state ? String((listingData as any).location.state) : '';
+    const locationLabel = city && state ? `${city}, ${state}` : state || '';
+
+    const sellerDisplayName =
+      String((listingData as any)?.sellerSnapshot?.displayName || '').trim() ||
+      String((listingData as any)?.sellerSnapshot?.name || '').trim() ||
+      'Seller';
+    const sellerPhotoURL =
+      typeof (listingData as any)?.sellerSnapshot?.photoURL === 'string' && String((listingData as any).sellerSnapshot.photoURL).trim()
+        ? String((listingData as any).sellerSnapshot.photoURL)
+        : undefined;
+
     const orderData: any = {
       listingId,
       buyerId,
       sellerId,
+      listingSnapshot: {
+        listingId,
+        title: String((listingData as any)?.title || 'Listing'),
+        type: (listingData as any)?.type ? String((listingData as any).type) : undefined,
+        category: listingCategory ? String(listingCategory) : undefined,
+        ...(coverPhotoUrl ? { coverPhotoUrl: String(coverPhotoUrl) } : {}),
+        ...(locationLabel ? { locationLabel } : {}),
+      },
+      sellerSnapshot: {
+        sellerId: String(sellerId || ''),
+        displayName: sellerDisplayName,
+        ...(sellerPhotoURL ? { photoURL: sellerPhotoURL } : {}),
+      },
       ...(offerId ? { offerId: String(offerId) } : {}),
       amount: amount / 100,
       platformFee: platformFee / 100,
@@ -424,6 +462,76 @@ export async function handleCheckoutSessionCompleted(
       await recomputeOrderComplianceDocsStatus({ db: db as any, orderId: orderRef.id });
     } catch {
       // ignore; best-effort
+    }
+
+    // Server-authored timeline events (idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId: orderRef.id,
+        event: {
+          id: `CHECKOUT_SESSION_CREATED:${checkoutSessionId}`,
+          type: 'CHECKOUT_SESSION_CREATED',
+          label: 'Checkout session created',
+          actor: 'system',
+          visibility: 'buyer',
+          meta: {
+            checkoutSessionId,
+            paymentMethod: effectivePaymentMethod,
+            async: isAsync,
+          },
+        },
+      });
+
+      if (paymentConfirmed) {
+        await appendOrderTimelineEvent({
+          db: db as any,
+          orderId: orderRef.id,
+          event: {
+            id: `PAYMENT_AUTHORIZED:${paymentIntentId}`,
+            type: 'PAYMENT_AUTHORIZED',
+            label: 'Payment confirmed',
+            actor: 'system',
+            visibility: 'buyer',
+            meta: { paymentIntentId },
+          },
+        });
+        await appendOrderTimelineEvent({
+          db: db as any,
+          orderId: orderRef.id,
+          event: {
+            id: `FUNDS_HELD:${paymentIntentId}`,
+            type: 'FUNDS_HELD',
+            label: 'Funds held (escrow)',
+            actor: 'system',
+            visibility: 'buyer',
+            meta: { escrow: true },
+          },
+        });
+      }
+
+      if (transferPermitRequired) {
+        await appendOrderTimelineEvent({
+          db: db as any,
+          orderId: orderRef.id,
+          event: {
+            id: `COMPLIANCE_REQUIRED:TPWD_TRANSFER_APPROVAL:${orderRef.id}`,
+            type: 'COMPLIANCE_REQUIRED',
+            label: 'Transfer permit required',
+            actor: 'system',
+            visibility: 'buyer',
+            meta: { type: 'TPWD_TRANSFER_APPROVAL' },
+          },
+        });
+      }
+    } catch (e) {
+      logWarn('Failed to append order timeline events (best-effort)', {
+        requestId,
+        route: '/api/stripe/webhook',
+        orderId: orderRef.id,
+        checkoutSessionId,
+        error: String(e),
+      });
     }
 
     // If this checkout originated from an accepted offer, link offer -> order + session
@@ -712,6 +820,43 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     { merge: true }
   );
 
+  // Timeline events (idempotent).
+  try {
+    await appendOrderTimelineEvent({
+      db: db as any,
+      orderId: orderDoc.id,
+      event: {
+        id: `PAYMENT_AUTHORIZED:${paymentIntentId}`,
+        type: 'PAYMENT_AUTHORIZED',
+        label: 'Payment confirmed',
+        actor: 'system',
+        visibility: 'buyer',
+        meta: { paymentIntentId, paymentMethod: effectivePaymentMethod },
+      },
+    });
+    await appendOrderTimelineEvent({
+      db: db as any,
+      orderId: orderDoc.id,
+      event: {
+        id: `FUNDS_HELD:${paymentIntentId}`,
+        type: 'FUNDS_HELD',
+        label: 'Funds held (escrow)',
+        actor: 'system',
+        visibility: 'buyer',
+        meta: { escrow: true, paymentMethod: effectivePaymentMethod },
+      },
+    });
+  } catch (e) {
+    logWarn('Failed to append async payment timeline events (best-effort)', {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId: orderDoc.id,
+      checkoutSessionId,
+      paymentIntentId,
+      error: String(e),
+    });
+  }
+
   // Determine listing type (public-safe) for sold metadata.
   let listingType: string | null = null;
   try {
@@ -988,6 +1133,42 @@ export async function handleWirePaymentIntentSucceeded(
     },
     { merge: true }
   );
+
+  // Timeline events (idempotent).
+  try {
+    await appendOrderTimelineEvent({
+      db: db as any,
+      orderId: orderDoc.id,
+      event: {
+        id: `PAYMENT_AUTHORIZED:${paymentIntentId}`,
+        type: 'PAYMENT_AUTHORIZED',
+        label: 'Payment confirmed',
+        actor: 'system',
+        visibility: 'buyer',
+        meta: { paymentIntentId, paymentMethod: 'wire' },
+      },
+    });
+    await appendOrderTimelineEvent({
+      db: db as any,
+      orderId: orderDoc.id,
+      event: {
+        id: `FUNDS_HELD:${paymentIntentId}`,
+        type: 'FUNDS_HELD',
+        label: 'Funds held (escrow)',
+        actor: 'system',
+        visibility: 'buyer',
+        meta: { escrow: true, paymentMethod: 'wire' },
+      },
+    });
+  } catch (e) {
+    logWarn('Failed to append wire payment timeline events (best-effort)', {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId: orderDoc.id,
+      paymentIntentId,
+      error: String(e),
+    });
+  }
 
   if (listingId) {
     let listingType: string | null = null;

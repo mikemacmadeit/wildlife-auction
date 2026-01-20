@@ -180,11 +180,11 @@ export default function RanchEquipmentBrowsePage() {
           <div className="flex items-center gap-3 mb-4">
             <Wrench className="h-8 w-8 text-primary" />
             <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
-              Ranch Equipment
+              Ranch Equipment &amp; Attachments
             </h1>
           </div>
           <p className="text-base md:text-lg text-muted-foreground">
-            Browse tractors, skid steers, UTVs, trailers, and ranch equipment
+            Tractors, skid steers, and ranch machinery, including attachments and implements such as shredders, plows, augers, grapples, and other work equipment. Vehicles and trailers are listed separately.
           </p>
         </div>
 

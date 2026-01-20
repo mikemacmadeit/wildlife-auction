@@ -49,7 +49,9 @@ function countActiveFilters(filters: FilterState): number {
     (filters.maxPrice !== undefined ? 1 : 0) +
     (filters.species?.length || 0) +
     (filters.quantity ? 1 : 0) +
-    (filters.category === 'ranch_equipment' ? (filters.healthStatus?.length || 0) : 0) +
+    (filters.category === 'ranch_equipment' || filters.category === 'ranch_vehicles' || filters.category === 'hunting_outfitter_assets'
+      ? (filters.healthStatus?.length || 0)
+      : 0) +
     (filters.papers !== undefined ? 1 : 0) +
     (filters.verifiedSeller ? 1 : 0) +
     (filters.transportReady ? 1 : 0) +
@@ -72,7 +74,10 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
     !localFilters.category ||
     localFilters.category === 'wildlife_exotics' ||
     localFilters.category === 'whitetail_breeder';
-  const showConditionFilter = localFilters.category === 'ranch_equipment';
+  const showConditionFilter =
+    localFilters.category === 'ranch_equipment' ||
+    localFilters.category === 'ranch_vehicles' ||
+    localFilters.category === 'hunting_outfitter_assets';
 
   const handleApply = () => {
     onFiltersChange(localFilters);

@@ -14,6 +14,7 @@ import { getPayoutSafetyBlockReason } from '@/lib/stripe/release-payment';
 import { validateRequest, resolveDisputeSchema } from '@/lib/validation/api-schemas';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -340,6 +341,25 @@ export async function POST(
       },
       source: 'admin_ui',
     });
+
+    // Timeline (server-authored, idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId,
+        event: {
+          id: `DISPUTE_RESOLVED:${orderId}`,
+          type: 'DISPUTE_RESOLVED',
+          label: 'Dispute resolved',
+          actor: 'admin',
+          visibility: 'buyer',
+          timestamp: Timestamp.now(),
+          meta: { resolution },
+        },
+      });
+    } catch {
+      // best-effort
+    }
 
     // Handle buyer fraud tracking
     if (markFraudulent) {

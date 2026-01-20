@@ -21,9 +21,10 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { containsProhibitedKeywords } from '@/lib/compliance/validation';
 import { formatWireInstructionsFromPaymentIntent } from '@/lib/stripe/wire';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
-import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
+import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error, details: validation.details?.errors }, { status: 400 });
     }
 
-    const { listingId, offerId } = validation.data as any;
+    const { listingId, offerId, buyerAcksAnimalRisk } = validation.data as any;
 
     // Get listing
     const listingRef = db.collection('listings').doc(listingId);
@@ -143,6 +144,19 @@ export async function POST(request: Request) {
       listingCategory = normalizeCategory((listingData as any).category);
     } catch {
       return NextResponse.json({ error: 'Invalid listing category' }, { status: 400 });
+    }
+
+    const categoryReq = getCategoryRequirements(listingCategory as any);
+    if (categoryReq.isAnimal && buyerAcksAnimalRisk !== true) {
+      return NextResponse.json(
+        {
+          error: 'Buyer acknowledgment required',
+          code: 'BUYER_ACK_REQUIRED',
+          message:
+            'Before purchasing an animal listing, you must acknowledge live-animal risk, seller-only representations, and that the platform does not take custody.',
+        },
+        { status: 400 }
+      );
     }
 
     // If a high-ticket checkout is pending for this listing, block additional checkouts
@@ -346,10 +360,45 @@ export async function POST(request: Request) {
       const l = latestListing.data() as any;
       if (l.purchaseReservedByOrderId) throw new Error('Listing is reserved pending payment confirmation');
 
+      // Public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
+      const photos = Array.isArray(l?.photos) ? l.photos : [];
+      const sortedPhotos = photos.length
+        ? [...photos].sort((a: any, b: any) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
+        : [];
+      const coverPhotoUrl =
+        (sortedPhotos.find((p: any) => typeof p?.url === 'string' && p.url.trim())?.url as string | undefined) ||
+        (Array.isArray(l?.images) ? (l.images.find((u: any) => typeof u === 'string' && u.trim()) as string | undefined) : undefined);
+
+      const city = l?.location?.city ? String(l.location.city) : '';
+      const state = l?.location?.state ? String(l.location.state) : '';
+      const locationLabel = city && state ? `${city}, ${state}` : state || '';
+
+      const sellerDisplayName =
+        String(l?.sellerSnapshot?.displayName || '').trim() ||
+        String(l?.sellerSnapshot?.name || '').trim() ||
+        'Seller';
+      const sellerPhotoURL =
+        typeof l?.sellerSnapshot?.photoURL === 'string' && l.sellerSnapshot.photoURL.trim()
+          ? String(l.sellerSnapshot.photoURL)
+          : undefined;
+
       tx.set(orderRef, {
         listingId,
         buyerId,
         sellerId: listingData.sellerId,
+        listingSnapshot: {
+          listingId,
+          title: String(l?.title || listingData?.title || 'Listing'),
+          type: l?.type ? String(l.type) : undefined,
+          category: l?.category ? String(l.category) : undefined,
+          ...(coverPhotoUrl ? { coverPhotoUrl: String(coverPhotoUrl) } : {}),
+          ...(locationLabel ? { locationLabel } : {}),
+        },
+        sellerSnapshot: {
+          sellerId: String(listingData.sellerId || ''),
+          displayName: sellerDisplayName,
+          ...(sellerPhotoURL ? { photoURL: sellerPhotoURL } : {}),
+        },
         ...(offerId ? { offerId: String(offerId) } : {}),
         amount: amountCents / 100,
         platformFee: platformFeeCents / 100,
@@ -360,6 +409,24 @@ export async function POST(request: Request) {
         sellerStripeAccountId: sellerStripeAccountId,
         paidAt: null,
         disputeDeadlineAt: null,
+        timeline: [
+          {
+            id: `ORDER_PLACED:${orderId}`,
+            type: 'ORDER_PLACED',
+            label: 'Order placed',
+            timestamp: Timestamp.fromDate(now),
+            actor: 'buyer',
+            visibility: 'buyer',
+            meta: { paymentMethod: 'wire' },
+          },
+        ],
+        ...(categoryReq.isAnimal
+          ? {
+              buyerAcksAnimalRisk: true,
+              buyerAcksAnimalRiskAt: now,
+              buyerAcksAnimalRiskVersion: LEGAL_VERSIONS.buyerAcknowledgment.version,
+            }
+          : {}),
         createdAt: now,
         updatedAt: now,
         lastUpdatedByRole: 'admin',

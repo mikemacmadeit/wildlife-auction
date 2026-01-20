@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
 import { createUserDocument } from '@/lib/firebase/users';
+import { getIdToken } from '@/lib/firebase/auth-helper';
 import { 
   User, 
   Mail, 
@@ -28,6 +29,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LegalDocsModal } from '@/components/legal/LegalDocsModal';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -47,6 +49,7 @@ export default function RegisterPage() {
   };
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -73,6 +76,33 @@ export default function RegisterPage() {
         if (result?.user) {
           createUserDocument(result.user)
             .then(() => {
+              // If the user accepted terms before redirecting to Google, record acceptance server-side now.
+              (async () => {
+                try {
+                  const agreed =
+                    typeof window !== 'undefined' && window.sessionStorage.getItem('we_agreed_terms') === '1';
+                  if (!agreed) {
+                    router.push('/legal/accept?next=/dashboard');
+                    return;
+                  }
+                  window.sessionStorage.removeItem('we_agreed_terms');
+
+                  const token = await getIdToken(result.user, true);
+                  await fetch('/api/legal/accept', {
+                    method: 'POST',
+                    headers: {
+                      'content-type': 'application/json',
+                      authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
+                    }),
+                  });
+                } catch {
+                  // If acceptance write fails, RequireAuth gate will force acceptance later.
+                }
+              })();
+
               toast({
                 title: 'Welcome to Wildlife Exchange!',
                 description: 'Your account has been created successfully with Google.',
@@ -189,6 +219,23 @@ export default function RegisterPage() {
           location: formData.location,
         });
 
+        // Record legal acceptance server-side (non-spoofable).
+        try {
+          const token = await getIdToken(userCredential.user, true);
+          await fetch('/api/legal/accept', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
+            }),
+          });
+        } catch {
+          // If this fails, the RequireAuth gate will force acceptance later.
+        }
+
         toast({
           title: 'Account created successfully!',
           description: 'Welcome to Wildlife Exchange! Please check your email to verify your account.',
@@ -224,11 +271,40 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      if (!formData.agreeToTerms) {
+        toast({
+          title: 'Terms required',
+          description: 'You must agree to the Terms of Service and Marketplace Policies to create an account.',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+      try {
+        // Persist across Google redirect.
+        sessionStorage.setItem('we_agreed_terms', '1');
+      } catch {}
+
       const userCredential = await signInWithGoogle();
 
       // Create user document in Firestore if it doesn't exist
       if (userCredential.user) {
         await createUserDocument(userCredential.user);
+
+        // Record legal acceptance server-side (best-effort; for redirect flows, see useEffect above).
+        try {
+          const token = await getIdToken(userCredential.user, true);
+          await fetch('/api/legal/accept', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
+            }),
+          });
+        } catch {}
 
         toast({
           title: 'Welcome to Wildlife Exchange!',
@@ -274,6 +350,19 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center py-12 md:py-20 px-4">
       <div className="w-full max-w-5xl">
+        <LegalDocsModal
+          open={legalOpen}
+          onOpenChange={setLegalOpen}
+          initialTab="tos"
+          agreeAction={{
+            buttonText: 'I Agree',
+            onConfirm: () => {
+              setFormData((p) => ({ ...p, agreeToTerms: true }));
+              if (errors.agreeToTerms) setErrors((e) => ({ ...e, agreeToTerms: '' }));
+              setLegalOpen(false);
+            },
+          }}
+        />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -730,11 +819,15 @@ export default function RegisterPage() {
                     />
                     <Label htmlFor="agreeToTerms" className="text-sm font-medium leading-relaxed cursor-pointer flex-1">
                       I agree to the{' '}
-                      <Link href="/terms" className="text-primary hover:underline font-semibold" target="_blank">
-                        Terms of Service
-                      </Link>
-                      {' '}and{' '}
-                      <Link href="/privacy" className="text-primary hover:underline font-semibold" target="_blank">
+                      <button
+                        type="button"
+                        className="text-primary hover:underline font-semibold"
+                        onClick={() => setLegalOpen(true)}
+                      >
+                        Terms of Service & Marketplace Policies
+                      </button>{' '}
+                      and{' '}
+                      <Link href="/privacy" className="text-primary hover:underline font-semibold">
                         Privacy Policy
                       </Link>
                       <span className="text-destructive"> *</span>
@@ -743,6 +836,9 @@ export default function RegisterPage() {
                   {errors.agreeToTerms && (
                     <p className="text-sm text-destructive font-medium ml-7">{errors.agreeToTerms}</p>
                   )}
+                  <div className="ml-7 text-xs text-muted-foreground">
+                    You can read the full Terms and policies in a modal without leaving this page.
+                  </div>
 
                   <div className="flex items-start space-x-3">
                     <Checkbox

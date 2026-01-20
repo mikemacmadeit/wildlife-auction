@@ -129,6 +129,47 @@ export async function POST(
       });
     }
 
+    // Seller-level badge: TPWD breeder permit verified (public seller trust doc).
+    if (docData.type === 'TPWD_BREEDER_PERMIT') {
+      try {
+        const listingSnap = await db.collection('listings').doc(listingId).get();
+        const listing = listingSnap.exists ? (listingSnap.data() as any) : null;
+        const sellerId = listing?.sellerId ? String(listing.sellerId) : '';
+
+        if (sellerId) {
+          // Prefer explicit doc expiresAt, fallback to listing attributes.
+          const expiresAtRaw = docData?.expiresAt || listing?.attributes?.tpwdPermitExpirationDate || null;
+          const expiresAt: Date | null =
+            expiresAtRaw?.toDate?.() || (expiresAtRaw instanceof Date ? expiresAtRaw : null);
+          const isExpired = expiresAt ? expiresAt.getTime() < Date.now() : false;
+
+          const trustRef = db.collection('publicSellerTrust').doc(sellerId);
+          const trustSnap = await trustRef.get();
+          const existing = trustSnap.exists ? (trustSnap.data() as any) : {};
+          const prev: string[] = Array.isArray(existing?.badgeIds) ? existing.badgeIds : [];
+          const next = new Set(prev.filter((b) => b !== 'tpwd_breeder_permit_verified'));
+
+          if (status === 'verified' && !isExpired) next.add('tpwd_breeder_permit_verified');
+
+          await trustRef.set(
+            {
+              userId: sellerId,
+              badgeIds: Array.from(next),
+              tpwdBreederPermit: {
+                status,
+                verifiedAt: Timestamp.now(),
+                ...(expiresAt ? { expiresAt: Timestamp.fromDate(expiresAt) } : {}),
+              },
+              updatedAt: Timestamp.now(),
+            },
+            { merge: true }
+          );
+        }
+      } catch (e) {
+        console.error('Failed to update publicSellerTrust TPWD badge', e);
+      }
+    }
+
     return json({
       success: true,
       message: `Document ${status}`,

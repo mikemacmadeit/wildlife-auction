@@ -103,7 +103,10 @@ export function FilterDialog({
     localFilters.category === 'wildlife_exotics' ||
     localFilters.category === 'whitetail_breeder';
 
-  const showConditionFilter = localFilters.category === 'ranch_equipment';
+  const showConditionFilter =
+    localFilters.category === 'ranch_equipment' ||
+    localFilters.category === 'ranch_vehicles' ||
+    localFilters.category === 'hunting_outfitter_assets';
 
   // Count active filters
   const activeFilterCount = 
@@ -115,7 +118,9 @@ export function FilterDialog({
     (filters.maxPrice ? 1 : 0) +
     (filters.species?.length || 0) +
     (filters.quantity ? 1 : 0) +
-    (filters.category === 'ranch_equipment' ? (filters.healthStatus?.length || 0) : 0) +
+    (filters.category === 'ranch_equipment' || filters.category === 'ranch_vehicles' || filters.category === 'hunting_outfitter_assets'
+      ? (filters.healthStatus?.length || 0)
+      : 0) +
     (filters.papers ? 1 : 0) +
     (filters.verifiedSeller ? 1 : 0) +
     (filters.transportReady ? 1 : 0) +
@@ -421,8 +426,8 @@ export function FilterDialog({
 
           <Separator />
 
-          {/* Condition (Ranch equipment only) */}
-          {localFilters.category === 'ranch_equipment' ? (
+          {/* Condition (Equipment / Vehicles / Assets) */}
+          {showConditionFilter ? (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-foreground">Condition</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

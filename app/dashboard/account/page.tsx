@@ -37,15 +37,17 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { getUserProfile, updateUserProfile } from '@/lib/firebase/users';
+import { getPublicSellerTrust, getUserProfile, updateUserProfile } from '@/lib/firebase/users';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser } from '@/lib/firebase/orders';
-import { UserProfile } from '@/lib/types';
+import { PublicSellerTrust, UserProfile } from '@/lib/types';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { auth } from '@/lib/firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
+import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
+import { computePublicSellerTrustFromUser } from '@/lib/seller/badges';
 
 export default function AccountPage() {
   const { toast } = useToast();
@@ -55,6 +57,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadPct, setAvatarUploadPct] = useState(0);
   const [pwCurrent, setPwCurrent] = useState('');
@@ -106,6 +109,9 @@ export default function AccountPage() {
         setLoading(true);
         const profile = await getUserProfile(user.uid);
         setUserProfile(profile);
+        // Public trust badges are server-authored; load them (best-effort).
+        const trust = await getPublicSellerTrust(user.uid).catch(() => null);
+        setPublicTrust(trust);
 
         if (profile) {
           // Initialize form data from profile
@@ -169,6 +175,32 @@ export default function AccountPage() {
       fetchUserData();
     }
   }, [user, authLoading, toast]);
+
+  const derivedBadgeIds = useMemo(() => {
+    if (!user || !userProfile) return [];
+    // If the server-authored trust doc exists, prefer it.
+    if (publicTrust?.badgeIds?.length) return publicTrust.badgeIds;
+    // Fallback: derive from your own profile fields (still useful during onboarding).
+    const derived = computePublicSellerTrustFromUser({
+      userId: user.uid,
+      userDoc: userProfile,
+      stripe: {
+        onboardingStatus: userProfile.stripeOnboardingStatus || 'not_started',
+        chargesEnabled: userProfile.chargesEnabled === true,
+        payoutsEnabled: userProfile.payoutsEnabled === true,
+        detailsSubmitted: userProfile.stripeDetailsSubmitted === true,
+        // Unknown client-side; be conservative so we don't incorrectly show "Verified seller".
+        hasPendingRequirements: true,
+      },
+      tpwdBreederPermit: publicTrust?.tpwdBreederPermit
+        ? {
+            status: publicTrust.tpwdBreederPermit.status,
+            expiresAt: publicTrust.tpwdBreederPermit.expiresAt || null,
+          }
+        : undefined,
+    });
+    return derived.badgeIds;
+  }, [publicTrust?.badgeIds, publicTrust?.tpwdBreederPermit, user, userProfile]);
 
   // If the user returns from a verification link with verified=1, refresh auth state and sync Firestore.
   useEffect(() => {
@@ -565,6 +597,7 @@ export default function AccountPage() {
                       type="file"
                       accept="image/*"
                       className="hidden"
+                      aria-label="Upload profile photo"
                       disabled={!isEditing || avatarUploading}
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
@@ -604,13 +637,8 @@ export default function AccountPage() {
                           {formData.businessName}
                         </p>
                       )}
-                      <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-                        {userProfile?.seller?.verified && (
-                          <Badge variant="outline" className="font-semibold">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Verified Seller
-                          </Badge>
-                        )}
+                      <div className="flex items-center justify-center md:justify-start gap-2 mt-2 flex-wrap">
+                        <SellerTrustBadges badgeIds={derivedBadgeIds as any} />
                         {userProfile?.createdAt && (
                           <Badge variant="secondary" className="font-semibold">
                             Member since {new Date(userProfile.createdAt).getFullYear()}

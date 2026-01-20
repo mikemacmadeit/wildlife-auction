@@ -375,9 +375,9 @@ export default function BidsOffersPage() {
   }, [rows, sortKey, statusFilter, tab]);
 
   const openOfferCheckout = (o: OfferRow) => {
-    const amount = Number(o.acceptedAmount ?? o.currentAmount ?? 0);
-    setPendingOfferCheckout({ listingId: o.listingId, offerId: o.offerId, amountUsd: Number.isFinite(amount) ? amount : 0 });
-    setPaymentDialogOpen(true);
+    // Checkout now requires a buyer acknowledgment for animal categories (server-enforced).
+    // The listing page contains the required acknowledgment flow and will route into checkout safely.
+    window.location.href = `/listing/${o.listingId}`;
   };
 
   const handleSelectPaymentMethod = async (method: PaymentMethodChoice) => {
@@ -491,60 +491,59 @@ export default function BidsOffersPage() {
 
         <Card className="border-2">
           <CardContent className="pt-6 space-y-4">
-            <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
-              <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+              <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
                 <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto">
                   <TabsTrigger value="needs_action">Needs action</TabsTrigger>
                   <TabsTrigger value="bids">Bids</TabsTrigger>
                   <TabsTrigger value="offers">Offers</TabsTrigger>
                   <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
-              </Tabs>
 
-              <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
-                <div className="relative w-full sm:w-[320px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by title…"
-                    className="pl-9"
-                  />
-                </div>
-                <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-                  <SelectTrigger className="min-w-[180px]">
-                    <SelectValue placeholder="Sort" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ending_soon">Sort: Ending Soon</SelectItem>
-                    <SelectItem value="newest">Sort: Newest</SelectItem>
-                    <SelectItem value="highest_amount">Sort: Highest Amount</SelectItem>
-                  </SelectContent>
-                </Select>
-                {tab === 'bids' ? (
-                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
+                  <div className="relative w-full sm:w-[320px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search by title…"
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
                     <SelectTrigger className="min-w-[180px]">
-                      <SelectValue placeholder="Status" />
+                      <SelectValue placeholder="Sort" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Status: All</SelectItem>
-                      <SelectItem value="winning">Winning</SelectItem>
-                      <SelectItem value="outbid">Outbid</SelectItem>
-                      <SelectItem value="accepted">Won</SelectItem>
-                      <SelectItem value="expired">Lost</SelectItem>
+                      <SelectItem value="ending_soon">Sort: Ending Soon</SelectItem>
+                      <SelectItem value="newest">Sort: Newest</SelectItem>
+                      <SelectItem value="highest_amount">Sort: Highest Amount</SelectItem>
                     </SelectContent>
                   </Select>
-                ) : null}
+                  {tab === 'bids' ? (
+                    <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                      <SelectTrigger className="min-w-[180px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Status: All</SelectItem>
+                        <SelectItem value="winning">Winning</SelectItem>
+                        <SelectItem value="outbid">Outbid</SelectItem>
+                        <SelectItem value="accepted">Won</SelectItem>
+                        <SelectItem value="expired">Lost</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                </div>
               </div>
-            </div>
 
-            {loading ? (
-              <div className="py-10 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <>
-                <TabsContent value="needs_action" className="mt-0">
+              {loading ? (
+                <div className="py-10 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <>
+                  <TabsContent value="needs_action" className="mt-0">
                   {needsAction.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">You’re all caught up.</div>
                   ) : (
@@ -624,9 +623,9 @@ export default function BidsOffersPage() {
                       ))}
                     </div>
                   )}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="bids" className="mt-0">
+                  <TabsContent value="bids" className="mt-0">
                   {bidRows.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No bids match your filters.</div>
                   ) : (
@@ -747,9 +746,9 @@ export default function BidsOffersPage() {
                       ))}
                     </div>
                   )}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="offers" className="mt-0">
+                  <TabsContent value="offers" className="mt-0">
                   {offerRows.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No offers match your search.</div>
                   ) : (
@@ -833,9 +832,9 @@ export default function BidsOffersPage() {
                       ))}
                     </div>
                   )}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="history" className="mt-0">
+                  <TabsContent value="history" className="mt-0">
                   {filtered.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No history yet.</div>
                   ) : (
@@ -855,9 +854,10 @@ export default function BidsOffersPage() {
                       ))}
                     </div>
                   )}
-                </TabsContent>
-              </>
-            )}
+                  </TabsContent>
+                </>
+              )}
+            </Tabs>
           </CardContent>
         </Card>
 

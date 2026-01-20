@@ -10,6 +10,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { Timestamp } from 'firebase-admin/firestore';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -111,6 +113,24 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     }
 
     await orderRef.update(updateData);
+
+    // Timeline (server-authored, idempotent).
+    try {
+      await appendOrderTimelineEvent({
+        db: db as any,
+        orderId,
+        event: {
+          id: `BUYER_CONFIRMED:${orderId}`,
+          type: 'BUYER_CONFIRMED',
+          label: 'Buyer confirmed receipt',
+          actor: 'buyer',
+          visibility: 'buyer',
+          timestamp: Timestamp.fromDate(now),
+        },
+      });
+    } catch (e) {
+      console.warn('[confirm-receipt] Failed to append timeline event (best-effort)', { orderId, error: String(e) });
+    }
 
     return json({
       success: true,

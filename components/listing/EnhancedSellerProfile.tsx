@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -237,12 +238,12 @@ export function EnhancedSellerProfile({
             <MessageSquare className="h-4 w-4" />
             Message Seller
           </Button>
-          <Button asChild variant="outline" size="sm" className="w-full h-9 text-sm font-semibold">
-            <Link href={sellerProfileHref}>
-              View profile
-            </Link>
-          </Button>
+          <SaveSellerButton sellerId={sellerId} size="sm" className="w-full h-9 text-sm" />
         </div>
+
+        <Button asChild variant="outline" size="sm" className="w-full h-9 text-sm font-semibold">
+          <Link href={sellerProfileHref}>View profile</Link>
+        </Button>
 
         {/* Key Metrics - Elegant Compact Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">

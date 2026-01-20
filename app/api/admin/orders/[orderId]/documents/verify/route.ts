@@ -11,6 +11,7 @@
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 // Initialize Firebase Admin
 let adminApp: App;
@@ -125,6 +126,25 @@ export async function POST(
         transferPermitStatus: 'pending_review', // Admin can then approve payout
         updatedAt: Timestamp.now(),
       });
+
+      // Timeline (server-authored, idempotent).
+      try {
+        await appendOrderTimelineEvent({
+          db: db as any,
+          orderId,
+          event: {
+            id: `TRANSFER_PERMIT_APPROVED:${documentId}`,
+            type: 'TRANSFER_PERMIT_APPROVED',
+            label: 'Transfer permit verified',
+            actor: 'admin',
+            visibility: 'buyer',
+            timestamp: Timestamp.now(),
+            meta: { documentId },
+          },
+        });
+      } catch {
+        // best-effort
+      }
     }
 
     return json({

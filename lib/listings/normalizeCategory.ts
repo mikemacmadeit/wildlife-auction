@@ -23,6 +23,9 @@ export function normalizeCategory(raw: unknown): ListingCategory {
   if (s === 'cattle_livestock') return 'cattle_livestock';
   if (s === 'ranch_equipment') return 'ranch_equipment';
   if (s === 'horse_equestrian') return 'horse_equestrian';
+  if (s === 'ranch_vehicles') return 'ranch_vehicles';
+  if (s === 'hunting_outfitter_assets') return 'hunting_outfitter_assets';
+  if (s === 'sporting_working_dogs') return 'sporting_working_dogs';
 
   // Legacy categories (historical stored values)
   if (s === 'wildlife') return 'wildlife_exotics';

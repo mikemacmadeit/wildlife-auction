@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2, MapPin, Package, User } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order } from '@/lib/types';
 import { getOrderById } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -99,6 +100,32 @@ export default function BuyerOrderDetailPage() {
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
 
+  const listingCoverPhotoURL = useMemo(() => {
+    if (!listing) return null;
+    const photos = Array.isArray((listing as any).photos) ? (listing as any).photos : [];
+    if (photos.length) {
+      const sorted = [...photos].sort((a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0));
+      const url = sorted.find((p) => typeof p?.url === 'string' && p.url.trim())?.url;
+      if (url) return String(url);
+    }
+    const images = Array.isArray((listing as any).images) ? (listing as any).images : [];
+    const url2 = images.find((u: any) => typeof u === 'string' && u.trim());
+    return url2 ? String(url2) : null;
+  }, [listing]);
+
+  const listingLocationLabel = useMemo(() => {
+    const city = (listing as any)?.location?.city ? String((listing as any).location.city) : '';
+    const state = (listing as any)?.location?.state ? String((listing as any).location.state) : '';
+    if (city && state) return `${city}, ${state}`;
+    if (state) return state;
+    return null;
+  }, [listing]);
+
+  const sellerDisplayName = useMemo(() => {
+    const name = String((listing as any)?.sellerSnapshot?.displayName || '').trim();
+    return name || 'Seller';
+  }, [listing]);
+
   const canConfirmReceipt = !!order && ['paid', 'paid_held', 'in_transit', 'delivered'].includes(order.status) && !order.stripeTransferId;
   const canDispute = !!order && ['paid', 'paid_held', 'in_transit', 'delivered'].includes(order.status) && !order.stripeTransferId;
 
@@ -162,18 +189,64 @@ export default function BuyerOrderDetailPage() {
         <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/25">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="space-y-2 min-w-[260px]">
+              <div className="space-y-3 min-w-[260px]">
                 <Button asChild variant="outline" size="sm">
                   <Link href="/dashboard/orders">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to orders
                   </Link>
                 </Button>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Order</h1>
-                  <p className="text-sm text-muted-foreground break-words mt-1">
-                    {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
-                  </p>
+
+                <div className="flex items-start gap-4">
+                  <div className="relative h-28 w-28 md:h-36 md:w-36 rounded-2xl overflow-hidden border bg-muted shrink-0">
+                    {listingCoverPhotoURL ? (
+                      <Image
+                        src={listingCoverPhotoURL}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="(min-width: 768px) 144px, 112px"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                        <Package className="h-6 w-6" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Order</h1>
+                    <p className="text-sm text-muted-foreground break-words mt-1">
+                      {listing?.title || 'Listing'} · <span className="font-mono">{order.id}</span>
+                    </p>
+                    <div className="mt-2 flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <User className="h-3.5 w-3.5" />
+                        {sellerDisplayName}
+                      </span>
+                      {listingLocationLabel ? (
+                        <>
+                          <span className="text-muted-foreground/60">•</span>
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {listingLocationLabel}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
+                      {listing?.id ? (
+                        <Button asChild size="sm" variant="outline" className="font-semibold">
+                          <Link href={`/listing/${listing.id}`}>View listing</Link>
+                        </Button>
+                      ) : null}
+                      {order?.sellerId ? (
+                        <Button asChild size="sm" variant="outline" className="font-semibold">
+                          <Link href={`/sellers/${order.sellerId}`}>View seller</Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               </div>
 
