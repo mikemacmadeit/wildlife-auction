@@ -11,7 +11,7 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { ListItem } from '@/components/listings/ListItem';
-import { listActiveListings, listEndingSoonAuctions, listMostWatchedAuctions } from '@/lib/firebase/listings';
+import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings } from '@/lib/firebase/listings';
 import { Listing } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -57,14 +57,21 @@ export default function HomePage() {
         setError(null);
         const results = await Promise.allSettled([
           listActiveListings({ limitCount: 12 }),
-          listMostWatchedAuctions({ limitCount: 8 }),
+          listMostWatchedListings({ limitCount: 8 }),
           listEndingSoonAuctions({ limitCount: 8 }),
         ]);
 
         const [dataRes, mwRes, esRes] = results;
 
         if (dataRes.status === 'fulfilled') setListings(dataRes.value);
-        if (mwRes.status === 'fulfilled') setMostWatched(mwRes.value);
+        if (mwRes.status === 'fulfilled') {
+          // Hide the section unless there is actual watch activity.
+          const filtered = (mwRes.value || []).filter((l: any) => {
+            const watchers = typeof l?.watcherCount === 'number' ? l.watcherCount : Number(l?.metrics?.favorites || 0);
+            return watchers > 0;
+          });
+          setMostWatched(filtered);
+        }
         if (esRes.status === 'fulfilled') setEndingSoon(esRes.value);
 
         // Only surface an error if the *primary* listings query failed.

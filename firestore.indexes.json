@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "sellerPermits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "messageThreads",
       "queryScope": "COLLECTION",
       "fields": [

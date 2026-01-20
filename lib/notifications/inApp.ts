@@ -279,6 +279,24 @@ export function buildInAppNotification(params: {
         metadata: { preview: p.preview || '', threadId: p.threadId, listingId: p.listingId || null },
       };
     }
+    case 'Admin.BreederPermit.Submitted': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.BreederPermit.Submitted' }>;
+      const who = p.sellerName ? `${p.sellerName}` : `Seller ${p.sellerId}`;
+      return {
+        ...base,
+        type: 'admin_breeder_permit_submitted',
+        title: 'New breeder permit to review',
+        body: p.permitNumber ? `${who} submitted a TPWD breeder permit (${p.permitNumber}).` : `${who} submitted a TPWD breeder permit.`,
+        deepLinkUrl: p.adminComplianceUrl,
+        linkLabel: 'Open compliance queue',
+        metadata: {
+          sellerId: p.sellerId,
+          permitNumber: p.permitNumber || null,
+          storagePath: p.storagePath,
+          documentUrl: p.documentUrl || null,
+        },
+      };
+    }
     case 'Offer.Received': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Offer.Received' }>;
       return {

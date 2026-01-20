@@ -151,6 +151,13 @@ export async function uploadListingImage(
     };
   } catch (error: any) {
     console.error('Error uploading listing image:', error);
+
+    const msg = String(error?.message || '');
+    if (!error?.code && (msg.includes('ERR_FAILED') || msg.toLowerCase().includes('cors') || msg.toLowerCase().includes('preflight'))) {
+      throw new Error(
+        'Upload blocked by Storage CORS configuration. Ops: apply scripts/storage-cors.json to the bucket. See docs/FIREBASE_STORAGE_CORS_SETUP.md.'
+      );
+    }
     
     // Preserve Firebase error codes for better error handling
     if (error.code) {

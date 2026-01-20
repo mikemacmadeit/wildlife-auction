@@ -4,6 +4,9 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
+import { emitEventToUsers } from '@/lib/notifications/emitEvent';
+import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
+import { getSiteUrl } from '@/lib/site-url';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -155,6 +158,34 @@ export async function POST(request: Request) {
       afterState: { status: 'pending', permitNumber: permitNumber || null, storagePath },
       source: 'seller_ui',
     });
+  } catch {
+    // ignore
+  }
+
+  // Admin notification (best-effort): alert admins that a new breeder permit is ready to review.
+  try {
+    const adminUids = await listAdminRecipientUids(user.db as any);
+    if (adminUids.length > 0) {
+      const baseUrl = getSiteUrl();
+      const adminComplianceUrl = `${baseUrl}/dashboard/admin/compliance?tab=breeder_permits`;
+      await emitEventToUsers({
+        type: 'Admin.BreederPermit.Submitted',
+        actorId: user.uid,
+        entityType: 'user',
+        entityId: user.uid,
+        targetUserIds: adminUids,
+        payload: {
+          type: 'Admin.BreederPermit.Submitted',
+          sellerId: user.uid,
+          permitNumber: permitNumber ? permitNumber : null,
+          storagePath,
+          documentUrl,
+          adminComplianceUrl,
+        },
+        // Ensure each submission triggers a new event (no accidental dedupe across re-uploads).
+        optionalHash: storagePath,
+      });
+    }
   } catch {
     // ignore
   }

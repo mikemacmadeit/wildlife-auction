@@ -93,6 +93,10 @@ export async function GET(request: Request) {
         uid,
         email: au?.email || doc?.email || null,
         displayName: au?.displayName || doc?.displayName || doc?.profile?.fullName || null,
+        photoURL:
+          (typeof au?.photoURL === 'string' && au.photoURL.trim() ? au.photoURL.trim() : null) ||
+          (typeof doc?.photoURL === 'string' && doc.photoURL.trim() ? doc.photoURL.trim() : null) ||
+          null,
         phoneNumber: au?.phoneNumber || doc?.phoneNumber || null,
         role: doc?.role || null,
         subscriptionTier: doc?.subscriptionTier || null,

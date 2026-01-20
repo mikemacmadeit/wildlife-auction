@@ -160,6 +160,14 @@ export async function uploadSellerPermitDocument(
     return { url, path: storagePath, documentId };
   } catch (error: any) {
     console.error('Error uploading seller permit document:', error);
+    // Firebase Storage uploads can fail with an opaque network error when bucket CORS is misconfigured.
+    // Surface an actionable message for ops instead of a generic "failed" toast.
+    const msg = String(error?.message || '');
+    if (!error?.code && (msg.includes('ERR_FAILED') || msg.toLowerCase().includes('cors') || msg.toLowerCase().includes('preflight'))) {
+      throw new Error(
+        'Upload blocked by Storage CORS configuration. Ops: apply scripts/storage-cors.json to the bucket. See docs/FIREBASE_STORAGE_CORS_SETUP.md.'
+      );
+    }
     if (error.code) {
       const enhancedError = new Error(error.message || 'Failed to upload document');
       (enhancedError as any).code = error.code;

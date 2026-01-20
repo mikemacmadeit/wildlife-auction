@@ -13,6 +13,7 @@ import { FileText, Loader2, Eye, Upload, AlertCircle, CheckCircle2 } from 'lucid
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { uploadSellerPermitDocument, type DocumentUploadProgress } from '@/lib/firebase/storage-documents';
+import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 
 type PermitStatus = 'pending' | 'verified' | 'rejected';
 
@@ -36,7 +37,7 @@ function statusBadgeVariant(status: PermitStatus | null | undefined) {
   return 'outline';
 }
 
-export function BreederPermitCard(props: { className?: string }) {
+export function BreederPermitCard(props: { className?: string; compactWhenVerified?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -127,6 +128,8 @@ export function BreederPermitCard(props: { className?: string }) {
     }
   }, [expiresAt, file, load, permitNumber, toast, user]);
 
+  const compactVerified = props.compactWhenVerified === true;
+
   return (
     <Card className={props.className}>
       <CardHeader>
@@ -179,6 +182,9 @@ export function BreederPermitCard(props: { className?: string }) {
                 <CheckCircle2 className="h-4 w-4 text-primary" />
                 Permit verified
               </div>
+              <div className="mt-2">
+                <SellerTrustBadges badgeIds={['tpwd_breeder_permit_verified']} />
+              </div>
               <div className="text-xs text-muted-foreground mt-1">
                 {permit.expiresAt ? `Expires: ${new Date(permit.expiresAt).toLocaleDateString()}` : 'No expiration on file.'}
               </div>
@@ -192,6 +198,8 @@ export function BreederPermitCard(props: { className?: string }) {
           </div>
         ) : null}
 
+        {/* Overview UX: once verified, keep this card “read-only” and hide the upload form. */}
+        {compactVerified && permit?.status === 'verified' ? null : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="tpwd-permit-number">Permit number</Label>
@@ -214,7 +222,9 @@ export function BreederPermitCard(props: { className?: string }) {
             />
           </div>
         </div>
+        )}
 
+        {compactVerified && permit?.status === 'verified' ? null : (
         <div className="space-y-2">
           <Label htmlFor="tpwd-permit-file">Upload permit (PDF or image)</Label>
           <Input
@@ -228,6 +238,7 @@ export function BreederPermitCard(props: { className?: string }) {
             Allowed: PDF/JPG/PNG/WEBP. Max 10MB.
           </div>
         </div>
+        )}
 
         {uploading ? (
           <div className="space-y-2">
@@ -236,6 +247,7 @@ export function BreederPermitCard(props: { className?: string }) {
           </div>
         ) : null}
 
+        {compactVerified && permit?.status === 'verified' ? null : (
         <div className="flex items-center gap-2">
           <Button
             onClick={handleSubmit}
@@ -252,6 +264,7 @@ export function BreederPermitCard(props: { className?: string }) {
             </Button>
           ) : null}
         </div>
+        )}
 
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
           <DialogContent className="max-w-3xl">

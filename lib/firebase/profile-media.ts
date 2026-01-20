@@ -69,37 +69,47 @@ export async function uploadUserAvatar(
   file: File,
   onProgress?: (pct: number) => void
 ): Promise<{ downloadUrl: string; storagePath: string; width: number; height: number; bytes: number }> {
-  const user = auth.currentUser;
-  if (!user) throw new Error('User must be authenticated');
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User must be authenticated');
 
-  const { blob, rect } = await resizeToJpeg(file, 900, 0.86);
-  const storagePath = `users/${user.uid}/profile/avatar.jpg`;
-  const storageRef = ref(storage, storagePath);
+    const { blob, rect } = await resizeToJpeg(file, 900, 0.86);
+    const storagePath = `users/${user.uid}/profile/avatar.jpg`;
+    const storageRef = ref(storage, storagePath);
 
-  const task = uploadBytesResumable(storageRef, blob, {
-    contentType: 'image/jpeg',
-    cacheControl: 'public,max-age=3600',
-  } as any);
+    const task = uploadBytesResumable(storageRef, blob, {
+      contentType: 'image/jpeg',
+      cacheControl: 'public,max-age=3600',
+    } as any);
 
-  task.on(
-    'state_changed',
-    (snap) => {
-      if (!onProgress) return;
-      const pct = snap.totalBytes ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0;
-      onProgress(Math.max(0, Math.min(100, pct)));
-    },
-    () => {
-      if (onProgress) onProgress(0);
+    task.on(
+      'state_changed',
+      (snap) => {
+        if (!onProgress) return;
+        const pct = snap.totalBytes ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0;
+        onProgress(Math.max(0, Math.min(100, pct)));
+      },
+      () => {
+        if (onProgress) onProgress(0);
+      }
+    );
+
+    await task;
+    const downloadUrlBase = await getDownloadURL(task.snapshot.ref);
+
+    // Bust client caches even if the underlying token/path didn't change.
+    const downloadUrl = downloadUrlBase.includes('?') ? `${downloadUrlBase}&v=${Date.now()}` : `${downloadUrlBase}?v=${Date.now()}`;
+
+    return { downloadUrl, storagePath, width: rect.width, height: rect.height, bytes: blob.size };
+  } catch (e: any) {
+    const msg = String(e?.message || '');
+    if (msg.includes('ERR_FAILED') || msg.toLowerCase().includes('cors') || msg.toLowerCase().includes('preflight')) {
+      throw new Error(
+        'Upload blocked by Storage CORS configuration. Ops: apply scripts/storage-cors.json to the bucket. See docs/FIREBASE_STORAGE_CORS_SETUP.md.'
+      );
     }
-  );
-
-  await task;
-  const downloadUrlBase = await getDownloadURL(task.snapshot.ref);
-
-  // Bust client caches even if the underlying token/path didn't change.
-  const downloadUrl = downloadUrlBase.includes('?') ? `${downloadUrlBase}&v=${Date.now()}` : `${downloadUrlBase}?v=${Date.now()}`;
-
-  return { downloadUrl, storagePath, width: rect.width, height: rect.height, bytes: blob.size };
+    throw e;
+  }
 }
 
 export async function setCurrentUserAvatarUrl(url: string): Promise<void> {

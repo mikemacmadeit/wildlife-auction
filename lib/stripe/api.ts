@@ -220,6 +220,54 @@ export async function createAccountLink(): Promise<{ url: string }> {
 }
 
 /**
+ * Create a Stripe Connect Express dashboard login link.
+ * Sellers use this to manage payout settings (bank account) inside Stripe.
+ */
+export async function createConnectLoginLink(): Promise<{ url: string }> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  const token = await getIdToken(user, true);
+  if (!token) {
+    throw new Error('Failed to get authentication token');
+  }
+
+  const response = await fetch(`${API_BASE}/connect/create-login-link`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to create Stripe login link';
+    let errorDetails: any = {};
+
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        errorDetails = error;
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        errorMessage = `${response.status} ${response.statusText}`;
+      }
+    } catch {
+      errorMessage = `${response.status} ${response.statusText}`;
+    }
+
+    const err: any = new Error(errorMessage);
+    if (errorDetails?.code) err.code = errorDetails.code;
+    throw err;
+  }
+
+  return response.json();
+}
+
+/**
  * Create a Stripe Checkout session for purchasing a listing
  */
 export async function createCheckoutSession(

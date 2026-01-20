@@ -199,6 +199,15 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     preview: z.string().optional(),
   }),
   z.object({
+    type: z.literal('Admin.BreederPermit.Submitted'),
+    sellerId: baseString,
+    sellerName: z.string().optional(),
+    permitNumber: z.string().optional().nullable(),
+    storagePath: baseString,
+    documentUrl: urlSchema.optional().nullable(),
+    adminComplianceUrl: urlSchema,
+  }),
+  z.object({
     type: z.literal('Offer.Received'),
     offerId: baseString,
     listingId: baseString,

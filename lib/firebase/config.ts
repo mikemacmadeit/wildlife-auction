@@ -7,14 +7,31 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 // Firebase configuration - MUST use environment variables (no hardcoded secrets!)
 // All values must be set via environment variables for security
 function normalizeStorageBucket(input: string | undefined, projectId: string | undefined): string | undefined {
-  const bucket = input?.trim();
+  const raw = input?.trim();
+  let bucket = raw;
   if (!bucket) return input;
   const pid = projectId?.trim();
   if (!pid) return bucket;
 
-  // Common misconfig: using the hosting domain `*.firebasestorage.app` as the bucket ID.
-  // The canonical default bucket ID is typically `${projectId}.appspot.com`.
-  if (bucket === `${pid}.firebasestorage.app`) return `${pid}.appspot.com`;
+  // Accept common forms:
+  // - "gs://<bucket>"
+  // - "https://storage.googleapis.com/<bucket>"
+  // - "<bucket>"
+  bucket = bucket.replace(/^gs:\/\//i, '');
+  bucket = bucket.replace(/^https?:\/\/storage\.googleapis\.com\//i, '');
+  bucket = bucket.replace(/\/+$/g, ''); // trailing slashes
+
+  // Firebase projects can have either default bucket naming scheme:
+  // - Legacy: `${projectId}.appspot.com`
+  // - Newer:  `${projectId}.firebasestorage.app`
+  //
+  // For this repo's Firebase project, the active bucket is `${projectId}.firebasestorage.app`.
+  // If env is set to the legacy form, normalize to the actual bucket to avoid 404/CORS failures.
+  if (bucket === `${pid}.appspot.com`) return `${pid}.firebasestorage.app`;
+  // Some environments provide the legacy bucket with small variations; normalize those too.
+  if (bucket.toLowerCase().startsWith(`${pid.toLowerCase()}.`) && bucket.toLowerCase().endsWith('.appspot.com')) {
+    return `${pid}.firebasestorage.app`;
+  }
 
   return bucket;
 }

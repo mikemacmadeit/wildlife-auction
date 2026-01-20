@@ -1358,6 +1358,80 @@ export const listMostWatchedAuctions = async (params?: { limitCount?: number }):
   }
 };
 
+/**
+ * List most watched listings across *all* listing types (auction/fixed/classified).
+ *
+ * Homepage "Most Watched" should not depend on auctions existing.
+ *
+ * Watcher metrics:
+ * - Canonical: listings/{id}.watcherCount (server-maintained)
+ * - Back-compat: listings/{id}.metrics.favorites
+ *
+ * This query uses metrics.favorites because it's always present in Listing metrics and is kept in sync
+ * by `POST /api/watchlist/toggle`.
+ */
+export const listMostWatchedListings = async (params?: { limitCount?: number }): Promise<Listing[]> => {
+  const limitCount = params?.limitCount || 12;
+  try {
+    const listingsRef = collection(db, 'listings');
+    const q = query(
+      listingsRef,
+      where('status', '==', 'active'),
+      orderBy('metrics.favorites', 'desc'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((docSnap) =>
+      toListing({
+        id: docSnap.id,
+        ...(docSnap.data() as ListingDoc),
+      })
+    );
+  } catch (error) {
+    // Same production-safe fallback strategy as listMostWatchedAuctions.
+    const msg = String((error as any)?.message || '');
+    const code = String((error as any)?.code || '');
+    const looksLikeMissingIndex =
+      code === 'failed-precondition' || /requires an index/i.test(msg);
+
+    if (looksLikeMissingIndex) {
+      (globalThis as any).__wxWarnedMostWatchedIndex =
+        (globalThis as any).__wxWarnedMostWatchedIndex === true ? true : false;
+      if ((globalThis as any).__wxWarnedMostWatchedIndex !== true) {
+        (globalThis as any).__wxWarnedMostWatchedIndex = true;
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[listMostWatchedListings] Missing index for favorites query; using fallback', {
+            code,
+            message: msg,
+          });
+        }
+      }
+
+      const listingsRef = collection(db, 'listings');
+      const fallbackLimit = Math.max(limitCount * 10, 80);
+      const qFallback = query(
+        listingsRef,
+        where('status', '==', 'active'),
+        orderBy('createdAt', 'desc'),
+        limit(fallbackLimit)
+      );
+      const snap = await getDocs(qFallback);
+      const items = snap.docs.map((docSnap) =>
+        toListing({
+          id: docSnap.id,
+          ...(docSnap.data() as ListingDoc),
+        })
+      );
+      return items
+        .sort((a: any, b: any) => Number(b?.metrics?.favorites || 0) - Number(a?.metrics?.favorites || 0))
+        .slice(0, limitCount);
+    }
+
+    console.error('Error fetching most watched listings:', error);
+    throw error;
+  }
+};
+
 export const listEndingSoonAuctions = async (params?: { limitCount?: number }): Promise<Listing[]> => {
   const limitCount = params?.limitCount || 12;
   try {

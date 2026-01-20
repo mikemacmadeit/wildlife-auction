@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile, type Order, type OrderStatus } from '@/lib/types';
-import { createStripeAccount, createAccountLink, checkStripeAccountStatus } from '@/lib/stripe/api';
+import { createStripeAccount, createAccountLink, checkStripeAccountStatus, createConnectLoginLink } from '@/lib/stripe/api';
 import { useToast } from '@/hooks/use-toast';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -56,6 +56,7 @@ export default function SellerPayoutsPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [isOpeningStripeDashboard, setIsOpeningStripeDashboard] = useState(false);
   const [payoutRows, setPayoutRows] = useState<PayoutRow[]>([]);
   const [loadingPayouts, setLoadingPayouts] = useState(false);
 
@@ -474,9 +475,44 @@ export default function SellerPayoutsPage() {
                     </CardDescription>
                   </div>
                 </div>
-                {!isPayoutsEnabled && (
-                  <div className="flex gap-2 flex-wrap">
-                    {userProfile?.stripeAccountId && (
+                <div className="flex gap-2 flex-wrap">
+                  {userProfile?.stripeAccountId ? (
+                    <Button
+                      variant="outline"
+                      className="min-h-[48px]"
+                      disabled={isOpeningStripeDashboard}
+                      onClick={async () => {
+                        try {
+                          setIsOpeningStripeDashboard(true);
+                          const { url } = await createConnectLoginLink();
+                          window.location.href = url;
+                        } catch (error: any) {
+                          toast({
+                            title: 'Unable to open payout settings',
+                            description:
+                              error?.message ||
+                              'Failed to open Stripe payout settings. Please try again.',
+                            variant: 'destructive',
+                          });
+                        } finally {
+                          setIsOpeningStripeDashboard(false);
+                        }
+                      }}
+                    >
+                      {isOpeningStripeDashboard ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Opening…
+                        </>
+                      ) : (
+                        'Manage payout method'
+                      )}
+                    </Button>
+                  ) : null}
+
+                  {!isPayoutsEnabled ? (
+                    <>
+                      {userProfile?.stripeAccountId && (
                       <Button
                         onClick={async () => {
                           try {
@@ -571,8 +607,9 @@ export default function SellerPayoutsPage() {
                         'Enable Payouts'
                       )}
                     </Button>
-                  </div>
-                )}
+                    </>
+                  ) : null}
+                </div>
               </div>
             </CardHeader>
             {!isPayoutsEnabled && (

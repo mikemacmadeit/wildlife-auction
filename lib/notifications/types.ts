@@ -58,6 +58,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Admin.Listing.Approved',
   'Admin.Listing.Rejected',
   'Admin.Order.DisputeOpened',
+  'Admin.BreederPermit.Submitted',
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -354,6 +355,15 @@ export type NotificationEventPayload =
       disputeType: 'order_dispute' | 'protected_transaction_dispute';
       reason: string;
       adminOpsUrl: string;
+    }
+  | {
+      type: 'Admin.BreederPermit.Submitted';
+      sellerId: string;
+      sellerName?: string;
+      permitNumber?: string | null;
+      storagePath: string;
+      documentUrl?: string | null;
+      adminComplianceUrl: string;
     };
 
 // ------------------------

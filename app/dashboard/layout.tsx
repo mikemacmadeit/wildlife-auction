@@ -75,7 +75,7 @@ const baseNavItems: DashboardNavItem[] = [
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
-  { href: '/seller/sales', label: 'Sales', icon: DollarSign },
+  { href: '/seller/sales', label: 'Sold', icon: DollarSign },
   { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
@@ -85,16 +85,16 @@ const baseNavItems: DashboardNavItem[] = [
 // Admin nav items (only visible to admins)
 const adminNavItems: DashboardNavItem[] = [
   { href: '/dashboard/admin/users', label: 'Users', icon: Users },
-  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
   { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
   { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
   { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
+  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
 ];
 
 export default function DashboardLayout({

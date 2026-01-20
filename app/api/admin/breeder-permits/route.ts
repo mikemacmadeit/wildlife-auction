@@ -26,14 +26,31 @@ export async function GET(request: Request) {
   const allowed = new Set(['pending', 'verified', 'rejected']);
   if (!allowed.has(status)) return json({ ok: false, error: 'Invalid status' }, { status: 400 });
 
-  const q = admin.ctx.db
-    .collection('sellerPermits')
-    .where('type', '==', 'TPWD_BREEDER_PERMIT')
-    .where('status', '==', status)
-    .orderBy('uploadedAt', 'desc')
-    .limit(limit);
+  // Preferred: server-side ordering (requires composite index on sellerPermits: type+status+uploadedAt).
+  // If the index isn't built yet, fall back to a less strict query and sort in-memory.
+  let snap: FirebaseFirestore.QuerySnapshot;
+  try {
+    const q = admin.ctx.db
+      .collection('sellerPermits')
+      .where('type', '==', 'TPWD_BREEDER_PERMIT')
+      .where('status', '==', status)
+      .orderBy('uploadedAt', 'desc')
+      .limit(limit);
+    snap = await q.get();
+  } catch (e: any) {
+    const msg = String(e?.message || '');
+    const code = String(e?.code || '');
+    const looksLikeMissingIndex = code === 'failed-precondition' || msg.toLowerCase().includes('requires an index');
+    if (!looksLikeMissingIndex) throw e;
 
-  const snap = await q.get();
+    const qFallback = admin.ctx.db
+      .collection('sellerPermits')
+      .where('type', '==', 'TPWD_BREEDER_PERMIT')
+      .where('status', '==', status)
+      .limit(Math.min(200, limit * 4)); // fetch a bit more and sort
+    snap = await qFallback.get();
+  }
+
   const items = snap.docs.map((d) => {
     const data = d.data() as any;
     return {
@@ -49,6 +66,13 @@ export async function GET(request: Request) {
       reviewedBy: data?.reviewedBy || null,
       updatedAt: toIso(data?.updatedAt),
     };
+  });
+
+  // If fallback query was used (or docs have mixed timestamp shapes), sort client-side.
+  items.sort((a, b) => {
+    const am = a.uploadedAt ? Date.parse(a.uploadedAt) : 0;
+    const bm = b.uploadedAt ? Date.parse(b.uploadedAt) : 0;
+    return bm - am;
   });
 
   return json({ ok: true, permits: items });

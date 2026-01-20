@@ -35,9 +35,9 @@ export const SELLER_BADGE_DEFS: Record<SellerBadgeId, SellerBadgeDefinition> = {
   },
   tpwd_breeder_permit_verified: {
     id: 'tpwd_breeder_permit_verified',
-    label: 'TPWD breeder permit',
-    description: 'TPWD breeder permit document has been verified.',
-    className: 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
+    label: 'Breeder permit verified',
+    description: 'Breeder permit document has been verified by the marketplace (not regulator approval).',
+    className: 'border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200',
   },
 };
 

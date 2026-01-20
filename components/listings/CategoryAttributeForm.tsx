@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CATTLE_BREED_OPTIONS } from '@/lib/taxonomy/cattle-breeds';
 import { DOG_BREED_OPTIONS } from '@/lib/taxonomy/dog-breeds';
-import { EQUIPMENT_MAKE_OPTIONS } from '@/lib/taxonomy/equipment-makes';
+import { getEquipmentMakeOptions, getEquipmentModelSuggestions } from '@/lib/taxonomy/equipment-makes';
 
 type ListingAttributes =
   | WildlifeAttributes
@@ -1142,6 +1142,17 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
 
   if (category === 'ranch_equipment' || category === 'ranch_vehicles' || category === 'hunting_outfitter_assets') {
     const equipmentType = (attributes as Partial<EquipmentAttributes>).equipmentType;
+    const makeOptions = getEquipmentMakeOptions({ category, equipmentType: equipmentType || null });
+    const modelSuggestions = getEquipmentModelSuggestions({
+      category,
+      equipmentType: equipmentType || null,
+      make: String((attributes as any)?.make || '') || null,
+    });
+    const modelListId = `equipment-models-${category}-${String(equipmentType || 'none')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '-')}-${String((attributes as any)?.make || 'none')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '-')}`;
     const vehiclesRequiringTitle = ['utv', 'atv', 'trailer', 'truck'];
     const requiresTitle = equipmentType && vehiclesRequiringTitle.includes(equipmentType.toLowerCase());
     const legacyVehicleTypes = ['truck', 'utv', 'atv', 'trailer'];
@@ -1219,6 +1230,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   <SelectItem value="thermal_optics">Thermal / Optics</SelectItem>
                   <SelectItem value="blind">Blind (tower / box / enclosure)</SelectItem>
                   <SelectItem value="water_system">Water / Well System</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </>
               ) : (
                 <>
@@ -1260,7 +1272,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <SearchableSelect
               value={(attributes as any)?.make || null}
               onChange={(v) => updateAttribute('make', v)}
-              options={EQUIPMENT_MAKE_OPTIONS}
+              options={makeOptions}
               placeholder="Select make…"
               searchPlaceholder="Search makes…"
             />
@@ -1285,10 +1297,18 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <Input
               id="model"
               placeholder="e.g., 5075E, SVL75"
+              list={modelSuggestions.length > 0 ? modelListId : undefined}
               value={(attributes as Partial<EquipmentAttributes>).model || ''}
               onChange={(e) => updateAttribute('model', e.target.value)}
               className="min-h-[48px] text-base"
             />
+            {modelSuggestions.length > 0 ? (
+              <datalist id={modelListId}>
+                {modelSuggestions.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            ) : null}
           </div>
         </div>
 

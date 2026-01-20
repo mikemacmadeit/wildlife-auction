@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { BadgeCheck, FileText, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, FileText, ShieldCheck, Shield } from 'lucide-react';
 import type { SellerBadgeId } from '@/lib/types';
 import { badgeIdsToDefinitions } from '@/lib/seller/badges';
 
@@ -17,7 +17,7 @@ const ICON_BY_ID: Partial<Record<SellerBadgeId, any>> = {
   identity_verified: ShieldCheck,
   stripe_payouts_enabled: ShieldCheck,
   stripe_payments_enabled: ShieldCheck,
-  tpwd_breeder_permit_verified: FileText,
+  tpwd_breeder_permit_verified: Shield,
 };
 
 export function SellerTrustBadges(props: {

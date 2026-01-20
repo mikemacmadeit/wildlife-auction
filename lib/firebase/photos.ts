@@ -99,58 +99,72 @@ export async function uploadUserPhoto(
   file: File,
   onProgress?: (pct: number) => void
 ): Promise<UploadUserPhotoResult> {
-  const user = auth.currentUser;
-  if (!user) throw new Error('User must be authenticated');
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User must be authenticated');
 
-  const photoId = nanoid();
-  const { blob, rect } = await resizeToJpeg(file);
-  const storagePath = `users/${user.uid}/uploads/${photoId}/original.jpg`;
-  const storageRef = ref(storage, storagePath);
+    const photoId = nanoid();
+    const { blob, rect } = await resizeToJpeg(file);
+    const storagePath = `users/${user.uid}/uploads/${photoId}/original.jpg`;
+    const storageRef = ref(storage, storagePath);
 
-  const task = uploadBytesResumable(storageRef, blob, { contentType: 'image/jpeg' });
-  task.on(
-    'state_changed',
-    (snap) => {
-      if (!onProgress) return;
-      const pct = snap.totalBytes ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0;
-      onProgress(Math.max(0, Math.min(100, pct)));
-    },
-    () => {
-      if (onProgress) onProgress(0);
-    }
-  );
+    const task = uploadBytesResumable(storageRef, blob, { contentType: 'image/jpeg' });
+    task.on(
+      'state_changed',
+      (snap) => {
+        if (!onProgress) return;
+        const pct = snap.totalBytes ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0;
+        onProgress(Math.max(0, Math.min(100, pct)));
+      },
+      () => {
+        if (onProgress) onProgress(0);
+      }
+    );
 
-  await task;
-  const downloadUrl = await getDownloadURL(task.snapshot.ref);
+    await task;
+    const downloadUrl = await getDownloadURL(task.snapshot.ref);
 
-  const docRef = doc(db, 'users', user.uid, 'photos', photoId);
-  const docData: UserPhotoDoc = {
-    photoId,
-    uid: user.uid,
-    storagePath,
-    downloadUrl,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    width: rect.width,
-    height: rect.height,
-    bytes: blob.size,
-    contentType: 'image/jpeg',
-    tags: [],
-    status: 'active',
-  };
+    const docRef = doc(db, 'users', user.uid, 'photos', photoId);
+    const docData: UserPhotoDoc = {
+      photoId,
+      uid: user.uid,
+      storagePath,
+      downloadUrl,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      width: rect.width,
+      height: rect.height,
+      bytes: blob.size,
+      contentType: 'image/jpeg',
+      tags: [],
+      status: 'active',
+    };
 
-  await setDoc(docRef, docData, { merge: true });
+    await setDoc(docRef, docData, { merge: true });
 
-  return {
-    photoId,
-    uid: user.uid,
-    storagePath,
-    downloadUrl,
-    width: rect.width,
-    height: rect.height,
-    bytes: blob.size,
-    contentType: 'image/jpeg',
-  };
+    return {
+      photoId,
+      uid: user.uid,
+      storagePath,
+      downloadUrl,
+      width: rect.width,
+      height: rect.height,
+      bytes: blob.size,
+      contentType: 'image/jpeg',
+    };
+  } catch (e: any) {
+    maybeRethrowCorsHint(e);
+    throw e;
+  }
+}
+
+function maybeRethrowCorsHint(e: any) {
+  const msg = String(e?.message || '');
+  if (msg.includes('ERR_FAILED') || msg.toLowerCase().includes('cors') || msg.toLowerCase().includes('preflight')) {
+    throw new Error(
+      'Upload blocked by Storage CORS configuration. Ops: apply scripts/storage-cors.json to the bucket. See docs/FIREBASE_STORAGE_CORS_SETUP.md.'
+    );
+  }
 }
 
 export async function listUserPhotos(uid: string, opts?: { includeDeleted?: boolean }) {

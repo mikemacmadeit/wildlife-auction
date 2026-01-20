@@ -158,6 +158,15 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: {},
         allowDuringQuietHours: true,
       };
+    case 'Admin.BreederPermit.Submitted':
+      return {
+        category: 'admin',
+        urgency: 'high',
+        channels: ['inApp'],
+        dedupeWindowMs: 1000 * 60 * 10,
+        rateLimitPerUser: {},
+        allowDuringQuietHours: true,
+      };
     case 'Order.Confirmed':
       return {
         category: 'orders',

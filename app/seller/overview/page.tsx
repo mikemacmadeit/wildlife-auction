@@ -672,10 +672,10 @@ export default function SellerOverviewPage() {
                 <CardDescription>Fast links + the key things that can block payout.</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="default" size="sm" className="font-semibold">
                   <Link href="/seller/sales">Open Sales</Link>
                 </Button>
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="default" size="sm" className="font-semibold">
                   <Link href="/seller/payouts">Open Payouts</Link>
                 </Button>
               </div>
@@ -964,7 +964,7 @@ export default function SellerOverviewPage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <BreederPermitCard />
+            <BreederPermitCard compactWhenVerified />
           </div>
         ) : null}
 

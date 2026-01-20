@@ -56,7 +56,7 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
   > = {
     draft: {
       label: 'Draft',
-      className: 'bg-muted/40 text-muted-foreground border-border/60',
+      className: 'bg-zinc-50 text-zinc-700 border-zinc-200 dark:bg-zinc-900/40 dark:text-zinc-200 dark:border-zinc-700',
     },
     pending: {
       label: 'Pending approval',

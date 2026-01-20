@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -112,6 +112,7 @@ function EditListingPageContent() {
   const [hasSavedEditsSinceRejection, setHasSavedEditsSinceRejection] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
+  const imagesInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load existing listing data from Firestore
   useEffect(() => {
@@ -978,6 +979,17 @@ function EditListingPageContent() {
                           className="w-full h-full object-cover"
                         />
                       )}
+                      {/* Upload progress overlay for in-flight uploads */}
+                      {uploadingImages.has(img) ? (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                          <div className="text-center text-white">
+                            <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                            <div className="mt-2 text-xs font-semibold">
+                              Uploading… {Math.round(Number(uploadProgress[img] || 0))}%
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                       <Button
                         variant="destructive"
                         size="icon"
@@ -988,6 +1000,7 @@ function EditListingPageContent() {
                             images: formData.images.filter((_, i) => i !== idx),
                           });
                         }}
+                        disabled={uploadingImages.has(img)}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -1002,29 +1015,101 @@ function EditListingPageContent() {
             <div className="space-y-4">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
               <div>
-                <Label htmlFor="images" className="cursor-pointer">
-                  <Button variant="outline" className="min-h-[48px] min-w-[200px]">
-                    {formData.images.length > 0 ? 'Add More Photos' : 'Upload Photos'}
-                  </Button>
-                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[48px] min-w-[200px]"
+                  disabled={!listingId || uploadingImages.size > 0 || formData.images.length >= 10}
+                  onClick={() => {
+                    if (!listingId) {
+                      toast({ title: 'Error', description: 'Missing listing ID for upload.', variant: 'destructive' });
+                      return;
+                    }
+                    if (uploadingImages.size > 0) return;
+                    if (formData.images.length >= 10) return;
+                    imagesInputRef.current?.click();
+                  }}
+                >
+                  {formData.images.length > 0 ? 'Add More Photos' : 'Upload Photos'}
+                </Button>
                 <Input
+                  ref={imagesInputRef}
                   id="images"
                   type="file"
                   multiple
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
+                  disabled={!listingId || uploadingImages.size > 0 || formData.images.length >= 10}
+                  onChange={async (e) => {
                     const files = Array.from(e.target.files || []);
-                    const newImages = files.map((f) => URL.createObjectURL(f));
-                    setFormData({
-                      ...formData,
-                      images: [...formData.images, ...newImages].slice(0, 10), // Limit to 10 images
-                    });
+                    // Allow re-selecting the same file after upload attempt.
+                    e.currentTarget.value = '';
+
+                    if (!listingId) {
+                      toast({ title: 'Error', description: 'Missing listing ID for upload.', variant: 'destructive' });
+                      return;
+                    }
+                    if (!user?.uid) {
+                      toast({ title: 'Sign in required', description: 'Please sign in to upload photos.', variant: 'destructive' });
+                      return;
+                    }
+
+                    const remaining = Math.max(0, 10 - (formData.images?.length || 0));
+                    const toUpload = files.slice(0, remaining);
+                    if (toUpload.length === 0) return;
+
+                    for (const file of toUpload) {
+                      const key = `${file.name}:${file.size}:${file.lastModified}`;
+
+                      // Add a placeholder token into the images list so we can show progress inline.
+                      setUploadingImages((prev) => new Set(prev).add(key));
+                      setUploadProgress((prev) => ({ ...prev, [key]: 0 }));
+                      setFormData((prev) => ({
+                        ...prev,
+                        images: [...(prev.images || []), key].slice(0, 10),
+                      }));
+
+                      try {
+                        const res = await uploadListingImage(listingId, file, (p) => {
+                          setUploadProgress((prev) => ({ ...prev, [key]: p.progress }));
+                        });
+
+                        setFormData((prev) => ({
+                          ...prev,
+                          images: (prev.images || []).map((v) => (v === key ? res.url : v)).slice(0, 10),
+                        }));
+                      } catch (err: any) {
+                        // Remove placeholder on failure
+                        setFormData((prev) => ({
+                          ...prev,
+                          images: (prev.images || []).filter((v) => v !== key),
+                        }));
+                        toast({
+                          title: 'Upload failed',
+                          description: err?.message || 'Could not upload photo. Please try again.',
+                          variant: 'destructive',
+                        });
+                      } finally {
+                        setUploadingImages((prev) => {
+                          const next = new Set(prev);
+                          next.delete(key);
+                          return next;
+                        });
+                        setUploadProgress((prev) => {
+                          const next = { ...prev };
+                          delete next[key];
+                          return next;
+                        });
+                      }
+                    }
                   }}
                 />
                 <p className="text-xs text-muted-foreground mt-2">
                   Upload up to 10 photos (JPG, PNG). {formData.images.length}/10 uploaded.
                 </p>
+                {formData.images.length >= 10 ? (
+                  <p className="text-xs text-muted-foreground mt-1">You’ve reached the 10 photo limit.</p>
+                ) : null}
               </div>
             </div>
           </Card>

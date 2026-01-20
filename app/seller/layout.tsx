@@ -74,7 +74,7 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
-  { href: '/seller/sales', label: 'Sales', icon: DollarSign },
+  { href: '/seller/sales', label: 'Sold', icon: DollarSign },
   { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },

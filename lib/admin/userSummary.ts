@@ -104,6 +104,12 @@ export function buildUserSummary(params: {
   const displayName = au?.displayName || doc?.displayName || doc?.profile?.fullName || null;
   const sellerDisplayName = doc?.profile?.businessName || null;
   const phoneNumber = au?.phoneNumber || doc?.phoneNumber || null;
+  const photoURL =
+    typeof au?.photoURL === 'string' && au.photoURL.trim()
+      ? au.photoURL.trim()
+      : typeof doc?.photoURL === 'string' && doc.photoURL.trim()
+        ? doc.photoURL.trim()
+        : null;
 
   const role = doc?.role || null;
   const emailVerified = au?.emailVerified === true || doc?.emailVerified === true;
@@ -147,6 +153,7 @@ export function buildUserSummary(params: {
     displayName,
     displayNameLower: typeof displayName === 'string' ? displayName.toLowerCase() : null,
     sellerDisplayName,
+    photoURL,
     phoneNumber,
     phoneDigits: typeof phoneNumber === 'string' ? digitsOnly(phoneNumber) : null,
     role,

@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { Loader2, MoreHorizontal, Search, ShieldAlert, Copy, UserX, UserCheck, KeyRound, ExternalLink, RefreshCw } from 'lucide-react';
 
@@ -21,6 +22,7 @@ type AdminUserRow = {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL?: string | null;
   phoneNumber: string | null;
   role: 'user' | 'admin' | 'super_admin' | null;
   subscriptionTier?: 'standard' | 'priority' | 'premier' | null;
@@ -51,6 +53,40 @@ function tierBadge(tier: AdminUserRow['subscriptionTier'], override: string | nu
       {override ? <Badge variant="outline" className="text-xs">Override</Badge> : null}
     </div>
   );
+}
+
+function initials(name: string) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/g)
+    .filter(Boolean);
+  if (parts.length === 0) return 'U';
+  const first = parts[0]?.[0] || 'U';
+  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] || '' : '';
+  return (first + last).toUpperCase();
+}
+
+function toDateSafe(v: string | null | undefined): Date | null {
+  try {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isFinite(d.getTime()) ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatRelative(d: Date | null) {
+  if (!d) return '—';
+  const diffMs = Date.now() - d.getTime();
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return 'Just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 48) return `${hr}h ago`;
+  const days = Math.floor(hr / 24);
+  return `${days}d ago`;
 }
 
 async function safeCopy(text: string) {
@@ -154,6 +190,7 @@ export default function AdminUsersPage() {
           uid: String(u.uid || u.id || ''),
           email: u.email || null,
           displayName: u.displayName || null,
+          photoURL: u.photoURL ?? null,
           phoneNumber: u.phoneNumber || null,
           role: (u.role || null) as any,
           subscriptionTier: u.subscriptionTier ?? null,
@@ -202,6 +239,7 @@ export default function AdminUsersPage() {
                   uid,
                   email: u?.email || null,
                   displayName: u?.displayName || null,
+                  photoURL: u?.photoURL ?? null,
                   phoneNumber: u?.phoneNumber || null,
                   role: (u?.role || null) as any,
                   subscriptionTier: u?.subscriptionTier ?? null,
@@ -262,6 +300,22 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (authLoading || adminLoading) return;
     if (!user || !isAdmin) return;
+    // Support deep links like /dashboard/admin/users?uid=... or ?q=...
+    try {
+      const url = new URL(window.location.href);
+      const uidParam = url.searchParams.get('uid');
+      const qParam = url.searchParams.get('q');
+      const initial = String(uidParam || qParam || '').trim();
+      if (initial) {
+        setQuery(initial);
+        setCursor(null);
+        setCursorStack([]);
+        void load({ query: initial });
+        return;
+      }
+    } catch {
+      // ignore
+    }
     void load({ query: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, adminLoading, user?.uid, isAdmin]);
@@ -370,6 +424,14 @@ export default function AdminUsersPage() {
   }, [authHeader, toast, user]);
 
   const filtered = useMemo(() => rows, [rows]);
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const admins = filtered.filter((r) => r.role === 'admin' || r.role === 'super_admin').length;
+    const disabled = filtered.filter((r) => r.disabled).length;
+    const highRisk = filtered.filter((r) => r.risk?.label === 'high').length;
+    const stripeLinked = filtered.filter((r) => !!r.stripeAccountId).length;
+    return { total, admins, disabled, highRisk, stripeLinked };
+  }, [filtered]);
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
@@ -398,8 +460,19 @@ export default function AdminUsersPage() {
 
         <Card className="border-2 border-border/50 bg-card">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Lookup</CardTitle>
-            <CardDescription>Search by email, uid, phone (token), or name token. Use filters for faster triage.</CardDescription>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle className="text-lg">Lookup</CardTitle>
+                <CardDescription>Search by email, uid, phone (token), or name token. Use filters for faster triage.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                <span className="rounded-full border bg-muted/30 px-2 py-1">Results: {stats.total}</span>
+                <span className="rounded-full border bg-muted/30 px-2 py-1">Admins: {stats.admins}</span>
+                <span className="rounded-full border bg-muted/30 px-2 py-1">Disabled: {stats.disabled}</span>
+                <span className="rounded-full border bg-muted/30 px-2 py-1">Stripe linked: {stats.stripeLinked}</span>
+                {stats.highRisk ? <span className="rounded-full border bg-destructive/10 text-destructive px-2 py-1">High risk: {stats.highRisk}</span> : null}
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -549,14 +622,16 @@ export default function AdminUsersPage() {
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Seller Tier</TableHead>
+                    <TableHead className="hidden lg:table-cell">Stripe</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="hidden xl:table-cell">Last activity</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5}>
+                      <TableCell colSpan={7}>
                         <div className="py-10 flex items-center justify-center text-muted-foreground">
                           <Loader2 className="h-5 w-5 animate-spin mr-2" />
                           Loading…
@@ -565,7 +640,7 @@ export default function AdminUsersPage() {
                     </TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5}>
+                      <TableCell colSpan={7}>
                         <div className="py-10 text-center text-muted-foreground">No users found.</div>
                       </TableCell>
                     </TableRow>
@@ -573,14 +648,59 @@ export default function AdminUsersPage() {
                     filtered.map((r) => (
                       <TableRow key={r.uid}>
                         <TableCell className="min-w-[280px]">
-                          <div className="space-y-1">
-                            <div className="font-semibold text-foreground">{r.displayName || '—'}</div>
-                            <div className="text-sm text-muted-foreground">{r.email || r.uid}</div>
-                            <div className="text-xs text-muted-foreground">UID: {r.uid}</div>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 border">
+                              <AvatarImage src={r.photoURL || ''} alt={r.displayName || r.email || r.uid} />
+                              <AvatarFallback className="text-xs font-semibold">
+                                {initials(r.displayName || r.email || r.uid)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="font-semibold text-foreground truncate">{r.displayName || '—'}</div>
+                                {r.email ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                    onClick={async () => {
+                                      const ok = await safeCopy(r.email || '');
+                                      toast({ title: ok ? 'Copied' : 'Copy failed', description: ok ? 'Email copied.' : 'Could not copy email.' });
+                                    }}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                    <span className="sr-only">Copy email</span>
+                                  </Button>
+                                ) : null}
+                              </div>
+                              <div className="text-sm text-muted-foreground truncate">{r.email || r.uid}</div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                <span className="font-mono truncate">UID: {r.uid}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                  onClick={async () => {
+                                    const ok = await safeCopy(r.uid);
+                                    toast({ title: ok ? 'Copied' : 'Copy failed', description: ok ? 'UID copied.' : 'Could not copy UID.' });
+                                  }}
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                  <span className="sr-only">Copy UID</span>
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>{roleBadge(r.role)}</TableCell>
                         <TableCell>{tierBadge((r.subscriptionTier || 'standard') as any, (r.adminPlanOverride || null) as any)}</TableCell>
+                        <TableCell className="hidden lg:table-cell whitespace-nowrap">
+                          {r.stripeAccountId ? (
+                            <Badge className="bg-sky-500 text-sky-950 whitespace-nowrap">Stripe linked</Badge>
+                          ) : (
+                            <Badge variant="outline" className="whitespace-nowrap">Not linked</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 flex-wrap">
                             {r.disabled ? (
@@ -600,6 +720,10 @@ export default function AdminUsersPage() {
                             ) : null}
                           </div>
                         </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          <div className="text-sm font-medium">{formatRelative(toDateSafe(r.lastSignInAt))}</div>
+                          <div className="text-xs text-muted-foreground">Created {formatRelative(toDateSafe(r.createdAt))}</div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -610,10 +734,10 @@ export default function AdminUsersPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
                               <DropdownMenuItem
-                                onSelect={(e) => {
+                                onSelect={async (e) => {
                                   e.preventDefault();
-                                  void safeCopy(r.uid);
-                                  toast({ title: 'Copied', description: 'UID copied.' });
+                                  const ok = await safeCopy(r.uid);
+                                  toast({ title: ok ? 'Copied' : 'Copy failed', description: ok ? 'UID copied.' : 'Could not copy UID.' });
                                 }}
                               >
                                 <Copy className="h-4 w-4 mr-2" />
