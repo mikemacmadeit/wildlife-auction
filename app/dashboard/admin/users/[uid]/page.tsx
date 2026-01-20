@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, ArrowLeft, ShieldAlert, UserX, UserCheck, Ban, Clock, RefreshCw, KeyRound, LogOut, MessageSquareOff, BadgeAlert } from 'lucide-react';
+import { getEffectiveSubscriptionTier, getTierLabel, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 
 type Dossier = {
   authUser: any | null;
@@ -56,6 +57,8 @@ export default function AdminUserDossierPage() {
 
   const [riskLabel, setRiskLabel] = useState<'low' | 'med' | 'high' | 'unknown'>('unknown');
   const [riskReasons, setRiskReasons] = useState('');
+  const [tierOverride, setTierOverride] = useState<SubscriptionTier>('standard');
+  const [tierNotes, setTierNotes] = useState('');
 
   const authHeader = async (): Promise<HeadersInit> => {
     const token = await user?.getIdToken();
@@ -74,6 +77,10 @@ export default function AdminUserDossierPage() {
       const existingRisk = jsonData?.userDoc?.riskLabel || jsonData?.summary?.risk?.label || 'unknown';
       setRiskLabel(['low', 'med', 'high', 'unknown'].includes(existingRisk) ? existingRisk : 'unknown');
       setRiskReasons(Array.isArray(jsonData?.userDoc?.riskReasons) ? jsonData.userDoc.riskReasons.join(', ') : '');
+
+      // Initialize tier UI from user doc if present.
+      const currentTier = getEffectiveSubscriptionTier(jsonData?.userDoc || null);
+      setTierOverride(currentTier);
     } catch (e: any) {
       setError(e?.message || 'Failed to load dossier');
       setData(null);
@@ -106,6 +113,14 @@ export default function AdminUserDossierPage() {
     sellingDisabled: data?.userDoc?.adminFlags?.sellingDisabled === true || data?.summary?.sellerFlags?.sellingDisabled === true,
     messagingMuted: data?.userDoc?.adminFlags?.messagingMuted === true || data?.summary?.messagingFlags?.muted === true,
   };
+
+  const tier = getEffectiveSubscriptionTier(data?.userDoc || null);
+  const adminPlanOverride = (data?.userDoc?.adminPlanOverride ?? null) as string | null;
+  const adminOverrideReason = (data?.userDoc?.adminOverrideReason ?? null) as string | null;
+  const adminOverrideBy = (data?.userDoc?.adminOverrideBy ?? null) as string | null;
+  const adminOverrideAtRaw = (data?.userDoc?.adminOverrideAt ?? null) as any;
+  const adminOverrideAt =
+    typeof adminOverrideAtRaw?.toDate === 'function' ? adminOverrideAtRaw.toDate() : adminOverrideAtRaw instanceof Date ? adminOverrideAtRaw : null;
 
   const openConfirm = (params: { title: string; description: string; action: () => Promise<void> }) => {
     setConfirmTitle(params.title);
@@ -310,6 +325,101 @@ export default function AdminUserDossierPage() {
             </div>
 
             <div className="lg:col-span-1 space-y-6">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>Seller tier</CardTitle>
+                  <CardDescription>Admin override for exposure tier. Requires a reason and is audited.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm text-muted-foreground">Effective tier</div>
+                    <Badge variant={tier === 'premier' ? 'default' : tier === 'priority' ? 'secondary' : 'outline'}>
+                      {getTierLabel(tier)}
+                    </Badge>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div>
+                      <span className="font-semibold">Override:</span> {adminPlanOverride ? String(adminPlanOverride) : 'none'}
+                    </div>
+                    {adminOverrideReason ? (
+                      <div>
+                        <span className="font-semibold">Reason:</span> {adminOverrideReason}
+                      </div>
+                    ) : null}
+                    {adminOverrideBy || adminOverrideAt ? (
+                      <div>
+                        <span className="font-semibold">Set by:</span> {adminOverrideBy || '—'}{' '}
+                        {adminOverrideAt ? `• ${adminOverrideAt.toLocaleString()}` : ''}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold">Set override tier</div>
+                    <Select value={tierOverride} onValueChange={(v) => setTierOverride(v as SubscriptionTier)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="priority">Priority</SelectItem>
+                        <SelectItem value="premier">Premier</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Textarea
+                      value={tierNotes}
+                      onChange={(e) => setTierNotes(e.target.value)}
+                      placeholder="Optional notes (internal)"
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        onClick={() =>
+                          openConfirm({
+                            title: `Set seller tier override to ${getTierLabel(tierOverride)}?`,
+                            description:
+                              'This sets an admin override for seller exposure tier. It does not create/cancel Stripe subscriptions.',
+                            action: async () => {
+                              await postJson(`/api/admin/users/${uid}/plan-override`, {
+                                planOverride: tierOverride,
+                                reason: confirmReason.trim(),
+                                ...(tierNotes.trim() ? { notes: tierNotes.trim() } : {}),
+                              });
+                              toast({ title: 'Tier updated', description: `Override set to ${getTierLabel(tierOverride)}.` });
+                            },
+                          })
+                        }
+                      >
+                        Set override
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          openConfirm({
+                            title: 'Remove seller tier override?',
+                            description: 'This removes the admin override and returns the user to their subscription-driven tier.',
+                            action: async () => {
+                              await postJson(`/api/admin/users/${uid}/plan-override`, {
+                                planOverride: null,
+                                reason: confirmReason.trim(),
+                                ...(tierNotes.trim() ? { notes: tierNotes.trim() } : {}),
+                              });
+                              toast({ title: 'Override removed' });
+                            },
+                          })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="border-2">
                 <CardHeader>
                   <CardTitle>Admin actions</CardTitle>

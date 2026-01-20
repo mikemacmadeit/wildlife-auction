@@ -142,6 +142,7 @@ export async function POST(
     });
 
     return json({
+      ok: true,
       success: true,
       userId,
       planOverride: updateData.adminPlanOverride ?? null,
@@ -154,6 +155,6 @@ export async function POST(
     captureException(error instanceof Error ? error : new Error(String(error)), {
       route: '/api/admin/users/[userId]/plan-override',
     });
-    return json({ error: 'Failed to set plan override', message: error.message }, { status: 500 });
+    return json({ ok: false, error: 'Failed to set plan override', message: error.message }, { status: 500 });
   }
 }
