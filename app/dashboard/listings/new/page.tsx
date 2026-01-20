@@ -15,7 +15,7 @@ import { Upload, X, Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react'
 import { ListingType, ListingCategory } from '@/lib/types';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
-import { createListingDraft, publishListing, updateListing } from '@/lib/firebase/listings';
+import { createEmptyListingDraft, createListingDraft, publishListing, updateListing } from '@/lib/firebase/listings';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPromptModal } from '@/components/auth/AuthPromptModal';
 import { ListingPhotoPicker, type ListingPhotoSnapshot } from '@/components/photos/ListingPhotoPicker';
@@ -2054,6 +2054,15 @@ function NewListingPageContent() {
       return;
     }
 
+    if (!formData.category) {
+      toast({
+        title: 'Select a category',
+        description: 'Please choose a category before publishing a listing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (formData.photoIds.length > 8) {
       toast({
         title: 'Too many images',
@@ -2282,6 +2291,18 @@ function NewListingPageContent() {
     }
 
     try {
+      // Draft-first UX: allow starting a draft even before category/type selection.
+      // This avoids Firestore rules rejects caused by invalid placeholder categories.
+      if (!formData.category) {
+        const draftId = listingId || (await createEmptyListingDraft(user.uid));
+        setListingId(draftId);
+        toast({
+          title: 'Draft saved',
+          description: 'Draft started. Choose a category to continue building your listing.',
+        });
+        return;
+      }
+
       const locationData: any = {
         city: formData.location.city,
         state: formData.location.state,
@@ -2298,7 +2319,7 @@ function NewListingPageContent() {
         title: formData.title || 'Draft Listing',
         description: formData.description || '',
         type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
-        category: (formData.category || 'other') as ListingCategory,
+        category: formData.category as ListingCategory,
         location: locationData,
         images: formData.images,
         trust: {

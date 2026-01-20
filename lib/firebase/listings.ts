@@ -539,6 +539,38 @@ export const createListingDraft = async (
 };
 
 /**
+ * Create a minimal draft listing document.
+ *
+ * This exists to support the "draft-first" UX before a category/type is selected.
+ * Firestore rules allow drafts to be created with only identity + audit fields.
+ */
+export const createEmptyListingDraft = async (uid: string): Promise<string> => {
+  try {
+    const listingRef = collection(db, 'listings');
+    const docData: any = {
+      status: 'draft' as ListingStatus,
+      sellerId: uid,
+      sellerSnapshot: { displayName: 'Seller', verified: false },
+      createdBy: uid,
+      updatedBy: uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      // Keep UI-friendly defaults (not required by rules)
+      title: 'Draft Listing',
+      description: '',
+      images: [],
+      metrics: { views: 0, favorites: 0, bidCount: 0 },
+    };
+    const cleaned = stripUndefinedDeep(docData);
+    const docRef = await addDoc(listingRef, cleaned);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating empty listing draft:', error);
+    throw error;
+  }
+};
+
+/**
  * Publish a listing (change status from draft to active)
  * Checks listing limit based on user's subscription plan
  * Enforces compliance review requirements
