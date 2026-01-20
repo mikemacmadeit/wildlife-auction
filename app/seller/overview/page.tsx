@@ -31,6 +31,7 @@ import { Listing, Order, UserProfile } from '@/lib/types';
 import { getUserProfile, isProfileComplete } from '@/lib/firebase/users';
 import { getEffectiveListingStatus } from '@/lib/listings/effectiveStatus';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
+import { BreederPermitCard } from '@/components/seller/BreederPermitCard';
 import { useToast } from '@/hooks/use-toast';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
@@ -647,6 +648,9 @@ export default function SellerOverviewPage() {
             </div>
           </div>
         )}
+
+        {/* Seller-level compliance (whitetail breeders): TPWD breeder permit */}
+        <BreederPermitCard />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           {/* Action Required Panel */}

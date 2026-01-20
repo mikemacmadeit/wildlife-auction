@@ -25,6 +25,7 @@ import { getEffectiveSubscriptionTier, type SubscriptionTier } from '@/lib/prici
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import type { UserProfile } from '@/lib/types';
+import { BreederPermitCard } from '@/components/seller/BreederPermitCard';
 
 export default function SellerReputationPage() {
   const { user } = useAuth();
@@ -126,6 +127,9 @@ export default function SellerReputationPage() {
             </span>
           </CardContent>
         </Card>
+
+        {/* TPWD breeder permit (seller-level compliance) */}
+        <BreederPermitCard />
 
         {/* Verification Status */}
         <Card className="border-2 border-border/50 bg-card">

@@ -300,6 +300,11 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                       ID verified
                     </Badge>
                   )}
+                  {sellerBadges.includes('TPWD breeder permit') && (
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      TPWD permit
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>

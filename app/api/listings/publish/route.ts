@@ -455,6 +455,18 @@ export async function POST(request: Request) {
       sellerBadges.push('TPWD permit provided');
     }
 
+    // Seller-level compliance badge: TPWD breeder permit verified (public trust doc).
+    // This is a stronger signal than "permit provided" and should show on listing cards once approved.
+    try {
+      const trustSnap = await db.collection('publicSellerTrust').doc(userId).get();
+      const badgeIds: string[] = trustSnap.exists ? ((trustSnap.data() as any)?.badgeIds || []) : [];
+      if (Array.isArray(badgeIds) && badgeIds.includes('tpwd_breeder_permit_verified')) {
+        sellerBadges.push('TPWD breeder permit');
+      }
+    } catch {
+      // ignore; listing publish should not fail if trust doc can't be read
+    }
+
     const photoURL =
       typeof userData?.photoURL === 'string' && userData.photoURL.trim().length > 0 ? String(userData.photoURL) : undefined;
 

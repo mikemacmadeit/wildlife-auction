@@ -344,6 +344,11 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                         ID verified
                       </Badge>
                     ) : null}
+                    {sellerBadges.includes('TPWD breeder permit') ? (
+                      <Badge variant="outline" className="text-[10px] font-semibold">
+                        TPWD permit
+                      </Badge>
+                    ) : null}
                   </div>
                 </div>
               </div>

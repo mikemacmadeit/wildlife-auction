@@ -61,6 +61,17 @@ service firebase.storage {
       
       allow delete: if isListingOwner(listingId) || isAdmin();
     }
+
+    // ============================================
+    // SELLER PERMITS (Seller-level compliance docs)
+    // ============================================
+    // Path: seller-permits/{sellerId}/{docId}/{filename}
+    // P0: Not publicly readable. Seller + admins only.
+    match /seller-permits/{sellerId}/{docId}/{fileName} {
+      allow read: if isAuthenticated() && (request.auth.uid == sellerId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == sellerId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == sellerId || isAdmin());
+    }
     
     // ============================================
     // ORDER DOCUMENTS (Transfer Approvals, etc.)

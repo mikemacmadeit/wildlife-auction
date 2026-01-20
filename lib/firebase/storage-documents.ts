@@ -4,6 +4,7 @@
  * Storage Path Convention:
  * listings/{listingId}/documents/{docId}/{filename}
  * orders/{orderId}/documents/{docId}/{filename}
+ * seller-permits/{sellerId}/{docId}/{filename}
  */
 
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -104,6 +105,66 @@ export async function uploadComplianceDocument(
       throw enhancedError;
     }
     
+    throw error;
+  }
+}
+
+/**
+ * Upload a seller-level breeder permit document to Firebase Storage.
+ *
+ * Path: seller-permits/{sellerId}/{docId}/{filename}
+ */
+export async function uploadSellerPermitDocument(
+  sellerId: string,
+  file: File,
+  onProgress?: (progress: DocumentUploadProgress) => void
+): Promise<DocumentUploadResult> {
+  try {
+    const documentId = nanoid();
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+    const fileName = `${documentId}.${fileExtension}`;
+
+    const storagePath = `seller-permits/${sellerId}/${documentId}/${fileName}`;
+    const storageRef = ref(storage, storagePath);
+
+    let contentType = 'application/pdf';
+    if (file.type.startsWith('image/')) {
+      contentType = file.type;
+    }
+
+    const uploadTask = uploadBytesResumable(storageRef, file, { contentType });
+
+    if (onProgress) {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          onProgress({
+            progress,
+            state: snapshot.state as 'running' | 'paused' | 'success' | 'error',
+          });
+        },
+        (error) => {
+          console.error('Seller permit upload error:', error);
+          onProgress({ progress: 0, state: 'error' });
+        },
+        () => {
+          onProgress({ progress: 100, state: 'success' });
+        }
+      );
+    }
+
+    await uploadTask;
+    const url = await getDownloadURL(uploadTask.snapshot.ref);
+
+    return { url, path: storagePath, documentId };
+  } catch (error: any) {
+    console.error('Error uploading seller permit document:', error);
+    if (error.code) {
+      const enhancedError = new Error(error.message || 'Failed to upload document');
+      (enhancedError as any).code = error.code;
+      throw enhancedError;
+    }
     throw error;
   }
 }

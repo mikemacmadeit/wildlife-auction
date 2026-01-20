@@ -107,7 +107,11 @@ export type AuditActionType =
   | 'admin_listing_document_verified'
   | 'admin_listing_document_rejected'
   | 'admin_order_document_verified'
-  | 'admin_order_document_rejected';
+  | 'admin_order_document_rejected'
+  // Seller: breeder permit submission + admin review (seller-level compliance)
+  | 'seller_breeder_permit_submitted'
+  | 'admin_seller_breeder_permit_verified'
+  | 'admin_seller_breeder_permit_rejected';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 

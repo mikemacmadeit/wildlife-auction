@@ -52,7 +52,21 @@ import { formatCurrency } from '@/lib/utils';
 import { ComplianceDocument } from '@/lib/types';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 
-type TabType = 'listings' | 'orders';
+type TabType = 'listings' | 'orders' | 'breeder_permits';
+
+type SellerPermit = {
+  sellerId: string;
+  status: 'pending' | 'verified' | 'rejected';
+  permitNumber?: string | null;
+  documentUrl?: string | null;
+  storagePath?: string | null;
+  rejectionReason?: string | null;
+  expiresAt?: string | null; // ISO
+  uploadedAt?: string | null; // ISO
+  reviewedAt?: string | null; // ISO
+  reviewedBy?: string | null;
+  updatedAt?: string | null;
+};
 
 export default function AdminCompliancePage() {
   const toDateSafe = (value: any): Date | null => {
@@ -88,6 +102,7 @@ export default function AdminCompliancePage() {
   const [activeTab, setActiveTab] = useState<TabType>('listings');
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [breederPermits, setBreederPermits] = useState<SellerPermit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -104,13 +119,19 @@ export default function AdminCompliancePage() {
   const [quickVerifyDocId, setQuickVerifyDocId] = useState<string | null>(null);
   const [listingDocsMap, setListingDocsMap] = useState<Record<string, ComplianceDocument[]>>({});
 
+  const [selectedPermit, setSelectedPermit] = useState<SellerPermit | null>(null);
+  const [permitDialogOpen, setPermitDialogOpen] = useState(false);
+  const [permitRejectionReason, setPermitRejectionReason] = useState('');
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       if (activeTab === 'listings') {
         await loadPendingListings();
-      } else {
+      } else if (activeTab === 'orders') {
         await loadPendingOrders();
+      } else {
+        await loadBreederPermits();
       }
     } catch (error) {
       console.error('Error loading compliance data:', error);
@@ -217,6 +238,19 @@ export default function AdminCompliancePage() {
     });
     
     setOrders(pendingOrders);
+  };
+
+  const loadBreederPermits = async () => {
+    if (!user?.uid) return;
+    const token = await user.getIdToken();
+    const res = await fetch('/api/admin/breeder-permits?status=pending&limit=50', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const jsonRes = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(jsonRes?.error || jsonRes?.message || `Failed to load breeder permits (HTTP ${res.status})`);
+    }
+    setBreederPermits(Array.isArray(jsonRes?.permits) ? jsonRes.permits : []);
   };
 
   const loadListingDocuments = async (listingId: string) => {
@@ -465,6 +499,9 @@ export default function AdminCompliancePage() {
           </TabsTrigger>
           <TabsTrigger value="orders">
             Orders ({orders.length})
+          </TabsTrigger>
+          <TabsTrigger value="breeder_permits">
+            Breeder Permits ({breederPermits.length})
           </TabsTrigger>
         </TabsList>
 
@@ -791,6 +828,203 @@ export default function AdminCompliancePage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="breeder_permits" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <div className="font-semibold">TPWD Breeder Permits</div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Seller-submitted TPWD breeder permits. Approving applies a public trust badge (marketplace workflow).
+                  </div>
+                </div>
+                <Button onClick={loadBreederPermits} variant="outline" disabled={loading || !user}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : breederPermits.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Pending Permits</h3>
+                  <p className="text-muted-foreground">All breeder permits have been reviewed.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {breederPermits.map((p) => (
+                <Card key={p.sellerId} className="border-2">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="font-semibold">Seller</div>
+                          <Link href={`/dashboard/admin/users/${p.sellerId}`} className="font-mono text-xs text-primary hover:underline">
+                            {p.sellerId}
+                          </Link>
+                          <Badge variant="outline" className="capitalize">
+                            {p.status === 'pending' ? 'Pending review' : p.status}
+                          </Badge>
+                        </div>
+                        {p.permitNumber ? (
+                          <div className="text-sm text-muted-foreground">
+                            Permit #: <span className="font-mono">{p.permitNumber}</span>
+                          </div>
+                        ) : null}
+                        {p.uploadedAt ? (
+                          <div className="text-xs text-muted-foreground">
+                            Submitted: {new Date(p.uploadedAt).toLocaleString()}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          disabled={!p.documentUrl}
+                          onClick={() => {
+                            setSelectedPermit(p);
+                            setPermitRejectionReason('');
+                            setPermitDialogOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Review
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Dialog open={permitDialogOpen} onOpenChange={setPermitDialogOpen}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Breeder Permit Review</DialogTitle>
+                <DialogDescription>
+                  Approving adds the “TPWD breeder permit” trust badge to the seller’s public profile and listing cards.
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedPermit ? (
+                <div className="space-y-4">
+                  <div className="text-sm">
+                    Seller:{' '}
+                    <Link href={`/dashboard/admin/users/${selectedPermit.sellerId}`} className="font-mono text-primary hover:underline">
+                      {selectedPermit.sellerId}
+                    </Link>
+                  </div>
+
+                  {selectedPermit.documentUrl ? (
+                    <div className="rounded-lg border overflow-hidden bg-background">
+                      <iframe title="Breeder permit document" src={selectedPermit.documentUrl} className="w-full h-[60vh]" />
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border bg-muted/20 p-6 text-sm text-muted-foreground">No document URL on file.</div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="permit-reject-reason">Rejection reason (required if rejecting)</Label>
+                    <Textarea
+                      id="permit-reject-reason"
+                      value={permitRejectionReason}
+                      onChange={(e) => setPermitRejectionReason(e.target.value)}
+                      rows={3}
+                      placeholder="Explain what is missing/invalid and what the seller should upload instead."
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <DialogFooter className="flex items-center justify-between sm:justify-between">
+                <Button variant="outline" onClick={() => setPermitDialogOpen(false)}>
+                  Close
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="destructive"
+                    disabled={!selectedPermit || processingId === selectedPermit?.sellerId}
+                    onClick={async () => {
+                      if (!user || !selectedPermit) return;
+                      if (!permitRejectionReason.trim()) {
+                        toast({
+                          title: 'Rejection reason required',
+                          description: 'Please provide a reason when rejecting a permit.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      try {
+                        setProcessingId(selectedPermit.sellerId);
+                        const token = await user.getIdToken();
+                        const res = await fetch(`/api/admin/breeder-permits/${selectedPermit.sellerId}/review`, {
+                          method: 'POST',
+                          headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ status: 'rejected', rejectionReason: permitRejectionReason.trim() }),
+                        });
+                        const j = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(j?.error || j?.message || 'Failed to reject permit');
+                        toast({ title: 'Rejected', description: 'Breeder permit rejected.' });
+                        setPermitDialogOpen(false);
+                        await loadBreederPermits();
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: e?.message || 'Failed to reject permit', variant: 'destructive' });
+                      } finally {
+                        setProcessingId(null);
+                      }
+                    }}
+                  >
+                    {processingId === selectedPermit?.sellerId ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Reject
+                  </Button>
+                  <Button
+                    variant="default"
+                    disabled={!selectedPermit || processingId === selectedPermit?.sellerId}
+                    onClick={async () => {
+                      if (!user || !selectedPermit) return;
+                      try {
+                        setProcessingId(selectedPermit.sellerId);
+                        const token = await user.getIdToken();
+                        const res = await fetch(`/api/admin/breeder-permits/${selectedPermit.sellerId}/review`, {
+                          method: 'POST',
+                          headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ status: 'verified' }),
+                        });
+                        const j = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(j?.error || j?.message || 'Failed to approve permit');
+                        toast({ title: 'Approved', description: 'Breeder permit verified. Badge applied.' });
+                        setPermitDialogOpen(false);
+                        await loadBreederPermits();
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: e?.message || 'Failed to approve permit', variant: 'destructive' });
+                      } finally {
+                        setProcessingId(null);
+                      }
+                    }}
+                  >
+                    {processingId === selectedPermit?.sellerId ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Approve
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
 
