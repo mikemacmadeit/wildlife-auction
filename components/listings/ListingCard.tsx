@@ -15,6 +15,7 @@ import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface ListingCardProps {
   listing: Listing;
@@ -29,6 +30,9 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
   const watchers = typeof listing.watcherCount === 'number' ? listing.watcherCount : listing.metrics?.favorites || 0;
   const sold = useMemo(() => getSoldSummary(listing), [listing]);
+  const sellerName = listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller';
+  const sellerInitial = String(sellerName || 'S').trim().slice(0, 1).toUpperCase();
+  const sellerPhotoUrl = listing.sellerSnapshot?.photoURL || '';
 
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
@@ -281,7 +285,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="text-xs font-semibold text-muted-foreground max-w-[160px] truncate hover:underline"
+                    className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground max-w-[200px] truncate hover:underline"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -291,7 +295,11 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     }}
                     aria-label="View seller profile"
                   >
-                    {listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller'}
+                    <Avatar className="h-6 w-6 border border-border/50">
+                      <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
+                      <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{sellerName}</span>
                   </button>
                   {/* Seller Tier badge (Seller Tiers) */}
                   <SellerTierBadge tier={(listing as any).sellerTier} />

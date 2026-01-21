@@ -14,6 +14,7 @@ import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface FeaturedListingCardProps {
   listing: Listing;
@@ -27,6 +28,9 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
+  const sellerName = listing.sellerSnapshot?.displayName || 'Seller';
+  const sellerInitial = String(sellerName || 'S').trim().slice(0, 1).toUpperCase();
+  const sellerPhotoUrl = listing.sellerSnapshot?.photoURL || '';
 
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
@@ -222,7 +226,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </div>
                 <button
                   type="button"
-                  className="text-xs text-muted-foreground font-medium max-w-[180px] truncate text-right hover:underline"
+                  className="inline-flex items-center justify-end gap-2 text-xs text-muted-foreground font-medium max-w-[220px] truncate text-right hover:underline"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -232,7 +236,11 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                   }}
                   aria-label="View seller profile"
                 >
-                  {listing.sellerSnapshot?.displayName || 'Seller'}
+                  <Avatar className="h-6 w-6 border border-border/50">
+                    <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
+                    <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{sellerName}</span>
                 </button>
               </div>
             </div>
