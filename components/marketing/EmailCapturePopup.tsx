@@ -18,6 +18,7 @@ import { Loader2, Mail, Sparkles } from 'lucide-react';
 
 const DISMISSED_KEY = 'we_email_capture_dismissed';
 const SUBSCRIBED_KEY = 'we_email_capture_subscribed';
+const SEEN_SESSION_KEY = 'we_email_capture_seen_session';
 
 function isEmail(email: string): boolean {
   // Light client-side validation; server is authoritative.
@@ -31,6 +32,15 @@ function canUseDOM(): boolean {
 function shouldSuppressPopup(): boolean {
   if (!canUseDOM()) return true;
   try {
+    // Session-level guard: if it already showed once this session, don't re-open repeatedly
+    // when navigating between route groups that mount/unmount this component.
+    try {
+      const seen = window.sessionStorage?.getItem(SEEN_SESSION_KEY);
+      if (seen === 'true') return true;
+    } catch {
+      // ignore
+    }
+
     const subscribed = window.localStorage.getItem(SUBSCRIBED_KEY);
     if (subscribed === 'true') return true;
     const dismissedAt = window.localStorage.getItem(DISMISSED_KEY);
@@ -54,6 +64,8 @@ export function EmailCapturePopup(props: { source?: string }) {
 
   const shownRef = useRef(false);
   const timerRef = useRef<number | null>(null);
+  const openRef = useRef(false);
+  const successRef = useRef(false);
 
   const eligible = useMemo(() => !shouldSuppressPopup(), []);
 
@@ -75,12 +87,23 @@ export function EmailCapturePopup(props: { source?: string }) {
     }
   }, []);
 
+  const markSeenThisSession = useCallback(() => {
+    if (!canUseDOM()) return;
+    try {
+      window.sessionStorage?.setItem(SEEN_SESSION_KEY, 'true');
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const showOnce = useCallback(() => {
     if (!eligible) return;
     if (shownRef.current) return;
     shownRef.current = true;
+    // Prevent repeated popups if this component unmounts/remounts during navigation (mobile is especially prone).
+    markSeenThisSession();
     setOpen(true);
-  }, [eligible]);
+  }, [eligible, markSeenThisSession]);
 
   // 12 second delay
   useEffect(() => {
@@ -152,6 +175,29 @@ export function EmailCapturePopup(props: { source?: string }) {
       setSubmitting(false);
     }
   }, [email, markSubscribed, source]);
+
+  // Track open/success in refs so we can safely mark dismissal if the component unmounts while open.
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    successRef.current = success;
+  }, [success]);
+
+  // If the popup is open and the user navigates away (this component can unmount between route groups),
+  // treat it as dismissed so it doesn’t keep popping up repeatedly.
+  useEffect(() => {
+    return () => {
+      try {
+        if (openRef.current && !successRef.current) {
+          markDismissed();
+          markSeenThisSession();
+        }
+      } catch {
+        // ignore
+      }
+    };
+  }, [markDismissed, markSeenThisSession]);
 
   if (!eligible) return null;
 
