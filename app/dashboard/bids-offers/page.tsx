@@ -443,10 +443,24 @@ export default function BidsOffersPage() {
               Your command center for auctions + offers. See what needs action, raise max bids, and complete accepted deals.
             </p>
           </div>
-          <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Button asChild variant="secondary" className="min-h-[40px]">
+              <Link href="/dashboard/offers">
+                <Handshake className="h-4 w-4 mr-2" />
+                My offers (sent)
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="min-h-[40px]">
+              <Link href="/seller/offers">
+                <Handshake className="h-4 w-4 mr-2" />
+                Offers received (seller)
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Top summary */}

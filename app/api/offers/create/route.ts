@@ -196,24 +196,28 @@ export async function POST(request: Request) {
       return json(result.body, { status: result.status });
     }
 
-    // Audit logs (outside txn)
-    await createAuditLog(db, {
-      actorUid: buyerId,
-      actorRole: 'buyer',
-      actionType: 'offer_created',
-      listingId,
-      metadata: { offerId: result.offerId, amount },
-      source: 'buyer_ui',
-    });
-    if (result.offerDoc.status === 'accepted') {
+    // Audit logs (outside txn) - best-effort (offers should never fail due to audit logging)
+    try {
       await createAuditLog(db, {
-        actorUid: 'system',
-        actorRole: 'system',
-        actionType: 'offer_accepted',
+        actorUid: buyerId,
+        actorRole: 'buyer',
+        actionType: 'offer_created',
         listingId,
-        metadata: { offerId: result.offerId, amount, auto: true },
-        source: 'api',
+        metadata: { offerId: result.offerId, amount },
+        source: 'buyer_ui',
       });
+      if (result.offerDoc.status === 'accepted') {
+        await createAuditLog(db, {
+          actorUid: 'system',
+          actorRole: 'system',
+          actionType: 'offer_accepted',
+          listingId,
+          metadata: { offerId: result.offerId, amount, auto: true },
+          source: 'api',
+        });
+      }
+    } catch (e) {
+      console.error('[offers.create] audit log failed (ignored)', e);
     }
 
     // Phase 3A (A3): Offer lifecycle notifications (existing pipeline; in-app by default via rules).

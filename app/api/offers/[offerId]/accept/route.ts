@@ -120,14 +120,19 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
 
     if (!result.ok) return json(result.body, { status: result.status });
 
-    await createAuditLog(db, {
-      actorUid: actorId,
-      actorRole: result.sellerId === actorId ? 'seller' : 'buyer',
-      actionType: 'offer_accepted',
-      listingId: result.listingId,
-      metadata: { offerId, acceptedAmount: result.amount },
-      source: result.sellerId === actorId ? 'seller_ui' : 'buyer_ui',
-    });
+    // Best-effort audit logging (never block offer acceptance)
+    try {
+      await createAuditLog(db, {
+        actorUid: actorId,
+        actorRole: result.sellerId === actorId ? 'seller' : 'buyer',
+        actionType: 'offer_accepted',
+        listingId: result.listingId,
+        metadata: { offerId, acceptedAmount: result.amount },
+        source: result.sellerId === actorId ? 'seller_ui' : 'buyer_ui',
+      });
+    } catch (e) {
+      console.error('[offers.accept] audit log failed (ignored)', e);
+    }
 
     // Phase 3A (A3): Notify both sides that the offer was accepted.
     try {

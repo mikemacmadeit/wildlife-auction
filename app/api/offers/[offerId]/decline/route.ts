@@ -107,14 +107,19 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
 
     if (!result.ok) return json(result.body, { status: result.status });
 
-    await createAuditLog(db, {
-      actorUid: actorId,
-      actorRole: result.role,
-      actionType: 'offer_declined',
-      listingId: result.listingId,
-      metadata: { offerId, ...(cleanNote ? { note: cleanNote } : {}) },
-      source: result.role === 'seller' ? 'seller_ui' : 'buyer_ui',
-    });
+    // Best-effort audit logging (never block declining)
+    try {
+      await createAuditLog(db, {
+        actorUid: actorId,
+        actorRole: result.role,
+        actionType: 'offer_declined',
+        listingId: result.listingId,
+        metadata: { offerId, ...(cleanNote ? { note: cleanNote } : {}) },
+        source: result.role === 'seller' ? 'seller_ui' : 'buyer_ui',
+      });
+    } catch (e) {
+      console.error('[offers.decline] audit log failed (ignored)', e);
+    }
 
     // Phase 3A (A3): notify counterparty of decline.
     try {

@@ -142,14 +142,19 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
 
     if (!result.ok) return json(result.body, { status: result.status });
 
-    await createAuditLog(db, {
-      actorUid: actorId,
-      actorRole: result.role,
-      actionType: 'offer_countered',
-      listingId: result.listingId,
-      metadata: { offerId, amount },
-      source: result.role === 'seller' ? 'seller_ui' : 'buyer_ui',
-    });
+    // Best-effort audit logging (never block countering)
+    try {
+      await createAuditLog(db, {
+        actorUid: actorId,
+        actorRole: result.role,
+        actionType: 'offer_countered',
+        listingId: result.listingId,
+        metadata: { offerId, amount },
+        source: result.role === 'seller' ? 'seller_ui' : 'buyer_ui',
+      });
+    } catch (e) {
+      console.error('[offers.counter] audit log failed (ignored)', e);
+    }
 
     // Phase 3A (A3): Notify the counterparty today's amount + expiry.
     try {

@@ -86,14 +86,19 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
 
     if (!result.ok) return json(result.body, { status: result.status });
 
-    await createAuditLog(db, {
-      actorUid: buyerId,
-      actorRole: 'buyer',
-      actionType: 'offer_withdrawn',
-      listingId: result.listingId,
-      metadata: { offerId, ...(cleanNote ? { note: cleanNote } : {}) },
-      source: 'buyer_ui',
-    });
+    // Best-effort audit logging (never block withdrawing)
+    try {
+      await createAuditLog(db, {
+        actorUid: buyerId,
+        actorRole: 'buyer',
+        actionType: 'offer_withdrawn',
+        listingId: result.listingId,
+        metadata: { offerId, ...(cleanNote ? { note: cleanNote } : {}) },
+        source: 'buyer_ui',
+      });
+    } catch (e) {
+      console.error('[offers.withdraw] audit log failed (ignored)', e);
+    }
 
     return json({ ok: true });
   } catch (error: any) {
