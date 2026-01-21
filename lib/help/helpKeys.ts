@@ -16,7 +16,8 @@ export function getHelpKeyForPathname(pathname: string | null | undefined): Help
   // Exact matches first
   // Home page: do not show help launcher.
   if (pathname === '/') return null;
-  if (pathname === '/browse') return 'public_browse';
+  // Browse: per product request, do not show the floating help launcher.
+  if (pathname === '/browse') return null;
   if (pathname === '/how-it-works') return 'public_how_it_works';
 
   // Authenticated app pages
@@ -27,7 +28,8 @@ export function getHelpKeyForPathname(pathname: string | null | undefined): Help
   if (pathname === '/dashboard' || pathname === '/seller' || pathname === '/seller/overview') return 'seller_overview';
 
   // Prefix fallbacks
-  if (pathname.startsWith('/browse')) return 'public_browse';
+  // Browse: per product request, do not show the floating help launcher.
+  if (pathname.startsWith('/browse')) return null;
   if (pathname.startsWith('/dashboard/orders')) return 'dashboard_orders';
   if (pathname.startsWith('/dashboard/listings/new')) return 'dashboard_listing_create';
   if (pathname.startsWith('/seller/overview')) return 'seller_overview';
