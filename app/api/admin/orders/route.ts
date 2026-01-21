@@ -74,20 +74,67 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '100', 10);
     const cursor = searchParams.get('cursor');
 
-    // Build Firestore query
-    let ordersQuery = db.collection('orders').orderBy('createdAt', 'desc').limit(limit);
+    // Build Firestore query.
+    //
+    // IMPORTANT: We must filter *before* limiting, otherwise real paid_held orders can be pushed
+    // out of the first N documents and never appear in Admin Ops.
+    //
+    // For complex filters we still do some in-memory checks, but we always narrow the query first.
+    const ordersCol = db.collection('orders');
+    const now = Timestamp.now();
 
-    // Apply cursor for pagination
+    const isMissingIndex = (e: any) => {
+      const code = String(e?.code || '');
+      const msg = String(e?.message || '').toLowerCase();
+      return code === 'failed-precondition' || msg.includes('requires an index') || msg.includes('failed-precondition');
+    };
+
+    let ordersQuery: any;
+    if (filter === 'escrow') {
+      ordersQuery = ordersCol
+        .where('status', 'in', ['paid', 'paid_held', 'awaiting_bank_transfer', 'awaiting_wire'])
+        .orderBy('createdAt', 'desc')
+        .limit(limit);
+    } else if (filter === 'disputes') {
+      ordersQuery = ordersCol
+        .where('disputeStatus', 'in', ['open', 'needs_evidence', 'under_review'])
+        .orderBy('createdAt', 'desc')
+        .limit(limit);
+    } else if (filter === 'ready_to_release') {
+      // Candidate statuses for manual release queue. Final eligibility still checked below.
+      ordersQuery = ordersCol.where('status', 'in', ['ready_to_release', 'buyer_confirmed', 'accepted']).orderBy('createdAt', 'desc').limit(limit);
+    } else {
+      // 'protected' and 'all' start with the broadest query; protected requires further in-memory checks.
+      ordersQuery = ordersCol.orderBy('createdAt', 'desc').limit(limit);
+    }
+
+    // Apply cursor for pagination (must match the same ordering).
     if (cursor) {
-      const cursorDoc = await db.collection('orders').doc(cursor).get();
+      const cursorDoc = await ordersCol.doc(cursor).get();
       if (cursorDoc.exists) {
         ordersQuery = ordersQuery.startAfter(cursorDoc);
       }
     }
 
-    // Execute query
-    const snapshot = await ordersQuery.get();
-    let orders = snapshot.docs.map((doc) => ({
+    // Execute query (with safe fallback for missing composite indexes).
+    let snapshot: any;
+    try {
+      snapshot = await ordersQuery.get();
+    } catch (e: any) {
+      if (isMissingIndex(e)) {
+        console.warn(`[api/admin/orders] Missing Firestore index for filter=${filter}; falling back to broad query + in-memory filter. Please deploy indexes.`, e);
+        let fallbackQuery: any = ordersCol.orderBy('createdAt', 'desc').limit(limit);
+        if (cursor) {
+          const cursorDoc = await ordersCol.doc(cursor).get();
+          if (cursorDoc.exists) fallbackQuery = fallbackQuery.startAfter(cursorDoc);
+        }
+        snapshot = await fallbackQuery.get();
+      } else {
+        throw e;
+      }
+    }
+
+    let orders = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
@@ -102,9 +149,6 @@ export async function GET(request: Request) {
         listingTitle: listingTitle || listingTitleFromSnapshot || o?.listingId || 'Unknown Listing',
       };
     });
-
-    // Server-side filtering based on filter type
-    const now = Timestamp.now();
 
     if (filter === 'escrow') {
       // Orders held for payout release: paid funds awaiting release OR high-ticket awaiting payment confirmation
