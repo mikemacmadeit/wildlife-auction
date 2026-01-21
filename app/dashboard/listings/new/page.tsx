@@ -133,6 +133,21 @@ function NewListingPageContent() {
     savedAtMs?: number;
   } | null>(null);
 
+  // Focal points selected during photo upload/crop (used to match review preview to chosen crop).
+  const focalPointsByUrl = useMemo(() => {
+    const m: Record<string, { x: number; y: number }> = {};
+    const photos = Array.isArray(formData.photos) ? formData.photos : [];
+    for (const p of photos) {
+      const url = typeof (p as any)?.url === 'string' ? String((p as any).url) : '';
+      const fp = (p as any)?.focalPoint;
+      if (!url || !fp) continue;
+      if (typeof fp?.x === 'number' && typeof fp?.y === 'number') {
+        m[url] = { x: fp.x, y: fp.y };
+      }
+    }
+    return m;
+  }, [formData.photos]);
+
   // Autosave: local (always) + server (only once we have a draftId).
   const [autoSaveState, setAutoSaveState] = useState<{
     status: 'idle' | 'saving' | 'saved' | 'error';
@@ -1817,7 +1832,7 @@ function NewListingPageContent() {
           {/* Listing Preview (photos + primary info) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-3">
-              <ImageGallery images={formData.images} title={formData.title || 'Listing'} />
+              <ImageGallery images={formData.images} title={formData.title || 'Listing'} focalPointsByUrl={focalPointsByUrl} />
               <div className="text-xs text-muted-foreground">
                 {formData.images.length} photo{formData.images.length === 1 ? '' : 's'} will appear on the listing.
               </div>

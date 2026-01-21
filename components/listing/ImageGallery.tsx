@@ -12,11 +12,24 @@ interface ImageGalleryProps {
   images: string[];
   title: string;
   className?: string;
+  /**
+   * Optional focal points (0..1 normalized) keyed by image URL.
+   * When provided, we apply `object-position` so `object-cover` matches the crop/focal point chosen in upload.
+   */
+  focalPointsByUrl?: Record<string, { x: number; y: number }>;
 }
 
-export function ImageGallery({ images, title, className }: ImageGalleryProps) {
+export function ImageGallery({ images, title, className, focalPointsByUrl }: ImageGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const getObjectPosition = (url: string): string => {
+    const fp = url && focalPointsByUrl ? focalPointsByUrl[url] : undefined;
+    if (!fp || !Number.isFinite(fp.x) || !Number.isFinite(fp.y)) return '50% 50%';
+    const x = Math.max(0, Math.min(1, fp.x));
+    const y = Math.max(0, Math.min(1, fp.y));
+    return `${Math.round(x * 100)}% ${Math.round(y * 100)}%`;
+  };
 
   if (!images || images.length === 0) {
     return (
@@ -64,6 +77,7 @@ export function ImageGallery({ images, title, className }: ImageGalleryProps) {
           alt={`${title} - Image ${selectedIndex + 1}`}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ objectPosition: getObjectPosition(images[selectedIndex] || '') }}
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
           unoptimized
           priority={selectedIndex === 0}
@@ -147,6 +161,7 @@ export function ImageGallery({ images, title, className }: ImageGalleryProps) {
                 alt={`Thumbnail ${index + 1}`}
                 fill
                 className="object-cover"
+                style={{ objectPosition: getObjectPosition(image) }}
                 sizes="(max-width: 768px) 25vw, 150px"
                 unoptimized
               />
