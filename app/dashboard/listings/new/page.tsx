@@ -290,6 +290,23 @@ function NewListingPageContent() {
       try {
         setAutoSaveState((s) => ({ ...s, status: 'saving' }));
 
+        // Safety: the "new listing" flow must never server-autosave onto an already-published listing.
+        // If localStorage restores a stale listingId (active/sold/expired), Firestore rules can deny the write
+        // and we also risk mutating a live listing unintentionally.
+        try {
+          const snap = await getDoc(doc(db, 'listings', listingId));
+          const status = snap.exists() ? String((snap.data() as any)?.status || '') : '';
+          if (status && status !== 'draft' && status !== 'pending') {
+            setListingId(null);
+            setAutoSaveState((s) => ({ ...s, status: 'idle' }));
+            return;
+          }
+        } catch {
+          // Best-effort guard: if we can't verify, skip server autosave rather than risk a rules-denied write.
+          setAutoSaveState((s) => ({ ...s, status: 'idle' }));
+          return;
+        }
+
         const locationData: any = {
           city: formData.location.city,
           state: formData.location.state,
