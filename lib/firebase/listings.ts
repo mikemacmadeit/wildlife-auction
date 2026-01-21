@@ -604,6 +604,7 @@ export const publishListing = async (
       // Surface structured error codes to the UI (e.g. PAYOUTS_NOT_READY) for better UX.
       if (json?.code) err.code = json.code;
       if (json?.error) err.error = json.error;
+      if (Array.isArray(json?.missing)) err.missing = json.missing;
       throw err;
     }
 

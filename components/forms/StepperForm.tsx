@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronLeft, ChevronRight, Save, Loader2 } from 'lucide-react';
@@ -29,6 +29,8 @@ interface StepperFormProps {
   completeButtonDataTour?: string; // Optional data-tour selector for the final action button
   completeButtonLabel?: string; // Optional label for the final action button (defaults to Publish Listing)
   onValidationError?: (stepId: string) => void; // Optional callback for highlighting invalid fields in the parent UI
+  activeStepId?: string | null; // Optional external step control (jump to a step by id)
+  onStepChange?: (stepId: string) => void; // Optional callback when step changes
 }
 
 export function StepperForm({
@@ -44,6 +46,8 @@ export function StepperForm({
   completeButtonDataTour,
   completeButtonLabel,
   onValidationError,
+  activeStepId = null,
+  onStepChange,
 }: StepperFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -52,6 +56,19 @@ export function StepperForm({
   const progress = ((currentStep + 1) / steps.length) * 100;
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === steps.length - 1;
+
+  // Allow parent to request a step jump (e.g. publish validation failure -> jump to the step with missing fields).
+  useEffect(() => {
+    if (!activeStepId) return;
+    const idx = steps.findIndex((s) => s.id === activeStepId);
+    if (idx >= 0 && idx !== currentStep) setCurrentStep(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStepId, steps]);
+
+  useEffect(() => {
+    onStepChange?.(currentStepData?.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   const handleNext = () => {
     // Prevent double-submits / double-advances while parent is saving/submitting.

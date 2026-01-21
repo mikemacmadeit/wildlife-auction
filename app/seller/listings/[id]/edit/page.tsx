@@ -111,6 +111,9 @@ function EditListingPageContent() {
   const [initialSignature, setInitialSignature] = useState<string>('');
   const [hasSavedEditsSinceRejection, setHasSavedEditsSinceRejection] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
+  const [publishMissingFields, setPublishMissingFields] = useState<string[]>([]);
+  const [requestedStepId, setRequestedStepId] = useState<string | null>(null);
+  const publishFocusFieldRef = useRef<string | null>(null);
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
   const imagesInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -649,7 +652,10 @@ function EditListingPageContent() {
               placeholder="e.g., Trophy Whitetail Buck"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="min-h-[48px] text-base bg-background"
+              className={cn(
+                "min-h-[48px] text-base bg-background",
+                publishMissingFields.includes('title') ? 'ring-2 ring-destructive border-destructive' : null
+              )}
             />
           </div>
 
@@ -660,7 +666,10 @@ function EditListingPageContent() {
               placeholder="Provide detailed information about your listing..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="min-h-[120px] text-base bg-background"
+              className={cn(
+                "min-h-[120px] text-base bg-background",
+                publishMissingFields.includes('description') ? 'ring-2 ring-destructive border-destructive' : null
+              )}
             />
           </div>
 
@@ -704,7 +713,10 @@ function EditListingPageContent() {
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                       disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
-                      className="min-h-[48px] text-base bg-background"
+                      className={cn(
+                        "min-h-[48px] text-base bg-background",
+                        publishMissingFields.includes('price') ? 'ring-2 ring-destructive border-destructive' : null
+                      )}
                     />
                   </div>
               )}
@@ -720,7 +732,10 @@ function EditListingPageContent() {
                       value={formData.startingBid}
                       onChange={(e) => setFormData({ ...formData, startingBid: e.target.value })}
                       disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
-                      className="min-h-[48px] text-base bg-background"
+                      className={cn(
+                        "min-h-[48px] text-base bg-background",
+                        publishMissingFields.includes('startingBid') ? 'ring-2 ring-destructive border-destructive' : null
+                      )}
                     />
                   </div>
                   <div className="space-y-2">
@@ -734,7 +749,10 @@ function EditListingPageContent() {
                       value={formData.reservePrice}
                       onChange={(e) => setFormData({ ...formData, reservePrice: e.target.value })}
                       disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
-                      className="min-h-[48px] text-base bg-background"
+                      className={cn(
+                        "min-h-[48px] text-base bg-background",
+                        publishMissingFields.includes('reservePrice') ? 'ring-2 ring-destructive border-destructive' : null
+                      )}
                     />
                     <p className="text-xs text-muted-foreground">
                       Minimum price you'll accept. Won't be shown to bidders.
@@ -750,7 +768,10 @@ function EditListingPageContent() {
                       value={formData.endsAt}
                       onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
                       disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
-                      className="min-h-[48px] text-base bg-background"
+                      className={cn(
+                        "min-h-[48px] text-base bg-background",
+                        publishMissingFields.includes('endsAt') ? 'ring-2 ring-destructive border-destructive' : null
+                      )}
                       min={new Date().toISOString().slice(0, 16)}
                     />
                     <p className="text-xs text-muted-foreground">
@@ -897,7 +918,10 @@ function EditListingPageContent() {
                     location: { ...formData.location, city: e.target.value },
                   })
                 }
-                className="min-h-[48px] text-base bg-background"
+                className={cn(
+                  "min-h-[48px] text-base bg-background",
+                  publishMissingFields.includes('location.city') ? 'ring-2 ring-destructive border-destructive' : null
+                )}
               />
             </div>
             <div className="space-y-2">
@@ -913,7 +937,10 @@ function EditListingPageContent() {
                   })
                 }
                 disabled={['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category)}
-                className="min-h-[48px] text-base bg-background"
+                className={cn(
+                  "min-h-[48px] text-base bg-background",
+                  publishMissingFields.includes('location.state') ? 'ring-2 ring-destructive border-destructive' : null
+                )}
               />
               {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) && (
                 <p className="text-xs text-muted-foreground">
@@ -954,7 +981,12 @@ function EditListingPageContent() {
       title: 'Photos',
       description: 'Update photos for your listing',
       content: (
-        <div className="space-y-4">
+        <div
+          className={cn(
+            "space-y-4",
+            publishMissingFields.includes('photos') ? 'rounded-lg ring-2 ring-destructive p-2' : null
+          )}
+        >
           {formData.images.length > 0 && (
             <div>
               <Label className="text-base font-semibold mb-2 block">Current Photos</Label>
@@ -1741,6 +1773,11 @@ function EditListingPageContent() {
     setSaving(true);
 
     try {
+      // Clear any prior publish hints when they try again.
+      setPublishMissingFields([]);
+      publishFocusFieldRef.current = null;
+      setRequestedStepId(null);
+
       const updates = prepareListingUpdates();
       await updateListing(user.uid, listingId, updates);
 
@@ -1764,6 +1801,43 @@ function EditListingPageContent() {
       router.push('/seller/listings');
     } catch (err: any) {
       console.error('Error updating listing:', err);
+
+      if (err?.code === 'LISTING_VALIDATION_FAILED' && Array.isArray(err?.missing) && err.missing.length > 0) {
+        const missing = err.missing.map((m: any) => String(m)).filter(Boolean);
+        setPublishMissingFields(missing);
+
+        const missingSet = new Set(missing);
+        const step =
+          missingSet.has('type') || missingSet.has('category')
+            ? 'type-category'
+            : missingSet.has('photos')
+              ? 'media'
+              : 'details';
+        setRequestedStepId(step);
+
+        const first = missing[0];
+        const focusId =
+          first === 'photos'
+            ? 'photos'
+            : first === 'location.city'
+              ? 'city'
+              : first === 'location.state'
+                ? 'state'
+                : first === 'startingBid'
+                  ? 'starting-bid'
+                  : first === 'reservePrice'
+                    ? 'reserve-price'
+                    : first === 'endsAt'
+                      ? 'ends-at'
+                      : first;
+        publishFocusFieldRef.current = focusId;
+        setTimeout(() => {
+          const el = document.getElementById(focusId);
+          if (el && typeof (el as any).focus === 'function') (el as any).focus();
+          if (el && typeof (el as any).scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 250);
+      }
+
       toast({
         title: listingData?.status === 'draft' ? 'Error publishing listing' : 'Error updating listing',
         description: err.message || 'Failed to update listing. Please try again.',
@@ -1918,6 +1992,10 @@ function EditListingPageContent() {
               saving={saving}
               showSaveButton={true}
               completeButtonLabel={listingData?.status === 'draft' ? 'Publish Listing' : 'Save Changes'}
+              activeStepId={requestedStepId}
+              onStepChange={() => {
+                if (requestedStepId) setRequestedStepId(null);
+              }}
             />
           </CardContent>
         </Card>
