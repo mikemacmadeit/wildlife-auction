@@ -586,10 +586,28 @@ export async function POST(request: Request) {
     const reserveUntilTs = Timestamp.fromMillis(Date.now() + Math.max(5, reserveMinutes) * 60_000);
 
     // Atomically reserve listing and create order skeleton.
+    // IMPORTANT: Firestore transactions require all reads to happen before any writes.
     await db.runTransaction(async (tx) => {
       const listingSnap: any = await (tx as any).get(listingRef);
       if (!listingSnap?.exists) throw new Error('Listing not found');
       const live = listingSnap.data() as any;
+
+      // If offer checkout, read + validate offer BEFORE any transaction writes.
+      // (Firestore requires all reads to be executed before all writes.)
+      let lockToken: string | null = null;
+      if (offerId && offerRef) {
+        const offerSnap: any = await (tx as any).get(offerRef);
+        if (!offerSnap?.exists) throw new Error('Offer not found');
+        const offer = offerSnap.data() as any;
+        if (offer.status !== 'accepted') throw new Error('Offer is not accepted');
+        if (offer.buyerId !== buyerId) throw new Error('Forbidden');
+        if (offer.checkoutSessionId) {
+          const existing = String(offer.checkoutSessionId || '');
+          if (existing.startsWith('creating:')) throw new Error('Checkout session is being created. Please retry.');
+          throw new Error('Checkout session already exists');
+        }
+        lockToken = `creating:${Date.now()}:${buyerId}`;
+      }
 
       // Build public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
       const photos = Array.isArray(live?.photos) ? live.photos : [];
@@ -693,13 +711,6 @@ export async function POST(request: Request) {
 
       // If offer checkout, lock offer against duplicate session creation and link orderId
       if (offerId && offerRef) {
-        const offerSnap: any = await (tx as any).get(offerRef);
-        if (!offerSnap?.exists) throw new Error('Offer not found');
-        const offer = offerSnap.data() as any;
-        if (offer.status !== 'accepted') throw new Error('Offer is not accepted');
-        if (offer.buyerId !== buyerId) throw new Error('Forbidden');
-        if (offer.checkoutSessionId) throw new Error('Checkout session already exists');
-        const lockToken = `creating:${Date.now()}:${buyerId}`;
         tx.update(offerRef, { checkoutSessionId: lockToken, orderId, updatedAt: nowTs });
       }
     });
