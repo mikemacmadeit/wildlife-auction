@@ -969,7 +969,7 @@ export default function SellerOverviewPage() {
         ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-          {/* Action Required Panel */}
+          {/* Action Required Panel + Performance */}
           <div className="space-y-4">
             <Card className="border-2 border-border/50 bg-card" data-tour="seller-action-required">
               <CardHeader>
@@ -1055,6 +1055,46 @@ export default function SellerOverviewPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Performance (Lightweight) */}
+            <Card className="border-2 border-border/50 bg-card" data-tour="seller-performance">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-xl font-extrabold">Performance</CardTitle>
+                </div>
+                <CardDescription>
+                  Quick metrics overview
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
+                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.completionRate}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Response Time</span>
+                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.responseTime}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Verified Animals</span>
+                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.verifiedAnimals}</span>
+                  </div>
+                </div>
+                <Separator />
+                <Button
+                  asChild
+                  variant="outline"
+                  className="w-full min-h-[44px] font-semibold"
+                >
+                  <Link href="/seller/reputation">
+                    View Full Stats
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Recent Activity & Performance */}
@@ -1109,45 +1149,6 @@ export default function SellerOverviewPage() {
               </CardContent>
             </Card>
 
-            {/* Performance (Lightweight) */}
-            <Card className="border-2 border-border/50 bg-card" data-tour="seller-performance">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl font-extrabold">Performance</CardTitle>
-                </div>
-                <CardDescription>
-                  Quick metrics overview
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
-                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.completionRate}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Response Time</span>
-                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.responseTime}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Verified Animals</span>
-                    <span className="text-base font-extrabold text-foreground">{performanceMetrics.verifiedAnimals}</span>
-                  </div>
-                </div>
-                <Separator />
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full min-h-[44px] font-semibold"
-                >
-                  <Link href="/seller/reputation">
-                    View Full Stats
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
