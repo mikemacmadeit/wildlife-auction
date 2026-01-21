@@ -133,15 +133,20 @@ const baseHandler: Handler = async () => {
           continue;
         }
 
-        // Engagement stop: if the user already clicked/read the corresponding in-app notification
+        // Engagement stop: if the user already clicked the corresponding in-app notification
         // before the delayed email fires, skip sending.
+        //
+        // IMPORTANT:
+        // We intentionally do NOT treat "read" as engagement here because some UI surfaces
+        // (like the navbar bell dropdown) mark notifications read automatically.
+        // Users still expect to receive the email unless they actually clicked through.
         try {
           const userId = String(claimed.userId || '');
           const eventId = String(claimed.eventId || jobId);
           if (userId && eventId && (template === 'auction_outbid' || template === 'auction_high_bidder')) {
             const notifSnap = await db.collection('users').doc(userId).collection('notifications').doc(eventId).get();
             const notif = notifSnap.exists ? (notifSnap.data() as any) : null;
-            if (notif && (notif.clickedAt || notif.readAt || notif.read === true)) {
+            if (notif && notif.clickedAt) {
               await ref.set({ status: 'skipped', error: 'engaged_before_email' }, { merge: true });
               skipped++;
               continue;
