@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import Link from 'next/link';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { createOffer, acceptOffer, counterOffer, declineOffer, withdrawOffer, getMyOffers } from '@/lib/offers/api';
@@ -54,6 +62,11 @@ export function OfferPanel(props: { listing: Listing }) {
   const [offerLimit, setOfferLimit] = useState<{ limit: number; used: number; left: number } | null>(null);
   const [preferredPaymentMethod, setPreferredPaymentMethod] = useState<PaymentMethodChoice | null>(null);
   const [offerPaymentDialogOpen, setOfferPaymentDialogOpen] = useState(false);
+  const [offerSentOpen, setOfferSentOpen] = useState(false);
+  const [sentOfferId, setSentOfferId] = useState<string | null>(null);
+  const [sentOfferAmount, setSentOfferAmount] = useState<number | null>(null);
+  const [retractOpen, setRetractOpen] = useState(false);
+  const [retractReason, setRetractReason] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [pendingCheckoutAmount, setPendingCheckoutAmount] = useState<number | null>(null);
@@ -189,13 +202,18 @@ export function OfferPanel(props: { listing: Listing }) {
           preferredPaymentMethod
         );
         if ((res as any)?.offerLimit) setOfferLimit((res as any).offerLimit);
-        toast({ title: 'Offer sent', description: 'Your offer was sent to the seller.' });
+        const newOfferId = String((res as any)?.offerId || (res as any)?.id || '');
+        setSentOfferId(newOfferId || null);
+        setSentOfferAmount(n);
+        setOfferSentOpen(true);
+        setRetractReason('');
       } else {
         if (!offer) throw new Error('No offer to counter');
         await counterOffer(offer.offerId, n, note.trim() ? note.trim() : undefined);
         toast({ title: 'Counter sent', description: 'Your counter was sent to the seller.' });
       }
       setModalOpen(false);
+      setStep('edit');
       await refresh();
     } catch (e: any) {
       if (e?.code === 'OFFER_LIMIT_REACHED') {
@@ -208,6 +226,33 @@ export function OfferPanel(props: { listing: Listing }) {
       } else {
         toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const retractSentOffer = async () => {
+    const id = sentOfferId || offer?.offerId || null;
+    if (!id) return;
+    if (!retractReason) {
+      toast({ title: 'Select a reason', description: 'Please choose a reason for retracting.', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    try {
+      await withdrawOffer(
+        id,
+        `Retracted offer. Reason: ${retractReason}`
+      );
+      toast({ title: 'Offer retracted', description: 'Your offer was retracted.' });
+      setRetractOpen(false);
+      setOfferSentOpen(false);
+      setSentOfferId(null);
+      setSentOfferAmount(null);
+      setRetractReason('');
+      await refresh();
+    } catch (e: any) {
+      toast({ title: 'Retract failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -577,6 +622,111 @@ export function OfferPanel(props: { listing: Listing }) {
                 </Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Post-send confirmation (eBay-style) */}
+      <Dialog open={offerSentOpen} onOpenChange={setOfferSentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Offer sent!</DialogTitle>
+            <DialogDescription>
+              We’ll notify you if the seller accepts, declines, or counters before your offer expires.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="font-semibold leading-snug">{listing.title}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Offer total:{' '}
+              <span className="font-semibold text-foreground">
+                ${Number(sentOfferAmount ?? 0).toLocaleString()}
+              </span>
+              {' '}· Expires in {expiryHours}h
+            </div>
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            Changed your mind? You can{' '}
+            <button
+              type="button"
+              className="underline underline-offset-4 text-foreground/90 hover:text-foreground"
+              onClick={() => setRetractOpen(true)}
+            >
+              retract your offer
+            </button>
+            .
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/offers">View my offers</Link>
+            </Button>
+            <Button
+              onClick={() => {
+                setOfferSentOpen(false);
+              }}
+              className="font-semibold"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Retract offer dialog */}
+      <Dialog open={retractOpen} onOpenChange={setRetractOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Retract offer</DialogTitle>
+            <DialogDescription>
+              Please remember that every Best Offer is binding. Retracted offers are counted toward your maximum available offers for this listing.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="font-semibold leading-snug">{listing.title}</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Listing ID: <span className="font-mono">{listing.id}</span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Your offer:{' '}
+                <span className="font-semibold text-foreground">
+                  ${Number(sentOfferAmount ?? offer?.currentAmount ?? 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              It’s OK to retract if you entered the wrong amount, the listing changed significantly, or you can’t reach the seller.
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">Reason for retraction</div>
+              <Select value={retractReason} onValueChange={setRetractReason}>
+                <SelectTrigger className="min-h-[48px]">
+                  <SelectValue placeholder="Choose one" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Accidentally entered the wrong offer amount">Accidentally entered the wrong offer amount</SelectItem>
+                  <SelectItem value="Listing description changed significantly">Listing description changed significantly</SelectItem>
+                  <SelectItem value="Cannot get in touch with the seller">Cannot get in touch with the seller</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRetractOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button onClick={retractSentOffer} disabled={loading || !retractReason} className="font-semibold">
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Retract offer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
