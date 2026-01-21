@@ -124,7 +124,9 @@ export default function SellerSalesPage() {
     if (!user?.uid) return;
     setLoading(true);
     try {
-      const sellerOrders = await getOrdersForUser(user.uid, 'seller');
+      const sellerOrdersRaw = await getOrdersForUser(user.uid, 'seller');
+      // Avoid showing checkout-abandoned "pending" skeleton orders as real sales.
+      const sellerOrders = sellerOrdersRaw.filter((o) => !(o.status === 'pending' && o.stripeCheckoutSessionId));
       // Prefer server-authored snapshots for list rendering (avoid N+1 listing reads).
       // Fallback to a listing fetch only if snapshot is missing (older historical orders).
       const needsListing = sellerOrders.filter((o) => !o.listingSnapshot?.title);

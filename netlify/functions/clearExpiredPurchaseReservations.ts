@@ -71,6 +71,30 @@ const baseHandler: Handler = async () => {
           if (!hasOrderId) return 'noop_no_order' as const;
           if (!untilMs || untilMs > nowTs.toMillis()) return 'noop_not_expired' as const;
 
+          // If the associated order is still in the checkout-created pending state, cancel it so it doesn't linger forever.
+          // (This also prevents it from appearing in Purchases/Sales in older UI code paths.)
+          const orderId = String(live.purchaseReservedByOrderId || '').trim();
+          if (orderId) {
+            const orderRef = db.collection('orders').doc(orderId);
+            const orderSnap = await tx.get(orderRef);
+            if (orderSnap.exists) {
+              const order = orderSnap.data() as any;
+              const isPending = String(order?.status || '') === 'pending';
+              const hasSession = typeof order?.stripeCheckoutSessionId === 'string' && order.stripeCheckoutSessionId.startsWith('cs_');
+              if (isPending && hasSession) {
+                tx.set(
+                  orderRef,
+                  {
+                    status: 'cancelled',
+                    updatedAt: nowTs,
+                    lastUpdatedByRole: 'buyer',
+                  },
+                  { merge: true }
+                );
+              }
+            }
+          }
+
           tx.set(
             ref,
             {

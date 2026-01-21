@@ -134,7 +134,13 @@ export default function OrdersPage() {
     try {
       if (!opts?.silent) setLoading(true);
       if (!opts?.silent) setError(null);
-      const userOrders = await getOrdersForUser(user.uid, 'buyer');
+      const userOrdersRaw = await getOrdersForUser(user.uid, 'buyer');
+
+      // IMPORTANT:
+      // We pre-create an order skeleton (status='pending') when a Stripe Checkout Session is created
+      // to reserve the listing. If the buyer exits Checkout, that order should NOT appear as a "purchase".
+      // Only show orders once they move past the checkout-created pending state.
+      const userOrders = userOrdersRaw.filter((o) => !(o.status === 'pending' && o.stripeCheckoutSessionId));
       const missingSnapshotOrderIds: string[] = [];
 
       const ordersWithListings = await Promise.all(
