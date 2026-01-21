@@ -46,6 +46,9 @@ export interface ReleasePaymentResult {
     availableOnIso?: string;
     minutesUntilAvailable?: number;
     usedSourceTransaction?: boolean;
+    // Back-compat + clearer naming for operators
+    requiresChargeAvailability?: boolean;
+    usesSourceTransaction?: boolean;
 
     // Extra operator/debug context (no secrets)
     orderAmountUsd?: number;
@@ -540,7 +543,7 @@ export async function releasePaymentForOrder(
           return {
             success: false,
             holdReasonCode: 'STRIPE_FUNDS_PENDING_SETTLEMENT',
-            error: 'Stripe settlement pending. Funds are not yet available to transfer.',
+            error: 'Stripe settlement pending; funds not yet available for transfer.',
             stripeDebug: {
               ...platform,
               paymentIntentId,
@@ -551,6 +554,8 @@ export async function releasePaymentForOrder(
               availableOnIso: settlementForTransfer.availableOnIso || undefined,
               minutesUntilAvailable: settlementForTransfer.minutesUntilAvailable || undefined,
               usedSourceTransaction: !!settlementForTransfer.chargeId,
+              requiresChargeAvailability: true,
+              usesSourceTransaction: !!settlementForTransfer.chargeId,
               orderAmountUsd,
               platformFeeUsd,
               sellerPayoutUsd: sellerAmount,
@@ -715,6 +720,33 @@ export async function releasePaymentForOrder(
           settlement = null;
         }
       }
+
+      // If Stripe says "insufficient available" but the underlying charge hasn't settled yet,
+      // report this as pending settlement (more actionable + correct for source_transaction workflows).
+      if (settlement && !settlement.isAvailableNow) {
+        return {
+          success: false,
+          holdReasonCode: 'STRIPE_FUNDS_PENDING_SETTLEMENT',
+          error: 'Stripe settlement pending; funds not yet available for transfer.',
+          stripeDebug: {
+            ...stripeDebugBase,
+            paymentIntentId: paymentIntentId || undefined,
+            chargeId: settlement?.chargeId || undefined,
+            balanceTransactionId: settlement?.balanceTransactionId || undefined,
+            balanceTransactionStatus: settlement?.balanceTransactionStatus || undefined,
+            availableOnUnix: settlement?.availableOnUnix || undefined,
+            availableOnIso: settlement?.availableOnIso || undefined,
+            minutesUntilAvailable: settlement?.minutesUntilAvailable || undefined,
+            usedSourceTransaction: !!settlement?.chargeId,
+            requiresChargeAvailability: true,
+            usesSourceTransaction: !!settlement?.chargeId,
+            orderAmountUsd,
+            platformFeeUsd,
+            sellerPayoutUsd: sellerAmount,
+            attemptedTransferUsdCents: transferAmount,
+          },
+        };
+      }
       return {
         success: false,
         holdReasonCode: 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE',
@@ -728,6 +760,8 @@ export async function releasePaymentForOrder(
           availableOnIso: settlement?.availableOnIso || undefined,
           minutesUntilAvailable: settlement?.minutesUntilAvailable || undefined,
           usedSourceTransaction: !!settlement?.chargeId,
+          requiresChargeAvailability: false,
+          usesSourceTransaction: !!settlement?.chargeId,
           orderAmountUsd,
           platformFeeUsd,
           sellerPayoutUsd: sellerAmount,
