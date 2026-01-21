@@ -101,6 +101,13 @@ export default function AdminOpsPage() {
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [lastReleaseDebug, setLastReleaseDebug] = useState<{
+    orderId: string;
+    holdReasonCode?: string;
+    stripeDebug?: any;
+    message?: string;
+    at: number;
+  } | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkActionDialogOpen, setBulkActionDialogOpen] = useState<'release' | 'hold' | 'unhold' | null>(null);
   const [bulkHoldReason, setBulkHoldReason] = useState('');
@@ -240,14 +247,32 @@ export default function AdminOpsPage() {
         description: `Payout released. Transfer ID: ${result.transferId}`,
       });
       setReleaseDialogOpen(null);
+      setLastReleaseDebug(null);
       await loadOrders();
     } catch (error: any) {
       console.error('Error releasing payout:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to release payout',
-        variant: 'destructive',
-      });
+      const holdReasonCode = String(error?.holdReasonCode || '');
+      const stripeDebug = error?.stripeDebug;
+      if (stripeDebug) {
+        setLastReleaseDebug({ orderId, holdReasonCode, stripeDebug, message: error?.message, at: Date.now() });
+      }
+
+      if (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT') {
+        const when = typeof stripeDebug?.availableOnIso === 'string' ? stripeDebug.availableOnIso : null;
+        toast({
+          title: 'Stripe settlement pending',
+          description: when
+            ? `Funds become available at ${new Date(when).toLocaleString()}. Retry after that.`
+            : 'Funds are not yet available to transfer. Retry shortly.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to release payout',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setProcessingOrderId(null);
     }
@@ -1444,6 +1469,26 @@ export default function AdminOpsPage() {
                   </div>
                 );
               })()}
+
+              {/* Stripe Debug (admin-only): shows Stripe settlement/balance context from last release attempt */}
+              {selectedOrder && lastReleaseDebug?.orderId === selectedOrder.id && lastReleaseDebug?.stripeDebug ? (
+                <div className="rounded-lg border border-border/50 bg-muted/10 p-4">
+                  <div className="text-sm font-semibold">Stripe Debug</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Returned from the payout release endpoint. IDs + timestamps only (no secrets).
+                  </div>
+                  <div className="mt-3">
+                    <details>
+                      <summary className="cursor-pointer text-sm font-semibold text-blue-600 hover:underline">
+                        View debug payload
+                      </summary>
+                      <pre className="mt-3 text-xs overflow-auto rounded-md bg-black/90 text-white p-3">
+{JSON.stringify(lastReleaseDebug.stripeDebug, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Timeline */}
               <div>

@@ -34,6 +34,106 @@ export interface ReleasePaymentResult {
     platformLivemode?: boolean;
     availableUsdCents?: number;
     pendingUsdCents?: number;
+    paymentIntentId?: string;
+    chargeId?: string;
+    balanceTransactionId?: string;
+    availableOnUnix?: number;
+    availableOnIso?: string;
+    minutesUntilAvailable?: number;
+    usedSourceTransaction?: boolean;
+  };
+}
+
+type StripeSettlementStatus = {
+  isAvailableNow: boolean;
+  availableOnUnix: number | null;
+  availableOnIso: string | null;
+  minutesUntilAvailable: number | null;
+  paymentIntentId: string;
+  chargeId: string | null;
+  balanceTransactionId: string | null;
+};
+
+async function getPlatformUsdBalanceDebug(): Promise<{
+  platformAccountId?: string;
+  platformLivemode?: boolean;
+  availableUsdCents?: number;
+  pendingUsdCents?: number;
+}> {
+  if (!stripe) return {};
+  try {
+    const acct = (await stripe.accounts.retrieve()) as any;
+    const bal = (await stripe.balance.retrieve()) as any;
+    const avail = Array.isArray(bal?.available) ? bal.available : [];
+    const pend = Array.isArray(bal?.pending) ? bal.pending : [];
+    const availUsd = avail.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
+    const pendUsd = pend.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
+    return {
+      platformAccountId: typeof acct?.id === 'string' ? acct.id : undefined,
+      platformLivemode: typeof acct?.livemode === 'boolean' ? acct.livemode : undefined,
+      availableUsdCents: typeof availUsd?.amount === 'number' ? availUsd.amount : undefined,
+      pendingUsdCents: typeof pendUsd?.amount === 'number' ? pendUsd.amount : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Stripe settlement availability gate.
+ *
+ * Transfers can only be created from AVAILABLE balance, not PENDING.
+ * We check `balance_transaction.available_on` for the PaymentIntent's latest charge.
+ */
+async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string): Promise<StripeSettlementStatus> {
+  if (!stripe) {
+    return {
+      isAvailableNow: true,
+      availableOnUnix: null,
+      availableOnIso: null,
+      minutesUntilAvailable: null,
+      paymentIntentId,
+      chargeId: null,
+      balanceTransactionId: null,
+    };
+  }
+
+  // Expand charges + balance_transaction so we can read `available_on` in one roundtrip when possible.
+  const pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+    expand: ['charges.data.balance_transaction'],
+  })) as any;
+
+  const charges: any[] = Array.isArray(pi?.charges?.data) ? pi.charges.data : [];
+  // Use the most recent charge (defensive: some flows can have multiple attempts).
+  const charge = charges.length > 0 ? charges[charges.length - 1] : null;
+  const chargeId = charge?.id ? String(charge.id) : null;
+
+  const btRaw = charge?.balance_transaction || null;
+  let bt: any = null;
+  let balanceTransactionId: string | null = null;
+  if (typeof btRaw === 'string') {
+    balanceTransactionId = btRaw;
+    bt = await stripe.balanceTransactions.retrieve(btRaw);
+  } else if (btRaw && typeof btRaw === 'object') {
+    bt = btRaw;
+    balanceTransactionId = bt?.id ? String(bt.id) : null;
+  }
+
+  const availableOnUnix = typeof bt?.available_on === 'number' ? bt.available_on : null;
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const isAvailableNow = availableOnUnix ? availableOnUnix <= nowUnix : true; // if unknown, do not block
+  const availableOnIso = availableOnUnix ? new Date(availableOnUnix * 1000).toISOString() : null;
+  const minutesUntilAvailable =
+    !isAvailableNow && availableOnUnix ? Math.max(1, Math.ceil((availableOnUnix - nowUnix) / 60)) : null;
+
+  return {
+    isAvailableNow,
+    availableOnUnix,
+    availableOnIso,
+    minutesUntilAvailable,
+    paymentIntentId,
+    chargeId,
+    balanceTransactionId,
   };
 }
 
@@ -388,6 +488,34 @@ export async function releasePaymentForOrder(
   const sellerAmount = computedSellerCents / 100;
 
   try {
+    // Settlement availability gate (Stripe funds must be AVAILABLE before transfer).
+    // This is a settlement/availability check only; it does not change business eligibility gates.
+    if (paymentIntentId && stripe) {
+      try {
+        const settlement = await getStripeSettlementStatusForPaymentIntent(paymentIntentId);
+        if (!settlement.isAvailableNow) {
+          const platform = await getPlatformUsdBalanceDebug();
+          return {
+            success: false,
+            holdReasonCode: 'STRIPE_FUNDS_PENDING_SETTLEMENT',
+            error: 'Stripe settlement pending. Funds are not yet available to transfer.',
+            stripeDebug: {
+              ...platform,
+              paymentIntentId,
+              chargeId: settlement.chargeId || undefined,
+              balanceTransactionId: settlement.balanceTransactionId || undefined,
+              availableOnUnix: settlement.availableOnUnix || undefined,
+              availableOnIso: settlement.availableOnIso || undefined,
+              minutesUntilAvailable: settlement.minutesUntilAvailable || undefined,
+              usedSourceTransaction: false,
+            },
+          };
+        }
+      } catch {
+        // If we cannot determine availability, do not block; Stripe will enforce availability at transfer time.
+      }
+    }
+
     // Create Stripe transfer to seller's connected account
     console.log(
       `[releasePaymentForOrder] Creating Stripe transfer for order ${orderId}: $${sellerAmount} to ${derivedSellerStripeAccountId}`
@@ -525,27 +653,28 @@ export async function releasePaymentForOrder(
 
       // Best-effort: include the actual platform account + USD available/pending for the configured key.
       // This helps diagnose "dashboard shows funds but API says none" situations (usually key/account mismatch).
-      let stripeDebug: ReleasePaymentResult['stripeDebug'] | undefined;
-      try {
-        const acct = (await stripe.accounts.retrieve()) as any;
-        const bal = (await stripe.balance.retrieve()) as any;
-        const avail = Array.isArray(bal?.available) ? bal.available : [];
-        const pend = Array.isArray(bal?.pending) ? bal.pending : [];
-        const availUsd = avail.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
-        const pendUsd = pend.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
-        stripeDebug = {
-          platformAccountId: typeof acct?.id === 'string' ? acct.id : undefined,
-          platformLivemode: typeof acct?.livemode === 'boolean' ? acct.livemode : undefined,
-          availableUsdCents: typeof availUsd?.amount === 'number' ? availUsd.amount : undefined,
-          pendingUsdCents: typeof pendUsd?.amount === 'number' ? pendUsd.amount : undefined,
-        };
-      } catch {
-        // ignore
+      const stripeDebugBase = await getPlatformUsdBalanceDebug();
+      let settlement: StripeSettlementStatus | null = null;
+      if (paymentIntentId && stripe) {
+        try {
+          settlement = await getStripeSettlementStatusForPaymentIntent(paymentIntentId);
+        } catch {
+          settlement = null;
+        }
       }
       return {
         success: false,
         holdReasonCode: 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE',
-        stripeDebug,
+        stripeDebug: {
+          ...stripeDebugBase,
+          paymentIntentId: paymentIntentId || undefined,
+          chargeId: settlement?.chargeId || undefined,
+          balanceTransactionId: settlement?.balanceTransactionId || undefined,
+          availableOnUnix: settlement?.availableOnUnix || undefined,
+          availableOnIso: settlement?.availableOnIso || undefined,
+          minutesUntilAvailable: settlement?.minutesUntilAvailable || undefined,
+          usedSourceTransaction: false,
+        },
         error: isTestMode
           ? [
               'Stripe test mode: insufficient AVAILABLE balance to create a transfer.',

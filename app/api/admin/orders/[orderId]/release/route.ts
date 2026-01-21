@@ -64,7 +64,8 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     const result = await releasePaymentForOrder(db as any, orderId, adminId);
     if (!result.success) {
       const status =
-        result.holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE'
+        result.holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE' ||
+        result.holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT'
           ? 409
           : result.holdReasonCode === 'GLOBAL_PAYOUT_FREEZE'
           ? 423
