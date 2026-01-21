@@ -92,7 +92,17 @@ export async function GET(request: Request) {
     let ordersQuery: any;
     if (filter === 'escrow') {
       ordersQuery = ordersCol
-        .where('status', 'in', ['paid', 'paid_held', 'awaiting_bank_transfer', 'awaiting_wire'])
+        // Payout-hold queue: includes paid/paid_held as well as post-delivery/buyer-confirm states
+        // that are still awaiting admin payout release.
+        .where('status', 'in', [
+          'paid',
+          'paid_held',
+          'awaiting_bank_transfer',
+          'awaiting_wire',
+          'buyer_confirmed',
+          'accepted',
+          'ready_to_release',
+        ])
         .orderBy('createdAt', 'desc')
         .limit(limit);
     } else if (filter === 'disputes') {
@@ -160,7 +170,10 @@ export async function GET(request: Request) {
           status === 'paid' ||
           status === 'paid_held' ||
           status === 'awaiting_bank_transfer' ||
-          status === 'awaiting_wire'
+          status === 'awaiting_wire' ||
+          status === 'buyer_confirmed' ||
+          status === 'accepted' ||
+          status === 'ready_to_release'
         );
       });
     } else if (filter === 'protected') {
