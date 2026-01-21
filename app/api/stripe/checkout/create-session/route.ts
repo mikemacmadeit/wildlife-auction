@@ -15,7 +15,7 @@ import { stripe, calculatePlatformFee, getAppUrl, isStripeConfigured } from '@/l
 import { getEffectiveSubscriptionTier, getTierWeight } from '@/lib/pricing/subscriptions';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { validateRequest, createCheckoutSessionSchema } from '@/lib/validation/api-schemas';
-import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkRateLimitByKey, rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
@@ -97,18 +97,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Rate limiting (before auth to prevent brute force)
-    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.checkout);
-    const rateLimitResult = await rateLimitCheck(request as any);
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, { 
-        status: rateLimitResult.status,
-        headers: {
-          'Retry-After': rateLimitResult.body.retryAfter.toString(),
-        },
-      });
-    }
-
     // Get Firebase Auth token from Authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -170,6 +158,17 @@ export async function POST(request: Request) {
     const normalizedPaymentMethod =
       paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');
     const paymentMethod = normalizedPaymentMethod as 'card' | 'ach_debit';
+
+    // Rate limiting (post-auth, keyed per user+listing) to prevent shared-IP false positives.
+    // This avoids scenarios where a legitimate first checkout attempt gets blocked by other users behind the same IP.
+    const rlKey = `checkout:user:${buyerId}:listing:${String(listingId || 'unknown')}`;
+    const rl = await checkRateLimitByKey(rlKey, RATE_LIMITS.checkout);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: rl.error || 'Too many requests. Please try again later.', retryAfter: rl.retryAfter },
+        { status: rl.status ?? 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
 
     // Get listing from Firestore using Admin SDK
     const listingRef = db.collection('listings').doc(listingId);

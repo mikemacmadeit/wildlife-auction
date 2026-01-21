@@ -14,7 +14,7 @@ import { getStorage } from 'firebase-admin/storage';
 import Stripe from 'stripe';
 import { stripe, calculatePlatformFee, isStripeConfigured } from '@/lib/stripe/config';
 import { validateRequest, createWireIntentSchema } from '@/lib/validation/api-schemas';
-import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkRateLimitByKey, rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
@@ -78,18 +78,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Rate limiting (before auth to prevent brute force)
-    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.checkout);
-    const rateLimitResult = await rateLimitCheck(request as any);
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(rateLimitResult.body, {
-        status: rateLimitResult.status,
-        headers: {
-          'Retry-After': rateLimitResult.body.retryAfter.toString(),
-        },
-      });
-    }
-
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized - Missing or invalid authorization header' }, { status: 401 });
@@ -131,6 +119,16 @@ export async function POST(request: Request) {
     }
 
     const { listingId, offerId, buyerAcksAnimalRisk } = validation.data as any;
+
+    // Rate limiting (post-auth, keyed per user+listing) to avoid shared-IP false positives.
+    const rlKey = `wire:user:${buyerId}:listing:${String(listingId || 'unknown')}`;
+    const rl = await checkRateLimitByKey(rlKey, RATE_LIMITS.checkout);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: rl.error || 'Too many requests. Please try again later.', retryAfter: rl.retryAfter },
+        { status: rl.status ?? 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
 
     // Get listing
     const listingRef = db.collection('listings').doc(listingId);

@@ -17,7 +17,7 @@ import { z } from 'zod';
 import Stripe from 'stripe';
 import { getFirestore } from 'firebase-admin/firestore';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
-import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkRateLimitByKey, rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { logInfo, logWarn, logError, getRequestId } from '@/lib/monitoring/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { handleCheckoutSessionCompleted } from '@/app/api/stripe/webhook/handlers';
@@ -39,16 +39,6 @@ const bodySchema = z.object({
 
 export async function POST(request: Request) {
   const requestId = getRequestId(request.headers);
-
-  // Rate limiting (before auth to reduce abuse)
-  const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.checkout);
-  const rateLimitResult = await rateLimitCheck(request as any);
-  if (!rateLimitResult.allowed) {
-    return json(rateLimitResult.body, {
-      status: rateLimitResult.status,
-      headers: { 'Retry-After': rateLimitResult.body.retryAfter.toString() },
-    });
-  }
 
   // Admin SDK init
   let auth: ReturnType<typeof getAdminAuth>;
@@ -99,6 +89,16 @@ export async function POST(request: Request) {
     return json({ ok: false, reason: 'unauthorized', message: 'Invalid auth token.' }, { status: 401 });
   }
   const callerUid = decoded.uid as string;
+
+  // Rate limiting (post-auth) - avoid shared-IP false positives.
+  const rlKey = `reconcile:user:${callerUid}`;
+  const rl = await checkRateLimitByKey(rlKey, RATE_LIMITS.checkout);
+  if (!rl.allowed) {
+    return json(
+      { error: rl.error || 'Too many requests. Please try again later.', retryAfter: rl.retryAfter },
+      { status: rl.status ?? 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+    );
+  }
 
   // Parse body
   let raw: any;
