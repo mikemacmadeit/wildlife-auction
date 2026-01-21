@@ -74,6 +74,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
           error: result.error || 'Failed to release funds',
           holdReasonCode: result.holdReasonCode,
           missingDocTypes: result.missingDocTypes,
+          stripeDebug: (result as any).stripeDebug || undefined,
         },
         { status }
       );

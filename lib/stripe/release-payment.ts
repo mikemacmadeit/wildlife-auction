@@ -29,6 +29,12 @@ export interface ReleasePaymentResult {
   message?: string;
   holdReasonCode?: string;
   missingDocTypes?: DocumentType[];
+  stripeDebug?: {
+    platformAccountId?: string;
+    platformLivemode?: boolean;
+    availableUsdCents?: number;
+    pendingUsdCents?: number;
+  };
 }
 
 /**
@@ -516,9 +522,30 @@ export async function releasePaymentForOrder(
     if (isBalanceInsufficient) {
       const secret = String(process.env.STRIPE_SECRET_KEY || '');
       const isTestMode = secret.startsWith('sk_test_') || secret.includes('_test_');
+
+      // Best-effort: include the actual platform account + USD available/pending for the configured key.
+      // This helps diagnose "dashboard shows funds but API says none" situations (usually key/account mismatch).
+      let stripeDebug: ReleasePaymentResult['stripeDebug'] | undefined;
+      try {
+        const acct = (await stripe.accounts.retrieve()) as any;
+        const bal = (await stripe.balance.retrieve()) as any;
+        const avail = Array.isArray(bal?.available) ? bal.available : [];
+        const pend = Array.isArray(bal?.pending) ? bal.pending : [];
+        const availUsd = avail.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
+        const pendUsd = pend.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
+        stripeDebug = {
+          platformAccountId: typeof acct?.id === 'string' ? acct.id : undefined,
+          platformLivemode: typeof acct?.livemode === 'boolean' ? acct.livemode : undefined,
+          availableUsdCents: typeof availUsd?.amount === 'number' ? availUsd.amount : undefined,
+          pendingUsdCents: typeof pendUsd?.amount === 'number' ? pendUsd.amount : undefined,
+        };
+      } catch {
+        // ignore
+      }
       return {
         success: false,
         holdReasonCode: 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE',
+        stripeDebug,
         error: isTestMode
           ? [
               'Stripe test mode: insufficient AVAILABLE balance to create a transfer.',
