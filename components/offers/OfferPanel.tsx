@@ -35,6 +35,8 @@ type OfferDTO = {
   expiresAt?: number | null;
 };
 
+const ACTIVE_OFFER_STATUSES = new Set(['open', 'countered', 'accepted']);
+
 function formatTimeLeft(expiresAtMs?: number | null): string {
   if (!expiresAtMs) return '—';
   const diff = expiresAtMs - Date.now();
@@ -102,7 +104,8 @@ export function OfferPanel(props: { listing: Listing }) {
     setLoading(true);
     try {
       const res = await getMyOffers({ listingId: listing.id, limit: 10 });
-      const first = (res?.offers || [])[0] as any;
+      const offers = (res?.offers || []) as any[];
+      const firstActive = offers.find((o) => ACTIVE_OFFER_STATUSES.has(String(o?.status || '')));
       if (res?.offerLimit && typeof res.offerLimit === 'object') {
         const l = res.offerLimit as any;
         if (typeof l.limit === 'number' && typeof l.used === 'number' && typeof l.left === 'number') {
@@ -111,14 +114,14 @@ export function OfferPanel(props: { listing: Listing }) {
       } else {
         setOfferLimit(null);
       }
-      if (first) {
+      if (firstActive) {
         setOffer({
-          offerId: first.offerId,
-          status: first.status,
-          currentAmount: Number(first.currentAmount),
-          acceptedAmount: first.acceptedAmount ? Number(first.acceptedAmount) : undefined,
-          lastActorRole: first.lastActorRole,
-          expiresAt: first.expiresAt,
+          offerId: firstActive.offerId,
+          status: firstActive.status,
+          currentAmount: Number(firstActive.currentAmount),
+          acceptedAmount: firstActive.acceptedAmount ? Number(firstActive.acceptedAmount) : undefined,
+          lastActorRole: firstActive.lastActorRole,
+          expiresAt: firstActive.expiresAt,
         });
       } else {
         setOffer(null);
@@ -347,8 +350,9 @@ export function OfferPanel(props: { listing: Listing }) {
   if (!eligible) return null;
   if (user?.uid === listing.sellerId) return null;
 
-  const showMake = !offer;
   const status = offer?.status;
+  const isActive = !status ? false : ACTIVE_OFFER_STATUSES.has(status);
+  const showMake = !offer || !isActive;
   const timeLeft = offer?.expiresAt ? formatTimeLeft(offer.expiresAt) : '—';
 
   const canWithdraw = status === 'open' || status === 'countered';
