@@ -9,6 +9,9 @@ import { z } from 'zod';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { json, requireAuth, requireRateLimit } from '../_util';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const querySchema = z.object({
   status: z.string().optional(),
   limit: z.string().optional(),
@@ -61,11 +64,65 @@ export async function GET(request: Request) {
   const limitN = Math.max(1, Math.min(100, Number(parsed.data.limit || 50) || 50));
   const status = parsed.data.status;
 
-  const db = getAdminDb();
-  let q: any = db.collection('offers').where('sellerId', '==', sellerId);
-  if (status) q = q.where('status', '==', status);
-  q = q.orderBy('updatedAt', 'desc').limit(limitN);
-  const snap = await q.get();
-  return json({ ok: true, offers: snap.docs.map(serializeOffer) });
+  let db: ReturnType<typeof getAdminDb>;
+  try {
+    db = getAdminDb();
+  } catch (e: any) {
+    return json(
+      {
+        error: 'Server is not configured for offers yet',
+        code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+        message: e?.message || 'Failed to initialize Firebase Admin SDK',
+        missing: e?.missing || undefined,
+      },
+      { status: 503 }
+    );
+  }
+
+  try {
+    // Avoid composite-index requirements by querying only on sellerId and filtering/sorting in-memory.
+    // This matches the buyer endpoint strategy and prevents opaque 500s in production if indexes differ.
+    const snap = await db.collection('offers').where('sellerId', '==', sellerId).limit(250).get();
+    let offers = snap.docs.map(serializeOffer);
+
+    if (status) offers = offers.filter((o: any) => o.status === status);
+
+    offers.sort((a: any, b: any) => {
+      const am = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+      const bm = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+      return bm - am;
+    });
+
+    return json({ ok: true, offers: offers.slice(0, limitN) });
+  } catch (e: any) {
+    const msg = String(e?.message || 'Unknown error');
+    const code = String(e?.code || '');
+    const isMissingIndex =
+      code === 'failed-precondition' ||
+      code === '9' ||
+      msg.toLowerCase().includes('requires an index') ||
+      msg.toLowerCase().includes('failed-precondition');
+
+    if (isMissingIndex) {
+      return json(
+        {
+          error: 'Offer system is warming up',
+          code: 'FIRESTORE_INDEX_REQUIRED',
+          message:
+            'The database index needed to load offers is still building or not deployed yet. Please try again in a few minutes.',
+        },
+        { status: 503 }
+      );
+    }
+
+    return json(
+      {
+        error: 'Failed to load offers',
+        code: 'OFFERS_QUERY_FAILED',
+        message: msg,
+      },
+      { status: 500 }
+    );
+  }
 }
 
