@@ -507,11 +507,31 @@ export default function BidsOffersPage() {
           <CardContent className="pt-6 space-y-4">
             <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
               <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
-                <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto">
-                  <TabsTrigger value="needs_action">Needs action</TabsTrigger>
-                  <TabsTrigger value="bids">Bids</TabsTrigger>
-                  <TabsTrigger value="offers">Offers</TabsTrigger>
-                  <TabsTrigger value="history">History</TabsTrigger>
+                <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto overflow-hidden rounded-xl border border-border/60 bg-muted/40 p-1">
+                  <TabsTrigger
+                    value="needs_action"
+                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                  >
+                    Needs action
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="bids"
+                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                  >
+                    Bids
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="offers"
+                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                  >
+                    Offers
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="history"
+                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                  >
+                    History
+                  </TabsTrigger>
                 </TabsList>
 
                 <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
