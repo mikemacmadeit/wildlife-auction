@@ -1661,17 +1661,14 @@ function EditListingPageContent() {
                 currentListing.complianceStatus !== 'approved' && 
                 currentListing.complianceStatus !== 'rejected') {
               updates.complianceStatus = 'pending_review';
-              // Only change status to pending if it's currently draft
-              if (currentListing.status === 'draft') {
-                updates.status = 'pending';
-              }
+              // IMPORTANT: Do NOT set listing.status client-side.
+              // Firestore rules restrict certain status transitions (e.g. whitetail breeder),
+              // and publish/review status changes should be performed by server routes.
               console.log('Setting complianceStatus to pending_review');
             } else if (currentListing.complianceStatus === 'none' || !currentListing.complianceStatus) {
               // If no compliance status set yet, set it to pending_review
               updates.complianceStatus = 'pending_review';
-              if (currentListing.status === 'draft') {
-                updates.status = 'pending';
-              }
+              // IMPORTANT: Do NOT set listing.status client-side (see note above).
               console.log('Setting complianceStatus to pending_review (was none)');
             }
           }
