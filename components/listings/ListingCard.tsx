@@ -157,9 +157,15 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
-            {/* Real-time countdown timer for auctions */}
-            {!sold.isSold && listing.type === 'auction' && listing.endsAt && (
-              <div className="absolute top-2 left-2 z-20">
+            {/* Top-left stack: Trending (if applicable), then auction timer */}
+            <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
+              {!sold.isSold && (watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) ? (
+                <Badge variant="default" className="text-xs shadow-warm">
+                  <Zap className="h-3 w-3 mr-1" />
+                  Trending
+                </Badge>
+              ) : null}
+              {!sold.isSold && listing.type === 'auction' && listing.endsAt ? (
                 <CountdownTimer
                   endsAt={listing.endsAt}
                   variant="badge"
@@ -167,8 +173,8 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   pulseWhenEndingSoon={true}
                   className="text-xs"
                 />
-              </div>
-            )}
+              ) : null}
+            </div>
             {/* Type badge */}
             <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
@@ -203,12 +209,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
                   <TrendingUp className="h-3 w-3 mr-1" />
                   {listing.metrics.bidCount} bids
-                </Badge>
-              )}
-              {!sold.isSold && (watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) && (
-                <Badge variant="default" className="text-xs shadow-warm">
-                  <Zap className="h-3 w-3 mr-1" />
-                  Trending
                 </Badge>
               )}
             </div>
