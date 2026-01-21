@@ -226,8 +226,12 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                 <div className="space-y-1 pt-0.5">
                   {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary" className="text-[11px] sm:text-xs" title="Reserved by an accepted offer">
-                        Reserved
+                      <Badge
+                        variant="secondary"
+                        className="text-[11px] sm:text-xs bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30"
+                        title="Reserved by an accepted offer"
+                      >
+                        Reserved (offer accepted)
                       </Badge>
                     </div>
                   ) : null}

@@ -148,10 +148,10 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               <div className="absolute bottom-3 left-3 z-20">
                 <Badge
                   variant="secondary"
-                  className="backdrop-blur-sm bg-card/80 border-border/50 font-semibold text-xs px-3 py-1.5 shadow-warm"
+                  className="backdrop-blur-sm bg-amber-500/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-200 border border-amber-500/30 font-semibold text-xs px-3 py-1.5 shadow-warm"
                   title="Reserved by an accepted offer"
                 >
-                  Reserved
+                  Reserved (offer accepted)
                 </Badge>
               </div>
             )}

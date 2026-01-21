@@ -196,10 +196,10 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               {!sold.isSold && (listing as any)?.offerReservedByOfferId && (
                 <Badge
                   variant="secondary"
-                  className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm"
+                  className="bg-amber-500/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-200 backdrop-blur-sm border border-amber-500/30 text-xs shadow-warm"
                   title="Reserved by an accepted offer"
                 >
-                  Reserved
+                  Reserved (offer accepted)
                 </Badge>
               )}
               {watchers > 0 && (
