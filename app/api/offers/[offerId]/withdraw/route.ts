@@ -31,7 +31,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
   const parsed = withdrawSchema.safeParse(body);
   if (!parsed.success) return json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
 
-  const note = parsed.data.note;
+  const cleanNote = typeof parsed.data.note === 'string' ? parsed.data.note.trim() : '';
   const offerId = ctx.params.offerId;
   const db = getAdminDb();
   const offerRef = db.collection('offers').doc(offerId);
@@ -71,7 +71,13 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         updatedAt: now,
         history: [
           ...(offer.history || []),
-          { type: 'withdraw', actorId: buyerId, actorRole: 'buyer', note: note || undefined, createdAt: now },
+          {
+            type: 'withdraw',
+            actorId: buyerId,
+            actorRole: 'buyer',
+            ...(cleanNote ? { note: cleanNote } : {}),
+            createdAt: now,
+          },
         ],
       });
 
@@ -85,7 +91,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       actorRole: 'buyer',
       actionType: 'offer_withdrawn',
       listingId: result.listingId,
-      metadata: { offerId, note: note || undefined },
+      metadata: { offerId, ...(cleanNote ? { note: cleanNote } : {}) },
       source: 'buyer_ui',
     });
 

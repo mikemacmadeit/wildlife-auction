@@ -37,6 +37,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
 
   const offerId = ctx.params.offerId;
   const { amount, note } = parsed.data;
+  const cleanNote = typeof note === 'string' ? note.trim() : '';
   const db = getAdminDb();
   const offerRef = db.collection('offers').doc(offerId);
 
@@ -121,7 +122,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
             actorId,
             actorRole: isSeller ? 'seller' : 'buyer',
             amount,
-            note: note || undefined,
+            ...(cleanNote ? { note: cleanNote } : {}),
             createdAt: now,
           },
         ],

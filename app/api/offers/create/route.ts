@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   }
 
   const { listingId, amount, note } = parsed.data;
+  const cleanNote = typeof note === 'string' ? note.trim() : '';
   let db: ReturnType<typeof getAdminDb>;
   try {
     db = getAdminDb();
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
           actorId: buyerId,
           actorRole: 'buyer',
           amount,
-          note: note || undefined,
+          ...(cleanNote ? { note: cleanNote } : {}),
           createdAt: now,
         },
       ];
