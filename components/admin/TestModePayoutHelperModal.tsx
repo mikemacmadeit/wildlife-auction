@@ -76,7 +76,13 @@ export function TestModePayoutHelperModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className={
+          // Keep the modal within the viewport on smaller screens and allow scrolling.
+          // (Some environments render slightly larger fonts which can otherwise overflow.)
+          'w-[calc(100vw-2rem)] sm:w-full sm:max-w-lg max-h-[85vh] overflow-y-auto'
+        }
+      >
         <DialogHeader>
           <DialogTitle>Test Mode: Make Funds Available Instantly</DialogTitle>
           <DialogDescription>
@@ -138,17 +144,17 @@ export function TestModePayoutHelperModal({
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-2 sm:gap-2 flex flex-col sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Close
           </Button>
-          <Button type="button" variant="outline" onClick={openAccessGate}>
+          <Button type="button" variant="outline" onClick={openAccessGate} className="w-full sm:w-auto">
             Open access page
           </Button>
-          <Button type="button" variant="secondary" onClick={openCheckout}>
+          <Button type="button" variant="secondary" onClick={openCheckout} className="w-full sm:w-auto">
             Create new test purchase
           </Button>
-          <Button type="button" onClick={tryRelease} disabled={trying}>
+          <Button type="button" onClick={tryRelease} disabled={trying} className="w-full sm:w-auto">
             {trying ? 'Trying…' : 'Try release again'}
           </Button>
         </DialogFooter>
