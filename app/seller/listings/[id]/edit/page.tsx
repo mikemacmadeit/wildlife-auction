@@ -1806,8 +1806,8 @@ function EditListingPageContent() {
 
       if (err?.code === 'LISTING_VALIDATION_FAILED' && Array.isArray(err?.missing) && err.missing.length > 0) {
         // Normalize server missing keys like "endsAt (must be in the future)" -> "endsAt"
-        const rawMissing = err.missing.map((m: any) => String(m)).filter(Boolean);
-        const missing = rawMissing.map((m) => m.split(' ')[0]).filter(Boolean);
+        const rawMissing: string[] = err.missing.map((m: any) => String(m)).filter(Boolean);
+        const missing = rawMissing.map((m: string) => m.split(' ')[0]).filter(Boolean);
 
         setPublishMissingFields(missing);
 
