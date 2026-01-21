@@ -39,6 +39,11 @@ export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listing
     }
   }, [cardNumber, toast]);
 
+  const openAccessGate = useCallback(() => {
+    // In private beta environments, public listing routes can be behind the access gate.
+    window.open('/coming-soon', '_blank', 'noopener,noreferrer');
+  }, []);
+
   const openCheckout = useCallback(() => {
     if (!rerunCheckoutUrl) {
       toast({
@@ -47,8 +52,10 @@ export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listing
       });
       return;
     }
-    window.open(rerunCheckoutUrl, '_blank', 'noopener,noreferrer');
-  }, [rerunCheckoutUrl, toast]);
+    // Navigate in the same tab so any existing session/cookies apply consistently.
+    onOpenChange(false);
+    window.location.href = rerunCheckoutUrl;
+  }, [onOpenChange, rerunCheckoutUrl, toast]);
 
   const tryRelease = useCallback(async () => {
     setTrying(true);
@@ -100,11 +107,19 @@ export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listing
           <div className="text-xs text-muted-foreground">
             Order: <span className="font-mono">{orderId}</span>
           </div>
+
+          <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+            If you land on a “Coming Soon / Private beta” screen, open the access page first, enter the access password,
+            then return to the listing and proceed to checkout.
+          </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close
+          </Button>
+          <Button type="button" variant="outline" onClick={openAccessGate}>
+            Open access page
           </Button>
           <Button type="button" variant="secondary" onClick={openCheckout}>
             Re-run checkout
