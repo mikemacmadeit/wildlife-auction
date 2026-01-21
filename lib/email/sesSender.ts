@@ -54,6 +54,15 @@ function isTrue(v: string | undefined): boolean {
   return String(v || '').toLowerCase() === 'true';
 }
 
+function extractEmailAddress(from: string): string {
+  const s = String(from || '').trim();
+  if (!s) return '';
+  // Support "Name <email@domain>" while keeping Netlify-safe SES_FROM config.
+  const m = s.match(/<([^>]+)>/);
+  const email = (m?.[1] || s).trim();
+  return email;
+}
+
 export async function sendViaSes(params: SesSendParams): Promise<SesSendResult> {
   const originalTo = parseEmails(params.to);
   if (!originalTo.length) return { success: false, error: 'Missing/invalid to address' };
@@ -62,8 +71,11 @@ export async function sendViaSes(params: SesSendParams): Promise<SesSendResult> 
   const sandboxTo = String(process.env.SES_SANDBOX_TO || 'michael@redwolfcinema.com').trim();
   const forcedTo = sandboxEnabled ? [sandboxTo] : originalTo;
 
-  const from = String(params.from || process.env.SES_FROM || '').trim();
-  if (!from) return { success: false, error: 'Missing SES_FROM' };
+  const rawFrom = String(params.from || process.env.SES_FROM || '').trim();
+  if (!rawFrom) return { success: false, error: 'Missing SES_FROM' };
+  // SESv2 `FromEmailAddress` must be an email address (not a full RFC5322 mailbox string).
+  const fromEmail = extractEmailAddress(rawFrom);
+  if (!fromEmail || !fromEmail.includes('@')) return { success: false, error: 'Invalid SES_FROM (expected email or Name <email>)' };
 
   const replyTo = String(params.replyTo || process.env.SES_REPLY_TO || '').trim();
 
@@ -72,7 +84,7 @@ export async function sendViaSes(params: SesSendParams): Promise<SesSendResult> 
   try {
     const client = getSesClient();
     const cmd = new SendEmailCommand({
-      FromEmailAddress: from,
+      FromEmailAddress: fromEmail,
       Destination: { ToAddresses: forcedTo },
       ReplyToAddresses: replyTo ? [replyTo] : undefined,
       Content: {
@@ -98,7 +110,12 @@ export async function sendViaSes(params: SesSendParams): Promise<SesSendResult> 
       ...(sandboxEnabled ? { sandbox: { enabled: true, originalTo, forcedTo } } : { sandbox: { enabled: false, originalTo, forcedTo } }),
     };
   } catch (e: any) {
-    return { success: false, error: e?.message || String(e) };
+    const meta = {
+      name: e?.name,
+      code: e?.code,
+      $metadata: e?.$metadata ? { requestId: e.$metadata.requestId, httpStatusCode: e.$metadata.httpStatusCode } : undefined,
+    };
+    return { success: false, error: `${e?.message || String(e)}${meta.name || meta.code ? ` (${meta.name || meta.code})` : ''}` };
   }
 }
 

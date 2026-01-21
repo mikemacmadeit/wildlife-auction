@@ -21,8 +21,30 @@ export async function enablePushForCurrentDevice(params: {
     const supported = await isSupported();
     if (!supported) return { ok: false, error: 'Push not supported in this browser' };
 
+    // If previously denied, browsers will not prompt again. Provide actionable guidance.
+    const existingPerm = Notification.permission;
+    if (existingPerm === 'denied') {
+      // eslint-disable-next-line no-console
+      console.warn('[push] browser notification permission is denied (previously blocked)');
+      return {
+        ok: false,
+        error:
+          'Notification permission is blocked in your browser. Enable notifications for wildlife.exchange in your browser/site settings, then try again.',
+      };
+    }
+
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') return { ok: false, error: 'Notification permission denied' };
+    if (perm !== 'granted') {
+      // eslint-disable-next-line no-console
+      console.warn('[push] notification permission not granted', { permission: perm });
+      return {
+        ok: false,
+        error:
+          perm === 'default'
+            ? 'Notification permission was dismissed. Please click Allow when prompted.'
+            : 'Notification permission denied',
+      };
+    }
 
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
     if (!vapidKey) return { ok: false, error: 'Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY' };
