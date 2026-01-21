@@ -31,6 +31,7 @@ interface StepperFormProps {
   onValidationError?: (stepId: string) => void; // Optional callback for highlighting invalid fields in the parent UI
   activeStepId?: string | null; // Optional external step control (jump to a step by id)
   onStepChange?: (stepId: string) => void; // Optional callback when step changes
+  attentionStepIds?: string[]; // Optional: steps to visually highlight (e.g. missing fields on publish)
 }
 
 export function StepperForm({
@@ -48,6 +49,7 @@ export function StepperForm({
   onValidationError,
   activeStepId = null,
   onStepChange,
+  attentionStepIds = [],
 }: StepperFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
@@ -56,6 +58,7 @@ export function StepperForm({
   const progress = ((currentStep + 1) / steps.length) * 100;
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === steps.length - 1;
+  const attention = new Set(attentionStepIds || []);
 
   // Allow parent to request a step jump (e.g. publish validation failure -> jump to the step with missing fields).
   useEffect(() => {
@@ -136,6 +139,9 @@ export function StepperForm({
                       : index === currentStep
                       ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
                       : 'bg-muted text-muted-foreground',
+                    attention.has(step.id) && index !== currentStep
+                      ? 'ring-4 ring-destructive/20 border border-destructive text-destructive bg-destructive/10'
+                      : null,
                     allowStepJump && 'cursor-pointer hover:scale-110 hover:ring-2 hover:ring-primary/30'
                   )}
                 >
@@ -148,6 +154,7 @@ export function StepperForm({
                     index === currentStep
                       ? 'font-semibold text-foreground'
                       : 'text-muted-foreground',
+                    attention.has(step.id) && index !== currentStep ? 'font-semibold text-destructive' : null,
                     allowStepJump && 'cursor-pointer hover:text-foreground transition-colors'
                   )}
                 >

@@ -112,6 +112,7 @@ function EditListingPageContent() {
   const [hasSavedEditsSinceRejection, setHasSavedEditsSinceRejection] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [publishMissingFields, setPublishMissingFields] = useState<string[]>([]);
+  const [publishMissingStepIds, setPublishMissingStepIds] = useState<string[]>([]);
   const [requestedStepId, setRequestedStepId] = useState<string | null>(null);
   const publishFocusFieldRef = useRef<string | null>(null);
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
@@ -1775,6 +1776,7 @@ function EditListingPageContent() {
     try {
       // Clear any prior publish hints when they try again.
       setPublishMissingFields([]);
+      setPublishMissingStepIds([]);
       publishFocusFieldRef.current = null;
       setRequestedStepId(null);
 
@@ -1803,18 +1805,31 @@ function EditListingPageContent() {
       console.error('Error updating listing:', err);
 
       if (err?.code === 'LISTING_VALIDATION_FAILED' && Array.isArray(err?.missing) && err.missing.length > 0) {
-        const missing = err.missing.map((m: any) => String(m)).filter(Boolean);
+        // Normalize server missing keys like "endsAt (must be in the future)" -> "endsAt"
+        const rawMissing = err.missing.map((m: any) => String(m)).filter(Boolean);
+        const missing = rawMissing.map((m) => m.split(' ')[0]).filter(Boolean);
+
         setPublishMissingFields(missing);
 
         const missingSet = new Set(missing);
-        const step =
-          missingSet.has('type') || missingSet.has('category')
-            ? 'type-category'
-            : missingSet.has('photos')
-              ? 'media'
-              : 'details';
-        setRequestedStepId(step);
+        const stepsNeedingAttention: string[] = [];
+        if (missingSet.has('type') || missingSet.has('category')) stepsNeedingAttention.push('type-category');
+        // Photos required (server uses "photos")
+        if (missingSet.has('photos')) stepsNeedingAttention.push('media');
+        // Everything else in this server validation lives on details (title/desc/location/price/auction fields)
+        const needsDetails = missing.some((m) =>
+          ['title', 'description', 'price', 'startingBid', 'reservePrice', 'endsAt', 'location.city', 'location.state'].includes(m)
+        );
+        if (needsDetails) stepsNeedingAttention.push('details');
 
+        setPublishMissingStepIds(stepsNeedingAttention);
+
+        // Jump to the earliest relevant step so the user can fix in sequence.
+        const stepOrder = ['type-category', 'details', 'media'];
+        const targetStep = stepOrder.find((s) => stepsNeedingAttention.includes(s)) || stepsNeedingAttention[0] || 'details';
+        setRequestedStepId(targetStep);
+
+        // Focus the first missing field on that step (best-effort).
         const first = missing[0];
         const focusId =
           first === 'photos'
@@ -1993,6 +2008,7 @@ function EditListingPageContent() {
               showSaveButton={true}
               completeButtonLabel={listingData?.status === 'draft' ? 'Publish Listing' : 'Save Changes'}
               activeStepId={requestedStepId}
+              attentionStepIds={publishMissingStepIds}
               onStepChange={() => {
                 if (requestedStepId) setRequestedStepId(null);
               }}
