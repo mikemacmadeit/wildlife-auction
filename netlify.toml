@@ -1,5 +1,5 @@
 [build]
-command = "node scripts/netlify-write-firebase-service-account.mjs && npx next build"
+command = "node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && npx next build"
 publish = ".next"
 
 [[plugins]]

@@ -8,6 +8,8 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+import { BUILD_INFO } from '@/lib/build-info';
+
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -18,6 +20,7 @@ function json(body: any, init?: { status?: number }) {
 export async function GET() {
   return json({
     ok: true,
+    build: BUILD_INFO,
     // Netlify
     netlify: {
       context: process.env.CONTEXT || null,
