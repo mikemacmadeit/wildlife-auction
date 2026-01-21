@@ -10,7 +10,7 @@
  */
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkRateLimitByKey, rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
@@ -63,13 +63,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Rate limit (cheap, before auth)
-  const rl = rateLimitMiddleware(RATE_LIMITS.checkout);
-  const rlRes = await rl(request as any);
-  if (!rlRes.allowed) {
-    return json(rlRes.body, {
-      status: rlRes.status,
-      headers: { 'Retry-After': rlRes.body.retryAfter.toString() },
+  // Coarse rate limit (cheap, before auth). This is intentionally generous to avoid blocking real-time auctions.
+  const rlIp = rateLimitMiddleware(RATE_LIMITS.bidsIp);
+  const rlIpRes = await rlIp(request as any);
+  if (!rlIpRes.allowed) {
+    return json(rlIpRes.body, {
+      status: rlIpRes.status,
+      headers: { 'Retry-After': rlIpRes.body.retryAfter.toString() },
     });
   }
 
@@ -117,6 +117,21 @@ export async function POST(request: Request) {
 
   if (!listingId) return json({ error: 'listingId is required' }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) return json({ error: 'amount must be a positive number' }, { status: 400 });
+
+  // High-frequency bid limiter (keyed per user + listing). This prevents abuse without blocking real-time bidding.
+  const bidKey = `bid:user:${bidderId}:listing:${listingId}`;
+  const rlBid = await checkRateLimitByKey(bidKey, RATE_LIMITS.bidsPlace);
+  if (!rlBid.allowed) {
+    return json(
+      {
+        ok: false,
+        error: rlBid.error || 'Too many bid attempts. Please slow down for a moment.',
+        code: 'RATE_LIMITED',
+        retryAfter: rlBid.retryAfter,
+      },
+      { status: rlBid.status ?? 429, headers: { 'Retry-After': rlBid.retryAfter.toString() } }
+    );
+  }
 
   try {
     let eventInfo:

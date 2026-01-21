@@ -23,7 +23,9 @@ export async function placeBidServer(params: {
     return { ok: false, error: 'You must be signed in to place a bid.' };
   }
 
-  const token = await getIdToken(user, true);
+  // Do NOT force-refresh the token on every bid; bidding is high-frequency.
+  // Firebase will refresh automatically when needed.
+  const token = await getIdToken(user, false);
   const res = await fetch('/api/bids/place', {
     method: 'POST',
     headers: {
@@ -48,10 +50,21 @@ export async function placeBidServer(params: {
   }
 
   if (!res.ok || !data?.ok) {
+    // Friendly handling for rate limits (429) with retry-after.
+    const retryAfter =
+      res.status === 429
+        ? Number(res.headers.get('retry-after') || (data?.retryAfter ?? 0)) || 0
+        : 0;
     const apiErr =
       (data && (data.error || data.message)) ||
       (text ? text.slice(0, 200) : null) ||
       `Failed to place bid (${res.status})`;
+    if (res.status === 429) {
+      return {
+        ok: false,
+        error: retryAfter > 0 ? `Too many bid attempts. Try again in ${retryAfter}s.` : 'Too many bid attempts. Try again in a moment.',
+      };
+    }
     return { ok: false, error: String(apiErr) };
   }
   return {

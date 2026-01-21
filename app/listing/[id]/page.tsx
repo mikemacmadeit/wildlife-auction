@@ -135,6 +135,7 @@ export default function ListingDetailPage() {
   const [selectedInsurance, setSelectedInsurance] = useState<string>('');
   const [showBidDialog, setShowBidDialog] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
+  const [bidInFlight, setBidInFlight] = useState(false);
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -383,6 +384,8 @@ export default function ListingDetailPage() {
 
   // Define all handlers first (before early returns)
   const handlePlaceBid = async () => {
+    // Client-side de-dupe: prevent double-submits from rapid clicks / key repeat.
+    if (bidInFlight) return;
     // Check authentication
     if (!user) {
       toast({
@@ -459,6 +462,7 @@ export default function ListingDetailPage() {
     }
 
     setIsPlacingBid(true);
+    setBidInFlight(true);
 
     try {
       const result = await placeBidServer({ listingId, amount });
@@ -513,6 +517,7 @@ export default function ListingDetailPage() {
       });
     } finally {
       setIsPlacingBid(false);
+      setBidInFlight(false);
     }
   };
 
