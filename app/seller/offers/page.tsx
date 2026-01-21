@@ -114,10 +114,15 @@ export default function SellerOffersPage() {
           </div>
           <p className="text-sm text-muted-foreground">Review and respond to best offers on your listings.</p>
         </div>
-        <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
-          {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="secondary" className="min-h-[40px]">
+            <Link href="/dashboard/bids-offers">Back to Bids &amp; Offers</Link>
+          </Button>
+          <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
+            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
