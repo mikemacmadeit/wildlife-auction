@@ -110,13 +110,21 @@ export async function POST(request: Request) {
     const result = await releasePaymentForOrder(db, orderId, adminId);
 
     if (!result.success) {
+      const status =
+        result.holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE' ||
+        result.holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT'
+          ? 409
+          : result.holdReasonCode === 'GLOBAL_PAYOUT_FREEZE'
+          ? 423
+          : 400;
       return json(
         {
           error: result.error || 'Failed to release payment',
           holdReasonCode: result.holdReasonCode,
           missingDocTypes: result.missingDocTypes,
+          stripeDebug: result.stripeDebug,
         },
-        { status: 400 }
+        { status }
       );
     }
 

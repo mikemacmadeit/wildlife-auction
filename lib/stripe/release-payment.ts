@@ -130,14 +130,17 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
     };
   }
 
-  // Expand charges + balance_transaction so we can read `available_on` in one roundtrip when possible.
+  // Prefer latest_charge (Stripe-recommended), with balance_transaction expanded for settlement timing.
+  // Fallback to charges.data for older objects / edge cases.
   const pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
-    expand: ['charges.data.balance_transaction'],
+    expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
   })) as any;
 
   const charges: any[] = Array.isArray(pi?.charges?.data) ? pi.charges.data : [];
-  // Use the most recent charge (defensive: some flows can have multiple attempts).
-  const charge = charges.length > 0 ? charges[charges.length - 1] : null;
+  const charge =
+    pi?.latest_charge && typeof pi.latest_charge === 'object'
+      ? pi.latest_charge
+      : (charges.length > 0 ? charges[charges.length - 1] : null); // most recent attempt
   const chargeId = charge?.id ? String(charge.id) : null;
 
   const btRaw = charge?.balance_transaction || null;
@@ -542,6 +545,14 @@ export async function releasePaymentForOrder(
       try {
         settlementForTransfer = await getStripeSettlementStatusForPaymentIntent(paymentIntentId);
         if (!settlementForTransfer.isAvailableNow) {
+          console.warn('[releasePaymentForOrder] Stripe settlement pending; blocking transfer', {
+            orderId,
+            paymentIntentId,
+            chargeId: settlementForTransfer.chargeId,
+            balanceTransactionId: settlementForTransfer.balanceTransactionId,
+            balanceTransactionStatus: settlementForTransfer.balanceTransactionStatus,
+            availableOnUnix: settlementForTransfer.availableOnUnix,
+          });
           const platform = await getPlatformUsdBalanceDebug();
           return {
             success: false,

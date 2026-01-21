@@ -259,10 +259,11 @@ export default function AdminOpsPage() {
 
       if (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT') {
         const when = typeof stripeDebug?.availableOnIso === 'string' ? stripeDebug.availableOnIso : null;
+        const mins = typeof stripeDebug?.minutesUntilAvailable === 'number' ? stripeDebug.minutesUntilAvailable : null;
         toast({
           title: 'Stripe settlement pending',
           description: when
-            ? `Funds become available at ${new Date(when).toLocaleString()}. Retry after that.`
+            ? `Funds become available at ${new Date(when).toLocaleString()}.${mins ? ` Try again in ~${mins} minutes.` : ' Retry after that.'}`
             : 'Funds are not yet available to transfer. Retry shortly.',
           variant: 'destructive',
         });
