@@ -502,10 +502,15 @@ export async function releasePaymentForOrder(
   try {
     // Settlement availability gate (Stripe funds must be AVAILABLE before transfer).
     // This is a settlement/availability check only; it does not change business eligibility gates.
+    //
+    // IMPORTANT: We prefer `source_transaction` when we can derive a chargeId. This pins the transfer to the
+    // underlying charge, which avoids confusing "available balance" edge cases in Stripe test mode and
+    // aligns the transfer with the specific order's funds.
+    let settlementForTransfer: StripeSettlementStatus | null = null;
     if (paymentIntentId && stripe) {
       try {
-        const settlement = await getStripeSettlementStatusForPaymentIntent(paymentIntentId);
-        if (!settlement.isAvailableNow) {
+        settlementForTransfer = await getStripeSettlementStatusForPaymentIntent(paymentIntentId);
+        if (!settlementForTransfer.isAvailableNow) {
           const platform = await getPlatformUsdBalanceDebug();
           return {
             success: false,
@@ -514,12 +519,12 @@ export async function releasePaymentForOrder(
             stripeDebug: {
               ...platform,
               paymentIntentId,
-              chargeId: settlement.chargeId || undefined,
-              balanceTransactionId: settlement.balanceTransactionId || undefined,
-              availableOnUnix: settlement.availableOnUnix || undefined,
-              availableOnIso: settlement.availableOnIso || undefined,
-              minutesUntilAvailable: settlement.minutesUntilAvailable || undefined,
-              usedSourceTransaction: false,
+              chargeId: settlementForTransfer.chargeId || undefined,
+              balanceTransactionId: settlementForTransfer.balanceTransactionId || undefined,
+              availableOnUnix: settlementForTransfer.availableOnUnix || undefined,
+              availableOnIso: settlementForTransfer.availableOnIso || undefined,
+              minutesUntilAvailable: settlementForTransfer.minutesUntilAvailable || undefined,
+              usedSourceTransaction: !!settlementForTransfer.chargeId,
               orderAmountUsd,
               platformFeeUsd,
               sellerPayoutUsd: sellerAmount,
@@ -529,6 +534,7 @@ export async function releasePaymentForOrder(
         }
       } catch {
         // If we cannot determine availability, do not block; Stripe will enforce availability at transfer time.
+        settlementForTransfer = null;
       }
     }
 
@@ -536,11 +542,16 @@ export async function releasePaymentForOrder(
     console.log(
       `[releasePaymentForOrder] Creating Stripe transfer for order ${orderId}: $${sellerAmount} to ${derivedSellerStripeAccountId}`
     );
+    const sourceTransaction =
+      settlementForTransfer?.chargeId && typeof settlementForTransfer.chargeId === 'string'
+        ? settlementForTransfer.chargeId
+        : undefined;
     const transfer = await stripe.transfers.create(
       {
         amount: transferAmount,
         currency: 'usd',
         destination: derivedSellerStripeAccountId,
+        ...(sourceTransaction ? { source_transaction: sourceTransaction } : {}),
         metadata: {
           orderId: orderId,
           listingId: orderData.listingId,
@@ -689,7 +700,7 @@ export async function releasePaymentForOrder(
           availableOnUnix: settlement?.availableOnUnix || undefined,
           availableOnIso: settlement?.availableOnIso || undefined,
           minutesUntilAvailable: settlement?.minutesUntilAvailable || undefined,
-          usedSourceTransaction: false,
+          usedSourceTransaction: !!settlement?.chargeId,
           orderAmountUsd,
           platformFeeUsd,
           sellerPayoutUsd: sellerAmount,
