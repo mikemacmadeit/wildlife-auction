@@ -27,6 +27,10 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
 
   try {
     const now = Timestamp.now();
+    const acceptedWindowHoursRaw = Number(process.env.OFFER_ACCEPTED_PAYMENT_WINDOW_HOURS || '24');
+    const acceptedWindowHours =
+      Number.isFinite(acceptedWindowHoursRaw) ? Math.max(1, Math.min(168, Math.round(acceptedWindowHoursRaw))) : 24;
+    const acceptedUntil = Timestamp.fromMillis(now.toMillis() + acceptedWindowHours * 60 * 60 * 1000);
 
     const result = await db.runTransaction(async (tx) => {
       const offerSnap = await tx.get(offerRef);
@@ -100,6 +104,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         status: 'accepted',
         acceptedAmount: offer.currentAmount,
         acceptedAt: now,
+        acceptedUntil,
         acceptedBy: actorId,
         lastActorRole: isSeller ? 'seller' : 'buyer',
         updatedAt: now,
@@ -112,6 +117,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       tx.update(listingRef, {
         offerReservedByOfferId: offerId,
         offerReservedAt: now,
+        offerReservedUntil: acceptedUntil,
         updatedAt: now,
       });
 

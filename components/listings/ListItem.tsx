@@ -224,6 +224,13 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
 
                 {/* Date (closer to title), then price, then bids + time-left row */}
                 <div className="space-y-1 pt-0.5">
+                  {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-[11px] sm:text-xs" title="Reserved by an accepted offer">
+                        Reserved
+                      </Badge>
+                    </div>
+                  ) : null}
                   {sold.isSold ? (
                     <>
                       <div className="text-sm sm:text-base font-extrabold">{sold.soldPriceLabel}</div>

@@ -144,6 +144,17 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </Badge>
               </div>
             )}
+            {!sold.isSold && (listing as any)?.offerReservedByOfferId && (
+              <div className="absolute bottom-3 left-3 z-20">
+                <Badge
+                  variant="secondary"
+                  className="backdrop-blur-sm bg-card/80 border-border/50 font-semibold text-xs px-3 py-1.5 shadow-warm"
+                  title="Reserved by an accepted offer"
+                >
+                  Reserved
+                </Badge>
+              </div>
+            )}
 
             {/* Subtle shimmer effect - warm tones */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-parchment/8 to-transparent z-5" />
