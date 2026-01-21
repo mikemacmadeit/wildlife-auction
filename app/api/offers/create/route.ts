@@ -15,6 +15,9 @@ import { emitEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const createOfferSchema = z.object({
   listingId: z.string().min(1),
   amount: offerAmountSchema,
@@ -42,7 +45,20 @@ export async function POST(request: Request) {
   }
 
   const { listingId, amount, note } = parsed.data;
-  const db = getAdminDb();
+  let db: ReturnType<typeof getAdminDb>;
+  try {
+    db = getAdminDb();
+  } catch (e: any) {
+    return json(
+      {
+        error: 'Server is not configured for offers yet',
+        code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+        message: e?.message || 'Failed to initialize Firebase Admin SDK',
+        missing: e?.missing || undefined,
+      },
+      { status: 503 }
+    );
+  }
 
   const listingRef = db.collection('listings').doc(listingId);
   const offersRef = db.collection('offers');

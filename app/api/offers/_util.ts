@@ -21,7 +21,25 @@ export async function requireAuth(request: Request) {
   }
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decoded = await getAdminAuth().verifyIdToken(token);
+    let adminAuth: ReturnType<typeof getAdminAuth>;
+    try {
+      adminAuth = getAdminAuth();
+    } catch (e: any) {
+      return {
+        ok: false as const,
+        response: json(
+          {
+            error: 'Server is not configured for offers yet',
+            code: e?.code || 'FIREBASE_ADMIN_INIT_FAILED',
+            message: e?.message || 'Failed to initialize Firebase Admin SDK',
+            missing: e?.missing || undefined,
+          },
+          { status: 503 }
+        ),
+      };
+    }
+
+    const decoded = await adminAuth.verifyIdToken(token);
     // Require verified email across all offer operations (prevents spam/abuse and aligns with checkout gating).
     if ((decoded as any)?.email_verified !== true) {
       return {
