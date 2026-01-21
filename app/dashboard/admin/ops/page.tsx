@@ -275,7 +275,8 @@ export default function AdminOpsPage() {
         // Avoid stacking dialogs: close the confirmation dialog and open the helper.
         setReleaseDialogOpen(null);
         setTestModePayoutHelpOrderId(orderId);
-        setTestModePayoutHelpOpen(true);
+        // Defer opening to avoid focus/aria-hidden warnings while the other dialog is closing.
+        setTimeout(() => setTestModePayoutHelpOpen(true), 0);
       }
 
       if (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT') {
@@ -1062,8 +1063,11 @@ export default function AdminOpsPage() {
                 variant="link"
                 className="text-xs text-muted-foreground"
                 onClick={() => {
-                  setTestModePayoutHelpOrderId(releaseDialogOpen);
-                  setTestModePayoutHelpOpen(true);
+                  // Close first, then open helper to avoid focus/aria-hidden warnings.
+                  const id = releaseDialogOpen;
+                  setReleaseDialogOpen(null);
+                  setTestModePayoutHelpOrderId(id);
+                  setTimeout(() => setTestModePayoutHelpOpen(true), 0);
                 }}
               >
                 Test Mode Help
@@ -1097,6 +1101,14 @@ export default function AdminOpsPage() {
           onOpenChange={setTestModePayoutHelpOpen}
           orderId={testModePayoutHelpOrderId}
           listingId={testModeHelpListingId}
+          settlementInfo={
+            lastReleaseDebug?.orderId === testModePayoutHelpOrderId
+              ? {
+                  availableOnIso: lastReleaseDebug?.stripeDebug?.availableOnIso,
+                  minutesUntilAvailable: lastReleaseDebug?.stripeDebug?.minutesUntilAvailable,
+                }
+              : null
+          }
           onTryReleaseAgain={async () => {
             if (!testModePayoutHelpOrderId) return;
             await handleReleasePayout(testModePayoutHelpOrderId);

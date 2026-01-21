@@ -12,10 +12,18 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   orderId: string;
   listingId?: string | null;
+  settlementInfo?: { availableOnIso?: string | null; minutesUntilAvailable?: number | null } | null;
   onTryReleaseAgain: () => Promise<void> | void;
 };
 
-export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listingId, onTryReleaseAgain }: Props) {
+export function TestModePayoutHelperModal({
+  open,
+  onOpenChange,
+  orderId,
+  listingId,
+  settlementInfo,
+  onTryReleaseAgain,
+}: Props) {
   const { toast } = useToast();
   const [trying, setTrying] = useState(false);
 
@@ -60,7 +68,6 @@ export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listing
   const tryRelease = useCallback(async () => {
     setTrying(true);
     try {
-      onOpenChange(false);
       await onTryReleaseAgain();
     } finally {
       setTrying(false);
@@ -79,6 +86,23 @@ export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listing
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm">
+            <div className="font-semibold">Important</div>
+            <div className="mt-1 text-muted-foreground text-xs">
+              Using this card helps when you create a <span className="font-semibold">new</span> test purchase. It does not change the settlement timing for this existing order.
+            </div>
+            {settlementInfo?.availableOnIso ? (
+              <div className="mt-2 text-xs text-muted-foreground">
+                This order’s funds are expected to become available at{' '}
+                <span className="font-semibold">{new Date(settlementInfo.availableOnIso).toLocaleString()}</span>
+                {typeof settlementInfo.minutesUntilAvailable === 'number'
+                  ? ` (~${settlementInfo.minutesUntilAvailable} minutes)`
+                  : ''}
+                .
+              </div>
+            ) : null}
+          </div>
+
           <div className="space-y-2">
             <Label>Card number</Label>
             <div className="flex gap-2">
@@ -122,7 +146,7 @@ export function TestModePayoutHelperModal({ open, onOpenChange, orderId, listing
             Open access page
           </Button>
           <Button type="button" variant="secondary" onClick={openCheckout}>
-            Re-run checkout
+            Create new test purchase
           </Button>
           <Button type="button" onClick={tryRelease} disabled={trying}>
             {trying ? 'Trying…' : 'Try release again'}
