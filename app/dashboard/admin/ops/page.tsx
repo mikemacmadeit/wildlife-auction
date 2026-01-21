@@ -72,6 +72,8 @@ import { getHoldInfo, generatePayoutExplanation } from '@/lib/orders/hold-reason
 import { Copy, Check } from 'lucide-react';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
+import { isStripeTestModeClient } from '@/lib/stripe/mode';
+import { TestModePayoutHelperModal } from '@/components/admin/TestModePayoutHelperModal';
 
 interface OrderWithDetails extends Order {
   listingTitle?: string;
@@ -115,6 +117,8 @@ export default function AdminOpsPage() {
   
   // Dialog states
   const [releaseDialogOpen, setReleaseDialogOpen] = useState<string | null>(null);
+  const [testModePayoutHelpOpen, setTestModePayoutHelpOpen] = useState(false);
+  const [testModePayoutHelpOrderId, setTestModePayoutHelpOrderId] = useState<string | null>(null);
   const [refundDialogOpen, setRefundDialogOpen] = useState<string | null>(null);
   const [resolveDialogOpen, setResolveDialogOpen] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState('');
@@ -220,6 +224,12 @@ export default function AdminOpsPage() {
   // Debounce search query
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
+  const testModeHelpListingId = useMemo(() => {
+    if (!testModePayoutHelpOrderId) return null;
+    const order = orders.find((o) => o.id === testModePayoutHelpOrderId);
+    return order?.listingId || null;
+  }, [orders, testModePayoutHelpOrderId]);
+
   // Filter orders by search query (enhanced with paymentIntentId)
   const filteredOrders = useMemo(() => {
     if (!debouncedSearchQuery) return orders;
@@ -255,6 +265,17 @@ export default function AdminOpsPage() {
       const stripeDebug = error?.stripeDebug;
       if (stripeDebug) {
         setLastReleaseDebug({ orderId, holdReasonCode, stripeDebug, message: error?.message, at: Date.now() });
+      }
+
+      // Test-mode helper modal: only show in Stripe test mode, only for settlement/balance holds.
+      if (
+        isStripeTestModeClient() &&
+        (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT' || holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE')
+      ) {
+        // Avoid stacking dialogs: close the confirmation dialog and open the helper.
+        setReleaseDialogOpen(null);
+        setTestModePayoutHelpOrderId(orderId);
+        setTestModePayoutHelpOpen(true);
       }
 
       if (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT') {
@@ -1035,6 +1056,19 @@ export default function AdminOpsPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReleaseDialogOpen(null)}>Cancel</Button>
+            {isStripeTestModeClient() && releaseDialogOpen ? (
+              <Button
+                type="button"
+                variant="link"
+                className="text-xs text-muted-foreground"
+                onClick={() => {
+                  setTestModePayoutHelpOrderId(releaseDialogOpen);
+                  setTestModePayoutHelpOpen(true);
+                }}
+              >
+                Test Mode Help
+              </Button>
+            ) : null}
             <Button
               onClick={() => releaseDialogOpen && handleReleasePayout(releaseDialogOpen)}
               disabled={processingOrderId === releaseDialogOpen}
@@ -1051,6 +1085,24 @@ export default function AdminOpsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Test Mode payout helper (Stripe TEST mode only).
+          Manual test checklist:
+          - Run checkout with a normal test card -> Release may show this modal (pending settlement).
+          - Run checkout with 4000 0000 0000 0077 -> Release should succeed immediately.
+      */}
+      {testModePayoutHelpOrderId ? (
+        <TestModePayoutHelperModal
+          open={testModePayoutHelpOpen && isStripeTestModeClient()}
+          onOpenChange={setTestModePayoutHelpOpen}
+          orderId={testModePayoutHelpOrderId}
+          listingId={testModeHelpListingId}
+          onTryReleaseAgain={async () => {
+            if (!testModePayoutHelpOrderId) return;
+            await handleReleasePayout(testModePayoutHelpOrderId);
+          }}
+        />
+      ) : null}
 
       {/* Refund Dialog */}
       <Dialog open={!!refundDialogOpen} onOpenChange={(open) => !open && setRefundDialogOpen(null)}>
