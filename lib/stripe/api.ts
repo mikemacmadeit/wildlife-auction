@@ -402,10 +402,26 @@ export async function releasePayment(orderId: string): Promise<{
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({} as any));
     const errorMessage = error.error || error.message || 'Failed to release payment';
-    console.error('Failed to release payment:', errorMessage, error);
-    throw new Error(errorMessage);
+
+    // Bubble up structured context so Admin Ops can show actionable info (and so we can detect key/account mismatch).
+    const err: any = new Error(errorMessage);
+    if (error?.holdReasonCode) err.holdReasonCode = error.holdReasonCode;
+    if (error?.stripeDebug) err.stripeDebug = error.stripeDebug;
+
+    // Helpful suffix for the common test-mode failure.
+    if (error?.holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE' && error?.stripeDebug) {
+      const dbg = error.stripeDebug;
+      const av = typeof dbg.availableUsdCents === 'number' ? (dbg.availableUsdCents / 100).toFixed(2) : 'unknown';
+      const pd = typeof dbg.pendingUsdCents === 'number' ? (dbg.pendingUsdCents / 100).toFixed(2) : 'unknown';
+      const acct = dbg.platformAccountId ? String(dbg.platformAccountId) : 'unknown';
+      const live = typeof dbg.platformLivemode === 'boolean' ? String(dbg.platformLivemode) : 'unknown';
+      err.message = `${errorMessage} (Stripe account ${acct}, livemode=${live}, USD available=$${av}, pending=$${pd})`;
+    }
+
+    console.error('Failed to release payment:', err.message, error);
+    throw err;
   }
 
   return response.json();
