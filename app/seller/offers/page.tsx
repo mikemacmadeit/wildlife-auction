@@ -54,14 +54,15 @@ export default function SellerOffersPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const res = await getSellerOffers({ status: tab, limit: 100 });
+      // Load all offers so tab counts can be shown without extra requests.
+      const res = await getSellerOffers({ limit: 250 });
       setOffers((res?.offers || []) as OfferRow[]);
     } catch (e: any) {
       toast({ title: 'Failed to load offers', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [tab, toast, user]);
+  }, [toast, user]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -96,6 +97,29 @@ export default function SellerOffersPage() {
     const t = setTimeout(() => setTabFading(false), 140);
     return () => clearTimeout(t);
   }, [tab]);
+
+  const counts = useMemo(() => {
+    const out: Record<'open' | 'countered' | 'accepted' | 'declined' | 'expired', number> = {
+      open: 0,
+      countered: 0,
+      accepted: 0,
+      declined: 0,
+      expired: 0,
+    };
+    for (const o of offers) {
+      const s = String((o as any)?.status || '').toLowerCase();
+      if (s === 'open') out.open += 1;
+      else if (s === 'countered') out.countered += 1;
+      else if (s === 'accepted') out.accepted += 1;
+      else if (s === 'declined') out.declined += 1;
+      else if (s === 'expired') out.expired += 1;
+    }
+    return out;
+  }, [offers]);
+
+  const visibleOffers = useMemo(() => {
+    return offers.filter((o) => String(o.status || '').toLowerCase() === tab);
+  }, [offers, tab]);
 
   const emptyCopy = useMemo(() => {
     if (tab === 'open') return 'No open offers right now.';
@@ -159,11 +183,36 @@ export default function SellerOffersPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full sm:w-auto">
-          <TabsTrigger value="open">Open</TabsTrigger>
-          <TabsTrigger value="countered">Countered</TabsTrigger>
-          <TabsTrigger value="accepted">Accepted</TabsTrigger>
-          <TabsTrigger value="declined">Declined</TabsTrigger>
-          <TabsTrigger value="expired">Expired</TabsTrigger>
+          <TabsTrigger value="open" className="gap-2">
+            <span>Open</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+              {counts.open}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="countered" className="gap-2">
+            <span>Countered</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+              {counts.countered}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="accepted" className="gap-2">
+            <span>Accepted</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+              {counts.accepted}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="declined" className="gap-2">
+            <span>Declined</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+              {counts.declined}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="expired" className="gap-2">
+            <span>Expired</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+              {counts.expired}
+            </Badge>
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -174,11 +223,11 @@ export default function SellerOffersPage() {
               <div className="py-10 flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : offers.length === 0 ? (
+            ) : visibleOffers.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">{emptyCopy}</div>
             ) : (
               <div className="divide-y">
-                {offers.map((o) => (
+                {visibleOffers.map((o) => (
                   <button
                     key={o.offerId}
                     className="w-full text-left py-4 hover:bg-muted/30 transition-colors px-2 rounded-lg"
