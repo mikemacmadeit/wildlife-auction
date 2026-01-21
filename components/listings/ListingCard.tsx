@@ -157,8 +157,8 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
             </div>
             
-            {/* Top-left stack: Trending (if applicable), then auction timer */}
-            <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
+            {/* Top-left row: Trending (if applicable) + auction timer (same line) */}
+            <div className="absolute top-2 left-2 z-20 flex items-center gap-1 flex-wrap">
               {!sold.isSold && (watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) ? (
                 <Badge variant="default" className="text-xs shadow-warm">
                   <Zap className="h-3 w-3 mr-1" />
