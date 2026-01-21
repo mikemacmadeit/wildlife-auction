@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
 
@@ -236,7 +236,7 @@ export async function POST(request: Request) {
       if (result.offerDoc.status === 'accepted') {
         // Auto-accepted offers: notify buyer (and seller for visibility).
         if (buyerId) {
-          await emitEventForUser({
+          await emitAndProcessEventForUser({
             type: 'Offer.Accepted',
             actorId: 'system',
             entityType: 'listing',
@@ -254,7 +254,7 @@ export async function POST(request: Request) {
           });
         }
         if (sellerId) {
-          await emitEventForUser({
+          await emitAndProcessEventForUser({
             type: 'Offer.Accepted',
             actorId: 'system',
             entityType: 'listing',
@@ -274,7 +274,7 @@ export async function POST(request: Request) {
       } else {
         // Regular offer: notify seller.
         if (sellerId) {
-          await emitEventForUser({
+          await emitAndProcessEventForUser({
             type: 'Offer.Received',
             actorId: buyerId || null,
             entityType: 'listing',

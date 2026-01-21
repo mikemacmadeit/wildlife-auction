@@ -26,6 +26,10 @@ import {
   getMessageReceivedEmail,
   getVerifyEmailEmail,
   getOfferAcceptedEmail,
+  getOfferReceivedEmail,
+  getOfferCounteredEmail,
+  getOfferDeclinedEmail,
+  getOfferExpiredEmail,
   getAdminListingSubmittedEmail,
   getAdminListingComplianceReviewEmail,
   getAdminListingAdminApprovalEmail,
@@ -50,6 +54,10 @@ import {
   type MessageReceivedEmailData,
   type VerifyEmailEmailData,
   type OfferAcceptedEmailData,
+  type OfferReceivedEmailData,
+  type OfferCounteredEmailData,
+  type OfferDeclinedEmailData,
+  type OfferExpiredEmailData,
   type AdminListingSubmittedEmailData,
   type AdminListingComplianceReviewEmailData,
   type AdminListingAdminApprovalEmailData,
@@ -213,6 +221,34 @@ const offerAcceptedSchema = z.object({
   userName: z.string().min(1),
   listingTitle: z.string().min(1),
   amount: z.number().finite().nonnegative(),
+  offerUrl: urlSchema,
+});
+
+const offerReceivedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  amount: z.number().finite().nonnegative(),
+  offerUrl: urlSchema,
+  expiresAt: z.string().optional(),
+});
+
+const offerCounteredSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  amount: z.number().finite().nonnegative(),
+  offerUrl: urlSchema,
+  expiresAt: z.string().optional(),
+});
+
+const offerDeclinedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  offerUrl: urlSchema,
+});
+
+const offerExpiredSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
   offerUrl: urlSchema,
 });
 
@@ -581,6 +617,70 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: OfferAcceptedEmailData) => {
       const { subject, html } = getOfferAcceptedEmail(data);
       return { subject, preheader: `Offer accepted`, html };
+    },
+  },
+  {
+    type: 'offer_received',
+    displayName: 'Offer: Received',
+    description: 'Sent to a seller when a new offer is received.',
+    schema: offerReceivedSchema,
+    samplePayload: {
+      userName: 'Jordan',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      amount: 8500,
+      offerUrl: 'https://wildlife.exchange/seller/offers',
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    },
+    render: (data: OfferReceivedEmailData) => {
+      const { subject, html } = getOfferReceivedEmail(data);
+      return { subject, preheader: `New offer`, html };
+    },
+  },
+  {
+    type: 'offer_countered',
+    displayName: 'Offer: Countered',
+    description: 'Sent when a counter offer is made.',
+    schema: offerCounteredSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      amount: 9000,
+      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    },
+    render: (data: OfferCounteredEmailData) => {
+      const { subject, html } = getOfferCounteredEmail(data);
+      return { subject, preheader: `Counter offer`, html };
+    },
+  },
+  {
+    type: 'offer_declined',
+    displayName: 'Offer: Declined',
+    description: 'Sent when an offer is declined.',
+    schema: offerDeclinedSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+    },
+    render: (data: OfferDeclinedEmailData) => {
+      const { subject, html } = getOfferDeclinedEmail(data);
+      return { subject, preheader: `Offer declined`, html };
+    },
+  },
+  {
+    type: 'offer_expired',
+    displayName: 'Offer: Expired',
+    description: 'Sent when an offer expires.',
+    schema: offerExpiredSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+    },
+    render: (data: OfferExpiredEmailData) => {
+      const { subject, html } = getOfferExpiredEmail(data);
+      return { subject, preheader: `Offer expired`, html };
     },
   },
   {

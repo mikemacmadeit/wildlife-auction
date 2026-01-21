@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { buildEventKey, eventDocIdFromKey, stableHash } from './eventKey';
 import { notificationEventPayloadSchema, notificationEventTypeSchema, assertPayloadMatchesType } from './schemas';
@@ -26,6 +27,59 @@ export interface EmitEventResult {
   eventId: string;
   eventKey: string;
   error?: string;
+}
+
+/**
+ * Emit + immediately process an event (creates in-app notification + queues emails/push jobs)
+ * in the same request path. This avoids relying on scheduled functions for time-sensitive UX
+ * like offers (eBay-style "see it instantly").
+ *
+ * Best-effort: if processing fails, the scheduled processor can still retry later.
+ */
+export async function emitAndProcessEventForUser<TType extends NotificationEventType>(
+  params: EmitEventParams<TType>
+): Promise<EmitEventResult & { processed?: boolean; processError?: string }> {
+  const db = getAdminDb();
+
+  // Emit first (idempotent by eventKey/doc id).
+  const emitted = await emitEventForUser(params);
+  if (!emitted.ok) return emitted;
+
+  // If we didn't create a new doc, don't try to process inline (avoid double-processing).
+  // Scheduled processor will handle it if still pending.
+  if (!emitted.created) return emitted;
+
+  try {
+    const { processEventDoc } = await import('./processEvent');
+
+    const eventRef = db.collection('events').doc(emitted.eventId);
+
+    // Provide a concrete Timestamp (avoid FieldValue.serverTimestamp() sentinel in the in-memory object).
+    const eventData: NotificationEventDoc = {
+      id: emitted.eventId,
+      type: params.type,
+      createdAt: Timestamp.now() as any,
+      actorId: params.actorId,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      targetUserIds: [params.targetUserId],
+      payload: params.payload as any,
+      status: 'pending',
+      processing: { attempts: 0, lastAttemptAt: null },
+      eventKey: buildEventKey({
+        type: params.type,
+        entityId: params.entityId,
+        targetUserId: params.targetUserId,
+        optionalHash: params.optionalHash ? stableHash(params.optionalHash).slice(0, 18) : undefined,
+      }),
+      ...(params.test ? { test: true } : {}),
+    };
+
+    const res = await processEventDoc({ db: db as any, eventRef: eventRef as any, eventData });
+    return { ...emitted, processed: res.ok };
+  } catch (e: any) {
+    return { ...emitted, processed: false, processError: e?.message || String(e) };
+  }
 }
 
 function isAlreadyExistsError(e: any): boolean {

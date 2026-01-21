@@ -85,6 +85,34 @@ export interface OfferAcceptedEmailData {
   offerUrl: string;
 }
 
+export interface OfferReceivedEmailData {
+  userName: string;
+  listingTitle: string;
+  amount: number;
+  offerUrl: string;
+  expiresAt?: string;
+}
+
+export interface OfferCounteredEmailData {
+  userName: string;
+  listingTitle: string;
+  amount: number;
+  offerUrl: string;
+  expiresAt?: string;
+}
+
+export interface OfferDeclinedEmailData {
+  userName: string;
+  listingTitle: string;
+  offerUrl: string;
+}
+
+export interface OfferExpiredEmailData {
+  userName: string;
+  listingTitle: string;
+  offerUrl: string;
+}
+
 export interface AdminListingSubmittedEmailData {
   adminName: string;
   listingTitle: string;
@@ -1147,6 +1175,128 @@ export function getOfferAcceptedEmail(data: OfferAcceptedEmailData): { subject: 
 
     <div style="margin-top: 12px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       Tip: If you’re the buyer, you can proceed to checkout from the offer page. If you’re the seller, you can track the accepted offer there.
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOfferReceivedEmail(data: OfferReceivedEmailData): { subject: string; html: string } {
+  const subject = `New offer — ${data.listingTitle}`;
+  const preheader = `You received an offer for $${Number(data.amount).toLocaleString()} — review and respond.`;
+  const origin = tryGetOrigin(data.offerUrl);
+
+  const expires =
+    data.expiresAt && data.expiresAt.trim()
+      ? `<div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+          Expires: <span style="font-weight:800; color:#22251F;">${escapeHtml(new Date(data.expiresAt).toLocaleString())}</span>
+        </div>`
+      : '';
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      New offer received
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — you received an offer on <span style="font-weight:700; color:#22251F;">${escapeHtml(data.listingTitle)}</span>.
+    </div>
+
+    <div style="margin: 12px 0 0 0; padding: 12px 14px; border: 1px solid #E6E1D6; border-radius: 12px; background: #FBFAF7;">
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; text-transform: uppercase; letter-spacing: .08em; font-weight: 800;">
+        Offer amount
+      </div>
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 20px; color:#22251F; font-weight: 900; margin-top: 2px;">
+        $${Number(data.amount).toLocaleString()}
+      </div>
+      ${expires}
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.offerUrl, 'Review offer')}
+    </div>
+
+    <div style="margin-top: 12px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+      Tip: You can accept, counter, or decline from the offer screen.
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOfferCounteredEmail(data: OfferCounteredEmailData): { subject: string; html: string } {
+  const subject = `Counter offer — ${data.listingTitle}`;
+  const preheader = `There’s a counter offer for $${Number(data.amount).toLocaleString()} — view and respond.`;
+  const origin = tryGetOrigin(data.offerUrl);
+
+  const expires =
+    data.expiresAt && data.expiresAt.trim()
+      ? `<div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+          Expires: <span style="font-weight:800; color:#22251F;">${escapeHtml(new Date(data.expiresAt).toLocaleString())}</span>
+        </div>`
+      : '';
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Counter offer
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — there’s a counter offer on <span style="font-weight:700; color:#22251F;">${escapeHtml(data.listingTitle)}</span>.
+    </div>
+
+    <div style="margin: 12px 0 0 0; padding: 12px 14px; border: 1px solid #E6E1D6; border-radius: 12px; background: #FBFAF7;">
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; text-transform: uppercase; letter-spacing: .08em; font-weight: 800;">
+        Counter amount
+      </div>
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 20px; color:#22251F; font-weight: 900; margin-top: 2px;">
+        $${Number(data.amount).toLocaleString()}
+      </div>
+      ${expires}
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.offerUrl, 'View offer')}
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOfferDeclinedEmail(data: OfferDeclinedEmailData): { subject: string; html: string } {
+  const subject = `Offer declined — ${data.listingTitle}`;
+  const preheader = `Your offer was declined — you can view details or make another offer.`;
+  const origin = tryGetOrigin(data.offerUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Offer declined
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — your offer on <span style="font-weight:700; color:#22251F;">${escapeHtml(data.listingTitle)}</span> was declined.
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.offerUrl, 'View offers')}
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOfferExpiredEmail(data: OfferExpiredEmailData): { subject: string; html: string } {
+  const subject = `Offer expired — ${data.listingTitle}`;
+  const preheader = `An offer expired — view details.`;
+  const origin = tryGetOrigin(data.offerUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Offer expired
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — an offer on <span style="font-weight:700; color:#22251F;">${escapeHtml(data.listingTitle)}</span> expired.
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.offerUrl, 'View offers')}
     </div>
   `;
 

@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
 
@@ -126,7 +126,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       const base = getSiteUrl();
       const targetUserId = result.role === 'seller' ? result.buyerId : result.sellerId;
       const offerUrl = result.role === 'seller' ? `${base}/dashboard/offers` : `${base}/seller/offers/${offerId}`;
-      await emitEventForUser({
+      await emitAndProcessEventForUser({
         type: 'Offer.Declined',
         actorId,
         entityType: 'listing',

@@ -276,10 +276,16 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         // Offers are purchase intent and belong in the transaction lane.
         category: 'orders',
         urgency: type === 'Offer.Accepted' ? 'high' : 'normal',
-        // Keep spam low: email/push only for accepted offers.
-        channels: type === 'Offer.Accepted' ? (['inApp', 'email', 'push'] as any) : (['inApp'] as any),
+        // eBay-like: email for key offer activity; push only for accepted (high intent).
+        channels:
+          type === 'Offer.Accepted'
+            ? (['inApp', 'email', 'push'] as any)
+            : (['inApp', 'email'] as any),
         dedupeWindowMs: 1000 * 60 * 10,
-        rateLimitPerUser: type === 'Offer.Accepted' ? { push: { perHour: 10, perDay: 30 }, email: { perHour: 6, perDay: 15 } } : {},
+        rateLimitPerUser:
+          type === 'Offer.Accepted'
+            ? { push: { perHour: 10, perDay: 30 }, email: { perHour: 6, perDay: 15 } }
+            : { email: { perHour: 10, perDay: 30 } },
         allowDuringQuietHours: true,
       };
     case 'Admin.Listing.Submitted':

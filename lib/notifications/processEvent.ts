@@ -263,6 +263,54 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Offer.Received': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Received' }>;
+      return {
+        template: 'offer_received',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
+          offerUrl: p.offerUrl,
+          expiresAt: p.expiresAt || undefined,
+        },
+      };
+    }
+    case 'Offer.Countered': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Countered' }>;
+      return {
+        template: 'offer_countered',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
+          offerUrl: p.offerUrl,
+          expiresAt: p.expiresAt || undefined,
+        },
+      };
+    }
+    case 'Offer.Declined': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Declined' }>;
+      return {
+        template: 'offer_declined',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          offerUrl: p.offerUrl,
+        },
+      };
+    }
+    case 'Offer.Expired': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Expired' }>;
+      return {
+        template: 'offer_expired',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          offerUrl: p.offerUrl,
+        },
+      };
+    }
     case 'Admin.Listing.Submitted': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Submitted' }>;
       return {

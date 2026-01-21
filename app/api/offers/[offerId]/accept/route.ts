@@ -8,7 +8,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
 
@@ -145,7 +145,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       const base = getSiteUrl();
       const listingTitle = String((await db.collection('listings').doc(result.listingId).get()).data()?.title || 'a listing');
 
-      await emitEventForUser({
+      await emitAndProcessEventForUser({
         type: 'Offer.Accepted',
         actorId,
         entityType: 'listing',
@@ -162,7 +162,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         optionalHash: `offer:${offerId}:accepted`,
       });
 
-      await emitEventForUser({
+      await emitAndProcessEventForUser({
         type: 'Offer.Accepted',
         actorId,
         entityType: 'listing',
