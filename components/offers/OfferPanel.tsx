@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { createOffer, acceptOffer, counterOffer, declineOffer, withdrawOffer, getMyOffers } from '@/lib/offers/api';
@@ -48,6 +49,8 @@ export function OfferPanel(props: { listing: Listing }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<'make' | 'counter'>('make');
   const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [offerLimit, setOfferLimit] = useState<{ limit: number; used: number; left: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [pendingCheckoutAmount, setPendingCheckoutAmount] = useState<number | null>(null);
@@ -84,6 +87,14 @@ export function OfferPanel(props: { listing: Listing }) {
     try {
       const res = await getMyOffers({ listingId: listing.id, limit: 10 });
       const first = (res?.offers || [])[0] as any;
+      if (res?.offerLimit && typeof res.offerLimit === 'object') {
+        const l = res.offerLimit as any;
+        if (typeof l.limit === 'number' && typeof l.used === 'number' && typeof l.left === 'number') {
+          setOfferLimit({ limit: l.limit, used: l.used, left: l.left });
+        }
+      } else {
+        setOfferLimit(null);
+      }
       if (first) {
         setOffer({
           offerId: first.offerId,
@@ -111,12 +122,14 @@ export function OfferPanel(props: { listing: Listing }) {
   const openMakeOffer = () => {
     setMode('make');
     setAmount('');
+    setNote('');
     setModalOpen(true);
   };
 
   const openCounter = () => {
     setMode('counter');
     setAmount('');
+    setNote('');
     setModalOpen(true);
   };
 
@@ -138,17 +151,27 @@ export function OfferPanel(props: { listing: Listing }) {
     setLoading(true);
     try {
       if (mode === 'make') {
-        await createOffer(listing.id, n);
+        const res = await createOffer(listing.id, n, note.trim() ? note.trim() : undefined);
+        if ((res as any)?.offerLimit) setOfferLimit((res as any).offerLimit);
         toast({ title: 'Offer sent', description: 'Your offer was sent to the seller.' });
       } else {
         if (!offer) throw new Error('No offer to counter');
-        await counterOffer(offer.offerId, n);
+        await counterOffer(offer.offerId, n, note.trim() ? note.trim() : undefined);
         toast({ title: 'Counter sent', description: 'Your counter was sent to the seller.' });
       }
       setModalOpen(false);
       await refresh();
     } catch (e: any) {
-      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      if (e?.code === 'OFFER_LIMIT_REACHED') {
+        const left = e?.data?.offerLimit?.left;
+        toast({
+          title: 'Offer limit reached',
+          description: typeof left === 'number' ? `You have ${left} offers left for this listing.` : e?.message || 'Offer limit reached for this listing.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
@@ -250,6 +273,7 @@ export function OfferPanel(props: { listing: Listing }) {
   const canWithdraw = status === 'open' || status === 'countered';
   const canBuyerRespondToCounter = status === 'countered' && offer?.lastActorRole === 'seller';
   const accepted = status === 'accepted';
+  const offersLeft = typeof offerLimit?.left === 'number' ? offerLimit.left : null;
 
   return (
     <div className="rounded-2xl border bg-card p-4 sm:p-5 space-y-3">
@@ -272,6 +296,7 @@ export function OfferPanel(props: { listing: Listing }) {
           <div className="text-xs text-muted-foreground">
             {typeof minPrice === 'number' && Number.isFinite(minPrice) ? `Min $${minPrice} · ` : ''}
             Expires in {expiryHours}h
+            {offersLeft !== null ? ` · ${offersLeft} offers left` : ''}
           </div>
         </div>
 
@@ -295,12 +320,14 @@ export function OfferPanel(props: { listing: Listing }) {
 
       {showMake ? (
         <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={openMakeOffer} disabled={loading} className="min-h-[44px] font-semibold">
+          <Button onClick={openMakeOffer} disabled={loading || (offersLeft !== null && offersLeft <= 0)} className="min-h-[44px] font-semibold">
             <DollarSign className="h-4 w-4 mr-2" />
             Make Offer
           </Button>
           <div className="text-xs text-muted-foreground sm:self-center">
-            Buyer and seller identities stay private until payment.
+            {offersLeft !== null && offersLeft <= 0
+              ? 'Offer limit reached for this listing.'
+              : 'Buyer and seller identities stay private until payment.'}
           </div>
         </div>
       ) : (
@@ -415,6 +442,19 @@ export function OfferPanel(props: { listing: Listing }) {
             <div className="text-xs text-muted-foreground">
               Buyer and seller identities stay private until payment.
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-semibold">Message (optional)</div>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add a message for the seller (optional)…"
+              className="min-h-[90px]"
+              maxLength={250}
+              disabled={loading}
+            />
+            <div className="text-xs text-muted-foreground">{note.length}/250</div>
           </div>
 
           <DialogFooter className="gap-2">

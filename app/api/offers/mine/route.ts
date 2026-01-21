@@ -70,6 +70,8 @@ export async function GET(request: Request) {
   const limitN = Math.max(1, Math.min(100, Number(parsed.data.limit || 50) || 50));
   const status = parsed.data.status;
   const listingId = parsed.data.listingId;
+  const offerLimitRaw = Number(process.env.OFFER_MAX_OFFERS_PER_BUYER_PER_LISTING || '5');
+  const offerLimit = Number.isFinite(offerLimitRaw) ? Math.max(1, Math.min(20, Math.round(offerLimitRaw))) : 5;
 
   let db;
   try {
@@ -90,7 +92,10 @@ export async function GET(request: Request) {
     // Avoid composite-index requirements by querying only on buyerId and filtering in-memory.
     // (Firestore commonly requires indexes for multi-field filters + orderBy.)
     const snap = await db.collection('offers').where('buyerId', '==', buyerId).limit(200).get();
-    let offers = snap.docs.map(serializeOffer);
+    const allOffers = snap.docs.map(serializeOffer);
+    const offersUsedForListing =
+      listingId ? allOffers.filter((o: any) => o.listingId === listingId).length : null;
+    let offers = allOffers;
 
     if (listingId) offers = offers.filter((o: any) => o.listingId === listingId);
     if (status) offers = offers.filter((o: any) => o.status === status);
@@ -118,7 +123,17 @@ export async function GET(request: Request) {
       return bm - am;
     });
 
-    return json({ ok: true, offers: offers.slice(0, limitN) });
+    return json({
+      ok: true,
+      offers: offers.slice(0, limitN),
+      offerLimit: listingId
+        ? {
+            limit: offerLimit,
+            used: offersUsedForListing || 0,
+            left: Math.max(0, offerLimit - (offersUsedForListing || 0)),
+          }
+        : undefined,
+    });
   } catch (e: any) {
     return json(
       {

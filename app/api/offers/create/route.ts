@@ -67,6 +67,8 @@ export async function POST(request: Request) {
 
   try {
     const now = Timestamp.now();
+    const offerLimitRaw = Number(process.env.OFFER_MAX_OFFERS_PER_BUYER_PER_LISTING || '5');
+    const offerLimit = Number.isFinite(offerLimitRaw) ? Math.max(1, Math.min(20, Math.round(offerLimitRaw))) : 5;
     const acceptedWindowHoursRaw = Number(process.env.OFFER_ACCEPTED_PAYMENT_WINDOW_HOURS || '24');
     const acceptedWindowHours =
       Number.isFinite(acceptedWindowHoursRaw) ? Math.max(1, Math.min(168, Math.round(acceptedWindowHoursRaw))) : 24;
@@ -106,6 +108,22 @@ export async function POST(request: Request) {
 
       if (listing.offerReservedByOfferId) {
         return { ok: false as const, status: 409, body: { error: 'Listing is reserved by an accepted offer' } };
+      }
+
+      // Enforce an eBay-style offer limit per buyer per listing (prevents offer spam).
+      // Avoid composite-index requirements by querying on buyerId only and filtering in-memory.
+      const mineSnap = await tx.get(offersRef.where('buyerId', '==', buyerId).limit(200));
+      const offersUsedForListing = mineSnap.docs.filter((d) => (d.data() as any)?.listingId === listingId).length;
+      if (offersUsedForListing >= offerLimit) {
+        return {
+          ok: false as const,
+          status: 409,
+          body: {
+            error: `Offer limit reached for this listing (${offerLimit}).`,
+            code: 'OFFER_LIMIT_REACHED',
+            offerLimit: { limit: offerLimit, used: offersUsedForListing, left: 0 },
+          },
+        };
       }
 
       const floor = settings.minPrice;
@@ -196,7 +214,16 @@ export async function POST(request: Request) {
 
       tx.set(offerRef, offerDoc);
 
-      return { ok: true as const, offerId: offerRef.id, offerDoc };
+      return {
+        ok: true as const,
+        offerId: offerRef.id,
+        offerDoc,
+        offerLimit: {
+          limit: offerLimit,
+          used: offersUsedForListing + 1,
+          left: Math.max(0, offerLimit - (offersUsedForListing + 1)),
+        },
+      };
     });
 
     if (!result.ok) {
@@ -298,7 +325,7 @@ export async function POST(request: Request) {
       // best-effort; do not fail offer creation on notification errors
     }
 
-    return json({ ok: true, offerId: result.offerId });
+    return json({ ok: true, offerId: result.offerId, offerLimit: (result as any).offerLimit });
   } catch (error: any) {
     const msg = String(error?.message || 'Unknown error');
     const code = String(error?.code || '');

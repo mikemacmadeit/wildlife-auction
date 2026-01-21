@@ -20,7 +20,10 @@ async function authedFetch(path: string, init: RequestInit = {}) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data?.error || data?.message || 'Request failed');
+    const err: any = new Error(data?.error || data?.message || 'Request failed');
+    err.code = data?.code;
+    err.data = data;
+    throw err;
   }
   return data;
 }
