@@ -7,15 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Loader2, Handshake, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Handshake, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { getMyOffers, acceptOffer, counterOffer, declineOffer, withdrawOffer } from '@/lib/offers/api';
-import { createCheckoutSession } from '@/lib/stripe/api';
+import { getMyOffers } from '@/lib/offers/api';
 import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
+import { BuyerOfferDetailModal } from '@/components/offers/BuyerOfferDetailModal';
+import { cn } from '@/lib/utils';
 
 type OfferRow = {
   offerId: string;
@@ -49,10 +48,8 @@ export default function MyOffersPage() {
   const [tab, setTab] = useState<'open' | 'countered' | 'accepted' | 'declined' | 'expired'>('open');
   const [loading, setLoading] = useState(false);
   const [offers, setOffers] = useState<OfferRow[]>([]);
-
-  const [counterOfferId, setCounterOfferId] = useState<string | null>(null);
-  const [counterAmount, setCounterAmount] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -103,76 +100,6 @@ export default function MyOffersPage() {
     return 'No expired offers right now.';
   }, [tab]);
 
-  const checkout = async (o: OfferRow) => {
-    try {
-      // Checkout now requires a buyer acknowledgment for animal categories (server-enforced).
-      // The listing page contains the required acknowledgment flow and will route into checkout safely.
-      router.push(`/listing/${o.listingId}`);
-    } catch (e: any) {
-      toast({ title: 'Checkout failed', description: e?.message || 'Please try again.', variant: 'destructive' });
-    }
-  };
-
-  const accept = async (offerId: string) => {
-    setActionLoading(true);
-    try {
-      await acceptOffer(offerId);
-      toast({ title: 'Accepted', description: 'Offer accepted.' });
-      await load();
-    } catch (e: any) {
-      toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const decline = async (offerId: string) => {
-    setActionLoading(true);
-    try {
-      await declineOffer(offerId);
-      toast({ title: 'Declined', description: 'You declined the counter.' });
-      await load();
-    } catch (e: any) {
-      toast({ title: 'Decline failed', description: e?.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const withdraw = async (offerId: string) => {
-    setActionLoading(true);
-    try {
-      await withdrawOffer(offerId);
-      toast({ title: 'Withdrawn', description: 'Offer withdrawn.' });
-      await load();
-    } catch (e: any) {
-      toast({ title: 'Withdraw failed', description: e?.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const submitCounter = async () => {
-    if (!counterOfferId) return;
-    const n = Number(counterAmount);
-    if (!Number.isFinite(n) || n <= 0) {
-      toast({ title: 'Invalid amount', description: 'Enter a valid amount.', variant: 'destructive' });
-      return;
-    }
-    setActionLoading(true);
-    try {
-      await counterOffer(counterOfferId, n);
-      toast({ title: 'Counter sent', description: 'Your counter was sent to the seller.' });
-      setCounterOfferId(null);
-      setCounterAmount('');
-      await load();
-    } catch (e: any) {
-      toast({ title: 'Counter failed', description: e?.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   if (authLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -214,8 +141,8 @@ export default function MyOffersPage() {
           </div>
           <p className="text-sm text-muted-foreground">Track offers you’ve made and respond to counters.</p>
         </div>
-        <Button variant="outline" onClick={load} disabled={loading || actionLoading} className="min-h-[40px]">
-          {(loading || actionLoading) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+        <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
+          {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           Refresh
         </Button>
       </div>
@@ -240,86 +167,38 @@ export default function MyOffersPage() {
                 <div className="py-10 text-center text-sm text-muted-foreground">{emptyCopy}</div>
               ) : (
                 <div className="divide-y">
-                  {offers.map((o) => {
-                    const canWithdraw = o.status === 'open' || o.status === 'countered';
-                    const canRespondToCounter = o.status === 'countered' && o.lastActorRole === 'seller';
-                    const canCheckout = o.status === 'accepted';
-                    return (
-                      <div
-                        key={o.offerId}
-                        className="py-4 px-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          const el = e.target as HTMLElement | null;
-                          if (el?.closest('button, a, input, textarea, select')) return;
-                          router.push(`/dashboard/offers/${o.offerId}`);
-                        }}
-                      >
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-semibold truncate">
-                              <Link href={`/dashboard/offers/${o.offerId}`} className="hover:underline">
-                                {o.listingSnapshot?.title || 'Listing'}
-                              </Link>
-                            </div>
-                            <div className="text-xs text-muted-foreground">Offer #{o.offerId.slice(0, 8)}</div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">{o.status}</Badge>
-                            <Badge variant="outline" className="text-xs">${Number(o.currentAmount).toLocaleString()}</Badge>
-                            <Badge variant="outline" className="text-xs flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTimeLeft(o.expiresAt)}
-                            </Badge>
-                          </div>
+                  {offers.map((o) => (
+                    <button
+                      key={o.offerId}
+                      className={cn(
+                        'w-full text-left py-4 hover:bg-muted/30 transition-colors px-2 rounded-lg',
+                        (o.status === 'countered' && o.lastActorRole === 'seller') || o.status === 'accepted' ? 'bg-primary/5' : ''
+                      )}
+                      onClick={() => {
+                        setSelectedOfferId(o.offerId);
+                        setDetailOpen(true);
+                      }}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{o.listingSnapshot?.title || 'Listing'}</div>
+                          <div className="text-xs text-muted-foreground">Offer #{o.offerId.slice(0, 8)}</div>
                         </div>
-
-                        <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                          <Button variant="outline" onClick={() => router.push(`/listing/${o.listingId}`)} className="min-h-[40px]">
-                            View listing
-                          </Button>
-                          <Button variant="outline" onClick={() => router.push(`/dashboard/offers/${o.offerId}`)} className="min-h-[40px]">
-                            View offer
-                          </Button>
-
-                          {canCheckout && (
-                            <Button onClick={() => checkout(o)} disabled={actionLoading} className="min-h-[40px] font-semibold">
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Checkout at ${(o.acceptedAmount ?? o.currentAmount).toLocaleString()}
-                            </Button>
-                          )}
-
-                          {canRespondToCounter && (
-                            <>
-                              <Button onClick={() => accept(o.offerId)} disabled={actionLoading} className="min-h-[40px] font-semibold">
-                                Accept
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() => {
-                                  setCounterOfferId(o.offerId);
-                                  setCounterAmount(String(o.currentAmount));
-                                }}
-                                disabled={actionLoading}
-                                className="min-h-[40px] font-semibold"
-                              >
-                                Counter
-                              </Button>
-                              <Button variant="outline" onClick={() => decline(o.offerId)} disabled={actionLoading} className="min-h-[40px] font-semibold">
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Decline
-                              </Button>
-                            </>
-                          )}
-
-                          {canWithdraw && (
-                            <Button variant="outline" onClick={() => withdraw(o.offerId)} disabled={actionLoading} className="min-h-[40px]">
-                              Withdraw
-                            </Button>
-                          )}
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                          <Badge variant="secondary" className="text-xs">
+                            {o.status}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            ${Number(o.currentAmount).toLocaleString()}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatTimeLeft(o.expiresAt)}
+                          </Badge>
                         </div>
                       </div>
-                    );
-                  })}
+                    </button>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -327,35 +206,15 @@ export default function MyOffersPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={counterOfferId !== null} onOpenChange={(v) => !v && setCounterOfferId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Counter offer</DialogTitle>
-            <DialogDescription>Send a new amount. Expiry resets on counter.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">Amount</div>
-            <Input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="1"
-              value={counterAmount}
-              onChange={(e) => setCounterAmount(e.target.value)}
-              className="min-h-[48px]"
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setCounterOfferId(null)} disabled={actionLoading}>
-              Cancel
-            </Button>
-            <Button onClick={submitCounter} disabled={actionLoading} className="font-semibold">
-              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Send counter
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BuyerOfferDetailModal
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+          if (!open) setSelectedOfferId(null);
+        }}
+        offerId={selectedOfferId}
+        onDidMutate={() => void load()}
+      />
     </div>
   );
 }
