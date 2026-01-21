@@ -232,13 +232,21 @@ export function subscribeToUnreadCountByTypes(
     return () => {};
   }
 
-  const uniq = Array.from(new Set(types)).slice(0, 10);
-  const q = query(notificationsRef, where('type', 'in', uniq), limit(250));
+  // IMPORTANT:
+  // Some Firestore rulesets restrict which queries are allowed (e.g., requiring orderBy('createdAt')).
+  // To avoid "badge stuck at 0" due to query permission constraints or index requirements,
+  // we subscribe to the recent feed and filter types client-side.
+  const uniq = new Set(types);
+  const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(250));
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const unread = snapshot.docs.filter((d) => (d.data() as any)?.read !== true).length;
+      const unread = snapshot.docs.filter((d) => {
+        const data = d.data() as any;
+        const t = String(data?.type || '');
+        return uniq.has(t as NotificationType) && data?.read !== true;
+      }).length;
       callback(unread);
     },
     (error) => {
