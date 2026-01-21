@@ -144,17 +144,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </Badge>
               </div>
             )}
-            {!sold.isSold && (listing as any)?.offerReservedByOfferId && (
-              <div className="absolute bottom-3 left-3 z-20">
-                <Badge
-                  variant="secondary"
-                  className="backdrop-blur-sm bg-amber-500/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-200 border border-amber-500/30 font-semibold text-xs px-3 py-1.5 shadow-warm"
-                  title="Reserved by an accepted offer"
-                >
-                  Reserved (offer accepted)
-                </Badge>
-              </div>
-            )}
 
             {/* Subtle shimmer effect - warm tones */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-parchment/8 to-transparent z-5" />
@@ -178,6 +167,19 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               <MapPin className="h-4 w-4 text-primary" />
               <span className="font-medium">{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
             </div>
+
+            {/* Reserved (offer accepted) - keep it under location for gallery cards */}
+            {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
+              <div className="-mt-2">
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30 text-xs font-semibold"
+                  title="Reserved by an accepted offer"
+                >
+                  Reserved (offer accepted)
+                </Badge>
+              </div>
+            ) : null}
 
             {/* Trust Badges - Premium styling */}
             <TrustBadges

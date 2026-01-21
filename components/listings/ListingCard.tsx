@@ -193,15 +193,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   SOLD
                 </Badge>
               )}
-              {!sold.isSold && (listing as any)?.offerReservedByOfferId && (
-                <Badge
-                  variant="secondary"
-                  className="bg-amber-500/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-200 backdrop-blur-sm border border-amber-500/30 text-xs shadow-warm"
-                  title="Reserved by an accepted offer"
-                >
-                  Reserved (offer accepted)
-                </Badge>
-              )}
               {watchers > 0 && (
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
                   <Heart className="h-3 w-3 mr-1" />
@@ -252,6 +243,19 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             <MapPin className="h-4 w-4" />
             <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
           </div>
+
+          {/* Reserved (offer accepted) - keep it in the content area for gallery cards */}
+          {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
+            <div className="flex items-center gap-2 flex-wrap -mt-1">
+              <Badge
+                variant="secondary"
+                className="bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30 text-xs"
+                title="Reserved by an accepted offer"
+              >
+                Reserved (offer accepted)
+              </Badge>
+            </div>
+          ) : null}
 
           {/* Trust Badges - Mobile optimized */}
           <TrustBadges
