@@ -34,6 +34,7 @@ export interface ReleasePaymentResult {
     platformLivemode?: boolean;
     availableUsdCents?: number;
     pendingUsdCents?: number;
+    connectReservedUsdCents?: number;
     paymentIntentId?: string;
     chargeId?: string;
     balanceTransactionId?: string;
@@ -65,6 +66,7 @@ async function getPlatformUsdBalanceDebug(): Promise<{
   platformLivemode?: boolean;
   availableUsdCents?: number;
   pendingUsdCents?: number;
+  connectReservedUsdCents?: number;
 }> {
   if (!stripe) return {};
   try {
@@ -72,13 +74,16 @@ async function getPlatformUsdBalanceDebug(): Promise<{
     const bal = (await stripe.balance.retrieve()) as any;
     const avail = Array.isArray(bal?.available) ? bal.available : [];
     const pend = Array.isArray(bal?.pending) ? bal.pending : [];
+    const reserved = Array.isArray(bal?.connect_reserved) ? bal.connect_reserved : [];
     const availUsd = avail.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
     const pendUsd = pend.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
+    const reservedUsd = reserved.find((x: any) => String(x?.currency || '').toLowerCase() === 'usd');
     return {
       platformAccountId: typeof acct?.id === 'string' ? acct.id : undefined,
       platformLivemode: typeof acct?.livemode === 'boolean' ? acct.livemode : undefined,
       availableUsdCents: typeof availUsd?.amount === 'number' ? availUsd.amount : undefined,
       pendingUsdCents: typeof pendUsd?.amount === 'number' ? pendUsd.amount : undefined,
+      connectReservedUsdCents: typeof reservedUsd?.amount === 'number' ? reservedUsd.amount : undefined,
     };
   } catch {
     return {};

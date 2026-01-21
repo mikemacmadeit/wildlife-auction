@@ -279,11 +279,15 @@ export default function AdminOpsPage() {
           typeof stripeDebug?.pendingUsdCents === 'number'
             ? `$${(stripeDebug.pendingUsdCents / 100).toFixed(2)}`
             : null;
+        const reserved =
+          typeof stripeDebug?.connectReservedUsdCents === 'number'
+            ? `$${(stripeDebug.connectReservedUsdCents / 100).toFixed(2)}`
+            : null;
         toast({
           title: 'Stripe balance not sufficient for transfer',
           description:
             attempted && available
-              ? `Attempted transfer ${attempted}, but USD available is ${available}${pending ? ` (pending ${pending})` : ''}.`
+              ? `Attempted transfer ${attempted}, but Stripe blocked the transfer. USD available=${available}${pending ? ` (pending ${pending})` : ''}${reserved ? ` (connect reserved ${reserved})` : ''}.`
               : (error.message || 'Failed to release payout'),
           variant: 'destructive',
         });
