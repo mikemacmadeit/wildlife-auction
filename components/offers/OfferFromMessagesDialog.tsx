@@ -48,9 +48,32 @@ export function OfferFromMessagesDialog(props: {
     async function load() {
       setLoading(true);
       try {
-        // Avoid composite-index requirements by querying a broad seller scope, then filtering client-side.
-        const snap = await getDocs(query(collection(db, 'listings'), where('sellerId', '==', sellerId), limit(100)));
-        const all: Listing[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as any;
+        // IMPORTANT (rules): querying by sellerId alone can match draft/pending listings, which are not readable to buyers.
+        // We MUST constrain to status == 'active' at query time (or use a safe fallback that only queries active listings).
+        let snap;
+        try {
+          snap = await getDocs(
+            query(
+              collection(db, 'listings'),
+              where('sellerId', '==', sellerId),
+              where('status', '==', 'active'),
+              limit(100)
+            )
+          );
+        } catch (e: any) {
+          const msg = String(e?.message || '');
+          const code = String(e?.code || '');
+          const looksLikeMissingIndex = code === 'failed-precondition' || /requires an index/i.test(msg);
+          if (!looksLikeMissingIndex) throw e;
+
+          // Fallback: query only active listings (publicly readable) and filter seller client-side.
+          const snap2 = await getDocs(query(collection(db, 'listings'), where('status', '==', 'active'), limit(250)));
+          snap = {
+            docs: snap2.docs.filter((d) => String((d.data() as any)?.sellerId || '') === sellerId),
+          } as any;
+        }
+
+        const all: Listing[] = (snap.docs || []).map((d: any) => ({ id: d.id, ...(d.data() as any) })) as any;
         const offerable = all.filter(isOfferableListing);
         if (cancelled) return;
         setListings(offerable);
