@@ -35,6 +35,9 @@ export interface ReleasePaymentResult {
     availableUsdCents?: number;
     pendingUsdCents?: number;
     connectReservedUsdCents?: number;
+    availableUsdSourceTypes?: Record<string, number>;
+    pendingUsdSourceTypes?: Record<string, number>;
+    connectReservedUsdSourceTypes?: Record<string, number>;
     paymentIntentId?: string;
     chargeId?: string;
     balanceTransactionId?: string;
@@ -67,6 +70,9 @@ async function getPlatformUsdBalanceDebug(): Promise<{
   availableUsdCents?: number;
   pendingUsdCents?: number;
   connectReservedUsdCents?: number;
+  availableUsdSourceTypes?: Record<string, number>;
+  pendingUsdSourceTypes?: Record<string, number>;
+  connectReservedUsdSourceTypes?: Record<string, number>;
 }> {
   if (!stripe) return {};
   try {
@@ -84,6 +90,12 @@ async function getPlatformUsdBalanceDebug(): Promise<{
       availableUsdCents: typeof availUsd?.amount === 'number' ? availUsd.amount : undefined,
       pendingUsdCents: typeof pendUsd?.amount === 'number' ? pendUsd.amount : undefined,
       connectReservedUsdCents: typeof reservedUsd?.amount === 'number' ? reservedUsd.amount : undefined,
+      availableUsdSourceTypes:
+        availUsd?.source_types && typeof availUsd.source_types === 'object' ? (availUsd.source_types as any) : undefined,
+      pendingUsdSourceTypes:
+        pendUsd?.source_types && typeof pendUsd.source_types === 'object' ? (pendUsd.source_types as any) : undefined,
+      connectReservedUsdSourceTypes:
+        reservedUsd?.source_types && typeof reservedUsd.source_types === 'object' ? (reservedUsd.source_types as any) : undefined,
     };
   } catch {
     return {};
