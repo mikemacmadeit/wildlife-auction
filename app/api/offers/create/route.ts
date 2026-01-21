@@ -22,6 +22,7 @@ const createOfferSchema = z.object({
   listingId: z.string().min(1),
   amount: offerAmountSchema,
   note: z.string().max(500).optional(),
+  preferredPaymentMethod: z.enum(['card', 'ach_debit', 'wire']).optional(),
 });
 
 export async function POST(request: Request) {
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     return json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { listingId, amount, note } = parsed.data;
+  const { listingId, amount, note, preferredPaymentMethod } = parsed.data;
   const cleanNote = typeof note === 'string' ? note.trim() : '';
   let db: ReturnType<typeof getAdminDb>;
   try {
@@ -180,6 +181,7 @@ export async function POST(request: Request) {
         status: shouldAutoAccept ? 'accepted' : 'open',
         currentAmount: amount,
         originalAmount: amount,
+        buyerPreferredPaymentMethod: preferredPaymentMethod || undefined,
         lastActorRole: shouldAutoAccept ? 'system' : 'buyer',
         expiresAt,
         createdAt: now,

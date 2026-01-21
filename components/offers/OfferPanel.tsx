@@ -48,9 +48,12 @@ export function OfferPanel(props: { listing: Listing }) {
   const [offer, setOffer] = useState<OfferDTO | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<'make' | 'counter'>('make');
+  const [step, setStep] = useState<'edit' | 'review'>('edit');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [offerLimit, setOfferLimit] = useState<{ limit: number; used: number; left: number } | null>(null);
+  const [preferredPaymentMethod, setPreferredPaymentMethod] = useState<PaymentMethodChoice | null>(null);
+  const [offerPaymentDialogOpen, setOfferPaymentDialogOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [pendingCheckoutAmount, setPendingCheckoutAmount] = useState<number | null>(null);
@@ -123,6 +126,8 @@ export function OfferPanel(props: { listing: Listing }) {
     setMode('make');
     setAmount('');
     setNote('');
+    setPreferredPaymentMethod(null);
+    setStep('edit');
     setModalOpen(true);
   };
 
@@ -130,7 +135,29 @@ export function OfferPanel(props: { listing: Listing }) {
     setMode('counter');
     setAmount('');
     setNote('');
+    setPreferredPaymentMethod(null);
+    setStep('edit');
     setModalOpen(true);
+  };
+
+  const paymentMethodLabel = (m: PaymentMethodChoice) => {
+    if (m === 'card') return 'Card';
+    if (m === 'ach_debit') return 'ACH debit';
+    return 'Wire';
+  };
+
+  const continueToReview = () => {
+    const n = Number(amount);
+    if (!Number.isFinite(n) || n <= 0) {
+      toast({ title: 'Invalid amount', description: 'Enter a valid amount.', variant: 'destructive' });
+      return;
+    }
+    if (typeof minPrice === 'number' && Number.isFinite(minPrice) && n < minPrice) {
+      toast({ title: 'Offer too low', description: `Minimum offer is $${minPrice}.`, variant: 'destructive' });
+      return;
+    }
+    setStep('review');
+    if (!preferredPaymentMethod) setOfferPaymentDialogOpen(true);
   };
 
   const submit = async () => {
@@ -151,7 +178,16 @@ export function OfferPanel(props: { listing: Listing }) {
     setLoading(true);
     try {
       if (mode === 'make') {
-        const res = await createOffer(listing.id, n, note.trim() ? note.trim() : undefined);
+        if (!preferredPaymentMethod) {
+          setOfferPaymentDialogOpen(true);
+          throw new Error('Select a payment method to continue.');
+        }
+        const res = await createOffer(
+          listing.id,
+          n,
+          note.trim() ? note.trim() : undefined,
+          preferredPaymentMethod
+        );
         if ((res as any)?.offerLimit) setOfferLimit((res as any).offerLimit);
         toast({ title: 'Offer sent', description: 'Your offer was sent to the seller.' });
       } else {
@@ -396,6 +432,19 @@ export function OfferPanel(props: { listing: Listing }) {
         isEmailVerified={!!user?.emailVerified}
       />
 
+      {/* Offer review payment method picker (used before sending the offer) */}
+      <PaymentMethodDialog
+        open={offerPaymentDialogOpen}
+        onOpenChange={setOfferPaymentDialogOpen}
+        amountUsd={Number(amount) || 0}
+        onSelect={(m) => {
+          setPreferredPaymentMethod(m);
+          setOfferPaymentDialogOpen(false);
+        }}
+        isAuthenticated={!!user}
+        isEmailVerified={!!user?.emailVerified}
+      />
+
       <CheckoutStartErrorDialog
         open={checkoutErrorOpen}
         onOpenChange={(open) => {
@@ -417,7 +466,7 @@ export function OfferPanel(props: { listing: Listing }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Handshake className="h-5 w-5 text-primary" />
-              {mode === 'make' ? 'Make an offer' : 'Send a counter offer'}
+              {step === 'review' ? 'Review offer' : mode === 'make' ? 'Make an offer' : 'Send a counter offer'}
             </DialogTitle>
             <DialogDescription>
               {typeof minPrice === 'number' && Number.isFinite(minPrice)
@@ -427,44 +476,107 @@ export function OfferPanel(props: { listing: Listing }) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">Amount</div>
-            <Input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="1"
-              placeholder={typeof minPrice === 'number' ? String(minPrice) : '0'}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="min-h-[48px]"
-            />
-            <div className="text-xs text-muted-foreground">
-              Buyer and seller identities stay private until payment.
-            </div>
-          </div>
+          {step === 'edit' ? (
+            <>
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">Your offer (USD)</div>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="1"
+                  placeholder={typeof minPrice === 'number' ? String(minPrice) : '0'}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="min-h-[48px]"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">Message (optional)</div>
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Add a message for the seller (optional)…"
-              className="min-h-[90px]"
-              maxLength={250}
-              disabled={loading}
-            />
-            <div className="text-xs text-muted-foreground">{note.length}/250</div>
-          </div>
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">Message (optional)</div>
+                <Textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add a message for the seller (optional)…"
+                  className="min-h-[90px]"
+                  maxLength={250}
+                  disabled={loading}
+                />
+                <div className="text-xs text-muted-foreground">{note.length}/250</div>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold">Total</div>
+                  <div className="text-sm font-extrabold">
+                    ${Number(amount || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  You will only be charged if the seller accepts your offer.
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-card p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs text-muted-foreground">Pay with</div>
+                    <div className="font-semibold">
+                      {preferredPaymentMethod ? paymentMethodLabel(preferredPaymentMethod) : 'Select payment method'}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    onClick={() => setOfferPaymentDialogOpen(true)}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </div>
+
+              {note.trim() ? (
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="text-xs text-muted-foreground">Message</div>
+                  <div className="text-sm whitespace-pre-line">{note.trim()}</div>
+                </div>
+              ) : null}
+
+              <div className="text-xs text-muted-foreground">
+                By selecting <span className="font-semibold text-foreground">Send offer</span>, you authorize Wildlife Exchange to charge your selected payment method if the seller accepts your offer.
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={loading}>
-              Cancel
-            </Button>
-            <Button onClick={submit} disabled={loading} className="font-semibold">
-              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Submit
-            </Button>
+            {step === 'review' ? (
+              <>
+                <Button variant="outline" onClick={() => setStep('edit')} disabled={loading}>
+                  Edit offer
+                </Button>
+                <Button
+                  onClick={submit}
+                  disabled={loading || !preferredPaymentMethod}
+                  className="font-semibold"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Send offer
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setModalOpen(false)} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button onClick={continueToReview} disabled={loading} className="font-semibold">
+                  Continue
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
