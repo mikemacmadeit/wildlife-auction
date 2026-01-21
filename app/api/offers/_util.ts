@@ -80,6 +80,33 @@ export async function isAdminUid(uid: string): Promise<boolean> {
   return role === 'admin' || role === 'super_admin' || superAdmin === true;
 }
 
+/**
+ * Server-side helper: pick a primary image URL for a listing.
+ * Supports both legacy `images[]` and the uploads library `photos[]` + `coverPhotoId`.
+ */
+export function getPrimaryListingImageUrl(listing: any): string | null {
+  try {
+    const coverPhotoId = typeof listing?.coverPhotoId === 'string' ? listing.coverPhotoId : null;
+    const photos = Array.isArray(listing?.photos) ? listing.photos : null;
+    if (photos && photos.length > 0) {
+      if (coverPhotoId) {
+        const match = photos.find((p: any) => p && typeof p.photoId === 'string' && p.photoId === coverPhotoId);
+        if (match && typeof match.url === 'string' && match.url.startsWith('http')) return match.url;
+      }
+      const first = photos.find((p: any) => p && typeof p.url === 'string' && p.url.startsWith('http'));
+      if (first) return first.url;
+    }
+    const images = Array.isArray(listing?.images) ? listing.images : null;
+    if (images && images.length > 0) {
+      const first = images.find((u: any) => typeof u === 'string' && u.startsWith('http'));
+      if (first) return first;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export const offerAmountSchema = z
   .number()
   .finite()

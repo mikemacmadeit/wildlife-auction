@@ -5,7 +5,7 @@
  */
 
 import { getAdminDb } from '@/lib/firebase/admin';
-import { isAdminUid, json, requireAuth, requireRateLimit } from '../_util';
+import { getPrimaryListingImageUrl, isAdminUid, json, requireAuth, requireRateLimit } from '../_util';
 
 function tsToMillis(v: any): number | null {
   if (!v) return null;
@@ -19,6 +19,7 @@ function serializeOffer(doc: any) {
     offerId: doc.id,
     listingId: data.listingId,
     listingSnapshot: data.listingSnapshot,
+    listingImageUrl: typeof data?.listingSnapshot?.imageUrl === 'string' ? data.listingSnapshot.imageUrl : undefined,
     sellerId: data.sellerId,
     buyerId: data.buyerId,
     currency: data.currency,
@@ -61,6 +62,19 @@ export async function GET(request: Request, ctx: { params: { offerId: string } }
     return json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  return json({ ok: true, offer: serializeOffer(snap) });
+  // Best-effort: hydrate listing image for modal display.
+  const base = serializeOffer(snap) as any;
+  if (!base.listingImageUrl) {
+    try {
+      const listingSnap = await db.collection('listings').doc(String(base.listingId || '')).get();
+      if (listingSnap.exists) {
+        base.listingImageUrl = getPrimaryListingImageUrl(listingSnap.data());
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return json({ ok: true, offer: base });
 }
 

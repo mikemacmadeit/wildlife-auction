@@ -56,6 +56,7 @@ type OfferRow = {
   offerId: string;
   listingId: string;
   listingSnapshot?: { title?: string; images?: string[]; type?: string; sellerSnapshot?: { displayName?: string } };
+  listingImageUrl?: string;
   sellerId?: string;
   status: string;
   currentAmount: number;
@@ -295,7 +296,9 @@ export default function BidsOffersPage() {
       const expiresAtMs = typeof o.expiresAt === 'number' ? o.expiresAt : null;
       const timeLeftMs = expiresAtMs ? expiresAtMs - now : null;
       const title = o.listingSnapshot?.title || 'Unknown listing';
-      const image = Array.isArray(o.listingSnapshot?.images) ? o.listingSnapshot!.images![0] : undefined;
+      const image =
+        o.listingImageUrl ||
+        (Array.isArray(o.listingSnapshot?.images) ? o.listingSnapshot!.images!.find((u) => typeof u === 'string' && u) : undefined);
       const sellerName = o.listingSnapshot?.sellerSnapshot?.displayName;
       const yourAmount = Number(o.acceptedAmount ?? o.currentAmount ?? 0);
       const listingType = o.listingSnapshot?.type;

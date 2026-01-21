@@ -13,7 +13,7 @@ import { getAdminDb } from '@/lib/firebase/admin';
 import { createAuditLog } from '@/lib/audit/logger';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
-import { offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
+import { getPrimaryListingImageUrl, offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -154,6 +154,7 @@ export async function POST(request: Request) {
           category: listing.category,
           type: listing.type,
           sellerId: listing.sellerId,
+          imageUrl: getPrimaryListingImageUrl(listing) || undefined,
         },
         sellerId: listing.sellerId,
         buyerId,

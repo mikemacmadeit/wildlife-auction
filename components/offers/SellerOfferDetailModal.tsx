@@ -11,11 +11,13 @@ import { Loader2, CheckCircle2, XCircle, Handshake, Clock, ExternalLink } from '
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOffer, acceptOffer, counterOffer, declineOffer } from '@/lib/offers/api';
+import Image from 'next/image';
 
 type OfferDTO = {
   offerId: string;
   listingId: string;
   listingSnapshot?: { title?: string; type?: string; category?: string };
+  listingImageUrl?: string;
   status: string;
   currentAmount: number;
   acceptedAmount?: number;
@@ -152,7 +154,12 @@ export function SellerOfferDetailModal(props: {
               <Card className="border-2">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate">Offer on {offer.listingSnapshot?.title || 'Listing'}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative h-10 w-10 overflow-hidden rounded-md border bg-muted/20 shrink-0">
+                        {offer.listingImageUrl ? <Image src={offer.listingImageUrl} alt="" fill className="object-cover" /> : null}
+                      </div>
+                      <span className="min-w-0 truncate">Offer on {offer.listingSnapshot?.title || 'Listing'}</span>
+                    </div>
                     <Button asChild variant="outline" size="sm" className="shrink-0">
                       <Link href={`/seller/offers/${offer.offerId}`}>
                         <ExternalLink className="h-4 w-4 mr-2" />
