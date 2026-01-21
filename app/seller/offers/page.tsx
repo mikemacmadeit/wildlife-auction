@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { Loader2, Handshake, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getSellerOffers } from '@/lib/offers/api';
+import { SellerOfferDetailModal } from '@/components/offers/SellerOfferDetailModal';
 
 type OfferRow = {
   offerId: string;
@@ -35,7 +35,6 @@ function formatTimeLeft(expiresAtMs?: number | null): string {
 }
 
 export default function SellerOffersPage() {
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
@@ -43,6 +42,8 @@ export default function SellerOffersPage() {
   const [tabFading, setTabFading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -144,7 +145,10 @@ export default function SellerOffersPage() {
                   <button
                     key={o.offerId}
                     className="w-full text-left py-4 hover:bg-muted/30 transition-colors px-2 rounded-lg"
-                    onClick={() => router.push(`/seller/offers/${o.offerId}`)}
+                    onClick={() => {
+                      setSelectedOfferId(o.offerId);
+                      setDetailOpen(true);
+                    }}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -173,6 +177,15 @@ export default function SellerOffersPage() {
           </CardContent>
         </Card>
       </div>
+
+      <SellerOfferDetailModal
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+          if (!open) setSelectedOfferId(null);
+        }}
+        offerId={selectedOfferId}
+      />
     </div>
   );
 }
