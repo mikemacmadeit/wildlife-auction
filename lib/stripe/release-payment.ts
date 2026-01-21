@@ -501,6 +501,37 @@ export async function releasePaymentForOrder(
     };
   } catch (error: any) {
     console.error(`[releasePaymentForOrder] Error creating Stripe transfer for order ${orderId}:`, error);
+
+    // Stripe test-mode nuance:
+    // - Transfers require *available* balance.
+    // - Many test charges land as "pending" balance by default, which cannot be transferred yet.
+    // Stripe exposes this as `balance_insufficient` / "insufficient available funds" errors.
+    const stripeCode = String(error?.code || (error?.raw as any)?.code || '');
+    const msg = String(error?.message || error?.toString?.() || '');
+    const isBalanceInsufficient =
+      stripeCode === 'balance_insufficient' ||
+      msg.toLowerCase().includes('insufficient available funds') ||
+      msg.toLowerCase().includes('insufficient funds');
+
+    if (isBalanceInsufficient) {
+      const secret = String(process.env.STRIPE_SECRET_KEY || '');
+      const isTestMode = secret.startsWith('sk_test_') || secret.includes('_test_');
+      return {
+        success: false,
+        holdReasonCode: 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE',
+        error: isTestMode
+          ? [
+              'Stripe test mode: insufficient AVAILABLE balance to create a transfer.',
+              'This usually means the payment is still in PENDING test balance.',
+              'Fix: re-run checkout using the Stripe test card 4000 0000 0000 0077 (creates available balance immediately), or wait for pending funds to become available.',
+            ].join(' ')
+          : [
+              'Stripe: insufficient AVAILABLE balance to create a transfer.',
+              'Check Stripe Dashboard → Balance (available vs pending). Transfers can only use available funds.',
+            ].join(' '),
+      };
+    }
+
     return {
       success: false,
       error: error.message || error.toString() || 'Unknown error',
