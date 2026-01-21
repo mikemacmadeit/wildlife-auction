@@ -36,13 +36,9 @@ function getExoticSpeciesId(attributes: ListingAttributes): string | null {
 
 export function getRequiredOrderDocsForListing(category: ListingCategory, attributes: ListingAttributes): DocumentType[] {
   if (category === 'whitetail_breeder') return ['TPWD_TRANSFER_APPROVAL'];
-  if (category === 'cattle_livestock') return ['TAHC_CVI'];
+  // TAHC Certificate of Veterinary Inspection (CVI) is required for HORSES only (payout-side hold).
+  // Do not add CVI requirements for exotics here.
   if (category === 'horse_equestrian') return ['TAHC_CVI']; // payout-only; checkout stays unchanged elsewhere
-
-  if (category === 'wildlife_exotics') {
-    // All exotics in-policy require CVI before payout release (see payout policy requirements).
-    return ['TAHC_CVI'];
-  }
 
   // Disclosure-only or non-animal categories.
   return [];
@@ -89,11 +85,21 @@ export function getPayoutHoldRequirements(category: ListingCategory, attributes:
   }
 
   if (category === 'cattle_livestock' || category === 'horse_equestrian') {
+    // CVI hold is for horses only. Cattle/livestock do not require CVI by default in this policy.
+    if (category === 'horse_equestrian') {
+      return {
+        requiredVerifiedDocs: ['TAHC_CVI'],
+        requiresAdminApprovalBeforePayout: false,
+        blockPayoutByDefault: false,
+        holdReasonCode: 'MISSING_TAHC_CVI',
+      };
+    }
+
     return {
-      requiredVerifiedDocs: ['TAHC_CVI'],
+      requiredVerifiedDocs: [],
       requiresAdminApprovalBeforePayout: false,
       blockPayoutByDefault: false,
-      holdReasonCode: 'MISSING_TAHC_CVI',
+      holdReasonCode: 'NONE',
     };
   }
 
@@ -105,7 +111,7 @@ export function getPayoutHoldRequirements(category: ListingCategory, attributes:
 
     if (isOther) {
       return {
-        requiredVerifiedDocs: ['TAHC_CVI'],
+        requiredVerifiedDocs: [],
         requiresAdminApprovalBeforePayout: true,
         blockPayoutByDefault: true,
         holdReasonCode: 'OTHER_EXOTIC_REVIEW_REQUIRED',
@@ -114,7 +120,7 @@ export function getPayoutHoldRequirements(category: ListingCategory, attributes:
 
     if (isEsaOverlay) {
       return {
-        requiredVerifiedDocs: ['TAHC_CVI'],
+        requiredVerifiedDocs: [],
         requiresAdminApprovalBeforePayout: true,
         blockPayoutByDefault: true,
         holdReasonCode: 'ESA_REVIEW_REQUIRED',
@@ -123,19 +129,19 @@ export function getPayoutHoldRequirements(category: ListingCategory, attributes:
 
     if (isCervid) {
       return {
-        requiredVerifiedDocs: ['TAHC_CVI'],
+        requiredVerifiedDocs: [],
         requiresAdminApprovalBeforePayout: true,
         blockPayoutByDefault: false,
         holdReasonCode: 'EXOTIC_CERVID_REVIEW_REQUIRED',
       };
     }
 
-    // Non-cervid exotic ungulates (and any other explicitly-listed exotics): CVI required; admin review only for other_exotic.
+    // Exotics: no CVI requirement by default. Admin review applies only for the higher-risk cases above.
     return {
-      requiredVerifiedDocs: ['TAHC_CVI'],
+      requiredVerifiedDocs: [],
       requiresAdminApprovalBeforePayout: false,
       blockPayoutByDefault: false,
-      holdReasonCode: 'MISSING_TAHC_CVI',
+      holdReasonCode: 'NONE',
     };
   }
 
