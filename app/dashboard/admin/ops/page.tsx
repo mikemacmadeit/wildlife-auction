@@ -266,6 +266,27 @@ export default function AdminOpsPage() {
             : 'Funds are not yet available to transfer. Retry shortly.',
           variant: 'destructive',
         });
+      } else if (holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE' && stripeDebug) {
+        const attempted =
+          typeof stripeDebug?.attemptedTransferUsdCents === 'number'
+            ? `$${(stripeDebug.attemptedTransferUsdCents / 100).toFixed(2)}`
+            : null;
+        const available =
+          typeof stripeDebug?.availableUsdCents === 'number'
+            ? `$${(stripeDebug.availableUsdCents / 100).toFixed(2)}`
+            : null;
+        const pending =
+          typeof stripeDebug?.pendingUsdCents === 'number'
+            ? `$${(stripeDebug.pendingUsdCents / 100).toFixed(2)}`
+            : null;
+        toast({
+          title: 'Stripe balance not sufficient for transfer',
+          description:
+            attempted && available
+              ? `Attempted transfer ${attempted}, but USD available is ${available}${pending ? ` (pending ${pending})` : ''}.`
+              : (error.message || 'Failed to release payout'),
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Error',

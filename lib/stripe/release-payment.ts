@@ -41,6 +41,12 @@ export interface ReleasePaymentResult {
     availableOnIso?: string;
     minutesUntilAvailable?: number;
     usedSourceTransaction?: boolean;
+
+    // Extra operator/debug context (no secrets)
+    orderAmountUsd?: number;
+    platformFeeUsd?: number;
+    sellerPayoutUsd?: number;
+    attemptedTransferUsdCents?: number;
   };
 }
 
@@ -486,6 +492,7 @@ export async function releasePaymentForOrder(
 
   const transferAmount = computedSellerCents;
   const sellerAmount = computedSellerCents / 100;
+  const platformFeeUsd = computedPlatformFeeCents / 100;
 
   try {
     // Settlement availability gate (Stripe funds must be AVAILABLE before transfer).
@@ -508,6 +515,10 @@ export async function releasePaymentForOrder(
               availableOnIso: settlement.availableOnIso || undefined,
               minutesUntilAvailable: settlement.minutesUntilAvailable || undefined,
               usedSourceTransaction: false,
+              orderAmountUsd,
+              platformFeeUsd,
+              sellerPayoutUsd: sellerAmount,
+              attemptedTransferUsdCents: transferAmount,
             },
           };
         }
@@ -674,6 +685,10 @@ export async function releasePaymentForOrder(
           availableOnIso: settlement?.availableOnIso || undefined,
           minutesUntilAvailable: settlement?.minutesUntilAvailable || undefined,
           usedSourceTransaction: false,
+          orderAmountUsd,
+          platformFeeUsd,
+          sellerPayoutUsd: sellerAmount,
+          attemptedTransferUsdCents: transferAmount,
         },
         error: isTestMode
           ? [
