@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { getAdminAuth } from '@/lib/firebase/admin';
 import { getDefaultNotificationPreferences, notificationPreferencesSchema } from './preferences';
 import { decideChannels, getEventRule } from './rules';
 import { buildInAppNotification } from './inApp';
@@ -24,13 +25,32 @@ async function loadUserContact(
   try {
     const snap = await db.collection('users').doc(userId).get();
     const data = snap.exists ? (snap.data() as any) : null;
-    const email = data?.email;
+    const emailFromProfile = data?.email;
     const name =
       data?.displayName ||
       data?.profile?.fullName ||
       data?.profile?.businessName ||
       'there';
-    return { email: typeof email === 'string' && email.includes('@') ? email : null, name: String(name || 'there') };
+
+    // IMPORTANT:
+    // Some environments do not store user email in Firestore (privacy/minimization),
+    // but we still need an email to deliver notification emails. Fall back to Firebase Auth.
+    if (typeof emailFromProfile === 'string' && emailFromProfile.includes('@')) {
+      return { email: emailFromProfile, name: String(name || 'there') };
+    }
+
+    try {
+      const auth = getAdminAuth();
+      const user = await auth.getUser(userId);
+      const email = user?.email;
+      const authName = user?.displayName;
+      return {
+        email: typeof email === 'string' && email.includes('@') ? email : null,
+        name: String(authName || name || 'there'),
+      };
+    } catch {
+      return { email: null, name: String(name || 'there') };
+    }
   } catch {
     return { email: null, name: 'there' };
   }
