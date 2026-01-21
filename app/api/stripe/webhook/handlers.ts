@@ -553,7 +553,16 @@ export async function handleCheckoutSessionCompleted(
           {
             checkoutSessionId: checkoutSessionId,
             orderId: orderRef.id,
-            updatedAt: new Date(),
+            ...(paymentConfirmed
+              ? {
+                  // Once payment is confirmed, the offer has effectively converted into an order.
+                  // We move it out of the "accepted" inbox state so the canonical record is the order.
+                  status: 'completed',
+                  completedAt: now,
+                }
+              : {}),
+            updatedAt: now,
+            lastActorRole: 'system',
           },
           { merge: true }
         );
@@ -627,6 +636,9 @@ export async function handleCheckoutSessionCompleted(
         status: 'sold',
         soldAt: now,
         saleType,
+        // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
+        offerReservedByOfferId: null,
+        offerReservedAt: null,
         purchaseReservedByOrderId: null,
         purchaseReservedAt: null,
         purchaseReservedUntil: null,
@@ -890,6 +902,9 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     status: 'sold',
     soldAt: now,
     saleType,
+    // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
+    offerReservedByOfferId: null,
+    offerReservedAt: null,
     purchaseReservedByOrderId: null,
     purchaseReservedAt: null,
     updatedAt: now,
@@ -898,6 +913,35 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     listingSoldUpdate.soldPriceCents = amountCents;
   }
   await db.collection('listings').doc(listingId).set(listingSoldUpdate, { merge: true });
+
+  // If this originated from an offer, close it out (canonical record is now the order).
+  if (offerId) {
+    try {
+      await db
+        .collection('offers')
+        .doc(String(offerId))
+        .set(
+          {
+            status: 'completed',
+            completedAt: now,
+            updatedAt: now,
+            lastActorRole: 'system',
+            orderId: orderDoc.id,
+            checkoutSessionId,
+          },
+          { merge: true }
+        );
+    } catch (e) {
+      logWarn('Failed to mark offer completed after async payment success (best-effort)', {
+        requestId,
+        route: '/api/stripe/webhook',
+        offerId,
+        orderId: orderDoc.id,
+        checkoutSessionId,
+        error: String(e),
+      });
+    }
+  }
 
   logInfo('Async payment succeeded: order marked paid_held and listing marked sold', {
     requestId,
@@ -1212,6 +1256,9 @@ export async function handleWirePaymentIntentSucceeded(
       status: 'sold',
       soldAt: now,
       saleType,
+      // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
+      offerReservedByOfferId: null,
+      offerReservedAt: null,
       purchaseReservedByOrderId: null,
       purchaseReservedAt: null,
       updatedAt: now,
@@ -1221,6 +1268,34 @@ export async function handleWirePaymentIntentSucceeded(
     }
 
     await db.collection('listings').doc(listingId).set(listingSoldUpdate, { merge: true });
+  }
+
+  // If this originated from an offer, close it out (canonical record is now the order).
+  if (offerId) {
+    try {
+      await db
+        .collection('offers')
+        .doc(String(offerId))
+        .set(
+          {
+            status: 'completed',
+            completedAt: now,
+            updatedAt: now,
+            lastActorRole: 'system',
+            orderId: orderDoc.id,
+            checkoutSessionId: orderData?.stripeCheckoutSessionId || null,
+          },
+          { merge: true }
+        );
+    } catch (e) {
+      logWarn('Failed to mark offer completed after wire payment success (best-effort)', {
+        requestId,
+        route: '/api/stripe/webhook',
+        offerId,
+        orderId: orderDoc.id,
+        error: String(e),
+      });
+    }
   }
 
   logInfo('Wire PI succeeded: order marked paid_held and listing marked sold', {

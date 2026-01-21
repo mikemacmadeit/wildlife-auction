@@ -53,6 +53,20 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         return { ok: false as const, status: 400, body: { error: 'Listing is not active' } };
       }
 
+      // If a checkout reservation is still active (pending payment), block accept to prevent double-sell/race.
+      // Note: this is separate from `offerReservedByOfferId` and is driven by checkout/session creation.
+      const reservedUntilMs =
+        typeof listing?.purchaseReservedUntil?.toMillis === 'function' ? listing.purchaseReservedUntil.toMillis() : null;
+      const hasActivePurchaseReservation =
+        Boolean(listing?.purchaseReservedByOrderId) && typeof reservedUntilMs === 'number' && reservedUntilMs > now.toMillis();
+      if (hasActivePurchaseReservation) {
+        return {
+          ok: false as const,
+          status: 409,
+          body: { error: 'Listing is reserved pending payment confirmation. Please try again later.' },
+        };
+      }
+
       // Enforce expiry
       const expiresAt: any = offer.expiresAt;
       if ((offer.status === 'open' || offer.status === 'countered') && expiresAt?.toMillis && expiresAt.toMillis() < now.toMillis()) {
