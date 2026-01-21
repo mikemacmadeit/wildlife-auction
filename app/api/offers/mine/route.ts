@@ -73,7 +73,7 @@ export async function GET(request: Request) {
   const offerLimitRaw = Number(process.env.OFFER_MAX_OFFERS_PER_BUYER_PER_LISTING || '5');
   const offerLimit = Number.isFinite(offerLimitRaw) ? Math.max(1, Math.min(20, Math.round(offerLimitRaw))) : 5;
 
-  let db;
+  let db: ReturnType<typeof getAdminDb>;
   try {
     db = getAdminDb();
   } catch (e: any) {
