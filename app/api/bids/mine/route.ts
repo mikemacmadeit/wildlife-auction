@@ -118,6 +118,57 @@ export async function GET(request: Request) {
       }
     }
 
+    // IMPORTANT: Proxy bidding stores the authoritative "max bid" under:
+    //   listings/{listingId}/autoBids/{uid}
+    // The server can update max bid without writing a visible bid row (no price movement).
+    // To keep UX honest, merge active autoBids into the "my bids" view.
+    try {
+      let autoSnap: FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>;
+      try {
+        autoSnap = await db
+          .collectionGroup('autoBids')
+          .where('userId', '==', uid)
+          .where('enabled', '==', true)
+          .limit(250)
+          .get();
+      } catch (e: any) {
+        // Some environments may not have the composite index for (userId, enabled).
+        // Fallback: query by userId only and filter enabled in memory.
+        autoSnap = await db.collectionGroup('autoBids').where('userId', '==', uid).limit(250).get();
+      }
+
+      for (const d of autoSnap.docs) {
+        const data = d.data() as any;
+        if (data?.enabled === false) continue;
+
+        // Expect path: listings/{listingId}/autoBids/{uid}
+        const path = String(d.ref.path || '');
+        const parts = path.split('/');
+        const listingId = parts.length >= 2 && parts[0] === 'listings' ? parts[1] : null;
+        if (!listingId) continue;
+
+        const maxBidCents = Number(data?.maxBidCents || 0) || 0;
+        const maxBidUsd = Math.round(maxBidCents) / 100;
+        const updatedAt = tsToMillis(data?.updatedAt) || tsToMillis(data?.createdAt) || null;
+
+        const prev = grouped.get(listingId);
+        if (!prev) {
+          grouped.set(listingId, {
+            listingId,
+            myMaxBid: maxBidUsd,
+            // This is a "max bid" record; it's still a bid participation signal.
+            myBidCount: 1,
+            myLastBidAt: updatedAt,
+          });
+        } else {
+          prev.myMaxBid = Math.max(prev.myMaxBid, maxBidUsd);
+          if (updatedAt && (!prev.myLastBidAt || updatedAt > prev.myLastBidAt)) prev.myLastBidAt = updatedAt;
+        }
+      }
+    } catch {
+      // If autoBids collectionGroup isn't available, keep the bids-only view.
+    }
+
     const listingIds = Array.from(grouped.keys()).slice(0, limitN);
     const listingRefs = listingIds.map((id) => db.collection('listings').doc(id));
     const listingSnaps = listingRefs.length ? await db.getAll(...listingRefs) : [];
