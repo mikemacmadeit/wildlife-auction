@@ -103,8 +103,12 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
     );
   }
 
-  // Sort bids by amount (highest first)
-  const sortedBids = [...bids].sort((a, b) => b.amount - a.amount);
+  // Show most recent bids first (subscription already orders by createdAt desc, but keep it explicit/safe).
+  const sortedBids = [...bids].sort((a, b) => {
+    const aT = toDateSafe((a as any).timestamp)?.getTime() ?? 0;
+    const bT = toDateSafe((b as any).timestamp)?.getTime() ?? 0;
+    return bT - aT;
+  });
 
   return (
     <Card className={cn('border-border/50', className)}>
@@ -120,8 +124,14 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {sortedBids.length > 5 ? (
+          <div className="text-xs text-muted-foreground">
+            Showing recent bids — scroll for more.
+          </div>
+        ) : null}
+        <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
         {sortedBids.map((bid, index) => {
-          const isHighestBid = index === 0 && bid.amount === currentBid;
+          const isHighestBid = typeof currentBid === 'number' && bid.amount === currentBid;
           const bidDate = toDateSafe((bid as any).timestamp);
           const isRecent = bidDate ? Date.now() - bidDate.getTime() < 10 * 60 * 1000 : false; // Within last 10 minutes
 
@@ -185,6 +195,7 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
             </motion.div>
           );
         })}
+        </div>
       </CardContent>
     </Card>
   );
