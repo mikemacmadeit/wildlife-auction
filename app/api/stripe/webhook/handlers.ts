@@ -18,6 +18,38 @@ import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
+function extractStripeSettlementFieldsFromPaymentIntent(pi: any): {
+  stripeChargeId?: string;
+  stripeBalanceTransactionId?: string;
+  stripeBalanceTransactionStatus?: string;
+  stripeFundsAvailableOn?: Date;
+} {
+  // Prefer latest_charge (Stripe-recommended), fallback to last charge in charges.data.
+  const charges: any[] = Array.isArray(pi?.charges?.data) ? pi.charges.data : [];
+  const charge =
+    pi?.latest_charge && typeof pi.latest_charge === 'object'
+      ? pi.latest_charge
+      : charges.length > 0
+        ? charges[charges.length - 1]
+        : null;
+
+  const chargeId = charge?.id ? String(charge.id) : undefined;
+
+  // balance_transaction may be expanded or an ID; only use expanded form here.
+  const bt = charge?.balance_transaction && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null;
+  const btId = bt?.id ? String(bt.id) : undefined;
+  const btStatus = bt?.status ? String(bt.status) : undefined;
+  const availableOnUnix = typeof bt?.available_on === 'number' ? bt.available_on : null;
+  const availableOn = typeof availableOnUnix === 'number' ? new Date(availableOnUnix * 1000) : undefined;
+
+  return {
+    ...(chargeId ? { stripeChargeId: chargeId } : {}),
+    ...(btId ? { stripeBalanceTransactionId: btId } : {}),
+    ...(btStatus ? { stripeBalanceTransactionStatus: btStatus } : {}),
+    ...(availableOn ? { stripeFundsAvailableOn: availableOn } : {}),
+  };
+}
+
 function inferEffectivePaymentMethodFromCheckoutSession(
   session: Stripe.Checkout.Session
 ): 'card' | 'ach_debit' | 'bank_transfer' | 'wire' {
@@ -98,11 +130,17 @@ export async function handleCheckoutSessionCompleted(
       return;
     }
 
+    // Settlement visibility for Admin Ops (best-effort).
+    let stripeSettlement: ReturnType<typeof extractStripeSettlementFieldsFromPaymentIntent> | null = null;
+
     // In tests, we may mock this - for now, try/catch it
     let amount: number;
     try {
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
+      })) as any;
       amount = paymentIntent.amount;
+      stripeSettlement = extractStripeSettlementFieldsFromPaymentIntent(paymentIntent);
     } catch (error: any) {
       // In test mode, use metadata or default
       amount = session.amount_total || 10000; // Default to $100
@@ -446,6 +484,7 @@ export async function handleCheckoutSessionCompleted(
       stripeCheckoutSessionId: checkoutSessionId,
       stripePaymentIntentId: paymentIntentId,
       sellerStripeAccountId: sellerStripeAccountId,
+      ...(stripeSettlement ? stripeSettlement : {}),
       // For async bank rails, payment is not confirmed yet; paidAt/dispute window are set on async success.
       paidAt: isAsync ? null : now,
       disputeDeadlineAt: isAsync ? null : disputeDeadline,
@@ -812,9 +851,13 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
   }
 
   let amountCents: number;
+  let stripeSettlement: ReturnType<typeof extractStripeSettlementFieldsFromPaymentIntent> | null = null;
   try {
-    const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
+    })) as any;
     amountCents = pi.amount;
+    stripeSettlement = extractStripeSettlementFieldsFromPaymentIntent(pi);
   } catch (e: any) {
     amountCents = session.amount_total || Math.round((orderData.amount || 0) * 100);
     logWarn('Could not retrieve payment intent for async success; using fallback amount', {
@@ -836,6 +879,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
       status: 'paid_held',
       paymentMethod: effectivePaymentMethod,
       stripePaymentIntentId: paymentIntentId,
+      ...(stripeSettlement ? stripeSettlement : {}),
       paidAt: now,
       disputeDeadlineAt: disputeDeadline,
       updatedAt: now,
@@ -1177,11 +1221,25 @@ export async function handleWirePaymentIntentSucceeded(
   const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
   const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
 
+  // Settlement visibility for Admin Ops (best-effort). Events often do not include expanded charge/balance_transaction.
+  let stripeSettlement: ReturnType<typeof extractStripeSettlementFieldsFromPaymentIntent> | null = null;
+  try {
+    if (stripe) {
+      const piFull = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
+      })) as any;
+      stripeSettlement = extractStripeSettlementFieldsFromPaymentIntent(piFull);
+    }
+  } catch {
+    // ignore; best-effort only
+  }
+
   await (orderDoc.ref as any).set(
     {
       status: 'paid_held',
       paymentMethod: 'wire',
       stripePaymentIntentId: paymentIntentId,
+      ...(stripeSettlement ? stripeSettlement : {}),
       paidAt: now,
       disputeDeadlineAt: disputeDeadline,
       updatedAt: now,

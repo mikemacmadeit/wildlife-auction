@@ -162,7 +162,9 @@ export default function AdminOpsPage() {
               'createdAt', 'updatedAt', 'paidAt', 'disputeDeadlineAt', 'deliveredAt',
               'acceptedAt', 'disputedAt', 'deliveryConfirmedAt', 'protectionStartAt',
               'protectionEndsAt', 'buyerAcceptedAt', 'disputeOpenedAt', 'releasedAt',
-              'refundedAt', 'completedAt'
+              'refundedAt', 'completedAt',
+              // Stripe settlement visibility (server-authored via webhooks)
+              'stripeFundsAvailableOn'
             ];
             
             dateFields.forEach((field) => {
@@ -1620,6 +1622,13 @@ function OrderCard({
 }) {
   const isAwaitingBankRails = order.status === 'awaiting_bank_transfer' || order.status === 'awaiting_wire';
   const isReleaseCandidate = order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted';
+  const fundsAvailableOn =
+    order.stripeFundsAvailableOn instanceof Date && Number.isFinite(order.stripeFundsAvailableOn.getTime())
+      ? order.stripeFundsAvailableOn
+      : null;
+  const btStatus = typeof (order as any).stripeBalanceTransactionStatus === 'string' ? String((order as any).stripeBalanceTransactionStatus) : null;
+  const minsUntilAvailable =
+    fundsAvailableOn && btStatus !== 'available' ? Math.max(0, Math.ceil((fundsAvailableOn.getTime() - Date.now()) / 60000)) : null;
 
   return (
     <Card>
@@ -1636,6 +1645,14 @@ function OrderCard({
               <p>Seller: {order.sellerName} ({order.sellerEmail})</p>
               <p>Amount: {formatCurrency(order.amount)} | Seller receives: {formatCurrency(order.sellerAmount)}</p>
               <p>Created: {formatDate(order.createdAt)}</p>
+              {fundsAvailableOn ? (
+                <p>
+                  Stripe settlement:{' '}
+                  {btStatus === 'available'
+                    ? 'Available now'
+                    : `Expected ${fundsAvailableOn.toLocaleString()}${minsUntilAvailable ? ` (~${minsUntilAvailable} min)` : ''}`}
+                </p>
+              ) : null}
               {order.payoutHoldReason && order.payoutHoldReason !== 'none' && (
                 <p className="text-orange-600">Hold: {getHoldReasonText(order.payoutHoldReason)}</p>
               )}

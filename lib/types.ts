@@ -607,6 +607,14 @@ export interface Order {
   status: OrderStatus;
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;
+  /**
+   * Stripe settlement visibility (server-authored via webhooks).
+   * This is used by Admin Ops to show when funds become transferable.
+   */
+  stripeChargeId?: string;
+  stripeBalanceTransactionId?: string;
+  stripeBalanceTransactionStatus?: 'pending' | 'available' | string;
+  stripeFundsAvailableOn?: Date;
   stripeTransferId?: string;
   stripeRefundId?: string; // Stripe refund ID
   sellerStripeAccountId?: string; // Seller's Stripe Connect account ID (for admin payout release transfers)

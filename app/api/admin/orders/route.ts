@@ -231,7 +231,9 @@ export async function GET(request: Request) {
         'createdAt', 'updatedAt', 'paidAt', 'disputeDeadlineAt', 'deliveredAt',
         'acceptedAt', 'buyerConfirmedAt', 'releaseEligibleAt', 'disputedAt', 'deliveryConfirmedAt', 'protectionStartAt',
         'protectionEndsAt', 'buyerAcceptedAt', 'disputeOpenedAt', 'releasedAt',
-        'refundedAt', 'completedAt'
+        'refundedAt', 'completedAt',
+        // Stripe settlement visibility (server-authored via webhooks)
+        'stripeFundsAvailableOn'
       ];
 
       timestampFields.forEach((field) => {
