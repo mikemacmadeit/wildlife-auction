@@ -272,6 +272,22 @@ export default function SellerLayout({
     }
   };
 
+  // Workaround: some environments intermittently fail to fetch the Next.js RSC payload during client navigation,
+  // which spams console with "Failed to fetch RSC payload ... Falling back to browser navigation".
+  // Since the runtime already falls back, we proactively do a hard navigation for seller sidebar links.
+  const hardNavigate = useCallback((e: any, href: string) => {
+    try {
+      if (!href) return;
+      if (e?.defaultPrevented) return;
+      if (e?.button !== undefined && e.button !== 0) return;
+      if (e?.metaKey || e?.ctrlKey || e?.shiftKey || e?.altKey) return;
+      e?.preventDefault?.();
+      if (typeof window !== 'undefined') window.location.href = href;
+    } catch {
+      // best-effort
+    }
+  }, []);
+
   // Protect all seller routes - require authentication
   return (
     <RequireAuth>
@@ -684,7 +700,11 @@ export default function SellerLayout({
                               <Link
                                 key={item.href}
                                 href={item.href}
-                                onClick={() => setMobileMenuOpen(false)}
+                                prefetch={false}
+                                onClick={(e) => {
+                                  setMobileMenuOpen(false);
+                                  hardNavigate(e, item.href);
+                                }}
                                 className={cn(
                                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                                   'hover:bg-background/50',
@@ -723,7 +743,11 @@ export default function SellerLayout({
                               <Link
                                 key={item.href}
                                 href={item.href}
-                                onClick={() => setMobileMenuOpen(false)}
+                                prefetch={false}
+                                onClick={(e) => {
+                                  setMobileMenuOpen(false);
+                                  hardNavigate(e, item.href);
+                                }}
                                 className={cn(
                                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                                   'hover:bg-background/50',
@@ -753,7 +777,11 @@ export default function SellerLayout({
                           <Link
                             key={item.href}
                             href={item.href}
-                            onClick={() => setMobileMenuOpen(false)}
+                            prefetch={false}
+                            onClick={(e) => {
+                              setMobileMenuOpen(false);
+                              hardNavigate(e, item.href);
+                            }}
                             className={cn(
                               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',
@@ -801,13 +829,14 @@ export default function SellerLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch={true}
+                  prefetch={false}
                   className={cn(
                     'flex flex-col items-center justify-center gap-1',
                     'hover:bg-background/50 active:bg-background',
                     'min-h-[44px] touch-manipulation',
                     active && 'text-primary'
                   )}
+                  onClick={(e) => hardNavigate(e, item.href)}
                 >
                   <div className="relative">
                     <Icon className={cn(
