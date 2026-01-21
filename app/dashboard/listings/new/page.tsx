@@ -41,6 +41,7 @@ import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { cn } from '@/lib/utils';
+import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
@@ -356,7 +357,10 @@ function NewListingPageContent() {
             listingData.reservePrice = parseFloat(formData.reservePrice);
           }
           if (formData.endsAt) {
-            listingData.endsAt = new Date(formData.endsAt);
+            {
+              const d = parseDateTimeLocal(formData.endsAt);
+              if (d) listingData.endsAt = d;
+            }
           }
         }
 
@@ -413,12 +417,8 @@ function NewListingPageContent() {
   };
 
   const isFutureDateString = (raw: string): boolean => {
-    const s = String(raw || '').trim();
-    if (!s) return false;
-    const d = new Date(s);
-    if (!Number.isFinite(d.getTime())) return false;
-    // Give a little buffer so "now" doesn't pass due to clock jitter.
-    return d.getTime() > Date.now() + 60 * 1000;
+    // datetime-local strings should be interpreted as LOCAL time.
+    return isFutureDateTimeLocalString(raw, 60_000);
   };
 
   const steps = [
@@ -1477,7 +1477,8 @@ function NewListingPageContent() {
                       !isFutureDateString(formData.endsAt) &&
                       'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
                   )}
-                  min={new Date().toISOString().slice(0, 16)}
+                  // datetime-local expects LOCAL strings; add a small buffer to avoid near-now flakiness.
+                  min={formatDateTimeLocal(new Date(Date.now() + 2 * 60 * 1000))}
                 />
                 <p className="text-xs text-muted-foreground">
                   When should this auction end? Must be in the future.
@@ -1911,7 +1912,7 @@ function NewListingPageContent() {
                       )}
                       {formData.endsAt ? (
                         <div className="text-sm">
-                          Ends: <span className="font-semibold">{new Date(formData.endsAt).toLocaleString()}</span>
+                          Ends: <span className="font-semibold">{parseDateTimeLocal(formData.endsAt)?.toLocaleString() || '—'}</span>
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">End time: not set</div>
@@ -1987,7 +1988,7 @@ function NewListingPageContent() {
                 sellerOffersDelivery: !!formData.sellerOffersDelivery,
               },
               attributes: (formData.attributes || {}) as any,
-              endsAt: formData.endsAt ? new Date(formData.endsAt) : undefined,
+              endsAt: parseDateTimeLocal(formData.endsAt) || undefined,
               createdAt: new Date(),
               updatedAt: new Date(),
               createdBy: user?.uid || 'preview',
@@ -2206,7 +2207,10 @@ function NewListingPageContent() {
         }
         // Add auction end date
         if (formData.endsAt) {
-          listingData.endsAt = new Date(formData.endsAt);
+          {
+            const d = parseDateTimeLocal(formData.endsAt);
+            if (d) listingData.endsAt = d;
+          }
         }
       }
 
@@ -2418,7 +2422,10 @@ function NewListingPageContent() {
           listingData.reservePrice = parseFloat(formData.reservePrice);
         }
         if (formData.endsAt) {
-          listingData.endsAt = new Date(formData.endsAt);
+          {
+            const d = parseDateTimeLocal(formData.endsAt);
+            if (d) listingData.endsAt = d;
+          }
         }
       }
 

@@ -27,6 +27,7 @@ import {
   WhitetailBreederAttributes,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getListingById, updateListing, publishListing } from '@/lib/firebase/listings';
@@ -167,7 +168,7 @@ function EditListingPageContent() {
           price: listing.price?.toString() || '',
           startingBid: listing.startingBid?.toString() || '',
           reservePrice: listing.reservePrice?.toString() || '',
-          endsAt: listing.endsAt ? new Date(listing.endsAt).toISOString().slice(0, 16) : '',
+          endsAt: listing.endsAt ? formatDateTimeLocal(new Date(listing.endsAt as any)) : '',
           location: {
             city: listing.location?.city ?? '',
             state: listing.location?.state ?? 'TX',
@@ -773,7 +774,8 @@ function EditListingPageContent() {
                         "min-h-[48px] text-base bg-background",
                         publishMissingFields.includes('endsAt') ? 'ring-2 ring-destructive border-destructive' : null
                       )}
-                      min={new Date().toISOString().slice(0, 16)}
+                      // datetime-local expects LOCAL strings; add a small buffer to avoid near-now flakiness.
+                      min={formatDateTimeLocal(new Date(Date.now() + 2 * 60 * 1000))}
                     />
                     <p className="text-xs text-muted-foreground">
                       When the auction will end. Must be in the future.
@@ -1571,7 +1573,8 @@ function EditListingPageContent() {
         updates.reservePrice = parseFloat(formData.reservePrice);
       }
       if (formData.endsAt) {
-        updates.endsAt = new Date(formData.endsAt);
+        const d = parseDateTimeLocal(formData.endsAt);
+        if (d) updates.endsAt = d;
       }
     }
 
