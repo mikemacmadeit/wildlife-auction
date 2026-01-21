@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, MessageSquare } from 'lucide-react';
 import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { subscribeToUnreadCount } from '@/lib/firebase/notifications';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,9 @@ export function NotificationsBell(props: { userId: string; className?: string })
   const router = useRouter();
 
   const [items, setItems] = useState<UserNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [open, setOpen] = useState(false);
+  const prevOpenRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -67,8 +70,42 @@ export function NotificationsBell(props: { userId: string; className?: string })
     );
   }, [userId]);
 
-  const unreadCount = useMemo(() => items.filter((n) => n.read !== true).length, [items]);
+  // IMPORTANT:
+  // The dropdown only loads the latest N notifications for UX, but the bell badge must reflect
+  // the user's true unread count (not just the visible slice).
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      return subscribeToUnreadCount(userId, (count) => setUnreadCount(count || 0));
+    } catch (e) {
+      console.error('NotificationsBell: failed to subscribe to unread count', e);
+      setUnreadCount(0);
+      return;
+    }
+  }, [userId]);
+
   const hasUnread = unreadCount > 0;
+
+  // When opening the dropdown, mark the visible notifications as read (best-effort).
+  // This ensures the bell badge clears promptly and matches user expectation.
+  useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!open || wasOpen) return;
+    if (!userId) return;
+
+    const unreadVisible = items.filter((n) => n.read !== true).slice(0, 8);
+    if (!unreadVisible.length) return;
+
+    void Promise.all(
+      unreadVisible.map((n) =>
+        updateDoc(doc(db, 'users', userId, 'notifications', n.id), {
+          read: true,
+          readAt: serverTimestamp(),
+        }).catch(() => null)
+      )
+    );
+  }, [open, userId, items]);
 
   const handleClickNotif = async (n: UserNotification) => {
     try {
