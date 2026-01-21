@@ -204,6 +204,10 @@ export default function SellerLayout({
         })
       );
       const offerTypes: NotificationType[] = [
+        // bids (from auction events)
+        'bid_outbid',
+        'bid_received',
+        // offers
         'offer_received',
         'offer_countered',
         'offer_accepted',

@@ -179,9 +179,13 @@ export default function DashboardLayout({
       console.error('Failed to subscribe to unread total notifications count:', e);
     }
 
-    // 1c) Offers badge: unread offer notifications (eBay-like: "you have offer activity")
+    // 1c) Bids & Offers badge: unread bid/offer notifications (eBay-like: "you have activity")
     try {
-      const offerTypes: NotificationType[] = [
+      const bidOfferTypes: NotificationType[] = [
+        // bids (from auction events)
+        'bid_outbid',
+        'bid_received',
+        // offers
         'offer_received',
         'offer_countered',
         'offer_accepted',
@@ -189,7 +193,7 @@ export default function DashboardLayout({
         'offer_expired',
       ];
       unsubs.push(
-        subscribeToUnreadCountByTypes(user.uid, offerTypes, (count) => {
+        subscribeToUnreadCountByTypes(user.uid, bidOfferTypes, (count) => {
           setUnreadOffersCount(count || 0);
         })
       );

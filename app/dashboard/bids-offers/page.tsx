@@ -512,25 +512,53 @@ export default function BidsOffersPage() {
                     value="needs_action"
                     className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
                   >
-                    Needs action
+                    <span className="flex items-center gap-2">
+                      Needs action
+                      {needsAction.length > 0 ? (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {needsAction.length}
+                        </Badge>
+                      ) : null}
+                    </span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="bids"
                     className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
                   >
-                    Bids
+                    <span className="flex items-center gap-2">
+                      Bids
+                      {bidRows.length > 0 ? (
+                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                          {bidRows.length}
+                        </Badge>
+                      ) : null}
+                    </span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="offers"
                     className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
                   >
-                    Offers
+                    <span className="flex items-center gap-2">
+                      Offers
+                      {offerRows.length > 0 ? (
+                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                          {offerRows.length}
+                        </Badge>
+                      ) : null}
+                    </span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
                     className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
                   >
-                    History
+                    <span className="flex items-center gap-2">
+                      History
+                      {filtered.length > 0 ? (
+                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                          {filtered.length}
+                        </Badge>
+                      ) : null}
+                    </span>
                   </TabsTrigger>
                 </TabsList>
 

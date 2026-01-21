@@ -11,6 +11,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getSellerOffers } from '@/lib/offers/api';
 import { SellerOfferDetailModal } from '@/components/offers/SellerOfferDetailModal';
+import { subscribeToUnreadCountByTypes } from '@/lib/firebase/notifications';
+import type { NotificationType } from '@/lib/types';
 
 type OfferRow = {
   offerId: string;
@@ -37,6 +39,7 @@ function formatTimeLeft(expiresAtMs?: number | null): string {
 export default function SellerOffersPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const [unreadOfferActivity, setUnreadOfferActivity] = useState<number>(0);
 
   const [tab, setTab] = useState<'open' | 'countered' | 'accepted' | 'declined' | 'expired'>('open');
   const [tabFading, setTabFading] = useState(false);
@@ -63,6 +66,21 @@ export default function SellerOffersPage() {
     if (!user) return;
     load();
   }, [authLoading, load, user]);
+
+  // "New activity" indicator (offer lifecycle notifications)
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadOfferActivity(0);
+      return;
+    }
+    const types: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+    try {
+      return subscribeToUnreadCountByTypes(user.uid, types, (count) => setUnreadOfferActivity(count || 0));
+    } catch {
+      setUnreadOfferActivity(0);
+      return;
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     setTabFading(true);
@@ -111,6 +129,11 @@ export default function SellerOffersPage() {
           <div className="flex items-center gap-2">
             <Handshake className="h-5 w-5 text-primary" />
             <h1 className="text-2xl font-extrabold tracking-tight">Offers</h1>
+            {unreadOfferActivity > 0 ? (
+              <Badge variant="secondary" className="font-semibold">
+                {unreadOfferActivity} new
+              </Badge>
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">Review and respond to best offers on your listings.</p>
         </div>
