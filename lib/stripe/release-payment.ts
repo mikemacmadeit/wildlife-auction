@@ -55,6 +55,9 @@ export interface ReleasePaymentResult {
     platformFeeUsd?: number;
     sellerPayoutUsd?: number;
     attemptedTransferUsdCents?: number;
+
+    // Diagnostics: which idempotency key was used for Stripe transfer creation (safe to log)
+    transferIdempotencyKey?: string;
   };
 }
 
@@ -560,6 +563,10 @@ export async function releasePaymentForOrder(
               platformFeeUsd,
               sellerPayoutUsd: sellerAmount,
               attemptedTransferUsdCents: transferAmount,
+              transferIdempotencyKey:
+                settlementForTransfer.balanceTransactionId && settlementForTransfer.balanceTransactionStatus
+                  ? `transfer:${orderId}:${settlementForTransfer.balanceTransactionId}:${settlementForTransfer.balanceTransactionStatus}`
+                  : `transfer:${orderId}`,
             },
           };
         }
@@ -577,6 +584,16 @@ export async function releasePaymentForOrder(
       settlementForTransfer?.chargeId && typeof settlementForTransfer.chargeId === 'string'
         ? settlementForTransfer.chargeId
         : undefined;
+
+    // IMPORTANT: Stripe idempotency keys can cache error responses for a period of time.
+    // If we always use `transfer:${orderId}`, a single early "balance_insufficient" can get replayed
+    // even after the underlying charge settles. To keep safety and allow retries:
+    // - include balanceTransactionId + status when known (stable once available)
+    // - fall back to orderId only when we cannot compute settlement context
+    const transferIdempotencyKey =
+      settlementForTransfer?.balanceTransactionId && settlementForTransfer?.balanceTransactionStatus
+        ? `transfer:${orderId}:${settlementForTransfer.balanceTransactionId}:${settlementForTransfer.balanceTransactionStatus}`
+        : `transfer:${orderId}`;
     const transfer = await stripe.transfers.create(
       {
         amount: transferAmount,
@@ -592,7 +609,7 @@ export async function releasePaymentForOrder(
           releaseType: releasedBy && releasedBy !== 'system' ? 'manual' : 'auto',
         },
       },
-      { idempotencyKey: `transfer:${orderId}` }
+      { idempotencyKey: transferIdempotencyKey }
     );
 
     // Capture before state for audit
@@ -744,6 +761,10 @@ export async function releasePaymentForOrder(
             platformFeeUsd,
             sellerPayoutUsd: sellerAmount,
             attemptedTransferUsdCents: transferAmount,
+            transferIdempotencyKey:
+              settlement.balanceTransactionId && settlement.balanceTransactionStatus
+                ? `transfer:${orderId}:${settlement.balanceTransactionId}:${settlement.balanceTransactionStatus}`
+                : `transfer:${orderId}`,
           },
         };
       }
@@ -766,6 +787,10 @@ export async function releasePaymentForOrder(
           platformFeeUsd,
           sellerPayoutUsd: sellerAmount,
           attemptedTransferUsdCents: transferAmount,
+          transferIdempotencyKey:
+            settlement?.balanceTransactionId && settlement?.balanceTransactionStatus
+              ? `transfer:${orderId}:${settlement.balanceTransactionId}:${settlement.balanceTransactionStatus}`
+              : `transfer:${orderId}`,
         },
         error: isTestMode
           ? [
