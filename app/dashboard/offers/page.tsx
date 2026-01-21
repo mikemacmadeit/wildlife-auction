@@ -141,10 +141,15 @@ export default function MyOffersPage() {
           </div>
           <p className="text-sm text-muted-foreground">Track offers you’ve made and respond to counters.</p>
         </div>
-        <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
-          {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="secondary" className="min-h-[40px]">
+            <Link href="/dashboard/bids-offers">Back to Bids &amp; Offers</Link>
+          </Button>
+          <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
+            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
