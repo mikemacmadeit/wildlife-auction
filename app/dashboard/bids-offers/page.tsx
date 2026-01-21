@@ -732,10 +732,25 @@ export default function BidsOffersPage() {
                               ) : (
                                 <>
                                   {r.status === 'ACCEPTED' ? (
-                                    <Button onClick={() => openOfferCheckout((r as any).raw)}>Checkout</Button>
+                                    <Button
+                                      onClick={() => openOfferCheckout((r as any).raw)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    >
+                                      Checkout
+                                    </Button>
                                   ) : (
-                                    <Button variant="outline" asChild>
-                                      <Link href={`/dashboard/offers/${(r as any).id}`}>Review</Link>
+                                    <Button
+                                      asChild
+                                      className={
+                                        r.status === 'COUNTERED'
+                                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                          : 'border-primary/40 text-primary hover:bg-primary/10'
+                                      }
+                                      variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
+                                    >
+                                      <Link href={`/dashboard/offers/${(r as any).id}`}>
+                                        {r.status === 'COUNTERED' ? 'Review counter' : 'View offer'}
+                                      </Link>
                                     </Button>
                                   )}
                                   <Button variant="outline" asChild>
@@ -922,9 +937,22 @@ export default function BidsOffersPage() {
 
                             <div className="flex items-center gap-2 justify-end">
                               {r.status === 'ACCEPTED' ? (
-                                <Button onClick={() => openOfferCheckout(r.raw)}>Checkout</Button>
+                                <Button
+                                  onClick={() => openOfferCheckout(r.raw)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  Checkout
+                                </Button>
                               ) : (
-                                <Button variant="outline" asChild>
+                                <Button
+                                  asChild
+                                  className={
+                                    r.status === 'COUNTERED'
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                      : 'border-primary/40 text-primary hover:bg-primary/10'
+                                  }
+                                  variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
+                                >
                                   <Link href={`/dashboard/offers/${r.id}`}>{r.status === 'COUNTERED' ? 'Review counter' : 'View offer'}</Link>
                                 </Button>
                               )}
