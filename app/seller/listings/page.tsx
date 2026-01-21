@@ -2,6 +2,7 @@
 
 import { useState, useMemo, memo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -142,6 +143,19 @@ const formatTimeRemaining = (date?: any) => {
   return `${days}d`;
 };
 
+const getPrimaryListingImageUrl = (listing: Listing): string | null => {
+  const coverId = (listing as any)?.coverPhotoId as string | undefined;
+  const photos = Array.isArray((listing as any)?.photos) ? ((listing as any).photos as any[]) : [];
+  if (coverId && photos.length) {
+    const cover = photos.find((p) => String(p?.photoId) === String(coverId));
+    if (cover?.url) return String(cover.url);
+  }
+  if (photos.length && photos[0]?.url) return String(photos[0].url);
+  const images = Array.isArray((listing as any)?.images) ? ((listing as any).images as any[]) : [];
+  if (images.length && images[0]) return String(images[0]);
+  return null;
+};
+
 // Memoized Listing Row component for performance
 const ListingRow = memo(({ 
   listing, 
@@ -167,19 +181,26 @@ const ListingRow = memo(({
     className="border-b border-border/30 hover:bg-background/50 group"
   >
     <td className="p-4 align-middle">
-      <div className="flex flex-col gap-1">
-        <Link
-          href={`/listing/${listing.id}`}
-          className="font-semibold text-foreground hover:text-primary group-hover:underline"
-        >
-          {listing.title}
-        </Link>
-        {listing.endsAt && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3" />
-            <span>{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
-          </div>
-        )}
+      <div className="flex items-start gap-3">
+        <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+          {getPrimaryListingImageUrl(listing) ? (
+            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1 min-w-0">
+          <Link
+            href={`/listing/${listing.id}`}
+            className="font-semibold text-foreground hover:text-primary group-hover:underline truncate"
+          >
+            {listing.title}
+          </Link>
+          {listing.endsAt && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              <span>{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
+            </div>
+          )}
+        </div>
       </div>
     </td>
     <td className="p-4 align-middle">{getTypeBadge(listing.type)}</td>
@@ -265,7 +286,13 @@ const MobileListingCard = memo(({
 }) => (
   <div key={listing.id} className="p-4 space-y-3">
     <div className="flex items-start justify-between gap-3">
-      <div className="flex-1 min-w-0">
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+          {getPrimaryListingImageUrl(listing) ? (
+            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
+          ) : null}
+        </div>
+        <div className="flex-1 min-w-0">
         <Link
           href={`/listing/${listing.id}`}
           className="font-semibold text-foreground hover:text-primary block mb-1"
@@ -279,6 +306,7 @@ const MobileListingCard = memo(({
             type: listing.type,
             ended: isAuctionEnded(listing),
           })}
+        </div>
         </div>
       </div>
       <ListingRowActions
