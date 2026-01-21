@@ -37,7 +37,7 @@ function statusBadgeVariant(status: PermitStatus | null | undefined) {
   return 'outline';
 }
 
-export function BreederPermitCard(props: { className?: string; compactWhenVerified?: boolean }) {
+export function BreederPermitCard(props: { className?: string; compactWhenVerified?: boolean; showDismissHint?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -129,6 +129,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
   }, [expiresAt, file, load, permitNumber, toast, user]);
 
   const compactVerified = props.compactWhenVerified === true;
+  const showDismissHint = props.showDismissHint === true;
 
   return (
     <Card className={props.className}>
@@ -141,6 +142,11 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             </CardTitle>
             <CardDescription>
               Upload your breeder permit. Admin will review and (if approved) you’ll receive a badge shown on your profile and listings.
+              {showDismissHint ? (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Not a breeder or don’t plan to list whitetails? You can exit out of this box (click the X in the corner).
+                </div>
+              ) : null}
             </CardDescription>
           </div>
           {permit?.status ? (

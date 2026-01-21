@@ -964,7 +964,7 @@ export default function SellerOverviewPage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <BreederPermitCard compactWhenVerified />
+            <BreederPermitCard compactWhenVerified showDismissHint />
           </div>
         ) : null}
 
