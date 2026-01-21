@@ -93,7 +93,9 @@ export async function POST(request: Request) {
   const bidderId = decoded.uid;
 
   // Verified email required for bidding (prevents abuse + aligns with payments readiness).
-  if ((decoded as any)?.email_verified !== true) {
+  // IMPORTANT: don't rely solely on ID token claims; they can be stale until the client refreshes.
+  const bidderRecord = await auth.getUser(bidderId).catch(() => null as any);
+  if (bidderRecord?.emailVerified !== true) {
     return json(
       {
         ok: false,

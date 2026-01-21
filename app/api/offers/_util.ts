@@ -41,7 +41,9 @@ export async function requireAuth(request: Request) {
 
     const decoded = await adminAuth.verifyIdToken(token);
     // Require verified email across all offer operations (prevents spam/abuse and aligns with checkout gating).
-    if ((decoded as any)?.email_verified !== true) {
+    // IMPORTANT: don't rely solely on ID token claims; they can be stale until the client refreshes.
+    const userRecord = await adminAuth.getUser(decoded.uid).catch(() => null as any);
+    if (userRecord?.emailVerified !== true) {
       return {
         ok: false as const,
         response: json(
