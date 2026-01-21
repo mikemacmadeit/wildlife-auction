@@ -165,6 +165,21 @@ export default function ListingDetailPage() {
   const endsAtMs = useMemo(() => (endsAtDate ? endsAtDate.getTime() : null), [endsAtDate]);
   const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
 
+  // Use photo focal points (selected during upload) to match object-cover crop on the listing page gallery.
+  const focalPointsByUrl = useMemo(() => {
+    const m: Record<string, { x: number; y: number }> = {};
+    const photos = Array.isArray((listing as any)?.photos) ? ((listing as any).photos as any[]) : [];
+    for (const p of photos) {
+      const url = typeof p?.url === 'string' ? String(p.url) : '';
+      const fp = p?.focalPoint;
+      if (!url || !fp) continue;
+      if (typeof fp?.x === 'number' && typeof fp?.y === 'number') {
+        m[url] = { x: fp.x, y: fp.y };
+      }
+    }
+    return m;
+  }, [listing]);
+
   // Determine winner client-side for UX (server is authoritative at checkout).
   // This enables the "Complete Purchase" CTA after finalization flips listing.status -> 'expired'.
   useEffect(() => {
@@ -892,7 +907,13 @@ export default function ListingDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               className="mb-6 relative"
             >
-              <ImageGallery images={listing!.images} title={listing!.title} />
+              <ImageGallery
+                images={listing!.images}
+                title={listing!.title}
+                focalPointsByUrl={focalPointsByUrl}
+                // Slightly taller hero to better match perceived crop and improve visual impact.
+                className="aspect-[4/3]"
+              />
 
               {/* Watchers (public metric): top-right overlay on the photo */}
               {watchingCount > 0 ? (
