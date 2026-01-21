@@ -49,6 +49,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { getMinIncrementCents } from '@/lib/auctions/proxyBidding';
+import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
+import type { NotificationType } from '@/lib/types';
 
 type OfferRow = {
   offerId: string;
@@ -147,6 +149,10 @@ export default function BidsOffersPage() {
   const { toast } = useToast();
 
   const [tab, setTab] = useState<'needs_action' | 'bids' | 'offers' | 'history'>('needs_action');
+  const [unreadNeedsAction, setUnreadNeedsAction] = useState(0);
+  const [unreadBids, setUnreadBids] = useState(0);
+  const [unreadOffers, setUnreadOffers] = useState(0);
+  const [unreadHistory, setUnreadHistory] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all'); // applies in Bids tab
   const [sortKey, setSortKey] = useState<SortKey>('ending_soon');
   const [query, setQuery] = useState('');
@@ -220,6 +226,54 @@ export default function BidsOffersPage() {
     if (!user) return;
     load();
   }, [authLoading, load, user]);
+
+  // Unread notification badges for tabs (these should clear when the user clicks into the tab).
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadNeedsAction(0);
+      setUnreadBids(0);
+      setUnreadOffers(0);
+      setUnreadHistory(0);
+      return;
+    }
+
+    const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received'];
+    // Buyer-side offers page: buyer mainly receives counter/accepted/declined/expired.
+    const offerTypes: NotificationType[] = ['offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+    const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
+    const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
+
+    const unsubs: Array<() => void> = [];
+    try {
+      unsubs.push(subscribeToUnreadCountByTypes(user.uid, needsActionTypes, (c) => setUnreadNeedsAction(c || 0)));
+      unsubs.push(subscribeToUnreadCountByTypes(user.uid, bidTypes, (c) => setUnreadBids(c || 0)));
+      unsubs.push(subscribeToUnreadCountByTypes(user.uid, offerTypes, (c) => setUnreadOffers(c || 0)));
+      unsubs.push(subscribeToUnreadCountByTypes(user.uid, historyTypes, (c) => setUnreadHistory(c || 0)));
+    } catch {
+      // ignore
+    }
+    return () => unsubs.forEach((fn) => fn());
+  }, [user?.uid]);
+
+  const clearTabNotifs = useCallback(
+    async (nextTab: 'needs_action' | 'bids' | 'offers' | 'history') => {
+      if (!user?.uid) return;
+      const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received'];
+      const offerTypes: NotificationType[] = ['offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+      const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
+      const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
+
+      try {
+        if (nextTab === 'needs_action') await markNotificationsAsReadByTypes(user.uid, needsActionTypes);
+        else if (nextTab === 'bids') await markNotificationsAsReadByTypes(user.uid, bidTypes);
+        else if (nextTab === 'offers') await markNotificationsAsReadByTypes(user.uid, offerTypes);
+        else await markNotificationsAsReadByTypes(user.uid, historyTypes);
+      } catch {
+        // best-effort
+      }
+    },
+    [user?.uid]
+  );
 
   const rows: UnifiedRow[] = useMemo(() => {
     const now = Date.now();
@@ -505,7 +559,14 @@ export default function BidsOffersPage() {
 
         <Card className="border-2">
           <CardContent className="pt-6 space-y-4">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+            <Tabs
+              value={tab}
+              onValueChange={(v) => {
+                const next = v as any;
+                setTab(next);
+                void clearTabNotifs(next);
+              }}
+            >
               <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
                 <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto overflow-hidden rounded-xl border border-border/60 bg-muted/40 p-1">
                   <TabsTrigger
@@ -514,9 +575,9 @@ export default function BidsOffersPage() {
                   >
                     <span className="flex items-center gap-2">
                       Needs action
-                      {needsAction.length > 0 ? (
+                      {unreadNeedsAction > 0 ? (
                         <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                          {needsAction.length}
+                          {unreadNeedsAction}
                         </Badge>
                       ) : null}
                     </span>
@@ -527,9 +588,9 @@ export default function BidsOffersPage() {
                   >
                     <span className="flex items-center gap-2">
                       Bids
-                      {bidRows.length > 0 ? (
-                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
-                          {bidRows.length}
+                      {unreadBids > 0 ? (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {unreadBids}
                         </Badge>
                       ) : null}
                     </span>
@@ -540,9 +601,9 @@ export default function BidsOffersPage() {
                   >
                     <span className="flex items-center gap-2">
                       Offers
-                      {offerRows.length > 0 ? (
-                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
-                          {offerRows.length}
+                      {unreadOffers > 0 ? (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {unreadOffers}
                         </Badge>
                       ) : null}
                     </span>
@@ -553,9 +614,9 @@ export default function BidsOffersPage() {
                   >
                     <span className="flex items-center gap-2">
                       History
-                      {filtered.length > 0 ? (
-                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
-                          {filtered.length}
+                      {unreadHistory > 0 ? (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                          {unreadHistory}
                         </Badge>
                       ) : null}
                     </span>

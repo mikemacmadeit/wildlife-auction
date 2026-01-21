@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getSellerOffers } from '@/lib/offers/api';
 import { SellerOfferDetailModal } from '@/components/offers/SellerOfferDetailModal';
-import { subscribeToUnreadCountByTypes } from '@/lib/firebase/notifications';
+import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
 
 type OfferRow = {
@@ -80,6 +80,13 @@ export default function SellerOffersPage() {
       setUnreadOfferActivity(0);
       return;
     }
+  }, [user?.uid]);
+
+  // UX: visiting the seller offers inbox clears offer notification badges.
+  useEffect(() => {
+    if (!user?.uid) return;
+    const types: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+    markNotificationsAsReadByTypes(user.uid, types).catch(() => {});
   }, [user?.uid]);
 
   useEffect(() => {

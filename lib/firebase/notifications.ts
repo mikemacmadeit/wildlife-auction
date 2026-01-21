@@ -279,3 +279,37 @@ export async function markNotificationsAsReadByType(
 
   await Promise.all(batch);
 }
+
+/**
+ * Mark all unread notifications of a set of types as read for a user.
+ *
+ * IMPORTANT: To stay compatible with restrictive Firestore rules (which often only allow
+ * `orderBy('createdAt')` queries on the notifications subcollection), we do NOT use an `in` query.
+ * Instead we read the recent feed and filter client-side.
+ */
+export async function markNotificationsAsReadByTypes(
+  userId: string,
+  types: NotificationType[]
+): Promise<void> {
+  if (!types?.length) return;
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
+  const want = new Set(types);
+
+  // Read a recent window and mark matches as read.
+  const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(250));
+  const snapshot = await getDocs(q);
+  const writes = snapshot.docs
+    .filter((docSnap) => {
+      const data = docSnap.data() as any;
+      const t = String(data?.type || '');
+      return want.has(t as NotificationType) && data?.read !== true;
+    })
+    .map((docSnap) =>
+      updateDoc(docSnap.ref, {
+        read: true,
+        readAt: serverTimestamp(),
+      })
+    );
+
+  await Promise.all(writes);
+}

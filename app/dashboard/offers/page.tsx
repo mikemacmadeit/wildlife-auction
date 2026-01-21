@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getMyOffers, acceptOffer, counterOffer, declineOffer, withdrawOffer } from '@/lib/offers/api';
 import { createCheckoutSession } from '@/lib/stripe/api';
-import { subscribeToUnreadCountByTypes } from '@/lib/firebase/notifications';
+import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
 
 type OfferRow = {
@@ -86,6 +86,13 @@ export default function MyOffersPage() {
       setUnreadOfferActivity(0);
       return;
     }
+  }, [user?.uid]);
+
+  // UX: once the user visits this page, clear offer notification badges.
+  useEffect(() => {
+    if (!user?.uid) return;
+    const types: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+    markNotificationsAsReadByTypes(user.uid, types).catch(() => {});
   }, [user?.uid]);
 
   const emptyCopy = useMemo(() => {
