@@ -578,7 +578,9 @@ export default function ListingDetailPage() {
     // intentionally excludes Stripe IDs. The server-side checkout route (Admin SDK) is the source of truth.
     const price = Number(listing!.price || 0);
     setPendingCheckout({ amountUsd: Number.isFinite(price) ? price : 0 });
-    setPaymentDialogOpen(true);
+    // Animal categories require an explicit buyer acknowledgment before checkout (server-enforced).
+    if (isAnimalListing && !animalRiskAcked) setAnimalAckOpen(true);
+    else setPaymentDialogOpen(true);
     return;
   };
 
@@ -671,6 +673,15 @@ export default function ListingDetailPage() {
     try {
       setPaymentDialogOpen(false);
       setIsPlacingBid(true);
+
+      // Defensive: animal listings require explicit acknowledgment (server-enforced).
+      // If we got here without it (e.g., user opened checkout error dialog and retried),
+      // route them back through the acknowledgment dialog.
+      if (isAnimalListing && !animalRiskAcked) {
+        setAnimalAckOpen(true);
+        return;
+      }
+
       // Client-side eligibility guard for nicer UX (server also enforces).
       if (method !== 'card' && !eligiblePaymentMethods.includes(method as any)) {
         throw new Error(
