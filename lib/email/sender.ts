@@ -4,6 +4,7 @@
  */
 
 import { getEmailProvider, getResendClient, isEmailEnabled, FROM_EMAIL, FROM_NAME } from './config';
+import { sendViaSes } from './sesSender';
 import {
   getOrderConfirmationEmail,
   getDeliveryConfirmationEmail,
@@ -28,12 +29,40 @@ async function sendTransactionalEmail(params: {
   subject: string;
   html: string;
 }): Promise<SendEmailResult> {
+  const killSwitch = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
+  if (killSwitch) {
+    console.warn('[email] EMAIL_DISABLED=true; noop send', { to: params.to, subject: params.subject });
+    return { success: true, messageId: 'disabled' };
+  }
+
   if (!isEmailEnabled()) {
-    console.log('Email disabled - would send:', params.subject, 'to:', params.to);
+    console.warn('[email] not configured; would send', { to: params.to, subject: params.subject, provider: getEmailProvider() });
     return { success: false, error: 'Email service not configured' };
   }
 
   const provider = getEmailProvider();
+
+  if (provider === 'ses') {
+    const out = await sendViaSes({
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      from: process.env.SES_FROM,
+      replyTo: process.env.SES_REPLY_TO,
+      tags: {
+        app: 'wildlifeexchange',
+        channel: 'transactional',
+      },
+    });
+    if (!out.success) {
+      console.error('[ses] transactional send failed', { error: out.error });
+      return { success: false, error: out.error || 'SES send failed' };
+    }
+    if (out.sandbox?.enabled) {
+      console.warn('[ses] sandbox mode forced recipient', { originalTo: out.sandbox.originalTo, forcedTo: out.sandbox.forcedTo });
+    }
+    return { success: true, messageId: out.messageId };
+  }
 
   if (provider === 'resend') {
     const resend = getResendClient();
