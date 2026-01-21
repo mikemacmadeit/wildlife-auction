@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { cn } from '@/lib/utils';
-import { Loader2, ArrowLeft, CheckCircle2, MapPin, Sparkles, ShieldCheck, Store, TrendingUp } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, MapPin, Sparkles, ShieldCheck, Store, TrendingUp, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { getPublicSellerTrust, getUserProfile } from '@/lib/firebase/users';
 import type { PublicSellerTrust, UserProfile } from '@/lib/types';
@@ -28,6 +28,8 @@ import type { Listing } from '@/lib/types';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
+import { useToast } from '@/hooks/use-toast';
+import { getOrCreateThread } from '@/lib/firebase/messages';
 
 export default function SellerProfilePage() {
   const params = useParams<{ sellerId: string }>();
@@ -35,6 +37,7 @@ export default function SellerProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
@@ -44,6 +47,7 @@ export default function SellerProfilePage() {
   const [soldListings, setSoldListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsError, setListingsError] = useState<string | null>(null);
+  const [creatingMessage, setCreatingMessage] = useState(false);
 
   const fromParam = useMemo(() => {
     const raw = searchParams?.get('from');
@@ -96,6 +100,7 @@ export default function SellerProfilePage() {
   const reputation = useMemo(() => getSellerReputation({ profile }), [profile]);
   const sellerTier = profile ? getEffectiveSubscriptionTier(profile) : 'standard';
   const txCount = profile ? Math.max(Number(profile.verifiedTransactionsCount || 0), Number(profile.completedSalesCount || 0)) : 0;
+  const isSelf = !!user?.uid && !!sellerId && user.uid === sellerId;
 
   const displayName = useMemo(() => {
     return (
@@ -233,6 +238,47 @@ export default function SellerProfilePage() {
             <Button asChild variant="outline" size="sm" className="font-semibold">
               <Link href="/browse">Browse listings</Link>
             </Button>
+            {!isSelf && sellerId ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="font-semibold"
+                  disabled={creatingMessage || listingsLoading || activeListings.length === 0}
+                  onClick={async () => {
+                    try {
+                      if (!user?.uid) return;
+                      if (!sellerId) return;
+                      if (activeListings.length === 0) {
+                        toast({
+                          title: 'No listings to message about',
+                          description: 'This seller has no active listings right now.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      setCreatingMessage(true);
+                      const listingId = activeListings[0].id;
+                      const threadId = await getOrCreateThread(listingId, user.uid, sellerId);
+                      router.push(`/dashboard/messages?listingId=${encodeURIComponent(listingId)}&sellerId=${encodeURIComponent(sellerId)}&threadId=${encodeURIComponent(threadId)}`);
+                    } catch (e: any) {
+                      toast({
+                        title: 'Could not start message',
+                        description: e?.message || 'Please try again.',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setCreatingMessage(false);
+                    }
+                  }}
+                >
+                  {creatingMessage ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+                  Message
+                </Button>
+                <SaveSellerButton sellerId={sellerId} size="sm" />
+              </>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -279,7 +325,54 @@ export default function SellerProfilePage() {
                   </div>
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <SellerTrustBadges badgeIds={publicTrust?.badgeIds} />
-                      {sellerId ? <SaveSellerButton sellerId={sellerId} size="sm" /> : null}
+                      {!isSelf && sellerId ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="font-semibold"
+                            disabled={creatingMessage || listingsLoading || activeListings.length === 0}
+                            onClick={async () => {
+                              try {
+                                if (!user?.uid) return;
+                                if (!sellerId) return;
+                                if (activeListings.length === 0) {
+                                  toast({
+                                    title: 'No listings to message about',
+                                    description: 'This seller has no active listings right now.',
+                                    variant: 'destructive',
+                                  });
+                                  return;
+                                }
+                                setCreatingMessage(true);
+                                const listingId = activeListings[0].id;
+                                const threadId = await getOrCreateThread(listingId, user.uid, sellerId);
+                                router.push(
+                                  `/dashboard/messages?listingId=${encodeURIComponent(listingId)}&sellerId=${encodeURIComponent(
+                                    sellerId
+                                  )}&threadId=${encodeURIComponent(threadId)}`
+                                );
+                              } catch (e: any) {
+                                toast({
+                                  title: 'Could not start message',
+                                  description: e?.message || 'Please try again.',
+                                  variant: 'destructive',
+                                });
+                              } finally {
+                                setCreatingMessage(false);
+                              }
+                            }}
+                          >
+                            {creatingMessage ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                            )}
+                            Message
+                          </Button>
+                          <SaveSellerButton sellerId={sellerId} size="sm" />
+                        </>
+                      ) : null}
                     </div>
                 </div>
               </div>
