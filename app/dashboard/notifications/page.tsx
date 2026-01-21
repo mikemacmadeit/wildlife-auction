@@ -29,11 +29,12 @@ import {
   AlertTriangle,
   ShieldAlert,
   DollarSign,
+  Handshake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
-type UiTab = 'all' | 'auctions' | 'orders';
+type UiTab = 'all' | 'offers' | 'auctions' | 'orders';
 
 type UserNotification = {
   id: string;
@@ -78,16 +79,19 @@ function timeAgo(n: UserNotification): string | null {
 
 function categoryFor(n: UserNotification): UiTab {
   const c = String(n.category || '').toLowerCase();
+  if (c === 'offers') return 'offers';
   if (c === 'auctions') return 'auctions';
   if (c === 'orders') return 'orders';
   // fallback based on type
   const t = String(n.type || '');
+  if (t.startsWith('offer_')) return 'offers';
   if (t.startsWith('auction_') || t.startsWith('bid_')) return 'auctions';
   if (t.startsWith('order_') || t.startsWith('payout_')) return 'orders';
   return 'all';
 }
 
 function iconFor(tab: UiTab) {
+  if (tab === 'offers') return Handshake;
   if (tab === 'auctions') return Gavel;
   if (tab === 'orders') return ShoppingBag;
   return Bell;
@@ -110,6 +114,18 @@ function styleForNotification(n: UserNotification): {
         'bg-primary/15 border-primary/25 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary',
       unreadRowClass: 'bg-primary/5',
       newBadgeClass: 'bg-primary/15 text-primary border-primary/25',
+    };
+  }
+
+  // Offers (Best Offer / eBay-style)
+  if (type.startsWith('offer_') || category === 'offers') {
+    return {
+      Icon: Handshake,
+      chipClass:
+        'bg-fuchsia-500/15 border-fuchsia-500/25 text-fuchsia-800 dark:bg-fuchsia-400/15 dark:border-fuchsia-400/25 dark:text-fuchsia-300',
+      unreadRowClass: 'bg-fuchsia-500/5 dark:bg-fuchsia-400/10',
+      newBadgeClass:
+        'bg-fuchsia-500/15 text-fuchsia-800 border-fuchsia-500/25 dark:bg-fuchsia-400/15 dark:text-fuchsia-200 dark:border-fuchsia-400/25',
     };
   }
 
@@ -237,19 +253,22 @@ export default function NotificationsPage() {
 
   const unreadCount = useMemo(() => items.filter((n) => n.read !== true).length, [items]);
   const tabCounts = useMemo(() => {
+    const offers = items.filter((n) => categoryFor(n) === 'offers').length;
     const auctions = items.filter((n) => categoryFor(n) === 'auctions').length;
     const orders = items.filter((n) => categoryFor(n) === 'orders').length;
     return {
       all: items.length,
+      offers,
       auctions,
       orders,
     };
   }, [items]);
 
   const tabUnreadCounts = useMemo(() => {
+    const offers = items.filter((n) => n.read !== true && categoryFor(n) === 'offers').length;
     const auctions = items.filter((n) => n.read !== true && categoryFor(n) === 'auctions').length;
     const orders = items.filter((n) => n.read !== true && categoryFor(n) === 'orders').length;
-    return { all: unreadCount, auctions, orders };
+    return { all: unreadCount, offers, auctions, orders };
   }, [items, unreadCount]);
 
   const markAllRead = useCallback(async () => {
@@ -345,6 +364,9 @@ export default function NotificationsPage() {
                   {tabCounts.all} total
                 </Badge>
                 <Badge variant="outline" className="font-semibold">
+                  <Handshake className="h-3 w-3 mr-1" /> {tabCounts.offers} offers
+                </Badge>
+                <Badge variant="outline" className="font-semibold">
                   <Gavel className="h-3 w-3 mr-1" /> {tabCounts.auctions} auctions
                 </Badge>
                 <Badge variant="outline" className="font-semibold">
@@ -370,7 +392,7 @@ export default function NotificationsPage() {
         <CardContent className="p-0">
           <Tabs value={tab} onValueChange={(v) => setTab(v as UiTab)} className="w-full">
             <div className="px-5 pb-4">
-              <TabsList className="grid grid-cols-3 w-full">
+              <TabsList className="grid grid-cols-4 w-full">
                 <TabsTrigger value="all" className="font-semibold">
                   <span className="flex items-center justify-center gap-2">
                     <Bell className="h-4 w-4" />
@@ -378,6 +400,17 @@ export default function NotificationsPage() {
                     {tabUnreadCounts.all > 0 ? (
                       <Badge variant="secondary" className="h-5 px-1.5 text-xs">
                         {tabUnreadCounts.all}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="offers" className="font-semibold">
+                  <span className="flex items-center justify-center gap-2">
+                    <Handshake className="h-4 w-4" />
+                    Offers
+                    {tabUnreadCounts.offers > 0 ? (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {tabUnreadCounts.offers}
                       </Badge>
                     ) : null}
                   </span>

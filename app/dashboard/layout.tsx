@@ -57,7 +57,8 @@ import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { subscribeToUnreadCount, subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
+import { subscribeToUnreadCount, subscribeToUnreadCountByType, subscribeToUnreadCountByTypes } from '@/lib/firebase/notifications';
+import type { NotificationType } from '@/lib/types';
 
 interface DashboardNavItem {
   href: string;
@@ -110,6 +111,7 @@ export default function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
+  const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
@@ -127,9 +129,12 @@ export default function DashboardLayout({
       if (item.href === '/dashboard/notifications') {
         return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
       }
+      if (item.href === '/dashboard/bids-offers') {
+        return { ...item, badge: unreadOffersCount > 0 ? unreadOffersCount : undefined };
+      }
       return item;
     });
-  }, [unreadMessagesCount, unreadNotificationsCount]);
+  }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
@@ -145,6 +150,7 @@ export default function DashboardLayout({
     if (!user?.uid) {
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
+      setUnreadOffersCount(0);
       setPendingApprovalsCount(0);
       return;
     }
@@ -171,6 +177,24 @@ export default function DashboardLayout({
       );
     } catch (e) {
       console.error('Failed to subscribe to unread total notifications count:', e);
+    }
+
+    // 1c) Offers badge: unread offer notifications (eBay-like: "you have offer activity")
+    try {
+      const offerTypes: NotificationType[] = [
+        'offer_received',
+        'offer_countered',
+        'offer_accepted',
+        'offer_declined',
+        'offer_expired',
+      ];
+      unsubs.push(
+        subscribeToUnreadCountByTypes(user.uid, offerTypes, (count) => {
+          setUnreadOffersCount(count || 0);
+        })
+      );
+    } catch (e) {
+      console.error('Failed to subscribe to unread offer notifications count:', e);
     }
 
     // 2) Admin badge: pending listing approvals (drops as listings are approved/rejected)

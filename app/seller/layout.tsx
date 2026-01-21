@@ -54,7 +54,8 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
-import { subscribeToUnreadCount, subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
+import { subscribeToUnreadCount, subscribeToUnreadCountByType, subscribeToUnreadCountByTypes } from '@/lib/firebase/notifications';
+import type { NotificationType } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
@@ -109,6 +110,7 @@ export default function SellerLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
+  const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
@@ -164,9 +166,12 @@ export default function SellerLayout({
       if (item.href === '/dashboard/notifications') {
         return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
       }
+      if (item.href === '/dashboard/bids-offers') {
+        return { ...item, badge: unreadOffersCount > 0 ? unreadOffersCount : undefined };
+      }
       return item;
     });
-  }, [unreadMessagesCount, unreadNotificationsCount]);
+  }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
@@ -182,6 +187,7 @@ export default function SellerLayout({
     if (!user?.uid) {
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
+      setUnreadOffersCount(0);
       return;
     }
 
@@ -197,11 +203,24 @@ export default function SellerLayout({
           setUnreadNotificationsCount(count || 0);
         })
       );
+      const offerTypes: NotificationType[] = [
+        'offer_received',
+        'offer_countered',
+        'offer_accepted',
+        'offer_declined',
+        'offer_expired',
+      ];
+      unsubs.push(
+        subscribeToUnreadCountByTypes(user.uid, offerTypes, (count) => {
+          setUnreadOffersCount(count || 0);
+        })
+      );
       return () => unsubs.forEach((fn) => fn());
     } catch (e) {
       console.error('Failed to subscribe to unread message count:', e);
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
+      setUnreadOffersCount(0);
       return;
     }
   }, [user?.uid]);

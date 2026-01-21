@@ -907,6 +907,12 @@ export type NotificationType =
   | 'message_received'
   | 'bid_received'
   | 'bid_outbid'
+  // Best Offer (eBay-style)
+  | 'offer_received'
+  | 'offer_countered'
+  | 'offer_accepted'
+  | 'offer_declined'
+  | 'offer_expired'
   | 'order_created'
   | 'order_paid'
   | 'order_completed'

@@ -214,6 +214,40 @@ export function subscribeToUnreadCountByType(
 }
 
 /**
+ * Subscribe to unread notification count for a set of notification types (real-time).
+ * Useful for per-nav badges (e.g., offers across multiple offer_* types).
+ *
+ * Note: Firestore `in` queries support up to 10 values.
+ */
+export function subscribeToUnreadCountByTypes(
+  userId: string,
+  types: NotificationType[],
+  callback: (count: number) => void
+): Unsubscribe {
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
+
+  if (!types?.length) {
+    // No-op subscription: immediately report 0 and return a dummy unsub.
+    callback(0);
+    return () => {};
+  }
+
+  const uniq = Array.from(new Set(types)).slice(0, 10);
+  const q = query(notificationsRef, where('type', 'in', uniq), limit(250));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const unread = snapshot.docs.filter((d) => (d.data() as any)?.read !== true).length;
+      callback(unread);
+    },
+    (error) => {
+      handleListenerError('subscribeToUnreadCountByTypes', error, callback);
+    }
+  );
+}
+
+/**
  * Mark all unread notifications of a specific type as read for a user.
  * This is used to "clear" badges in a persistent way (Firestore write).
  */
