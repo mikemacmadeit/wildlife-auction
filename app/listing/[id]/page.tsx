@@ -672,15 +672,15 @@ export default function ListingDetailPage() {
     if (!listing) return;
     try {
       setPaymentDialogOpen(false);
-      setIsPlacingBid(true);
 
-      // Defensive: animal listings require explicit acknowledgment (server-enforced).
-      // If we got here without it (e.g., user opened checkout error dialog and retried),
-      // route them back through the acknowledgment dialog.
+      // Animal listings require explicit acknowledgment (server-enforced).
+      // If we got here without it (e.g. retry buttons), route back through the ack dialog.
       if (isAnimalListing && !animalRiskAcked) {
         setAnimalAckOpen(true);
         return;
       }
+
+      setIsPlacingBid(true);
 
       // Client-side eligibility guard for nicer UX (server also enforces).
       if (method !== 'card' && !eligiblePaymentMethods.includes(method as any)) {
@@ -710,8 +710,8 @@ export default function ListingDetailPage() {
         technical: error?.message ? String(error.message) : String(error),
       });
       setCheckoutErrorOpen(true);
-      setIsPlacingBid(false);
     } finally {
+      setIsPlacingBid(false);
       setPendingCheckout(null);
     }
   };
