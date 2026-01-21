@@ -41,6 +41,7 @@ export interface ReleasePaymentResult {
     paymentIntentId?: string;
     chargeId?: string;
     balanceTransactionId?: string;
+    balanceTransactionStatus?: string;
     availableOnUnix?: number;
     availableOnIso?: string;
     minutesUntilAvailable?: number;
@@ -62,6 +63,7 @@ type StripeSettlementStatus = {
   paymentIntentId: string;
   chargeId: string | null;
   balanceTransactionId: string | null;
+  balanceTransactionStatus: string | null;
 };
 
 async function getPlatformUsdBalanceDebug(): Promise<{
@@ -118,6 +120,7 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
       paymentIntentId,
       chargeId: null,
       balanceTransactionId: null,
+      balanceTransactionStatus: null,
     };
   }
 
@@ -134,6 +137,7 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
   const btRaw = charge?.balance_transaction || null;
   let bt: any = null;
   let balanceTransactionId: string | null = null;
+  let balanceTransactionStatus: string | null = null;
   if (typeof btRaw === 'string') {
     balanceTransactionId = btRaw;
     bt = await stripe.balanceTransactions.retrieve(btRaw);
@@ -142,9 +146,17 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
     balanceTransactionId = bt?.id ? String(bt.id) : null;
   }
 
+  balanceTransactionStatus = typeof bt?.status === 'string' ? String(bt.status) : null; // 'available' | 'pending' | unknown
   const availableOnUnix = typeof bt?.available_on === 'number' ? bt.available_on : null;
   const nowUnix = Math.floor(Date.now() / 1000);
-  const isAvailableNow = availableOnUnix ? availableOnUnix <= nowUnix : true; // if unknown, do not block
+  // Prefer Stripe's explicit status when present.
+  // If status is missing, fall back to `available_on` timestamp.
+  const isAvailableNow =
+    balanceTransactionStatus === 'available'
+      ? true
+      : balanceTransactionStatus === 'pending'
+        ? false
+        : (availableOnUnix ? availableOnUnix <= nowUnix : true); // if unknown, do not block
   const availableOnIso = availableOnUnix ? new Date(availableOnUnix * 1000).toISOString() : null;
   const minutesUntilAvailable =
     !isAvailableNow && availableOnUnix ? Math.max(1, Math.ceil((availableOnUnix - nowUnix) / 60)) : null;
@@ -157,6 +169,7 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
     paymentIntentId,
     chargeId,
     balanceTransactionId,
+    balanceTransactionStatus,
   };
 }
 
@@ -533,6 +546,7 @@ export async function releasePaymentForOrder(
               paymentIntentId,
               chargeId: settlementForTransfer.chargeId || undefined,
               balanceTransactionId: settlementForTransfer.balanceTransactionId || undefined,
+              balanceTransactionStatus: settlementForTransfer.balanceTransactionStatus || undefined,
               availableOnUnix: settlementForTransfer.availableOnUnix || undefined,
               availableOnIso: settlementForTransfer.availableOnIso || undefined,
               minutesUntilAvailable: settlementForTransfer.minutesUntilAvailable || undefined,
@@ -709,6 +723,7 @@ export async function releasePaymentForOrder(
           paymentIntentId: paymentIntentId || undefined,
           chargeId: settlement?.chargeId || undefined,
           balanceTransactionId: settlement?.balanceTransactionId || undefined,
+          balanceTransactionStatus: settlement?.balanceTransactionStatus || undefined,
           availableOnUnix: settlement?.availableOnUnix || undefined,
           availableOnIso: settlement?.availableOnIso || undefined,
           minutesUntilAvailable: settlement?.minutesUntilAvailable || undefined,
