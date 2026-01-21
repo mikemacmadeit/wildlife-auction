@@ -692,7 +692,37 @@ export const updateListing = async (
     // Remove undefined values recursively (nested objects like bestOfferSettings, location, etc.)
     const cleanedUpdates = stripUndefinedDeep(firestoreUpdates);
 
-    await updateDoc(listingRef, cleanedUpdates);
+    try {
+      await updateDoc(listingRef, cleanedUpdates);
+      return;
+    } catch (e: any) {
+      // Fallback: in some flows (e.g. duplicate → convert), strict Firestore rules can deny a client write.
+      // Use a server endpoint (Admin SDK) to apply the same safety gates more ergonomically.
+      const code = String(e?.code || '');
+      if (!code.includes('permission-denied')) throw e;
+
+      const user = auth.currentUser;
+      if (!user) throw e;
+      if (user.uid !== uid) throw e;
+
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/listings/${listingId}/update`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ updates: cleanedUpdates }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok !== true) {
+        const err: any = new Error(json?.message || json?.error || 'Failed to update listing');
+        if (json?.code) err.code = json.code;
+        if (json?.blockedFields) err.blockedFields = json.blockedFields;
+        throw err;
+      }
+      return;
+    }
   } catch (error) {
     console.error('Error updating listing:', error);
     throw error;
