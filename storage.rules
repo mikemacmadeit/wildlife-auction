@@ -22,6 +22,16 @@ service firebase.storage {
         firestore.get(/databases/(default)/documents/listings/$(listingId)) != null &&
         firestore.get(/databases/(default)/documents/listings/$(listingId)).data.sellerId == request.auth.uid;
     }
+
+    function isMessageThreadParticipant(threadId) {
+      return isAuthenticated() &&
+        firestore.get(/databases/(default)/documents/messageThreads/$(threadId)) != null &&
+        (
+          firestore.get(/databases/(default)/documents/messageThreads/$(threadId)).data.buyerId == request.auth.uid ||
+          firestore.get(/databases/(default)/documents/messageThreads/$(threadId)).data.sellerId == request.auth.uid ||
+          isAdmin()
+        );
+    }
     
     // ============================================
     // LISTING IMAGES
@@ -46,6 +56,17 @@ service firebase.storage {
       allow read: if isAuthenticated() && request.auth.uid == userId;
       allow write: if isAuthenticated() && request.auth.uid == userId;
       allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // MESSAGE THREAD ATTACHMENTS (Participant-shared)
+    // ============================================
+    // Path: messageThreads/{threadId}/attachments/{attachmentId}/{fileName}
+    // Allows buyer+seller in the thread to share images securely.
+    match /messageThreads/{threadId}/attachments/{attachmentId}/{fileName} {
+      allow read: if isMessageThreadParticipant(threadId);
+      allow write: if isMessageThreadParticipant(threadId);
+      allow delete: if isMessageThreadParticipant(threadId);
     }
     
     // ============================================

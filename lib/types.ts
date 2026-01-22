@@ -1003,6 +1003,34 @@ export interface MessageThread {
     text: string;
   }>;
   archived?: boolean;
+
+  /**
+   * App-like UX fields (optional; back-compat with older docs).
+   * These are used for richer messaging behaviors: read state, typing indicators, and per-participant settings.
+   */
+  buyerLastReadAt?: Date;
+  sellerLastReadAt?: Date;
+  buyerTypingUntil?: Date;
+  sellerTypingUntil?: Date;
+  buyerMuted?: boolean;
+  sellerMuted?: boolean;
+  buyerPinned?: boolean;
+  sellerPinned?: boolean;
+}
+
+export type MessageKind = 'text' | 'system' | 'offer_card' | 'order_card';
+
+export type MessageAttachmentKind = 'image';
+
+export interface MessageAttachment {
+  id: string;
+  kind: MessageAttachmentKind;
+  url: string;
+  contentType?: string;
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
+  name?: string;
 }
 
 export interface Message {
@@ -1023,6 +1051,17 @@ export interface Message {
     email: boolean;
     paymentKeywords: string[];
   };
+
+  // Rich messaging (optional; back-compat)
+  kind?: MessageKind;
+  attachments?: MessageAttachment[];
+  replyTo?: {
+    messageId: string;
+    senderId: string;
+    bodyPreview?: string;
+  };
+  // Simple reactions model (optional): emoji -> list of userIds.
+  reactions?: Record<string, string[]>;
 }
 
 // Document Types (for permits, CVIs, etc.)
