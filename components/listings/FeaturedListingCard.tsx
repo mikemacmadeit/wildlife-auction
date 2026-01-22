@@ -52,6 +52,10 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     cover?.focalPoint && typeof cover.focalPoint.x === 'number' && typeof cover.focalPoint.y === 'number'
       ? `${Math.max(0, Math.min(1, cover.focalPoint.x)) * 100}% ${Math.max(0, Math.min(1, cover.focalPoint.y)) * 100}%`
       : undefined;
+  const coverCropZoom =
+    typeof (cover as any)?.cropZoom === 'number' && Number.isFinite((cover as any).cropZoom)
+      ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
+      : 1;
 
   return (
     <motion.div
@@ -102,16 +106,26 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             </div>
             
             {coverUrl ? (
-              <Image
-                src={coverUrl}
-                alt={listing.title}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
-                style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                unoptimized
-                priority={index < 2}
-              />
+              <div className="absolute inset-0 overflow-hidden">
+                <div
+                  className="absolute inset-0 transition-transform duration-500"
+                  style={{
+                    transform: `scale(${coverCropZoom})`,
+                    transformOrigin: coverObjectPosition || '50% 50%',
+                  }}
+                >
+                  <Image
+                    src={coverUrl}
+                    alt={listing.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    unoptimized
+                    priority={index < 2}
+                  />
+                </div>
+              </div>
             ) : (
               <div className="w-full h-full bg-muted flex items-center justify-center">
                 <div className="text-center space-y-2">

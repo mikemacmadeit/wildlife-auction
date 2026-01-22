@@ -13,10 +13,10 @@ interface ImageGalleryProps {
   title: string;
   className?: string;
   /**
-   * Optional focal points (0..1 normalized) keyed by image URL.
-   * When provided, we apply `object-position` so `object-cover` matches the crop/focal point chosen in upload.
+   * Optional crop settings keyed by image URL.
+   * When provided, we apply `object-position` (and optional zoom) so `object-cover` matches the crop chosen in upload.
    */
-  focalPointsByUrl?: Record<string, { x: number; y: number }>;
+  focalPointsByUrl?: Record<string, { x: number; y: number; zoom?: number }>;
 }
 
 export function ImageGallery({ images, title, className, focalPointsByUrl }: ImageGalleryProps) {
@@ -29,6 +29,12 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
     const x = Math.max(0, Math.min(1, fp.x));
     const y = Math.max(0, Math.min(1, fp.y));
     return `${Math.round(x * 100)}% ${Math.round(y * 100)}%`;
+  };
+
+  const getZoom = (url: string): number => {
+    const fp = url && focalPointsByUrl ? focalPointsByUrl[url] : undefined;
+    const z = typeof fp?.zoom === 'number' && Number.isFinite(fp.zoom) ? fp.zoom : 1;
+    return Math.max(1, Math.min(3, z));
   };
 
   if (!images || images.length === 0) {
@@ -72,16 +78,26 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
         }}
         aria-label="Open image viewer"
       >
-        <Image
-          src={images[selectedIndex]}
-          alt={`${title} - Image ${selectedIndex + 1}`}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          style={{ objectPosition: getObjectPosition(images[selectedIndex] || '') }}
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-          unoptimized
-          priority={selectedIndex === 0}
-        />
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0 transition-transform duration-500"
+            style={{
+              transform: `scale(${getZoom(images[selectedIndex] || '')})`,
+              transformOrigin: getObjectPosition(images[selectedIndex] || ''),
+            }}
+          >
+            <Image
+              src={images[selectedIndex]}
+              alt={`${title} - Image ${selectedIndex + 1}`}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              style={{ objectPosition: getObjectPosition(images[selectedIndex] || '') }}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+              unoptimized
+              priority={selectedIndex === 0}
+            />
+          </div>
+        </div>
         
         {/* Gradient Overlay on Hover */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -156,15 +172,25 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
                   : 'border-border/50 hover:border-primary/50'
               )}
             >
-              <Image
-                src={image}
-                alt={`Thumbnail ${index + 1}`}
-                fill
-                className="object-cover"
-                style={{ objectPosition: getObjectPosition(image) }}
-                sizes="(max-width: 768px) 25vw, 150px"
-                unoptimized
-              />
+              <div className="absolute inset-0 overflow-hidden">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    transform: `scale(${getZoom(image)})`,
+                    transformOrigin: getObjectPosition(image),
+                  }}
+                >
+                  <Image
+                    src={image}
+                    alt={`Thumbnail ${index + 1}`}
+                    fill
+                    className="object-cover"
+                    style={{ objectPosition: getObjectPosition(image) }}
+                    sizes="(max-width: 768px) 25vw, 150px"
+                    unoptimized
+                  />
+                </div>
+              </div>
               {selectedIndex === index && (
                 <div className="absolute inset-0 bg-primary/20 border-2 border-primary rounded-md" />
               )}

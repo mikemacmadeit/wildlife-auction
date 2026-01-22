@@ -85,6 +85,7 @@ export interface CreateListingInput {
     height?: number;
     sortOrder?: number;
     focalPoint?: { x: number; y: number };
+    cropZoom?: number;
   }>;
   coverPhotoId?: string;
   location: {
@@ -294,6 +295,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
               typeof p.focalPoint.y === 'number'
                 ? { x: Math.max(0, Math.min(1, p.focalPoint.x)), y: Math.max(0, Math.min(1, p.focalPoint.y)) }
                 : undefined,
+            cropZoom: typeof p?.cropZoom === 'number' && Number.isFinite(p.cropZoom) ? Math.max(1, Math.min(3, p.cropZoom)) : undefined,
           }))
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       : undefined;

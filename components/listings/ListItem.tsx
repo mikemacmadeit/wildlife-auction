@@ -67,6 +67,10 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     cover?.focalPoint && typeof cover.focalPoint.x === 'number' && typeof cover.focalPoint.y === 'number'
       ? `${Math.max(0, Math.min(1, cover.focalPoint.x)) * 100}% ${Math.max(0, Math.min(1, cover.focalPoint.y)) * 100}%`
       : undefined;
+  const coverCropZoom =
+    typeof (cover as any)?.cropZoom === 'number' && Number.isFinite((cover as any).cropZoom)
+      ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
+      : 1;
 
   const specs = useMemo(() => {
     // eBay-style “at a glance” line: Species • Sex • Age
@@ -202,16 +206,26 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
           <div className="relative w-32 sm:w-44 md:w-full h-32 sm:h-44 md:h-full min-h-[128px] md:min-h-[208px] flex-shrink-0 bg-muted overflow-hidden rounded-l-xl">
             
             {coverUrl ? (
-              <Image
-                src={coverUrl}
-                alt={listing.title}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
-                style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
-                sizes="(max-width: 640px) 128px, (max-width: 768px) 176px, (max-width: 1024px) 288px, 320px"
-                unoptimized
-                loading="lazy"
-              />
+              <div className="absolute inset-0 overflow-hidden">
+                <div
+                  className="absolute inset-0 transition-transform duration-500"
+                  style={{
+                    transform: `scale(${coverCropZoom})`,
+                    transformOrigin: coverObjectPosition || '50% 50%',
+                  }}
+                >
+                  <Image
+                    src={coverUrl}
+                    alt={listing.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
+                    sizes="(max-width: 640px) 128px, (max-width: 768px) 176px, (max-width: 1024px) 288px, 320px"
+                    unoptimized
+                    loading="lazy"
+                  />
+                </div>
+              </div>
             ) : (
               <div className="w-full h-full bg-muted flex items-center justify-center">
                 <span className="text-muted-foreground text-sm font-medium">No Image</span>

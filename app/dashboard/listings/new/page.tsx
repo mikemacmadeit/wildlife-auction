@@ -137,16 +137,18 @@ function NewListingPageContent() {
     savedAtMs?: number;
   } | null>(null);
 
-  // Focal points selected during photo upload/crop (used to match review preview to chosen crop).
+  // Crop settings selected during photo upload/crop (used to match review preview to chosen crop).
   const focalPointsByUrl = useMemo(() => {
-    const m: Record<string, { x: number; y: number }> = {};
+    const m: Record<string, { x: number; y: number; zoom?: number }> = {};
     const photos = Array.isArray(formData.photos) ? formData.photos : [];
     for (const p of photos) {
       const url = typeof (p as any)?.url === 'string' ? String((p as any).url) : '';
       const fp = (p as any)?.focalPoint;
       if (!url || !fp) continue;
       if (typeof fp?.x === 'number' && typeof fp?.y === 'number') {
-        m[url] = { x: fp.x, y: fp.y };
+        const zRaw = (p as any)?.cropZoom;
+        const zoom = typeof zRaw === 'number' && Number.isFinite(zRaw) ? Math.max(1, Math.min(3, zRaw)) : undefined;
+        m[url] = { x: fp.x, y: fp.y, zoom };
       }
     }
     return m;

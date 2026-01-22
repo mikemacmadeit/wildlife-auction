@@ -11,7 +11,7 @@ import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw, Crop } from 
 import { cn } from '@/lib/utils';
 import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
-import { PhotoCropDialog, type FocalPoint } from '@/components/photos/PhotoCropDialog';
+import { PhotoCropDialog, type FocalPoint, type PhotoCropResult } from '@/components/photos/PhotoCropDialog';
 
 export type ListingPhotoSnapshot = {
   photoId: string;
@@ -24,6 +24,11 @@ export type ListingPhotoSnapshot = {
    * This does not modify the underlying image; it only affects how it is positioned when using `object-fit: cover`.
    */
   focalPoint?: FocalPoint;
+  /**
+   * Optional zoom factor (>=1) used to match the crop the user chose in the crop dialog.
+   * This is applied at render-time (CSS transform) for thumbnails/cards.
+   */
+  cropZoom?: number;
 };
 
 export function ListingPhotoPicker(props: {
@@ -45,16 +50,16 @@ export function ListingPhotoPicker(props: {
   const [activeUploads, setActiveUploads] = useState<UserPhotoDoc[]>([]);
   const [deletedUploads, setDeletedUploads] = useState<UserPhotoDoc[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const cropResolveRef = useRef<null | ((fp: FocalPoint | null) => void)>(null);
+  const cropResolveRef = useRef<null | ((res: PhotoCropResult | null) => void)>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropTarget, setCropTarget] = useState<null | { photoId: string; url: string }>(null);
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.photoId)), [selected]);
 
-  const requestCrop = async (target: { photoId: string; url: string }): Promise<FocalPoint | null> => {
+  const requestCrop = async (target: { photoId: string; url: string }): Promise<PhotoCropResult | null> => {
     setCropTarget(target);
     setCropOpen(true);
-    return await new Promise<FocalPoint | null>((resolve) => {
+    return await new Promise<PhotoCropResult | null>((resolve) => {
       cropResolveRef.current = resolve;
     });
   };
@@ -121,8 +126,10 @@ export function ListingPhotoPicker(props: {
     onChange({ selected: next, coverPhotoId: nextCover });
   };
 
-  const setFocalPoint = (photoId: string, focalPoint: FocalPoint | undefined) => {
-    const next = selected.map((s) => (s.photoId === photoId ? { ...s, focalPoint } : s));
+  const setCrop = (photoId: string, crop: { focalPoint?: FocalPoint; cropZoom?: number }) => {
+    const next = selected.map((s) =>
+      s.photoId === photoId ? { ...s, focalPoint: crop.focalPoint, cropZoom: crop.cropZoom } : s
+    );
     onChange({ selected: next, coverPhotoId });
   };
 
@@ -169,9 +176,11 @@ export function ListingPhotoPicker(props: {
 
           // Smooth onboarding: if this becomes the cover, prompt the user to set the crop focal point once.
           if (workingCover === res.photoId) {
-            const fp = await requestCrop({ photoId: res.photoId, url: res.downloadUrl });
-            if (fp) {
-              workingSelected = workingSelected.map((x) => (x.photoId === res.photoId ? { ...x, focalPoint: fp } : x));
+            const crop = await requestCrop({ photoId: res.photoId, url: res.downloadUrl });
+            if (crop) {
+              workingSelected = workingSelected.map((x) =>
+                x.photoId === res.photoId ? { ...x, focalPoint: crop.focalPoint, cropZoom: crop.zoom } : x
+              );
               onChange({ selected: workingSelected, coverPhotoId: workingCover });
             }
           }
@@ -255,8 +264,8 @@ export function ListingPhotoPicker(props: {
                     onDragMove={(from, to) => move(from, to)}
                     onRemove={() => removeSelected(p.photoId)}
                     onEditCrop={async () => {
-                      const fp = await requestCrop({ photoId: p.photoId, url: p.url });
-                      if (fp) setFocalPoint(p.photoId, fp);
+                      const crop = await requestCrop({ photoId: p.photoId, url: p.url });
+                      if (crop) setCrop(p.photoId, { focalPoint: crop.focalPoint, cropZoom: crop.zoom });
                     }}
                   />
                 ))}
@@ -362,12 +371,12 @@ export function ListingPhotoPicker(props: {
           }}
           imageSrc={cropTarget.url}
           aspect={4 / 3}
-          onSave={(fp) => {
+          onSave={(res) => {
             const resolve = cropResolveRef.current;
             cropResolveRef.current = null;
             setCropTarget(null);
             setCropOpen(false);
-            resolve?.(fp);
+            resolve?.(res);
           }}
         />
       ) : null}
@@ -517,6 +526,7 @@ function SelectedTile(props: {
     p.focalPoint && Number.isFinite(p.focalPoint.x) && Number.isFinite(p.focalPoint.y)
       ? `${Math.round(p.focalPoint.x * 100)}% ${Math.round(p.focalPoint.y * 100)}%`
       : '50% 50%';
+  const cropZoom = Number.isFinite(p.cropZoom as any) ? Math.max(1, Math.min(3, Number(p.cropZoom))) : 1;
   return (
     <div
       className={cn(
@@ -543,14 +553,24 @@ function SelectedTile(props: {
       }}
     >
       <div className="relative aspect-square">
-        <Image
-          src={p.url}
-          alt="Selected"
-          fill
-          className="object-cover"
-          style={{ objectPosition }}
-          unoptimized
-        />
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{
+              transform: cropZoom !== 1 ? `scale(${cropZoom})` : undefined,
+              transformOrigin: objectPosition,
+            }}
+          >
+            <Image
+              src={p.url}
+              alt="Selected"
+              fill
+              className="object-cover"
+              style={{ objectPosition }}
+              unoptimized
+            />
+          </div>
+        </div>
       </div>
 
       {/* Controls BELOW the thumbnail (no overlays; easier to read + tap on small tiles) */}

@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
 export type FocalPoint = { x: number; y: number };
+export type PhotoCropResult = { focalPoint: FocalPoint; zoom: number };
 
 function clamp01(n: number) {
   if (!Number.isFinite(n)) return 0.5;
@@ -22,7 +23,7 @@ export function PhotoCropDialog(props: {
   aspect?: number; // width/height
   title?: string;
   description?: string;
-  onSave: (focalPoint: FocalPoint) => void;
+  onSave: (result: PhotoCropResult) => void;
 }) {
   const {
     open,
@@ -56,6 +57,11 @@ export function PhotoCropDialog(props: {
     const cy = (croppedAreaPixels.y + croppedAreaPixels.height / 2) / (media.naturalHeight || 1);
     return { x: clamp01(cx), y: clamp01(cy) };
   }, [croppedAreaPixels, media]);
+
+  const cropResult = useMemo<PhotoCropResult>(() => {
+    const safeZoom = Number.isFinite(zoom) ? Math.max(1, Math.min(3, zoom)) : 1;
+    return { focalPoint, zoom: safeZoom };
+  }, [focalPoint, zoom]);
 
   return (
     <Dialog
@@ -122,7 +128,7 @@ export function PhotoCropDialog(props: {
               type="button"
               className="min-h-[44px] font-semibold"
               disabled={!saveEnabled}
-              onClick={() => onSave(focalPoint)}
+              onClick={() => onSave(cropResult)}
             >
               Save
             </Button>

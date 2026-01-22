@@ -333,6 +333,11 @@ export interface Listing {
      * Normalized coordinates (0..1).
      */
     focalPoint?: { x: number; y: number };
+    /**
+     * Optional UI zoom factor (>=1) for thumbnail rendering (pairs with focalPoint).
+     * Does not change the underlying image bytes.
+     */
+    cropZoom?: number;
   }>;
   coverPhotoId?: string;
   
