@@ -374,14 +374,18 @@ export default function MessagesPage() {
                 <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
               ) : (
                 <ScrollArea className="h-full">
-                  <div className="divide-y divide-border/50">
+                  {/* Add a little right padding so the scroll bar never clips row content (especially on Windows). */}
+                  <div className="divide-y divide-border/50 pr-3">
                     {inboxItems.map((item) => {
                       const active = selectedThreadId === item.id || thread?.id === item.id;
                       const updatedAt = item.updatedAtMs ? new Date(item.updatedAtMs) : null;
                       return (
                         <div
                           key={item.id}
-                          className={cn('group flex items-stretch gap-2 p-3 hover:bg-muted/30 transition-colors', active && 'bg-muted/40')}
+                          className={cn(
+                            'group w-full min-w-0 flex items-stretch gap-2 p-3 hover:bg-muted/30 transition-colors',
+                            active && 'bg-muted/40'
+                          )}
                         >
                           <button
                             onClick={() => {
