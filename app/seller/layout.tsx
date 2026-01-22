@@ -54,7 +54,12 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
-import { subscribeToUnreadCount, subscribeToUnreadCountByType, subscribeToUnreadCountByTypes } from '@/lib/firebase/notifications';
+import {
+  markNotificationsAsReadByTypes,
+  subscribeToUnreadCount,
+  subscribeToUnreadCountByType,
+  subscribeToUnreadCountByTypes,
+} from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
@@ -160,7 +165,7 @@ export default function SellerLayout({
 
   const baseNavWithBadges = useMemo(() => {
     return baseNavItems.map((item) => {
-      if (item.href === '/seller/messages') {
+      if (item.href === '/dashboard/messages') {
         return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
       }
       if (item.href === '/dashboard/notifications') {
@@ -172,6 +177,13 @@ export default function SellerLayout({
       return item;
     });
   }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
+
+  // Clear the Messages badge when the user views the Messages page.
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!pathname?.startsWith('/dashboard/messages')) return;
+    void markNotificationsAsReadByTypes(user.uid, ['message_received']);
+  }, [pathname, user?.uid]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
