@@ -479,67 +479,65 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Logged-out only: Hero Section */}
-      {!user ? (
-        <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
-          {/* Background Image with Dark Overlay */}
-          <div className="absolute inset-0 z-0">
-            <Image
-              src="/images/Buck_1.webp"
-              alt="Wildlife Exchange Hero Background"
-              fill
-              className="object-cover object-[50%_20%]"
-              priority
-              quality={90}
-              sizes="100vw"
-            />
-            {/* Dark Overlay for Text Readability - Strong enough for contrast */}
-            <div className="absolute inset-0 bg-black/60 z-0" />
-          </div>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
+        {/* Background Image with Dark Overlay */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/images/Buck_1.webp"
+            alt="Wildlife Exchange Hero Background"
+            fill
+            className="object-cover object-[50%_20%]"
+            priority
+            quality={90}
+            sizes="100vw"
+          />
+          {/* Dark Overlay for Text Readability - Strong enough for contrast */}
+          <div className="absolute inset-0 bg-black/60 z-0" />
+        </div>
 
-          {/* Hero Content */}
-          <div className="relative z-10 container mx-auto px-4 text-center text-white">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="max-w-4xl mx-auto"
-            >
-              <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
-                <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
-                  <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
-                </div>
-                <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
-                  Wildlife Exchange
-                </h1>
+        {/* Hero Content */}
+        <div className="relative z-10 container mx-auto px-4 text-center text-white">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="max-w-4xl mx-auto"
+          >
+            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
+              <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
+                <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
-              <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
-                Wildlife-first marketplace for Texas livestock, horses &amp; ranch assets
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-                <Button
-                  asChild
-                  size="lg"
-                  className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold"
-                >
-                  <Link href="/browse">
-                    Browse Listings
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Link>
-                </Button>
-                <CreateListingGateButton
-                  href="/dashboard/listings/new?fresh=1"
-                  variant="outline"
-                  size="lg"
-                  className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-                >
-                  Create listing
-                </CreateListingGateButton>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      ) : null}
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
+                Wildlife Exchange
+              </h1>
+            </div>
+            <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
+              Wildlife-first marketplace for Texas livestock, horses &amp; ranch assets
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
+              <Button
+                asChild
+                size="lg"
+                className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold"
+              >
+                <Link href="/browse">
+                  Browse Listings
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <CreateListingGateButton
+                href="/dashboard/listings/new?fresh=1"
+                variant="outline"
+                size="lg"
+                className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+              >
+                Create listing
+              </CreateListingGateButton>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
       {/* Trust Indicators */}
       <section className="py-8 md:py-12 border-b border-border/50 bg-card/50">
