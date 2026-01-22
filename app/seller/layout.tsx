@@ -667,16 +667,19 @@ export default function SellerLayout({
       <div className="md:hidden sticky top-0 z-50 border-b border-border/50 bg-card">
         <div className="flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-3">
-            <Image
-              src="/images/Kudu.png"
-              alt="Wildlife Exchange"
-              width={36}
-              height={36}
-              className="h-9 w-9 object-contain opacity-90"
-              priority
-              loading="eager"
+            <div
+              aria-hidden="true"
+              className="h-9 w-9 opacity-95"
               style={{
-                filter: 'brightness(0) saturate(100%) invert(31%) sepia(12%) saturate(1200%) hue-rotate(75deg) brightness(95%) contrast(90%)',
+                backgroundColor: 'hsl(var(--primary))',
+                WebkitMaskImage: "url('/images/Kudu.png')",
+                maskImage: "url('/images/Kudu.png')",
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
               }}
             />
             <div className="flex flex-col">
@@ -691,13 +694,13 @@ export default function SellerLayout({
           <div className="flex items-center gap-1">
             <Link href="/browse" prefetch={false} onClick={(e) => hardNavigate(e, '/browse')}>
               <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Browse listings">
-                <LayoutGrid className="h-5 w-5" />
+                <LayoutGrid className="h-5 w-5 text-primary" />
               </Button>
             </Link>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <Menu className="h-5 w-5" />
+                  <Menu className="h-5 w-5 text-primary" />
                   <span className="sr-only">Menu</span>
                 </Button>
               </SheetTrigger>
