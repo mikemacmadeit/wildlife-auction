@@ -26,9 +26,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ShieldAlert, Rocket, RefreshCw, PlayCircle } from 'lucide-react';
+import { Loader2, ShieldAlert, Rocket, RefreshCw, PlayCircle, Mail, ChevronDown } from 'lucide-react';
 import { listEmailEvents } from '@/lib/email';
 import { NOTIFICATION_EVENT_TYPES } from '@/lib/notifications/types';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 function prettyJson(v: any): string {
   return JSON.stringify(v, null, 2);
@@ -61,19 +62,25 @@ export default function AdminNotificationsPage() {
       newHighBidAmount: 9850,
     })
   );
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const [emailStatus, setEmailStatus] = useState<any | null>(null);
+  const [quickTo, setQuickTo] = useState('');
+  const [quickTemplate, setQuickTemplate] = useState<string>('auction_winner');
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
       const token = await user.getIdToken();
-      const [eventsRes, emailRes, pushRes, dlqEvRes, dlqEmailRes, dlqPushRes] = await Promise.all([
+      const [eventsRes, emailRes, pushRes, dlqEvRes, dlqEmailRes, dlqPushRes, emailStatusRes] = await Promise.all([
         fetch('/api/admin/notifications/events?limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/jobs?kind=email&limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/jobs?kind=push&limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/deadletters?kind=event&limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/deadletters?kind=email&limit=100', { headers: { authorization: `Bearer ${token}` } }),
         fetch('/api/admin/notifications/deadletters?kind=push&limit=100', { headers: { authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/email/status', { headers: { authorization: `Bearer ${token}` } }),
       ]);
       const eventsJson = await eventsRes.json().catch(() => ({}));
       const emailJson = await emailRes.json().catch(() => ({}));
@@ -81,12 +88,14 @@ export default function AdminNotificationsPage() {
       const dlqEvJson = await dlqEvRes.json().catch(() => ({}));
       const dlqEmailJson = await dlqEmailRes.json().catch(() => ({}));
       const dlqPushJson = await dlqPushRes.json().catch(() => ({}));
+      const emailStatusJson = await emailStatusRes.json().catch(() => ({}));
       setEvents(Array.isArray(eventsJson.events) ? eventsJson.events : []);
       setEmailJobs(Array.isArray(emailJson.jobs) ? emailJson.jobs : []);
       setPushJobs(Array.isArray(pushJson.jobs) ? pushJson.jobs : []);
       setDlqEvents(Array.isArray(dlqEvJson.items) ? dlqEvJson.items : []);
       setDlqEmail(Array.isArray(dlqEmailJson.items) ? dlqEmailJson.items : []);
       setDlqPush(Array.isArray(dlqPushJson.items) ? dlqPushJson.items : []);
+      setEmailStatus(emailStatusJson?.ok ? emailStatusJson : null);
     } catch (e: any) {
       toast({ title: 'Load failed', description: e?.message || 'Failed to load admin data.', variant: 'destructive' });
     } finally {
@@ -124,6 +133,18 @@ export default function AdminNotificationsPage() {
   useEffect(() => {
     if (!adminLoading && isAdmin && user) void load();
   }, [adminLoading, isAdmin, user, load]);
+
+  // Friendly defaults for non-technical admins
+  useEffect(() => {
+    if (!user) return;
+    if (!targetUserId) setTargetUserId(user.uid);
+    if (!quickTo) {
+      const email = (user as any)?.email;
+      if (typeof email === 'string' && email.includes('@')) setQuickTo(email);
+    }
+    if (!entityId) setEntityId('listing_123');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
   const emitTest = useCallback(async () => {
     if (!user) return;
@@ -166,6 +187,39 @@ export default function AdminNotificationsPage() {
       setLoading(false);
     }
   }, [entityId, entityType, eventType, load, nonce, payloadText, targetUserId, toast, user]);
+
+  const sendQuickTestEmail = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          to: quickTo || undefined,
+          template: quickTemplate || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        toast({ title: 'Test email failed', description: data?.message || data?.error || 'Send failed.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Test email sent', description: `${data.provider} → ${data.to} (${data.template})` });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Test email failed', description: e?.message || 'Send failed.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [load, quickTemplate, quickTo, toast, user]);
+
+  const emitAndProcess = useCallback(async () => {
+    // Friendly one-click flow: emit a test event then process immediately
+    await emitTest();
+    await runProcessorsNow();
+  }, [emitTest, runProcessorsNow]);
 
   const dlqAction = useCallback(
     async (params: { kind: 'event' | 'email' | 'push'; id: string; action: 'retry' | 'suppress' }) => {
@@ -216,7 +270,7 @@ export default function AdminNotificationsPage() {
           <div className="space-y-1">
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Notifications</h1>
             <p className="text-sm text-muted-foreground">
-              Inspect the canonical event stream and queued jobs. Simulate events without sending directly.
+              Quick test email + run processors without writing code. Advanced tools are below.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -232,6 +286,80 @@ export default function AdminNotificationsPage() {
         </div>
 
         <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" />
+              Quick test (recommended)
+            </CardTitle>
+            <CardDescription>
+              Send a test email to yourself and/or emit a test event, then process it immediately.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-border/60 p-3">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email provider status</div>
+              <div className="mt-2 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-sm">
+                  <span className="font-semibold">Provider:</span>{' '}
+                  <span className="font-mono">{emailStatus?.provider || 'unknown'}</span>
+                </div>
+                <Badge variant={emailStatus?.provider === 'sendgrid' ? 'secondary' : 'outline'}>
+                  {emailStatus?.provider === 'sendgrid' ? 'SendGrid selected' : 'Not SendGrid'}
+                </Badge>
+              </div>
+              {emailStatus?.sendgrid ? (
+                <div className="mt-2 text-xs text-muted-foreground break-words">
+                  apiKey: {emailStatus.sendgrid.hasApiKey ? 'present' : 'missing'} · from: {emailStatus.sendgrid.fromEmail || 'missing'}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2 md:col-span-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Send test email to</div>
+                <Input value={quickTo} onChange={(e) => setQuickTo(e.target.value)} placeholder="you@example.com" />
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Template</div>
+                <Select value={quickTemplate} onValueChange={(v) => setQuickTemplate(v)}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {listEmailEvents().map((t) => (
+                      <SelectItem key={t.type} value={t.type}>
+                        {t.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-end gap-2">
+              <Button variant="outline" onClick={emitAndProcess} disabled={loading || !targetUserId || !entityId}>
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Rocket className="h-4 w-4 mr-2" />}
+                Emit test event + process
+              </Button>
+              <Button onClick={sendQuickTestEmail} disabled={loading || !quickTo || !quickTo.includes('@')}>
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                Send test email
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold">Advanced tools</div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                {advancedOpen ? 'Hide' : 'Show'} <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="pt-3">
+            <Card className="border-border/60">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Rocket className="h-4 w-4 text-primary" />
@@ -307,6 +435,8 @@ export default function AdminNotificationsPage() {
             </div>
           </CardContent>
         </Card>
+          </CollapsibleContent>
+        </Collapsible>
 
         <Card className="border-border/60 overflow-hidden">
           <CardHeader className="pb-4">
