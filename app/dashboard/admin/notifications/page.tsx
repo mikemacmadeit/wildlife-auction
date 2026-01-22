@@ -67,6 +67,7 @@ export default function AdminNotificationsPage() {
   const [emailStatus, setEmailStatus] = useState<any | null>(null);
   const [quickTo, setQuickTo] = useState('');
   const [quickTemplate, setQuickTemplate] = useState<string>('auction_winner');
+  const [quickResult, setQuickResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -191,6 +192,7 @@ export default function AdminNotificationsPage() {
   const sendQuickTestEmail = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setQuickResult(null);
     try {
       const token = await user.getIdToken();
       const res = await fetch('/api/admin/test-email', {
@@ -203,13 +205,18 @@ export default function AdminNotificationsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
-        toast({ title: 'Test email failed', description: data?.message || data?.error || 'Send failed.', variant: 'destructive' });
+        const msg = data?.message || data?.error || 'Send failed.';
+        setQuickResult({ ok: false, message: msg });
+        toast({ title: 'Test email failed', description: msg, variant: 'destructive' });
         return;
       }
+      setQuickResult({ ok: true, message: `${data.provider} → ${data.to} (${data.template})` });
       toast({ title: 'Test email sent', description: `${data.provider} → ${data.to} (${data.template})` });
       await load();
     } catch (e: any) {
-      toast({ title: 'Test email failed', description: e?.message || 'Send failed.', variant: 'destructive' });
+      const msg = e?.message || 'Send failed.';
+      setQuickResult({ ok: false, message: msg });
+      toast({ title: 'Test email failed', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -346,6 +353,22 @@ export default function AdminNotificationsPage() {
                 Send test email
               </Button>
             </div>
+
+            {quickResult ? (
+              <Alert className={quickResult.ok ? 'border-border/60 bg-muted/30' : 'border-destructive/40 bg-destructive/5 text-destructive'}>
+                <AlertDescription className="text-sm break-words">
+                  <span className="font-semibold">{quickResult.ok ? 'Result:' : 'Error:'}</span> {quickResult.message}
+                  {quickResult.ok ? (
+                    <>
+                      {' '}
+                      <span className="text-muted-foreground">
+                        (If you don’t see it, check Spam or SendGrid → Email API → Activity.)
+                      </span>
+                    </>
+                  ) : null}
+                </AlertDescription>
+              </Alert>
+            ) : null}
           </CardContent>
         </Card>
 
