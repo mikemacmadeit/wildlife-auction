@@ -64,7 +64,8 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
       whileHover={{ y: -8 }}
-      className={cn('group touch-none md:touch-auto', className)}
+      // Mobile: allow vertical scrolling even when the gesture starts on the card/image.
+      className={cn('group touch-manipulation md:touch-auto', className)}
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className={cn(

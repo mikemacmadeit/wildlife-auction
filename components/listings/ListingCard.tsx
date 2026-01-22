@@ -127,7 +127,8 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       whileHover={{ y: -4 }}
-      className={cn('group touch-none md:touch-auto', className)}
+      // Mobile: allow vertical scrolling even when the gesture starts on the card/image.
+      className={cn('group touch-manipulation md:touch-auto', className)}
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className={cn(

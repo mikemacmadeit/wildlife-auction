@@ -66,7 +66,8 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
     <>
       {/* Main Image */}
       <div
-        className={cn('relative aspect-video w-full rounded-lg overflow-hidden group cursor-pointer', className)}
+        // Mobile: ensure vertical scrolling is never blocked when swiping over the image area.
+        className={cn('relative aspect-video w-full rounded-lg overflow-hidden group cursor-pointer touch-manipulation', className)}
         role="button"
         tabIndex={0}
         onClick={() => setIsDialogOpen(true)}
