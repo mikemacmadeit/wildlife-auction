@@ -62,6 +62,10 @@ function NewListingPageContent() {
   // (No listing-limit gating in Seller Tiers model)
   const [sellerAttestationAccepted, setSellerAttestationAccepted] = useState(false);
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
+  const sellerAnimalAckForceRef = useRef(false);
+  const [sellerAnimalAckModalOpen, setSellerAnimalAckModalOpen] = useState(false);
+  const [sellerAnimalAckModalChecked, setSellerAnimalAckModalChecked] = useState(false);
+  const pendingPublishPayloadRef = useRef<Record<string, unknown> | null>(null);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';
     type: ListingType | '';
@@ -1060,37 +1064,7 @@ function NewListingPageContent() {
             </div>
           )}
 
-          {formData.category &&
-            isAnimalCategory(formData.category as any) &&
-            formData.category !== 'whitetail_breeder' && (
-              <div
-                className={`space-y-3 p-4 border rounded-lg ${
-                  !sellerAnimalAttestationAccepted ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'
-                }`}
-              >
-                <Label className="text-base font-semibold">
-                  Seller acknowledgment <span className="text-destructive">*</span>
-                </Label>
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="seller-animal-attestation"
-                    checked={sellerAnimalAttestationAccepted}
-                    onCheckedChange={(checked) => setSellerAnimalAttestationAccepted(checked === true)}
-                  />
-                  <Label htmlFor="seller-animal-attestation" className="cursor-pointer flex-1">
-                    <div className="font-medium">
-                      I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                      Wildlife Exchange does not take custody of animals.
-                    </div>
-                  </Label>
-                </div>
-                {!sellerAnimalAttestationAccepted && (
-                  <p className="text-sm text-destructive">
-                    You must accept this acknowledgment to publish an animal listing.
-                  </p>
-                )}
-              </div>
-            )}
+          {/* Seller animal acknowledgment is collected at publish-time (modal) for a cleaner flow. */}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
@@ -1152,14 +1126,6 @@ function NewListingPageContent() {
           if (!attrs.animalIdDisclosure) errors.push('Animal Identification Disclosure');
           if (!attrs.healthDisclosure) errors.push('Health Disclosure');
           if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
-          if (!sellerAnimalAttestationAccepted) {
-            toast({
-              title: 'Seller acknowledgment required',
-              description: 'Please accept the seller acknowledgment for animal listings.',
-              variant: 'destructive',
-            });
-            return false;
-          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -1185,14 +1151,6 @@ function NewListingPageContent() {
               : !!String((attrs as any).age || '').trim();
           const hasWeight = !!String(attrs.weightRange || '').trim();
           if (!hasAge && !hasWeight) errors.push('Age or Weight Range');
-          if (!sellerAnimalAttestationAccepted) {
-            toast({
-              title: 'Seller acknowledgment required',
-              description: 'Please accept the seller acknowledgment for animal listings.',
-              variant: 'destructive',
-            });
-            return false;
-          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -1216,14 +1174,6 @@ function NewListingPageContent() {
           if (!d.healthDisclosure) errors.push('Health Disclosure');
           if (!d.transportDisclosure) errors.push('Transport Disclosure');
           if (!d.titleOrLienDisclosure) errors.push('Title/Lien Disclosure');
-          if (!sellerAnimalAttestationAccepted) {
-            toast({
-              title: 'Seller acknowledgment required',
-              description: 'Please accept the seller acknowledgment for animal listings.',
-              variant: 'destructive',
-            });
-            return false;
-          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -1244,14 +1194,6 @@ function NewListingPageContent() {
           if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
           if (!attrs.healthDisclosure) errors.push('Health Disclosure');
           if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
-          if (!sellerAnimalAttestationAccepted) {
-            toast({
-              title: 'Seller acknowledgment required',
-              description: 'Please accept the seller acknowledgment for animal listings.',
-              variant: 'destructive',
-            });
-            return false;
-          }
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -2056,6 +1998,13 @@ function NewListingPageContent() {
       return;
     }
 
+    const requiresSellerAnimalAck =
+      formData.category &&
+      isAnimalCategory(formData.category as any) &&
+      formData.category !== 'whitetail_breeder';
+    const sellerAnimalAckAcceptedNow =
+      sellerAnimalAttestationAccepted === true || sellerAnimalAckForceRef.current === true;
+
     // Whitetail-only hard gate (required even for draft creation)
     if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
       toast({
@@ -2063,15 +2012,16 @@ function NewListingPageContent() {
         description: 'Please accept the seller attestation before saving or publishing a whitetail breeder listing.',
         variant: 'destructive',
       });
+      submittingRef.current = false;
       return;
     }
 
-    if (formData.category && isAnimalCategory(formData.category as any) && formData.category !== 'whitetail_breeder' && !sellerAnimalAttestationAccepted) {
-      toast({
-        title: 'Seller acknowledgment required',
-        description: 'Please accept the seller acknowledgment before publishing an animal listing.',
-        variant: 'destructive',
-      });
+    // Seller acknowledgment is requested at publish-time (modal), not as a step.
+    if (requiresSellerAnimalAck && !sellerAnimalAckAcceptedNow) {
+      pendingPublishPayloadRef.current = data;
+      setSellerAnimalAckModalChecked(false);
+      setSellerAnimalAckModalOpen(true);
+      submittingRef.current = false;
       return;
     }
 
@@ -2082,6 +2032,7 @@ function NewListingPageContent() {
         description: 'Please upload at least one photo before publishing.',
         variant: 'destructive',
       });
+      submittingRef.current = false;
       return;
     }
 
@@ -2091,6 +2042,7 @@ function NewListingPageContent() {
         description: 'Please choose a category before publishing a listing.',
         variant: 'destructive',
       });
+      submittingRef.current = false;
       return;
     }
 
@@ -2100,6 +2052,7 @@ function NewListingPageContent() {
         description: 'You can upload a maximum of 8 photos per listing.',
         variant: 'destructive',
       });
+      submittingRef.current = false;
       return;
     }
 
@@ -2152,8 +2105,8 @@ function NewListingPageContent() {
         ...(formData.category &&
           isAnimalCategory(formData.category as any) &&
           formData.category !== 'whitetail_breeder' && {
-            sellerAnimalAttestationAccepted: sellerAnimalAttestationAccepted === true,
-            sellerAnimalAttestationAcceptedAt: sellerAnimalAttestationAccepted ? new Date() : undefined,
+            sellerAnimalAttestationAccepted: sellerAnimalAckAcceptedNow === true,
+            sellerAnimalAttestationAcceptedAt: sellerAnimalAckAcceptedNow ? new Date() : undefined,
           }),
       } as any;
 
@@ -2236,6 +2189,18 @@ function NewListingPageContent() {
       }
     } catch (error: any) {
       console.error('Error creating listing:', error);
+
+      if (error?.code === 'SELLER_ANIMAL_ACK_REQUIRED') {
+        pendingPublishPayloadRef.current = data;
+        setSellerAnimalAckModalChecked(false);
+        setSellerAnimalAckModalOpen(true);
+        toast({
+          title: 'Seller acknowledgment required',
+          description: 'Please accept the seller acknowledgment to publish this animal listing.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       // UX: If the server blocks publish because payouts aren't ready, show a friendly action dialog.
       if (error?.code === 'PAYOUTS_NOT_READY' || String(error?.message || '').toLowerCase().includes('connect stripe payouts')) {
@@ -2573,6 +2538,74 @@ function NewListingPageContent() {
             </Button>
             <Button type="button" variant="outline" onClick={() => setPayoutsGateOpen(false)}>
               Continue editing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Seller acknowledgment (publish-time) for animal listings (non-whitetail) */}
+      <Dialog
+        open={sellerAnimalAckModalOpen}
+        onOpenChange={(open) => {
+          setSellerAnimalAckModalOpen(open);
+          if (!open) {
+            // Keep the pending payload so user can reopen by clicking Publish again.
+            setSellerAnimalAckModalChecked(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Seller acknowledgment</DialogTitle>
+            <DialogDescription>
+              You must accept this acknowledgment to publish an animal listing.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="seller-animal-ack-modal"
+                  checked={sellerAnimalAckModalChecked}
+                  onCheckedChange={(checked) => setSellerAnimalAckModalChecked(checked === true)}
+                />
+                <Label htmlFor="seller-animal-ack-modal" className="cursor-pointer leading-relaxed">
+                  I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
+                  Wildlife Exchange does not take custody of animals.
+                </Label>
+              </div>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              After you publish, your listing will be submitted for review and approval.
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSellerAnimalAckModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!sellerAnimalAckModalChecked}
+              onClick={async () => {
+                sellerAnimalAckForceRef.current = true;
+                setSellerAnimalAttestationAccepted(true);
+                setSellerAnimalAckModalOpen(false);
+                const payload = pendingPublishPayloadRef.current;
+                // Re-run publish using the original submit payload (so we don't lose stepper state)
+                if (payload) {
+                  // Let state updates enqueue, but rely on the ref for correctness.
+                  Promise.resolve().then(() => void handleComplete(payload));
+                }
+              }}
+            >
+              I agree &amp; continue to publish
             </Button>
           </DialogFooter>
         </DialogContent>
