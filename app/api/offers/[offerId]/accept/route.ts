@@ -11,6 +11,7 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 export async function POST(request: Request, ctx: { params: { offerId: string } }) {
   const rate = await requireRateLimit(request);
@@ -145,7 +146,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       const base = getSiteUrl();
       const listingTitle = String((await db.collection('listings').doc(result.listingId).get()).data()?.title || 'a listing');
 
-      await emitAndProcessEventForUser({
+      const evBuyer = await emitAndProcessEventForUser({
         type: 'Offer.Accepted',
         actorId,
         entityType: 'listing',
@@ -162,7 +163,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         optionalHash: `offer:${offerId}:accepted`,
       });
 
-      await emitAndProcessEventForUser({
+      const evSeller = await emitAndProcessEventForUser({
         type: 'Offer.Accepted',
         actorId,
         entityType: 'listing',
@@ -178,6 +179,13 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         },
         optionalHash: `offer:${offerId}:accepted_seller`,
       });
+
+      if (evBuyer?.ok && typeof evBuyer?.eventId === 'string') {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: evBuyer.eventId }).catch(() => {});
+      }
+      if (evSeller?.ok && typeof evSeller?.eventId === 'string') {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: evSeller.eventId }).catch(() => {});
+      }
     } catch {
       // best-effort
     }

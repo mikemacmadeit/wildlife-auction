@@ -11,6 +11,7 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 const declineSchema = z.object({
   note: z.string().max(500).optional(),
@@ -126,7 +127,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       const base = getSiteUrl();
       const targetUserId = result.role === 'seller' ? result.buyerId : result.sellerId;
       const offerUrl = result.role === 'seller' ? `${base}/dashboard/offers` : `${base}/seller/offers/${offerId}`;
-      await emitAndProcessEventForUser({
+      const ev = await emitAndProcessEventForUser({
         type: 'Offer.Declined',
         actorId,
         entityType: 'listing',
@@ -141,6 +142,9 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         },
         optionalHash: `offer:${offerId}:declined`,
       });
+      if (ev?.ok && typeof ev?.eventId === 'string') {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+      }
     } catch {
       // best-effort
     }

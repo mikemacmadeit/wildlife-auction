@@ -15,6 +15,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { getPrimaryListingImageUrl, offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
 import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -315,7 +316,7 @@ export async function POST(request: Request) {
       } else {
         // Regular offer: notify seller.
         if (sellerId) {
-          await emitAndProcessEventForUser({
+          const ev = await emitAndProcessEventForUser({
             type: 'Offer.Received',
             actorId: buyerId || null,
             entityType: 'listing',
@@ -332,6 +333,10 @@ export async function POST(request: Request) {
             },
             optionalHash: `offer:${result.offerId}:received`,
           });
+          // Best-effort: send the queued email job immediately (avoids relying on schedulers for time-sensitive offers).
+          if (ev?.ok && typeof ev?.eventId === 'string') {
+            void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+          }
         }
       }
     } catch {
