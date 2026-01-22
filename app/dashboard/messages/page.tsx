@@ -374,8 +374,8 @@ export default function MessagesPage() {
                 <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
               ) : (
                 <ScrollArea className="h-full">
-                  {/* Add a little right padding so the scroll bar never clips row content (especially on Windows). */}
-                  <div className="divide-y divide-border/50 pr-5">
+                  {/* Keep a small right padding so the scrollbar never overlays content. */}
+                  <div className="divide-y divide-border/50 pr-3">
                     {inboxItems.map((item) => {
                       const active = selectedThreadId === item.id || thread?.id === item.id;
                       const updatedAt = item.updatedAtMs ? new Date(item.updatedAtMs) : null;
@@ -383,8 +383,7 @@ export default function MessagesPage() {
                         <div
                           key={item.id}
                           className={cn(
-                            // Extra right padding avoids any clipping when the scroll bar overlays content.
-                            'group w-full min-w-0 flex items-stretch gap-2 p-3 pr-4 hover:bg-muted/30 transition-colors',
+                            'group w-full min-w-0 flex items-stretch gap-2 p-3 hover:bg-muted/30 transition-colors',
                             active && 'bg-muted/40'
                           )}
                         >
@@ -430,8 +429,9 @@ export default function MessagesPage() {
                                     </div>
                                     <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
                                   </div>
-                                  <div className="flex flex-col items-end gap-1 shrink-0 min-w-[88px]">
-                                    <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                  {/* Reserve enough horizontal space so timestamps like "about 13 hours ago" never clip. */}
+                                  <div className="flex flex-col items-end gap-1 shrink-0 min-w-[132px]">
+                                    <div className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
                                       {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: true }) : ''}
                                     </div>
                                     {item.unread > 0 ? (
