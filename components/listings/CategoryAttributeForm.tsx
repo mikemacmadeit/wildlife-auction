@@ -1056,7 +1056,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           </div>
           <div className="space-y-2">
             <Label htmlFor="dog-age" className="text-base font-semibold">
-              Age <span className="text-destructive">*</span>
+              Age (years, optional)
             </Label>
             <Input
               id="dog-age"
@@ -1078,12 +1078,8 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 const n = Number(raw);
                 updateAttribute('age', Number.isFinite(n) ? n : undefined);
               }}
-              className={cn(
-                'min-h-[48px] text-base',
-                hasError('Age') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
-              )}
+              className="min-h-[48px] text-base"
             />
-            {hasError('Age') ? <p className="text-sm text-destructive">Age is required</p> : null}
           </div>
         </div>
 

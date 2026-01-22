@@ -1008,11 +1008,6 @@ function NewListingPageContent() {
                 const errs: string[] = [];
                 if ((attrs as any).speciesId !== 'dog') errs.push('Species');
                 if (!attrs.breed?.trim()) errs.push('Breed');
-                const hasAge =
-                  typeof (attrs as any).age === 'number'
-                    ? Number.isFinite((attrs as any).age)
-                    : !!String((attrs as any).age || '').trim();
-                if (!hasAge) errs.push('Age');
                 if (!attrs.sex) errs.push('Sex');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
                 if (!attrs.identificationDisclosure) errs.push('Identification Disclosure');
@@ -1242,11 +1237,6 @@ function NewListingPageContent() {
           const errors: string[] = [];
           if (attrs.speciesId !== 'dog') errors.push('Species');
           if (!String(attrs.breed || '').trim()) errors.push('Breed');
-          const hasAge =
-            typeof attrs.age === 'number'
-              ? Number.isFinite(attrs.age)
-              : !!String(attrs.age || '').trim();
-          if (!hasAge) errors.push('Age');
           if (!attrs.sex) errors.push('Sex');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
           if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
