@@ -382,113 +382,102 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={item.id}
-                          className={cn(
-                            'group w-full min-w-0 flex items-stretch gap-2 p-3 hover:bg-muted/30 transition-colors',
-                            active && 'bg-muted/40'
-                          )}
+                          className={cn('group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors', active && 'bg-muted/40')}
                         >
-                          <button
-                            onClick={() => {
-                              setSelectedThreadId(item.id);
-                              router.replace(`/dashboard/messages?threadId=${item.id}`);
-                            }}
-                            className="flex-1 text-left min-w-0"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted shrink-0">
+                          <div className="grid grid-cols-[48px_1fr_116px_44px] gap-3 items-start min-w-0">
+                            <button
+                              onClick={() => {
+                                setSelectedThreadId(item.id);
+                                router.replace(`/dashboard/messages?threadId=${item.id}`);
+                              }}
+                              className="contents text-left"
+                            >
+                              {/* Thumb */}
+                              <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted">
                                 {item.listingImageUrl ? (
-                                  <Image
-                                    src={item.listingImageUrl}
-                                    alt={item.listingTitle}
-                                    fill
-                                    sizes="48px"
-                                    className="object-cover"
-                                  />
+                                  <Image src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
                                 ) : (
                                   <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                                     <MessageSquare className="h-5 w-5" />
                                   </div>
                                 )}
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <Avatar className="h-6 w-6 shrink-0">
-                                        <AvatarImage src={item.otherAvatar} />
-                                        <AvatarFallback>{String(item.otherName || 'U').slice(0, 2).toUpperCase()}</AvatarFallback>
-                                      </Avatar>
-                                      <div className="min-w-0 flex-1 text-sm font-semibold truncate leading-5">
-                                        {item.otherName}
-                                      </div>
-                                      {item.archived ? (
-                                        <Badge variant="outline" className="text-[10px] shrink-0">
-                                          Archived
-                                        </Badge>
-                                      ) : null}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
-                                  </div>
-                                  {/* Timestamp column: fixed width + wrapping (prevents clipping on narrow inbox cards). */}
-                                  <div className="flex flex-col items-end gap-1 shrink-0 w-[120px]">
-                                    <div className="text-[11px] text-muted-foreground text-right whitespace-normal leading-tight">
-                                      {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: true }) : ''}
-                                    </div>
-                                    {item.unread > 0 ? (
-                                      <Badge variant="destructive" className="h-5 px-2 text-xs font-semibold">
-                                        {item.unread}
-                                      </Badge>
-                                    ) : null}
-                                  </div>
+
+                              {/* Main content */}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Avatar className="h-6 w-6 shrink-0">
+                                    <AvatarImage src={item.otherAvatar} />
+                                    <AvatarFallback>{String(item.otherName || 'U').slice(0, 2).toUpperCase()}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0 flex-1 text-sm font-semibold truncate leading-5">{item.otherName}</div>
+                                  {item.archived ? (
+                                    <Badge variant="outline" className="text-[10px] shrink-0">
+                                      Archived
+                                    </Badge>
+                                  ) : null}
                                 </div>
+                                <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
                                 {item.lastMessagePreview ? (
-                                  <div className="text-xs text-muted-foreground line-clamp-2 mt-2">
-                                    {item.lastMessagePreview}
+                                  <div className="text-xs text-muted-foreground line-clamp-2 mt-2">{item.lastMessagePreview}</div>
+                                ) : null}
+                              </div>
+
+                              {/* Timestamp + unread (guaranteed visible column) */}
+                              <div className="min-w-0 text-right">
+                                <div className="text-[11px] text-muted-foreground whitespace-normal leading-tight">
+                                  {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: true }) : ''}
+                                </div>
+                                {item.unread > 0 ? (
+                                  <div className="mt-1 flex justify-end">
+                                    <Badge variant="destructive" className="h-5 px-2 text-xs font-semibold">
+                                      {item.unread}
+                                    </Badge>
                                   </div>
                                 ) : null}
                               </div>
-                            </div>
-                          </button>
+                            </button>
 
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="shrink-0 opacity-60 hover:opacity-100">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  if (!user?.uid) return;
-                                  try {
-                                    await markThreadAsRead(item.id, user.uid);
-                                  } catch {}
-                                }}
-                              >
-                                <CheckCheck className="h-4 w-4 mr-2" />
-                                Mark read
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  try {
-                                    await setThreadArchived(item.id, !item.archived);
-                                  } catch (e: any) {
-                                    toast({ title: 'Error', description: e?.message || 'Failed to update thread', variant: 'destructive' });
-                                  }
-                                }}
-                              >
-                                {item.archived ? (
-                                  <>
-                                    <Inbox className="h-4 w-4 mr-2" /> Unarchive
-                                  </>
-                                ) : (
-                                  <>
-                                    <Archive className="h-4 w-4 mr-2" /> Archive
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-11 w-11 opacity-60 hover:opacity-100">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    if (!user?.uid) return;
+                                    try {
+                                      await markThreadAsRead(item.id, user.uid);
+                                    } catch {}
+                                  }}
+                                >
+                                  <CheckCheck className="h-4 w-4 mr-2" />
+                                  Mark read
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    try {
+                                      await setThreadArchived(item.id, !item.archived);
+                                    } catch (e: any) {
+                                      toast({ title: 'Error', description: e?.message || 'Failed to update thread', variant: 'destructive' });
+                                    }
+                                  }}
+                                >
+                                  {item.archived ? (
+                                    <>
+                                      <Inbox className="h-4 w-4 mr-2" /> Unarchive
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Archive className="h-4 w-4 mr-2" /> Archive
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       );
                     })}
