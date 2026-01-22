@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,13 +11,36 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { ListItem } from '@/components/listings/ListItem';
-import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings } from '@/lib/firebase/listings';
-import { Listing } from '@/lib/types';
+import { collection, getCountFromServer, onSnapshot, orderBy, query, where, limit as fsLimit, getDocs } from 'firebase/firestore';
+import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, getListingsByIds, toListing } from '@/lib/firebase/listings';
+import { db } from '@/lib/firebase/config';
+import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
+import { useFavorites } from '@/hooks/use-favorites';
+import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
 
 type ViewMode = 'card' | 'list';
 
+function toDateSafe(v: any): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v?.toDate === 'function') {
+    try {
+      const d = v.toDate();
+      return d instanceof Date ? d : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export default function HomePage() {
+  const { user } = useAuth();
+  const { recentIds } = useRecentlyViewed();
+  const { favoriteIds, isLoading: favoritesLoading } = useFavorites();
+
   const [listings, setListings] = useState<Listing[]>([]);
   const [mostWatched, setMostWatched] = useState<Listing[]>([]);
   const [endingSoon, setEndingSoon] = useState<Listing[]>([]);
@@ -31,6 +54,13 @@ export default function HomePage() {
   // View mode with localStorage persistence
   // Initialize to 'card' to ensure server/client consistency
   const [viewMode, setViewMode] = useState<ViewMode>('card');
+
+  // Personalized modules (signed-in home)
+  const [recentlyViewedListings, setRecentlyViewedListings] = useState<Listing[]>([]);
+  const [watchlistListings, setWatchlistListings] = useState<Listing[]>([]);
+  const [savedSellers, setSavedSellers] = useState<SavedSellerDoc[]>([]);
+  const [activeCountBySellerId, setActiveCountBySellerId] = useState<Record<string, number | null>>({});
+  const [newFromSavedSellers, setNewFromSavedSellers] = useState<Listing[]>([]);
 
   // Load from localStorage after hydration (client-side only)
   useEffect(() => {
@@ -146,8 +176,285 @@ export default function HomePage() {
     };
   }, []);
 
+  // Signed-in: Recently viewed listings
+  useEffect(() => {
+    if (!user?.uid) {
+      setRecentlyViewedListings([]);
+      return;
+    }
+    if (!recentIds?.length) {
+      setRecentlyViewedListings([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const fetched = await getListingsByIds(recentIds);
+        if (cancelled) return;
+        const valid = fetched.filter((x) => x !== null) as Listing[];
+        setRecentlyViewedListings(valid);
+      } catch {
+        if (!cancelled) setRecentlyViewedListings([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recentIds, user?.uid]);
+
+  // Signed-in: Watchlist preview
+  useEffect(() => {
+    if (!user?.uid) {
+      setWatchlistListings([]);
+      return;
+    }
+    if (favoritesLoading) return;
+
+    const ids = Array.from(favoriteIds || []);
+    if (!ids.length) {
+      setWatchlistListings([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const fetched = await getListingsByIds(ids.slice(0, 12));
+        if (cancelled) return;
+        const valid = fetched.filter((x) => x !== null) as Listing[];
+        setWatchlistListings(valid);
+      } catch {
+        if (!cancelled) setWatchlistListings([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [favoriteIds, favoritesLoading, user?.uid]);
+
+  // Signed-in: Saved sellers subscription
+  useEffect(() => {
+    if (!user?.uid) {
+      setSavedSellers([]);
+      return;
+    }
+
+    const ref = collection(db, 'users', user.uid, 'following');
+    const q = query(ref, orderBy('followedAt', 'desc'), fsLimit(50));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const out: SavedSellerDoc[] = [];
+        snap.forEach((d) => {
+          const data = d.data() as any;
+          out.push({
+            sellerId: String(data.sellerId || d.id),
+            followedAt: toDateSafe(data.followedAt) || new Date(0),
+            sellerUsername: String(data.sellerUsername || '').trim(),
+            sellerDisplayName: String(data.sellerDisplayName || 'Seller').trim(),
+            sellerPhotoURL: data.sellerPhotoURL ? String(data.sellerPhotoURL) : undefined,
+            ratingAverage: Number(data.ratingAverage || 0) || 0,
+            ratingCount: Number(data.ratingCount || 0) || 0,
+            positivePercent: Number(data.positivePercent || 0) || 0,
+            itemsSold: Number(data.itemsSold || 0) || 0,
+          });
+        });
+        setSavedSellers(out);
+      },
+      () => {
+        setSavedSellers([]);
+      }
+    );
+    return () => unsub();
+  }, [user?.uid]);
+
+  // Signed-in: Best-effort active listings count per saved seller (small cap)
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!savedSellers.length) return;
+
+    const sellerIds = savedSellers.slice(0, 12).map((s) => s.sellerId);
+    const missing = sellerIds.filter((id) => !(id in activeCountBySellerId));
+    if (missing.length === 0) return;
+
+    // Mark missing as loading
+    setActiveCountBySellerId((prev) => {
+      const next = { ...prev };
+      for (const id of missing) next[id] = null;
+      return next;
+    });
+
+    let cancelled = false;
+    (async () => {
+      const updates: Record<string, number> = {};
+      await Promise.all(
+        missing.map(async (sellerId) => {
+          try {
+            const listingsRef = collection(db, 'listings');
+            const q = query(listingsRef, where('sellerId', '==', sellerId), where('status', '==', 'active'));
+            const snap = await getCountFromServer(q);
+            updates[sellerId] = Number(snap.data().count || 0);
+          } catch {
+            updates[sellerId] = 0;
+          }
+        })
+      );
+      if (cancelled) return;
+      setActiveCountBySellerId((prev) => ({ ...prev, ...updates }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCountBySellerId, savedSellers, user?.uid]);
+
+  // Signed-in: New listings from saved sellers (lightweight, capped)
+  useEffect(() => {
+    if (!user?.uid) {
+      setNewFromSavedSellers([]);
+      return;
+    }
+    if (!savedSellers.length) {
+      setNewFromSavedSellers([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const sellers = savedSellers.slice(0, 6);
+      const listingsRef = collection(db, 'listings');
+
+      const results = await Promise.allSettled(
+        sellers.map(async (s) => {
+          // Prefer newest, but gracefully fallback if an index is missing.
+          try {
+            const q1 = query(
+              listingsRef,
+              where('sellerId', '==', s.sellerId),
+              where('status', '==', 'active'),
+              orderBy('createdAt', 'desc'),
+              fsLimit(2)
+            );
+            const snap = await getDocs(q1);
+            return snap.docs.map((d) => toListing({ ...(d.data() as any), id: d.id } as any));
+          } catch {
+            const q2 = query(listingsRef, where('sellerId', '==', s.sellerId), where('status', '==', 'active'), fsLimit(2));
+            const snap = await getDocs(q2);
+            return snap.docs.map((d) => toListing({ ...(d.data() as any), id: d.id } as any));
+          }
+        })
+      );
+
+      if (cancelled) return;
+      const flat = results
+        .filter((r): r is PromiseFulfilledResult<Listing[]> => r.status === 'fulfilled')
+        .flatMap((r) => r.value || []);
+
+      const uniq: Listing[] = [];
+      const seen = new Set<string>();
+      for (const l of flat) {
+        if (!l?.id) continue;
+        if (seen.has(l.id)) continue;
+        seen.add(l.id);
+        uniq.push(l);
+      }
+
+      setNewFromSavedSellers(uniq.slice(0, 12));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [savedSellers, user?.uid]);
+
   const featuredListings = listings.filter(l => l.featured).slice(0, 3);
   const recentListings = listings.slice(0, 6);
+
+  const recommendedForYou = useMemo(() => {
+    if (!user?.uid) return [];
+    const exclude = new Set<string>([
+      ...recentlyViewedListings.map((l) => l.id),
+      ...watchlistListings.map((l) => l.id),
+    ]);
+
+    const weightsByCategory: Record<string, number> = {};
+    const weightsBySpecies: Record<string, number> = {};
+
+    const signalListings = [...recentlyViewedListings, ...watchlistListings];
+    for (const l of signalListings) {
+      if (l?.category) weightsByCategory[l.category] = (weightsByCategory[l.category] || 0) + 2;
+      const species = (l as any)?.attributes?.speciesId;
+      if (species) weightsBySpecies[String(species)] = (weightsBySpecies[String(species)] || 0) + 1;
+    }
+
+    const scored = (listings || [])
+      .filter((l) => l?.id && !exclude.has(l.id))
+      .map((l) => {
+        const species = (l as any)?.attributes?.speciesId ? String((l as any).attributes.speciesId) : null;
+        const score =
+          (l?.category ? (weightsByCategory[l.category] || 0) : 0) +
+          (species ? (weightsBySpecies[species] || 0) : 0) +
+          (l?.featured ? 0.25 : 0);
+        return { l, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    return scored.map((x) => x.l).slice(0, 12);
+  }, [listings, recentlyViewedListings, user?.uid, watchlistListings]);
+
+  const SectionHeader = (props: { title: string; subtitle?: string; href?: string; actionLabel?: string; right?: ReactNode }) => {
+    return (
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold mb-1 font-founders">{props.title}</h2>
+          {props.subtitle ? <p className="text-muted-foreground">{props.subtitle}</p> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {props.right}
+          {props.href ? (
+            <Button asChild variant="outline" size="sm" className="min-h-[40px] font-semibold">
+              <Link href={props.href}>{props.actionLabel || 'See all'}</Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
+  const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
+    if (!props.listings.length) {
+      return (
+        <Card className="border-2 border-border/50">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">{props.emptyText}</CardContent>
+        </Card>
+      );
+    }
+
+    if (viewMode === 'list') {
+      return (
+        <div className="space-y-3">
+          {props.listings.slice(0, 8).map((listing) => (
+            <ListItem key={listing.id} listing={listing} />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto pb-2 -mx-4 px-4">
+        <div className="flex gap-4 min-w-max">
+          {props.listings.map((listing) => (
+            <div key={listing.id} className="min-w-[280px] max-w-[280px]">
+              <ListingCard listing={listing} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -172,61 +479,67 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section - Premium Design with Background Image */}
-      <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
-        {/* Background Image with Dark Overlay */}
-        <div className="absolute inset-0 z-0">
-          <Image
-            src="/images/Buck_1.webp"
-            alt="Wildlife Exchange Hero Background"
-            fill
-            className="object-cover object-[50%_20%]"
-            priority
-            quality={90}
-            sizes="100vw"
-          />
-          {/* Dark Overlay for Text Readability - Strong enough for contrast */}
-          <div className="absolute inset-0 bg-black/60 z-0" />
-        </div>
+      {/* Logged-out only: Hero Section */}
+      {!user ? (
+        <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
+          {/* Background Image with Dark Overlay */}
+          <div className="absolute inset-0 z-0">
+            <Image
+              src="/images/Buck_1.webp"
+              alt="Wildlife Exchange Hero Background"
+              fill
+              className="object-cover object-[50%_20%]"
+              priority
+              quality={90}
+              sizes="100vw"
+            />
+            {/* Dark Overlay for Text Readability - Strong enough for contrast */}
+            <div className="absolute inset-0 bg-black/60 z-0" />
+          </div>
 
-        {/* Hero Content */}
-        <div className="relative z-10 container mx-auto px-4 text-center text-white">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-4xl mx-auto"
-          >
-            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
-              <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
-                <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
+          {/* Hero Content */}
+          <div className="relative z-10 container mx-auto px-4 text-center text-white">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="max-w-4xl mx-auto"
+            >
+              <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
+                <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
+                  <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
+                </div>
+                <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
+                  Wildlife Exchange
+                </h1>
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
-                Wildlife Exchange
-              </h1>
-            </div>
-            <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
-              Wildlife-first marketplace for Texas livestock, horses &amp; ranch assets
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-              <Button asChild size="lg" className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold">
-                <Link href="/browse">
-                  Browse Listings
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <CreateListingGateButton
-                href="/dashboard/listings/new?fresh=1"
-                variant="outline"
-                size="lg"
-                className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-              >
-                Create listing
-              </CreateListingGateButton>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+              <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
+                Wildlife-first marketplace for Texas livestock, horses &amp; ranch assets
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
+                <Button
+                  asChild
+                  size="lg"
+                  className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold"
+                >
+                  <Link href="/browse">
+                    Browse Listings
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                <CreateListingGateButton
+                  href="/dashboard/listings/new?fresh=1"
+                  variant="outline"
+                  size="lg"
+                  className="min-h-[48px] sm:min-h-[56px] w-full sm:min-w-[220px] text-base sm:text-lg font-semibold bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+                >
+                  Create listing
+                </CreateListingGateButton>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Trust Indicators */}
       <section className="py-8 md:py-12 border-b border-border/50 bg-card/50">
@@ -252,6 +565,122 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Signed-in only: Personalized home */}
+      {user ? (
+        <section className="py-10 md:py-12 border-b border-border/50 bg-background">
+          <div className="container mx-auto px-4 space-y-8">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <div className="text-sm text-muted-foreground">Welcome back</div>
+                <h1 className="text-3xl md:text-4xl font-bold font-founders truncate">
+                  {user.displayName ? user.displayName : '—'}
+                </h1>
+                <div className="text-sm text-muted-foreground mt-1">Pick up where you left off.</div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button asChild className="min-h-[44px] font-semibold">
+                  <Link href="/browse">
+                    <Search className="h-4 w-4 mr-2" />
+                    Browse
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="min-h-[44px] font-semibold">
+                  <Link href="/dashboard/watchlist">Watchlist</Link>
+                </Button>
+                <Button asChild variant="outline" className="min-h-[44px] font-semibold">
+                  <Link href="/dashboard/messages">Messages</Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <SectionHeader
+                title="Recently viewed"
+                subtitle="Your latest clicks — fast way back in."
+                href="/dashboard/recently-viewed"
+              />
+              <ListingRail listings={recentlyViewedListings} emptyText="No recently viewed listings yet." />
+            </div>
+
+            <div className="space-y-4">
+              <SectionHeader
+                title="Watched items"
+                subtitle="Listings you’re keeping an eye on."
+                href="/dashboard/watchlist"
+                right={
+                  favoritesLoading ? (
+                    <span className="text-xs text-muted-foreground">Loading…</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{Array.from(favoriteIds || []).length} watched</span>
+                  )
+                }
+              />
+              <ListingRail listings={watchlistListings} emptyText="No watched items yet. Tap the heart on any listing." />
+            </div>
+
+            <div className="space-y-4">
+              <SectionHeader title="Saved sellers" subtitle="Sellers you follow — with their active inventory." href="/dashboard/watchlist" actionLabel="Manage" />
+              {savedSellers.length === 0 ? (
+                <Card className="border-2 border-border/50">
+                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                    You haven’t saved any sellers yet. Save a seller from a listing page to get updates here.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="overflow-x-auto pb-2 -mx-4 px-4">
+                  <div className="flex gap-3 min-w-max">
+                    {savedSellers.slice(0, 12).map((s) => {
+                      const activeCount = activeCountBySellerId[s.sellerId];
+                      const href = `/sellers/${s.sellerId}`;
+                      return (
+                        <Link
+                          key={s.sellerId}
+                          href={href}
+                          className="group border-2 border-border/50 hover:border-primary/40 transition-colors rounded-xl bg-card px-3 py-2 min-w-[220px]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative h-10 w-10 rounded-full overflow-hidden bg-muted border shrink-0">
+                              {s.sellerPhotoURL ? (
+                                <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="40px" unoptimized />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
+                                  {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-extrabold leading-tight truncate">{s.sellerDisplayName}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {activeCount === null ? 'Loading…' : `${activeCount ?? 0} active listings`}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <SectionHeader
+                title="New from saved sellers"
+                subtitle="Fresh inventory from people you follow."
+                href="/dashboard/watchlist"
+                actionLabel="See sellers"
+              />
+              <ListingRail listings={newFromSavedSellers} emptyText="No active listings from your saved sellers yet." />
+            </div>
+
+            <div className="space-y-4">
+              <SectionHeader title="New for you" subtitle="Personalized picks based on what you view and watch." href="/browse" actionLabel="Browse all" />
+              <ListingRail listings={recommendedForYou} emptyText="Browse a few listings and we’ll start tuning this feed for you." />
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Category Tiles */}
       <section className="py-12 md:py-16 bg-background border-b border-border/50">
