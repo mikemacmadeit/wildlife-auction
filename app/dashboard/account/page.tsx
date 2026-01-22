@@ -473,59 +473,48 @@ export default function AccountPage() {
           </div>
         </motion.div>
 
-        {/* Email verification status */}
-        <Card className={cn('border-2', user?.emailVerified ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-card')}>
-          <CardContent className="pt-5 pb-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div className="font-bold">Email verification</div>
-                  {user?.emailVerified ? (
-                    <Badge variant="secondary" className="font-semibold">
-                      Verified
-                    </Badge>
-                  ) : (
+        {/* Email verification status (hide once verified) */}
+        {!user?.emailVerified ? (
+          <Card className={cn('border-2', 'border-border/50 bg-card')}>
+            <CardContent className="pt-5 pb-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div className="font-bold">Email verification</div>
                     <Badge variant="destructive" className="font-semibold">
                       Not verified
                     </Badge>
-                  )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Please verify your email to unlock messaging, publishing, and checkout.
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {user?.emailVerified
-                    ? 'Your email is verified.'
-                    : 'Please verify your email to unlock messaging, publishing, and checkout.'}
-                </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button
-                  variant={user?.emailVerified ? 'outline' : 'default'}
-                  className="min-h-[40px] font-semibold"
-                  onClick={async () => {
-                    try {
-                      if (user?.emailVerified) {
-                        await reloadCurrentUser();
-                        toast({ title: 'Account refreshed', description: 'Your verification status has been refreshed.' });
-                        return;
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="default"
+                    className="min-h-[40px] font-semibold"
+                    onClick={async () => {
+                      try {
+                        await resendVerificationEmail();
+                        toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                      } catch (e: any) {
+                        toast({
+                          title: 'Could not send verification email',
+                          description: e?.message || 'Please try again.',
+                          variant: 'destructive',
+                        });
                       }
-                      await resendVerificationEmail();
-                      toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
-                    } catch (e: any) {
-                      toast({
-                        title: 'Could not send verification email',
-                        description: e?.message || 'Please try again.',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                >
-                  {user?.emailVerified ? 'Refresh Status' : 'Resend Verification Email'}
-                </Button>
+                    }}
+                  >
+                    Resend Verification Email
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Stats Cards - Quick Overview */}
         <motion.div
