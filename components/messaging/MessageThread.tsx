@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -413,20 +412,21 @@ export function MessageThreadComponent({
 
       {/* Input */}
       <div className="border-t p-4">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Type your message..."
+        <div className="flex gap-2 items-end">
+          <Textarea
+            placeholder="Write a message…"
             value={messageInput}
             onChange={(e) => setMessageInput(e.target.value)}
-            onKeyPress={(e) => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
               }
             }}
             disabled={sending}
+            className="min-h-[44px] max-h-[140px] resize-none text-base"
           />
-          <Button onClick={handleSend} disabled={!messageInput.trim() || sending}>
+          <Button onClick={handleSend} disabled={!messageInput.trim() || sending} className="h-[44px] w-[44px] px-0">
             <Send className="h-4 w-4" />
           </Button>
         </div>

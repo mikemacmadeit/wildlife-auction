@@ -20,6 +20,9 @@ import {
   Timestamp,
   onSnapshot,
   Unsubscribe,
+  type DocumentData,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 import { auth, db } from './config';
 import { MessageThread, Message } from '@/lib/types';
@@ -355,6 +358,151 @@ export async function getAllUserThreads(userId: string): Promise<MessageThread[]
 
   out.sort((a, b) => (b.updatedAt?.getTime?.() || 0) - (a.updatedAt?.getTime?.() || 0));
   return out.slice(0, 50);
+}
+
+function isMissingIndexError(error: any): boolean {
+  const code = String(error?.code || '');
+  const msg = String(error?.message || '').toLowerCase();
+  return (
+    code === 'failed-precondition' ||
+    msg.includes('requires an index') ||
+    msg.includes('failed-precondition') ||
+    msg.includes('index')
+  );
+}
+
+function toThread(docSnap: QueryDocumentSnapshot<DocumentData>): MessageThread {
+  const data = docSnap.data() as any;
+  return {
+    id: docSnap.id,
+    ...data,
+    createdAt: data.createdAt?.toDate?.() || new Date(),
+    updatedAt: data.updatedAt?.toDate?.() || new Date(),
+    lastMessageAt: data.lastMessageAt?.toDate?.(),
+  } as MessageThread;
+}
+
+/**
+ * Subscribe to threads for a user role (buyer OR seller) in real-time.
+ * Uses an ordered query when indexes are available; falls back to unordered + client sort.
+ */
+export function subscribeToUserThreads(
+  userId: string,
+  role: 'buyer' | 'seller',
+  callback: (threads: MessageThread[]) => void,
+  opts?: { onError?: (error: any) => void }
+): Unsubscribe {
+  const threadsRef = collection(db, 'messageThreads');
+  const field = role === 'buyer' ? 'buyerId' : 'sellerId';
+
+  const orderedQ = query(threadsRef, where(field, '==', userId), orderBy('updatedAt', 'desc'), limit(50));
+  const fallbackQ = query(threadsRef, where(field, '==', userId), limit(250));
+
+  let unsub: Unsubscribe = () => {};
+  let usingFallback = false;
+
+  const start = (q: any, fallback: boolean) => {
+    usingFallback = fallback;
+    unsub = onSnapshot(
+      q,
+      (snap: QuerySnapshot<DocumentData>) => {
+        const threads = snap.docs.map(toThread);
+        if (fallback) {
+          threads.sort((a, b) => (b.updatedAt?.getTime?.() || 0) - (a.updatedAt?.getTime?.() || 0));
+        }
+        callback(threads.slice(0, 50));
+      },
+      (err) => {
+        // If we don't have the composite index yet, retry with fallback query.
+        if (!usingFallback && isMissingIndexError(err)) {
+          console.warn('[subscribeToUserThreads] Missing index; using fallback subscription', { field, userId });
+          try {
+            unsub();
+          } catch {
+            // ignore
+          }
+          start(fallbackQ, true);
+          return;
+        }
+        opts?.onError?.(err);
+      }
+    );
+  };
+
+  start(orderedQ, false);
+  return () => unsub();
+}
+
+/**
+ * Subscribe to ALL threads for a user (buyer + seller merged).
+ */
+export function subscribeToAllUserThreads(
+  userId: string,
+  callback: (threads: MessageThread[]) => void,
+  opts?: { onError?: (error: any) => void }
+): Unsubscribe {
+  let buyerThreads: MessageThread[] = [];
+  let sellerThreads: MessageThread[] = [];
+
+  const emit = () => {
+    const byId = new Map<string, MessageThread>();
+    for (const t of buyerThreads) byId.set(t.id, t);
+    for (const t of sellerThreads) byId.set(t.id, t);
+    const out = Array.from(byId.values());
+    out.sort((a, b) => (b.updatedAt?.getTime?.() || 0) - (a.updatedAt?.getTime?.() || 0));
+    callback(out.slice(0, 50));
+  };
+
+  const unsubBuyer = subscribeToUserThreads(
+    userId,
+    'buyer',
+    (t) => {
+      buyerThreads = t;
+      emit();
+    },
+    opts
+  );
+  const unsubSeller = subscribeToUserThreads(
+    userId,
+    'seller',
+    (t) => {
+      sellerThreads = t;
+      emit();
+    },
+    opts
+  );
+
+  return () => {
+    try {
+      unsubBuyer();
+    } catch {}
+    try {
+      unsubSeller();
+    } catch {}
+  };
+}
+
+/**
+ * Archive/unarchive a thread (server authoritative).
+ * Firestore rules intentionally don't allow participants to update `archived`, so we route via API.
+ */
+export async function setThreadArchived(threadId: string, archived: boolean): Promise<void> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Authentication required');
+
+  const token = await currentUser.getIdToken();
+  const res = await fetch(`/api/messages/thread/${encodeURIComponent(threadId)}/archive`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({ archived: Boolean(archived) }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) {
+    const msg = typeof data?.message === 'string' ? data.message : typeof data?.error === 'string' ? data.error : 'Failed to update thread';
+    const err: any = new Error(msg);
+    if (typeof data?.code === 'string') err.code = data.code;
+    throw err;
+  }
 }
 
 /**
