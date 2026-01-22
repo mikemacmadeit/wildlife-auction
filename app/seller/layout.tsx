@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LayoutDashboard,
+  LayoutGrid,
   Package,
   DollarSign,
   FileCheck,
@@ -74,6 +75,7 @@ interface SellerNavItem {
 // Base nav items (always visible)
 const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
+  { href: '/browse', label: 'Browse', icon: LayoutGrid },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
@@ -262,6 +264,20 @@ export default function SellerLayout({
   const navItems = useMemo(() => {
     return showAdminNav ? [...baseNavWithBadges, ...adminNavWithBadges] : baseNavWithBadges;
   }, [showAdminNav, baseNavWithBadges, adminNavWithBadges]);
+
+  const mobileBottomNavItems = useMemo(() => {
+    // Mobile UX: keep Browse one-tap away from seller backend.
+    // Use a fixed, predictable set regardless of the full sidebar/menu list.
+    const byHref = new Map(navItems.map((n) => [n.href, n] as const));
+    const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
+    return [
+      pick('/seller/overview', { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard }),
+      pick('/seller/listings', { href: '/seller/listings', label: 'Listings', icon: Package }),
+      pick('/browse', { href: '/browse', label: 'Browse', icon: LayoutGrid }),
+      pick('/dashboard/messages', { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare }),
+      pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
+    ];
+  }, [navItems]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -672,14 +688,20 @@ export default function SellerLayout({
               </span>
             </div>
           </div>
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Menu</span>
+          <div className="flex items-center gap-1">
+            <Link href="/browse" prefetch={false} onClick={(e) => hardNavigate(e, '/browse')}>
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Browse listings">
+                <LayoutGrid className="h-5 w-5" />
               </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0">
+            </Link>
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80 p-0">
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between p-4 border-b border-border/50">
                   <span className="text-lg font-extrabold text-foreground">Menu</span>
@@ -815,8 +837,9 @@ export default function SellerLayout({
                   )}
                 </nav>
               </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
 
@@ -827,14 +850,14 @@ export default function SellerLayout({
         sidebarCollapsed && 'md:ml-20'
       )}>
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           {children}
         </main>
 
         {/* Mobile Bottom Nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-card">
           <div className="grid grid-cols-5 h-16">
-            {navItems.slice(0, 5).map((item) => {
+            {mobileBottomNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
@@ -865,7 +888,7 @@ export default function SellerLayout({
                     'text-[10px] font-medium',
                     active ? 'text-primary' : 'text-muted-foreground'
                   )}>
-                    {item.label.split(' ')[0]}
+                    {item.label}
                   </span>
                 </Link>
               );
