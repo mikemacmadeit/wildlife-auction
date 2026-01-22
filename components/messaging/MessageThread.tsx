@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -28,6 +28,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { OfferFromMessagesDialog } from '@/components/offers/OfferFromMessagesDialog';
+import { extractUrls, linkify } from '@/lib/text/linkify';
+import { LinkPreviewCard, type LinkPreview } from '@/components/messaging/LinkPreviewCard';
 
 interface MessageThreadProps {
   thread: MessageThread;
@@ -58,6 +60,8 @@ export function MessageThreadComponent({
   const [reportDetails, setReportDetails] = useState('');
   const [offerOpen, setOfferOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previewCacheRef = useRef<Map<string, LinkPreview>>(new Map());
+  const [previewByUrl, setPreviewByUrl] = useState<Record<string, LinkPreview>>({});
 
   const toDateSafe = (value: any): Date | null => {
     if (!value) return null;
@@ -116,6 +120,53 @@ export function MessageThreadComponent({
 
     return () => unsubscribe();
   }, [authInitialized, thread.id, toast, user?.uid]);
+
+  // Load link previews for visible messages (best-effort; cached in-memory per session).
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!messages?.length) return;
+
+    const urls = new Set<string>();
+    for (const m of messages) {
+      const body = String((m as any)?.body || '');
+      const first = extractUrls(body, 1)[0];
+      if (first) urls.add(first);
+    }
+
+    const toFetch = Array.from(urls).filter((u) => !previewCacheRef.current.has(u));
+    if (toFetch.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        await Promise.all(
+          toFetch.map(async (url) => {
+            try {
+              const res = await fetch('/api/messages/link-preview', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                body: JSON.stringify({ url }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data?.ok || !data?.preview) return;
+              const preview = data.preview as LinkPreview;
+              previewCacheRef.current.set(url, preview);
+              if (!cancelled) setPreviewByUrl((prev) => ({ ...prev, [url]: preview }));
+            } catch {
+              // ignore
+            }
+          })
+        );
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, user]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -298,6 +349,10 @@ export function MessageThreadComponent({
           messages.map((message) => {
             const isSender = message.senderId === user?.uid;
             const createdAt = toDateSafe((message as any).createdAt);
+            const body = String(message.body || '');
+            const tokens = linkify(body);
+            const firstUrl = extractUrls(body, 1)[0];
+            const preview = firstUrl ? (previewByUrl[firstUrl] || previewCacheRef.current.get(firstUrl)) : undefined;
             return (
               <div
                 key={message.id}
@@ -317,7 +372,24 @@ export function MessageThreadComponent({
                       : 'bg-muted border border-border'
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {tokens.map((t, idx) =>
+                      t.type === 'link' ? (
+                        <a
+                          key={`${t.href}-${idx}`}
+                          href={t.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 text-primary hover:text-primary/80"
+                        >
+                          {t.value}
+                        </a>
+                      ) : (
+                        <span key={`t-${idx}`}>{t.value}</span>
+                      )
+                    )}
+                  </p>
+                  {preview ? <LinkPreviewCard preview={preview} /> : null}
                   {message.wasRedacted && (
                     <Badge variant="outline" className="mt-2 text-xs">
                       Contact details redacted
