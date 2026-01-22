@@ -35,24 +35,21 @@ export async function GET(request: Request) {
 
   const provider = getEmailProvider();
 
-  const ses = {
-    region: process.env.SES_AWS_REGION || 'us-east-1',
-    hasAccessKey: !!process.env.SES_AWS_ACCESS_KEY_ID,
-    hasSecretKey: !!process.env.SES_AWS_SECRET_ACCESS_KEY,
-    from: redactMailbox(process.env.SES_FROM || null),
-    replyTo: redactMailbox(process.env.SES_REPLY_TO || null),
-    sandboxMode: truthy(process.env.SES_SANDBOX_MODE),
-    sandboxTo: redactMailbox(process.env.SES_SANDBOX_TO || 'michael@redwolfcinema.com'),
+  const sendgrid = {
+    hasApiKey: !!process.env.SENDGRID_API_KEY,
+    fromEmail: redactMailbox(process.env.EMAIL_FROM || process.env.FROM_EMAIL || null),
+    fromName: process.env.EMAIL_FROM_NAME || process.env.FROM_NAME || null,
+    replyTo: redactMailbox(process.env.EMAIL_REPLY_TO || null),
   };
 
   return json({
     ok: true,
     provider,
     emailDisabled: truthy(process.env.EMAIL_DISABLED),
-    ses,
+    sendgrid,
     hints: [
-      'If SES is in sandbox, both the sender identity (SES_FROM email/domain) AND the recipient (SES_SANDBOX_TO) must be verified in SES.',
-      'If provider is "none", set EMAIL_PROVIDER=ses and provide SES_AWS_ACCESS_KEY_ID / SES_AWS_SECRET_ACCESS_KEY / SES_FROM in Netlify env vars.',
+      'SendGrid is used for transactional email only. Verify your sender identity in SendGrid and set EMAIL_FROM/EMAIL_FROM_NAME.',
+      'If provider is "none", set EMAIL_PROVIDER=sendgrid and provide SENDGRID_API_KEY (server-side env vars).',
     ],
   });
 }

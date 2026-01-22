@@ -4,7 +4,7 @@
  */
 
 import { getEmailProvider, getResendClient, isEmailEnabled, FROM_EMAIL, FROM_NAME } from './config';
-import { sendViaSes } from './sesSender';
+import { sendViaSendGrid } from './sendgridSender';
 import {
   getOrderConfirmationEmail,
   getDeliveryConfirmationEmail,
@@ -42,24 +42,18 @@ async function sendTransactionalEmail(params: {
 
   const provider = getEmailProvider();
 
-  if (provider === 'ses') {
-    const out = await sendViaSes({
+  if (provider === 'sendgrid') {
+    const out = await sendViaSendGrid({
       to: params.to,
       subject: params.subject,
       html: params.html,
-      from: process.env.SES_FROM,
-      replyTo: process.env.SES_REPLY_TO,
-      tags: {
-        app: 'wildlifeexchange',
-        channel: 'transactional',
-      },
+      from: { email: FROM_EMAIL, name: FROM_NAME },
+      replyTo: process.env.EMAIL_REPLY_TO || undefined,
+      categories: ['wildlifeexchange', 'transactional'],
     });
     if (!out.success) {
-      console.error('[ses] transactional send failed', { error: out.error });
-      return { success: false, error: out.error || 'SES send failed' };
-    }
-    if (out.sandbox?.enabled) {
-      console.warn('[ses] sandbox mode forced recipient', { originalTo: out.sandbox.originalTo, forcedTo: out.sandbox.forcedTo });
+      console.error('[sendgrid] transactional send failed', { error: out.error });
+      return { success: false, error: out.error || 'SendGrid send failed' };
     }
     return { success: true, messageId: out.messageId };
   }

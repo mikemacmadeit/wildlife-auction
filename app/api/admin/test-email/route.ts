@@ -2,7 +2,7 @@
  * POST /api/admin/test-email
  *
  * Admin-only endpoint to send a test transactional email through the configured provider.
- * Designed for verifying SES end-to-end (including SES_SANDBOX_MODE overrides).
+ * Designed for verifying transactional email end-to-end (SendGrid recommended).
  */
 import { z } from 'zod';
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return json({ ok: false, error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
 
   const provider = getEmailProvider();
-  const to = parsed.data.to || process.env.SES_SANDBOX_TO || 'michael@redwolfcinema.com';
+  const to = parsed.data.to || process.env.SENDGRID_TEST_TO || 'michael@redwolfcinema.com';
   const template = parsed.data.template || 'auction_winner';
 
   // Minimal, safe dummy payloads (validated by template registry).
