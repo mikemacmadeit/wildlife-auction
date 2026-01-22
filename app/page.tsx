@@ -6,11 +6,10 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, LayoutGrid, List, FileCheck, BookOpen } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
-import { ListItem } from '@/components/listings/ListItem';
 import { collection, getCountFromServer, onSnapshot, orderBy, query, where, limit as fsLimit, getDocs } from 'firebase/firestore';
 import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, getListingsByIds, toListing } from '@/lib/firebase/listings';
 import { db } from '@/lib/firebase/config';
@@ -19,8 +18,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
-
-type ViewMode = 'card' | 'list';
 
 function toDateSafe(v: any): Date | null {
   if (!v) return null;
@@ -51,10 +48,6 @@ export default function HomePage() {
   const [fieldNotesFeatured, setFieldNotesFeatured] = useState<any | null>(null);
   const [fieldNotesPicks, setFieldNotesPicks] = useState<any[]>([]);
 
-  // View mode with localStorage persistence
-  // Initialize to 'card' to ensure server/client consistency
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
-
   // Personalized modules (signed-in home)
   const [recentlyViewedListings, setRecentlyViewedListings] = useState<Listing[]>([]);
   const [watchlistListings, setWatchlistListings] = useState<Listing[]>([]);
@@ -67,48 +60,6 @@ export default function HomePage() {
   useEffect(() => {
     activeCountBySellerIdRef.current = activeCountBySellerId;
   }, [activeCountBySellerId]);
-
-  // Load from localStorage after hydration (client-side only)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('home-view-mode');
-      if (saved === 'card' || saved === 'list') {
-        setViewMode(saved);
-      }
-    }
-  }, []);
-
-  const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('home-view-mode', mode);
-    }
-  };
-
-  const ViewModeToggle = (props: { className?: string }) => {
-    return (
-      <div className={cn('flex items-center gap-2 border border-border rounded-lg p-1 bg-card', props.className)}>
-        <Button
-          variant={viewMode === 'card' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => handleViewModeChange('card')}
-          className="h-8 px-3"
-        >
-          <LayoutGrid className="h-4 w-4 mr-2" />
-          Gallery
-        </Button>
-        <Button
-          variant={viewMode === 'list' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => handleViewModeChange('list')}
-          className="h-8 px-3"
-        >
-          <List className="h-4 w-4 mr-2" />
-          List
-        </Button>
-      </div>
-    );
-  };
 
   // Fetch listings from Firestore
   useEffect(() => {
@@ -414,7 +365,8 @@ export default function HomePage() {
     );
   };
 
-  const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
+  const ListingRail = (props: { listings: Listing[]; emptyText: string; variant?: 'standard' | 'featured' }) => {
+    const scrollerRef = useRef<HTMLDivElement | null>(null);
     if (!props.listings.length) {
       return (
         <Card className="border-2 border-border/50">
@@ -423,24 +375,46 @@ export default function HomePage() {
       );
     }
 
-    if (viewMode === 'list') {
-      return (
-        <div className="space-y-3">
-          {props.listings.slice(0, 8).map((listing) => (
-            <ListItem key={listing.id} listing={listing} />
-          ))}
-        </div>
-      );
-    }
+    const isFeatured = props.variant === 'featured';
+    const itemClass = isFeatured ? 'min-w-[280px] sm:min-w-[340px] lg:min-w-[380px]' : 'min-w-[260px] sm:min-w-[300px] lg:min-w-[320px]';
 
     return (
-      <div className="overflow-x-auto pb-2 -mx-4 px-4">
-        <div className="flex gap-4 min-w-max">
-          {props.listings.map((listing) => (
-            <div key={listing.id} className="min-w-[280px] max-w-[280px]">
-              <ListingCard listing={listing} />
-            </div>
-          ))}
+      <div className="relative">
+        {/* Desktop arrows (eBay-style) */}
+        <div className="hidden md:flex absolute -top-12 right-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => scrollerRef.current?.scrollBy({ left: -Math.round((scrollerRef.current?.clientWidth || 800) * 0.9), behavior: 'smooth' })}
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => scrollerRef.current?.scrollBy({ left: Math.round((scrollerRef.current?.clientWidth || 800) * 0.9), behavior: 'smooth' })}
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div
+          ref={scrollerRef}
+          className="overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth"
+        >
+          <div className="flex gap-4 min-w-max snap-x snap-mandatory">
+            {props.listings.map((listing) => (
+              <div key={listing.id} className={cn('snap-start', itemClass)}>
+                {isFeatured ? <FeaturedListingCard listing={listing} /> : <ListingCard listing={listing} />}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -960,30 +934,10 @@ export default function HomePage() {
                     Hand-picked listings with high visibility. New inventory added daily.
                   </p>
                 </div>
-                <ViewModeToggle />
               </div>
             </motion.div>
 
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className={cn(
-                viewMode === 'card'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8'
-                  : 'space-y-4'
-              )}
-            >
-              <AnimatePresence>
-                {featuredListings.map((listing) =>
-                  viewMode === 'card' ? (
-                    <FeaturedListingCard key={listing.id} listing={listing} />
-                  ) : (
-                    <ListItem key={listing.id} listing={listing} />
-                  )
-                )}
-              </AnimatePresence>
-            </motion.div>
+            <ListingRail listings={featuredListings} emptyText="No featured listings right now." variant="featured" />
           </div>
         </section>
       )}
@@ -998,27 +952,12 @@ export default function HomePage() {
                 <p className="text-muted-foreground text-base md:text-lg">Social proof that drives liquidity.</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
-                <ViewModeToggle />
                 <Button variant="outline" asChild>
                   <Link href="/browse">Browse</Link>
                 </Button>
               </div>
             </div>
-            <div
-              className={cn(
-                viewMode === 'card'
-                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'
-                  : 'space-y-4'
-              )}
-            >
-              {mostWatched.map((listing) =>
-                viewMode === 'card' ? (
-                  <ListingCard key={listing.id} listing={listing} />
-                ) : (
-                  <ListItem key={listing.id} listing={listing} />
-                )
-              )}
-            </div>
+            <ListingRail listings={mostWatched} emptyText="No watched listings yet." />
           </div>
         </section>
       )}
@@ -1033,27 +972,12 @@ export default function HomePage() {
                 <p className="text-muted-foreground text-base md:text-lg">Auctions closing soon—act now.</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
-                <ViewModeToggle />
                 <Button variant="outline" asChild>
                   <Link href="/browse">View all</Link>
                 </Button>
               </div>
             </div>
-            <div
-              className={cn(
-                viewMode === 'card'
-                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'
-                  : 'space-y-4'
-              )}
-            >
-              {endingSoon.map((listing) =>
-                viewMode === 'card' ? (
-                  <ListingCard key={listing.id} listing={listing} />
-                ) : (
-                  <ListItem key={listing.id} listing={listing} />
-                )
-              )}
-            </div>
+            <ListingRail listings={endingSoon} emptyText="No auctions ending soon." />
           </div>
         </section>
       )}
@@ -1070,9 +994,6 @@ export default function HomePage() {
                 Latest additions to the marketplace
               </p>
             </div>
-
-            {/* View Mode Toggle */}
-            <ViewModeToggle />
           </div>
 
           {/* Loading State */}
@@ -1093,32 +1014,13 @@ export default function HomePage() {
 
           {/* Listings Grid/List */}
           {!loading && !error && (
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className={cn(
-                viewMode === 'card'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8'
-                  : 'space-y-4'
-              )}
-            >
-              <AnimatePresence>
-                {recentListings.length > 0 ? (
-                  recentListings.map((listing) =>
-                    viewMode === 'card' ? (
-                      <ListingCard key={listing.id} listing={listing} />
-                    ) : (
-                      <ListItem key={listing.id} listing={listing} />
-                    )
-                  )
-                ) : (
-                  <div className="col-span-full text-center py-12">
-                    <p className="text-muted-foreground">No listings available yet.</p>
-                  </div>
-                )}
-              </AnimatePresence>
-            </motion.div>
+            recentListings.length > 0 ? (
+              <ListingRail listings={recentListings} emptyText="No listings available yet." />
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No listings available yet.</p>
+              </div>
+            )
           )}
         </div>
       </section>
