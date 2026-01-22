@@ -244,7 +244,54 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          {/* Mobile-only: compact 2-column grid (icons + title only) */}
+          <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto md:hidden">
+            {[
+              { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-9 h-9 icon-primary-color mask-icon-whitetail-breeder" /> },
+              { href: '/browse?category=wildlife_exotics', label: 'Wildlife & Exotics', icon: <div className="w-9 h-9 icon-primary-color mask-icon-fallow" /> },
+              { href: '/browse?category=cattle_livestock', label: 'Cattle & Livestock', icon: <div className="w-9 h-9 icon-primary-color mask-icon-bull" /> },
+              {
+                href: '/browse?category=horse_equestrian',
+                label: 'Horse & Equestrian',
+                icon: (
+                  <div
+                    className="w-9 h-9"
+                    style={{
+                      WebkitMaskImage: `url('/images/Horse.png')`,
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: `url('/images/Horse.png')`,
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      backgroundColor: 'hsl(var(--primary))',
+                    }}
+                  />
+                ),
+              },
+              { href: '/browse?category=sporting_working_dogs', label: 'Sporting Dogs', icon: <div className="w-9 h-9 icon-primary-color mask-icon-dog" /> },
+              { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-9 h-9 icon-primary-color mask-icon-hunting-blind" /> },
+              { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-9 h-9 icon-primary-color mask-icon-tractor" /> },
+              { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-9 h-9 icon-primary-color mask-icon-top-drive" /> },
+            ].map((c) => (
+              <Link key={c.href} href={c.href} className="group">
+                <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-3 min-h-[56px]">
+                      <div className="flex-shrink-0">{c.icon}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-extrabold leading-tight line-clamp-2">{c.label}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+
+          {/* Desktop/tablet: keep existing layout exactly */}
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {/* Whitetail Breeder - First priority */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
