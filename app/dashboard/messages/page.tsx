@@ -496,6 +496,7 @@ export default function MessagesPage() {
               </CardContent>
             ) : (
               <MessageThreadComponent
+                key={thread.id}
                 thread={thread}
                 listingTitle={listing?.title || 'Listing'}
                 listing={listing}

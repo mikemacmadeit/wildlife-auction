@@ -58,9 +58,12 @@ export function MessageThreadComponent({
   const [reportReason, setReportReason] = useState<'spam' | 'harassment' | 'circumvention' | 'scam' | 'other'>('circumvention');
   const [reportDetails, setReportDetails] = useState('');
   const [offerOpen, setOfferOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previewCacheRef = useRef<Map<string, LinkPreview>>(new Map());
   const [previewByUrl, setPreviewByUrl] = useState<Record<string, LinkPreview>>({});
+  const isAtBottomRef = useRef(true);
+  const initialScrollForThreadRef = useRef(true);
 
   const toDateSafe = (value: any): Date | null => {
     if (!value) return null;
@@ -167,9 +170,27 @@ export function MessageThreadComponent({
     };
   }, [messages, user]);
 
-  // Scroll to bottom
+  // Reset scroll behavior when switching threads
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    initialScrollForThreadRef.current = true;
+    isAtBottomRef.current = true;
+    // Ensure we don't show stale previews from a previous thread
+    setPreviewByUrl({});
+  }, [thread.id]);
+
+  // Scroll to bottom (smart):
+  // - On thread switch: jump to bottom (auto)
+  // - On new messages: only auto-scroll if user is already near bottom (smooth)
+  useEffect(() => {
+    const el = messagesEndRef.current;
+    if (!el) return;
+
+    const shouldAutoScroll = initialScrollForThreadRef.current || isAtBottomRef.current;
+    if (!shouldAutoScroll) return;
+
+    const behavior = initialScrollForThreadRef.current ? 'auto' : 'smooth';
+    el.scrollIntoView({ behavior });
+    initialScrollForThreadRef.current = false;
   }, [messages]);
 
   // Update paid status
@@ -330,7 +351,17 @@ export function MessageThreadComponent({
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        onScroll={() => {
+          const sc = scrollRef.current;
+          if (!sc) return;
+          const thresholdPx = 80;
+          const remaining = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
+          isAtBottomRef.current = remaining <= thresholdPx;
+        }}
+      >
         {listenError ? (
           <Alert className="border-destructive/40 bg-destructive/5 text-destructive">
             <AlertTriangle className="h-4 w-4" />
