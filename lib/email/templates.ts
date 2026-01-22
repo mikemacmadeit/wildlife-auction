@@ -322,9 +322,13 @@ function getEmailTemplate(params: {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Encourage email clients to render this as light mode (reduces mobile/desktop color drift). -->
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>${escapeHtml(params.title)}</title>
   <!-- Web fonts are not guaranteed in email clients. We provide best-effort + robust fallbacks. -->
   <style>
+    :root { color-scheme: light; supported-color-schemes: light; }
     @font-face {
       font-family: 'BarlettaInline';
       src: url('${origin}/fonts/Barletta%20Inline.otf') format('opentype');
@@ -339,13 +343,13 @@ function getEmailTemplate(params: {
     }
   </style>
 </head>
-<body style="margin:0; padding:0; background-color:${cSandBase};">
+<body style="margin:0; padding:0; background-color:${cSandBase}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
   <!-- Preheader (hidden) -->
   <div style="display:none; font-size:1px; color:${cSandBase}; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
     ${escapeHtml(params.preheader)}
   </div>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${cSandBase}; padding: 26px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${cSandBase}" style="background-color:${cSandBase}; padding: 26px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px;">
@@ -353,7 +357,8 @@ function getEmailTemplate(params: {
           <tr>
             <td style="padding: 0 0 12px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                     style="background:${cOlivewood}; border-radius: 18px; overflow:hidden; border: 1px solid rgba(34,37,31,0.18);">
+                     bgcolor="${cOlivewood}"
+                     style="background:${cOlivewood}; background-color:${cOlivewood}; border-radius: 18px; overflow:hidden; border: 1px solid rgba(34,37,31,0.18);">
                 <tr>
                   <td style="padding: 18px 18px;">
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -370,24 +375,30 @@ function getEmailTemplate(params: {
                                  style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface}; padding:6px;" />
                           <![endif]-->
                           <!--[if !mso]><!-->
-                            <!-- Badge wrapper ensures the logo never blends into the dark header background -->
-                            <div style="width:40px; height:40px; display:block; border-radius:12px; background:${cSandSurface}; padding:6px; box-sizing:border-box;">
-                              <div
-                                style="
-                                  width:28px; height:28px; display:block;
-                                  background-color:${logoTint};
-                                  mask-image:url('${logoUrl}');
-                                  mask-size:contain;
-                                  mask-repeat:no-repeat;
-                                  mask-position:center;
-                                  -webkit-mask-image:url('${logoUrl}');
-                                  -webkit-mask-size:contain;
-                                  -webkit-mask-repeat:no-repeat;
-                                  -webkit-mask-position:center;
-                                "
-                                aria-label="Wildlife Exchange"
-                              ></div>
-                            </div>
+                            <!-- Table/TD badge wrapper is more consistent across mobile email clients than DIVs. -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
+                              <tr>
+                                <td width="40" height="40"
+                                    bgcolor="${cSandSurface}"
+                                    style="width:40px; height:40px; background-color:${cSandSurface}; border-radius:12px; padding:6px; mso-line-height-rule:exactly;">
+                                  <div
+                                    style="
+                                      width:28px; height:28px; display:block;
+                                      background-color:${logoTint};
+                                      mask-image:url('${logoUrl}');
+                                      mask-size:contain;
+                                      mask-repeat:no-repeat;
+                                      mask-position:center;
+                                      -webkit-mask-image:url('${logoUrl}');
+                                      -webkit-mask-size:contain;
+                                      -webkit-mask-repeat:no-repeat;
+                                      -webkit-mask-position:center;
+                                    "
+                                    aria-label="Wildlife Exchange"
+                                  ></div>
+                                </td>
+                              </tr>
+                            </table>
                           <!--<![endif]-->
                         </td>
                         <td style="vertical-align: middle;">
