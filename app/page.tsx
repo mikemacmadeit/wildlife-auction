@@ -383,37 +383,11 @@ export default function HomePage() {
   const featuredListings = listings.filter(l => l.featured).slice(0, 3);
   const recentListings = listings.slice(0, 6);
 
-  const recommendedForYou = useMemo(() => {
+  const signedInDiscoveryListings = useMemo(() => {
     if (!user?.uid) return [];
-    const exclude = new Set<string>([
-      ...recentlyViewedListings.map((l) => l.id),
-      ...watchlistListings.map((l) => l.id),
-    ]);
-
-    const weightsByCategory: Record<string, number> = {};
-    const weightsBySpecies: Record<string, number> = {};
-
-    const signalListings = [...recentlyViewedListings, ...watchlistListings];
-    for (const l of signalListings) {
-      if (l?.category) weightsByCategory[l.category] = (weightsByCategory[l.category] || 0) + 2;
-      const species = (l as any)?.attributes?.speciesId;
-      if (species) weightsBySpecies[String(species)] = (weightsBySpecies[String(species)] || 0) + 1;
-    }
-
-    const scored = (listings || [])
-      .filter((l) => l?.id && !exclude.has(l.id))
-      .map((l) => {
-        const species = (l as any)?.attributes?.speciesId ? String((l as any).attributes.speciesId) : null;
-        const score =
-          (l?.category ? (weightsByCategory[l.category] || 0) : 0) +
-          (species ? (weightsBySpecies[species] || 0) : 0) +
-          (l?.featured ? 0.25 : 0);
-        return { l, score };
-      })
-      .sort((a, b) => b.score - a.score);
-
-    return scored.map((x) => x.l).slice(0, 12);
-  }, [listings, recentlyViewedListings, user?.uid, watchlistListings]);
+    if (mostWatched?.length) return mostWatched.slice(0, 12);
+    return recentListings.slice(0, 12);
+  }, [mostWatched, recentListings, user?.uid]);
 
   const showRecentlyViewed = user?.uid ? recentlyViewedListings.length > 0 : false;
   const showWatchlist =
@@ -609,8 +583,13 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-4">
-              <SectionHeader title="New for you" subtitle="Personalized picks based on what you view and watch." href="/browse" actionLabel="Browse all" />
-              <ListingRail listings={recommendedForYou} emptyText="Browse a few listings and we’ll start tuning this feed for you." />
+              <SectionHeader
+                title={mostWatched?.length ? "Trending now" : "Explore listings"}
+                subtitle={mostWatched?.length ? "What people are watching right now." : "Fresh listings to start browsing."}
+                href="/browse"
+                actionLabel="Browse all"
+              />
+              <ListingRail listings={signedInDiscoveryListings} emptyText="Browse listings to get started." />
             </div>
 
             {showRecentlyViewed ? (
