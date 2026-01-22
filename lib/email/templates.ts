@@ -367,24 +367,27 @@ function getEmailTemplate(params: {
                           -->
                           <!--[if mso]>
                             <img src="${logoUrl}" width="40" height="40" alt="Wildlife Exchange"
-                                 style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface};" />
+                                 style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface}; padding:6px;" />
                           <![endif]-->
                           <!--[if !mso]><!-->
-                            <div
-                              style="
-                                width:40px; height:40px; display:block;
-                                background-color:${logoTint};
-                                mask-image:url('${logoUrl}');
-                                mask-size:contain;
-                                mask-repeat:no-repeat;
-                                mask-position:center;
-                                -webkit-mask-image:url('${logoUrl}');
-                                -webkit-mask-size:contain;
-                                -webkit-mask-repeat:no-repeat;
-                                -webkit-mask-position:center;
-                              "
-                              aria-label="Wildlife Exchange"
-                            ></div>
+                            <!-- Badge wrapper ensures the logo never blends into the dark header background -->
+                            <div style="width:40px; height:40px; display:block; border-radius:12px; background:${cSandSurface}; padding:6px; box-sizing:border-box;">
+                              <div
+                                style="
+                                  width:28px; height:28px; display:block;
+                                  background-color:${logoTint};
+                                  mask-image:url('${logoUrl}');
+                                  mask-size:contain;
+                                  mask-repeat:no-repeat;
+                                  mask-position:center;
+                                  -webkit-mask-image:url('${logoUrl}');
+                                  -webkit-mask-size:contain;
+                                  -webkit-mask-repeat:no-repeat;
+                                  -webkit-mask-position:center;
+                                "
+                                aria-label="Wildlife Exchange"
+                              ></div>
+                            </div>
                           <!--<![endif]-->
                         </td>
                         <td style="vertical-align: middle;">
