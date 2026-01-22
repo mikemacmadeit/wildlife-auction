@@ -337,8 +337,14 @@ export default function MessagesPage() {
           <h1 className="text-2xl font-bold">Messages</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4">
-          <Card className="lg:h-[calc(100vh-220px)] flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
+          <Card
+            className={cn(
+              'h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex flex-col min-h-0',
+              // Mobile: when a thread is selected, show thread view full-screen.
+              selectedThreadId ? 'hidden lg:flex' : 'flex'
+            )}
+          >
             <CardHeader className="pb-3 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="text-lg font-bold">Inbox</CardTitle>
@@ -363,7 +369,7 @@ export default function MessagesPage() {
                 </TabsList>
               </Tabs>
             </CardHeader>
-            <CardContent className="p-0 flex-1">
+            <CardContent className="p-0 flex-1 min-h-0">
               {inboxItems.length === 0 ? (
                 <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
               ) : (
@@ -487,7 +493,12 @@ export default function MessagesPage() {
             </CardContent>
           </Card>
 
-          <Card className="lg:h-[calc(100vh-220px)] flex flex-col overflow-hidden">
+          <Card
+            className={cn(
+              'h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex flex-col overflow-hidden min-h-0',
+              selectedThreadId ? 'flex' : 'hidden lg:flex'
+            )}
+          >
             {!thread ? (
               <CardContent className="pt-12 pb-12 text-center">
                 <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50" />
@@ -495,15 +506,35 @@ export default function MessagesPage() {
                 <div className="text-sm text-muted-foreground mt-1">Choose a thread from the inbox.</div>
               </CardContent>
             ) : (
-              <MessageThreadComponent
-                key={thread.id}
-                thread={thread}
-                listingTitle={listing?.title || 'Listing'}
-                listing={listing}
-                otherPartyName={otherPartyName}
-                otherPartyAvatar={otherPartyAvatar}
-                orderStatus={orderStatus}
-              />
+              <>
+                {/* Mobile: back to inbox */}
+                <div className="lg:hidden border-b p-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedThreadId(null);
+                      setThread(null);
+                      router.replace('/dashboard/messages');
+                    }}
+                  >
+                    <Inbox className="h-4 w-4 mr-2" />
+                    Inbox
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <MessageThreadComponent
+                    key={thread.id}
+                    thread={thread}
+                    listingTitle={listing?.title || 'Listing'}
+                    listing={listing}
+                    otherPartyName={otherPartyName}
+                    otherPartyAvatar={otherPartyAvatar}
+                    orderStatus={orderStatus}
+                  />
+                </div>
+              </>
             )}
           </Card>
         </div>
