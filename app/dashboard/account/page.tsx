@@ -43,6 +43,7 @@ import { getOrdersForUser } from '@/lib/firebase/orders';
 import { PublicSellerTrust, UserProfile } from '@/lib/types';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
 import { auth } from '@/lib/firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
@@ -1007,6 +1008,13 @@ export default function AccountPage() {
 
           {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-6 mt-6">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-sm font-semibold text-foreground">Notifications</div>
+                <div className="text-xs text-muted-foreground">Manage email, push, quiet hours, and category alerts.</div>
+              </div>
+              <NotificationSettingsDialog triggerLabel="Open in modal" triggerVariant="outline" triggerSize="sm" />
+            </div>
             <NotificationPreferencesPanel embedded />
           </TabsContent>
 

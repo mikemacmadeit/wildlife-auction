@@ -22,6 +22,7 @@ import {
   Activity,
   Loader2,
   X,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -37,6 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
 import type { SellerDashboardData } from '@/lib/seller/getSellerDashboardData';
+import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
 
 // Helper functions outside component to prevent recreation
 const getAlertIcon = (type: string) => {
@@ -619,7 +621,13 @@ export default function SellerOverviewPage() {
               Daily briefing and action items for your listings
             </p>
           </div>
-          <div data-tour="seller-create-listing">
+          <div className="flex items-center gap-2 flex-wrap" data-tour="seller-create-listing">
+            <NotificationSettingsDialog
+              triggerLabel="Notifications"
+              triggerVariant="outline"
+              triggerSize="default"
+              className="min-h-[44px] font-semibold"
+            />
             <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
               <Package className="h-4 w-4" />
               Create Listing
