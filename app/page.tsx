@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -60,7 +60,13 @@ export default function HomePage() {
   const [watchlistListings, setWatchlistListings] = useState<Listing[]>([]);
   const [savedSellers, setSavedSellers] = useState<SavedSellerDoc[]>([]);
   const [activeCountBySellerId, setActiveCountBySellerId] = useState<Record<string, number | null>>({});
+  const activeCountBySellerIdRef = useRef<Record<string, number | null>>({});
   const [newFromSavedSellers, setNewFromSavedSellers] = useState<Listing[]>([]);
+
+  // Keep a ref in sync so effects can read the latest cache without depending on it.
+  useEffect(() => {
+    activeCountBySellerIdRef.current = activeCountBySellerId;
+  }, [activeCountBySellerId]);
 
   // Load from localStorage after hydration (client-side only)
   useEffect(() => {
@@ -277,7 +283,8 @@ export default function HomePage() {
     if (!savedSellers.length) return;
 
     const sellerIds = savedSellers.slice(0, 12).map((s) => s.sellerId);
-    const missing = sellerIds.filter((id) => !(id in activeCountBySellerId));
+    const cache = activeCountBySellerIdRef.current || {};
+    const missing = sellerIds.filter((id) => !(id in cache));
     if (missing.length === 0) return;
 
     // Mark missing as loading
@@ -309,7 +316,10 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [activeCountBySellerId, savedSellers, user?.uid]);
+    // NOTE: Do NOT depend on activeCountBySellerId here; we mark items as "loading" (null),
+    // which triggers a re-render. If this effect re-runs due to that state change, it will
+    // clean up and cancel the in-flight async fetch, leaving "Loading…" stuck forever.
+  }, [savedSellers, user?.uid]);
 
   // Signed-in: New listings from saved sellers (lightweight, capped)
   useEffect(() => {
@@ -404,6 +414,12 @@ export default function HomePage() {
 
     return scored.map((x) => x.l).slice(0, 12);
   }, [listings, recentlyViewedListings, user?.uid, watchlistListings]);
+
+  const showRecentlyViewed = user?.uid ? recentlyViewedListings.length > 0 : false;
+  const showWatchlist =
+    user?.uid ? favoritesLoading || Array.from(favoriteIds || []).length > 0 || watchlistListings.length > 0 : false;
+  const showSavedSellers = user?.uid ? savedSellers.length > 0 : false;
+  const showNewFromSavedSellers = user?.uid ? newFromSavedSellers.length > 0 : false;
 
   const SectionHeader = (props: { title: string; subtitle?: string; href?: string; actionLabel?: string; right?: ReactNode }) => {
     return (
@@ -593,39 +609,47 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-4">
-              <SectionHeader
-                title="Recently viewed"
-                subtitle="Your latest clicks — fast way back in."
-                href="/dashboard/recently-viewed"
-              />
-              <ListingRail listings={recentlyViewedListings} emptyText="No recently viewed listings yet." />
+              <SectionHeader title="New for you" subtitle="Personalized picks based on what you view and watch." href="/browse" actionLabel="Browse all" />
+              <ListingRail listings={recommendedForYou} emptyText="Browse a few listings and we’ll start tuning this feed for you." />
             </div>
 
-            <div className="space-y-4">
-              <SectionHeader
-                title="Watched items"
-                subtitle="Listings you’re keeping an eye on."
-                href="/dashboard/watchlist"
-                right={
-                  favoritesLoading ? (
-                    <span className="text-xs text-muted-foreground">Loading…</span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">{Array.from(favoriteIds || []).length} watched</span>
-                  )
-                }
-              />
-              <ListingRail listings={watchlistListings} emptyText="No watched items yet. Tap the heart on any listing." />
-            </div>
+            {showRecentlyViewed ? (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="Recently viewed"
+                  subtitle="Your latest clicks — fast way back in."
+                  href="/dashboard/recently-viewed"
+                />
+                <ListingRail listings={recentlyViewedListings} emptyText="No recently viewed listings yet." />
+              </div>
+            ) : null}
 
-            <div className="space-y-4">
-              <SectionHeader title="Saved sellers" subtitle="Sellers you follow — with their active inventory." href="/dashboard/watchlist" actionLabel="Manage" />
-              {savedSellers.length === 0 ? (
-                <Card className="border-2 border-border/50">
-                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                    You haven’t saved any sellers yet. Save a seller from a listing page to get updates here.
-                  </CardContent>
-                </Card>
-              ) : (
+            {showWatchlist ? (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="Watched items"
+                  subtitle="Listings you’re keeping an eye on."
+                  href="/dashboard/watchlist"
+                  right={
+                    favoritesLoading ? (
+                      <span className="text-xs text-muted-foreground">Loading…</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{Array.from(favoriteIds || []).length} watched</span>
+                    )
+                  }
+                />
+                <ListingRail listings={watchlistListings} emptyText="No watched items yet. Tap the heart on any listing." />
+              </div>
+            ) : null}
+
+            {showSavedSellers ? (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="Saved sellers"
+                  subtitle="Sellers you follow — with their active inventory."
+                  href="/dashboard/watchlist"
+                  actionLabel="Manage"
+                />
                 <div className="overflow-x-auto pb-2 -mx-4 px-4">
                   <div className="flex gap-3 min-w-max">
                     {savedSellers.slice(0, 12).map((s) => {
@@ -659,23 +683,20 @@ export default function HomePage() {
                     })}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : null}
 
-            <div className="space-y-4">
-              <SectionHeader
-                title="New from saved sellers"
-                subtitle="Fresh inventory from people you follow."
-                href="/dashboard/watchlist"
-                actionLabel="See sellers"
-              />
-              <ListingRail listings={newFromSavedSellers} emptyText="No active listings from your saved sellers yet." />
-            </div>
-
-            <div className="space-y-4">
-              <SectionHeader title="New for you" subtitle="Personalized picks based on what you view and watch." href="/browse" actionLabel="Browse all" />
-              <ListingRail listings={recommendedForYou} emptyText="Browse a few listings and we’ll start tuning this feed for you." />
-            </div>
+            {showNewFromSavedSellers ? (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="New from saved sellers"
+                  subtitle="Fresh inventory from people you follow."
+                  href="/dashboard/watchlist"
+                  actionLabel="See sellers"
+                />
+                <ListingRail listings={newFromSavedSellers} emptyText="No active listings from your saved sellers yet." />
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}
