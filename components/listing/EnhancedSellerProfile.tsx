@@ -30,6 +30,8 @@ import Image from 'next/image';
 import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 import type { PublicSellerTrust } from '@/lib/types';
+import { collection, getCountFromServer, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 interface EnhancedSellerProfileProps {
   listing: Listing;
@@ -65,6 +67,7 @@ export function EnhancedSellerProfile({
   const [sellerTier, setSellerTier] = useState<SubscriptionTier>('standard');
   const [sellerProfile, setSellerProfile] = useState<UserProfile | null>(null);
   const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
+  const [activeListingsCount, setActiveListingsCount] = useState<number | null>(null);
 
   const sellerPhotoUrl =
     sellerProfile?.photoURL ||
@@ -134,10 +137,40 @@ export function EnhancedSellerProfile({
     };
   }, [sellerId, viewerId]);
 
+  // Active listings count (public inventory signal). This must be correct even if user doc stats are stale.
+  useEffect(() => {
+    let cancelled = false;
+    if (!sellerId) {
+      setActiveListingsCount(null);
+      return;
+    }
+    (async () => {
+      try {
+        const listingsRef = collection(db, 'listings');
+        const q = query(listingsRef, where('sellerId', '==', sellerId), where('status', '==', 'active'));
+        const snap = await getCountFromServer(q);
+        const count = Number(snap.data().count || 0);
+        if (!cancelled) setActiveListingsCount(Number.isFinite(count) ? count : 0);
+      } catch {
+        if (!cancelled) setActiveListingsCount(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
+
   const reputation = getSellerReputation({ profile: sellerProfile });
   const publicTxCount = sellerProfile
     ? Math.max(Number(sellerProfile.verifiedTransactionsCount || 0), Number(sellerProfile.completedSalesCount || 0))
     : null;
+
+  const sellerHomeLabel = (() => {
+    const city = String((sellerProfile as any)?.profile?.location?.city || '').trim();
+    const state = String((sellerProfile as any)?.profile?.location?.state || '').trim();
+    if (city && state) return `${city}, ${state}`;
+    return city || state || null;
+  })();
 
   return (
     <Card className={cn(
@@ -274,7 +307,11 @@ export function EnhancedSellerProfile({
             <div className="flex items-center justify-center gap-1 mb-1">
               <Package className="h-3.5 w-3.5 text-accent" />
               <span className="text-base font-bold text-foreground">
-                {typeof sellerProfile?.totalListingsCount === 'number' ? sellerProfile.totalListingsCount : '—'}
+                {typeof activeListingsCount === 'number'
+                  ? activeListingsCount
+                  : typeof sellerProfile?.totalListingsCount === 'number'
+                    ? sellerProfile.totalListingsCount
+                    : '—'}
               </span>
             </div>
             <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Listings</div>
@@ -313,7 +350,10 @@ export function EnhancedSellerProfile({
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-1.5 rounded-md bg-muted/30 border border-border/40">
             <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
             <span className="leading-tight">
-              Based in <span className="font-semibold text-foreground">{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
+              Based in{' '}
+              <span className="font-semibold text-foreground">
+                {sellerHomeLabel || `${listing.location?.city || 'Unknown'}, ${listing.location?.state || 'Unknown'}`}
+              </span>
             </span>
           </div>
         </div>
