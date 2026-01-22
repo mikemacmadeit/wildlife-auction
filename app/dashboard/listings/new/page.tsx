@@ -1471,6 +1471,7 @@ function NewListingPageContent() {
                   type="datetime-local"
                   value={formData.endsAt}
                   onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
+                  step={60}
                   className={cn(
                     "min-h-[48px] text-base",
                     validationAttempted.details &&

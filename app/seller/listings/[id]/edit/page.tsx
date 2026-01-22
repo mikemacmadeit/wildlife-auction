@@ -27,7 +27,7 @@ import {
   WhitetailBreederAttributes,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
+import { formatDateTimeLocal, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getListingById, updateListing, publishListing } from '@/lib/firebase/listings';
@@ -770,6 +770,7 @@ function EditListingPageContent() {
                       value={formData.endsAt}
                       onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
                       disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
+                      step={60}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
                         publishMissingFields.includes('endsAt') ? 'ring-2 ring-destructive border-destructive' : null
@@ -1717,6 +1718,35 @@ function EditListingPageContent() {
       setInitialSignature(currentSignature);
       if (fullListing?.status === 'removed') {
         setHasSavedEditsSinceRejection(true);
+      }
+
+      // Immediately reload from Firestore so the UI reflects what actually persisted.
+      // This prevents "Saved!" toasts when rules/normalization reverted some fields (e.g. endsAt).
+      try {
+        const refreshed = await getListingById(listingId);
+        if (refreshed) {
+          setFullListing(refreshed as any);
+          setListingData((prev) => ({
+            ...(prev || {}),
+            metrics: (refreshed as any).metrics,
+            status: (refreshed as any).status,
+            currentBid: (refreshed as any).currentBid,
+            type: (refreshed as any).type,
+          }));
+          setFormData((prev) => ({
+            ...prev,
+            type: (refreshed as any).type,
+            category: (refreshed as any).category,
+            title: String((refreshed as any).title || ''),
+            description: String((refreshed as any).description || ''),
+            price: (refreshed as any).price?.toString?.() || '',
+            startingBid: (refreshed as any).startingBid?.toString?.() || '',
+            reservePrice: (refreshed as any).reservePrice?.toString?.() || '',
+            endsAt: (refreshed as any).endsAt ? formatDateTimeLocal(new Date((refreshed as any).endsAt)) : '',
+          }));
+        }
+      } catch {
+        // best-effort; don't block save UX
       }
 
       // Reload documents after save to ensure we have the latest state

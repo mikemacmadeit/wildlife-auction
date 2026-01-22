@@ -21,7 +21,11 @@ export function formatDateTimeLocal(value: Date | null | undefined): string {
 export function parseDateTimeLocal(raw: string | null | undefined): Date | null {
   const s = String(raw || '').trim();
   if (!s) return null;
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  // Accept common datetime-local shapes:
+  // - YYYY-MM-DDTHH:mm
+  // - YYYY-MM-DDTHH:mm:ss
+  // - YYYY-MM-DDTHH:mm:ss.sss
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?$/);
   if (!m) {
     const fallback = new Date(s);
     return Number.isFinite(fallback.getTime()) ? fallback : null;
@@ -31,7 +35,8 @@ export function parseDateTimeLocal(raw: string | null | undefined): Date | null 
   const da = Number(m[3]);
   const hh = Number(m[4]);
   const mm = Number(m[5]);
-  const d = new Date(y, mo - 1, da, hh, mm, 0, 0);
+  const ss = m[6] ? Number(m[6]) : 0;
+  const d = new Date(y, mo - 1, da, hh, mm, Number.isFinite(ss) ? ss : 0, 0);
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
