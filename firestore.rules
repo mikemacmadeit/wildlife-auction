@@ -568,9 +568,8 @@ service cloud.firestore {
       // Fields a normal participant is allowed to change on the thread doc.
       // Everything else is admin/server controlled.
       function participantAllowedThreadUpdate() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'buyerUnreadCount',
-          'sellerUnreadCount',
+        let keys = request.resource.data.diff(resource.data).affectedKeys();
+        let shared = [
           'unreadCount',
           'updatedAt',
           'flagged',
@@ -579,11 +578,35 @@ service cloud.firestore {
           'flaggedAt',
           'flaggedReason',
           'flaggedDetails'
-        ]) &&
-        // Disallow changing core identity fields
-        request.resource.data.buyerId == resource.data.buyerId &&
-        request.resource.data.sellerId == resource.data.sellerId &&
-        request.resource.data.listingId == resource.data.listingId;
+        ];
+        let buyerOnly = [
+          'buyerUnreadCount',
+          'buyerLastReadAt',
+          'buyerTypingUntil',
+          'buyerMuted',
+          'buyerPinned'
+        ];
+        let sellerOnly = [
+          'sellerUnreadCount',
+          'sellerLastReadAt',
+          'sellerTypingUntil',
+          'sellerMuted',
+          'sellerPinned'
+        ];
+
+        return (
+          // Disallow changing core identity fields
+          request.resource.data.buyerId == resource.data.buyerId &&
+          request.resource.data.sellerId == resource.data.sellerId &&
+          request.resource.data.listingId == resource.data.listingId
+        ) && (
+          // Buyer can only update buyer-specific fields (+ shared)
+          (request.auth.uid == resource.data.buyerId && keys.hasOnly(shared + buyerOnly)) ||
+          // Seller can only update seller-specific fields (+ shared)
+          (request.auth.uid == resource.data.sellerId && keys.hasOnly(shared + sellerOnly)) ||
+          // Admin can update any of these participant fields (still constrained by allow update)
+          (isAdmin() && keys.hasOnly(shared + buyerOnly + sellerOnly))
+        );
       }
 
       // Allow read: if user is buyer or seller in the thread, OR if admin

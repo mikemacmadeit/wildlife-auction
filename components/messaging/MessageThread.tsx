@@ -19,10 +19,17 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { MessageSquare, Send, AlertTriangle, Flag, Tag, Image as ImageIcon, X } from 'lucide-react';
+import { MessageSquare, Send, AlertTriangle, Flag, Tag, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Message, MessageThread, Listing, MessageAttachment } from '@/lib/types';
-import { subscribeToThreadMessages, sendMessage, markThreadAsRead, flagThread } from '@/lib/firebase/messages';
+import {
+  subscribeToThreadMessagesPage,
+  fetchOlderThreadMessages,
+  sendMessage,
+  markThreadAsRead,
+  flagThread,
+  setThreadTyping,
+} from '@/lib/firebase/messages';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -34,6 +41,8 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
+import { db } from '@/lib/firebase/config';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface MessageThreadProps {
   thread: MessageThread;
@@ -54,7 +63,12 @@ export function MessageThreadComponent({
 }: MessageThreadProps) {
   const { user, initialized: authInitialized } = useAuth();
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const PAGE_SIZE = 30;
+  const [latestMessages, setLatestMessages] = useState<Message[]>([]);
+  const [olderMessages, setOlderMessages] = useState<Message[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  const oldestCursorRef = useRef<any | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [sending, setSending] = useState(false);
   const [isPaid, setIsPaid] = useState(orderStatus === 'paid' || orderStatus === 'completed');
@@ -77,6 +91,10 @@ export function MessageThreadComponent({
     }>
   >([]);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [threadLive, setThreadLive] = useState<MessageThread>(thread);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+  const lastTypingPingAtRef = useRef<number>(0);
+  const typingClearTimerRef = useRef<any>(null);
   const previewCacheRef = useRef<Map<string, LinkPreview>>(new Map());
   const [previewByUrl, setPreviewByUrl] = useState<Record<string, LinkPreview>>({});
   const isAtBottomRef = useRef(true);
@@ -104,38 +122,94 @@ export function MessageThreadComponent({
     return null;
   };
 
+  const isBuyer = !!user?.uid && user.uid === thread.buyerId;
+  const myLastReadAt = isBuyer ? (threadLive as any)?.buyerLastReadAt : (threadLive as any)?.sellerLastReadAt;
+  const otherLastReadAt = isBuyer ? (threadLive as any)?.sellerLastReadAt : (threadLive as any)?.buyerLastReadAt;
+  const otherTypingUntil = isBuyer ? (threadLive as any)?.sellerTypingUntil : (threadLive as any)?.buyerTypingUntil;
+  const isOtherTyping = (() => {
+    const d = toDateSafe(otherTypingUntil);
+    if (!d) return false;
+    return d.getTime() > nowTick;
+  })();
+
+  const messages = useMemo(() => {
+    const byId = new Map<string, Message>();
+    for (const m of olderMessages) byId.set(m.id, m);
+    for (const m of latestMessages) byId.set(m.id, m);
+    const out = Array.from(byId.values());
+    out.sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0));
+    return out;
+  }, [latestMessages, olderMessages]);
+
+  // Live thread fields (typing/read receipts) subscription
+  useEffect(() => {
+    if (!thread.id) return;
+    try {
+      const ref = doc(db, 'messageThreads', thread.id);
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          const d = snap.data() as any;
+          if (!d) return;
+          setThreadLive((prev) => ({
+            ...(prev || thread),
+            ...(d || {}),
+            id: thread.id,
+            createdAt: d?.createdAt?.toDate?.() || (prev as any)?.createdAt || thread.createdAt,
+            updatedAt: d?.updatedAt?.toDate?.() || (prev as any)?.updatedAt || thread.updatedAt,
+            lastMessageAt: d?.lastMessageAt?.toDate?.() || (prev as any)?.lastMessageAt,
+          } as any));
+        },
+        () => {
+          // ignore
+        }
+      );
+      return () => unsub();
+    } catch {
+      // ignore
+    }
+  }, [thread, thread.id]);
+
+  // Tick for typing indicator TTLs / "Seen" rendering
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // Subscribe to messages
   useEffect(() => {
     if (!thread.id) return;
     if (!authInitialized) return;
     if (!user?.uid) return;
     setListenError(null);
+    setOlderMessages([]);
+    setLatestMessages([]);
+    oldestCursorRef.current = null;
+    setHasMoreOlder(true);
 
-    const unsubscribe = subscribeToThreadMessages(
-      thread.id,
-      (newMessages) => {
-        setMessages(newMessages);
-        // Mark as read when viewing (best-effort; never crash the listener)
-        void markThreadAsRead(thread.id, user.uid).catch(() => {});
+    const unsubscribe = subscribeToThreadMessagesPage(thread.id, PAGE_SIZE, (page) => {
+      setLatestMessages(page.messages || []);
+      oldestCursorRef.current = page.oldestCursor;
+      if (!page.oldestCursor) setHasMoreOlder(false);
+      // Mark as read when viewing (best-effort; never crash the listener)
+      void markThreadAsRead(thread.id, user.uid).catch(() => {});
+    }, {
+      onError: (err: any) => {
+        const code = String(err?.code || '');
+        const msg = String(err?.message || 'Failed to load messages');
+        if (code === 'permission-denied') {
+          setListenError('You do not have permission to view this conversation.');
+        } else {
+          setListenError('Failed to load messages. Please refresh and try again.');
+        }
+        console.error('[MessageThread] subscribeToThreadMessagesPage error', err);
+        toast({
+          title: 'Messaging error',
+          description: code ? `${msg} (${code})` : msg,
+          variant: 'destructive',
+        });
       },
-      {
-        onError: (err: any) => {
-          const code = String(err?.code || '');
-          const msg = String(err?.message || 'Failed to load messages');
-          if (code === 'permission-denied') {
-            setListenError('You do not have permission to view this conversation.');
-          } else {
-            setListenError('Failed to load messages. Please refresh and try again.');
-          }
-          console.error('[MessageThread] subscribeToThreadMessages error', err);
-          toast({
-            title: 'Messaging error',
-            description: code ? `${msg} (${code})` : msg,
-            variant: 'destructive',
-          });
-        },
-      }
-    );
+    });
 
     return () => unsubscribe();
   }, [authInitialized, thread.id, toast, user?.uid]);
@@ -223,6 +297,17 @@ export function MessageThreadComponent({
 
     setSending(true);
     try {
+      // stop typing indicator
+      try {
+        await setThreadTyping({
+          threadId: thread.id,
+          userId: user.uid,
+          buyerId: thread.buyerId,
+          sellerId: thread.sellerId,
+          isTyping: false,
+        });
+      } catch {}
+
       await sendMessage(
         thread.id,
         user.uid,
@@ -252,6 +337,75 @@ export function MessageThreadComponent({
     } finally {
       setSending(false);
     }
+  };
+
+  const loadOlder = async () => {
+    if (loadingOlder) return;
+    if (!hasMoreOlder) return;
+    const before = oldestCursorRef.current;
+    if (!before) {
+      setHasMoreOlder(false);
+      return;
+    }
+    const sc = scrollRef.current;
+    const prevHeight = sc?.scrollHeight || 0;
+    const prevTop = sc?.scrollTop || 0;
+
+    setLoadingOlder(true);
+    try {
+      const page = await fetchOlderThreadMessages({ threadId: thread.id, pageSize: PAGE_SIZE, before });
+      if (!page?.messages?.length) {
+        setHasMoreOlder(false);
+      } else {
+        setOlderMessages((prev) => {
+          const byId = new Map(prev.map((m) => [m.id, m] as const));
+          for (const m of page.messages) byId.set(m.id, m);
+          const out = Array.from(byId.values());
+          out.sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0));
+          return out;
+        });
+      }
+      oldestCursorRef.current = page.oldestCursor;
+      if (!page.oldestCursor) setHasMoreOlder(false);
+    } catch (e) {
+      // ignore (best-effort)
+    } finally {
+      setLoadingOlder(false);
+      // Maintain scroll position when we prepend older messages.
+      requestAnimationFrame(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const newHeight = el.scrollHeight || 0;
+        const delta = newHeight - prevHeight;
+        if (delta > 0) el.scrollTop = prevTop + delta;
+      });
+    }
+  };
+
+  const handleTypingPing = () => {
+    if (!user?.uid) return;
+    const now = Date.now();
+    // throttle network writes
+    if (now - lastTypingPingAtRef.current < 4000) return;
+    lastTypingPingAtRef.current = now;
+    void setThreadTyping({
+      threadId: thread.id,
+      userId: user.uid,
+      buyerId: thread.buyerId,
+      sellerId: thread.sellerId,
+      isTyping: true,
+    }).catch(() => {});
+
+    if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
+    typingClearTimerRef.current = setTimeout(() => {
+      void setThreadTyping({
+        threadId: thread.id,
+        userId: user.uid,
+        buyerId: thread.buyerId,
+        sellerId: thread.sellerId,
+        isTyping: false,
+      }).catch(() => {});
+    }, 10000);
   };
 
   const handlePickImages = () => {
@@ -439,8 +593,21 @@ export function MessageThreadComponent({
           const thresholdPx = 80;
           const remaining = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
           isAtBottomRef.current = remaining <= thresholdPx;
+
+          // Auto-load older messages when near top
+          if (sc.scrollTop <= 60 && hasMoreOlder && !loadingOlder) {
+            void loadOlder();
+          }
         }}
       >
+        {hasMoreOlder ? (
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
+              {loadingOlder ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Load earlier
+            </Button>
+          </div>
+        ) : null}
         {listenError ? (
           <Alert className="border-destructive/40 bg-destructive/5 text-destructive">
             <AlertTriangle className="h-4 w-4" />
@@ -526,6 +693,28 @@ export function MessageThreadComponent({
                   <p className="text-xs text-muted-foreground mt-1">
                     {createdAt ? formatDistanceToNow(createdAt, { addSuffix: true }) : '—'}
                   </p>
+                  {(() => {
+                    if (!user?.uid) return null;
+                    if (message.senderId !== user.uid) return null;
+                    const msgTime = createdAt?.getTime?.() || 0;
+                    if (!msgTime) return null;
+                    const otherRead = toDateSafe(otherLastReadAt);
+                    if (!otherRead) return null;
+                    // Only show on the latest outgoing message to avoid noise
+                    const lastOutgoing = (() => {
+                      for (let i = messages.length - 1; i >= 0; i--) {
+                        if (messages[i]?.senderId === user.uid) return messages[i];
+                      }
+                      return null;
+                    })();
+                    if (!lastOutgoing || lastOutgoing.id !== message.id) return null;
+                    if (otherRead.getTime() < msgTime) return null;
+                    return (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Seen {formatDistanceToNow(otherRead, { addSuffix: true })}
+                      </p>
+                    );
+                  })()}
                 </div>
                 {isSender && (
                   <Avatar className="h-8 w-8">
@@ -600,7 +789,20 @@ export function MessageThreadComponent({
           <Textarea
             placeholder="Write a message…"
             value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
+            onChange={(e) => {
+              setMessageInput(e.target.value);
+              handleTypingPing();
+            }}
+            onBlur={() => {
+              if (!user?.uid) return;
+              void setThreadTyping({
+                threadId: thread.id,
+                userId: user.uid,
+                buyerId: thread.buyerId,
+                sellerId: thread.sellerId,
+                isTyping: false,
+              }).catch(() => {});
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -627,6 +829,11 @@ export function MessageThreadComponent({
             Contact details are hidden until payment is completed.
           </p>
         )}
+        {isOtherTyping ? (
+          <p className="text-xs text-muted-foreground mt-2">
+            {otherPartyName} is typing…
+          </p>
+        ) : null}
       </div>
 
       <Dialog open={!!viewerUrl} onOpenChange={(o) => (!o ? setViewerUrl(null) : null)}>

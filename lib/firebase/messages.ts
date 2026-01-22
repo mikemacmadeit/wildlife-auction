@@ -14,6 +14,7 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   arrayUnion,
   increment,
   serverTimestamp,
@@ -527,11 +528,13 @@ export async function markThreadAsRead(threadId: string, userId: string): Promis
 
   if (!threadData) return;
 
-  const fieldName = userId === threadData.buyerId ? 'buyerUnreadCount' : 'sellerUnreadCount';
+  const isBuyer = userId === threadData.buyerId;
+  const fieldName = isBuyer ? 'buyerUnreadCount' : 'sellerUnreadCount';
+  const lastReadField = isBuyer ? 'buyerLastReadAt' : 'sellerLastReadAt';
   
   await updateDoc(threadRef, {
     [fieldName]: 0,
-    updatedAt: serverTimestamp(),
+    [lastReadField]: serverTimestamp(),
   });
 }
 
@@ -584,4 +587,84 @@ export function subscribeToThreadMessages(
       opts?.onError?.(error);
     }
   );
+}
+
+function docToMessage(docSnap: QueryDocumentSnapshot<DocumentData>): Message {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    createdAt: data.createdAt?.toDate?.() || new Date(),
+    readAt: data.readAt?.toDate?.(),
+  } as Message;
+}
+
+export type ThreadMessagesPage = {
+  messages: Message[];
+  oldestCursor: QueryDocumentSnapshot<DocumentData> | null;
+};
+
+/**
+ * Subscribe to the latest N messages for a thread (paged real-time).
+ * Useful for performance on large threads.
+ */
+export function subscribeToThreadMessagesPage(
+  threadId: string,
+  pageSize: number,
+  callback: (page: ThreadMessagesPage) => void,
+  opts?: { onError?: (error: any) => void }
+): Unsubscribe {
+  const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
+  const q = query(messagesRef, orderBy('createdAt', 'desc'), limit(pageSize));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const docs = snapshot.docs;
+      const oldestCursor = docs.length ? docs[docs.length - 1] : null;
+      const msgs = docs.map(docToMessage);
+      // Normalize for UI: oldest -> newest
+      msgs.sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0));
+      callback({ messages: msgs, oldestCursor });
+    },
+    (error) => {
+      opts?.onError?.(error);
+    }
+  );
+}
+
+/**
+ * Fetch older messages (older than the given cursor), descending query, returns oldest->newest.
+ */
+export async function fetchOlderThreadMessages(params: {
+  threadId: string;
+  pageSize: number;
+  before: QueryDocumentSnapshot<DocumentData>;
+}): Promise<ThreadMessagesPage> {
+  const messagesRef = collection(db, 'messageThreads', params.threadId, 'messages');
+  const q = query(messagesRef, orderBy('createdAt', 'desc'), startAfter(params.before), limit(params.pageSize));
+  const snap = await getDocs(q);
+  const docs = snap.docs;
+  const oldestCursor = docs.length ? docs[docs.length - 1] : null;
+  const msgs = docs.map(docToMessage);
+  msgs.sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0));
+  return { messages: msgs, oldestCursor };
+}
+
+/**
+ * Best-effort typing indicator. Writes a short-lived typing TTL to the thread doc.
+ */
+export async function setThreadTyping(opts: {
+  threadId: string;
+  userId: string;
+  buyerId: string;
+  sellerId: string;
+  isTyping: boolean;
+}): Promise<void> {
+  const fieldName = opts.userId === opts.buyerId ? 'buyerTypingUntil' : 'sellerTypingUntil';
+  const threadRef = doc(db, 'messageThreads', opts.threadId);
+
+  await updateDoc(threadRef, {
+    [fieldName]: opts.isTyping ? Timestamp.fromMillis(Date.now() + 8000) : null,
+  });
 }
