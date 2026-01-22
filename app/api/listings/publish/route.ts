@@ -20,6 +20,7 @@ import { emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { getCategoryRequirements } from '@/lib/compliance/requirements';
+import { coerceDurationDays, computeEndAt, isValidDurationDays, toMillisSafe } from '@/lib/listings/duration';
 
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
@@ -82,6 +83,8 @@ function validatePublishRequiredFields(listingData: any): { ok: true } | { ok: f
 
   const price = typeof listingData?.price === 'number' ? listingData.price : Number(listingData?.price);
   const startingBid = typeof listingData?.startingBid === 'number' ? listingData.startingBid : Number(listingData?.startingBid);
+  const durationDaysRaw = listingData?.durationDays;
+  const durationDays = typeof durationDaysRaw === 'number' ? durationDaysRaw : Number(durationDaysRaw);
   const reservePrice =
     listingData?.reservePrice === undefined || listingData?.reservePrice === null
       ? null
@@ -95,17 +98,18 @@ function validatePublishRequiredFields(listingData: any): { ok: true } | { ok: f
 
   if (type === 'auction') {
     if (!Number.isFinite(startingBid) || startingBid <= 0) missing.push('startingBid');
-    const endsAt = toDateSafe(listingData?.endsAt);
-    if (!endsAt) {
-      missing.push('endsAt');
-    } else if (endsAt.getTime() <= Date.now() + 60 * 1000) {
-      missing.push('endsAt (must be in the future)');
-    }
     if (reservePrice !== null) {
       if (!Number.isFinite(reservePrice) || reservePrice <= 0) missing.push('reservePrice');
       if (Number.isFinite(reservePrice) && Number.isFinite(startingBid) && reservePrice < startingBid) {
         missing.push('reservePrice (must be >= startingBid)');
       }
+    }
+  }
+
+  // Duration: default is applied server-side on publish if missing, but if provided it must be valid.
+  if (durationDaysRaw !== undefined && durationDaysRaw !== null) {
+    if (![1, 3, 5, 7, 10].includes(durationDays)) {
+      missing.push('durationDays (invalid)');
     }
   }
 
@@ -508,9 +512,11 @@ export async function POST(request: Request) {
     }
 
     if (needsReview) {
+      const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
       await listingRef.update({
         category: normalizedCategory,
         status: 'pending',
+        durationDays,
         updatedAt: Timestamp.now(),
         updatedBy: userId,
         sellerTierSnapshot: sellerTier,
@@ -617,11 +623,31 @@ export async function POST(request: Request) {
     }
 
     // Publish listing (non-review categories)
+    const now = Timestamp.now();
+    const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
+    // startAt/endAt are only set when the listing becomes ACTIVE (not pending review).
+    const startAt = now;
+    const endAtMs = computeEndAt(startAt.toMillis(), durationDays);
+    const endAt = Timestamp.fromMillis(endAtMs);
+
+    // Safety: hard cap at 10 days even if caller tries to sneak something else in.
+    if (!isValidDurationDays(durationDays)) {
+      return json(
+        { error: 'Invalid duration', code: 'INVALID_DURATION', message: 'Listing duration must be 1, 3, 5, 7, or 10 days.' },
+        { status: 400 }
+      );
+    }
+
     await listingRef.update({
       category: normalizedCategory,
       status: 'active',
-      publishedAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      publishedAt: now,
+      startAt,
+      endAt,
+      durationDays,
+      // Back-compat: auctions still use endsAt for countdown/bidding gates.
+      ...(String((listingData as any)?.type || '') === 'auction' ? { endsAt: endAt } : {}),
+      updatedAt: now,
       updatedBy: userId,
       sellerTierSnapshot: sellerTier,
       sellerTierWeightSnapshot: sellerTierWeight,

@@ -6,7 +6,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
-import { ListingType, ListingCategory, ListingStatus, ComplianceStatus } from '../types';
+import { ListingType, ListingCategory, ListingStatus, ComplianceStatus, ListingDurationDays, ListingEndedReason } from '../types';
 
 /**
  * Listing document as stored in Firestore
@@ -76,6 +76,16 @@ export interface ListingDoc {
 
   // Auction-specific
   endsAt?: Timestamp; // Auction end time
+
+  /**
+   * Universal listing duration model (eBay-style).
+   * Backwards compatible: older docs may be missing these fields.
+   */
+  durationDays?: ListingDurationDays;
+  startAt?: Timestamp;
+  endAt?: Timestamp;
+  endedAt?: Timestamp;
+  endedReason?: ListingEndedReason;
 
   /**
    * Sold listing metadata (public-safe; market history).

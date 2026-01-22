@@ -12,7 +12,15 @@ export type ListingCategory =
   | 'hunting_outfitter_assets'
   | 'sporting_working_dogs';
 
-export type ListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'expired' | 'removed';
+// NOTE: Backwards-compatible.
+// - Historically we used `expired` (primarily for auctions).
+// - New duration model introduces `ended` + `endedReason` for all listing types.
+export type ListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'ended' | 'expired' | 'removed';
+
+// eBay-style duration choices (hard cap: 10 days)
+export type ListingDurationDays = 1 | 3 | 5 | 7 | 10;
+
+export type ListingEndedReason = 'expired' | 'sold' | 'manual_end';
 
 export type ComplianceStatus = 'none' | 'pending_review' | 'approved' | 'rejected';
 
@@ -392,6 +400,20 @@ export interface Listing {
   
   // Auction-specific
   endsAt?: Date; // Auction end time
+
+  /**
+   * eBay-style universal listing duration model.
+   * Backwards compatible: older docs may not have these fields.
+   *
+   * - startAt: when the listing became active (server time)
+   * - endAt: startAt + durationDays (server time)
+   * - durationDays: 1|3|5|7|10
+   */
+  durationDays?: ListingDurationDays;
+  startAt?: Date;
+  endAt?: Date;
+  endedAt?: Date | null;
+  endedReason?: ListingEndedReason;
 
   /**
    * Sold listing metadata (public-safe; eBay-style historical market data).

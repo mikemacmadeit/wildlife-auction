@@ -673,6 +673,8 @@ export async function handleCheckoutSessionCompleted(
       // Card flow: payment is already confirmed at checkout completion.
       const listingUpdates: any = {
         status: 'sold',
+        endedReason: 'sold',
+        endedAt: now,
         soldAt: now,
         saleType,
         // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
@@ -944,6 +946,8 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
   // Mark listing sold and clear reservation fields
   const listingSoldUpdate: any = {
     status: 'sold',
+    endedReason: 'sold',
+    endedAt: now,
     soldAt: now,
     saleType,
     // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
@@ -951,6 +955,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     offerReservedAt: null,
     purchaseReservedByOrderId: null,
     purchaseReservedAt: null,
+    purchaseReservedUntil: null,
     updatedAt: now,
   };
   if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
@@ -1312,6 +1317,8 @@ export async function handleWirePaymentIntentSucceeded(
 
     const listingSoldUpdate: any = {
       status: 'sold',
+      endedReason: 'sold',
+      endedAt: now,
       soldAt: now,
       saleType,
       // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
@@ -1319,6 +1326,7 @@ export async function handleWirePaymentIntentSucceeded(
       offerReservedAt: null,
       purchaseReservedByOrderId: null,
       purchaseReservedAt: null,
+      purchaseReservedUntil: null,
       updatedAt: now,
     };
     if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {

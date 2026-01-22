@@ -28,6 +28,7 @@ import {
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatDateTimeLocal, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
+import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getListingById, updateListing, publishListing } from '@/lib/firebase/listings';
@@ -58,6 +59,7 @@ function EditListingPageContent() {
     startingBid: string;
     reservePrice: string;
     endsAt: string;
+    durationDays: 1 | 3 | 5 | 7 | 10;
     location: { city: string; state: string; zip: string };
     images: string[];
     verification: boolean;
@@ -83,6 +85,7 @@ function EditListingPageContent() {
     startingBid: '',
     reservePrice: '',
     endsAt: '',
+    durationDays: 7,
     location: {
       city: '',
       state: 'TX',
@@ -169,6 +172,7 @@ function EditListingPageContent() {
           startingBid: listing.startingBid?.toString() || '',
           reservePrice: listing.reservePrice?.toString() || '',
           endsAt: listing.endsAt ? formatDateTimeLocal(new Date(listing.endsAt as any)) : '',
+          durationDays: isValidDurationDays((listing as any).durationDays) ? (listing as any).durationDays : 7,
           location: {
             city: listing.location?.city ?? '',
             state: listing.location?.state ?? 'TX',
@@ -205,7 +209,7 @@ function EditListingPageContent() {
           price: listing.price ?? null,
           startingBid: listing.startingBid ?? null,
           reservePrice: listing.reservePrice ?? null,
-          endsAt: listing.endsAt ? new Date(listing.endsAt).toISOString() : null,
+          durationDays: isValidDurationDays((listing as any).durationDays) ? (listing as any).durationDays : 7,
           location: listing.location,
           images: listing.images || [],
           verification: listing.trust?.verified || false,
@@ -761,26 +765,35 @@ function EditListingPageContent() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ends-at" className="text-base font-semibold">
-                      Auction End Date & Time <span className="text-destructive">*</span>
+                    <Label htmlFor="listing-duration" className="text-base font-semibold">
+                      Listing duration <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      id="ends-at"
-                      type="datetime-local"
-                      value={formData.endsAt}
-                      onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-                      disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
-                      step={60}
-                      className={cn(
-                        "min-h-[48px] text-base bg-background",
-                        publishMissingFields.includes('endsAt') ? 'ring-2 ring-destructive border-destructive' : null
-                      )}
-                      // datetime-local expects LOCAL strings; add a small buffer to avoid near-now flakiness.
-                      min={formatDateTimeLocal(new Date(Date.now() + 2 * 60 * 1000))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      When the auction will end. Must be in the future.
-                    </p>
+                    <Select
+                      value={String(formData.durationDays)}
+                      onValueChange={(v) => {
+                        const n = Number(v);
+                        if (isValidDurationDays(n)) setFormData({ ...formData, durationDays: n });
+                      }}
+                      disabled={listingData?.status === 'active'}
+                    >
+                      <SelectTrigger
+                        id="listing-duration"
+                        className={cn(
+                          "min-h-[48px] text-base bg-background",
+                          publishMissingFields.includes('durationDays') ? 'ring-2 ring-destructive border-destructive' : null
+                        )}
+                      >
+                        <SelectValue placeholder="Select duration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ALLOWED_DURATION_DAYS.map((d) => (
+                          <SelectItem key={d} value={String(d)}>
+                            {d} day{d === 1 ? '' : 's'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Listings can run up to 10 days. Duration starts when the listing goes live.</p>
                   </div>
                 </>
               )}
@@ -976,7 +989,7 @@ function EditListingPageContent() {
           (formData.type === 'fixed' || formData.type === 'classified'
             ? true // Price optional for existing listings
             : !!formData.startingBid) && // Starting bid required for auctions
-          (formData.type !== 'auction' || !!formData.endsAt) // endsAt required for auctions
+          isValidDurationDays(formData.durationDays)
         );
       },
     },
@@ -1573,10 +1586,11 @@ function EditListingPageContent() {
       if (formData.reservePrice) {
         updates.reservePrice = parseFloat(formData.reservePrice);
       }
-      if (formData.endsAt) {
-        const d = parseDateTimeLocal(formData.endsAt);
-        if (d) updates.endsAt = d;
-      }
+    }
+
+    // Duration model: allow durationDays changes only while not active.
+    if (listingData?.status !== 'active' && isValidDurationDays(formData.durationDays)) {
+      updates.durationDays = formData.durationDays;
     }
 
     // Only include protectedTermsVersion if protected transaction is enabled
@@ -1638,7 +1652,7 @@ function EditListingPageContent() {
       price: formData.price || null,
       startingBid: formData.startingBid || null,
       reservePrice: formData.reservePrice || null,
-      endsAt: formData.endsAt || null,
+      durationDays: formData.durationDays,
       location: formData.location,
       images: formData.images || [],
       verification: formData.verification,
@@ -1838,7 +1852,7 @@ function EditListingPageContent() {
       console.error('Error updating listing:', err);
 
       if (err?.code === 'LISTING_VALIDATION_FAILED' && Array.isArray(err?.missing) && err.missing.length > 0) {
-        // Normalize server missing keys like "endsAt (must be in the future)" -> "endsAt"
+        // Normalize server missing keys like "durationDays (invalid)" -> "durationDays"
         const rawMissing: string[] = err.missing.map((m: any) => String(m)).filter(Boolean);
         const missing = rawMissing.map((m: string) => m.split(' ')[0]).filter(Boolean);
 
@@ -1851,7 +1865,7 @@ function EditListingPageContent() {
         if (missingSet.has('photos')) stepsNeedingAttention.push('media');
         // Everything else in this server validation lives on details (title/desc/location/price/auction fields)
         const needsDetails = missing.some((m) =>
-          ['title', 'description', 'price', 'startingBid', 'reservePrice', 'endsAt', 'location.city', 'location.state'].includes(m)
+          ['title', 'description', 'price', 'startingBid', 'reservePrice', 'durationDays', 'location.city', 'location.state'].includes(m)
         );
         if (needsDetails) stepsNeedingAttention.push('details');
 
@@ -1875,8 +1889,8 @@ function EditListingPageContent() {
                   ? 'starting-bid'
                   : first === 'reservePrice'
                     ? 'reserve-price'
-                    : first === 'endsAt'
-                      ? 'ends-at'
+                    : first === 'durationDays'
+                      ? 'listing-duration'
                       : first;
         publishFocusFieldRef.current = focusId;
         setTimeout(() => {

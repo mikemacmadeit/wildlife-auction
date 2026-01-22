@@ -161,11 +161,12 @@ service cloud.firestore {
       // Allow read:
       //   - If listing status is 'active' (PUBLIC - anyone can see active listings)
       //   - If listing status is 'expired' (PUBLIC - ended auctions remain viewable/auditable)
+      //   - If listing status is 'ended' (PUBLIC - ended listings remain viewable/auditable)
       //   - OR if user is authenticated and is the seller (seller can see their own listings regardless of status)
       //   - OR if user is an admin (admins can see all listings including draft/pending)
       // Note: For queries, sellers can query their own listings (where sellerId == auth.uid)
       //       and the rule evaluates per-document, so each document must pass this check
-      allow read: if (resource.data.status == 'active' || resource.data.status == 'sold' || resource.data.status == 'expired') || 
+      allow read: if (resource.data.status == 'active' || resource.data.status == 'sold' || resource.data.status == 'expired' || resource.data.status == 'ended') || 
                     (isAuthenticated() && resource.data.sellerId == request.auth.uid) ||
                     isAdmin();
       
@@ -184,8 +185,16 @@ service cloud.firestore {
           'offerReservedAt',
           'purchaseReservedByOrderId',
           'purchaseReservedAt',
-          'purchaseReservedUntil'
+          'purchaseReservedUntil',
+          // Duration lifecycle is server-controlled on publish/expiry
+          'startAt',
+          'endAt',
+          'endedAt',
+          'endedReason'
         ]) &&
+        // If durationDays is provided, it must be one of the allowed eBay-style values.
+        (!request.resource.data.keys().hasAny(['durationDays']) ||
+          request.resource.data.durationDays in [1, 3, 5, 7, 10]) &&
         // If category is provided at create time, it must be a supported canonical category.
         (!request.resource.data.keys().hasAny(['category']) || isValidListingCategory(request.resource.data.category)) &&
         // Prevent setting sellerId to different value
@@ -198,6 +207,13 @@ service cloud.firestore {
       allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid && 
                        // Sellers cannot mutate immutable identity/audit fields
                        !request.resource.data.diff(resource.data).changedKeys().hasAny(['sellerId', 'createdBy', 'createdAt']) &&
+                       // Duration lifecycle fields are server-controlled.
+                       !request.resource.data.diff(resource.data).changedKeys().hasAny(['startAt', 'endAt', 'endedAt', 'endedReason']) &&
+                       // durationDays (if present) must be an allowed value, and cannot be changed after activation.
+                       (!request.resource.data.keys().hasAny(['durationDays']) ||
+                        request.resource.data.durationDays in [1, 3, 5, 7, 10]) &&
+                       (!(resource.data.status == 'active') ||
+                        !request.resource.data.diff(resource.data).changedKeys().hasAny(['durationDays'])) &&
                        // Sellers cannot change complianceStatus to approved/rejected
                        (request.resource.data.complianceStatus == null || 
                         request.resource.data.complianceStatus == resource.data.complianceStatus ||

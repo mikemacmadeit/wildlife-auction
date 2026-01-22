@@ -25,6 +25,7 @@ import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/r
 import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
+import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -135,6 +136,27 @@ export async function POST(request: Request) {
     const listingDoc = await listingRef.get();
     if (!listingDoc.exists) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     const listingData = listingDoc.data()!;
+
+    // Listing duration guard (server authoritative) for non-auctions.
+    if (String((listingData as any)?.type || '') !== 'auction') {
+      const nowMs = Date.now();
+      const endMsDirect = toMillisSafe((listingData as any)?.endAt) ?? toMillisSafe((listingData as any)?.endsAt);
+      const startMs =
+        toMillisSafe((listingData as any)?.startAt) ??
+        toMillisSafe((listingData as any)?.publishedAt) ??
+        toMillisSafe((listingData as any)?.createdAt);
+      const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
+      const endMs = endMsDirect ?? (typeof startMs === 'number' ? computeEndAt(startMs, durationDays) : null);
+      if ((listingData as any)?.status !== 'active') {
+        return NextResponse.json({ error: 'Listing is not available for purchase' }, { status: 409 });
+      }
+      if (typeof endMs === 'number' && endMs <= nowMs) {
+        return NextResponse.json(
+          { error: 'Listing has ended', code: 'LISTING_ENDED', message: 'This listing has ended.' },
+          { status: 409 }
+        );
+      }
+    }
 
     // Canonicalize category (fail closed)
     let listingCategory: any;

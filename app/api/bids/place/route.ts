@@ -18,6 +18,7 @@ import { emitEventForUser } from '@/lib/notifications';
 import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib/auctions/proxyBidding';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
+import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -164,9 +165,22 @@ export async function POST(request: Request) {
       if (listing.type !== 'auction') throw new BidError({ code: 'NOT_AUCTION', message: 'Bids can only be placed on auction listings', status: 400 });
       if (listing.status !== 'active') throw new BidError({ code: 'LISTING_NOT_ACTIVE', message: 'Bids can only be placed on active listings', status: 400 });
 
-      if (listing.endsAt?.toDate) {
-        const endsAt = listing.endsAt.toDate() as Date;
-        if (endsAt.getTime() <= Date.now()) throw new BidError({ code: 'AUCTION_ENDED', message: 'This auction has ended', status: 400 });
+      // End guard (server authoritative):
+      // Prefer endAt (universal), fall back to endsAt (legacy auctions), and finally to a virtual endAt (publishedAt/createdAt + durationDays).
+      const nowWallMs = Date.now();
+      const endMsDirect =
+        toMillisSafe(listing?.endAt) ??
+        (listing?.endsAt?.toMillis ? listing.endsAt.toMillis() : null) ??
+        (listing?.endsAt?.toDate ? (listing.endsAt.toDate() as Date).getTime() : null);
+      const startMs =
+        toMillisSafe(listing?.startAt) ??
+        (listing?.publishedAt?.toMillis ? listing.publishedAt.toMillis() : null) ??
+        (listing?.createdAt?.toMillis ? listing.createdAt.toMillis() : null) ??
+        null;
+      const durationDays = coerceDurationDays(listing?.durationDays, 7);
+      const endMs = endMsDirect ?? (startMs ? computeEndAt(startMs, durationDays) : null);
+      if (endMs && endMs <= nowWallMs) {
+        throw new BidError({ code: 'LISTING_ENDED', message: 'This listing has ended', status: 409 });
       }
 
       // TX-only for animals (buyer + listing)

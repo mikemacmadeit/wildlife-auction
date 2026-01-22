@@ -45,6 +45,7 @@ import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
+import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
 // Seller Tiers model: no listing limits.
 
 function NewListingPageContent() {
@@ -70,6 +71,7 @@ function NewListingPageContent() {
     startingBid: string;
     reservePrice: string;
     endsAt: string;
+    durationDays: 1 | 3 | 5 | 7 | 10;
     location: { city: string; state: string; zip: string };
     images: string[];
     photoIds: string[];
@@ -98,6 +100,7 @@ function NewListingPageContent() {
     startingBid: '',
     reservePrice: '',
     endsAt: '',
+    durationDays: 7,
     location: {
       city: '',
       state: 'TX',
@@ -181,7 +184,7 @@ function NewListingPageContent() {
       price: formData.price,
       startingBid: formData.startingBid,
       reservePrice: formData.reservePrice,
-      endsAt: formData.endsAt,
+      durationDays: formData.durationDays,
       location: formData.location,
       photoIds: formData.photoIds,
       coverPhotoId: formData.coverPhotoId,
@@ -321,6 +324,7 @@ function NewListingPageContent() {
           description: formData.description || '',
           type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
           category: formData.category as any,
+          durationDays: formData.durationDays,
           location: locationData,
           images: formData.images,
           photoIds: formData.photoIds,
@@ -355,12 +359,6 @@ function NewListingPageContent() {
           listingData.startingBid = parseFloat(formData.startingBid || '0');
           if (formData.reservePrice) {
             listingData.reservePrice = parseFloat(formData.reservePrice);
-          }
-          if (formData.endsAt) {
-            {
-              const d = parseDateTimeLocal(formData.endsAt);
-              if (d) listingData.endsAt = d;
-            }
           }
         }
 
@@ -417,6 +415,7 @@ function NewListingPageContent() {
   };
 
   const isFutureDateString = (raw: string): boolean => {
+    // Back-compat helper still used by legacy UIs; duration model supersedes this for listing expiry.
     // datetime-local strings should be interpreted as LOCAL time.
     return isFutureDateTimeLocalString(raw, 60_000);
   };
@@ -1458,35 +1457,33 @@ function NewListingPageContent() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="auction-end" className="text-base font-semibold">
-                    Auction End Date & Time
+                  <Label htmlFor="listing-duration" className="text-base font-semibold">
+                    Listing duration
                   </Label>
                   <HelpTooltip
                     side="left"
-                    text="Pick a time when buyers are active (evenings/weekends). It must be in the future."
+                    text="eBay-style: listings can run up to 10 days. Duration starts when the listing goes live."
                   />
                 </div>
-                <Input
-                  id="auction-end"
-                  type="datetime-local"
-                  value={formData.endsAt}
-                  onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-                  step={60}
-                  className={cn(
-                    "min-h-[48px] text-base",
-                    validationAttempted.details &&
-                      !isFutureDateString(formData.endsAt) &&
-                      'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
-                  )}
-                  // datetime-local expects LOCAL strings; add a small buffer to avoid near-now flakiness.
-                  min={formatDateTimeLocal(new Date(Date.now() + 2 * 60 * 1000))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  When should this auction end? Must be in the future.
-                </p>
-                {validationAttempted.details && !isFutureDateString(formData.endsAt) ? (
-                  <div className="text-sm text-destructive">Auction end date/time is required.</div>
-                ) : null}
+                <Select
+                  value={String(formData.durationDays)}
+                  onValueChange={(v) => {
+                    const n = Number(v);
+                    if (isValidDurationDays(n)) setFormData({ ...formData, durationDays: n });
+                  }}
+                >
+                  <SelectTrigger id="listing-duration" className="min-h-[48px] text-base">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALLOWED_DURATION_DAYS.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d} day{d === 1 ? '' : 's'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Listings can run up to 10 days. Default is 7.</p>
               </div>
             </>
           )}
@@ -1706,10 +1703,10 @@ function NewListingPageContent() {
             ? isPositiveMoney(formData.price)
             : isPositiveMoney(formData.startingBid);
 
-        const auctionOk = formData.type !== 'auction' || isFutureDateString(formData.endsAt);
+        const durationOk = isValidDurationDays(formData.durationDays);
 
         // Note: ZIP remains optional.
-        return titleOk && descOk && cityOk && stateOk && priceOk && auctionOk;
+        return titleOk && descOk && cityOk && stateOk && priceOk && durationOk;
       },
     },
     {
@@ -1911,13 +1908,10 @@ function NewListingPageContent() {
                       ) : (
                         <div className="text-sm text-muted-foreground">Reserve price: none</div>
                       )}
-                      {formData.endsAt ? (
-                        <div className="text-sm">
-                          Ends: <span className="font-semibold">{parseDateTimeLocal(formData.endsAt)?.toLocaleString() || '—'}</span>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">End time: not set</div>
-                      )}
+                      <div className="text-sm">
+                        Duration: <span className="font-semibold">{formData.durationDays} day{formData.durationDays === 1 ? '' : 's'}</span>
+                        <span className="text-muted-foreground"> (starts when live)</span>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-1">
@@ -1989,7 +1983,7 @@ function NewListingPageContent() {
                 sellerOffersDelivery: !!formData.sellerOffersDelivery,
               },
               attributes: (formData.attributes || {}) as any,
-              endsAt: parseDateTimeLocal(formData.endsAt) || undefined,
+              durationDays: formData.durationDays,
               createdAt: new Date(),
               updatedAt: new Date(),
               createdBy: user?.uid || 'preview',
@@ -2156,6 +2150,7 @@ function NewListingPageContent() {
         description: formData.description,
         type: formData.type as 'auction' | 'fixed' | 'classified',
         category: formData.category as ListingCategory,
+        durationDays: formData.durationDays,
         location: locationData,
         // Back-compat: `images` is derived from the cached snapshot.
         images: formData.images,
@@ -2205,13 +2200,6 @@ function NewListingPageContent() {
         listingData.startingBid = parseFloat(formData.startingBid || '0');
         if (formData.reservePrice) {
           listingData.reservePrice = parseFloat(formData.reservePrice);
-        }
-        // Add auction end date
-        if (formData.endsAt) {
-          {
-            const d = parseDateTimeLocal(formData.endsAt);
-            if (d) listingData.endsAt = d;
-          }
         }
       }
 
@@ -2389,6 +2377,7 @@ function NewListingPageContent() {
         description: formData.description || '',
         type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
         category: formData.category as ListingCategory,
+        durationDays: formData.durationDays,
         location: locationData,
         images: formData.images,
         trust: {
@@ -2421,12 +2410,6 @@ function NewListingPageContent() {
         listingData.startingBid = parseFloat(formData.startingBid || '0');
         if (formData.reservePrice) {
           listingData.reservePrice = parseFloat(formData.reservePrice);
-        }
-        if (formData.endsAt) {
-          {
-            const d = parseDateTimeLocal(formData.endsAt);
-            if (d) listingData.endsAt = d;
-          }
         }
       }
 

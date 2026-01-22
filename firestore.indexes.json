@@ -208,6 +208,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "endAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "listings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "soldAt", "order": "DESCENDING" }
       ]
     },

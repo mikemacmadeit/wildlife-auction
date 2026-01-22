@@ -14,6 +14,7 @@ import { createAuditLog } from '@/lib/audit/logger';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { getPrimaryListingImageUrl, offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
+import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -85,6 +86,16 @@ export async function POST(request: Request) {
 
       if (listing.status !== 'active') {
         return { ok: false as const, status: 400, body: { error: 'Listing is not available for offers' } };
+      }
+
+      // Read-time guard: don't allow offers on ended listings (even if status is still 'active').
+      const nowMs = Date.now();
+      const endMsDirect = toMillisSafe(listing?.endAt) ?? toMillisSafe(listing?.endsAt);
+      const startMs = toMillisSafe(listing?.startAt) ?? toMillisSafe(listing?.publishedAt) ?? toMillisSafe(listing?.createdAt);
+      const durationDays = coerceDurationDays(listing?.durationDays, 7);
+      const endMs = endMsDirect ?? (typeof startMs === 'number' ? computeEndAt(startMs, durationDays) : null);
+      if (typeof endMs === 'number' && endMs <= nowMs) {
+        return { ok: false as const, status: 409, body: { error: 'Listing has ended', code: 'LISTING_ENDED' } };
       }
 
       if (listing.type !== 'fixed' && listing.type !== 'classified') {

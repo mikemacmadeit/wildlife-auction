@@ -83,7 +83,7 @@ export default function BrowsePage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
   const [filters, setFilters] = useState<FilterState>({});
   const [selectedType, setSelectedType] = useState<ListingType | 'all'>('all');
-  const [listingStatus, setListingStatus] = useState<'active' | 'sold' | 'ended'>('active');
+  const [listingStatus, setListingStatus] = useState<'active' | 'completed' | 'sold'>('active');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
   const [priceMinInput, setPriceMinInput] = useState<string>('');
@@ -142,15 +142,15 @@ export default function BrowsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user?.uid]);
 
-  // Public deep links (used by sold listing pages): /browse?status=active&category=...&state=...&type=...&speciesId=...
+  // Public deep links: /browse?status=active|completed|sold&category=...&state=...&type=...&speciesId=...
   useEffect(() => {
     const savedSearchId = searchParams?.get('savedSearchId');
     if (savedSearchId) return; // Saved search should take precedence.
 
     const status = searchParams?.get('status');
-    if (status === 'active' || status === 'sold' || status === 'ended') {
-      setListingStatus(status as any);
-    }
+    // Back-compat: `ended` deep links map to Completed.
+    if (status === 'active' || status === 'sold' || status === 'completed') setListingStatus(status as any);
+    if (status === 'ended') setListingStatus('completed');
 
     const type = searchParams?.get('type');
     if (type === 'auction' || type === 'fixed' || type === 'classified' || type === 'all') {
@@ -287,9 +287,7 @@ export default function BrowsePage() {
 
   // Convert UI filters to Firestore query filters
   const getBrowseFilters = (): BrowseFilters => {
-    const browseFilters: BrowseFilters = {
-      status: listingStatus === 'ended' ? 'expired' : listingStatus,
-    };
+    const browseFilters: BrowseFilters = { lifecycle: listingStatus };
     
     if (selectedType !== 'all') {
       browseFilters.type = selectedType;
@@ -408,8 +406,8 @@ export default function BrowsePage() {
   
   // Load initial page when filters/sort change
   useEffect(() => {
-    // Sold listings don't have an "ending soon" concept.
-    if (listingStatus === 'sold' && sortBy === 'ending-soon') {
+    // Only Active listings have an "ending soon" concept.
+    if (listingStatus !== 'active' && sortBy === 'ending-soon') {
       setSortBy('newest');
       return;
     }
@@ -1147,9 +1145,9 @@ export default function BrowsePage() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">All (Active)</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="sold">Sold</SelectItem>
-                <SelectItem value="ended">Ended</SelectItem>
               </SelectContent>
             </Select>
 

@@ -27,6 +27,7 @@ import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/r
 import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
+import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -182,6 +183,30 @@ export async function POST(request: Request) {
     }
 
     const listingData = listingDoc.data()!;
+
+    // Listing duration guard (server authoritative):
+    // For non-auction listings, checkout is only allowed while the listing is still active (endAt > now).
+    // For auctions, checkout can be allowed after the auction ends (winner flow), so we do NOT block
+    // purely on endAt here. Auction eligibility is handled later with explicit status checks.
+    if (String((listingData as any)?.type || '') !== 'auction') {
+      const nowMs = Date.now();
+      const endMsDirect = toMillisSafe((listingData as any)?.endAt) ?? toMillisSafe((listingData as any)?.endsAt);
+      const startMs =
+        toMillisSafe((listingData as any)?.startAt) ??
+        toMillisSafe((listingData as any)?.publishedAt) ??
+        toMillisSafe((listingData as any)?.createdAt);
+      const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
+      const endMs = endMsDirect ?? (typeof startMs === 'number' ? computeEndAt(startMs, durationDays) : null);
+      if ((listingData as any)?.status !== 'active') {
+        return NextResponse.json({ error: 'Listing is not available for purchase' }, { status: 409 });
+      }
+      if (typeof endMs === 'number' && endMs <= nowMs) {
+        return NextResponse.json(
+          { error: 'Listing has ended', code: 'LISTING_ENDED', message: 'This listing has ended.' },
+          { status: 409 }
+        );
+      }
+    }
 
     // Canonicalize category (fail closed if unknown/unsupported).
     let listingCategory: string;
@@ -634,9 +659,19 @@ export async function POST(request: Request) {
       // Validate listing availability (server-side authoritative)
       if (live.type !== 'auction') {
         if (live.status !== 'active') throw new Error('Listing is not available for purchase');
+        // Read-time guard inside the transaction: treat expired actives as ended.
+        const nowMs = Date.now();
+        const endMsDirect = toMillisSafe((live as any)?.endAt) ?? toMillisSafe((live as any)?.endsAt);
+        const startMs =
+          toMillisSafe((live as any)?.startAt) ??
+          toMillisSafe((live as any)?.publishedAt) ??
+          toMillisSafe((live as any)?.createdAt);
+        const durationDays = coerceDurationDays((live as any)?.durationDays, 7);
+        const endMs = endMsDirect ?? (typeof startMs === 'number' ? computeEndAt(startMs, durationDays) : null);
+        if (typeof endMs === 'number' && endMs <= nowMs) throw new Error('Listing has ended');
       } else {
         // Auctions can be status=expired after backend finalization.
-        if (live.status !== 'active' && live.status !== 'expired') throw new Error('Auction is not available for purchase');
+        if (live.status !== 'active' && live.status !== 'expired' && live.status !== 'ended') throw new Error('Auction is not available for purchase');
       }
       if (!offerId && live.offerReservedByOfferId) throw new Error('Listing is reserved by an accepted offer');
 

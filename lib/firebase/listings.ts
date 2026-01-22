@@ -27,6 +27,7 @@ import { ListingDoc } from '@/lib/types/firestore';
 import { validateListingCompliance, requiresComplianceReview } from '@/lib/compliance/validation';
 import { getTierWeight } from '@/lib/pricing/subscriptions';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
+import { normalizeListingForUI } from '@/lib/listings/duration';
 
 /**
  * Firestore does not allow `undefined` values anywhere in a document (including nested objects).
@@ -74,6 +75,7 @@ export interface CreateListingInput {
   price?: number;
   startingBid?: number;
   reservePrice?: number;
+  durationDays?: 1 | 3 | 5 | 7 | 10;
   images: string[];
   photoIds?: string[];
   photos?: Array<{
@@ -297,7 +299,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
       : undefined;
   const derivedImages = normalizedPhotos?.map((p) => p.url).filter(Boolean) ?? doc.images ?? [];
 
-  return {
+  const listing: Listing = {
     id: doc.id,
     title: doc.title,
     description: doc.description,
@@ -321,6 +323,11 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     subcategory: doc.subcategory,
     attributes, // Migrate old metadata to new attributes if needed + normalize whitetail dates
     endsAt: timestampToDate(doc.endsAt),
+    startAt: timestampToDate((doc as any).startAt),
+    endAt: timestampToDate((doc as any).endAt),
+    durationDays: typeof (doc as any).durationDays === 'number' ? ((doc as any).durationDays as any) : undefined,
+    endedAt: timestampToDate((doc as any).endedAt) || null,
+    endedReason: typeof (doc as any).endedReason === 'string' ? ((doc as any).endedReason as any) : undefined,
     soldAt: timestampToDate((doc as any).soldAt) || null,
     soldPriceCents: typeof (doc as any).soldPriceCents === 'number' ? (doc as any).soldPriceCents : null,
     saleType: typeof (doc as any).saleType === 'string' ? ((doc as any).saleType as any) : undefined,
@@ -372,6 +379,9 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     purchaseReservedAt: timestampToDate((doc as any).purchaseReservedAt),
     purchaseReservedUntil: timestampToDate((doc as any).purchaseReservedUntil),
   };
+
+  // Read-time guard: expired actives become virtual-ended in UI without writing to Firestore.
+  return normalizeListingForUI(listing);
 }
 
 /**
@@ -419,6 +429,8 @@ function toListingDocInput(
     ...(listingInput.price !== undefined && { price: listingInput.price }),
     ...(listingInput.startingBid !== undefined && { startingBid: listingInput.startingBid }),
     ...(listingInput.reservePrice !== undefined && { reservePrice: listingInput.reservePrice }),
+    // Duration fields (do NOT set startAt/endAt here; those are set server-side on publish)
+    ...(listingInput.durationDays !== undefined && { durationDays: listingInput.durationDays as any }),
     // Date fields (convert to Timestamp)
     ...(listingInput.endsAt && { endsAt: Timestamp.fromDate(listingInput.endsAt) }),
     ...(listingInput.featured && { featured: listingInput.featured }),
@@ -934,12 +946,20 @@ export type BrowseCursor = QueryDocumentSnapshot<DocumentData> | {
  * Input filters for browse query
  */
 export interface BrowseFilters {
-  status?: 'active' | 'draft' | 'sold' | 'expired' | 'removed';
+  // Backwards compatible.
+  status?: 'active' | 'draft' | 'sold' | 'ended' | 'expired' | 'removed';
   /**
    * Optional multi-status filter for eBay-style browse toggles (e.g., Active + Sold).
    * If provided, `statuses` takes precedence over `status`.
    */
-  statuses?: Array<'active' | 'sold'>;
+  statuses?: Array<'active' | 'sold' | 'ended' | 'expired'>;
+  /**
+   * eBay-style lifecycle view:
+   * - active (default)
+   * - completed (ended + sold; also includes "stale active" listings that normalize to ended at read-time)
+   * - sold
+   */
+  lifecycle?: 'active' | 'completed' | 'sold';
   type?: ListingType;
   category?: ListingCategory;
   location?: {
@@ -989,9 +1009,15 @@ export const queryListingsForBrowse = async (
     const constraints: QueryConstraint[] = [];
     
     // Status filter (default to active)
-    const statuses = Array.isArray(filters.statuses) && filters.statuses.length ? filters.statuses : null;
-    const status = filters.status || 'active';
-    const soldOnly = statuses ? statuses.length === 1 && statuses[0] === 'sold' : status === 'sold';
+    const lifecycle = filters.lifecycle || null;
+    const statuses =
+      lifecycle === 'completed'
+        ? (['active', 'sold', 'ended', 'expired'] as const)
+        : Array.isArray(filters.statuses) && filters.statuses.length
+          ? filters.statuses
+          : null;
+    const status = lifecycle === 'sold' ? 'sold' : (filters.status || 'active');
+    const soldOnly = status === 'sold' && lifecycle !== 'completed' && !statuses;
     // "Ended" browse mode: ended auctions are often still stored as status=active with endsAt in the past.
     // When the UI requests status='expired', treat it as "ended auctions" and query both active+expired,
     // then filter to auctions whose endsAt is in the past (and not sold).
@@ -1001,7 +1027,7 @@ export const queryListingsForBrowse = async (
       constraints.push(where('status', 'in', statuses));
     } else {
       if (endedMode) {
-        constraints.push(where('status', 'in', ['active', 'expired']));
+        constraints.push(where('status', 'in', ['active', 'expired', 'ended']));
       } else {
         constraints.push(where('status', '==', status));
       }
@@ -1154,12 +1180,12 @@ export const queryListingsForBrowse = async (
     // eBay-style behavior: hide "ended but unsold" auctions from default browse.
     // If an auction has `endsAt` in the past and isn't sold, it should not appear as an active listing.
     // (Bidding is already blocked server-side; this is purely browse UX.)
-    const showingActive =
-      (Array.isArray(statuses) && statuses.includes('active')) || (!statuses && status === 'active');
+    const showingActive = lifecycle === 'active' || ((Array.isArray(statuses) && statuses.includes('active')) || (!statuses && status === 'active'));
     if (showingActive) {
       const nowMs = Date.now();
       filteredItems = filteredItems.filter((l) => {
-        if (l.status !== 'active') return true;
+        // Read-time guard may have normalized status -> ended; hide those from Active browse.
+        if (l.status !== 'active') return false;
         // Hide purchase-reserved listings from Active browse (prevents "it can be bought twice" UX).
         // IMPORTANT: only treat a reservation as active if `purchaseReservedUntil > now`.
         // A stale `purchaseReservedByOrderId` must NOT hide a listing indefinitely.
@@ -1168,9 +1194,13 @@ export const queryListingsForBrowse = async (
             ? l.purchaseReservedUntil.getTime()
             : null;
         if (reservedUntilMs && reservedUntilMs > nowMs) return false;
-        if (l.type !== 'auction') return true;
-        const endMs = l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
-        // If we can't read endsAt, don't hide it.
+        const endMs =
+          l.endAt?.getTime?.() && Number.isFinite(l.endAt.getTime())
+            ? l.endAt.getTime()
+            : l.endsAt?.getTime?.() && Number.isFinite(l.endsAt.getTime())
+              ? l.endsAt.getTime()
+              : null;
+        // If we can't read endAt, don't hide it here (server guards still apply).
         if (!endMs) return true;
         return endMs > nowMs;
       });
@@ -1183,11 +1213,16 @@ export const queryListingsForBrowse = async (
         if (l.type !== 'auction') return false;
         // Sold should be in the Sold tab, not Ended.
         if (l.soldAt) return false;
-        const endMs = l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
-        // If endsAt is missing but the doc is explicitly expired, include it.
-        if (!endMs) return l.status === 'expired';
+        const endMs = l.endAt?.getTime?.() ? l.endAt.getTime() : l.endsAt?.getTime?.() ? l.endsAt.getTime() : null;
+        // If end time is missing but the doc is explicitly ended/expired, include it.
+        if (!endMs) return l.status === 'expired' || l.status === 'ended';
         return endMs <= nowMs;
       });
+    }
+
+    // Completed lifecycle: keep only ended/expired/sold after read-time normalization (includes stale actives).
+    if (lifecycle === 'completed') {
+      filteredItems = filteredItems.filter((l) => l.status === 'sold' || l.status === 'ended' || l.status === 'expired');
     }
 
     // For sold-only mode, sort client-side by soldAt as a stable, backwards-compatible tie-breaker.

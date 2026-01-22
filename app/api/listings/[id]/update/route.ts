@@ -38,6 +38,11 @@ const IMMUTABLE_OR_SERVER_ONLY_FIELDS = new Set([
   'sellerId',
   'createdBy',
   'createdAt',
+  // Duration lifecycle is server-controlled (publish + scheduled expiry).
+  'startAt',
+  'endAt',
+  'endedAt',
+  'endedReason',
   'offerReservedByOfferId',
   'offerReservedAt',
   'purchaseReservedByOrderId',
@@ -137,6 +142,23 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   // Enforce the same protection as rules for active auctions.
   const currentType = String(current?.type || '');
   const currentStatus = String(current?.status || '');
+
+  // Universal duration rule: once active, duration cannot be changed/extended.
+  if (currentStatus === 'active') {
+    const requestedKeys = Object.keys(updates);
+    const blocked = requestedKeys.filter((k) => k === 'durationDays');
+    if (blocked.length > 0) {
+      return json(
+        {
+          ok: false,
+          error: 'Active listing duration is locked',
+          code: 'ACTIVE_LISTING_DURATION_LOCKED',
+          blockedFields: blocked,
+        },
+        { status: 409 }
+      );
+    }
+  }
   if (currentType === 'auction' && currentStatus === 'active') {
     const requestedKeys = Object.keys(updates);
     const blocked = requestedKeys.filter((k) => ACTIVE_AUCTION_LOCKED_FIELDS.has(k));
