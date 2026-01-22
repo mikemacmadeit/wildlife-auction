@@ -66,7 +66,7 @@ export function validateSingleMode(type: ListingType, data: { price?: number; st
       throw new Error('Fixed price listings cannot have auction fields (startingBid, reservePrice).');
     }
   }
-  // classified can have asking price but no checkout
+  // classified is deprecated; kept for backward compatibility with legacy docs.
 }
 
 /**

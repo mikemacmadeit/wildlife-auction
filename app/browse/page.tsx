@@ -153,7 +153,8 @@ export default function BrowsePage() {
     if (status === 'ended') setListingStatus('completed');
 
     const type = searchParams?.get('type');
-    if (type === 'auction' || type === 'fixed' || type === 'classified' || type === 'all') {
+    // Back-compat: ignore legacy `classified` deep links.
+    if (type === 'auction' || type === 'fixed' || type === 'all') {
       setSelectedType(type as any);
     }
 
@@ -606,7 +607,7 @@ export default function BrowsePage() {
     // also allow setting/clearing it. Treat presence of the key as authoritative (including `undefined`).
     if (Object.prototype.hasOwnProperty.call(next, 'type')) {
       const t = next.type;
-      setSelectedType(t === 'auction' || t === 'fixed' || t === 'classified' ? t : 'all');
+      setSelectedType(t === 'auction' || t === 'fixed' ? t : 'all');
       delete next.type;
     }
     setFilters((prev) => {

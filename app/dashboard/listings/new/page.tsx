@@ -322,7 +322,8 @@ function NewListingPageContent() {
         const listingData: any = {
           title: formData.title || 'Draft Listing',
           description: formData.description || '',
-          type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
+          // Classified listings are deprecated; treat any legacy value as fixed.
+          type: ((formData.type === 'classified' ? 'fixed' : formData.type) || 'fixed') as 'auction' | 'fixed',
           category: formData.category as any,
           durationDays: formData.durationDays,
           location: locationData,
@@ -353,7 +354,7 @@ function NewListingPageContent() {
             }),
         };
 
-        if (formData.type === 'fixed' || formData.type === 'classified') {
+        if (formData.type === 'fixed') {
           listingData.price = parseFloat(formData.price || '0');
         } else if (formData.type === 'auction') {
           listingData.startingBid = parseFloat(formData.startingBid || '0');
@@ -895,7 +896,7 @@ function NewListingPageContent() {
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              <strong>Single Mode:</strong> Each listing must be either Auction, Fixed Price, or Classified. 
+              <strong>Single Mode:</strong> Each listing must be either Auction or Fixed Price.
               No hybrid "auction + buy now" listings are allowed.
             </AlertDescription>
           </Alert>
@@ -908,7 +909,7 @@ function NewListingPageContent() {
                 const newData: any = { ...formData, type: value as ListingType };
                 if (value === 'auction') {
                   newData.price = ''; // Clear fixed price
-                } else if (value === 'fixed' || value === 'classified') {
+                } else if (value === 'fixed') {
                   newData.startingBid = ''; // Clear auction fields
                   newData.reservePrice = '';
                   newData.endsAt = '';
@@ -919,7 +920,6 @@ function NewListingPageContent() {
               {[
                 { value: 'auction', label: 'Auction', desc: 'Bidders compete, highest bid wins' },
                 { value: 'fixed', label: 'Fixed Price', desc: 'Set a price, buyer pays immediately' },
-                { value: 'classified', label: 'Classified', desc: 'Contact seller to negotiate price' },
               ].map((option) => (
                 <div key={option.value} className="flex items-start space-x-3 min-h-[44px]">
                   <RadioGroupItem value={option.value} id={option.value} className="mt-1" />
@@ -1488,22 +1488,8 @@ function NewListingPageContent() {
             </>
           )}
 
-          {formData.type === 'classified' && (
-            <div className="space-y-2">
-              <Label htmlFor="asking-price" className="text-base font-semibold">Asking Price</Label>
-              <Input
-                id="asking-price"
-                type="number"
-                placeholder="0.00"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="min-h-[48px] text-base"
-              />
-            </div>
-          )}
-
-          {/* Best Offer (Fixed/Classified) */}
-          {(formData.type === 'fixed' || formData.type === 'classified') && (
+          {/* Best Offer (Fixed) */}
+          {formData.type === 'fixed' && (
             <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1698,10 +1684,7 @@ function NewListingPageContent() {
         const cityOk = String(formData.location.city || '').trim().length > 0;
         const stateOk = String(formData.location.state || '').trim().length > 0;
 
-        const priceOk =
-          formData.type === 'fixed' || formData.type === 'classified'
-            ? isPositiveMoney(formData.price)
-            : isPositiveMoney(formData.startingBid);
+        const priceOk = formData.type === 'fixed' ? isPositiveMoney(formData.price) : isPositiveMoney(formData.startingBid);
 
         const durationOk = isValidDurationDays(formData.durationDays);
 
@@ -1918,7 +1901,7 @@ function NewListingPageContent() {
                       <div className="text-lg font-bold">
                         ${Number(parseFloat(formData.price || '0') || 0).toLocaleString()}
                       </div>
-                      {(formData.type === 'fixed' || formData.type === 'classified') && (
+                      {formData.type === 'fixed' && (
                         <div className="text-sm">
                           Best Offer:{' '}
                           <span className="font-semibold">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span>
@@ -2021,7 +2004,7 @@ function NewListingPageContent() {
                     <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
                     <div><span className="text-muted-foreground">Transport ready:</span> <span className="font-medium">{formData.transport ? 'Yes' : 'No'}</span></div>
                     <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
-                    {(formData.type === 'fixed' || formData.type === 'classified') && (
+                    {formData.type === 'fixed' && (
                       <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
                     )}
                   </div>
@@ -2148,7 +2131,8 @@ function NewListingPageContent() {
       const listingData = {
         title: formData.title,
         description: formData.description,
-        type: formData.type as 'auction' | 'fixed' | 'classified',
+        // Classified listings are deprecated; treat any legacy value as fixed.
+        type: (formData.type === 'classified' ? 'fixed' : (formData.type as any)) as 'auction' | 'fixed',
         category: formData.category as ListingCategory,
         durationDays: formData.durationDays,
         location: locationData,
@@ -2182,7 +2166,7 @@ function NewListingPageContent() {
       } as any;
 
       // Add pricing based on type
-      if (formData.type === 'fixed' || formData.type === 'classified') {
+      if (formData.type === 'fixed') {
         listingData.price = parseFloat(formData.price || '0');
         if (formData.bestOffer.enabled) {
           const bo: any = {
@@ -2375,7 +2359,8 @@ function NewListingPageContent() {
       const listingData = {
         title: formData.title || 'Draft Listing',
         description: formData.description || '',
-        type: (formData.type || 'fixed') as 'auction' | 'fixed' | 'classified',
+        // Classified listings are deprecated; treat any legacy value as fixed.
+        type: ((formData.type === 'classified' ? 'fixed' : formData.type) || 'fixed') as 'auction' | 'fixed',
         category: formData.category as ListingCategory,
         durationDays: formData.durationDays,
         location: locationData,
@@ -2404,7 +2389,7 @@ function NewListingPageContent() {
           }),
       } as any;
 
-      if (formData.type === 'fixed' || formData.type === 'classified') {
+      if (formData.type === 'fixed') {
         listingData.price = parseFloat(formData.price || '0');
       } else if (formData.type === 'auction') {
         listingData.startingBid = parseFloat(formData.startingBid || '0');
@@ -2521,7 +2506,12 @@ function NewListingPageContent() {
               type="button"
               onClick={async () => {
                 const p = resumeDraftPayload;
-                if (p?.formData) setFormData(p.formData);
+                if (p?.formData) {
+                  // Back-compat: classified listings are deprecated; coerce old drafts to fixed.
+                  const t = (p.formData as any)?.type;
+                  const next = { ...p.formData, ...(t === 'classified' ? { type: 'fixed' } : {}) };
+                  setFormData(next);
+                }
                 if (typeof p?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(p.sellerAttestationAccepted);
                 if (typeof p?.sellerAnimalAttestationAccepted === 'boolean') setSellerAnimalAttestationAccepted(p.sellerAnimalAttestationAccepted);
                 if (typeof p?.listingId === 'string' && p.listingId.trim()) {

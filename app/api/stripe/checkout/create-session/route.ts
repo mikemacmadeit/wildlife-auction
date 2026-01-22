@@ -184,6 +184,14 @@ export async function POST(request: Request) {
 
     const listingData = listingDoc.data()!;
 
+    // Classified listings are deprecated (no direct checkout).
+    if (String((listingData as any)?.type || '') === 'classified') {
+      return NextResponse.json(
+        { error: 'This listing type is no longer supported for checkout', code: 'CLASSIFIED_DISABLED' },
+        { status: 400 }
+      );
+    }
+
     // Listing duration guard (server authoritative):
     // For non-auction listings, checkout is only allowed while the listing is still active (endAt > now).
     // For auctions, checkout can be allowed after the auction ends (winner flow), so we do NOT block

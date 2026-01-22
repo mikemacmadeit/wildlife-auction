@@ -164,7 +164,8 @@ function EditListingPageContent() {
 
         // Populate form with existing data
         setFormData({
-          type: listing.type,
+          // Back-compat: classified listings are deprecated; treat as fixed for editing.
+          type: listing.type === 'classified' ? 'fixed' : listing.type,
           category: listing.category,
           title: listing.title,
           description: listing.description,
@@ -294,9 +295,8 @@ function EditListingPageContent() {
               disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
             >
               {[
-                { value: 'auction', label: 'Auction', desc: 'Bidders compete, highest bid wins' },
-                { value: 'fixed', label: 'Fixed Price', desc: 'Set a price, buyer pays immediately' },
-                { value: 'classified', label: 'Classified', desc: 'Contact seller to negotiate price' },
+              { value: 'auction', label: 'Auction', desc: 'Bidders compete, highest bid wins' },
+              { value: 'fixed', label: 'Fixed Price', desc: 'Set a price, buyer pays immediately' },
               ].map((option) => (
                 <div key={option.value} className="flex items-start space-x-3 min-h-[44px]">
                   <RadioGroupItem value={option.value} id={option.value} className="mt-1" />
@@ -798,23 +798,8 @@ function EditListingPageContent() {
                 </>
               )}
 
-              {formData.type === 'classified' && (
-                <div className="space-y-2">
-                  <Label htmlFor="asking-price" className="text-base font-semibold">Asking Price</Label>
-                  <Input
-                    id="asking-price"
-                    type="number"
-                    placeholder="0.00"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
-                    className="min-h-[48px] text-base bg-background"
-                  />
-                </div>
-              )}
-
-              {/* Best Offer (Fixed/Classified) */}
-              {(formData.type === 'fixed' || formData.type === 'classified') && (
+              {/* Best Offer (Fixed) */}
+              {formData.type === 'fixed' && (
                 <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -986,7 +971,7 @@ function EditListingPageContent() {
       validate: () => {
         return (
           !!formData.title &&
-          (formData.type === 'fixed' || formData.type === 'classified'
+          (formData.type === 'fixed'
             ? true // Price optional for existing listings
             : !!formData.startingBid) && // Starting bid required for auctions
           isValidDurationDays(formData.durationDays)
@@ -1565,7 +1550,7 @@ function EditListingPageContent() {
     }
 
     // Add pricing based on type
-    if (formData.type === 'fixed' || formData.type === 'classified') {
+    if (formData.type === 'fixed') {
       updates.price = parseFloat(formData.price || '0');
       if (formData.bestOffer.enabled) {
         const bo: any = {

@@ -137,6 +137,14 @@ export async function POST(request: Request) {
     if (!listingDoc.exists) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     const listingData = listingDoc.data()!;
 
+    // Classified listings are deprecated (no wire checkout).
+    if (String((listingData as any)?.type || '') === 'classified') {
+      return NextResponse.json(
+        { error: 'This listing type is no longer supported for checkout', code: 'CLASSIFIED_DISABLED' },
+        { status: 400 }
+      );
+    }
+
     // Listing duration guard (server authoritative) for non-auctions.
     if (String((listingData as any)?.type || '') !== 'auction') {
       const nowMs = Date.now();

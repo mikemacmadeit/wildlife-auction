@@ -81,6 +81,15 @@ function validatePublishRequiredFields(listingData: any): { ok: true } | { ok: f
     (Array.isArray(listingData?.images) && listingData.images.length > 0);
   if (!hasPhotos) missing.push('photos');
 
+  // Classified listings are deprecated (do not allow new publishes).
+  if (type === 'classified') {
+    return {
+      ok: false,
+      missing: ['type (classified disabled)'],
+      message: 'Classified listings are no longer supported. Please choose Auction or Fixed Price.',
+    };
+  }
+
   const price = typeof listingData?.price === 'number' ? listingData.price : Number(listingData?.price);
   const startingBid = typeof listingData?.startingBid === 'number' ? listingData.startingBid : Number(listingData?.startingBid);
   const durationDaysRaw = listingData?.durationDays;
@@ -92,7 +101,7 @@ function validatePublishRequiredFields(listingData: any): { ok: true } | { ok: f
         ? listingData.reservePrice
         : Number(listingData.reservePrice);
 
-  if (type === 'fixed' || type === 'classified') {
+  if (type === 'fixed') {
     if (!Number.isFinite(price) || price <= 0) missing.push('price');
   }
 
