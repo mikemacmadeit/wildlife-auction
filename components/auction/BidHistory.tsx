@@ -129,7 +129,7 @@ export function BidHistory({ listingId, currentBid, startingBid, className }: Bi
             Showing recent bids — scroll for more.
           </div>
         ) : null}
-        <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+        <div className="space-y-3 max-h-[220px] md:max-h-[360px] overflow-y-auto pr-1">
         {sortedBids.map((bid, index) => {
           const isHighestBid = typeof currentBid === 'number' && bid.amount === currentBid;
           const bidDate = toDateSafe((bid as any).timestamp);

@@ -659,7 +659,7 @@ export default function BrowsePage() {
   }, [filters, selectedType, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-4">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
       <ScrollToTop />
       
       {/* Header */}

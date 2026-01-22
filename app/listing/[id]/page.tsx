@@ -66,6 +66,7 @@ import { EnhancedSellerProfile } from '@/components/listing/EnhancedSellerProfil
 import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { OfferPanel } from '@/components/offers/OfferPanel';
+import { BottomNav } from '@/components/navigation/BottomNav';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
@@ -808,7 +809,7 @@ export default function ListingDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-0">
       {/* Back Navigation */}
       <div className="border-b border-border/50 bg-card/50 sticky top-0 z-30">
         <div className="container mx-auto px-4 py-3">
@@ -2129,6 +2130,9 @@ export default function ListingDetailPage() {
       />
 
       <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav />
 
       {/* eBay-style bid modal is handled inline in the auction CTA block above */}
     </div>

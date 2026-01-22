@@ -317,10 +317,17 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* Use on pages that render the mobile BottomNav (h-16) so content never sits under it on iOS. */
+  .pb-bottom-nav-safe {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
   .mb-bottom-nav {
     margin-bottom: 4rem;
   }
   @media (min-width: 768px) {
+    .pb-bottom-nav-safe {
+      padding-bottom: 0;
+    }
     .mb-bottom-nav {
       margin-bottom: 0;
     }

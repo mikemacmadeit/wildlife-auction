@@ -208,7 +208,7 @@ export default function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-4">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-background">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />

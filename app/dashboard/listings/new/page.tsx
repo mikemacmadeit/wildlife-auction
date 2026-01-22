@@ -2426,7 +2426,7 @@ function NewListingPageContent() {
   const hasFormData = hasAnyProgress;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
       {/* Resume draft prompt (prevents "new listing" from being prefilled unexpectedly) */}
       <Dialog
         open={resumeDraftOpen}

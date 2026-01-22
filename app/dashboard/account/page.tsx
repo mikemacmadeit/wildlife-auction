@@ -427,7 +427,7 @@ export default function AccountPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-24 md:pb-4 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
           <p className="text-muted-foreground">Loading profile...</p>
@@ -439,7 +439,7 @@ export default function AccountPage() {
   // Not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pb-24 md:pb-4">
+      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
         <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl">
           <Card>
             <CardContent className="pt-12 pb-12 text-center">
@@ -454,7 +454,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-4">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl space-y-6 md:space-y-8">
         {/* Header */}
         <motion.div

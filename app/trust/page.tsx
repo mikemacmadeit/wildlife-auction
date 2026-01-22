@@ -28,19 +28,20 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 
 export default function TrustPage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <div className="mb-8 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-          <Shield className="h-8 w-8 text-primary" />
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-0">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+            <Shield className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-4xl font-bold mb-4">Trust & Compliance</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Wildlife Exchange is built for trust, clear disclosures, and compliance workflows for regulated categories—
+            without claiming to be a regulator or approving transfers.
+          </p>
         </div>
-        <h1 className="text-4xl font-bold mb-4">Trust & Compliance</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Wildlife Exchange is built for trust, clear disclosures, and compliance workflows for regulated categories—
-          without claiming to be a regulator or approving transfers.
-        </p>
-      </div>
 
-      <div className="space-y-8">
+        <div className="space-y-8">
         {/* Trust Badges Section */}
         <Card id="badges" className="scroll-mt-24">
           <CardHeader>
@@ -467,7 +468,7 @@ export default function TrustPage() {
           </CardContent>
         </Card>
       </div>
-
+      </div>
       <BottomNav />
     </div>
   );

@@ -127,7 +127,7 @@ export default function SportingWorkingDogsBrowsePage() {
 
   if (loading && listings.length === 0) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
         <div className="container mx-auto px-4 py-6 md:py-8">
           <SkeletonListingGrid count={12} />
         </div>
@@ -137,7 +137,7 @@ export default function SportingWorkingDogsBrowsePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8">
         <div className="mb-6 md:mb-8">
           <div className="flex items-center gap-3 mb-4">
