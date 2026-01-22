@@ -154,6 +154,7 @@ export default function BidsOffersPage() {
   const [unreadBids, setUnreadBids] = useState(0);
   const [unreadOffers, setUnreadOffers] = useState(0);
   const [unreadHistory, setUnreadHistory] = useState(0);
+  const [unreadSellerOfferReceived, setUnreadSellerOfferReceived] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all'); // applies in Bids tab
   const [sortKey, setSortKey] = useState<SortKey>('ending_soon');
   const [query, setQuery] = useState('');
@@ -254,6 +255,21 @@ export default function BidsOffersPage() {
       // ignore
     }
     return () => unsubs.forEach((fn) => fn());
+  }, [user?.uid]);
+
+  // Seller offers badge (top link): only count *new offers received*.
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadSellerOfferReceived(0);
+      return;
+    }
+    const types: NotificationType[] = ['offer_received'];
+    try {
+      return subscribeToUnreadCountByTypes(user.uid, types, (c) => setUnreadSellerOfferReceived(c || 0));
+    } catch {
+      setUnreadSellerOfferReceived(0);
+      return;
+    }
   }, [user?.uid]);
 
   const clearTabNotifs = useCallback(
@@ -508,9 +524,23 @@ export default function BidsOffersPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="min-h-[40px]">
-              <Link href="/seller/offers">
-                <Handshake className="h-4 w-4 mr-2" />
-                Offers received (seller)
+              <Link
+                href="/seller/offers"
+                onClick={() => {
+                  if (!user?.uid) return;
+                  // Clear the badge as soon as they click into the seller offers inbox.
+                  markNotificationsAsReadByTypes(user.uid, ['offer_received']).catch(() => {});
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <Handshake className="h-4 w-4" />
+                  <span>Offers received (seller)</span>
+                  {unreadSellerOfferReceived > 0 ? (
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                      {unreadSellerOfferReceived}
+                    </Badge>
+                  ) : null}
+                </span>
               </Link>
             </Button>
             <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
