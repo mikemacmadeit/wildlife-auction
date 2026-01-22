@@ -117,9 +117,11 @@ export async function POST(request: Request) {
 
     // Parse request body
     const body = await request.json();
-    const { threadId, listingId, messageBody } = body;
+    const { threadId, listingId, messageBody, attachments } = body;
 
-    if (!threadId || !listingId || !messageBody) {
+    const hasBody = typeof messageBody === 'string' && messageBody.trim().length > 0;
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    if (!threadId || !listingId || (!hasBody && !hasAttachments)) {
       return json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -167,10 +169,60 @@ export async function POST(request: Request) {
 
     // Sanitize message on server
     const isPaid = orderStatus === 'paid' || orderStatus === 'completed';
-    const sanitizeResult = sanitizeMessage(messageBody, {
+    const sanitizeResult = sanitizeMessage(String(messageBody || ''), {
       isPaid,
       paymentStatus: orderStatus,
     });
+
+    const getStoragePathFromUrl = (url: string): string | null => {
+      try {
+        const match = url.match(/\/o\/(.+?)\?/);
+        if (!match) return null;
+        return decodeURIComponent(match[1]);
+      } catch {
+        return null;
+      }
+    };
+
+    // Validate attachments (best-effort; Storage rules enforce access; this prevents obvious spoofed URLs)
+    let safeAttachments: any[] | undefined = undefined;
+    if (hasAttachments) {
+      if (attachments.length > 6) {
+        return json({ error: 'Too many attachments' }, { status: 400 });
+      }
+
+      safeAttachments = [];
+      for (const a of attachments) {
+        const url = typeof a?.url === 'string' ? a.url : '';
+        const kind = typeof a?.kind === 'string' ? a.kind : '';
+        const id = typeof a?.id === 'string' ? a.id : '';
+        if (!url || kind !== 'image') continue;
+        const path = getStoragePathFromUrl(url);
+        if (!path) continue;
+        if (!path.startsWith(`messageThreads/${threadId}/attachments/`)) continue;
+
+        safeAttachments.push({
+          id: id || path.split('/').slice(-2)[0] || 'att',
+          kind: 'image',
+          url,
+          contentType: typeof a?.contentType === 'string' ? a.contentType : undefined,
+          sizeBytes: typeof a?.sizeBytes === 'number' ? a.sizeBytes : undefined,
+          width: typeof a?.width === 'number' ? a.width : undefined,
+          height: typeof a?.height === 'number' ? a.height : undefined,
+          name: typeof a?.name === 'string' ? a.name : undefined,
+        });
+      }
+
+      if (safeAttachments.length === 0) {
+        return json({ error: 'Invalid attachments' }, { status: 400 });
+      }
+    }
+
+    const previewText = sanitizeResult.sanitizedText.trim()
+      ? sanitizeResult.sanitizedText.substring(0, 100)
+      : safeAttachments?.length
+      ? '📷 Photo'
+      : '';
 
     // Store message
     const messagesRef = threadRef.collection('messages');
@@ -180,6 +232,7 @@ export async function POST(request: Request) {
       recipientId,
       listingId,
       body: sanitizeResult.sanitizedText,
+      ...(safeAttachments?.length ? { attachments: safeAttachments } : {}),
       createdAt: Timestamp.now(),
       wasRedacted: sanitizeResult.wasRedacted,
       violationCount: sanitizeResult.violationCount,
@@ -196,7 +249,7 @@ export async function POST(request: Request) {
     await threadRef.update({
       updatedAt: Timestamp.now(),
       lastMessageAt: Timestamp.now(),
-      lastMessagePreview: sanitizeResult.sanitizedText.substring(0, 100),
+      lastMessagePreview: previewText,
       [`${senderId === threadData.buyerId ? 'buyer' : 'seller'}UnreadCount`]: 0,
       [unreadField]: FieldValue.increment(1),
       violationCount: newViolationCount,
@@ -227,7 +280,7 @@ export async function POST(request: Request) {
               ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
               : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
           senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
-          preview: sanitizeResult.sanitizedText.substring(0, 100),
+          preview: previewText,
         },
         optionalHash: `msg:${messageRef.id}`,
       });
@@ -254,7 +307,7 @@ export async function POST(request: Request) {
                 ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
                 : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
             senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
-            preview: sanitizeResult.sanitizedText.substring(0, 100),
+            preview: previewText,
           },
         });
         await db

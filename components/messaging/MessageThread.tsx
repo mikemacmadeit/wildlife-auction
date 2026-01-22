@@ -19,9 +19,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { MessageSquare, Send, AlertTriangle, Flag, Tag } from 'lucide-react';
+import { MessageSquare, Send, AlertTriangle, Flag, Tag, Image as ImageIcon, X } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { Message, MessageThread, Listing } from '@/lib/types';
+import type { Message, MessageThread, Listing, MessageAttachment } from '@/lib/types';
 import { subscribeToThreadMessages, sendMessage, markThreadAsRead, flagThread } from '@/lib/firebase/messages';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +29,11 @@ import { cn } from '@/lib/utils';
 import { OfferFromMessagesDialog } from '@/components/offers/OfferFromMessagesDialog';
 import { extractUrls, linkify } from '@/lib/text/linkify';
 import { LinkPreviewCard, type LinkPreview } from '@/components/messaging/LinkPreviewCard';
+import { uploadMessageImageAttachment } from '@/lib/firebase/message-attachments';
+import {
+  Dialog,
+  DialogContent,
+} from '@/components/ui/dialog';
 
 interface MessageThreadProps {
   thread: MessageThread;
@@ -60,6 +65,18 @@ export function MessageThreadComponent({
   const [offerOpen, setOfferOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<
+    Array<{
+      id: string;
+      localUrl: string;
+      uploading: boolean;
+      progress: number;
+      attachment?: MessageAttachment;
+      error?: string;
+    }>
+  >([]);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const previewCacheRef = useRef<Map<string, LinkPreview>>(new Map());
   const [previewByUrl, setPreviewByUrl] = useState<Record<string, LinkPreview>>({});
   const isAtBottomRef = useRef(true);
@@ -199,7 +216,10 @@ export function MessageThreadComponent({
   }, [orderStatus]);
 
   const handleSend = async () => {
-    if (!messageInput.trim() || !user || sending) return;
+    const body = messageInput.trim();
+    const uploaded = attachments.map((a) => a.attachment).filter(Boolean) as MessageAttachment[];
+    const stillUploading = attachments.some((a) => a.uploading);
+    if ((!body && uploaded.length === 0) || !user || sending || stillUploading) return;
 
     setSending(true);
     try {
@@ -208,10 +228,20 @@ export function MessageThreadComponent({
         user.uid,
         user.uid === thread.buyerId ? thread.sellerId : thread.buyerId,
         thread.listingId,
-        messageInput.trim(),
-        orderStatus
+        body,
+        orderStatus,
+        { attachments: uploaded.length ? uploaded : undefined }
       );
       setMessageInput('');
+      // clear attachments + revoke local URLs
+      setAttachments((prev) => {
+        for (const a of prev) {
+          try {
+            URL.revokeObjectURL(a.localUrl);
+          } catch {}
+        }
+        return [];
+      });
     } catch (error: any) {
       const code = typeof error?.code === 'string' ? error.code : '';
       toast({
@@ -222,6 +252,55 @@ export function MessageThreadComponent({
     } finally {
       setSending(false);
     }
+  };
+
+  const handlePickImages = () => {
+    try {
+      fileInputRef.current?.click();
+    } catch {}
+  };
+
+  const handleFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (!user?.uid) return;
+
+    const maxPerMessage = 6;
+    const existingCount = attachments.length;
+    const remaining = Math.max(0, maxPerMessage - existingCount);
+    const picked = Array.from(files).slice(0, remaining);
+
+    if (picked.length === 0) {
+      toast({ title: 'Too many photos', description: `Max ${maxPerMessage} per message.` });
+      return;
+    }
+
+    const newRows = picked.map((f) => {
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const localUrl = URL.createObjectURL(f);
+      return { id, localUrl, uploading: true, progress: 0 } as const;
+    });
+
+    setAttachments((prev) => [...prev, ...newRows]);
+
+    await Promise.all(
+      picked.map(async (file, idx) => {
+        const row = newRows[idx];
+        try {
+          const att = await uploadMessageImageAttachment(thread.id, file, (p) => {
+            setAttachments((prev) =>
+              prev.map((x) => (x.id === row.id ? { ...x, progress: Math.round(p.progress), uploading: p.state !== 'success' } : x))
+            );
+          });
+          setAttachments((prev) => prev.map((x) => (x.id === row.id ? { ...x, uploading: false, progress: 100, attachment: att } : x)));
+        } catch (e: any) {
+          const msg = String(e?.message || 'Failed to upload');
+          setAttachments((prev) => prev.map((x) => (x.id === row.id ? { ...x, uploading: false, error: msg } : x)));
+        }
+      })
+    );
+
+    // reset input value so selecting the same file again works
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleFlag = async () => {
@@ -383,6 +462,7 @@ export function MessageThreadComponent({
             const tokens = linkify(body);
             const firstUrl = extractUrls(body, 1)[0];
             const preview = firstUrl ? (previewByUrl[firstUrl] || previewCacheRef.current.get(firstUrl)) : undefined;
+            const atts = Array.isArray((message as any)?.attachments) ? ((message as any).attachments as MessageAttachment[]) : [];
             return (
               <div
                 key={message.id}
@@ -402,6 +482,24 @@ export function MessageThreadComponent({
                       : 'bg-muted border border-border'
                   )}
                 >
+                  {atts.length ? (
+                    <div className="mb-2 grid grid-cols-2 gap-2">
+                      {atts.slice(0, 6).map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => setViewerUrl(a.url)}
+                          className="relative overflow-hidden rounded-md border bg-background/30"
+                        >
+                          <img
+                            src={a.url}
+                            alt="Attachment"
+                            className="block h-[140px] w-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <p className="text-sm whitespace-pre-wrap break-words">
                     {tokens.map((t, idx) =>
                       t.type === 'link' ? (
@@ -443,7 +541,62 @@ export function MessageThreadComponent({
 
       {/* Input */}
       <div className="border-t p-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => void handleFilesSelected(e.target.files)}
+        />
+
+        {attachments.length ? (
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            {attachments.map((a) => (
+              <div key={a.id} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-muted">
+                <img src={a.localUrl} alt="Upload preview" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  className="absolute right-1 top-1 rounded-full bg-background/80 p-1 shadow"
+                  onClick={() => {
+                    setAttachments((prev) => {
+                      const next = prev.filter((x) => x.id !== a.id);
+                      try {
+                        URL.revokeObjectURL(a.localUrl);
+                      } catch {}
+                      return next;
+                    });
+                  }}
+                  aria-label="Remove attachment"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                {a.uploading ? (
+                  <div className="absolute inset-x-0 bottom-0 h-1 bg-background/60">
+                    <div className="h-1 bg-primary" style={{ width: `${a.progress}%` }} />
+                  </div>
+                ) : null}
+                {a.error ? (
+                  <div className="absolute inset-0 bg-destructive/60 text-[10px] text-white p-1 flex items-center justify-center text-center">
+                    Upload failed
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <div className="flex gap-2 items-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-[44px] w-[44px] px-0"
+            onClick={handlePickImages}
+            disabled={sending}
+            aria-label="Add photos"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </Button>
           <Textarea
             placeholder="Write a message…"
             value={messageInput}
@@ -457,7 +610,15 @@ export function MessageThreadComponent({
             disabled={sending}
             className="min-h-[44px] max-h-[140px] resize-none text-base"
           />
-          <Button onClick={handleSend} disabled={!messageInput.trim() || sending} className="h-[44px] w-[44px] px-0">
+          <Button
+            onClick={handleSend}
+            disabled={
+              sending ||
+              (attachments.length > 0 && attachments.some((a) => a.uploading)) ||
+              (!messageInput.trim() && attachments.filter((a) => !!a.attachment).length === 0)
+            }
+            className="h-[44px] w-[44px] px-0"
+          >
             <Send className="h-4 w-4" />
           </Button>
         </div>
@@ -467,6 +628,17 @@ export function MessageThreadComponent({
           </p>
         )}
       </div>
+
+      <Dialog open={!!viewerUrl} onOpenChange={(o) => (!o ? setViewerUrl(null) : null)}>
+        <DialogContent className="max-w-3xl">
+          {viewerUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={viewerUrl} alt="Attachment" className="w-full max-h-[80vh] object-contain rounded-md" />
+          ) : (
+            <div />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

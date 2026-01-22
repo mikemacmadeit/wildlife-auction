@@ -25,7 +25,7 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore';
 import { auth, db } from './config';
-import { MessageThread, Message } from '@/lib/types';
+import type { MessageAttachment, MessageThread, Message } from '@/lib/types';
 import { sanitizeMessage, hasViolations } from '@/lib/safety/sanitizeMessage';
 
 /**
@@ -141,7 +141,8 @@ export async function sendMessage(
   recipientId: string,
   listingId: string,
   body: string,
-  orderStatus?: 'pending' | 'paid' | 'completed'
+  orderStatus?: 'pending' | 'paid' | 'completed',
+  opts?: { attachments?: MessageAttachment[] }
 ): Promise<string> {
   // Preferred path: use the hardened server route that sanitizes server-side and creates recipient notifications
   // using Admin SDK (so it can write cross-user safely).
@@ -166,6 +167,7 @@ export async function sendMessage(
         recipientId,
         listingId,
         messageBody: body,
+        attachments: Array.isArray(opts?.attachments) ? opts?.attachments : undefined,
         // orderStatus is intentionally not trusted by the server; it derives payment state itself.
       }),
     });
@@ -217,11 +219,20 @@ export async function sendMessage(
     }
   }
 
+  const safeBody = String(body || '');
+
   // Sanitize message
-  const sanitizeResult = sanitizeMessage(body, {
+  const sanitizeResult = sanitizeMessage(safeBody, {
     isPaid,
     paymentStatus: orderStatus,
   });
+
+  const hasAttachments = Array.isArray(opts?.attachments) && opts!.attachments!.length > 0;
+  const previewText = sanitizeResult.sanitizedText.trim()
+    ? sanitizeResult.sanitizedText.substring(0, 100)
+    : hasAttachments
+    ? '📷 Photo'
+    : '';
 
   // Store message (only store sanitized version, not original)
   const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
@@ -231,6 +242,7 @@ export async function sendMessage(
     recipientId,
     listingId,
     body: sanitizeResult.sanitizedText, // Store sanitized version
+    ...(hasAttachments ? { attachments: opts!.attachments } : {}),
     createdAt: serverTimestamp(),
     wasRedacted: sanitizeResult.wasRedacted,
     violationCount: sanitizeResult.violationCount,
@@ -251,7 +263,7 @@ export async function sendMessage(
   await updateDoc(threadRef, {
     updatedAt: serverTimestamp(),
     lastMessageAt: serverTimestamp(),
-    lastMessagePreview: sanitizeResult.sanitizedText.substring(0, 100),
+    lastMessagePreview: previewText,
     [`${senderId === threadData?.buyerId ? 'buyer' : 'seller'}UnreadCount`]: 0, // Sender's unread = 0
     [`${senderId === threadData?.buyerId ? 'seller' : 'buyer'}UnreadCount`]: 
       (threadData?.[`${senderId === threadData?.buyerId ? 'seller' : 'buyer'}UnreadCount`] || 0) + 1,
