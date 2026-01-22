@@ -49,6 +49,31 @@ export default function HomePage() {
     }
   };
 
+  const ViewModeToggle = (props: { className?: string }) => {
+    return (
+      <div className={cn('flex items-center gap-2 border border-border rounded-lg p-1 bg-card', props.className)}>
+        <Button
+          variant={viewMode === 'card' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => handleViewModeChange('card')}
+          className="h-8 px-3"
+        >
+          <LayoutGrid className="h-4 w-4 mr-2" />
+          Gallery
+        </Button>
+        <Button
+          variant={viewMode === 'list' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => handleViewModeChange('list')}
+          className="h-8 px-3"
+        >
+          <List className="h-4 w-4 mr-2" />
+          List
+        </Button>
+      </div>
+    );
+  };
+
   // Fetch listings from Firestore
   useEffect(() => {
     async function fetchListings() {
@@ -501,24 +526,35 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               className="mb-8"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">
-                Featured Listings
-              </h2>
-              <p className="text-muted-foreground text-base md:text-lg">
-                Hand-picked listings with high visibility. New inventory added daily.
-              </p>
+              <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">Featured Listings</h2>
+                  <p className="text-muted-foreground text-base md:text-lg">
+                    Hand-picked listings with high visibility. New inventory added daily.
+                  </p>
+                </div>
+                <ViewModeToggle />
+              </div>
             </motion.div>
 
             <motion.div
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8"
+              className={cn(
+                viewMode === 'card'
+                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8'
+                  : 'space-y-4'
+              )}
             >
               <AnimatePresence>
-                {featuredListings.map((listing) => (
-                  <FeaturedListingCard key={listing.id} listing={listing} />
-                ))}
+                {featuredListings.map((listing) =>
+                  viewMode === 'card' ? (
+                    <FeaturedListingCard key={listing.id} listing={listing} />
+                  ) : (
+                    <ListItem key={listing.id} listing={listing} />
+                  )
+                )}
               </AnimatePresence>
             </motion.div>
           </div>
@@ -529,19 +565,32 @@ export default function HomePage() {
       {!loading && mostWatched.length > 0 && (
         <section className="py-12 md:py-16 bg-background border-t border-border/50">
           <div className="container mx-auto px-4">
-            <div className="flex items-end justify-between gap-4 mb-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
               <div>
                 <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">Most Watched</h2>
                 <p className="text-muted-foreground text-base md:text-lg">Social proof that drives liquidity.</p>
               </div>
-              <Button variant="outline" asChild>
-                <Link href="/browse">Browse</Link>
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <ViewModeToggle />
+                <Button variant="outline" asChild>
+                  <Link href="/browse">Browse</Link>
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {mostWatched.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
+            <div
+              className={cn(
+                viewMode === 'card'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'
+                  : 'space-y-4'
+              )}
+            >
+              {mostWatched.map((listing) =>
+                viewMode === 'card' ? (
+                  <ListingCard key={listing.id} listing={listing} />
+                ) : (
+                  <ListItem key={listing.id} listing={listing} />
+                )
+              )}
             </div>
           </div>
         </section>
@@ -551,19 +600,32 @@ export default function HomePage() {
       {!loading && endingSoon.length > 0 && (
         <section className="py-12 md:py-16 bg-background border-t border-border/50">
           <div className="container mx-auto px-4">
-            <div className="flex items-end justify-between gap-4 mb-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
               <div>
                 <h2 className="text-3xl md:text-4xl font-bold mb-2 font-founders">Ending Soon</h2>
                 <p className="text-muted-foreground text-base md:text-lg">Auctions closing soon—act now.</p>
               </div>
-              <Button variant="outline" asChild>
-                <Link href="/browse">View all</Link>
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <ViewModeToggle />
+                <Button variant="outline" asChild>
+                  <Link href="/browse">View all</Link>
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {endingSoon.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
+            <div
+              className={cn(
+                viewMode === 'card'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'
+                  : 'space-y-4'
+              )}
+            >
+              {endingSoon.map((listing) =>
+                viewMode === 'card' ? (
+                  <ListingCard key={listing.id} listing={listing} />
+                ) : (
+                  <ListItem key={listing.id} listing={listing} />
+                )
+              )}
             </div>
           </div>
         </section>
@@ -583,26 +645,7 @@ export default function HomePage() {
             </div>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 border border-border rounded-lg p-1 bg-card">
-              <Button
-                variant={viewMode === 'card' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleViewModeChange('card')}
-                className="h-8 px-3"
-              >
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Cards
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleViewModeChange('list')}
-                className="h-8 px-3"
-              >
-                <List className="h-4 w-4 mr-2" />
-                List
-              </Button>
-            </div>
+            <ViewModeToggle />
           </div>
 
           {/* Loading State */}
