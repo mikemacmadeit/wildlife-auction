@@ -43,6 +43,11 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
   const hasCountdown = !sold.isSold && listing.type === 'auction' && !!listing.endsAt;
   const cover = listing.photos?.[0];
   const coverUrl = cover?.url || listing.images?.[0] || '';
+  const quantity = (() => {
+    const q = (listing as any)?.attributes?.quantity;
+    const n = typeof q === 'number' ? q : Number(q);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
   const coverObjectPosition =
     cover?.focalPoint && typeof cover.focalPoint.x === 'number' && typeof cover.focalPoint.y === 'number'
       ? `${Math.max(0, Math.min(1, cover.focalPoint.x)) * 100}% ${Math.max(0, Math.min(1, cover.focalPoint.y)) * 100}%`
@@ -199,6 +204,11 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                   {priceDisplay}
                 </div>
+                {quantity && quantity > 1 ? (
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Qty: {quantity}
+                  </div>
+                ) : null}
                 {listing.type === 'auction' && listing.reservePrice && (
                   <div className="text-xs text-muted-foreground font-medium">
                     Reserve: ${listing.reservePrice.toLocaleString()}

@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 
 interface KeyFactsPanelProps {
   listing: Listing;
@@ -71,6 +71,11 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       icon: Package,
       label: 'Quantity',
       value: `${(listing.attributes as WildlifeAttributes).quantity} ${(listing.attributes as WildlifeAttributes).quantity === 1 ? 'item' : 'items'}`,
+    },
+    listing.attributes && listing.category === 'whitetail_breeder' && (listing.attributes as WhitetailBreederAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as WhitetailBreederAttributes).quantity} ${(listing.attributes as WhitetailBreederAttributes).quantity === 1 ? 'deer' : 'deer'}`,
     },
     listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).breed && {
       icon: Package,
@@ -185,6 +190,11 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         (listing.attributes as HorseAttributes).sex === 'mare' ? 'Mare' :
         (listing.attributes as HorseAttributes).sex === 'gelding' ? 'Gelding' : 'Unknown',
       detail: formatAge((listing.attributes as HorseAttributes).age),
+    },
+    listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as HorseAttributes).quantity} ${(listing.attributes as HorseAttributes).quantity === 1 ? 'horse' : 'horses'}`,
     },
     listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).registered !== undefined && {
       icon: FileText,

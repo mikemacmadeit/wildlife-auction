@@ -73,6 +73,21 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     const attrs: any = listing.attributes || null;
     if (!attrs) return null;
 
+    const quantity = (() => {
+      const q = attrs.quantity;
+      const n = typeof q === 'number' ? q : Number(q);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })();
+
+    const qtyLabel = (() => {
+      if (!quantity || quantity <= 1) return null;
+      if (listing.category === 'cattle_livestock') return `${quantity} head`;
+      if (listing.category === 'sporting_working_dogs') return `${quantity} dogs`;
+      if (listing.category === 'horse_equestrian') return `${quantity} horses`;
+      if (listing.category === 'whitetail_breeder' || listing.category === 'wildlife_exotics') return `${quantity} animals`;
+      return `Qty: ${quantity}`;
+    })();
+
     const formatAge = (age: any): string | null => {
       if (age === null || age === undefined) return null;
       if (typeof age === 'number' && Number.isFinite(age)) return `${age} yr${age === 1 ? '' : 's'}`;
@@ -97,7 +112,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
       const sexLabel =
         sexRaw === 'male' ? 'Male' : sexRaw === 'female' ? 'Female' : sexRaw === 'unknown' ? null : titleCase(sexRaw);
 
-      const parts = [speciesLabel, sexLabel, ageLabel].filter(Boolean) as string[];
+      const parts = [speciesLabel, sexLabel, ageLabel, qtyLabel].filter(Boolean) as string[];
       return parts.length ? parts : null;
     }
 
@@ -115,7 +130,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
         sexRaw === 'steer' ? 'Steer' :
         sexRaw ? titleCase(sexRaw) : null;
 
-      const parts = [breed || null, sexLabel, ageLabel].filter(Boolean) as string[];
+      const parts = [breed || null, sexLabel, ageLabel, qtyLabel].filter(Boolean) as string[];
       return parts.length ? parts : null;
     }
 
@@ -125,7 +140,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
       const typeLabel = e.equipmentType ? String(e.equipmentType).trim() : null;
       const yearLabel = e.year !== undefined && e.year !== null ? `Year: ${String(e.year)}` : null;
       const condLabel = e.condition ? String(e.condition).trim() : null;
-      const parts = [typeLabel, yearLabel || condLabel].filter(Boolean) as string[];
+      const parts = [typeLabel, yearLabel || condLabel, qtyLabel].filter(Boolean) as string[];
       return parts.length ? parts : null;
     }
 
@@ -137,7 +152,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
       const sexLabel =
         sexRaw === 'male' ? 'Male' : sexRaw === 'female' ? 'Female' : sexRaw === 'unknown' ? null : titleCase(sexRaw);
       const ageLabel = formatAge(d.age);
-      const parts = [breedLabel, sexLabel, ageLabel].filter(Boolean) as string[];
+      const parts = [breedLabel, sexLabel, ageLabel, qtyLabel].filter(Boolean) as string[];
       return parts.length ? parts : null;
     }
 
@@ -153,7 +168,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
         sexRaw ? titleCase(sexRaw) : null;
       const ageLabel = formatAge(h.age);
       const reg = h.registered ? 'Registered' : null;
-      const parts = ['Horse', sexLabel, ageLabel || reg].filter(Boolean) as string[];
+      const parts = ['Horse', sexLabel, ageLabel || reg, qtyLabel].filter(Boolean) as string[];
       return parts.length ? parts : null;
     }
 
