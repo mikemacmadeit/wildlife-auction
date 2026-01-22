@@ -636,7 +636,8 @@ export default function SellerOverviewPage() {
         </div>
 
         {/* KPI Snapshot (always first) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" data-tour="seller-stats">
+        {/* Mobile: show KPIs as 2 rows of 2 (Active Listings + Total Revenue, then Views + Conversion). Desktop unchanged. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6" data-tour="seller-stats">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
