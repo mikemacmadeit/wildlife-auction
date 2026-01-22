@@ -77,7 +77,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
           className
         )}>
           {/* Featured Badge - High Contrast for Light & Dark Mode */}
-          <div className="absolute top-3 left-3 z-20">
+          <div className="hidden sm:block absolute top-3 left-3 z-20">
             <Badge 
               className={cn(
                 // Light mode: Darker sage background (HSL 90, 18%, 35%) with white text for maximum contrast
@@ -96,7 +96,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
           </div>
 
           {/* Image with Premium Overlay */}
-          <div className="relative aspect-[16/9] w-full bg-muted overflow-hidden rounded-t-xl">
+          <div className="relative aspect-[4/3] sm:aspect-[16/9] w-full bg-muted overflow-hidden rounded-t-xl">
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/20 to-transparent z-10" />
             {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
@@ -140,7 +140,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
 
             {/* Real-time countdown timer for auctions - placed to avoid action buttons */}
             {hasCountdown && (
-              <div className="absolute top-14 left-3 z-20">
+              <div className="hidden sm:block absolute top-14 left-3 z-20">
                 <CountdownTimer
                   endsAt={listing.endsAt}
                   variant="badge"
@@ -152,7 +152,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             )}
 
             {/* Type badge - Enhanced */}
-            <div className="absolute bottom-3 right-3 z-20">
+            <div className="hidden sm:block absolute bottom-3 right-3 z-20">
               <Badge 
                 variant="outline" 
                 className="backdrop-blur-sm bg-card/80 border-border/50 font-semibold text-xs px-3 py-1.5 shadow-warm"
@@ -174,7 +174,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
           </div>
 
           {/* Content with Premium Styling */}
-          <div className="p-5 flex-1 flex flex-col gap-4">
+          <div className="p-3 sm:p-5 flex-1 flex flex-col gap-2 sm:gap-4">
             {sold.isSold && (
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
                 <div className="font-semibold">{sold.soldPriceLabel}</div>
@@ -182,7 +182,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </div>
             )}
             {/* Title with gradient text effect */}
-            <h3 className="font-bold text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors duration-300 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+            <h3 className="font-bold text-base sm:text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors duration-300 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
               {listing.title}
             </h3>
 
@@ -194,7 +194,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
 
             {/* Reserved (offer accepted) - keep it under location for gallery cards */}
             {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
-              <div className="-mt-2">
+              <div className="hidden sm:block -mt-2">
                 <Badge
                   variant="secondary"
                   className="bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30 text-xs font-semibold"
@@ -206,15 +206,17 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             ) : null}
 
             {/* Trust Badges - Premium styling */}
-            <TrustBadges
-              verified={listing.trust.verified}
-              transport={listing.trust.transportReady}
-              size="sm"
-              className="flex-wrap gap-2"
-            />
+            <div className="hidden sm:block">
+              <TrustBadges
+                verified={listing.trust.verified}
+                transport={listing.trust.transportReady}
+                size="sm"
+                className="flex-wrap gap-2"
+              />
+            </div>
 
             {/* Price and Seller Info - Enhanced */}
-            <div className="mt-auto pt-4 border-t border-border/50 flex items-center justify-between">
+            <div className="mt-auto pt-3 sm:pt-4 border-t border-border/50 flex items-center justify-between">
               <div className="space-y-1">
                 <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                   {priceDisplay}
@@ -224,14 +226,14 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                     Qty: {quantity}
                   </div>
                 ) : null}
-                {listing.type === 'auction' && listing.reservePrice && (
+                {listing.type === 'auction' && listing.reservePrice ? (
                   <div className="text-xs text-muted-foreground font-medium">
                     Reserve: ${listing.reservePrice.toLocaleString()}
                   </div>
-                )}
+                ) : null}
               </div>
               <div className="flex flex-col items-end gap-1.5">
-                <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end">
                   {listing.sellerSnapshot?.verified && (
                     <Badge variant="secondary" className="text-[10px] font-semibold">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -273,7 +275,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             {/* View Details CTA - Premium */}
             <motion.div
               whileHover={{ x: 4 }}
-              className="flex items-center justify-between pt-2 mt-2 border-t border-border/30"
+              className="hidden sm:flex items-center justify-between pt-2 mt-2 border-t border-border/30"
             >
               <span className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
                 View Details

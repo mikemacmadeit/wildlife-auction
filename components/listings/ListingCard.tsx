@@ -177,7 +177,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             </div>
             
             {/* Top-left row: Trending (if applicable) + auction timer (same line) */}
-            <div className="absolute top-2 left-2 z-20 flex items-center gap-1 flex-wrap">
+            <div className="hidden sm:flex absolute top-2 left-2 z-20 items-center gap-1 flex-wrap">
               {!sold.isSold && (watchers >= 10 || (listing.metrics?.bidCount || 0) >= 8) ? (
                 <Badge variant="default" className="text-xs shadow-warm">
                   <Zap className="h-3 w-3 mr-1" />
@@ -195,7 +195,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               ) : null}
             </div>
             {/* Type badge */}
-            <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
+            <div className="hidden sm:flex absolute bottom-2 right-2 z-20 flex-col gap-1 items-end">
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
@@ -212,12 +212,15 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             </div>
 
             {/* Social proof (watchers + bids) */}
-            <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5">
-              {sold.isSold && (
+            {/* Keep SOLD on mobile; hide other social proof on mobile */}
+            {sold.isSold ? (
+              <div className="absolute bottom-2 left-2 z-20">
                 <Badge className="bg-destructive text-destructive-foreground text-xs shadow-warm">
                   SOLD
                 </Badge>
-              )}
+              </div>
+            ) : null}
+            <div className="hidden sm:flex absolute bottom-2 left-2 z-20 items-center gap-1.5">
               {watchers > 0 && (
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
                   <Heart className="h-3 w-3 mr-1" />
@@ -234,7 +237,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
           </div>
 
           {/* Content */}
-          <div className="p-4 flex-1 flex flex-col gap-3">
+          <div className="p-3 sm:p-4 flex-1 flex flex-col gap-2 sm:gap-3">
             {sold.isSold && (
               <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
                 <div className="font-semibold">{sold.soldPriceLabel}</div>
@@ -248,7 +251,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
 
           {/* Key Attributes */}
           {keyAttributes && keyAttributes.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+            <div className="hidden sm:flex flex-wrap gap-1.5 text-xs text-muted-foreground">
               {keyAttributes.map((attr, idx) => (
                 <span key={idx} className="px-2 py-0.5 bg-muted rounded-md">
                   {attr}
@@ -265,7 +268,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
 
           {/* Reserved (offer accepted) - keep it in the content area for gallery cards */}
           {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
-            <div className="flex items-center gap-2 flex-wrap -mt-1">
+            <div className="hidden sm:flex items-center gap-2 flex-wrap -mt-1">
               <Badge
                 variant="secondary"
                 className="bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30 text-xs"
@@ -277,12 +280,14 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
           ) : null}
 
           {/* Trust Badges - Mobile optimized */}
-          <TrustBadges
-            verified={listing.trust?.verified || false}
-            transport={listing.trust?.transportReady || false}
-            size="sm"
-            className="flex-wrap gap-1.5"
-          />
+          <div className="hidden sm:block">
+            <TrustBadges
+              verified={listing.trust?.verified || false}
+              transport={listing.trust?.transportReady || false}
+              size="sm"
+              className="flex-wrap gap-1.5"
+            />
+          </div>
 
             {/* Price and Seller Info */}
             <div className="mt-auto pt-3 border-t border-border/50 flex items-center justify-between">
@@ -291,7 +296,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   {priceDisplay}
                 </div>
                 {listing.type === 'auction' && listing.reservePrice && (
-                  <div className="text-xs text-muted-foreground font-medium mt-0.5">
+                  <div className="hidden sm:block text-xs text-muted-foreground font-medium mt-0.5">
                     Reserve: ${listing.reservePrice.toLocaleString()}
                   </div>
                 )}
@@ -317,9 +322,11 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     <span className="truncate">{sellerName}</span>
                   </button>
                   {/* Seller Tier badge (Seller Tiers) */}
-                  <SellerTierBadge tier={(listing as any).sellerTier} />
+                  <div className="hidden sm:block">
+                    <SellerTierBadge tier={(listing as any).sellerTier} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <div className="hidden sm:flex items-center gap-1.5 flex-wrap justify-end">
                   {listing.sellerSnapshot?.verified && (
                     <Badge variant="secondary" className="text-[10px] font-semibold">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
