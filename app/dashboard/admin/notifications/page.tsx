@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ShieldAlert, Rocket, RefreshCw } from 'lucide-react';
+import { Loader2, ShieldAlert, Rocket, RefreshCw, PlayCircle } from 'lucide-react';
 import { listEmailEvents } from '@/lib/email';
 import { NOTIFICATION_EVENT_TYPES } from '@/lib/notifications/types';
 
@@ -93,6 +93,33 @@ export default function AdminNotificationsPage() {
       setLoading(false);
     }
   }, [toast, user]);
+
+  const runProcessorsNow = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/admin/notifications/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ kind: 'all', limit: 50 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        toast({ title: 'Run failed', description: data?.error || 'Failed to run processors.', variant: 'destructive' });
+        return;
+      }
+      toast({
+        title: 'Processors ran',
+        description: `events: ${data?.events?.processed || 0}/${data?.events?.scanned || 0}, email: ${data?.email?.sent || 0}/${data?.email?.scanned || 0}`,
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Run failed', description: e?.message || 'Failed to run processors.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [load, toast, user]);
 
   useEffect(() => {
     if (!adminLoading && isAdmin && user) void load();
@@ -192,10 +219,16 @@ export default function AdminNotificationsPage() {
               Inspect the canonical event stream and queued jobs. Simulate events without sending directly.
             </p>
           </div>
-          <Button variant="outline" onClick={load} disabled={loading || adminLoading}>
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={runProcessorsNow} disabled={loading || adminLoading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
+              Run processors now
+            </Button>
+            <Button variant="outline" onClick={load} disabled={loading || adminLoading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <Card className="border-border/60">
