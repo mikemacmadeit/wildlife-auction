@@ -429,9 +429,9 @@ export default function MessagesPage() {
                                     </div>
                                     <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
                                   </div>
-                                  {/* Reserve enough horizontal space so timestamps like "about 13 hours ago" never clip. */}
-                                  <div className="flex flex-col items-end gap-1 shrink-0 min-w-[132px]">
-                                    <div className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
+                                  {/* Timestamp column: fixed width + wrapping (prevents clipping on narrow inbox cards). */}
+                                  <div className="flex flex-col items-end gap-1 shrink-0 w-[120px]">
+                                    <div className="text-[11px] text-muted-foreground text-right whitespace-normal leading-tight">
                                       {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: true }) : ''}
                                     </div>
                                     {item.unread > 0 ? (
