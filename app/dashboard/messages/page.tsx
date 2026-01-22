@@ -403,13 +403,19 @@ export default function MessagesPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <Avatar className="h-6 w-6">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Avatar className="h-6 w-6 shrink-0">
                                         <AvatarImage src={item.otherAvatar} />
                                         <AvatarFallback>{String(item.otherName || 'U').slice(0, 2).toUpperCase()}</AvatarFallback>
                                       </Avatar>
-                                      <div className="text-sm font-semibold truncate">{item.otherName}</div>
-                                      {item.archived ? <Badge variant="outline" className="text-[10px]">Archived</Badge> : null}
+                                      <div className="min-w-0 flex-1 text-sm font-semibold truncate leading-5">
+                                        {item.otherName}
+                                      </div>
+                                      {item.archived ? (
+                                        <Badge variant="outline" className="text-[10px] shrink-0">
+                                          Archived
+                                        </Badge>
+                                      ) : null}
                                     </div>
                                     <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
                                   </div>
