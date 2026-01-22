@@ -21,11 +21,12 @@ function safeString(v: any): string {
 async function loadUserContact(
   db: FirebaseFirestore.Firestore,
   userId: string
-): Promise<{ email: string | null; name: string }> {
+): Promise<{ email: string | null; phone: string | null; name: string }> {
   try {
     const snap = await db.collection('users').doc(userId).get();
     const data = snap.exists ? (snap.data() as any) : null;
     const emailFromProfile = data?.email;
+    const phoneFromProfile = typeof data?.phoneNumber === 'string' ? data.phoneNumber : null;
     const name =
       data?.displayName ||
       data?.profile?.fullName ||
@@ -36,7 +37,7 @@ async function loadUserContact(
     // Some environments do not store user email in Firestore (privacy/minimization),
     // but we still need an email to deliver notification emails. Fall back to Firebase Auth.
     if (typeof emailFromProfile === 'string' && emailFromProfile.includes('@')) {
-      return { email: emailFromProfile, name: String(name || 'there') };
+      return { email: emailFromProfile, phone: phoneFromProfile, name: String(name || 'there') };
     }
 
     try {
@@ -46,13 +47,52 @@ async function loadUserContact(
       const authName = user?.displayName;
       return {
         email: typeof email === 'string' && email.includes('@') ? email : null,
+        phone: phoneFromProfile,
         name: String(authName || name || 'there'),
       };
     } catch {
-      return { email: null, name: String(name || 'there') };
+      return { email: null, phone: phoneFromProfile, name: String(name || 'there') };
     }
   } catch {
-    return { email: null, name: 'there' };
+    return { email: null, phone: null, name: 'there' };
+  }
+}
+
+function normalizePhone(v: any): string | null {
+  const raw = typeof v === 'string' ? v.trim() : '';
+  if (!raw) return null;
+  // Very light validation: require E.164-ish "+1..." or at least digits count >= 10.
+  if (raw.startsWith('+') && raw.length >= 11) return raw;
+  const digits = raw.replace(/[^\d]/g, '');
+  if (digits.length >= 10) return `+${digits}`; // best-effort; encourage storing E.164 in profile
+  return null;
+}
+
+function buildSmsBody(params: { eventType: NotificationEventType; payload: NotificationEventPayload }): string | null {
+  const { eventType, payload } = params;
+  switch (eventType) {
+    case 'Order.Confirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Confirmed' }>;
+      return `Payment received for "${p.listingTitle}". View order: ${p.orderUrl}`;
+    }
+    case 'Order.Preparing': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Preparing' }>;
+      return `Seller is preparing delivery for "${p.listingTitle}". View order: ${p.orderUrl}`;
+    }
+    case 'Order.InTransit': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.InTransit' }>;
+      return `In transit: "${p.listingTitle}". View order: ${p.orderUrl}`;
+    }
+    case 'Order.DeliveryCheckIn': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryCheckIn' }>;
+      return `Quick check-in: confirm receipt or report an issue for "${p.listingTitle}". ${p.orderUrl}`;
+    }
+    case 'Order.Received': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Received' }>;
+      return `Buyer confirmed receipt for "${p.listingTitle}". View: ${p.orderUrl}`;
+    }
+    default:
+      return null;
   }
 }
 
@@ -139,6 +179,18 @@ function buildEmailJobPayload(params: {
           listingTitle: p.listingTitle,
           amount: p.amount,
           orderDate: new Date().toISOString(),
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.Preparing': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Preparing' }>;
+      return {
+        template: 'order_preparing',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,
         },
       };
@@ -650,7 +702,7 @@ export async function processEventDoc(params: {
     }
   }
 
-  // 4) SMS stub: we create smsJobs but do not dispatch yet
+  // 4) SMS jobs
   if (decision.channels.sms.enabled) {
     const allowed = await enforceRateLimit({
       db,
@@ -660,24 +712,45 @@ export async function processEventDoc(params: {
       perDay: rule.rateLimitPerUser.sms?.perDay || 0,
     });
     if (allowed) {
-      // We don't have a phone field/provider in repo. Leave as architecture stub.
+      const contact = await loadUserContact(db, targetUserId);
+      const toPhone = normalizePhone(contact.phone);
+      const body = buildSmsBody({ eventType: eventData.type, payload: eventData.payload as any });
       const jobRef = db.collection('smsJobs').doc(eventId);
-      await jobRef.set(
-        {
-          id: eventId,
-          eventId,
-          userId: targetUserId,
-          toPhone: '',
-          body: safeString((eventData.payload as any)?.listingTitle || 'Notification'),
-          status: 'skipped',
-          createdAt: FieldValue.serverTimestamp(),
-          attempts: 0,
-          lastAttemptAt: null,
-          error: 'SMS provider not configured',
-          ...(eventData.test ? { test: true } : {}),
-        } as any,
-        { merge: true }
-      );
+      if (!toPhone || !body) {
+        await jobRef.set(
+          {
+            id: eventId,
+            eventId,
+            userId: targetUserId,
+            toPhone: toPhone || null,
+            body: body || null,
+            status: 'skipped',
+            createdAt: FieldValue.serverTimestamp(),
+            attempts: 0,
+            lastAttemptAt: null,
+            error: !toPhone ? 'Missing/invalid phone number' : 'Unsupported SMS event',
+            ...(eventData.test ? { test: true } : {}),
+          } as any,
+          { merge: true }
+        );
+      } else {
+        await jobRef.set(
+          {
+            id: eventId,
+            eventId,
+            userId: targetUserId,
+            toPhone,
+            body,
+            status: 'queued',
+            createdAt: FieldValue.serverTimestamp(),
+            attempts: 0,
+            lastAttemptAt: null,
+            ...(decision.channels.sms.deliverAfterMs ? { deliverAfterAt: new Date(Date.now() + decision.channels.sms.deliverAfterMs) } : {}),
+            ...(eventData.test ? { test: true } : {}),
+          } as any,
+          { merge: true }
+        );
+      }
     }
   }
 

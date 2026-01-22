@@ -1,19 +1,17 @@
 /**
- * POST /api/orders/[orderId]/mark-in-transit
+ * POST /api/orders/[orderId]/mark-preparing
  *
- * Phase 2C (Option A - preferred):
- * - Seller-initiated explicit transition to `status: 'in_transit'`
- * - Emits `Order.InTransit` so buyers get a visible state change
+ * Seller marks "preparing for delivery".
  *
- * NOTE: This does NOT change payout logic. It only makes an implicit step explicit.
+ * This is intentionally an explicit UX marker so buyers/sellers always know
+ * where they are in the fulfillment timeline.
  */
-
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { emitEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
-import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import type { OrderStatus } from '@/lib/types';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
@@ -37,9 +35,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     if (!rateLimitResult.allowed) {
       return json(rateLimitResult.body, {
         status: rateLimitResult.status,
-        headers: {
-          'Retry-After': rateLimitResult.body.retryAfter.toString(),
-        },
+        headers: { 'Retry-After': rateLimitResult.body.retryAfter.toString() },
       });
     }
 
@@ -49,21 +45,21 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       return json({ error: 'Unauthorized' }, { status: 401 });
     }
     const token = authHeader.split('Bearer ')[1];
-    let decodedToken: any;
+    let decoded: any;
     try {
-      decodedToken = await auth.verifyIdToken(token);
+      decoded = await auth.verifyIdToken(token);
     } catch {
       return json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const sellerId = decodedToken.uid;
+    const sellerId = decoded.uid;
     const orderId = params.orderId;
 
     const orderRef = db.collection('orders').doc(orderId);
     const orderDoc = await orderRef.get();
     if (!orderDoc.exists) return json({ error: 'Order not found' }, { status: 404 });
-
     const orderData = orderDoc.data() as any;
+
     if (orderData.sellerId !== sellerId) {
       return json({ error: 'Unauthorized - You can only update your own orders' }, { status: 403 });
     }
@@ -74,31 +70,34 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       return json(
         {
           error: 'Invalid status transition',
-          details: `Cannot mark in transit for order with status '${currentStatus}'. Order must be in one of: ${allowedStatuses.join(', ')}`,
+          details: `Cannot mark preparing for order with status '${currentStatus}'. Order must be in one of: ${allowedStatuses.join(', ')}`,
         },
         { status: 400 }
       );
     }
 
+    // If seller already marked preparing, idempotent success.
+    if (orderData.sellerPreparingAt) {
+      return json({ success: true, orderId, message: 'Already marked preparing.' });
+    }
+
     const now = new Date();
     await orderRef.update({
-      status: 'in_transit' as OrderStatus,
-      inTransitAt: Timestamp.now(),
+      sellerPreparingAt: Timestamp.now(),
       updatedAt: now,
       lastUpdatedByRole: 'seller',
-      // Keep a server timestamp as well for audit/ordering if needed in other systems.
       lastStatusChangeAt: Timestamp.now(),
     });
 
-    // Timeline (server-authored, idempotent).
+    // Timeline (server-authored, idempotent)
     try {
       await appendOrderTimelineEvent({
         db: db as any,
         orderId,
         event: {
-          id: `SELLER_SHIPPED:${orderId}`,
-          type: 'SELLER_SHIPPED',
-          label: 'Seller marked in transit',
+          id: `SELLER_PREPARING:${orderId}`,
+          type: 'SELLER_PREPARING',
+          label: 'Seller marked preparing for delivery',
           actor: 'seller',
           visibility: 'buyer',
           timestamp: Timestamp.now(),
@@ -108,38 +107,36 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       // best-effort
     }
 
-    // Emit canonical notification event for buyer
+    // Notify buyer (email/in-app per preferences)
     try {
-      const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
-      const listingTitle = listingDoc.data()?.title || 'Your listing';
+      const listingTitle = String(orderData?.listingSnapshot?.title || '').trim() || 'Your order';
       await emitEventForUser({
-        type: 'Order.InTransit',
+        type: 'Order.Preparing',
         actorId: sellerId,
         entityType: 'order',
         entityId: orderId,
         targetUserId: orderData.buyerId,
         payload: {
-          type: 'Order.InTransit',
+          type: 'Order.Preparing',
           orderId,
           listingId: orderData.listingId,
           listingTitle,
           orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
         },
-        optionalHash: `in_transit:${now.toISOString()}`,
+        optionalHash: `preparing:${now.toISOString()}`,
       });
     } catch (e) {
-      console.error('Error emitting Order.InTransit notification event:', e);
+      console.error('Error emitting Order.Preparing notification event:', e);
     }
 
     return json({
       success: true,
       orderId,
-      status: 'in_transit',
-      message: 'Order marked as in transit.',
+      message: 'Order marked as preparing for delivery.',
     });
   } catch (error: any) {
-    console.error('Error marking order as in transit:', error);
-    return json({ error: 'Failed to mark order as in transit', message: error.message }, { status: 500 });
+    console.error('Error marking order as preparing:', error);
+    return json({ error: 'Failed to mark order as preparing', message: error?.message }, { status: 500 });
   }
 }
 

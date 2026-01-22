@@ -150,8 +150,17 @@ export function TransactionTimeline(props: {
       order.status === 'ready_to_release' ||
       order.status === 'completed';
 
-    const hasInTransit = order.status === 'in_transit';
-    const hasDelivered = !!order.deliveredAt || !!order.deliveryConfirmedAt || order.status === 'delivered' || order.status === 'buyer_confirmed' || order.status === 'accepted' || order.status === 'ready_to_release' || order.status === 'completed';
+    const hasInTransit = order.status === 'in_transit' || !!(order as any).inTransitAt;
+    const hasDelivered =
+      !!order.deliveredAt ||
+      !!order.deliveryConfirmedAt ||
+      !!order.buyerConfirmedAt ||
+      order.status === 'delivered' ||
+      order.status === 'buyer_confirmed' ||
+      order.status === 'accepted' ||
+      order.status === 'ready_to_release' ||
+      order.status === 'completed';
+    const hasPreparing = !!(order as any).sellerPreparingAt || hasInTransit || hasDelivered;
     const inProtection = order.payoutHoldReason === 'protection_window' && !!order.deliveryConfirmedAt;
     const readyForPayout = trust === 'ready_for_payout' || order.status === 'ready_to_release';
     const paymentReleased =
@@ -171,7 +180,14 @@ export function TransactionTimeline(props: {
       {
         key: 'prepare',
         title: 'Preparing delivery',
-        description: copy.prepare,
+        description:
+          role === 'seller'
+            ? hasPreparing
+              ? 'Preparing marked. Update to “In transit” when it’s on the way.'
+              : 'Mark “Preparing” once you begin getting the order ready.'
+            : hasPreparing
+              ? 'Seller is preparing delivery. You’ll confirm receipt once it arrives.'
+              : 'Waiting on the seller to begin preparing delivery.',
         icon: <Truck className="h-4 w-4" />,
         rank: 2,
         show: paymentReceived,
@@ -179,7 +195,14 @@ export function TransactionTimeline(props: {
       {
         key: 'in_transit',
         title: 'In transit',
-        description: copy.inTransit,
+        description:
+          role === 'seller'
+            ? hasInTransit
+              ? 'In transit marked. Next step is for the buyer to confirm receipt.'
+              : 'Mark “In transit” when the order leaves your care.'
+            : hasInTransit
+              ? 'Your order is on the way.'
+              : 'Once the order is on the way, it will be marked “In transit”.',
         icon: <Truck className="h-4 w-4" />,
         rank: 3,
         show: true, // Always show (may be upcoming) to make the mental model consistent.
@@ -187,7 +210,12 @@ export function TransactionTimeline(props: {
       {
         key: 'delivered',
         title: 'Delivered',
-        description: copy.delivered,
+        description:
+          role === 'seller'
+            ? 'Buyer will confirm receipt once delivery is complete.'
+            : hasDelivered
+              ? 'Delivered/received is confirmed.'
+              : 'Once it arrives, confirm receipt here (or report an issue if needed).',
         icon: <PackageCheck className="h-4 w-4" />,
         rank: 4,
         show: true,

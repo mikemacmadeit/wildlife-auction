@@ -184,11 +184,22 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_received',
-        title: 'New order received',
-        body: `You received an order for “${p.listingTitle}”.`,
+        title: 'Receipt confirmed',
+        body: `The buyer confirmed receipt for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
         metadata: { amount: p.amount },
+      };
+    }
+    case 'Order.Preparing': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.Preparing' }>;
+      return {
+        ...base,
+        type: 'order_preparing',
+        title: 'Seller is preparing delivery',
+        body: `The seller is preparing your order for “${p.listingTitle}”.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'View order',
       };
     }
     case 'Order.InTransit': {

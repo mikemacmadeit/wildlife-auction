@@ -11,6 +11,7 @@ import {
   getOrderConfirmationEmail,
   getDeliveryConfirmationEmail,
   getOrderInTransitEmail,
+  getOrderPreparingEmail,
   getPayoutNotificationEmail,
   getAuctionWinnerEmail,
   getAuctionOutbidEmail,
@@ -39,6 +40,7 @@ import {
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
+  type OrderPreparingEmailData,
   type PayoutNotificationEmailData,
   type AuctionWinnerEmailData,
   type AuctionOutbidEmailData,
@@ -100,6 +102,13 @@ const deliveryConfirmationSchema = z.object({
 });
 
 const orderInTransitSchema = z.object({
+  buyerName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().min(1),
+  orderUrl: urlSchema,
+});
+
+const orderPreparingSchema = z.object({
   buyerName: z.string().min(1),
   orderId: z.string().min(1),
   listingTitle: z.string().min(1),
@@ -369,6 +378,22 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: OrderInTransitEmailData) => {
       const { subject, html } = getOrderInTransitEmail(data);
       return { subject, preheader: `In transit: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'order_preparing',
+    displayName: 'Order Preparing',
+    description: 'Sent to buyer when seller marks the order as preparing for delivery.',
+    schema: orderPreparingSchema,
+    samplePayload: {
+      buyerName: 'Alex Johnson',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: OrderPreparingEmailData) => {
+      const { subject, html } = getOrderPreparingEmail(data);
+      return { subject, preheader: `Preparing delivery: ${data.listingTitle}`, html };
     },
   },
   {

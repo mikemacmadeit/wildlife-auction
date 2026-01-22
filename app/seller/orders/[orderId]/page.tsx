@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, AlertTriangle, ArrowLeft, Truck, PackageCheck } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, PackageCheck } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order } from '@/lib/types';
 import { getOrderById } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -56,7 +56,7 @@ export default function SellerOrderDetailPage() {
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'in_transit' | 'delivered' | null>(null);
+  const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,9 +89,11 @@ export default function SellerOrderDetailPage() {
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
 
+  const hasPreparing = !!(order as any)?.sellerPreparingAt;
+  const canMarkPreparing = !!order && ['paid', 'paid_held'].includes(order.status) && !hasPreparing;
+  const canMarkInTransit = !!order && (hasPreparing || ['paid', 'paid_held'].includes(order.status));
+  // Seller "mark delivered" is still supported for legacy / ops workflows, but buyer confirmation no longer depends on it.
   const canMarkDelivered = !!order && ['paid', 'paid_held', 'in_transit'].includes(order.status) && !order.deliveredAt;
-  // Phase 2C: mark-in-transit route will enable this (kept disabled until route exists)
-  const canMarkInTransit = !!order && ['paid', 'paid_held'].includes(order.status);
 
   if (authLoading || loading) {
     return (
@@ -187,13 +189,42 @@ export default function SellerOrderDetailPage() {
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Delivery actions</CardTitle>
-              <CardDescription>These actions update existing order fields only.</CardDescription>
+              <CardDescription>Update the timeline so the buyer always knows what’s next.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
+                  <div className="font-semibold text-sm">Mark preparing</div>
+                  <div className="text-xs text-muted-foreground">Tell the buyer you’ve started getting the order ready.</div>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={!canMarkPreparing || processing !== null}
+                  onClick={async () => {
+                    try {
+                      setProcessing('preparing');
+                      await postAuthJson(`/api/orders/${order.id}/mark-preparing`);
+                      toast({ title: 'Updated', description: 'Marked preparing.' });
+                      const refreshed = await getOrderById(order.id);
+                      if (refreshed) setOrder(refreshed);
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: e?.message || 'Failed to mark preparing', variant: 'destructive' });
+                    } finally {
+                      setProcessing(null);
+                    }
+                  }}
+                >
+                  {processing === 'preparing' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Package className="h-4 w-4 mr-2" />}
+                  Mark preparing
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
                   <div className="font-semibold text-sm">Mark in transit</div>
-                  <div className="text-xs text-muted-foreground">Optional step before delivered (Phase 2C).</div>
+                  <div className="text-xs text-muted-foreground">When the order is on the way to the buyer.</div>
                 </div>
                 <Button
                   variant="outline"
@@ -221,8 +252,8 @@ export default function SellerOrderDetailPage() {
 
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <div className="font-semibold text-sm">Mark delivered</div>
-                  <div className="text-xs text-muted-foreground">Unlocks buyer receipt confirmation and issue reporting.</div>
+                  <div className="font-semibold text-sm">Mark delivered (optional)</div>
+                  <div className="text-xs text-muted-foreground">Legacy: buyer can now confirm receipt even without this.</div>
                 </div>
                 <Button
                   disabled={!canMarkDelivered || processing !== null}

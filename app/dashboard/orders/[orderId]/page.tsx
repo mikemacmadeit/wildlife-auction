@@ -127,8 +127,20 @@ export default function BuyerOrderDetailPage() {
     return name || 'Seller';
   }, [listing]);
 
-  const canConfirmReceipt = !!order && ['paid', 'paid_held', 'in_transit', 'delivered'].includes(order.status) && !order.stripeTransferId;
-  const canDispute = !!order && ['paid', 'paid_held', 'in_transit', 'delivered'].includes(order.status) && !order.stripeTransferId;
+  const canConfirmReceipt =
+    !!order &&
+    (order.status === 'in_transit' ||
+      order.status === 'delivered' ||
+      !!order.deliveredAt ||
+      !!order.deliveryConfirmedAt) &&
+    !order.stripeTransferId;
+  const canDispute =
+    !!order &&
+    (order.status === 'in_transit' ||
+      order.status === 'delivered' ||
+      !!order.deliveredAt ||
+      !!order.deliveryConfirmedAt) &&
+    !order.stripeTransferId;
 
   const checkin = searchParams?.get('checkin') === '1';
   const issueParam = searchParams?.get('issue') === '1';
@@ -283,7 +295,7 @@ export default function BuyerOrderDetailPage() {
             <DialogHeader>
               <DialogTitle>Delivery check-in</DialogTitle>
               <DialogDescription>
-                Confirm receipt if delivery arrived, or report an issue so we can review before payout is released.
+                If delivery arrived, mark it delivered (confirm receipt). If something isn’t right, report an issue so we can review before payout is released.
               </DialogDescription>
             </DialogHeader>
             <div className="flex items-start gap-3">
@@ -328,7 +340,7 @@ export default function BuyerOrderDetailPage() {
                 }}
               >
                 {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Yes, delivery arrived
+                  Mark delivered
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -345,8 +357,8 @@ export default function BuyerOrderDetailPage() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <div className="font-semibold text-sm">Confirm receipt</div>
-                  <div className="text-xs text-muted-foreground">Only confirm after delivery is complete.</div>
+                  <div className="font-semibold text-sm">Mark delivered (confirm receipt)</div>
+                  <div className="text-xs text-muted-foreground">Only do this after delivery is complete.</div>
                 </div>
                 <Button
                   disabled={!canConfirmReceipt || processing !== null}
@@ -365,7 +377,7 @@ export default function BuyerOrderDetailPage() {
                   }}
                 >
                   {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Confirm receipt
+                  Mark delivered
                 </Button>
               </div>
               <Separator />

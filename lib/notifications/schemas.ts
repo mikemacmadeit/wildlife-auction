@@ -110,6 +110,13 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     amount: z.number().finite().nonnegative(),
   }),
   z.object({
+    type: z.literal('Order.Preparing'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    orderUrl: urlSchema,
+  }),
+  z.object({
     type: z.literal('Order.InTransit'),
     orderId: baseString,
     listingId: baseString,

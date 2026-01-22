@@ -600,6 +600,7 @@ export type OrderTimelineEventType =
   | 'TRANSFER_PERMIT_REQUESTED'
   | 'TRANSFER_PERMIT_SUBMITTED'
   | 'TRANSFER_PERMIT_APPROVED'
+  | 'SELLER_PREPARING'
   | 'SELLER_SHIPPED'
   | 'DELIVERED'
   | 'BUYER_CONFIRMED'
@@ -662,6 +663,12 @@ export interface Order {
   paymentMethod?: OrderPaymentMethod; // How buyer paid (card vs bank rails)
   paidAt?: Date; // When payment was confirmed/settled into platform (card: immediate; bank/wire: async)
   disputeDeadlineAt?: Date; // Deadline for buyer to dispute
+  /**
+   * Seller-progress markers for fulfillment (explicit UX timeline).
+   * These do NOT change payout logic; they exist to make "who needs to do what next" obvious.
+   */
+  sellerPreparingAt?: Date; // Seller marked "preparing for delivery"
+  inTransitAt?: Date; // Seller marked "in transit" (timestamp even if status was already in_transit)
   deliveredAt?: Date; // When seller marked as delivered
   /**
    * @deprecated Prefer buyerConfirmedAt/buyerAcceptedAt.

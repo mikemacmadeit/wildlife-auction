@@ -60,6 +60,8 @@ export interface OrderDoc {
   // Escrow workflow fields
   paidAt?: Timestamp;
   disputeDeadlineAt?: Timestamp;
+  sellerPreparingAt?: Timestamp;
+  inTransitAt?: Timestamp;
   deliveredAt?: Timestamp;
   acceptedAt?: Timestamp;
   disputedAt?: Timestamp;
@@ -166,6 +168,8 @@ function toOrder(docId: string, data: OrderDoc): Order {
     // Escrow workflow fields
     paidAt: data.paidAt?.toDate(),
     disputeDeadlineAt: data.disputeDeadlineAt?.toDate(),
+    sellerPreparingAt: data.sellerPreparingAt?.toDate(),
+    inTransitAt: data.inTransitAt?.toDate(),
     deliveredAt: data.deliveredAt?.toDate(),
     acceptedAt: data.acceptedAt?.toDate(),
     disputedAt: data.disputedAt?.toDate(),

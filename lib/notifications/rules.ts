@@ -171,45 +171,54 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
       return {
         category: 'orders',
         urgency: 'normal',
-        channels: ['inApp', 'email'],
+        channels: ['inApp', 'email', 'sms'],
         dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
     case 'Order.Received':
       return {
         category: 'orders',
         urgency: 'normal',
-        channels: ['inApp', 'email'],
+        channels: ['inApp', 'email', 'sms'],
         dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: { email: { perHour: 3, perDay: 8 } },
+        rateLimitPerUser: { email: { perHour: 3, perDay: 8 }, sms: { perHour: 3, perDay: 8 } },
+        allowDuringQuietHours: true,
+      };
+    case 'Order.Preparing':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email', 'sms'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
     case 'Order.InTransit':
       return {
         category: 'orders',
         urgency: 'normal',
-        channels: ['inApp', 'email'],
+        channels: ['inApp', 'email', 'sms'],
         dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
     case 'Order.DeliveryConfirmed':
       return {
         category: 'orders',
         urgency: 'normal',
-        channels: ['inApp', 'email'],
+        channels: ['inApp', 'email', 'sms'],
         dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
     case 'Order.DeliveryCheckIn':
       return {
         category: 'orders',
         urgency: 'low',
-        channels: ['inApp', 'email'],
+        channels: ['inApp', 'email', 'sms'],
         dedupeWindowMs: 1000 * 60 * 60 * 24 * 7,
-        rateLimitPerUser: { email: { perHour: 2, perDay: 4 } },
+        rateLimitPerUser: { email: { perHour: 2, perDay: 4 }, sms: { perHour: 2, perDay: 4 } },
         allowDuringQuietHours: true,
       };
     case 'Payout.Released':

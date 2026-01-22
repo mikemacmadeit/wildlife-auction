@@ -48,13 +48,23 @@ export function getOrderTrustState(order: Order): OrderTrustState {
 
   // Payment received (funds held)
   if (status === 'paid' || status === 'paid_held') {
+    // If the seller explicitly marked they are preparing, reflect that.
+    if ((order as any).sellerPreparingAt) return 'preparing_delivery';
     return 'payment_received';
   }
 
   // Delivery progression (note: `in_transit` may be set via seller action; see Phase 2C)
-  if (status === 'in_transit') return 'in_transit';
+  if (status === 'in_transit' || (order as any).inTransitAt) return 'in_transit';
 
-  const hasDeliveredMarker = !!order.deliveredAt || !!order.deliveryConfirmedAt || status === 'delivered';
+  // Treat buyer confirmation as a delivery marker as well (prevents "stuck" states if seller doesn't mark delivered).
+  const hasDeliveredMarker =
+    !!order.deliveredAt ||
+    !!order.deliveryConfirmedAt ||
+    !!order.buyerConfirmedAt ||
+    status === 'delivered' ||
+    status === 'buyer_confirmed' ||
+    status === 'accepted' ||
+    status === 'ready_to_release';
   if (!hasDeliveredMarker) {
     // Payment is received (or legacy accepted/buyer_confirmed) but seller hasn't marked delivery yet.
     return 'preparing_delivery';
@@ -65,7 +75,7 @@ export function getOrderTrustState(order: Order): OrderTrustState {
 
   // Buyer confirmed + delivery marked -> ready for payout review/release (manual release still required).
   const buyerConfirmed = !!order.buyerConfirmedAt || status === 'buyer_confirmed' || status === 'accepted' || status === 'ready_to_release';
-  const delivered = !!order.deliveredAt || !!order.deliveryConfirmedAt || status === 'delivered';
+  const delivered = !!order.deliveredAt || !!order.deliveryConfirmedAt || !!order.buyerConfirmedAt || status === 'delivered';
   if ((status === 'ready_to_release' || status === 'buyer_confirmed' || status === 'accepted') && buyerConfirmed && delivered) {
     return 'ready_for_payout';
   }

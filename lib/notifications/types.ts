@@ -28,6 +28,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   // ORDERS / PAYOUTS
   'Order.Confirmed',
   'Order.Received',
+  'Order.Preparing',
   'Order.InTransit',
   'Order.DeliveryConfirmed',
   'Order.DeliveryCheckIn',
@@ -183,6 +184,13 @@ export type NotificationEventPayload =
       listingTitle: string;
       orderUrl: string;
       amount: number;
+    }
+  | {
+      type: 'Order.Preparing';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
     }
   | {
       type: 'Order.InTransit';

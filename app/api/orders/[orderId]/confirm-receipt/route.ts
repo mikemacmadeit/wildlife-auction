@@ -12,6 +12,8 @@ import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { Timestamp } from 'firebase-admin/firestore';
+import { emitEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -78,12 +80,15 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       );
     }
 
-    // Require delivery to be marked first
-    if (!orderData.deliveredAt && !orderData.deliveryConfirmedAt) {
+    // Require the seller to have marked at least "in transit" (or delivered/admin-confirmed),
+    // otherwise buyers get stuck waiting on a redundant seller "delivered" action.
+    const hasInTransit = currentStatus === 'in_transit' || !!orderData.inTransitAt;
+    const hasDeliveredMarker = !!orderData.deliveredAt || !!orderData.deliveryConfirmedAt || currentStatus === 'delivered';
+    if (!hasInTransit && !hasDeliveredMarker) {
       return json(
         {
-          error: 'Delivery not confirmed',
-          details: 'Delivery must be marked as delivered before you can confirm receipt.',
+          error: 'Not yet in transit',
+          details: 'The seller must mark the order as in transit before you can confirm receipt.',
         },
         { status: 400 }
       );
@@ -102,6 +107,11 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
     };
+
+    // Ensure we have a delivery marker even if seller never pressed "delivered".
+    if (!orderData.deliveredAt) {
+      updateData.deliveredAt = now;
+    }
 
     // If protected transaction and no open dispute, mark as ready_to_release
     if (
@@ -130,6 +140,29 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       });
     } catch (e) {
       console.warn('[confirm-receipt] Failed to append timeline event (best-effort)', { orderId, error: String(e) });
+    }
+
+    // Notify seller that receipt was confirmed (in-app/email per preferences).
+    try {
+      const listingTitle = String(orderData?.listingSnapshot?.title || '').trim() || 'Your listing';
+      await emitEventForUser({
+        type: 'Order.Received',
+        actorId: buyerId,
+        entityType: 'order',
+        entityId: orderId,
+        targetUserId: orderData.sellerId,
+        payload: {
+          type: 'Order.Received',
+          orderId,
+          listingId: orderData.listingId,
+          listingTitle,
+          orderUrl: `${getSiteUrl()}/seller/orders/${orderId}`,
+          amount: typeof orderData.amount === 'number' ? orderData.amount : 0,
+        },
+        optionalHash: `buyer_confirmed:${now.toISOString()}`,
+      });
+    } catch (e) {
+      console.warn('[confirm-receipt] Failed to emit Order.Received (best-effort)', { orderId, error: String(e) });
     }
 
     return json({

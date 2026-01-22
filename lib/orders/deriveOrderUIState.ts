@@ -97,10 +97,11 @@ export function deriveOrderUIState(order: Order): {
   }
 
   if (order.status === 'paid_held' || order.status === 'paid') {
+    const preparing = !!(order as any).sellerPreparingAt;
     return {
       statusKey: 'held',
-      // Badge already communicates "Held (payout)" — avoid redundant "Paid (held)" copy here.
-      currentStepLabel: 'Waiting on seller delivery',
+      currentStepLabel: preparing ? 'Seller preparing delivery' : 'Payment received',
+      waitingOn: preparing ? 'Waiting on seller to mark in transit' : 'Waiting on seller to begin preparing',
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },
     };
