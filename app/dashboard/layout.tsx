@@ -60,6 +60,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import {
   markNotificationsAsReadByTypes,
   subscribeToUnreadCount,
+  subscribeToUnreadCountByCategory,
   subscribeToUnreadCountByType,
   subscribeToUnreadCountByTypes,
 } from '@/lib/firebase/notifications';
@@ -111,12 +112,13 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { isAdmin, loading: adminLoading, role } = useAdmin();
+  const { isAdmin, isSuperAdmin, loading: adminLoading, role } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
+  const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
@@ -154,9 +156,16 @@ export default function DashboardLayout({
       if (item.href === '/dashboard/admin/listings') {
         return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
       }
+      if (item.href === '/dashboard/admin/notifications') {
+        // Super admin only: show unread ADMIN-category notifications as a red badge.
+        return {
+          ...item,
+          badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
+        };
+      }
       return item;
     });
-  }, [pendingApprovalsCount]);
+  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount]);
 
   // Real-time badges (unread messages/notifications + pending approvals)
   useEffect(() => {
@@ -164,6 +173,7 @@ export default function DashboardLayout({
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
+      setUnreadAdminNotificationsCount(0);
       setPendingApprovalsCount(0);
       return;
     }
@@ -190,6 +200,19 @@ export default function DashboardLayout({
       );
     } catch (e) {
       console.error('Failed to subscribe to unread total notifications count:', e);
+    }
+
+    // 1d) Admin notifications badge (super admin): unread ADMIN-category notifications only
+    if (showAdminNav && isSuperAdmin) {
+      try {
+        unsubs.push(
+          subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
+            setUnreadAdminNotificationsCount(count || 0);
+          })
+        );
+      } catch (e) {
+        console.error('Failed to subscribe to unread admin notifications count:', e);
+      }
     }
 
     // 1c) Bids & Offers badge: unread bid/offer notifications (eBay-like: "you have activity")

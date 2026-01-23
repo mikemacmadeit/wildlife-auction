@@ -188,6 +188,42 @@ export function subscribeToUnreadCount(
 }
 
 /**
+ * Subscribe to unread notification count for a specific notification category (real-time).
+ *
+ * We filter client-side for the same migration/rules reasons as subscribeToUnreadCount:
+ * - Some historical docs may be missing `read`
+ * - Some rulesets only allow orderBy('createdAt') queries
+ */
+export function subscribeToUnreadCountByCategory(
+  userId: string,
+  category: string,
+  callback: (count: number) => void
+): Unsubscribe {
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
+  const want = String(category || '').trim();
+  if (!want) {
+    callback(0);
+    return () => {};
+  }
+
+  const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(250));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const unread = snapshot.docs.filter((d) => {
+        const data = d.data() as any;
+        return String(data?.category || '') === want && data?.read !== true;
+      }).length;
+      callback(unread);
+    },
+    (error) => {
+      handleListenerError('subscribeToUnreadCountByCategory', error, callback);
+    }
+  );
+}
+
+/**
  * Subscribe to unread notification count for a specific notification type (real-time).
  * Useful for per-tab badges (e.g., unread messages only).
  */

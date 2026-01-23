@@ -200,6 +200,9 @@ export function Navbar() {
             {/* Theme Toggle */}
             <ThemeToggle />
 
+            {/* Notifications (mobile + desktop) */}
+            {user?.uid ? <NotificationsBell userId={user.uid} className="md:hidden" /> : null}
+
             {/* Desktop Actions - User Menu */}
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
               {user?.uid ? <NotificationsBell userId={user.uid} /> : null}

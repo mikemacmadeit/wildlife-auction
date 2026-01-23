@@ -58,6 +58,7 @@ import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import {
   markNotificationsAsReadByTypes,
   subscribeToUnreadCount,
+  subscribeToUnreadCountByCategory,
   subscribeToUnreadCountByType,
   subscribeToUnreadCountByTypes,
 } from '@/lib/firebase/notifications';
@@ -112,12 +113,13 @@ export default function SellerLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isSuperAdmin } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
+  const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
@@ -192,9 +194,15 @@ export default function SellerLayout({
       if (item.href === '/dashboard/admin/listings') {
         return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
       }
+      if (item.href === '/dashboard/admin/notifications') {
+        return {
+          ...item,
+          badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
+        };
+      }
       return item;
     });
-  }, [pendingApprovalsCount]);
+  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount]);
 
   // Real-time unread badge for Messages (same source of truth as notifications)
   useEffect(() => {
@@ -202,6 +210,7 @@ export default function SellerLayout({
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
+      setUnreadAdminNotificationsCount(0);
       return;
     }
 
@@ -217,6 +226,15 @@ export default function SellerLayout({
           setUnreadNotificationsCount(count || 0);
         })
       );
+
+      if (showAdminNav && isSuperAdmin) {
+        unsubs.push(
+          subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
+            setUnreadAdminNotificationsCount(count || 0);
+          })
+        );
+      }
+
       const offerTypes: NotificationType[] = [
         // bids (from auction events)
         'bid_outbid',
