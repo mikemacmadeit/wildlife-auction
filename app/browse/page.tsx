@@ -710,8 +710,9 @@ export default function BrowsePage() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={cn(
                         'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
-                        'bg-background/10 border-background/25 text-background placeholder:text-background/60',
-                        'focus-visible:ring-background/30 focus-visible:ring-2'
+                        // Stronger contrast so the search bar never "disappears" against the inverted header.
+                        'bg-background/20 border-background/45 text-background placeholder:text-background/70',
+                        'focus-visible:ring-background/40 focus-visible:ring-2'
                       )}
                     />
                   </div>
