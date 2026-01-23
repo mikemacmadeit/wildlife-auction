@@ -7,6 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
+import type { Query, CollectionReference } from 'firebase-admin/firestore';
 
 function toInt(v: string | null, fallback: number) {
   const n = Number(v);
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   const actorUid = admin.ctx.actorUid;
 
   // Build query with filters
-  let q = db.collection('supportTickets');
+  let q: Query | CollectionReference = db.collection('supportTickets');
 
   // Status filter
   if (status === 'open' || status === 'resolved') {
