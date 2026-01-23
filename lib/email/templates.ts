@@ -344,8 +344,8 @@ function getEmailTemplate(params: {
   const cOlive = '#B9C2A4';
   const cBark = '#5B564A';
 
-  // Logo tint: use the lighter olive brand accent (matches site dark-mode accent usage).
-  const logoTint = cOlive;
+  // Logo tint: match the email header background (dark olivewood) per brand direction.
+  const logoTint = cOlivewood;
 
   return `
 <!DOCTYPE html>
