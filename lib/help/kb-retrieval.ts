@@ -11,6 +11,11 @@ export interface KBRetrievalOptions {
   query: string;
   audience?: KBArticleAudience;
   limit?: number;
+  context?: {
+    pathname?: string;
+    listingId?: string;
+    orderId?: string;
+  };
 }
 
 export interface KBRetrievalResult {
@@ -36,14 +41,34 @@ export interface KBRetrievalResult {
 export async function retrieveKBArticles(
   options: KBRetrievalOptions
 ): Promise<KBRetrievalResult> {
-  const { query, audience = 'all', limit = 8 } = options;
+  const { query, audience = 'all', limit = 8, context } = options;
 
   try {
     const db = getAdminDb();
     const queryLower = query.toLowerCase().trim();
     
+    // Enhance query with context if available
+    let enhancedQuery = queryLower;
+    if (context) {
+      if (context.pathname) {
+        // Add context-based keywords
+        if (context.pathname.includes('/listing/') || context.listingId) {
+          enhancedQuery += ' listing item sell';
+        }
+        if (context.pathname.includes('/order/') || context.orderId) {
+          enhancedQuery += ' order purchase delivery';
+        }
+        if (context.pathname.includes('/dashboard/seller')) {
+          enhancedQuery += ' seller dashboard manage listings';
+        }
+        if (context.pathname.includes('/dashboard/buyer') || context.pathname.includes('/browse')) {
+          enhancedQuery += ' buyer browse search';
+        }
+      }
+    }
+    
     // Expand query with comprehensive synonyms and variations
-    const queryExpansions: string[] = [queryLower];
+    const queryExpansions: string[] = [enhancedQuery, queryLower];
     
     // Authentication variations (very comprehensive)
     if (queryLower.includes('sign') || queryLower.includes('login') || queryLower.includes('auth')) {
@@ -241,7 +266,7 @@ export function formatKBArticlesForPrompt(articles: KBRetrievalResult['articles'
 Category: ${article.category}
 Tags: ${article.tags.join(', ') || 'none'}
 Content:
-${article.content.slice(0, 2000)}${article.content.length > 2000 ? '...' : ''}
+${article.content.slice(0, 3000)}${article.content.length > 3000 ? '...' : ''}
 ---`;
   });
 

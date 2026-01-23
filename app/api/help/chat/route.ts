@@ -24,9 +24,17 @@ const ChatSchema = z.object({
       orderId: z.string().optional(),
     })
     .optional(),
+  conversationHistory: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string(),
+      })
+    )
+    .optional(),
 });
 
-async function requireUser(request: Request): Promise<{ uid: string | null; db: ReturnType<typeof getAdminDb> } | Response> {
+async function requireUser(request: Request): Promise<{ uid: string | null; db: ReturnType<typeof getAdminDb>; userRole?: 'buyer' | 'seller' | 'all' } | Response> {
   let db: ReturnType<typeof getAdminDb>;
   try {
     db = getAdminDb();
@@ -37,6 +45,8 @@ async function requireUser(request: Request): Promise<{ uid: string | null; db: 
   // Optional auth - allow anonymous users to use help chat
   const authHeader = request.headers.get('authorization');
   let uid: string | null = null;
+  let userRole: 'buyer' | 'seller' | 'all' = 'all';
+  
   if (authHeader?.startsWith('Bearer ')) {
     try {
       const { getAdminAuth } = await import('@/lib/firebase/admin');
@@ -44,13 +54,33 @@ async function requireUser(request: Request): Promise<{ uid: string | null; db: 
       const token = authHeader.slice('Bearer '.length);
       const decoded = await auth.verifyIdToken(token);
       uid = decoded?.uid || null;
+      
+      // Determine user role by checking if they have seller data
+      if (uid) {
+        try {
+          const userDoc = await db.collection('users').doc(uid).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            // Check if user is a seller (has Stripe account or seller data)
+            if (userData?.stripeAccountId || userData?.seller || userData?.stripeAccountStatus) {
+              userRole = 'seller';
+            } else {
+              // If they have a profile but no seller data, they're a buyer
+              userRole = 'buyer';
+            }
+          }
+        } catch (e) {
+          // If we can't check, default to 'all'
+          console.warn('[Help Chat] Could not determine user role:', e);
+        }
+      }
     } catch {
       // Invalid token, continue as anonymous
       uid = null;
     }
   }
 
-  return { uid, db };
+  return { uid, db, userRole };
 }
 
 export async function POST(request: Request) {
@@ -61,7 +91,7 @@ export async function POST(request: Request) {
 
   const ctx = await requireUser(request);
   if (ctx instanceof Response) return ctx;
-  const { uid, db } = ctx;
+  const { uid, db, userRole } = ctx;
 
   let body: unknown;
   try {
@@ -78,10 +108,18 @@ export async function POST(request: Request) {
   // Generate KB-grounded AI response
   const { generateKBGroundedChatResponse } = await import('@/lib/help/ai-chat');
   
+  // Use detected role if not provided, fallback to 'all'
+  const audience = parsed.data.role || userRole || 'all';
+  
   const result = await generateKBGroundedChatResponse({
     userMessage: parsed.data.message,
-    audience: parsed.data.role || 'all',
+    audience: audience as 'buyer' | 'seller' | 'all',
+    context: parsed.data.context,
+    conversationHistory: parsed.data.conversationHistory,
   });
+  
+  // Generate suggested follow-up questions
+  const suggestedQuestions = generateSuggestedQuestions(parsed.data.message, result.answer);
 
   return json({
     ok: true,

@@ -9,6 +9,15 @@ import { retrieveKBArticles, formatKBArticlesForPrompt } from './kb-retrieval';
 export interface GenerateChatResponseOptions {
   userMessage: string;
   audience?: 'buyer' | 'seller' | 'all';
+  context?: {
+    pathname?: string;
+    listingId?: string;
+    orderId?: string;
+  };
+  conversationHistory?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
   kbArticles?: Array<{
     slug: string;
     title: string;
@@ -90,6 +99,7 @@ export async function generateKBGroundedChatResponse(
         query: options.userMessage,
         audience: options.audience || 'all',
         limit: 8,
+        context: options.context,
       });
       articles = retrievalResult.articles;
     }
@@ -249,50 +259,104 @@ GENERAL PRINCIPLES (apply to all):
 - Mention related topics that might help
 - Always end with encouragement and offer to help further`;
 
-    // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+    // Build messages array with conversation history if available
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      {
+        role: 'system',
+        content: systemPrompt,
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // Cost-effective, fast model
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
-        max_tokens: 700, // Allow very comprehensive, detailed answers
-        temperature: 0.75, // Higher for more natural, empathetic, conversational, helpful tone
-      }),
+    ];
+    
+    // Add conversation history (last 5 messages for context)
+    if (options.conversationHistory && options.conversationHistory.length > 0) {
+      const recentHistory = options.conversationHistory.slice(-5);
+      for (const msg of recentHistory) {
+        messages.push({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+        });
+      }
+    }
+    
+    // Add current user message
+    messages.push({
+      role: 'user',
+      content: userPrompt,
     });
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      // Call OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Cost-effective, fast model
+          messages,
+          max_tokens: 700, // Allow very comprehensive, detailed answers
+          temperature: 0.75, // Higher for more natural, empathetic, conversational, helpful tone
+        }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('[AI Help Chat] OpenAI API error:', response.status, errorText);
-      return {
-        answer: "I'm having trouble processing your question right now. Please try again or contact support.",
-        sources: [],
-        kbAvailable: true,
-      };
-    }
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[AI Help Chat] OpenAI API error:', response.status, errorText);
+        
+        // Better error messages based on status
+        let errorMessage = "I'm having trouble processing your question right now.";
+        if (response.status === 429) {
+          errorMessage = "I'm receiving too many requests right now. Please wait a moment and try again.";
+        } else if (response.status === 401 || response.status === 403) {
+          errorMessage = "The AI chat service is not properly configured. Please contact support for help.";
+        } else if (response.status >= 500) {
+          errorMessage = "The AI service is temporarily unavailable. Please try again in a few moments or contact support.";
+        }
+        
+        return {
+          answer: errorMessage,
+          sources: [],
+          kbAvailable: true,
+        };
+      }
 
-    const data = await response.json();
-    const answer = data.choices?.[0]?.message?.content?.trim();
+      const data = await response.json();
+      let answer = data.choices?.[0]?.message?.content?.trim();
 
-    if (!answer) {
-      return {
-        answer: "I couldn't generate a response. Please try rephrasing your question or contact support.",
-        sources: [],
-        kbAvailable: true,
-      };
-    }
+      if (!answer) {
+        return {
+          answer: "I couldn't generate a response. Please try rephrasing your question or contact support.",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      // Response quality validation
+      if (answer.length < 30) {
+        // Response is too short, might be incomplete
+        console.warn('[AI Help Chat] Response too short, might be incomplete');
+      }
+      
+      // Check for generic/unhelpful responses
+      const genericPatterns = [
+        /^I don't know/i,
+        /^I can't help/i,
+        /^I'm not sure/i,
+        /^I don't have/i,
+      ];
+      
+      if (genericPatterns.some(pattern => pattern.test(answer))) {
+        // Response seems generic, try to enhance it
+        answer = answer + " However, I'd be happy to help you find the information you need. Could you provide more details about what you're looking for?";
+      }
 
     // Extract source article titles
     const sources = articles.map((a) => a.title);
@@ -302,12 +366,35 @@ GENERAL PRINCIPLES (apply to all):
       sources,
       kbAvailable: true,
     };
-  } catch (error: any) {
-    console.error('[AI Help Chat] Error generating response:', error);
-    return {
-      answer: "I encountered an error processing your question. Please try again or contact support.",
-      sources: [],
-      kbAvailable: true,
-    };
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      // Better error handling
+      if (error.name === 'AbortError') {
+        console.error('[AI Help Chat] Request timeout after 30 seconds');
+        return {
+          answer: "I'm taking longer than expected to respond. This might be due to high demand. Please try again in a moment or contact support for immediate help.",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      console.error('[AI Help Chat] Error generating response:', error);
+      
+      // Network errors
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        return {
+          answer: "I'm having trouble connecting to the AI service. Please check your internet connection and try again, or contact support.",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      return {
+        answer: "I encountered an error processing your question. Please try again or contact support.",
+        sources: [],
+        kbAvailable: true,
+      };
+    }
   }
 }

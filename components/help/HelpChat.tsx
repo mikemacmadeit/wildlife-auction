@@ -14,7 +14,8 @@ type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  sources?: string[];
+  sources?: Array<{ title: string; slug?: string }>;
+  suggestedQuestions?: string[];
   timestamp: Date;
 };
 
@@ -71,21 +72,41 @@ export function HelpChat({ onSwitchToSupport }: { onSwitchToSupport: () => void 
         },
         body: JSON.stringify({
           message: userMessage.content,
-          role: 'all', // TODO: Determine user role (buyer/seller)
+          role: 'all', // Will be auto-detected on server
           context,
+          conversationHistory: messages.slice(-5).map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
         }),
       });
 
       const body = await res.json().catch(() => ({}));
       if (!res.ok || body?.ok !== true) {
-        throw new Error(body?.error || body?.message || 'Failed to get response');
+        // Better error messages
+        let errorMessage = body?.error || body?.message || 'Failed to get response';
+        if (res.status === 429) {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (res.status === 503) {
+          errorMessage = 'Service temporarily unavailable. Please try again in a moment.';
+        } else if (res.status >= 500) {
+          errorMessage = 'Server error. Please try again or contact support.';
+        }
+        throw new Error(errorMessage);
       }
 
+      // Convert sources to objects with title and slug
+      const sources = (body.sources || []).map((title: string) => ({
+        title,
+        slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      }));
+      
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: body.answer || "I'm sorry, I couldn't generate a response. Please try contacting support.",
-        sources: body.sources || [],
+        sources,
+        suggestedQuestions: body.suggestedQuestions || [],
         timestamp: new Date(),
       };
 
@@ -165,9 +186,42 @@ export function HelpChat({ onSwitchToSupport }: { onSwitchToSupport: () => void 
                       <p className="text-xs font-semibold mb-1">Sources:</p>
                       <ul className="text-xs space-y-1">
                         {msg.sources.map((source, idx) => (
-                          <li key={idx}>• {source}</li>
+                          <li key={idx}>
+                            <a
+                              href={`/help/${source.slug || source.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              • {source.title}
+                            </a>
+                          </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  {msg.suggestedQuestions && msg.suggestedQuestions.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-border/50">
+                      <p className="text-xs font-semibold mb-2">You might also ask:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {msg.suggestedQuestions.map((question, idx) => (
+                          <Button
+                            key={idx}
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-auto py-1 px-2"
+                            onClick={() => {
+                              setInput(question);
+                              // Auto-send after a brief delay
+                              setTimeout(() => {
+                                sendMessage();
+                              }, 100);
+                            }}
+                          >
+                            {question}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
