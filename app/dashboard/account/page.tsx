@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { 
   User, 
@@ -98,6 +99,7 @@ export default function AccountPage() {
     preferences: {
       verification: true,
       transport: true,
+      displayNamePreference: 'personal' as 'personal' | 'business',
     }
   });
 
@@ -138,9 +140,10 @@ export default function AccountPage() {
               messages: true,
               promotions: false,
             },
-            preferences: profile.profile?.preferences || {
-              verification: true,
-              transport: true,
+            preferences: {
+              verification: profile.profile?.preferences?.verification ?? true,
+              transport: profile.profile?.preferences?.transport ?? true,
+              displayNamePreference: profile.profile?.preferences?.displayNamePreference || 'personal',
             },
           });
 
@@ -1076,6 +1079,55 @@ export default function AccountPage() {
                     })}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-border/50 bg-card">
+              <CardHeader>
+                <CardTitle className="text-xl">Display Name Preference</CardTitle>
+                <CardDescription>
+                  Choose which name appears on your listings and seller profile
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup
+                  value={formData.preferences.displayNamePreference}
+                  onValueChange={(value) => setFormData({
+                    ...formData,
+                    preferences: { ...formData.preferences, displayNamePreference: value as 'personal' | 'business' }
+                  })}
+                  className="space-y-3"
+                >
+                  <div className="flex items-center gap-3 p-4 rounded-lg border border-border/50 bg-background/50 hover:bg-background/70 transition-colors">
+                    <RadioGroupItem value="personal" id="display-personal" />
+                    <label htmlFor="display-personal" className="flex-1 cursor-pointer">
+                      <div className="font-semibold text-foreground">Personal Name</div>
+                      <div className="text-sm text-muted-foreground">
+                        Show your name: {formData.fullName || 'Your name'}
+                      </div>
+                    </label>
+                  </div>
+                  <div className={`flex items-center gap-3 p-4 rounded-lg border border-border/50 bg-background/50 transition-colors ${!formData.businessName ? 'opacity-60' : 'hover:bg-background/70'}`}>
+                    <RadioGroupItem 
+                      value="business" 
+                      id="display-business" 
+                      disabled={!formData.businessName}
+                    />
+                    <label htmlFor="display-business" className={`flex-1 ${formData.businessName ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                      <div className="font-semibold text-foreground flex items-center gap-2">
+                        Business / Ranch Name
+                        {!formData.businessName && (
+                          <Badge variant="outline" className="text-xs">Set business name first</Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {formData.businessName 
+                          ? `Show your business name: ${formData.businessName}`
+                          : 'Add a business name in your profile to use this option'}
+                      </div>
+                    </label>
+                  </div>
+                </RadioGroup>
               </CardContent>
             </Card>
           </TabsContent>

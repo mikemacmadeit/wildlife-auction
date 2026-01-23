@@ -490,7 +490,16 @@ function toListingDocInput(
 const getSellerSnapshot = async (userId: string): Promise<{ displayName: string; verified: boolean }> => {
   try {
     const userProfile = await getDocument<UserProfile>('users', userId);
-    const displayName = userProfile?.displayName || userProfile?.profile?.fullName || userProfile?.email?.split('@')[0] || 'Unknown Seller';
+    const displayNamePreference = userProfile?.profile?.preferences?.displayNamePreference || 'personal';
+    
+    // Determine display name based on preference
+    let displayName: string;
+    if (displayNamePreference === 'business' && userProfile?.profile?.businessName?.trim()) {
+      displayName = userProfile.profile.businessName.trim();
+    } else {
+      displayName = userProfile?.displayName || userProfile?.profile?.fullName || userProfile?.email?.split('@')[0] || 'Unknown Seller';
+    }
+    
     const verified = userProfile?.seller?.verified || false;
     const photoURL = typeof userProfile?.photoURL === 'string' && userProfile.photoURL.trim().length > 0 ? userProfile.photoURL : undefined;
     return { displayName, verified, ...(photoURL ? { photoURL } : {}) };

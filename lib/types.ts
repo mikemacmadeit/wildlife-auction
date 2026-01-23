@@ -863,6 +863,7 @@ export interface UserProfile {
     preferences: {
       verification: boolean;
       transport: boolean;
+      displayNamePreference?: 'personal' | 'business'; // Which name to show on listings/seller cards
     };
     notifications: {
       email: boolean;

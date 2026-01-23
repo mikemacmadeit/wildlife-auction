@@ -59,11 +59,11 @@ export const notificationPreferencesSchema = z.object({
   timezone: z.string().min(1).default('America/Chicago'),
   quietHours: z
     .object({
-      enabled: z.boolean().default(true),
+      enabled: z.boolean().default(false),
       startHour: z.number().int().min(0).max(23).default(21),
       endHour: z.number().int().min(0).max(23).default(8),
     })
-    .default({ enabled: true, startHour: 21, endHour: 8 }),
+    .default({ enabled: false, startHour: 21, endHour: 8 }),
   channels: z
     .object({
       email: z.boolean().default(true),

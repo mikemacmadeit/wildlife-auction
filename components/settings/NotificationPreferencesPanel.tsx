@@ -17,6 +17,14 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Bell, Mail, Smartphone, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Format hour (0-23) to user-friendly time (e.g., "9:00 PM")
+function formatHour(hour: number): string {
+  if (hour < 0 || hour > 23) return '12:00 AM';
+  const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const period = hour < 12 ? 'AM' : 'PM';
+  return `${h}:00 ${period}`;
+}
+
 export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
   const { embedded = false } = props;
   const { user, loading: authLoading } = useAuth();
@@ -185,41 +193,61 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
               />
               <p className="text-xs text-muted-foreground">Used for quiet hours and scheduling.</p>
             </div>
-            <div className="space-y-2">
-              <Label>Quiet hours</Label>
-              <div className="flex items-center gap-2">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Quiet hours</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pause non-urgent notifications during these hours
+                  </p>
+                </div>
                 <Switch
                   checked={prefs.quietHours.enabled}
                   onCheckedChange={(v) => setPrefs((p) => ({ ...p, quietHours: { ...p.quietHours, enabled: v } }))}
                 />
-                <span className="text-sm text-muted-foreground">{prefs.quietHours.enabled ? 'On' : 'Off'}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Start hour (0-23)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={prefs.quietHours.startHour}
-                    onChange={(e) =>
-                      setPrefs((p) => ({ ...p, quietHours: { ...p.quietHours, startHour: Number(e.target.value) } }))
-                    }
-                  />
+              {prefs.quietHours.enabled && (
+                <div className="grid grid-cols-2 gap-3 pl-1">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Start time</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={23}
+                        value={prefs.quietHours.startHour}
+                        onChange={(e) => {
+                          const val = Math.max(0, Math.min(23, Number(e.target.value) || 0));
+                          setPrefs((p) => ({ ...p, quietHours: { ...p.quietHours, startHour: val } }));
+                        }}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-muted-foreground min-w-[60px]">
+                        {formatHour(prefs.quietHours.startHour)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">End time</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={23}
+                        value={prefs.quietHours.endHour}
+                        onChange={(e) => {
+                          const val = Math.max(0, Math.min(23, Number(e.target.value) || 0));
+                          setPrefs((p) => ({ ...p, quietHours: { ...p.quietHours, endHour: val } }));
+                        }}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-muted-foreground min-w-[60px]">
+                        {formatHour(prefs.quietHours.endHour)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">End hour (0-23)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={prefs.quietHours.endHour}
-                    onChange={(e) =>
-                      setPrefs((p) => ({ ...p, quietHours: { ...p.quietHours, endHour: Number(e.target.value) } }))
-                    }
-                  />
-                </div>
-              </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Channels</Label>

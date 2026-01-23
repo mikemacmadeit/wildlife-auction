@@ -29,9 +29,18 @@ function buildPublicProfileFromUserDoc(userId: string, userDoc: Partial<UserProf
     },
   };
 
+  // Determine display name based on preference
+  const displayNamePreference = userDoc?.profile?.preferences?.displayNamePreference || 'personal';
+  let displayName: string | undefined;
+  if (displayNamePreference === 'business' && profile.businessName?.trim()) {
+    displayName = profile.businessName.trim();
+  } else {
+    displayName = userDoc?.displayName || profile.fullName || undefined;
+  }
+
   const out: PublicProfileDoc = {
     userId,
-    displayName: userDoc?.displayName || profile.fullName || undefined,
+    displayName,
     photoURL: userDoc?.photoURL || undefined,
     profile,
     updatedAt: new Date(),
