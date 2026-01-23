@@ -713,7 +713,7 @@ export default function BrowsePage() {
               <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                 <div className="flex-1 w-full md:max-w-2xl">
                   <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-background/70" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder="Search listings, species, breeds, and locations…"
@@ -721,9 +721,10 @@ export default function BrowsePage() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={cn(
                         'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
-                        // Stronger contrast so the search bar never "disappears" against the inverted header.
-                        'bg-background/20 border-background/45 text-background placeholder:text-background/70',
-                        'focus-visible:ring-background/40 focus-visible:ring-2'
+                        // Force readable input text regardless of the header's inverted theme.
+                        'bg-background text-foreground caret-foreground',
+                        'border-border/70 placeholder:text-muted-foreground',
+                        'focus-visible:ring-ring/40 focus-visible:ring-2'
                       )}
                     />
                   </div>
