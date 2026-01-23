@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -712,21 +713,25 @@ export default function BrowsePage() {
             <div className="flex flex-col gap-3">
               <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                 <div className="flex-1 w-full md:max-w-2xl">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search listings, species, breeds, and locations…"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className={cn(
-                        'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
-                        // Force readable input text regardless of the header's inverted theme.
-                        'bg-background text-foreground caret-foreground',
-                        'border-border/70 placeholder:text-muted-foreground',
-                        'focus-visible:ring-ring/40 focus-visible:ring-2'
-                      )}
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search listings, species, breeds, and locations…"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className={cn(
+                          'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
+                          // Force readable input text regardless of the header's inverted theme.
+                          'bg-background text-foreground caret-foreground',
+                          'border-border/70 placeholder:text-muted-foreground',
+                          'focus-visible:ring-ring/40 focus-visible:ring-2'
+                        )}
+                      />
+                    </div>
+                    {/* Night mode toggle (quick access next to search) */}
+                    <ThemeToggle className="border border-background/30 text-background hover:bg-background/10 rounded-xl" />
                   </div>
                 </div>
 
