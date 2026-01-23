@@ -86,8 +86,34 @@ export function useFavorites() {
           else ids.delete(listingId);
         }
 
-        setFavoriteIds(ids);
-        setPendingIds(new Set(pending.keys()));
+        // Only update state if the Set actually changed to prevent unnecessary re-renders
+        setFavoriteIds((prev) => {
+          // Quick check: if sizes differ, definitely changed
+          if (prev.size !== ids.size) return ids;
+          // Deep check: compare all items
+          for (const id of ids) {
+            if (!prev.has(id)) return ids;
+          }
+          for (const id of prev) {
+            if (!ids.has(id)) return ids;
+          }
+          // No change - return previous to prevent re-render
+          return prev;
+        });
+
+        // Only update pendingIds if it actually changed
+        const newPendingIds = new Set(pending.keys());
+        setPendingIds((prev) => {
+          if (prev.size !== newPendingIds.size) return newPendingIds;
+          for (const id of newPendingIds) {
+            if (!prev.has(id)) return newPendingIds;
+          }
+          for (const id of prev) {
+            if (!newPendingIds.has(id)) return newPendingIds;
+          }
+          return prev;
+        });
+
         setIsLoading(false);
       },
       (error) => {
@@ -160,10 +186,19 @@ export function useFavorites() {
       try {
         await syncWatchlistServer(listingId, isCurrentlyFavorite ? 'remove' : 'add');
         // Success - optimistic update was correct, Firestore will update via onSnapshot
+        // Clear pending immediately since server confirmed the change
+        pendingOpsRef.current.delete(listingId);
+        setPendingIds((prev) => {
+          if (!prev.has(listingId)) return prev; // No change needed
+          const next = new Set(prev);
+          next.delete(listingId);
+          return next;
+        });
         return action;
       } catch (error: any) {
         pendingOpsRef.current.delete(listingId);
         setPendingIds((prev) => {
+          if (!prev.has(listingId)) return prev; // No change needed
           const next = new Set(prev);
           next.delete(listingId);
           return next;
