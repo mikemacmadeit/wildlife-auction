@@ -209,17 +209,19 @@ export default function DashboardLayout({
     }
 
     // 1d) Admin notifications badge (super admin): unread ADMIN-category notifications only
-    if (showAdminNav && isSuperAdmin) {
-      try {
-        unsubs.push(
-          subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
-            setUnreadAdminNotificationsCount(count || 0);
-          })
-        );
-      } catch (e) {
-        console.error('Failed to subscribe to unread admin notifications count:', e);
-      }
-    }
+    // NOTE: Admin notifications page is a TEST page, not a real notifications inbox
+    // So we don't subscribe to admin notifications count for the badge
+    // if (showAdminNav && isSuperAdmin) {
+    //   try {
+    //     unsubs.push(
+    //       subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
+    //         setUnreadAdminNotificationsCount(count || 0);
+    //       })
+    //     );
+    //   } catch (e) {
+    //     console.error('Failed to subscribe to unread admin notifications count:', e);
+    //   }
+    // }
 
     // 1c) Bids & Offers badge: unread bid/offer notifications (eBay-like: "you have activity")
     try {
