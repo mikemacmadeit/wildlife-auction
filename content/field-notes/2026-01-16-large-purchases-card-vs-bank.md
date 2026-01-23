@@ -11,10 +11,68 @@ editorPick: true
 
 For smaller purchases, **card** is usually the fastest.
 
-For high-ticket purchases, **bank rails** often have fewer surprises:
-- Fewer card-limit/decline issues
-- Clear funding instructions
-- Better fit for \( \$20k+ \) and \( \$50k+ \) tiers
+For high-ticket purchases, **bank rails** (bank transfer or wire) usually have fewer surprises and fewer “why did my bank decline that?” moments.
 
-On Wildlife Exchange, **all three payment methods are available on every checkout**—we simply recommend one based on the purchase amount.
+## TL;DR (quick recommendation)
+
+- **Under \$5k–\$10k**: Card is usually easiest.
+- **\$10k–\$25k**: Card can work, but bank transfer often has fewer declines.
+- **\$25k+**: Prefer bank transfer or wire for predictability.
+
+Wildlife Exchange can present multiple payment options at checkout; we recommend a path based on amount and reliability.
+
+## Why large card charges fail (even if you “have the money”)
+
+Card declines for large purchases are common because:
+
+- **Daily purchase limits** (per card, per issuer, per merchant category)
+- **Fraud/risk models** that flag unusual amounts or new merchants
+- **3DS / verification requirements** that can fail silently on some banks
+- **Mismatch of billing details** (address/ZIP) or travel-related account flags
+
+### If you still want to use a card (best practices)
+
+- Call your bank/card issuer **before** checkout and ask them to approve the charge.
+- Ensure your billing address/ZIP matches exactly.
+- If the charge fails once, don’t spam retries—switch rails or contact your bank first.
+
+## Bank transfer vs wire (what’s the difference?)
+
+### Bank transfer (ACH / bank rails)
+
+- **Pros**: Great for high-ticket amounts; fewer card-limit issues; clear funding flow.
+- **Cons**: Can require additional bank verification steps depending on your bank.
+- **Best for**: Most high-ticket purchases when you want simplicity without wire complexity.
+
+### Wire
+
+- **Pros**: Highest predictability for very large transactions; common for \$50k+.
+- **Cons**: Manual steps; bank fees; can require verified recipient details.
+- **Best for**: The largest purchases or when you want the most “institutional” rail.
+
+## What to do if checkout “couldn’t be started”
+
+When checkout can’t start, it’s usually one of these:
+
+- A required acknowledgment wasn’t accepted (category-specific)
+- Your selected payment method needs a different verification step
+- A temporary bank/issuer restriction
+
+Best next steps:
+
+- Try **bank transfer** (if card failed).
+- If bank transfer is blocked by your bank, use **wire**.
+- If you’re still stuck, capture a screenshot and contact support via `/contact`.
+
+## Copy/paste checklist for buyers (high-ticket)
+
+- [ ] Decide your payment rail **before** you bid/offer: card vs bank vs wire
+- [ ] If using card, call your issuer for an “allow” on the amount
+- [ ] Keep all communication in `/dashboard/messages`
+- [ ] Pay only through Wildlife Exchange checkout (never off-platform)
+
+## Related guides
+
+- “Trust badges, explained”
+- “Welcome to Field Notes”
 

@@ -10,30 +10,37 @@ featured: false
 editorPick: false
 ---
 
+## TL;DR
+
+- 3–6 bullets that answer the question fast.
+
 ## Who this is for
 
 - Buyer…
 - Seller…
+- Admin… (if relevant)
 
-## The quick answer
+## Definitions (optional)
 
-Write the punchline in 3–5 bullets.
+Define any terms the user is likely to misunderstand.
 
-## The details
+## Step-by-step
 
-### Payments
+### 1) Do this first
 
-### Compliance (marketplace workflow)
+### 2) Then do this
+
+### 3) If something goes wrong
 
 Use “marketplace review” language. Do **not** imply regulator approval.
 
-### Delivery / pickup
+## Common mistakes
 
 Buyer and seller coordinate directly. Wildlife Exchange does not arrange transport.
 
-## Common mistakes
-
 ## Checklist (copy/paste)
+
+Provide a checklist the user can literally follow.
 
 ## Related guides
 

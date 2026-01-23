@@ -10,12 +10,46 @@ featured: true
 editorPick: true
 ---
 
-Field Notes is where we publish the practical, real-world guidance we wish every buyer and seller had.
+Field Notes is our “high-signal” library for **real transactions**—what to do, what to avoid, and how to move faster with fewer surprises.
 
-### What you’ll find here
-- **How-to guides** for listings, offers, and auctions
-- **Trust & safety** education (what badges mean, what we verify, and what we don’t)
-- **Payments explained** in plain English (including “funds held until delivery confirmation”)
+## TL;DR (start here)
 
-If there’s a topic you want covered, send it to us via the Contact page.
+- **Buyers**: Learn how to evaluate listings, understand trust/compliance, and choose the right payment method.
+- **Sellers**: Learn how to publish faster, set expectations, and get paid smoothly (without confusion).
+- **Everyone**: Learn what we verify, what we don’t, and how to keep transactions on-platform.
+
+## Who this is for
+
+- **First-time buyers** who want to avoid mistakes and checkout friction
+- **Sellers** who want listings approved quickly and payouts released cleanly
+- **High-ticket buyers/sellers** (\$10k–\$50k+) who need predictable payment rails
+- **Anyone** who wants to understand badges, compliance workflow, and transaction timelines
+
+## What you’ll find here (and how to use it)
+
+- **Guides**: step-by-step “do this next” instructions for common scenarios  
+  Start: `/field-notes/guides`
+- **Trust & Compliance**: plain-English explanations of badges, review, and “marketplace workflow” checks  
+  Start: `/trust` and `/field-notes` (Trust category)
+- **Payments**: how card vs bank transfer vs wire works at different price points, and how to prevent declines  
+  Start: “Large purchases: Card vs Bank Transfer vs Wire”
+
+## Most common questions we’ll answer
+
+- “Why does checkout fail for large amounts?”
+- “What does **Marketplace Review Complete** mean?”
+- “What does it mean when funds are held until delivery confirmation?”
+- “What should I do before I accept an offer?”
+
+## Quick links (inside the app)
+
+- Browse listings: `/browse`
+- Notifications: `/dashboard/notifications`
+- Messages: `/dashboard/messages`
+- Orders: `/dashboard/orders`
+- Seller dashboard: `/seller/overview`
+
+## Want a topic covered?
+
+Send your question (and screenshots if helpful) via `/contact`. The best topics usually come straight from live transactions.
 
