@@ -349,9 +349,16 @@ export default function BrowsePage() {
       
       const browseFilters = getBrowseFilters();
       const browseSort = getBrowseSort();
+
+      // IMPORTANT:
+      // Full-text search is client-side only (Firestore doesn't support it here).
+      // To avoid "search feels broken" (0 results simply because the first page doesn't contain matches),
+      // we fetch a larger first page while a query is present.
+      const q = debouncedSearchQuery?.trim() || '';
+      const limitCount = q ? 120 : 20;
       
       const result = await queryListingsForBrowse({
-        limit: 20,
+        limit: limitCount,
         filters: browseFilters,
         sort: browseSort,
       });
@@ -382,9 +389,11 @@ export default function BrowsePage() {
       
       const browseFilters = getBrowseFilters();
       const browseSort = getBrowseSort();
+      const q = debouncedSearchQuery?.trim() || '';
+      const limitCount = q ? 120 : 20;
       
       const result = await queryListingsForBrowse({
-        limit: 20,
+        limit: limitCount,
         cursor: nextCursor,
         filters: browseFilters,
         sort: browseSort,
@@ -414,7 +423,7 @@ export default function BrowsePage() {
     }
     loadInitial();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedType, filters, sortBy, listingStatus]);
+  }, [selectedType, filters, sortBy, listingStatus, debouncedSearchQuery]);
 
   // Animals don't use "condition" on Browse; only equipment-like categories do.
   // If the user switches away, clear any stale condition selection so results don't look broken.
