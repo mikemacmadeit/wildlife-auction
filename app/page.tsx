@@ -627,31 +627,100 @@ export default function HomePage() {
                   href="/dashboard/watchlist"
                   actionLabel="Manage"
                 />
-                <div className="overflow-x-auto pb-2 -mx-4 px-4">
-                  <div className="flex gap-3 min-w-max">
+                <div className="overflow-x-auto pb-2 -mx-4 px-4 we-scrollbar-hover">
+                  <div className="flex gap-4 min-w-max">
                     {savedSellers.slice(0, 12).map((s) => {
                       const activeCount = activeCountBySellerId[s.sellerId];
                       const href = `/sellers/${s.sellerId}`;
+                      const usernameLabel = s.sellerUsername ? `@${s.sellerUsername}` : `@${s.sellerId.slice(0, 8)}`;
+                      const ratingCount = Number(s.ratingCount || 0) || 0;
+                      const ratingAvg = Number(s.ratingAverage || 0) || 0;
+                      const itemsSold = Number(s.itemsSold || 0) || 0;
+                      const positivePercent = Number(s.positivePercent || 0) || 0;
+                      const hasRating = ratingCount > 0 && ratingAvg > 0;
                       return (
                         <Link
                           key={s.sellerId}
                           href={href}
-                          className="group border-2 border-border/50 hover:border-primary/40 transition-colors rounded-xl bg-card px-3 py-2 min-w-[220px]"
+                          className={cn(
+                            'group min-w-[280px] sm:min-w-[320px] max-w-[320px]',
+                            'rounded-2xl border-2 border-border/50 hover:border-primary/40 transition-all',
+                            'bg-card/80 shadow-warm hover:shadow-lifted',
+                            'overflow-hidden'
+                          )}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="relative h-10 w-10 rounded-full overflow-hidden bg-muted border shrink-0">
-                              {s.sellerPhotoURL ? (
-                                <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="40px" unoptimized />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
-                                  {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
+                          <div className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="relative h-12 w-12 rounded-full overflow-hidden bg-muted border shrink-0">
+                                {s.sellerPhotoURL ? (
+                                  <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="48px" unoptimized />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
+                                    {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="font-extrabold leading-tight truncate">
+                                      {s.sellerDisplayName}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {usernameLabel}
+                                    </div>
+                                  </div>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      'shrink-0 font-semibold text-[10px]',
+                                      'bg-muted/30 border-border/60'
+                                    )}
+                                    title="Active listings"
+                                  >
+                                    {activeCount === null ? '…' : `${activeCount ?? 0}`} active
+                                  </Badge>
                                 </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-extrabold leading-tight truncate">{s.sellerDisplayName}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {activeCount === null ? 'Loading…' : `${activeCount ?? 0} active listings`}
+
+                                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                  <Badge
+                                    variant="secondary"
+                                    className={cn(
+                                      'text-[10px] font-semibold',
+                                      hasRating
+                                        ? 'bg-amber-500/15 text-amber-800 border border-amber-500/20 dark:text-amber-200'
+                                        : 'bg-muted/40 text-muted-foreground'
+                                    )}
+                                    title={hasRating ? `${ratingAvg.toFixed(1)} average from ${ratingCount} ratings` : 'No ratings yet'}
+                                  >
+                                    {hasRating ? `★ ${ratingAvg.toFixed(1)} (${ratingCount})` : 'No ratings yet'}
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-semibold bg-card/50 border-border/60"
+                                    title="Successful transactions"
+                                  >
+                                    {itemsSold} sales
+                                  </Badge>
+                                  {positivePercent > 0 ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-800 border-emerald-500/20 dark:text-emerald-200"
+                                      title="Positive feedback (best-effort)"
+                                    >
+                                      {Math.round(positivePercent)}% positive
+                                    </Badge>
+                                  ) : null}
+                                </div>
+
+                                <div className="mt-3">
+                                  <div className="h-9 rounded-xl border border-border/60 bg-background/40 group-hover:bg-background/55 transition-colors flex items-center justify-between px-3">
+                                    <span className="text-xs font-extrabold tracking-wide text-primary">
+                                      View seller
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">→</span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
