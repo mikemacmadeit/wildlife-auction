@@ -71,7 +71,7 @@ export function HelpTicketForm() {
       setTicketId(body.ticketId || null);
       toast({
         title: 'Ticket Created',
-        description: 'Your support ticket has been created. We'll respond by email soon.',
+        description: 'Your support ticket has been created. We will respond by email soon.',
       });
 
       // Reset form
