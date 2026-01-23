@@ -93,40 +93,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const gateEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
-  
-  // Generate token using EXACT same logic as login route
-  const explicitToken = String(process.env.SITE_GATE_TOKEN || '').trim();
-  let gateToken: string;
-  if (explicitToken) {
-    gateToken = explicitToken;
-  } else {
-    const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
-    if (gatePassword) {
-      // CRITICAL: Normalize exactly the same way as login route
-      // lowercase + remove ALL whitespace (spaces, tabs, newlines, etc)
-      const gatePasswordNormalized = gatePassword.toLowerCase().replace(/\s+/g, '');
-      gateToken = gatePasswordNormalized ? `pw:${gatePasswordNormalized}` : '';
-    } else {
-      gateToken = '';
-    }
-  }
-  
-  // Next.js cookies().get() automatically decodes URL-encoded values
-  // So we read it directly without additional decoding
+  const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
+  const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePassword ? `pw:${gatePassword}` : '');
   const gateCookie = cookies().get('we:site_gate:v1')?.value || '';
   const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
-  
-  // Debug logging (server-side, visible in build logs)
-  if (gateEnabled && !gateAllowed) {
-    console.log('[Site Gate] Access check:', {
-      hasCookie: !!gateCookie,
-      cookieValue: gateCookie ? `${gateCookie.substring(0, 10)}***` : '(empty)',
-      expectedToken: gateToken ? `${gateToken.substring(0, 10)}***` : '(empty)',
-      cookieLength: gateCookie.length,
-      tokenLength: gateToken.length,
-      match: gateCookie === gateToken,
-    });
-  }
 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>

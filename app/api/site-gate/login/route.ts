@@ -18,20 +18,10 @@ function isEnabled() {
 }
 
 function expectedToken(): string | null {
-  // Check for explicit token first
-  const explicitToken = String(process.env.SITE_GATE_TOKEN || '').trim();
-  if (explicitToken) {
-    return explicitToken;
-  }
-  // Fall back to password-based token (normalized)
-  const passwordEnv = String(process.env.SITE_GATE_PASSWORD || '').trim();
-  if (!passwordEnv) {
-    return null;
-  }
-  // CRITICAL: Normalize exactly the same way as layout.tsx
-  // lowercase + remove ALL whitespace (spaces, tabs, newlines, etc)
-  const normalized = passwordEnv.toLowerCase().replace(/\s+/g, '');
-  return normalized ? `pw:${normalized}` : null;
+  const t = String(process.env.SITE_GATE_TOKEN || '').trim();
+  if (t) return t;
+  const p = String(process.env.SITE_GATE_PASSWORD || '').trim();
+  return p ? `pw:${p}` : null;
 }
 
 export async function POST(req: Request) {
@@ -53,61 +43,24 @@ export async function POST(req: Request) {
   const password = String(body?.password || '').trim();
   const next = String(body?.next || '/').trim() || '/';
 
-  if (!password) {
-    return json({ error: 'Password is required' }, { status: 401 });
+  // Case-insensitive password comparison (only change from original)
+  if (!password || password.toLowerCase() !== passwordEnv.toLowerCase()) {
+    return json({ error: 'Invalid password' }, { status: 401 });
   }
 
-  // Normalize both passwords: lowercase and remove all whitespace
-  const normalizedProvided = password.toLowerCase().replace(/\s+/g, '');
-  const normalizedExpected = passwordEnv.toLowerCase().replace(/\s+/g, '');
-  
-  // Always log for debugging (visible in Netlify function logs)
-  console.log('[Site Gate] Password check:', {
-    providedRaw: password,
-    expectedRaw: passwordEnv,
-    normalizedProvided,
-    normalizedExpected,
-    match: normalizedProvided === normalizedExpected,
-    token: token ? `${token.substring(0, 10)}***` : '(none)',
-    tokenFull: token, // Log full token for debugging (will be visible in server logs only)
-  });
-  
-  if (normalizedProvided !== normalizedExpected) {
-    return json({ 
-      error: 'Invalid password. Please check your password and try again.',
-      // Always show debug info to help diagnose
-      debug: {
-        providedLength: password.length,
-        expectedLength: passwordEnv.length,
-        normalizedProvided,
-        normalizedExpected,
-        match: false,
-      }
-    }, { status: 401 });
-  }
-  
-  // Ensure token matches normalized password (double-check)
-  const finalToken = !process.env.SITE_GATE_TOKEN ? `pw:${normalizedExpected}` : token;
-  
-  // Set cookie using manual header (original working method)
-  // Next.js cookies().get() automatically decodes URL-encoded values
+  // httpOnly cookie so it's not readable by JS.
   const cookie = [
-    `${COOKIE_NAME}=${encodeURIComponent(finalToken)}`,
+    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
+    // Use Secure in production so cookie only travels over HTTPS.
     process.env.NODE_ENV === 'production' ? 'Secure' : '',
+    // 7 days
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
     .filter(Boolean)
     .join('; ');
-
-  console.log('[Site Gate] Setting cookie:', {
-    cookieName: COOKIE_NAME,
-    token: finalToken ? `${finalToken.substring(0, 15)}***` : '(none)',
-    tokenLength: finalToken?.length || 0,
-    encoded: encodeURIComponent(finalToken).substring(0, 20),
-  });
 
   return json(
     { ok: true, redirect: next },
@@ -119,4 +72,3 @@ export async function POST(req: Request) {
     }
   );
 }
-
