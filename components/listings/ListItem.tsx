@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, CheckCircle2, Gavel, Tag, Clock } from 'lucide-react';
+import { MapPin, CheckCircle2, Gavel, Tag, Clock, Heart } from 'lucide-react';
 import { format } from 'date-fns';
 import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, HorseAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
@@ -17,10 +17,15 @@ import { BROWSE_SPECIES } from '@/components/browse/filters/constants';
 import { useRouter } from 'next/navigation';
 interface ListItemProps {
   listing: Listing;
+  /**
+   * Mobile browse variant: eBay-style list row (image ~25% width, no seller line, watchers shown).
+   * Other surfaces (watchlist, admin, etc.) should use the default card.
+   */
+  variant?: 'default' | 'browseMobile';
 }
 
 export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
-  ({ listing }, ref) => {
+  ({ listing, variant = 'default' }, ref) => {
   const router = useRouter();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
@@ -31,6 +36,10 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   const isClassified = listing.type === 'classified';
   const bestOfferEnabled = Boolean((listing as any).bestOfferEnabled);
   const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
+  const watchers =
+    typeof (listing as any)?.watcherCount === 'number'
+      ? Math.max(0, Math.floor(Number((listing as any).watcherCount)))
+      : Math.max(0, Math.floor(Number((listing as any)?.metrics?.favorites || 0) || 0));
 
   const endsAtDate = useMemo(() => {
     const v: any = (listing as any)?.endsAt;
@@ -71,6 +80,11 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     typeof (cover as any)?.cropZoom === 'number' && Number.isFinite((cover as any).cropZoom)
       ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
       : 1;
+
+  const primaryPriceBrowse = (() => {
+    if (isAuction) return Number((listing as any).currentBid || (listing as any).startingBid || 0) || 0;
+    return Number((listing as any).price || 0) || 0;
+  })();
 
   const specs = useMemo(() => {
     // eBay-style “at a glance” line: Species • Sex • Age
@@ -185,6 +199,81 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
     if (isClassified) return Number(listing.price || 0) || 0;
     return 0;
   }, [isAuction, isFixed, isClassified, listing.currentBid, listing.startingBid, listing.price]);
+
+  if (variant === 'browseMobile') {
+    return (
+      <motion.div ref={ref} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="w-full">
+        <Link href={`/listing/${listing.id}`} className="block">
+          <Card className="overflow-hidden rounded-xl border border-border/60 bg-card hover:shadow-warm">
+            <div className="flex">
+              <div className="relative w-[96px] min-w-[96px] h-[112px] bg-muted overflow-hidden">
+                {coverUrl ? (
+                  <div className="absolute inset-0 overflow-hidden">
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        transform: `scale(${coverCropZoom})`,
+                        transformOrigin: coverObjectPosition || '50% 50%',
+                      }}
+                    >
+                      <Image
+                        src={coverUrl}
+                        alt={listing.title}
+                        fill
+                        className="object-cover"
+                        style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
+                        sizes="96px"
+                        unoptimized
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">No Image</div>
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-extrabold text-[15px] leading-snug line-clamp-2">{listing.title}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="truncate">
+                        {listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-shrink-0">
+                    <FavoriteButton listingId={listing.id} className="h-9 w-9" />
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-end justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-lg font-extrabold text-primary leading-none">
+                      ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
+                    </div>
+                    {bestOfferEnabled ? (
+                      <div className="mt-1 text-[11px] font-semibold text-muted-foreground">Best Offer</div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge variant={watchers > 0 ? 'secondary' : 'outline'} className="text-[11px] font-semibold">
+                      <Heart className="h-3 w-3 mr-1" />
+                      {watchers > 0 ? watchers : 0}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Link>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

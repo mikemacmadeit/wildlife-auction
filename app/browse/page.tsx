@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2 } from 'lucide-react';
+import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2, ArrowLeft, Heart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -52,6 +52,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 
@@ -79,6 +81,7 @@ function toMillisSafe(value: any): number | null {
 export default function BrowsePage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
@@ -108,6 +111,12 @@ export default function BrowsePage() {
   // Initialize to 'card' to ensure server/client consistency
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [savingSearch, setSavingSearch] = useState(false);
+  const [savedSearchConfirmOpen, setSavedSearchConfirmOpen] = useState(false);
+  const [savedSearchConfirmEmail, setSavedSearchConfirmEmail] = useState(true);
+  const [savedSearchConfirmPush, setSavedSearchConfirmPush] = useState(false);
+  const [savedSearchConfirmId, setSavedSearchConfirmId] = useState<string | null>(null);
+  const [savedSearchConfirmDraft, setSavedSearchConfirmDraft] = useState<FilterState | null>(null);
+  const [savedSearchConfirmName, setSavedSearchConfirmName] = useState<string>('');
 
   // Load from localStorage after hydration (client-side only)
   useEffect(() => {
@@ -259,6 +268,39 @@ export default function BrowsePage() {
     setSaveSearchPreview(preview);
     setSaveSearchName(preview.defaultName);
     setSaveSearchDialogOpen(true);
+  };
+
+  const quickSaveSearchMobile = async () => {
+    if (!user?.uid) {
+      toast({ title: 'Sign in required', description: 'Sign in to save searches and get alerts.' });
+      return;
+    }
+    const preview = buildSaveSearchPreview();
+    setSavingSearch(true);
+    try {
+      const criteria = preview.criteria;
+      const name = preview.defaultName;
+      const id = await upsertSavedSearch(user.uid, {
+        data: {
+          name,
+          criteria,
+          alertFrequency: 'instant',
+          channels: { inApp: true, email: true, push: false },
+          lastNotifiedAt: null,
+          keys: buildSavedSearchKeys(criteria),
+        },
+      });
+      setSavedSearchConfirmId(id);
+      setSavedSearchConfirmDraft(criteria);
+      setSavedSearchConfirmName(name);
+      setSavedSearchConfirmEmail(true);
+      setSavedSearchConfirmPush(false);
+      setSavedSearchConfirmOpen(true);
+    } catch (e: any) {
+      toast({ title: 'Save failed', description: e?.message || 'Could not save this search.', variant: 'destructive' });
+    } finally {
+      setSavingSearch(false);
+    }
   };
 
   const handleConfirmSaveSearch = async () => {
@@ -713,7 +755,55 @@ export default function BrowsePage() {
             <div className="flex flex-col gap-3">
               <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                 <div className="flex-1 w-full md:max-w-2xl">
-                  <div className="flex items-center gap-2">
+                  {/* Mobile (eBay-style): back circle + search + heart-in-search */}
+                  <div className="md:hidden flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        try {
+                          router.back();
+                        } catch {
+                          router.push('/browse');
+                        }
+                      }}
+                      className="min-w-[44px] min-h-[44px] rounded-full border border-background/30 text-background hover:bg-background/10"
+                      aria-label="Back"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Button>
+
+                    <div className="relative flex-1">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className={cn(
+                          'pl-11 pr-12 min-h-[52px] text-base rounded-full',
+                          'bg-background text-foreground caret-foreground',
+                          'border-border/70 placeholder:text-muted-foreground',
+                          'focus-visible:ring-ring/40 focus-visible:ring-2'
+                        )}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={quickSaveSearchMobile}
+                        disabled={savingSearch}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full hover:bg-muted"
+                        aria-label="Save search"
+                      >
+                        <Heart className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Desktop: search + theme toggle */}
+                  <div className="hidden md:flex items-center gap-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input
@@ -842,7 +932,7 @@ export default function BrowsePage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-10 px-3 font-semibold rounded-full"
+                    className="hidden md:inline-flex h-10 px-3 font-semibold rounded-full"
                     onClick={openSaveSearchDialog}
                     disabled={savingSearch}
                   >
@@ -1275,8 +1365,8 @@ export default function BrowsePage() {
               </SelectContent>
             </Select>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-card">
+            {/* View Mode Toggle (desktop/tablet only; mobile is always list) */}
+            <div className="hidden md:flex items-center gap-1 border border-border rounded-lg p-1 bg-card">
               <Button
                 variant={viewMode === 'card' ? 'default' : 'ghost'}
                 size="sm"
@@ -1335,8 +1425,19 @@ export default function BrowsePage() {
             {/* Listings Grid/List */}
             {!loading && !error && sortedListings.length > 0 && (
               <>
+                {/* Mobile: always list view (eBay-style) */}
+                <div className="md:hidden space-y-3">
+                  <AnimatePresence>
+                    {sortedListings.map((listing) => (
+                      <ListItem key={listing.id} listing={listing} variant="browseMobile" />
+                    ))}
+                  </AnimatePresence>
+                </div>
+
+                {/* Desktop/tablet: respect view mode */}
                 <div
                   className={cn(
+                    'hidden md:block',
                     viewMode === 'card'
                       ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
                       : 'space-y-4'
@@ -1385,6 +1486,79 @@ export default function BrowsePage() {
       </div>
 
       <BottomNav />
+
+      {/* Mobile: "Search saved!" confirmation sheet (eBay-style) */}
+      <Sheet open={savedSearchConfirmOpen} onOpenChange={setSavedSearchConfirmOpen}>
+        <SheetContent side="bottom" className="p-0">
+          <div className="px-4 pt-5 pb-4 border-b border-border/50">
+            <SheetHeader>
+              <SheetTitle>Search saved!</SheetTitle>
+              <SheetDescription>Get alert emails and push notifications for new matches.</SheetDescription>
+            </SheetHeader>
+          </div>
+
+          <div className="px-4 py-4 space-y-4">
+            <div className="rounded-xl border border-border/60 bg-background/40 p-3">
+              <div className="text-sm font-semibold">{savedSearchConfirmName || 'Saved search'}</div>
+              {savedSearchConfirmId ? <div className="text-xs text-muted-foreground mt-0.5">ID: {savedSearchConfirmId}</div> : null}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">Email alerts</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Recommended so you never miss a match.</div>
+                </div>
+                <Switch checked={savedSearchConfirmEmail} onCheckedChange={setSavedSearchConfirmEmail} />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">Push notifications</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Fastest alerts (requires permission).</div>
+                </div>
+                <Switch checked={savedSearchConfirmPush} onCheckedChange={setSavedSearchConfirmPush} />
+              </div>
+            </div>
+          </div>
+
+          <div className="px-4 pb-5 pt-3 border-t border-border/50 bg-background">
+            <Button
+              className="w-full min-h-[48px] font-semibold"
+              onClick={async () => {
+                if (!user?.uid || !savedSearchConfirmDraft || !savedSearchConfirmId) {
+                  setSavedSearchConfirmOpen(false);
+                  return;
+                }
+                setSavingSearch(true);
+                try {
+                  await upsertSavedSearch(user.uid, {
+                    id: savedSearchConfirmId,
+                    data: {
+                      name: savedSearchConfirmName || 'Saved search',
+                      criteria: savedSearchConfirmDraft,
+                      alertFrequency: 'instant',
+                      channels: { inApp: true, email: savedSearchConfirmEmail, push: savedSearchConfirmPush },
+                      lastNotifiedAt: null,
+                      keys: buildSavedSearchKeys(savedSearchConfirmDraft),
+                    },
+                  });
+                  toast({ title: 'Saved', description: 'Search saved and alerts updated.' });
+                } catch (e: any) {
+                  toast({ title: 'Update failed', description: e?.message || 'Could not update alerts.', variant: 'destructive' });
+                } finally {
+                  setSavingSearch(false);
+                  setSavedSearchConfirmOpen(false);
+                }
+              }}
+              disabled={savingSearch}
+            >
+              {savingSearch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Confirm
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
