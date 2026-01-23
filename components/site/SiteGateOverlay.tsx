@@ -24,24 +24,9 @@ export function SiteGateOverlay() {
             type="password"
             placeholder="Access password"
             value={password}
-            onChange={(e) => {
-              // Trim whitespace as user types to prevent issues
-              const trimmed = e.target.value.trim();
-              setPassword(trimmed);
-            }}
-            onBlur={(e) => {
-              // Ensure trimmed on blur
-              const trimmed = e.target.value.trim();
-              if (trimmed !== password) {
-                setPassword(trimmed);
-              }
-            }}
+            onChange={(e) => setPassword(e.target.value)}
             className="min-h-[48px]"
             autoFocus
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
           />
           {error ? <div className="text-sm text-destructive">{error}</div> : null}
           <Button
@@ -52,30 +37,19 @@ export function SiteGateOverlay() {
               setLoading(true);
               setError(null);
               try {
-                // Ensure password is trimmed before sending
-                const trimmedPassword = password.trim();
                 const next = window.location.pathname + window.location.search;
-                
-                console.log('[Site Gate] Submitting password:', {
-                  length: trimmedPassword.length,
-                  firstChars: trimmedPassword.substring(0, 3),
-                });
-                
                 const res = await fetch('/api/site-gate/login', {
                   method: 'POST',
                   headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify({ password: trimmedPassword, next }),
+                  body: JSON.stringify({ password, next }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                  console.error('[Site Gate] Login failed:', data);
                   setError(data?.error || 'Invalid password');
                   return;
                 }
-                // Force a hard reload to ensure cookie is read
-                window.location.href = data?.redirect || next || '/';
+                window.location.reload();
               } catch (e: any) {
-                console.error('[Site Gate] Error:', e);
                 setError(e?.message || 'Failed to sign in');
               } finally {
                 setLoading(false);
