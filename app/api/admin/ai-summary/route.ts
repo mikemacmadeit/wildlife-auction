@@ -200,16 +200,30 @@ export async function POST(request: Request) {
         return json({ ok: false, error: 'Invalid entity type' }, { status: 400 });
     }
 
-    // Check if summary already exists and is recent (unless force regenerate)
+    // Check if summary already exists (unless force regenerate)
+    // For listings, we generate on submission, so if it exists, use it
+    // For other entities, check if it's recent (24 hours)
     if (!forceRegenerate) {
       const existingSummary = entityData.aiAdminSummary;
       const existingSummaryAt = entityData.aiAdminSummaryAt;
       
       if (existingSummary && existingSummaryAt) {
         const summaryDate = existingSummaryAt.toDate ? existingSummaryAt.toDate() : new Date(existingSummaryAt);
-        const ageInHours = (Date.now() - summaryDate.getTime()) / (1000 * 60 * 60);
         
-        // If summary is less than 24 hours old, return it
+        // For listings, if summary exists, always use it (it was generated on submission)
+        // For other entities, check if it's recent (24 hours)
+        if (entityType === 'listing') {
+          return json({
+            ok: true,
+            summary: existingSummary,
+            model: entityData.aiAdminSummaryModel || 'gpt-4o-mini',
+            generatedAt: summaryDate.toISOString(),
+            cached: true,
+          });
+        }
+        
+        // For other entities, check age
+        const ageInHours = (Date.now() - summaryDate.getTime()) / (1000 * 60 * 60);
         if (ageInHours < 24) {
           return json({
             ok: true,

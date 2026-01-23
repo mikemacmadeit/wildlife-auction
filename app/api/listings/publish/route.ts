@@ -534,6 +534,46 @@ export async function POST(request: Request) {
         ...flagUpdate,
       });
 
+      // Generate AI summary immediately when listing goes to pending
+      // This runs async and non-blocking - if it fails, listing submission still succeeds
+      try {
+        const { generateAISummary, isAISummaryEnabled } = await import('@/lib/admin/ai-summary');
+        if (isAISummaryEnabled()) {
+          // Fetch full listing data for AI summary
+          const fullListingDoc = await listingRef.get();
+          if (fullListingDoc.exists) {
+            const fullListingData = {
+              ...fullListingDoc.data(),
+              id: fullListingDoc.id,
+            };
+            
+            // Generate summary in background (don't await - non-blocking)
+            generateAISummary({
+              entityType: 'listing',
+              entityData: fullListingData,
+              existingSummary: null, // Always generate new summary on submission
+            }).then((summaryResult) => {
+              if (summaryResult) {
+                // Update listing with AI summary
+                listingRef.update({
+                  aiAdminSummary: summaryResult.summary,
+                  aiAdminSummaryAt: Timestamp.now(),
+                  aiAdminSummaryModel: summaryResult.model,
+                }).catch((e: any) => {
+                  logError('Failed to save AI summary to listing', e, { listingId });
+                });
+              }
+            }).catch((e: any) => {
+              // Log but don't fail listing submission
+              logError('AI summary generation failed (non-blocking)', e, { listingId });
+            });
+          }
+        }
+      } catch (e: any) {
+        // AI summary generation is optional - don't block listing submission
+        logError('AI summary setup failed (non-blocking)', e, { listingId });
+      }
+
       // Admin notifications (email + in-app) for review queues.
       // Non-blocking: listing submission should not fail if notifications fail.
       try {

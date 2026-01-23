@@ -95,8 +95,20 @@ export async function generateAISummary(
     // Prepare structured data for the prompt
     const dataForPrompt = prepareDataForPrompt(options.entityType, options.entityData);
 
-    // Conservative prompt - neutral, factual, no speculation
-    const prompt = `Summarize the following information for an internal admin reviewer.
+    // Enhanced prompt for listings - more insightful and helpful
+    const isListing = options.entityType === 'listing';
+    const prompt = isListing
+      ? `You are an expert admin reviewer analyzing a marketplace listing submission. Provide a concise, insightful summary that helps admins quickly understand:
+1. **What this listing is** - Clear description of the item/service
+2. **Key highlights** - Notable features, quality indicators, or selling points
+3. **Potential concerns** - Missing information, pricing anomalies, compliance flags, or red flags
+4. **Seller context** - Seller verification status, experience level, or relevant history
+5. **Action items** - What admins should pay attention to during review
+
+Be specific, actionable, and focus on what matters for approval decisions. Highlight any unusual patterns, missing required information, or compliance considerations.
+
+${dataForPrompt}`
+      : `Summarize the following information for an internal admin reviewer.
 Focus on important facts, patterns, or issues.
 Be neutral, factual, and concise.
 Do not speculate or accuse.
@@ -115,14 +127,16 @@ ${dataForPrompt}`;
         messages: [
           {
             role: 'system',
-            content: 'You are an assistant that provides neutral, factual summaries for internal admin review. Focus on facts, patterns, and important information. Do not make judgments or accusations.',
+            content: isListing
+              ? 'You are an expert marketplace admin reviewer. Provide insightful, actionable summaries that help admins quickly understand listings and make approval decisions. Be specific about what matters - quality indicators, potential issues, compliance concerns, and seller context. Focus on what admins need to know, not just listing facts.'
+              : 'You are an assistant that provides neutral, factual summaries for internal admin review. Focus on facts, patterns, and important information. Do not make judgments or accusations.',
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        max_tokens: 200, // Keep summaries short (3-6 sentences)
+        max_tokens: isListing ? 400 : 200, // More tokens for listings to allow detailed analysis
         temperature: 0.3, // Lower temperature for more factual output
       }),
     });
@@ -239,37 +253,124 @@ function formatUserData(data: any): string {
 function formatListingData(data: any): string {
   const parts: string[] = [];
   
+  // Basic listing info
+  parts.push(`=== LISTING INFORMATION ===`);
   parts.push(`Listing ID: ${data.id || 'N/A'}`);
   parts.push(`Title: ${data.title || 'N/A'}`);
   parts.push(`Category: ${data.category || 'N/A'}`);
   parts.push(`Type: ${data.type || 'N/A'}`);
   parts.push(`Status: ${data.status || 'N/A'}`);
   parts.push(`Compliance Status: ${data.complianceStatus || 'none'}`);
-  parts.push(`Price: ${data.price || data.startingBid || 'N/A'}`);
-  parts.push(`Location: ${data.location?.city || ''}, ${data.location?.state || ''}`);
   
+  // Pricing analysis
+  parts.push(`\n=== PRICING ===`);
+  if (data.price) {
+    parts.push(`Fixed Price: $${data.price}`);
+  }
+  if (data.startingBid) {
+    parts.push(`Starting Bid: $${data.startingBid}`);
+  }
+  if (data.reservePrice) {
+    parts.push(`Reserve Price: $${data.reservePrice}`);
+  }
+  if (!data.price && !data.startingBid) {
+    parts.push(`⚠️ NO PRICE SET`);
+  }
+  
+  // Location
+  parts.push(`\n=== LOCATION ===`);
+  parts.push(`City: ${data.location?.city || 'N/A'}`);
+  parts.push(`State: ${data.location?.state || 'N/A'}`);
+  if (data.location?.zip) {
+    parts.push(`ZIP: ${data.location.zip}`);
+  }
+  
+  // Seller information
+  parts.push(`\n=== SELLER INFORMATION ===`);
   if (data.sellerId) {
     parts.push(`Seller ID: ${data.sellerId}`);
   }
+  if (data.sellerSnapshot) {
+    parts.push(`Seller Name: ${data.sellerSnapshot.displayName || 'N/A'}`);
+    parts.push(`Seller Verified: ${data.sellerSnapshot.verified ? 'YES' : 'NO ⚠️'}`);
+    if (data.sellerSnapshot.completedSalesCount !== undefined) {
+      parts.push(`Completed Sales: ${data.sellerSnapshot.completedSalesCount}`);
+    }
+    if (data.sellerSnapshot.badges && Array.isArray(data.sellerSnapshot.badges)) {
+      parts.push(`Seller Badges: ${data.sellerSnapshot.badges.join(', ')}`);
+    }
+  }
+  if (data.sellerTierSnapshot) {
+    parts.push(`Seller Tier: ${data.sellerTierSnapshot || 'standard'}`);
+  }
   
-  if (data.createdAt) {
+  // Description
+  parts.push(`\n=== DESCRIPTION ===`);
+  if (data.description && typeof data.description === 'string') {
+    const desc = data.description.trim();
+    if (desc.length > 0) {
+      parts.push(desc.length > 500 ? `${desc.substring(0, 500)}...` : desc);
+    } else {
+      parts.push(`⚠️ NO DESCRIPTION PROVIDED`);
+    }
+  } else {
+    parts.push(`⚠️ NO DESCRIPTION PROVIDED`);
+  }
+  
+  // Attributes (category-specific)
+  parts.push(`\n=== ATTRIBUTES ===`);
+  if (data.attributes) {
     try {
-      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
-      parts.push(`Created: ${createdAt.toISOString()}`);
+      const attrs = data.attributes;
+      // Format attributes in a readable way
+      Object.keys(attrs).forEach((key) => {
+        const value = attrs[key];
+        if (value !== null && value !== undefined && value !== '') {
+          parts.push(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`);
+        }
+      });
     } catch (e) {
-      // Ignore date parsing errors
+      parts.push(`Error parsing attributes`);
     }
   }
   
-  if (data.description && typeof data.description === 'string') {
-    parts.push(`Description: ${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}`);
+  // Compliance and flags
+  parts.push(`\n=== COMPLIANCE & FLAGS ===`);
+  if (data.complianceStatus && data.complianceStatus !== 'none') {
+    parts.push(`⚠️ COMPLIANCE REVIEW REQUIRED: ${data.complianceStatus}`);
+  }
+  if (data.internalFlags && Array.isArray(data.internalFlags) && data.internalFlags.length > 0) {
+    parts.push(`Internal Flags: ${data.internalFlags.join(', ')}`);
+  }
+  if (data.internalFlagsNotes) {
+    parts.push(`Internal Notes: ${data.internalFlagsNotes}`);
   }
   
-  if (data.attributes) {
+  // Trust indicators
+  if (data.trust) {
+    parts.push(`\n=== TRUST INDICATORS ===`);
+    parts.push(`Verified: ${data.trust.verified ? 'YES' : 'NO'}`);
+    parts.push(`Insurance Available: ${data.trust.insuranceAvailable ? 'YES' : 'NO'}`);
+    parts.push(`Transport Ready: ${data.trust.transportReady ? 'YES' : 'NO'}`);
+  }
+  
+  // Images
+  if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+    parts.push(`\n=== MEDIA ===`);
+    parts.push(`Number of Images: ${data.images.length}`);
+  } else {
+    parts.push(`\n=== MEDIA ===`);
+    parts.push(`⚠️ NO IMAGES PROVIDED`);
+  }
+  
+  // Timestamps
+  if (data.createdAt) {
     try {
-      parts.push(`Attributes: ${JSON.stringify(data.attributes)}`);
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+      parts.push(`\n=== TIMESTAMPS ===`);
+      parts.push(`Created: ${createdAt.toISOString()}`);
     } catch (e) {
-      // Ignore JSON stringify errors
+      // Ignore date parsing errors
     }
   }
   
