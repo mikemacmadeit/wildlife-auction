@@ -238,7 +238,7 @@ export function SavedSellersList(props: { className?: string }) {
       ) : (
         <div className="space-y-3">
           {filtered.map((s) => {
-            const usernameLabel = s.sellerUsername ? `@${s.sellerUsername}` : `@${s.sellerId.slice(0, 8)}`;
+            const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
             const hasRating = s.ratingCount > 0;
             const ratingLabel = hasRating ? s.ratingAverage.toFixed(1) : '—';
             const positiveLabel = s.itemsSold > 0 && s.positivePercent > 0 ? `${Math.round(s.positivePercent)}%` : '—';
@@ -284,6 +284,12 @@ export function SavedSellersList(props: { className?: string }) {
                     </div>
 
                     <div className="flex items-center gap-2 justify-end flex-wrap">
+                      <Button asChild variant="outline" className="min-h-[40px]">
+                        <Link href={shopHref}>
+                          <Store className="h-4 w-4 mr-2" />
+                          View seller store
+                        </Link>
+                      </Button>
                       <Button
                         className="min-h-[40px]"
                         disabled={messagingSellerId === s.sellerId || (typeof activeCount === 'number' && activeCount <= 0)}
@@ -312,13 +318,7 @@ export function SavedSellersList(props: { className?: string }) {
                         ) : (
                           <MessageCircle className="h-4 w-4 mr-2" />
                         )}
-                        Message
-                      </Button>
-                      <Button asChild variant="outline" className="min-h-[40px]">
-                        <Link href={shopHref}>
-                          <Store className="h-4 w-4 mr-2" />
-                          View Shop
-                        </Link>
+                        Message seller
                       </Button>
                       <Button
                         variant="destructive"

@@ -3,11 +3,12 @@
 import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle } from 'lucide-react';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
+import { useToast } from '@/hooks/use-toast';
 
 function toDateSafe(v: any): Date | null {
   if (!v) return null;
@@ -38,6 +40,8 @@ export default function HomePage() {
   const { user } = useAuth();
   const { recentIds } = useRecentlyViewed();
   const { favoriteIds, isLoading: favoritesLoading } = useFavorites();
+  const router = useRouter();
+  const { toast } = useToast();
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [mostWatched, setMostWatched] = useState<Listing[]>([]);
@@ -55,6 +59,7 @@ export default function HomePage() {
   const [savedSellers, setSavedSellers] = useState<SavedSellerDoc[]>([]);
   const [activeCountBySellerId, setActiveCountBySellerId] = useState<Record<string, number | null>>({});
   const activeCountBySellerIdRef = useRef<Record<string, number | null>>({});
+  const [messagingSellerId, setMessagingSellerId] = useState<string | null>(null);
   const [newFromSavedSellers, setNewFromSavedSellers] = useState<Listing[]>([]);
 
   // Keep a ref in sync so effects can read the latest cache without depending on it.
@@ -815,18 +820,17 @@ export default function HomePage() {
                     {savedSellers.slice(0, 12).map((s) => {
                       const activeCount = activeCountBySellerId[s.sellerId];
                       const href = `/sellers/${s.sellerId}`;
-                      const usernameLabel = s.sellerUsername ? `@${s.sellerUsername}` : `@${s.sellerId.slice(0, 8)}`;
+                      const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
                       const ratingCount = Number(s.ratingCount || 0) || 0;
                       const ratingAvg = Number(s.ratingAverage || 0) || 0;
                       const itemsSold = Number(s.itemsSold || 0) || 0;
                       const positivePercent = Number(s.positivePercent || 0) || 0;
                       const hasRating = ratingCount > 0 && ratingAvg > 0;
                       return (
-                        <Link
+                        <div
                           key={s.sellerId}
-                          href={href}
                           className={cn(
-                            'group relative min-w-[300px] sm:min-w-[360px] max-w-[360px] h-[190px]',
+                            'group relative min-w-[300px] sm:min-w-[360px] max-w-[360px] h-[236px]',
                             'rounded-2xl border-2 border-border/50 hover:border-primary/40 transition-all',
                             'bg-card/80 shadow-warm hover:shadow-lifted overflow-hidden'
                           )}
@@ -856,12 +860,6 @@ export default function HomePage() {
                                     <div className="font-extrabold leading-tight truncate text-base">
                                       {s.sellerDisplayName}
                                     </div>
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-[10px] font-semibold bg-primary/15 text-primary border border-primary/20"
-                                    >
-                                      Saved
-                                    </Badge>
                                   </div>
                                   <div className="text-xs text-muted-foreground truncate">{usernameLabel}</div>
                                   <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
@@ -903,17 +901,58 @@ export default function HomePage() {
                               </div>
                             </div>
 
-                            <div className="mt-auto pt-3">
-                              <div className="h-10 rounded-xl border border-border/60 bg-background/35 group-hover:bg-background/55 transition-colors flex items-center justify-between px-3">
-                                <span className="inline-flex items-center gap-2 text-xs font-extrabold tracking-wide text-primary">
+                            <div className="mt-auto pt-3 space-y-2">
+                              <Button asChild className="w-full h-10 rounded-xl font-extrabold">
+                                <Link href={href} className="inline-flex items-center justify-center gap-2">
                                   <Store className="h-4 w-4" />
                                   View seller store
-                                </span>
-                                <span className="text-xs text-muted-foreground">→</span>
-                              </div>
+                                </Link>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full h-10 rounded-xl font-extrabold"
+                                disabled={
+                                  messagingSellerId === s.sellerId || (typeof activeCount === 'number' && activeCount <= 0)
+                                }
+                                onClick={async () => {
+                                  if (!user?.uid) return;
+                                  try {
+                                    setMessagingSellerId(s.sellerId);
+                                    const listingsRef = collection(db, 'listings');
+                                    const q = query(
+                                      listingsRef,
+                                      where('sellerId', '==', s.sellerId),
+                                      where('status', '==', 'active'),
+                                      fsLimit(1)
+                                    );
+                                    const snap = await getDocs(q);
+                                    const listingId = snap.docs[0]?.id;
+                                    if (!listingId) {
+                                      toast({
+                                        title: 'No active listings',
+                                        description: 'This seller has no active listings to message about yet.',
+                                      });
+                                      return;
+                                    }
+                                    router.push(`/dashboard/messages?listingId=${listingId}&sellerId=${s.sellerId}`);
+                                  } catch {
+                                    toast({
+                                      title: 'Error',
+                                      description: 'Failed to start a message',
+                                      variant: 'destructive',
+                                    });
+                                  } finally {
+                                    setMessagingSellerId(null);
+                                  }
+                                }}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Message seller
+                              </Button>
                             </div>
                           </div>
-                        </Link>
+                        </div>
                       );
                     })}
                   </div>
