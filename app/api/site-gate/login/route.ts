@@ -43,8 +43,15 @@ export async function POST(req: Request) {
   const password = String(body?.password || '').trim();
   const next = String(body?.next || '/').trim() || '/';
 
-  // Case-insensitive password comparison (only change from original)
-  if (!password || password.toLowerCase() !== passwordEnv.toLowerCase()) {
+  // EXACT original password check - case sensitive
+  if (!password || password !== passwordEnv) {
+    console.log('[Site Gate] Password mismatch:', {
+      provided: password,
+      expected: passwordEnv,
+      providedLength: password.length,
+      expectedLength: passwordEnv.length,
+      match: password === passwordEnv,
+    });
     return json({ error: 'Invalid password' }, { status: 401 });
   }
 
