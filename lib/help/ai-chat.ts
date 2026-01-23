@@ -208,8 +208,8 @@ Provide an incredibly helpful, friendly, and comprehensive answer. Use the knowl
             content: userPrompt,
           },
         ],
-        max_tokens: 500, // Allow comprehensive, detailed answers
-        temperature: 0.6, // Higher for more natural, conversational, helpful tone
+        max_tokens: 700, // Allow very comprehensive, detailed answers
+        temperature: 0.75, // Higher for more natural, empathetic, conversational, helpful tone
       }),
     });
 
