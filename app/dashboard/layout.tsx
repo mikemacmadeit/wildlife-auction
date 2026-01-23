@@ -57,6 +57,8 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
+import { QuickSetupTour } from '@/components/onboarding/QuickSetupTour';
+import { useQuickSetupTour } from '@/hooks/use-quick-setup-tour';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import {
@@ -117,6 +119,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const { user, loading } = useAuth();
   const { isAdmin, isSuperAdmin, loading: adminLoading, role } = useAdmin();
+  const { shouldShow: showTour, markDismissed, markCompleted } = useQuickSetupTour();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
@@ -405,6 +408,11 @@ export default function DashboardLayout({
   return (
     <RequireAuth>
       <ProfileCompletionGate />
+      <QuickSetupTour
+        open={showTour}
+        onClose={markDismissed}
+        onComplete={markCompleted}
+      />
       <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside
