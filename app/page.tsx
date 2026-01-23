@@ -374,6 +374,9 @@ export default function HomePage() {
       startY: number;
       startScrollLeft: number;
       dragged: boolean;
+      lastDragAtMs: number;
+      rafId: number | null;
+      pendingScrollLeft: number | null;
     }>({ active: false, startX: 0, startY: 0, startScrollLeft: 0, dragged: false });
     const [isDragging, setIsDragging] = useState(false);
     if (!props.listings.length) {
@@ -393,9 +396,11 @@ export default function HomePage() {
       if (!el) return;
       dragRef.current.active = true;
       dragRef.current.dragged = false;
+      dragRef.current.lastDragAtMs = 0;
       dragRef.current.startX = clientX;
       dragRef.current.startY = clientY;
       dragRef.current.startScrollLeft = el.scrollLeft;
+      dragRef.current.pendingScrollLeft = null;
       setIsDragging(true);
     };
 
@@ -430,12 +435,27 @@ export default function HomePage() {
         }
       }
 
-      if (Math.abs(dx) > 4) dragRef.current.dragged = true;
+      // Require a deliberate horizontal drag before we enter "dragging" mode
+      // so normal clicks don't get blocked by tiny pointer jitter.
+      if (Math.abs(dx) > 12) {
+        if (!dragRef.current.dragged) dragRef.current.lastDragAtMs = Date.now();
+        dragRef.current.dragged = true;
+      }
       if (!dragRef.current.dragged) return;
 
       // Prevent selecting text/images while dragging.
       e.preventDefault?.();
-      el.scrollLeft = dragRef.current.startScrollLeft - dx;
+
+      const nextLeft = dragRef.current.startScrollLeft - dx;
+      dragRef.current.pendingScrollLeft = nextLeft;
+
+      if (dragRef.current.rafId == null) {
+        dragRef.current.rafId = window.requestAnimationFrame(() => {
+          dragRef.current.rafId = null;
+          if (dragRef.current.pendingScrollLeft == null) return;
+          el.scrollLeft = dragRef.current.pendingScrollLeft;
+        });
+      }
     };
 
     const onPointerMove = (e: React.PointerEvent) => {
@@ -454,11 +474,14 @@ export default function HomePage() {
         // ignore
       }
 
-      // Reset dragged state shortly after to allow normal clicks.
+      // Mark the end of a drag so we can suppress the synthetic click that follows a drag.
       if (dragRef.current.dragged) {
+        dragRef.current.lastDragAtMs = Date.now();
         window.setTimeout(() => {
           dragRef.current.dragged = false;
-        }, 0);
+        }, 220);
+      } else {
+        dragRef.current.lastDragAtMs = 0;
       }
     };
 
@@ -541,8 +564,9 @@ export default function HomePage() {
             e.preventDefault();
           }}
           onClickCapture={(e) => {
-            // If a drag happened, suppress the click so we don't open a listing while scrolling.
-            if (dragRef.current.dragged) {
+            // If a drag just happened, suppress the click so we don't open a listing while scrolling.
+            const ms = dragRef.current.lastDragAtMs;
+            if (ms && Date.now() - ms < 300) {
               e.preventDefault();
               e.stopPropagation();
             }
