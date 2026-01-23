@@ -147,6 +147,7 @@ export function ProfileCompletionModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
