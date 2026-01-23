@@ -205,6 +205,26 @@ export function HelpLauncher() {
             consumeTourPrompt();
             setTourOpen(false);
           }}
+          onAdvanceFormStep={(formStepId) => {
+            // For create listing tour, advance the form step when needed
+            if (helpKey === 'dashboard_listing_create') {
+              // Find the StepperForm's Next button and click it programmatically
+              // We'll use a custom event that the listing page can listen to
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('tour:advance-form-step', { detail: { stepId: formStepId } }));
+              }
+            }
+          }}
+          formStepMap={
+            helpKey === 'dashboard_listing_create'
+              ? {
+                  category: 'category',
+                  title: 'details',
+                  pricing: 'details', // Pricing is also in the details step
+                  publish: 'review',
+                }
+              : undefined
+          }
         />
       ) : null}
     </>

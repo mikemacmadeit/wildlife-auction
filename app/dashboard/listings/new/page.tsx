@@ -2858,8 +2858,15 @@ function NewListingPageContent() {
             showSavingBar={false}
             suppressValidationToast={true}
             completeButtonDataTour="listing-publish"
+            activeStepId={tourRequestedStep}
             onValidationError={(stepId) => {
               setValidationAttempted((prev) => ({ ...prev, [stepId]: true }));
+            }}
+            onStepChange={(stepId) => {
+              // Clear tour request after step changes
+              if (tourRequestedStep === stepId) {
+                setTourRequestedStep(null);
+              }
             }}
           />
         </div>

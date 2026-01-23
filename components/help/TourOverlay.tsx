@@ -23,8 +23,10 @@ export function TourOverlay(props: {
   title: string;
   steps: TourStep[];
   onClose: () => void;
+  onAdvanceFormStep?: (stepId: string) => void; // Optional callback to advance form step
+  formStepMap?: Record<string, string>; // Map tour step IDs to form step IDs
 }) {
-  const { open, title, steps, onClose } = props;
+  const { open, title, steps, onClose, onAdvanceFormStep, formStepMap } = props;
   const [mounted, setMounted] = useState(false);
   const [idx, setIdx] = useState(0);
   const [targetEl, setTargetEl] = useState<Element | null>(null);
@@ -89,6 +91,41 @@ export function TourOverlay(props: {
       return null;
     };
 
+    // Check if current step's element exists
+    const el = document.querySelector(activeStep.selector);
+    
+    // If element doesn't exist and we have form step mapping, try to advance the form
+    if (!el && onAdvanceFormStep && formStepMap && activeStep.id) {
+      const formStepId = formStepMap[activeStep.id];
+      if (formStepId) {
+        // Try advancing the form step, then wait a bit for it to render
+        onAdvanceFormStep(formStepId);
+        // Wait for the element to appear (with a timeout)
+        let attempts = 0;
+        const maxAttempts = 30; // 3 seconds max wait
+        const checkInterval = setInterval(() => {
+          attempts++;
+          const found = document.querySelector(activeStep.selector);
+          if (found || attempts >= maxAttempts) {
+            clearInterval(checkInterval);
+            if (found) {
+              resolveTarget();
+            } else {
+              // Element still not found after waiting, try to find first available step
+              const available = findFirstAvailable();
+              if (available === null) {
+                onClose();
+              } else if (available !== idx) {
+                setIdx(available);
+              }
+            }
+          }
+        }, 100);
+        return () => clearInterval(checkInterval);
+      }
+    }
+
+    // Find first available step if current target is missing
     const available = findFirstAvailable();
     if (available === null) {
       // Nothing to show; close gracefully.
