@@ -51,8 +51,10 @@ export async function POST(req: Request) {
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'SameSite=Lax',
+    process.env.NODE_ENV === 'production' ? 'Secure' : '',
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
+    .filter(Boolean)
     .join('; ');
 
   return json(

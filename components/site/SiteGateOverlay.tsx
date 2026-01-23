@@ -41,15 +41,19 @@ export function SiteGateOverlay() {
                 const res = await fetch('/api/site-gate/login', {
                   method: 'POST',
                   headers: { 'content-type': 'application/json' },
+                  credentials: 'include',
                   body: JSON.stringify({ password, next }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
                   setError(data?.error || 'Invalid password');
+                  setLoading(false);
                   return;
                 }
-                // Redirect to home to force fresh server render with cookie
-                window.location.href = '/';
+                // Cookie is set in response headers via Set-Cookie
+                // Full page reload ensures cookie is available on next page
+                const redirectTo = data?.redirect || next || '/';
+                window.location.href = redirectTo;
               } catch (e: any) {
                 setError(e?.message || 'Failed to sign in');
               } finally {
