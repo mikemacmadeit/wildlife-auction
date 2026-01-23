@@ -66,14 +66,73 @@ async function resizeToJpeg(file: File, maxDimension = 900, quality = 0.86): Pro
 }
 
 export async function uploadUserAvatar(
-  file: File,
+  fileOrBlob: File | Blob,
   onProgress?: (pct: number) => void
 ): Promise<{ downloadUrl: string; storagePath: string; width: number; height: number; bytes: number }> {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('User must be authenticated');
 
-    const { blob, rect } = await resizeToJpeg(file, 900, 0.86);
+    // If it's already a Blob (from cropping), use it directly; otherwise resize the File
+    let blob: Blob;
+    let rect: Rect;
+    
+    if (fileOrBlob instanceof Blob && !(fileOrBlob instanceof File)) {
+      // Already a cropped blob, just resize it to max 900px
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const url = URL.createObjectURL(fileOrBlob);
+        const el = new Image();
+        el.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(el);
+        };
+        el.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Failed to load image'));
+        };
+        el.src = url;
+      });
+
+      let w = img.width || 1;
+      let h = img.height || 1;
+      const maxDimension = 900;
+
+      if (w > h) {
+        if (w > maxDimension) {
+          h = Math.round((h * maxDimension) / w);
+          w = maxDimension;
+        }
+      } else {
+        if (h > maxDimension) {
+          w = Math.round((w * maxDimension) / h);
+          h = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to create canvas context');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => {
+            if (b) resolve(b);
+            else reject(new Error('Failed to encode JPEG'));
+          },
+          'image/jpeg',
+          0.86
+        );
+      });
+      rect = { width: w, height: h };
+    } else {
+      // It's a File, use existing resize logic
+      const { blob: resizedBlob, rect: resizedRect } = await resizeToJpeg(fileOrBlob as File, 900, 0.86);
+      blob = resizedBlob;
+      rect = resizedRect;
+    }
     const storagePath = `users/${user.uid}/profile/avatar.jpg`;
     const storageRef = ref(storage, storagePath);
 

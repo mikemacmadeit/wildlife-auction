@@ -76,11 +76,11 @@ export function QuickSetupTour({ open, onClose, onComplete }: QuickSetupTourProp
       const profile = await getUserProfile(user.uid);
       setUserProfile(profile);
       
-      const profileOk = profile && isProfileComplete(profile);
+      const profileOk = profile ? isProfileComplete(profile) : false;
       const emailOk = user.emailVerified === true;
-      const stripeOk = profile?.stripeOnboardingStatus === 'complete' && 
+      const stripeOk = !!(profile?.stripeOnboardingStatus === 'complete' && 
                        profile?.payoutsEnabled === true && 
-                       profile?.chargesEnabled === true;
+                       profile?.chargesEnabled === true);
 
       setStatus({
         profileComplete: profileOk,

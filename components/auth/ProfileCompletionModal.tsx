@@ -19,6 +19,7 @@ import { updateUserProfile } from '@/lib/firebase/users';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { useAuth } from '@/hooks/use-auth';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
+import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/AvatarCropDialog';
 
 interface ProfileCompletionModalProps {
   open: boolean;
@@ -41,6 +42,8 @@ export function ProfileCompletionModal({
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadPct, setAvatarUploadPct] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     fullName: userDisplayName || '',
     phone: '',
@@ -227,23 +230,24 @@ export function ProfileCompletionModal({
                     const f = e.target.files?.[0];
                     e.target.value = '';
                     if (!f) return;
-                    try {
-                      setAvatarUploading(true);
-                      setAvatarUploadPct(0);
-                      const { downloadUrl } = await uploadUserAvatar(f, (pct) => setAvatarUploadPct(pct));
-                      setAvatarUrl(downloadUrl);
-                      toast({ title: 'Photo ready', description: 'Looks good — we’ll save it when you finish this step.' });
-                    } catch (err: any) {
-                      console.error('Avatar upload failed', err);
+                    
+                    // Show crop dialog first
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      const result = event.target?.result;
+                      if (typeof result === 'string') {
+                        setCropImageSrc(result);
+                        setCropDialogOpen(true);
+                      }
+                    };
+                    reader.onerror = () => {
                       toast({
-                        title: 'Upload failed',
-                        description: err?.message || 'Could not upload your photo. Please try again.',
+                        title: 'Failed to read image',
+                        description: 'Could not load the selected image. Please try again.',
                         variant: 'destructive',
                       });
-                    } finally {
-                      setAvatarUploading(false);
-                      setAvatarUploadPct(0);
-                    }
+                    };
+                    reader.readAsDataURL(f);
                   }}
                 />
               </label>
@@ -428,6 +432,39 @@ export function ProfileCompletionModal({
           </Button>
         </form>
       </DialogContent>
+      
+      {/* Avatar Crop Dialog */}
+      {cropImageSrc && (
+        <AvatarCropDialog
+          open={cropDialogOpen}
+          onOpenChange={setCropDialogOpen}
+          imageSrc={cropImageSrc}
+          onSave={async (result: AvatarCropResult) => {
+            setCropDialogOpen(false);
+            try {
+              setAvatarUploading(true);
+              setAvatarUploadPct(0);
+              const { downloadUrl } = await uploadUserAvatar(result.croppedImageBlob, (pct) => setAvatarUploadPct(pct));
+              setAvatarUrl(downloadUrl);
+              if (result.croppedImageUrl) {
+                URL.revokeObjectURL(result.croppedImageUrl);
+              }
+              toast({ title: 'Photo ready', description: 'Looks good — we'll save it when you finish this step.' });
+            } catch (err: any) {
+              console.error('Avatar upload failed', err);
+              toast({
+                title: 'Upload failed',
+                description: err?.message || 'Could not upload your photo. Please try again.',
+                variant: 'destructive',
+              });
+            } finally {
+              setAvatarUploading(false);
+              setAvatarUploadPct(0);
+              setCropImageSrc(null);
+            }
+          }}
+        />
+      )}
     </Dialog>
   );
 }

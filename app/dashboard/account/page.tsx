@@ -44,6 +44,7 @@ import { PublicSellerTrust, UserProfile } from '@/lib/types';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
+import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/AvatarCropDialog';
 import { auth } from '@/lib/firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
@@ -61,6 +62,8 @@ export default function AccountPage() {
   const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadPct, setAvatarUploadPct] = useState(0);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [pwCurrent, setPwCurrent] = useState('');
   const [pwNext, setPwNext] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
@@ -391,12 +394,41 @@ export default function AccountPage() {
     if (!file) return;
     if (!user?.uid) return;
 
+    // Show crop dialog first
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') {
+        setCropImageSrc(result);
+        setCropDialogOpen(true);
+      }
+    };
+    reader.onerror = () => {
+      toast({
+        title: 'Failed to read image',
+        description: 'Could not load the selected image. Please try again.',
+        variant: 'destructive',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropSave = async (result: AvatarCropResult) => {
+    if (!user?.uid) return;
+    setCropDialogOpen(false);
+
     try {
       setAvatarUploading(true);
       setAvatarUploadPct(0);
 
-      const { downloadUrl } = await uploadUserAvatar(file, (pct) => setAvatarUploadPct(pct));
+      // Upload the cropped blob
+      const { downloadUrl } = await uploadUserAvatar(result.croppedImageBlob, (pct) => setAvatarUploadPct(pct));
       await setCurrentUserAvatarUrl(downloadUrl);
+
+      // Clean up the object URL
+      if (result.croppedImageUrl) {
+        URL.revokeObjectURL(result.croppedImageUrl);
+      }
 
       // Refresh local UI state (avoid waiting for a full refetch).
       setUserProfile((prev) => (prev ? ({ ...prev, photoURL: downloadUrl } as any) : prev));
@@ -415,6 +447,7 @@ export default function AccountPage() {
     } finally {
       setAvatarUploading(false);
       setAvatarUploadPct(0);
+      setCropImageSrc(null);
     }
   };
 
@@ -1104,6 +1137,16 @@ export default function AccountPage() {
       </div>
 
       <BottomNav />
+      
+      {/* Avatar Crop Dialog */}
+      {cropImageSrc && (
+        <AvatarCropDialog
+          open={cropDialogOpen}
+          onOpenChange={setCropDialogOpen}
+          imageSrc={cropImageSrc}
+          onSave={handleCropSave}
+        />
+      )}
     </div>
   );
 }
