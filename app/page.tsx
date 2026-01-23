@@ -377,7 +377,16 @@ export default function HomePage() {
       lastDragAtMs: number;
       rafId: number | null;
       pendingScrollLeft: number | null;
-    }>({ active: false, startX: 0, startY: 0, startScrollLeft: 0, dragged: false });
+    }>({
+      active: false,
+      startX: 0,
+      startY: 0,
+      startScrollLeft: 0,
+      dragged: false,
+      lastDragAtMs: 0,
+      rafId: null,
+      pendingScrollLeft: null,
+    });
     const [isDragging, setIsDragging] = useState(false);
     if (!props.listings.length) {
       return (
