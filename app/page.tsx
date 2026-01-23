@@ -375,6 +375,7 @@ export default function HomePage() {
       startScrollLeft: number;
       dragged: boolean;
     }>({ active: false, startX: 0, startY: 0, startScrollLeft: 0, dragged: false });
+    const [isDragging, setIsDragging] = useState(false);
     if (!props.listings.length) {
       return (
         <Card className="border-2 border-border/50">
@@ -387,18 +388,22 @@ export default function HomePage() {
     // This avoids “some huge, some small” cards when different variants render.
     const itemClass = 'w-[280px] sm:w-[320px] lg:w-[340px] h-[420px]';
 
+    const beginDrag = (clientX: number, clientY: number) => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      dragRef.current.active = true;
+      dragRef.current.dragged = false;
+      dragRef.current.startX = clientX;
+      dragRef.current.startY = clientY;
+      dragRef.current.startScrollLeft = el.scrollLeft;
+      setIsDragging(true);
+    };
+
     const onPointerDown = (e: React.PointerEvent) => {
       // Desktop: allow grab-to-scroll with mouse/trackpad pointer.
       // Ignore non-primary buttons.
       if (e.button !== 0) return;
-      const el = scrollerRef.current;
-      if (!el) return;
-
-      dragRef.current.active = true;
-      dragRef.current.dragged = false;
-      dragRef.current.startX = e.clientX;
-      dragRef.current.startY = e.clientY;
-      dragRef.current.startScrollLeft = el.scrollLeft;
+      beginDrag(e.clientX, e.clientY);
 
       // Capture pointer so dragging continues even if leaving the element.
       try {
@@ -408,7 +413,7 @@ export default function HomePage() {
       }
     };
 
-    const onPointerMove = (e: React.PointerEvent) => {
+    const moveDrag = (e: { clientX: number; clientY: number; preventDefault?: () => void }) => {
       const el = scrollerRef.current;
       if (!el) return;
       if (!dragRef.current.active) return;
@@ -420,6 +425,7 @@ export default function HomePage() {
       if (!dragRef.current.dragged) {
         if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
           dragRef.current.active = false;
+          setIsDragging(false);
           return;
         }
       }
@@ -428,15 +434,22 @@ export default function HomePage() {
       if (!dragRef.current.dragged) return;
 
       // Prevent selecting text/images while dragging.
-      e.preventDefault();
+      e.preventDefault?.();
       el.scrollLeft = dragRef.current.startScrollLeft - dx;
     };
 
-    const endDrag = (e: React.PointerEvent) => {
+    const onPointerMove = (e: React.PointerEvent) => {
+      moveDrag(e);
+    };
+
+    const endDrag = (e?: { pointerId?: number; currentTarget?: any }) => {
       // Release capture and end drag state.
       dragRef.current.active = false;
+      setIsDragging(false);
       try {
-        (e.currentTarget as any)?.releasePointerCapture?.(e.pointerId);
+        if (e?.currentTarget && typeof e?.pointerId === 'number') {
+          (e.currentTarget as any)?.releasePointerCapture?.(e.pointerId);
+        }
       } catch {
         // ignore
       }
@@ -503,14 +516,29 @@ export default function HomePage() {
           className={cn(
             'overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth we-scrollbar-hover',
             // Desktop UX: grab cursor for draggable rails.
-            'md:cursor-grab'
+            'md:cursor-grab',
+            isDragging && 'md:cursor-grabbing select-none'
           )}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          onPointerUp={(e) => endDrag(e)}
+          onPointerCancel={(e) => endDrag(e)}
           onPointerLeave={(e) => {
             if (dragRef.current.active) endDrag(e);
+          }}
+          // Fallback for environments where pointer events are flaky:
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            beginDrag(e.clientX, e.clientY);
+          }}
+          onMouseMove={(e) => {
+            if (!dragRef.current.active) return;
+            moveDrag(e);
+          }}
+          onMouseUp={() => endDrag()}
+          // Prevent native link/image drag from taking over (common cause of "not draggable").
+          onDragStartCapture={(e) => {
+            e.preventDefault();
           }}
           onClickCapture={(e) => {
             // If a drag happened, suppress the click so we don't open a listing while scrolling.
