@@ -111,17 +111,19 @@ export default function RootLayout({
     }
   }
   
-  // Read cookie and decode it (cookie is set with encodeURIComponent)
-  const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
-  const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';
+  // Next.js cookies().get() automatically decodes URL-encoded values
+  // So we read it directly without additional decoding
+  const gateCookie = cookies().get('we:site_gate:v1')?.value || '';
   const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
   
   // Debug logging (server-side, visible in build logs)
   if (gateEnabled && !gateAllowed) {
     console.log('[Site Gate] Access check:', {
       hasCookie: !!gateCookie,
-      cookieValue: gateCookie ? `${gateCookie.substring(0, 5)}***` : '(empty)',
-      expectedToken: gateToken ? `${gateToken.substring(0, 5)}***` : '(empty)',
+      cookieValue: gateCookie ? `${gateCookie.substring(0, 10)}***` : '(empty)',
+      expectedToken: gateToken ? `${gateToken.substring(0, 10)}***` : '(empty)',
+      cookieLength: gateCookie.length,
+      tokenLength: gateToken.length,
       match: gateCookie === gateToken,
     });
   }

@@ -90,7 +90,7 @@ export async function POST(req: Request) {
   const finalToken = !process.env.SITE_GATE_TOKEN ? `pw:${normalizedExpected}` : token;
   
   // Set cookie using manual header (original working method)
-  // Cookie value is URL-encoded, layout will decode it
+  // Next.js cookies().get() automatically decodes URL-encoded values
   const cookie = [
     `${COOKIE_NAME}=${encodeURIComponent(finalToken)}`,
     'Path=/',
