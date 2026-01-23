@@ -43,15 +43,20 @@ export async function POST(req: Request) {
   const password = String(body?.password || '').trim();
   const next = String(body?.next || '/').trim() || '/';
 
+  // Log everything for debugging
+  console.log('[Site Gate] Login attempt:', {
+    passwordProvided: password,
+    passwordExpected: passwordEnv,
+    passwordProvidedLength: password.length,
+    passwordExpectedLength: passwordEnv.length,
+    passwordMatch: password === passwordEnv,
+    token: token,
+    tokenLength: token?.length || 0,
+  });
+
   // EXACT original password check - case sensitive
   if (!password || password !== passwordEnv) {
-    console.log('[Site Gate] Password mismatch:', {
-      provided: password,
-      expected: passwordEnv,
-      providedLength: password.length,
-      expectedLength: passwordEnv.length,
-      match: password === passwordEnv,
-    });
+    console.log('[Site Gate] ❌ PASSWORD MISMATCH - Access denied');
     return json({ error: 'Invalid password' }, { status: 401 });
   }
 
@@ -68,6 +73,12 @@ export async function POST(req: Request) {
   ]
     .filter(Boolean)
     .join('; ');
+
+  console.log('[Site Gate] ✅ PASSWORD MATCH - Setting cookie:', {
+    cookieName: COOKIE_NAME,
+    token: token,
+    cookieHeader: cookie.substring(0, 100) + '...',
+  });
 
   return json(
     { ok: true, redirect: next },
