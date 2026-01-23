@@ -526,7 +526,7 @@ export default function HomePage() {
 
     return (
       <div className="group/rail relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
-        {/* Arrows: centered over the image area (middle of first/last card image) */}
+        {/* Arrows: sit in the rail gutters (ends of the section), not on top of card images */}
         <div
           className={cn(
             'hidden md:block absolute left-0 right-0 z-30',
@@ -584,7 +584,8 @@ export default function HomePage() {
           ref={scrollerRef}
           className={cn(
             // NOTE: no scroll-smooth here; it makes drag-scrolling feel like it "catches up" after release.
-            'overflow-x-auto pb-2 -mx-4 px-4 we-scrollbar-hover snap-x snap-proximity',
+            // Add side gutters on desktop so the arrow buttons don't overlap card images.
+            'overflow-x-auto pb-2 -mx-4 px-4 md:px-14 we-scrollbar-hover snap-x snap-proximity',
             // Desktop UX: grab cursor for draggable rails.
             'md:cursor-grab',
             isDragging && 'md:cursor-grabbing select-none'
