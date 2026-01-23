@@ -58,7 +58,8 @@ export function HelpChat({ onSwitchToSupport }: { onSwitchToSupport: () => void 
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput('');
     setLoading(true);
 
@@ -120,6 +121,8 @@ export function HelpChat({ onSwitchToSupport }: { onSwitchToSupport: () => void 
         });
       }
     } catch (e: any) {
+      // Remove the user message on error so user can retry
+      setMessages(messages);
       toast({
         title: 'Chat Error',
         description: e?.message || 'Failed to send message. Please try again or contact support.',
@@ -128,7 +131,7 @@ export function HelpChat({ onSwitchToSupport }: { onSwitchToSupport: () => void 
     } finally {
       setLoading(false);
     }
-  }, [input, loading, user, context, messages.length, toast]);
+  }, [input, loading, user, context, messages, toast]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

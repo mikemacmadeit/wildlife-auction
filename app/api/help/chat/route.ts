@@ -126,5 +126,35 @@ export async function POST(request: Request) {
     answer: result.answer,
     sources: result.sources,
     kbAvailable: result.kbAvailable,
+    suggestedQuestions,
   });
+}
+
+/**
+ * Generate suggested follow-up questions based on the user's question and the answer
+ */
+function generateSuggestedQuestions(userQuestion: string, answer: string): string[] {
+  const questionLower = userQuestion.toLowerCase();
+  const suggestions: string[] = [];
+  
+  // Common follow-ups based on question type
+  if (questionLower.includes('sign in') || questionLower.includes('login')) {
+    suggestions.push('How do I reset my password?', 'Why is my email not verified?');
+  } else if (questionLower.includes('list') || questionLower.includes('sell')) {
+    suggestions.push('What are the seller fees?', 'How do I add photos to my listing?');
+  } else if (questionLower.includes('buy') || questionLower.includes('purchase')) {
+    suggestions.push('What payment methods are accepted?', 'How long does delivery take?');
+  } else if (questionLower.includes('bid') || questionLower.includes('auction')) {
+    suggestions.push('How does proxy bidding work?', 'What is a reserve price?');
+  } else if (questionLower.includes('refund') || questionLower.includes('return')) {
+    suggestions.push('How do I open a dispute?', 'What if I don\'t receive my order?');
+  } else if (questionLower.includes('deliver') || questionLower.includes('ship')) {
+    suggestions.push('How do I track my order?', 'What are the delivery options?');
+  } else {
+    // Generic helpful suggestions
+    suggestions.push('How do I contact support?', 'What are the platform fees?');
+  }
+  
+  // Limit to 3 suggestions
+  return suggestions.slice(0, 3);
 }
