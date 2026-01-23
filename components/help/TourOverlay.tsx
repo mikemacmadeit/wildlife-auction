@@ -92,10 +92,10 @@ export function TourOverlay(props: {
     };
 
     // Check if current step's element exists
-    const el = document.querySelector(activeStep.selector);
+    const currentEl = document.querySelector(activeStep.selector);
     
     // If element doesn't exist and we have form step mapping, try to advance the form
-    if (!el && onAdvanceFormStep && formStepMap && activeStep.id) {
+    if (!currentEl && onAdvanceFormStep && formStepMap && activeStep.id) {
       const formStepId = formStepMap[activeStep.id];
       if (formStepId) {
         // Try advancing the form step, then wait a bit for it to render
@@ -138,10 +138,10 @@ export function TourOverlay(props: {
     }
 
     resolveTarget();
-    // Scroll the target into view for a “guided” feel.
-    const el = document.querySelector(activeStep.selector);
+    // Scroll the target into view for a "guided" feel.
+    const scrollEl = document.querySelector(activeStep.selector);
     try {
-      (el as any)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      (scrollEl as any)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     } catch {
       // ignore
     }
