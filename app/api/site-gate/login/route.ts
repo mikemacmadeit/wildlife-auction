@@ -1,5 +1,7 @@
 export const runtime = 'nodejs';
 
+import { cookies } from 'next/headers';
+
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -103,27 +105,20 @@ export async function POST(req: Request) {
     }
   }
 
-  // httpOnly cookie so it's not readable by JS.
-  const cookie = [
-    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    // Use Secure in production so cookie only travels over HTTPS.
-    process.env.NODE_ENV === 'production' ? 'Secure' : '',
-    // 7 days
-    `Max-Age=${7 * 24 * 60 * 60}`,
-  ]
-    .filter(Boolean)
-    .join('; ');
+  // Set cookie using Next.js cookies() API for proper server-side handling
+  const cookieStore = cookies();
+  cookieStore.set(COOKIE_NAME, token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  });
 
   return json(
     { ok: true, redirect: next },
     {
       status: 200,
-      headers: {
-        'Set-Cookie': cookie,
-      },
     }
   );
 }
