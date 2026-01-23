@@ -21,7 +21,9 @@ function expectedToken(): string | null {
   const t = String(process.env.SITE_GATE_TOKEN || '').trim();
   if (t) return t;
   const p = String(process.env.SITE_GATE_PASSWORD || '').trim();
-  return p ? `pw:${p}` : null;
+  // Normalize password for token generation (lowercase, no spaces) to match comparison logic
+  const normalized = p.toLowerCase().replace(/\s+/g, '');
+  return normalized ? `pw:${normalized}` : null;
 }
 
 export async function POST(req: Request) {
@@ -43,39 +45,34 @@ export async function POST(req: Request) {
   const password = String(body?.password || '').trim();
   const next = String(body?.next || '/').trim() || '/';
 
-  // Always log in production for debugging (can be removed later)
-  console.log('[Site Gate] Password check:', {
-    provided: password ? `${password.substring(0, 2)}***` : '(empty)',
-    providedLength: password.length,
-    expectedLength: passwordEnv.length,
-    providedLower: password.toLowerCase(),
-    expectedLower: passwordEnv.toLowerCase(),
-    match: password.toLowerCase() === passwordEnv.toLowerCase(),
-  });
-
   if (!password) {
     return json({ error: 'Password is required' }, { status: 401 });
   }
 
-  // Case-insensitive comparison for better mobile compatibility
-  // Also normalize whitespace (remove all spaces)
+  // Normalize both passwords: lowercase and remove all whitespace
   const normalizedProvided = password.toLowerCase().replace(/\s+/g, '');
   const normalizedExpected = passwordEnv.toLowerCase().replace(/\s+/g, '');
   
+  // Always log for debugging (visible in Netlify function logs)
+  console.log('[Site Gate] Password check:', {
+    providedRaw: password,
+    expectedRaw: passwordEnv,
+    normalizedProvided,
+    normalizedExpected,
+    match: normalizedProvided === normalizedExpected,
+    token: token ? `${token.substring(0, 10)}***` : '(none)',
+  });
+  
   if (normalizedProvided !== normalizedExpected) {
-    console.log('[Site Gate] Password mismatch:', {
-      normalizedProvided,
-      normalizedExpected,
-      providedRaw: password,
-      expectedRaw: passwordEnv,
-    });
     return json({ 
       error: 'Invalid password. Please check your password and try again.',
-      // Show helpful debug info
+      // Always show debug info to help diagnose
       debug: {
         providedLength: password.length,
         expectedLength: passwordEnv.length,
-        normalizedMatch: normalizedProvided === normalizedExpected,
+        normalizedProvided,
+        normalizedExpected,
+        match: false,
       }
     }, { status: 401 });
   }
