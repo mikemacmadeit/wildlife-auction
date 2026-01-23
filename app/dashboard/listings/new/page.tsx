@@ -561,7 +561,12 @@ function NewListingPageContent() {
                       TPWD-permitted whitetail deer breeding facilities
                     </p>
                     <div className="flex flex-wrap gap-2 justify-start md:justify-center">
-                      <Badge variant="outline" className="text-[11px]">TPWD PERMIT REQUIRED</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-[11px] whitespace-nowrap px-2"
+                      >
+                        TPWD PERMIT REQUIRED
+                      </Badge>
                       {!canSelectWhitetail ? (
                         <Badge variant="secondary" className="text-[11px] capitalize">
                           {whitetailPermitStatus || 'not submitted'}
