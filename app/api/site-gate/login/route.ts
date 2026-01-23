@@ -72,14 +72,13 @@ export async function POST(req: Request) {
   }
 
   // httpOnly cookie so it's not readable by JS.
-  // Use SameSite=None with Secure for better mobile compatibility, fallback to Lax
-  const isSecure = process.env.NODE_ENV === 'production';
   const cookie = [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
-    // Use SameSite=None with Secure for cross-site requests (mobile apps), otherwise Lax
-    isSecure ? 'SameSite=None; Secure' : 'SameSite=Lax',
+    'SameSite=Lax',
+    // Use Secure in production so cookie only travels over HTTPS.
+    process.env.NODE_ENV === 'production' ? 'Secure' : '',
     // 7 days
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
