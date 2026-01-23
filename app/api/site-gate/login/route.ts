@@ -48,7 +48,8 @@ export async function POST(req: Request) {
     console.log('[Site Gate] Password check:', {
       provided: password ? `${password.substring(0, 2)}***` : '(empty)',
       expectedLength: passwordEnv.length,
-      match: password === passwordEnv,
+      providedLength: password.length,
+      match: password.toLowerCase() === passwordEnv.toLowerCase(),
     });
   }
 
@@ -56,7 +57,8 @@ export async function POST(req: Request) {
     return json({ error: 'Password is required' }, { status: 401 });
   }
 
-  if (password !== passwordEnv) {
+  // Case-insensitive comparison for better mobile compatibility
+  if (password.toLowerCase() !== passwordEnv.toLowerCase()) {
     return json({ 
       error: 'Invalid password. Please check your password and try again.',
       // Only show debug info in development
@@ -69,14 +71,15 @@ export async function POST(req: Request) {
     }, { status: 401 });
   }
 
-  // httpOnly cookie so it’s not readable by JS.
+  // httpOnly cookie so it's not readable by JS.
+  // Use SameSite=None with Secure for better mobile compatibility, fallback to Lax
+  const isSecure = process.env.NODE_ENV === 'production';
   const cookie = [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
-    // Use Secure in production so cookie only travels over HTTPS.
-    process.env.NODE_ENV === 'production' ? 'Secure' : '',
+    // Use SameSite=None with Secure for cross-site requests (mobile apps), otherwise Lax
+    isSecure ? 'SameSite=None; Secure' : 'SameSite=Lax',
     // 7 days
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
