@@ -93,10 +93,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const gateEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
-  const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
-  // CRITICAL: Normalize password the same way as login route (lowercase, no spaces) to ensure token matches
-  const gatePasswordNormalized = gatePassword ? gatePassword.toLowerCase().replace(/\s+/g, '') : '';
-  const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePasswordNormalized ? `pw:${gatePasswordNormalized}` : '');
+  
+  // Generate token using EXACT same logic as login route
+  const explicitToken = String(process.env.SITE_GATE_TOKEN || '').trim();
+  let gateToken: string;
+  if (explicitToken) {
+    gateToken = explicitToken;
+  } else {
+    const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
+    if (gatePassword) {
+      // CRITICAL: Normalize exactly the same way as login route
+      // lowercase + remove ALL whitespace (spaces, tabs, newlines, etc)
+      const gatePasswordNormalized = gatePassword.toLowerCase().replace(/\s+/g, '');
+      gateToken = gatePasswordNormalized ? `pw:${gatePasswordNormalized}` : '';
+    } else {
+      gateToken = '';
+    }
+  }
+  
   const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
   // Decode the cookie value since it's URL encoded when set
   const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';

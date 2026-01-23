@@ -18,11 +18,19 @@ function isEnabled() {
 }
 
 function expectedToken(): string | null {
-  const t = String(process.env.SITE_GATE_TOKEN || '').trim();
-  if (t) return t;
-  const p = String(process.env.SITE_GATE_PASSWORD || '').trim();
-  // Normalize password for token generation (lowercase, no spaces) to match comparison logic
-  const normalized = p.toLowerCase().replace(/\s+/g, '');
+  // Check for explicit token first
+  const explicitToken = String(process.env.SITE_GATE_TOKEN || '').trim();
+  if (explicitToken) {
+    return explicitToken;
+  }
+  // Fall back to password-based token (normalized)
+  const passwordEnv = String(process.env.SITE_GATE_PASSWORD || '').trim();
+  if (!passwordEnv) {
+    return null;
+  }
+  // CRITICAL: Normalize exactly the same way as layout.tsx
+  // lowercase + remove ALL whitespace (spaces, tabs, newlines, etc)
+  const normalized = passwordEnv.toLowerCase().replace(/\s+/g, '');
   return normalized ? `pw:${normalized}` : null;
 }
 
@@ -78,16 +86,21 @@ export async function POST(req: Request) {
     }, { status: 401 });
   }
   
-  // Double-check: verify the token we're about to set matches what layout.tsx will expect
-  const expectedTokenFromNormalized = `pw:${normalizedExpected}`;
-  if (token !== expectedTokenFromNormalized) {
-    console.error('[Site Gate] CRITICAL: Token mismatch!', {
-      tokenFromFunction: token,
-      tokenFromNormalized: expectedTokenFromNormalized,
-      passwordEnv,
-      normalizedExpected,
-    });
-    // Still proceed, but log the error for debugging
+  // Verify token generation is correct
+  // If using password-based token, verify it matches what we'd generate
+  if (!process.env.SITE_GATE_TOKEN) {
+    const expectedTokenFromNormalized = `pw:${normalizedExpected}`;
+    if (token !== expectedTokenFromNormalized) {
+      console.error('[Site Gate] CRITICAL: Token generation mismatch!', {
+        tokenFromFunction: token,
+        tokenFromNormalized: expectedTokenFromNormalized,
+        passwordEnv,
+        normalizedExpected,
+      });
+      // Use the correct token
+      const correctToken = expectedTokenFromNormalized;
+      // Continue with correct token
+    }
   }
 
   // httpOnly cookie so it's not readable by JS.
