@@ -1266,6 +1266,7 @@ function NewListingPageContent() {
               <Label htmlFor="title" className="text-base font-semibold">Title</Label>
               <HelpTooltip
                 side="left"
+                className="hidden md:inline-flex"
                 text="Be specific: species/breed, sex/quantity, and a key selling point. Great titles get more clicks."
               />
             </div>
@@ -1292,6 +1293,7 @@ function NewListingPageContent() {
               <Label htmlFor="description" className="text-base font-semibold">Description</Label>
               <HelpTooltip
                 side="left"
+                className="hidden md:inline-flex"
                 text="Include health, genetics/papers, transport details, and anything a buyer needs to decide without messaging."
               />
             </div>
@@ -1318,6 +1320,7 @@ function NewListingPageContent() {
                 <Label htmlFor="price" className="text-base font-semibold">Price</Label>
                 <HelpTooltip
                   side="left"
+                  className="hidden md:inline-flex"
                   text="This is the Buy Now price buyers will pay at checkout. Be realistic—better detail supports higher prices."
                 />
               </div>
@@ -1346,6 +1349,7 @@ function NewListingPageContent() {
                   <Label htmlFor="starting-bid" className="text-base font-semibold">Starting Bid</Label>
                   <HelpTooltip
                     side="left"
+                    className="hidden md:inline-flex"
                     text="Your auction starts here. Lower starts can drive bidding, but ensure you’re comfortable with the risk."
                   />
                 </div>
@@ -1374,6 +1378,7 @@ function NewListingPageContent() {
                   </Label>
                   <HelpTooltip
                     side="left"
+                    className="hidden md:inline-flex"
                     text="Your private minimum. If bids don’t reach it, you’re not forced to sell. Buyers won’t see this."
                   />
                 </div>
@@ -1396,6 +1401,7 @@ function NewListingPageContent() {
                   </Label>
                   <HelpTooltip
                     side="left"
+                    className="hidden md:inline-flex"
                     text="eBay-style: listings can run up to 10 days. Duration starts when the listing goes live."
                   />
                 </div>
