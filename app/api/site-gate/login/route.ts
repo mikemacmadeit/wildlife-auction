@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // Set cookie using Next.js cookies() API for proper server-side handling
+  // Set cookie using Next.js cookies() API AND manual header to ensure it works
   const cookieStore = cookies();
   cookieStore.set(COOKIE_NAME, token, {
     path: '/',
@@ -115,10 +115,31 @@ export async function POST(req: Request) {
     maxAge: 7 * 24 * 60 * 60, // 7 days
   });
 
+  // Also set manually in headers as backup (Next.js should do this automatically, but ensure it works)
+  const cookieHeader = [
+    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    process.env.NODE_ENV === 'production' ? 'Secure' : '',
+    `Max-Age=${7 * 24 * 60 * 60}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
+
+  console.log('[Site Gate] Setting cookie:', {
+    cookieName: COOKIE_NAME,
+    token: token ? `${token.substring(0, 10)}***` : '(none)',
+    cookieHeader: cookieHeader.substring(0, 50) + '...',
+  });
+
   return json(
     { ok: true, redirect: next },
     {
       status: 200,
+      headers: {
+        'Set-Cookie': cookieHeader,
+      },
     }
   );
 }
