@@ -904,11 +904,11 @@ export default function HomePage() {
                               </div>
                             </div>
 
-                            <div className="mt-auto pt-3 space-y-2">
+                            <div className="mt-auto pt-3 grid grid-cols-2 gap-2">
                               <Button asChild className="w-full h-10 rounded-xl font-extrabold">
                                 <Link href={href} className="inline-flex items-center justify-center gap-2">
                                   <Store className="h-4 w-4" />
-                                  View seller store
+                                  View store
                                 </Link>
                               </Button>
                               <Button
@@ -951,7 +951,7 @@ export default function HomePage() {
                                 }}
                               >
                                 <MessageCircle className="h-4 w-4 mr-2" />
-                                Message seller
+                                Message
                               </Button>
                             </div>
                           </div>

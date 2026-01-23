@@ -283,15 +283,15 @@ export function SavedSellersList(props: { className?: string }) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 justify-end flex-wrap">
-                      <Button asChild variant="outline" className="min-h-[40px]">
+                    <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:justify-end sm:flex-wrap">
+                      <Button asChild variant="outline" className="min-h-[40px] w-full sm:w-auto">
                         <Link href={shopHref}>
                           <Store className="h-4 w-4 mr-2" />
-                          View seller store
+                          View store
                         </Link>
                       </Button>
                       <Button
-                        className="min-h-[40px]"
+                        className="min-h-[40px] w-full sm:w-auto"
                         disabled={messagingSellerId === s.sellerId || (typeof activeCount === 'number' && activeCount <= 0)}
                         onClick={async () => {
                           if (!user?.uid) return;
@@ -318,11 +318,11 @@ export function SavedSellersList(props: { className?: string }) {
                         ) : (
                           <MessageCircle className="h-4 w-4 mr-2" />
                         )}
-                        Message seller
+                        Message
                       </Button>
                       <Button
                         variant="destructive"
-                        className="min-h-[40px]"
+                        className="min-h-[40px] w-full col-span-2 sm:col-auto sm:w-auto"
                         disabled={removing === s.sellerId}
                         onClick={() => onRemove(s.sellerId)}
                       >
