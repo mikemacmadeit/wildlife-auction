@@ -56,6 +56,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
+import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 
 type FilterType = 'all' | 'pending' | 'compliance';
 type SortType = 'newest' | 'oldest' | 'price-high' | 'price-low';
@@ -776,6 +777,21 @@ export default function AdminListingsPage() {
 
                         {/* Center: Compliance & Documents */}
                         <div className="space-y-3">
+                          {/* AI Summary */}
+                          <AIAdminSummary
+                            entityType="listing"
+                            entityId={listing.id}
+                            existingSummary={listing.aiAdminSummary || null}
+                            existingSummaryAt={listing.aiAdminSummaryAt || null}
+                            existingSummaryModel={listing.aiAdminSummaryModel || null}
+                            onSummaryUpdated={(summary, model, generatedAt) => {
+                              // Update local state
+                              listing.aiAdminSummary = summary;
+                              listing.aiAdminSummaryAt = generatedAt;
+                              listing.aiAdminSummaryModel = model;
+                            }}
+                          />
+                          
                           {/* Compliance Status - Whitetail Breeder */}
                           {listing.category === 'whitetail_breeder' && (
                             <Card className={`border ${

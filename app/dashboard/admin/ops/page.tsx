@@ -74,6 +74,7 @@ import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { isStripeTestModeClient } from '@/lib/stripe/mode';
 import { TestModePayoutHelperModal } from '@/components/admin/TestModePayoutHelperModal';
+import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 
 interface OrderWithDetails extends Order {
   listingTitle?: string;
@@ -1432,6 +1433,23 @@ export default function AdminOpsPage() {
                   );
                 })()}
               </div>
+
+              {/* AI Summary */}
+              {selectedOrder.id && (
+                <AIAdminSummary
+                  entityType="order"
+                  entityId={selectedOrder.id}
+                  existingSummary={(selectedOrder as any).aiAdminSummary || null}
+                  existingSummaryAt={(selectedOrder as any).aiAdminSummaryAt || null}
+                  existingSummaryModel={(selectedOrder as any).aiAdminSummaryModel || null}
+                  onSummaryUpdated={(summary, model, generatedAt) => {
+                    // Update local state
+                    (selectedOrder as any).aiAdminSummary = summary;
+                    (selectedOrder as any).aiAdminSummaryAt = generatedAt;
+                    (selectedOrder as any).aiAdminSummaryModel = model;
+                  }}
+                />
+              )}
 
               {/* Order Info */}
               <div className="grid grid-cols-2 gap-4">

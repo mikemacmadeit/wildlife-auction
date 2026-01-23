@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Loader2, ArrowLeft, ShieldAlert, UserX, UserCheck, Ban, Clock, RefreshCw, KeyRound, LogOut, MessageSquareOff, BadgeAlert } from 'lucide-react';
 import { getEffectiveSubscriptionTier, getTierLabel, type SubscriptionTier } from '@/lib/pricing/subscriptions';
+import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 
 type Dossier = {
   authUser: any | null;
@@ -209,9 +210,29 @@ export default function AdminUserDossierPage() {
             </CardContent>
           </Card>
         ) : data ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <Card className="border-2">
+          <div className="space-y-6">
+            {/* AI Summary - shown at top for quick context */}
+            {uid && (
+              <AIAdminSummary
+                entityType="user"
+                entityId={uid}
+                existingSummary={data.userDoc?.aiAdminSummary || null}
+                existingSummaryAt={data.userDoc?.aiAdminSummaryAt || null}
+                existingSummaryModel={data.userDoc?.aiAdminSummaryModel || null}
+                onSummaryUpdated={(summary, model, generatedAt) => {
+                  // Update local state if needed
+                  if (data.userDoc) {
+                    data.userDoc.aiAdminSummary = summary;
+                    data.userDoc.aiAdminSummaryAt = generatedAt;
+                    data.userDoc.aiAdminSummaryModel = model;
+                  }
+                }}
+              />
+            )}
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="border-2">
                 <CardHeader>
                   <CardTitle className="text-xl font-extrabold">{displayName}</CardTitle>
                   <CardDescription>

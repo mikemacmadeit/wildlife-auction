@@ -487,6 +487,11 @@ export interface Listing {
   complianceRejectionReason?: string; // Reason if rejected
   complianceReviewedBy?: string; // Admin UID who reviewed
   complianceReviewedAt?: Date; // When reviewed
+  
+  // AI Admin Summary (admin-only, read-only, optional)
+  aiAdminSummary?: string | null; // AI-generated summary for admin review
+  aiAdminSummaryAt?: Date | null; // When summary was generated
+  aiAdminSummaryModel?: string | null; // OpenAI model used (e.g., "gpt-4o-mini")
 
   // Whitetail-only seller attestation (top-level; not shown as "TPWD approved")
   sellerAttestationAccepted?: boolean;
@@ -766,6 +771,11 @@ export interface Order {
    * Back-compat: older values like 'needs_response' may still appear on historical orders.
    */
   chargebackStatus?: 'open' | 'active' | 'funds_withdrawn' | 'won' | 'lost' | 'warning_needs_response' | 'needs_response' | 'unknown';
+  
+  // AI Admin Summary (admin-only, read-only, optional)
+  aiAdminSummary?: string | null; // AI-generated summary for admin review
+  aiAdminSummaryAt?: Date | null; // When summary was generated
+  aiAdminSummaryModel?: string | null; // OpenAI model used (e.g., "gpt-4o-mini")
 }
 
 export interface FilterState {
@@ -901,6 +911,11 @@ export interface UserProfile {
   totalListingsCount?: number; // Total listings created
   completionRate?: number; // completedSalesCount / totalListingsCount (percentage)
   verifiedTransactionsCount?: number; // Same as completedSalesCount for now
+  
+  // AI Admin Summary (admin-only, read-only, optional)
+  aiAdminSummary?: string | null; // AI-generated summary for admin review
+  aiAdminSummaryAt?: Date | null; // When summary was generated
+  aiAdminSummaryModel?: string | null; // OpenAI model used (e.g., "gpt-4o-mini")
 }
 
 // ============================================
