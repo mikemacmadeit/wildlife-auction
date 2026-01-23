@@ -23,10 +23,11 @@ export function FavoriteButton({
   className 
 }: FavoriteButtonProps) {
   const { user } = useAuth();
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const { isFavorite, isPending, toggleFavorite } = useFavorites();
   const { toast } = useToast();
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const isFavorited = isFavorite(listingId);
+  const pending = isPending(listingId);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -59,6 +60,7 @@ export function FavoriteButton({
           variant="outline"
           size={buttonSize as 'sm' | 'default' | 'lg' | 'icon' | null | undefined}
           onClick={handleClick}
+          disabled={pending}
           className={cn(
             'gap-2',
             isFavorited && 'border-primary bg-primary/10 text-primary',
@@ -85,6 +87,7 @@ export function FavoriteButton({
         variant="ghost"
         size="icon"
         onClick={handleClick}
+        disabled={pending}
         className={cn(
           'h-10 w-10',
           'hover:bg-primary/10',

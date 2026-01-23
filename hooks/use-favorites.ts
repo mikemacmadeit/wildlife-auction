@@ -24,7 +24,11 @@ export function useFavorites() {
   const { toast } = useToast();
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
+  const pendingOpsRef = useRef<Map<string, { desired: boolean; startedAt: number }>>(new Map());
+
+  const PENDING_TTL_MS = 15_000;
 
   // Logged-out: no watchlist (auth required)
   useEffect(() => {
@@ -43,6 +47,8 @@ export function useFavorites() {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
+      pendingOpsRef.current.clear();
+      setPendingIds(new Set());
       return;
     }
 
@@ -58,7 +64,30 @@ export function useFavorites() {
         snapshot.forEach((doc) => {
           ids.add(doc.id); // listingId is the document ID
         });
+
+        // Merge in-flight optimistic toggles to avoid UI flicker:
+        // Firestore snapshot can briefly show the old state before the server write lands.
+        const now = Date.now();
+        const pending = pendingOpsRef.current;
+        // NOTE: Avoid Map iterator downlevelIteration issues by iterating Array.from().
+        for (const [listingId, op] of Array.from(pending.entries())) {
+          if (!op || now - op.startedAt > PENDING_TTL_MS) {
+            pending.delete(listingId);
+            continue;
+          }
+          const inSnapshot = ids.has(listingId);
+          // If snapshot already reflects desired state, clear pending.
+          if (inSnapshot === op.desired) {
+            pending.delete(listingId);
+            continue;
+          }
+          // Otherwise, keep optimistic desired state in the UI.
+          if (op.desired) ids.add(listingId);
+          else ids.delete(listingId);
+        }
+
         setFavoriteIds(ids);
+        setPendingIds(new Set(pending.keys()));
         setIsLoading(false);
       },
       (error) => {
@@ -104,8 +133,18 @@ export function useFavorites() {
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
+
+      // Prevent double-toggles (common on mobile where click/pointer events can fire close together).
+      const existingPending = pendingOpsRef.current.get(listingId);
+      if (existingPending) {
+        return existingPending.desired ? 'added' : 'removed';
+      }
+
       const isCurrentlyFavorite = favoriteIds.has(listingId);
       const action: 'added' | 'removed' = isCurrentlyFavorite ? 'removed' : 'added';
+      const desired = !isCurrentlyFavorite;
+      pendingOpsRef.current.set(listingId, { desired, startedAt: Date.now() });
+      setPendingIds((prev) => new Set(prev).add(listingId));
 
       // Optimistic update
       setFavoriteIds((prev) => {
@@ -123,6 +162,13 @@ export function useFavorites() {
         // Success - optimistic update was correct, Firestore will update via onSnapshot
         return action;
       } catch (error: any) {
+        pendingOpsRef.current.delete(listingId);
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(listingId);
+          return next;
+        });
+
         // Rollback optimistic update
         setFavoriteIds((prev) => {
           const next = new Set(prev);
@@ -157,6 +203,13 @@ export function useFavorites() {
       return favoriteIds.has(listingId);
     },
     [favoriteIds]
+  );
+
+  const isPending = useCallback(
+    (listingId: string) => {
+      return pendingIds.has(listingId);
+    },
+    [pendingIds]
   );
 
   const addFavorite = useCallback(
@@ -232,6 +285,7 @@ export function useFavorites() {
   return {
     favoriteIds: favoriteIdsArray,
     isFavorite,
+    isPending,
     toggleFavorite,
     addFavorite,
     removeFavorite,
