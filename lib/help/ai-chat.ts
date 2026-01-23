@@ -57,7 +57,7 @@ export async function generateKBGroundedChatResponse(
   if (!isAIHelpChatEnabled()) {
     console.log('[AI Help Chat] Feature disabled via AI_HELP_CHAT_ENABLED');
     return {
-      answer: "I'm here to help, but the AI chat feature is currently disabled. Please use the 'Contact Support' option to get help from our team.",
+      answer: "I'm here to help! However, the AI chat feature needs to be enabled by an administrator. In the meantime, please use the 'Contact Support' tab to get help from our team, or check the Help tab for quick guides.",
       sources: [],
       kbAvailable: false,
     };
@@ -67,7 +67,7 @@ export async function generateKBGroundedChatResponse(
   if (!hasOpenAIKey()) {
     console.warn('[AI Help Chat] OPENAI_API_KEY not configured');
     return {
-      answer: "I'm here to help, but the AI chat feature is not fully configured yet. Please use the 'Contact Support' option to get help from our team.",
+      answer: "I'm here to help! However, the AI chat feature needs to be configured by an administrator. In the meantime, please use the 'Contact Support' tab to get help from our team, or check the Help tab for quick guides.",
       sources: [],
       kbAvailable: false,
     };

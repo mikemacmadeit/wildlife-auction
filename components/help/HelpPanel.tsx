@@ -21,6 +21,25 @@ import type { HelpContent } from '@/help/helpContent';
 import { HelpChat } from '@/components/help/HelpChat';
 import { HelpTicketForm } from '@/components/help/HelpTicketForm';
 
+// Default help content for pages without a specific helpKey
+const DEFAULT_HELP_CONTENT: HelpContent = {
+  key: 'default' as any,
+  title: 'Help Center',
+  oneLiner: 'Get help, ask questions, or contact support.',
+  checklist: [
+    'Use the "Ask" tab to chat with our AI assistant',
+    'Use the "Support" tab to create a support ticket',
+    'Browse our knowledge base articles for common questions',
+    'Contact support if you need immediate assistance',
+  ],
+  quickActions: [
+    { label: 'Browse Listings', href: '/browse' },
+    { label: 'Create Listing', href: '/dashboard/listings/new' },
+    { label: 'My Orders', href: '/dashboard/orders' },
+    { label: 'Account Settings', href: '/dashboard/account' },
+  ],
+};
+
 export function HelpPanel(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,6 +49,9 @@ export function HelpPanel(props: {
 }) {
   const { open, onOpenChange, content, onStartTour, showStartTour } = props;
   const [activeTab, setActiveTab] = useState<'help' | 'chat' | 'support'>('help');
+  
+  // Use default content if no specific content is available
+  const displayContent = content || DEFAULT_HELP_CONTENT;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -88,27 +110,24 @@ export function HelpPanel(props: {
                   <h3 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Checklist</h3>
                 </div>
                 <ul className="space-y-2">
-                  {(content?.checklist || []).slice(0, 7).map((item) => (
-                    <li key={item} className="flex gap-3 text-sm leading-relaxed">
+                  {(displayContent?.checklist || []).slice(0, 7).map((item, idx) => (
+                    <li key={idx} className="flex gap-3 text-sm leading-relaxed">
                       <span className="mt-1 h-2 w-2 rounded-full bg-primary/70 flex-shrink-0" />
                       <span className="text-foreground">{item}</span>
                     </li>
                   ))}
-                  {(!content?.checklist || content.checklist.length === 0) && (
-                    <li className="text-sm text-muted-foreground">No checklist is defined for this page yet.</li>
-                  )}
                 </ul>
               </section>
 
-              {content?.commonMistakes && content.commonMistakes.length > 0 && (
+              {displayContent?.commonMistakes && displayContent.commonMistakes.length > 0 && (
                 <section className="space-y-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                     <h3 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Common mistakes</h3>
                   </div>
                   <ul className="space-y-2">
-                    {content.commonMistakes.slice(0, 7).map((item) => (
-                      <li key={item} className="flex gap-3 text-sm leading-relaxed">
+                    {displayContent.commonMistakes.slice(0, 7).map((item, idx) => (
+                      <li key={idx} className="flex gap-3 text-sm leading-relaxed">
                         <span className="mt-1 h-2 w-2 rounded-full bg-amber-500/80 flex-shrink-0" />
                         <span className="text-foreground">{item}</span>
                       </li>
@@ -117,11 +136,11 @@ export function HelpPanel(props: {
                 </section>
               )}
 
-              {content?.quickActions && content.quickActions.length > 0 && (
+              {displayContent?.quickActions && displayContent.quickActions.length > 0 && (
                 <section className="space-y-3">
                   <h3 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Quick actions</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {content.quickActions.slice(0, 6).map((qa) => (
+                    {displayContent.quickActions.slice(0, 6).map((qa) => (
                       <Button key={qa.href} asChild variant="outline" className="justify-between min-h-[44px] font-semibold">
                         <Link href={qa.href}>
                           <span className="truncate">{qa.label}</span>
