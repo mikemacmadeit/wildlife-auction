@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import { FilterState, ListingType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
@@ -66,21 +68,6 @@ export function FilterDialog({
     setLocalFilters(resetFilters);
     onFiltersChange(resetFilters);
     setOpen(false);
-  };
-
-  const handleSpeciesChange = (speciesValue: string, checked: boolean) => {
-    const currentSpecies = localFilters.species || [];
-    if (checked) {
-      setLocalFilters({
-        ...localFilters,
-        species: [...currentSpecies, speciesValue],
-      });
-    } else {
-      setLocalFilters({
-        ...localFilters,
-        species: currentSpecies.filter(s => s !== speciesValue),
-      });
-    }
   };
 
   const handleHealthStatusChange = (status: string, checked: boolean) => {
@@ -306,29 +293,22 @@ export function FilterDialog({
                     </Button>
                   )}
                 </div>
-                <Select
-                  value={localFilters.location?.state || undefined}
-                  onValueChange={(value) => {
+                <SearchableSelect
+                  value={localFilters.location?.state || null}
+                  onChange={(value) => {
                     setLocalFilters({
                       ...localFilters,
                       location: {
                         ...localFilters.location,
-                        state: value || undefined,
+                        state: value === '__any__' ? undefined : value,
                       },
                     });
                   }}
-                >
-                  <SelectTrigger id="state" className="min-h-[44px]">
-                    <SelectValue placeholder="All States" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {states.map((state) => (
-                      <SelectItem key={state.value} value={state.value}>
-                        {state.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={[{ value: '__any__', label: 'All States' }, ...states]}
+                  placeholder="All States"
+                  searchPlaceholder="Search states…"
+                  buttonClassName="min-h-[44px]"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="city" className="text-sm font-semibold">City (Optional)</Label>
@@ -359,23 +339,13 @@ export function FilterDialog({
             <>
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Species</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {species.map((spec) => (
-                    <div key={spec.value} className="flex items-center space-x-3 min-h-[44px]">
-                      <Checkbox
-                        id={`species-${spec.value}`}
-                        checked={localFilters.species?.includes(spec.value) || false}
-                        onCheckedChange={(checked) => handleSpeciesChange(spec.value, checked as boolean)}
-                      />
-                      <Label
-                        htmlFor={`species-${spec.value}`}
-                        className="text-sm font-normal cursor-pointer flex-1"
-                      >
-                        {spec.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <SearchableMultiSelect
+                  values={localFilters.species || []}
+                  onChange={(vals) => setLocalFilters((p) => ({ ...p, species: vals.length ? vals : undefined }))}
+                  options={species}
+                  placeholder="Select species…"
+                  searchPlaceholder="Search species…"
+                />
               </div>
               <Separator />
             </>

@@ -14,7 +14,6 @@ import {
   WhitetailBreederAttributes,
   HorseAttributes,
   SportingWorkingDogAttributes,
-  EXOTIC_SPECIES,
 } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +28,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CATTLE_BREED_OPTIONS } from '@/lib/taxonomy/cattle-breeds';
 import { DOG_BREED_OPTIONS } from '@/lib/taxonomy/dog-breeds';
 import { getEquipmentMakeOptions, getEquipmentModelSuggestions } from '@/lib/taxonomy/equipment-makes';
+import { EXOTIC_SPECIES_OPTIONS } from '@/lib/taxonomy/exotic-species';
 
 type ListingAttributes =
   | WildlifeAttributes
@@ -562,29 +562,15 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           <Label htmlFor="species-id" className="text-base font-semibold">
             Species <span className="text-destructive">*</span>
           </Label>
-          <Select
-            value={(attributes as Partial<WildlifeAttributes>).speciesId || ''}
-            onValueChange={(value) => updateAttribute('speciesId', value)}
-          >
-            <SelectTrigger
-              id="species-id"
-              className={cn(
-                'min-h-[48px]',
-                hasError('Species') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
-              )}
-            >
-              <SelectValue placeholder="Select species" />
-            </SelectTrigger>
-            <SelectContent>
-              {EXOTIC_SPECIES.map((species) => (
-                <SelectItem key={species} value={species}>
-                  {species === 'other_exotic' ? 'Other Exotic (Requires Admin Review)' : species.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={(attributes as Partial<WildlifeAttributes>).speciesId || null}
+            onChange={(value) => updateAttribute('speciesId', value)}
+            options={EXOTIC_SPECIES_OPTIONS}
+            placeholder="Select species…"
+            searchPlaceholder="Search species…"
+          />
           <p className="text-xs text-muted-foreground">
-            Note: Whitetail deer must be listed under "Whitetail Breeder" category
+            Note: Whitetail deer must be listed under "Whitetail Breeder" category.
           </p>
         </div>
 

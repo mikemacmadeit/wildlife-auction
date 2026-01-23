@@ -7,6 +7,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import {
   Select,
   SelectContent,
@@ -170,27 +172,19 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
           {/* Location */}
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Item Location</Label>
-            <Select
-              value={localFilters.location?.state || '__any__'}
-              onValueChange={(v) =>
+            <SearchableSelect
+              value={localFilters.location?.state || null}
+              onChange={(v) =>
                 setLocalFilters((p) => ({
                   ...p,
                   location: { ...(p.location || {}), state: v === '__any__' ? undefined : v },
                 }))
               }
-            >
-              <SelectTrigger className="min-h-[44px]">
-                <SelectValue placeholder="State" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__any__">Any state</SelectItem>
-                {states.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={[{ value: '__any__', label: 'Any state' }, ...states]}
+              placeholder="State"
+              searchPlaceholder="Search states…"
+              buttonClassName="min-h-[44px]"
+            />
           </div>
 
           {/* Price */}
@@ -261,25 +255,14 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
           {showSpeciesFilter ? (
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Species</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {species.slice(0, 8).map((sp) => (
-                  <div key={sp.value} className="flex items-center gap-3 min-h-[40px]">
-                    <Checkbox
-                      id={`m-sp-${sp.value}`}
-                      checked={Boolean(localFilters.species?.includes(sp.value))}
-                      onCheckedChange={(checked) => {
-                        const current = localFilters.species || [];
-                        const next = checked ? [...current, sp.value] : current.filter((x) => x !== sp.value);
-                        setLocalFilters((p) => ({ ...p, species: next.length ? next : undefined }));
-                      }}
-                    />
-                    <Label htmlFor={`m-sp-${sp.value}`} className="text-sm font-normal cursor-pointer flex-1">
-                      {sp.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">Tip: use desktop for full species list (coming soon for mobile).</p>
+              <SearchableMultiSelect
+                values={localFilters.species || []}
+                onChange={(vals) => setLocalFilters((p) => ({ ...p, species: vals.length ? vals : undefined }))}
+                options={species}
+                placeholder="Select species…"
+                searchPlaceholder="Search species…"
+                buttonClassName="min-h-[44px]"
+              />
             </div>
           ) : null}
 

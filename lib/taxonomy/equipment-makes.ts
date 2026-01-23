@@ -79,6 +79,13 @@ const UTV_MAKES: SearchableSelectOption[] = [
   { value: 'kubota', label: 'Kubota' },
   { value: 'arctic_cat', label: 'Arctic Cat' },
   { value: 'cfmoto', label: 'CFMOTO' },
+  { value: 'textron', label: 'Textron Off Road' },
+  { value: 'hisun', label: 'Hisun' },
+  { value: 'kymco', label: 'Kymco' },
+  { value: 'segway', label: 'Segway Powersports' },
+  { value: 'intimidator', label: 'Intimidator' },
+  { value: 'massimo', label: 'Massimo' },
+  { value: 'tracker_off_road', label: 'Tracker Off Road' },
 ];
 
 const ATV_MAKES: SearchableSelectOption[] = [
@@ -89,6 +96,9 @@ const ATV_MAKES: SearchableSelectOption[] = [
   { value: 'yamaha', label: 'Yamaha' },
   { value: 'suzuki', label: 'Suzuki' },
   { value: 'cfmoto', label: 'CFMOTO' },
+  { value: 'kymco', label: 'Kymco' },
+  { value: 'hisun', label: 'Hisun' },
+  { value: 'segway', label: 'Segway Powersports' },
 ];
 
 const TRAILER_MAKES: SearchableSelectOption[] = [
@@ -99,6 +109,11 @@ const TRAILER_MAKES: SearchableSelectOption[] = [
   { value: 'lamar', label: 'Lamar' },
   { value: 'delco', label: 'Delco' },
   { value: 'trailers_plus', label: 'TrailersPlus' },
+  { value: 'sure_trac', label: 'Sure-Trac' },
+  { value: 'carry_on', label: 'Carry-On' },
+  { value: 'bwise', label: 'Bwise' },
+  { value: 'wells_cargo', label: 'Wells Cargo' },
+  { value: 'continental_cargo', label: 'Continental Cargo' },
 ];
 
 const HORSE_TRAILER_MAKES: SearchableSelectOption[] = [
