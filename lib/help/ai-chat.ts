@@ -123,6 +123,30 @@ export async function generateKBGroundedChatResponse(
         };
       }
       
+      if (queryLower.includes('photo') || queryLower.includes('picture') || queryLower.includes('image')) {
+        return {
+          answer: "For listing photos: You need at least 1 photo (required), but 3-5 photos are recommended. Photos should be clear, well-lit, and show the item from multiple angles. Use natural daylight when possible, keep backgrounds simple, and make sure the item is in focus. For animals, include full body shots, head shots, and any unique markings. For equipment, show all sides and important features. First photo is most important as it's the thumbnail buyers see. Upload JPG or PNG files under 10MB each. Need more details? Check our 'Photo Requirements' guide!",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      if (queryLower.includes('refund') || queryLower.includes('money back') || queryLower.includes('return')) {
+        return {
+          answer: "To get a refund: 1) Contact the seller first to try to resolve the issue - most problems are solved this way. 2) If the seller won't help, go to 'My Orders', click on the order, and open a dispute. 3) Provide details about the issue and any evidence (photos, messages). 4) Admin will review your dispute (usually within a few business days). 5) If approved, refund is processed to your original payment method (5-10 business days). Valid reasons include: item not as described, item not received, item damaged, or seller unresponsive. Buyer's remorse or minor issues typically don't qualify. Need help? Contact support!",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      if (queryLower.includes('fee') || queryLower.includes('cost') || queryLower.includes('how much')) {
+        return {
+          answer: "Seller fees: You only pay fees when your item sells (no listing fees). Platform fee is typically 5-10% of the final sale price, depending on your seller tier. Payment processing fees (Stripe) are about 2.9% + $0.30 per transaction. So if you sell an item for $1,000, you might pay $80 platform fee + $29.30 processing = $109.30 total, and receive $890.70. Buyers don't pay any fees - they just pay the listing price. All fees are transparent and shown before you publish. Want more details? Check 'Seller Fees Explained' in our help articles!",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
       // Default helpful fallback
       return {
         answer: `I want to help you with "${options.userMessage}". While I don't have specific information about that exact question in our knowledge base right now, here are some ways I can help: 1) Try rephrasing your question with different words. 2) Use the 'Contact Support' option for personalized help from our team. 3) Browse our Help articles for related topics. Our support team is here to help and typically responds within 1-2 business days. What specific issue are you trying to solve?`,
@@ -146,12 +170,15 @@ YOUR PERSONALITY:
 
 HOW TO HELP:
 1. **Use knowledge base articles as your foundation** - They contain accurate, up-to-date information
-2. **Be comprehensive** - Don't just answer the question, provide helpful context and next steps
-3. **Be practical** - Give actionable, step-by-step guidance when possible
-4. **Anticipate follow-up questions** - Address related concerns the user might have
-5. **For troubleshooting** - Walk through common solutions systematically
-6. **For "how-to" questions** - Provide clear, step-by-step instructions
-7. **Be encouraging** - If someone is frustrated, acknowledge it and help them through it
+2. **Be comprehensive** - Don't just answer the question, provide helpful context, examples, and next steps
+3. **Be practical** - Give actionable, step-by-step guidance when possible. Use numbered lists for clarity.
+4. **Anticipate follow-up questions** - Address related concerns the user might have. Think ahead.
+5. **For troubleshooting** - Walk through common solutions systematically. Start with quick fixes, then deeper solutions.
+6. **For "how-to" questions** - Provide clear, detailed step-by-step instructions. Explain the "why" behind steps.
+7. **Be encouraging** - If someone is frustrated, acknowledge it ("I understand that's frustrating") and help them through it
+8. **Provide examples** - Use concrete examples when helpful. Show, don't just tell.
+9. **Be proactive** - Don't just answer, suggest next steps, related topics, and ways to prevent issues
+10. **Show expertise** - Demonstrate deep knowledge while remaining accessible and friendly
 
 ANSWER FORMAT:
 - Start with a warm, empathetic acknowledgment (especially for problems)
