@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -147,7 +147,7 @@ export function ProfileCompletionModal({
   };
 
   return (
-    <React.Fragment>
+    <>
       <Dialog open={open} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -451,7 +451,7 @@ export function ProfileCompletionModal({
             if (result.croppedImageUrl) {
               URL.revokeObjectURL(result.croppedImageUrl);
             }
-            toast({ title: 'Photo ready', description: 'Looks good — we'll save it when you finish this step.' });
+            toast({ title: 'Photo ready', description: 'Looks good - we\'ll save it when you finish this step.' });
           } catch (err: any) {
             console.error('Avatar upload failed', err);
             toast({
@@ -467,6 +467,6 @@ export function ProfileCompletionModal({
         }}
         />
       )}
-    </React.Fragment>
+    </>
   );
 }
