@@ -120,6 +120,14 @@ export interface OfferExpiredEmailData {
   offerUrl: string;
 }
 
+export interface SupportTicketReplyEmailData {
+  ticketId: string;
+  userName: string;
+  userMessage: string;
+  subjectLine: string;
+  ticketUrl: string;
+}
+
 export interface ListingApprovedEmailData {
   userName: string;
   listingTitle: string;
@@ -1379,6 +1387,32 @@ export function getOfferExpiredEmail(data: OfferExpiredEmailData): { subject: st
 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.offerUrl, 'View offers')}
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getSupportTicketReplyEmail(data: SupportTicketReplyEmailData): { subject: string; html: string } {
+  const subject = `Support reply: ${data.subjectLine || 'Your ticket'} (${data.ticketId})`;
+  const preheader = `Support replied to your ticket ${data.ticketId}.`;
+  const origin = tryGetOrigin(data.ticketUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Support replied
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName || 'there')} — we replied to your ticket <strong>${escapeHtml(data.ticketId)}</strong>.
+    </div>
+
+    <div style="margin: 14px 0; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(34,37,31,0.18); background: rgba(214,200,176,0.35);">
+      <div style="font-size: 12px; opacity: 0.8; font-weight: 800; letter-spacing: 0.2px; text-transform: uppercase;">Support reply</div>
+      <div style="margin-top: 8px; white-space: pre-wrap; line-height: 1.5;">${escapeHtml(data.userMessage || '')}</div>
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.ticketUrl, 'View ticket')}
     </div>
   `;
 

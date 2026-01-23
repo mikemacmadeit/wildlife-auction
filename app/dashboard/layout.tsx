@@ -33,6 +33,7 @@ import {
   Mail,
   Bell,
   HelpCircle,
+  LifeBuoy,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -86,6 +87,7 @@ const baseNavItems: DashboardNavItem[] = [
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
   { href: '/seller/sales', label: 'Sold', icon: DollarSign },
   { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
+  { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
   { href: '/dashboard/account', label: 'Settings', icon: Settings },

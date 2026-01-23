@@ -111,7 +111,10 @@ export type AuditActionType =
   // Seller: breeder permit submission + admin review (seller-level compliance)
   | 'seller_breeder_permit_submitted'
   | 'admin_seller_breeder_permit_verified'
-  | 'admin_seller_breeder_permit_rejected';
+  | 'admin_seller_breeder_permit_rejected'
+  // Admin: support tickets
+  | 'admin_support_reply'
+  | 'admin_support_ticket_status_changed';
 
 export type AuditActorRole = 'admin' | 'system' | 'webhook' | 'buyer' | 'seller';
 
