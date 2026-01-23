@@ -61,6 +61,7 @@ export async function POST(req: Request) {
     normalizedExpected,
     match: normalizedProvided === normalizedExpected,
     token: token ? `${token.substring(0, 10)}***` : '(none)',
+    tokenFull: token, // Log full token for debugging (will be visible in server logs only)
   });
   
   if (normalizedProvided !== normalizedExpected) {
@@ -75,6 +76,18 @@ export async function POST(req: Request) {
         match: false,
       }
     }, { status: 401 });
+  }
+  
+  // Double-check: verify the token we're about to set matches what layout.tsx will expect
+  const expectedTokenFromNormalized = `pw:${normalizedExpected}`;
+  if (token !== expectedTokenFromNormalized) {
+    console.error('[Site Gate] CRITICAL: Token mismatch!', {
+      tokenFromFunction: token,
+      tokenFromNormalized: expectedTokenFromNormalized,
+      passwordEnv,
+      normalizedExpected,
+    });
+    // Still proceed, but log the error for debugging
   }
 
   // httpOnly cookie so it's not readable by JS.

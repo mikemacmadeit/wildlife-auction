@@ -94,7 +94,9 @@ export default function RootLayout({
 }) {
   const gateEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
   const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
-  const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePassword ? `pw:${gatePassword}` : '');
+  // CRITICAL: Normalize password the same way as login route (lowercase, no spaces) to ensure token matches
+  const gatePasswordNormalized = gatePassword ? gatePassword.toLowerCase().replace(/\s+/g, '') : '';
+  const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePasswordNormalized ? `pw:${gatePasswordNormalized}` : '');
   const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
   // Decode the cookie value since it's URL encoded when set
   const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';
