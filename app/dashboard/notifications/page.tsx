@@ -528,7 +528,7 @@ export default function NotificationsPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="px-5 py-4">
-            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 we-scrollbar-hover">
               {(
                 [
                   { key: 'all', label: 'All' },

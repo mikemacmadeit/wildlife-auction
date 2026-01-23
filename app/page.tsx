@@ -430,7 +430,7 @@ export default function HomePage() {
 
         <div
           ref={scrollerRef}
-          className="overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth"
+          className="overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth we-scrollbar-hover"
         >
           <div className="flex gap-4 min-w-max snap-x snap-mandatory">
             {props.listings.map((listing) => (

@@ -384,6 +384,39 @@
     box-shadow: inset 0 1px 0 hsl(40, 30%, 93% / 0.1);
   }
 
+  /**
+   * Hide scrollbars until hover (clean appearance).
+   * Apply to section-level scrollers (rails, panels, lists) where you don't want persistent bars.
+   *
+   * Notes:
+   * - Touch devices have no hover → scrollbars remain hidden (still scrollable).
+   * - Intentionally NOT global (do not affect page scrollbar).
+   */
+  .we-scrollbar-hover {
+    scrollbar-width: none; /* Firefox */
+    scrollbar-color: transparent transparent;
+  }
+  .we-scrollbar-hover::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .we-scrollbar-hover::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .we-scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .we-scrollbar-hover:hover {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .we-scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+  }
+
   @keyframes shimmer {
     0% {
       background-position: -1000px 0;
