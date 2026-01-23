@@ -98,6 +98,17 @@ export default function RootLayout({
   const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
   // Decode the cookie value since it's URL encoded when set
   const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';
+  
+  // Debug logging (server-side, visible in build logs)
+  if (gateEnabled && !gateAllowed) {
+    console.log('[Site Gate] Access check:', {
+      hasCookie: !!gateCookieRaw,
+      cookieValue: gateCookie ? `${gateCookie.substring(0, 5)}***` : '(empty)',
+      expectedToken: gateToken ? `${gateToken.substring(0, 5)}***` : '(empty)',
+      match: gateCookie === gateToken,
+    });
+  }
+  
   const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
 
   return (
