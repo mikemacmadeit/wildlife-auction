@@ -2856,6 +2856,7 @@ function NewListingPageContent() {
             onComplete={handleComplete}
             saving={isSubmitting}
             showSavingBar={false}
+            suppressValidationToast={true}
             completeButtonDataTour="listing-publish"
             onValidationError={(stepId) => {
               setValidationAttempted((prev) => ({ ...prev, [stepId]: true }));

@@ -29,6 +29,7 @@ interface StepperFormProps {
   completeButtonDataTour?: string; // Optional data-tour selector for the final action button
   completeButtonLabel?: string; // Optional label for the final action button (defaults to Publish Listing)
   onValidationError?: (stepId: string) => void; // Optional callback for highlighting invalid fields in the parent UI
+  suppressValidationToast?: boolean; // If true, StepperForm won't show its own validation toast (caller handles UX)
   activeStepId?: string | null; // Optional external step control (jump to a step by id)
   onStepChange?: (stepId: string) => void; // Optional callback when step changes
   attentionStepIds?: string[]; // Optional: steps to visually highlight (e.g. missing fields on publish)
@@ -47,6 +48,7 @@ export function StepperForm({
   completeButtonDataTour,
   completeButtonLabel,
   onValidationError,
+  suppressValidationToast = false,
   activeStepId = null,
   onStepChange,
   attentionStepIds = [],
@@ -80,9 +82,11 @@ export function StepperForm({
     if (currentStepData.validate && !currentStepData.validate()) {
       const errorMsg = currentStepData.errorMessage || 'Please complete all required fields before continuing.';
       onValidationError?.(currentStepData.id);
-      toast.error('Validation Error', {
-        description: errorMsg,
-      });
+      if (!suppressValidationToast) {
+        toast.error('Validation Error', {
+          description: errorMsg,
+        });
+      }
       return;
     }
 
