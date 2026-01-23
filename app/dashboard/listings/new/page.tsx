@@ -130,6 +130,13 @@ function NewListingPageContent() {
   });
   const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [tpwdPermit, setTpwdPermit] = useState<null | {
+    status: 'pending' | 'verified' | 'rejected';
+    rejectionReason?: string | null;
+    expiresAt?: string | null;
+    uploadedAt?: string | null;
+    reviewedAt?: string | null;
+  }>(null);
   const [payoutsGateOpen, setPayoutsGateOpen] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState<Record<string, boolean>>({});
   const [resumeDraftOpen, setResumeDraftOpen] = useState(false);
@@ -397,9 +404,36 @@ function NewListingPageContent() {
   useEffect(() => {
     if (!user) {
       setUserProfile(null);
+      setTpwdPermit(null);
       return;
     }
     refreshUserProfile();
+    // Load TPWD permit status (controls whitetail category gating in Create Listing)
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/seller/breeder-permit', { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setTpwdPermit(null);
+          return;
+        }
+        const p = json?.permit || null;
+        if (!p || !p.status) {
+          setTpwdPermit(null);
+          return;
+        }
+        setTpwdPermit({
+          status: p.status,
+          rejectionReason: p.rejectionReason || null,
+          expiresAt: p.expiresAt || null,
+          uploadedAt: p.uploadedAt || null,
+          reviewedAt: p.reviewedAt || null,
+        });
+      } catch {
+        setTpwdPermit(null);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -408,6 +442,9 @@ function NewListingPageContent() {
     userProfile?.stripeOnboardingStatus === 'complete' &&
     userProfile?.payoutsEnabled === true &&
     userProfile?.chargesEnabled === true;
+
+  const whitetailPermitStatus = tpwdPermit?.status || null;
+  const canSelectWhitetail = whitetailPermitStatus === 'verified';
 
   const numberFromInput = (raw: string): number | null => {
     const s = String(raw || '').trim();
@@ -451,11 +488,19 @@ function NewListingPageContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card
               role="button"
-              tabIndex={0}
+              tabIndex={canSelectWhitetail ? 0 : -1}
               aria-pressed={formData.category === 'whitetail_breeder'}
+              aria-disabled={!canSelectWhitetail}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  if (!canSelectWhitetail) {
+                    toast({
+                      title: 'TPWD permit required',
+                      description: 'Submit your TPWD breeder permit (Seller Overview) and wait for verification to enable Whitetail listings.',
+                    });
+                    return;
+                  }
                   setFormData({
                     ...formData,
                     category: 'whitetail_breeder',
@@ -463,12 +508,21 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'whitetail_breeder'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
-                  : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+                  : canSelectWhitetail
+                    ? 'border-border cursor-pointer hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+                    : 'border-border bg-muted/20 opacity-60 grayscale cursor-not-allowed'
               }`}
               onClick={() => {
+                if (!canSelectWhitetail) {
+                  toast({
+                    title: 'TPWD permit required',
+                    description: 'Submit your TPWD breeder permit (Seller Overview) and wait for verification to enable Whitetail listings.',
+                  });
+                  return;
+                }
                 setFormData({ 
                   ...formData, 
                   category: 'whitetail_breeder',
@@ -507,8 +561,22 @@ function NewListingPageContent() {
                       TPWD-permitted whitetail deer breeding facilities
                     </p>
                     <div className="flex flex-wrap gap-2 justify-start md:justify-center">
-                      <Badge variant="outline" className="text-[11px]">TPWD Required</Badge>
+                      <Badge variant="outline" className="text-[11px]">TPWD PERMIT REQUIRED</Badge>
+                      {!canSelectWhitetail ? (
+                        <Badge variant="secondary" className="text-[11px] capitalize">
+                          {whitetailPermitStatus || 'not submitted'}
+                        </Badge>
+                      ) : null}
                     </div>
+                    {!canSelectWhitetail ? (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {whitetailPermitStatus === 'pending'
+                          ? 'Permit submitted — waiting on verification.'
+                          : whitetailPermitStatus === 'rejected'
+                            ? 'Permit rejected — resubmit in Seller Overview.'
+                            : 'Submit your TPWD breeder permit in Seller Overview to unlock.'}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </CardContent>
