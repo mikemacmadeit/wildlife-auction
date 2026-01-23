@@ -432,39 +432,40 @@ export function ProfileCompletionModal({
           </Button>
         </form>
       </DialogContent>
-      
-      {/* Avatar Crop Dialog */}
-      {cropImageSrc && (
-        <AvatarCropDialog
-          open={cropDialogOpen}
-          onOpenChange={setCropDialogOpen}
-          imageSrc={cropImageSrc}
-          onSave={async (result: AvatarCropResult) => {
-            setCropDialogOpen(false);
-            try {
-              setAvatarUploading(true);
-              setAvatarUploadPct(0);
-              const { downloadUrl } = await uploadUserAvatar(result.croppedImageBlob, (pct) => setAvatarUploadPct(pct));
-              setAvatarUrl(downloadUrl);
-              if (result.croppedImageUrl) {
-                URL.revokeObjectURL(result.croppedImageUrl);
-              }
-              toast({ title: 'Photo ready', description: 'Looks good — we'll save it when you finish this step.' });
-            } catch (err: any) {
-              console.error('Avatar upload failed', err);
-              toast({
-                title: 'Upload failed',
-                description: err?.message || 'Could not upload your photo. Please try again.',
-                variant: 'destructive',
-              });
-            } finally {
-              setAvatarUploading(false);
-              setAvatarUploadPct(0);
-              setCropImageSrc(null);
-            }
-          }}
-        />
-      )}
     </Dialog>
+    
+    {/* Avatar Crop Dialog */}
+    {cropImageSrc && (
+      <AvatarCropDialog
+        open={cropDialogOpen}
+        onOpenChange={setCropDialogOpen}
+        imageSrc={cropImageSrc}
+        onSave={async (result: AvatarCropResult) => {
+          setCropDialogOpen(false);
+          try {
+            setAvatarUploading(true);
+            setAvatarUploadPct(0);
+            const { downloadUrl } = await uploadUserAvatar(result.croppedImageBlob, (pct) => setAvatarUploadPct(pct));
+            setAvatarUrl(downloadUrl);
+            if (result.croppedImageUrl) {
+              URL.revokeObjectURL(result.croppedImageUrl);
+            }
+            toast({ title: 'Photo ready', description: 'Looks good — we'll save it when you finish this step.' });
+          } catch (err: any) {
+            console.error('Avatar upload failed', err);
+            toast({
+              title: 'Upload failed',
+              description: err?.message || 'Could not upload your photo. Please try again.',
+              variant: 'destructive',
+            });
+          } finally {
+            setAvatarUploading(false);
+            setAvatarUploadPct(0);
+            setCropImageSrc(null);
+          }
+        }}
+      />
+    )}
+  </>
   );
 }
