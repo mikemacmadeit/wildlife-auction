@@ -97,21 +97,6 @@ export default function RootLayout({
   const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePassword ? `pw:${gatePassword}` : '');
   const gateCookie = cookies().get('we:site_gate:v1')?.value || '';
   const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
-  
-  // Debug logging
-  if (gateEnabled) {
-    console.log('[Site Gate Layout] Check:', {
-      enabled: gateEnabled,
-      hasPassword: !!gatePassword,
-      passwordLength: gatePassword.length,
-      token: gateToken ? `${gateToken.substring(0, 15)}***` : '(none)',
-      tokenLength: gateToken.length,
-      cookie: gateCookie ? `${gateCookie.substring(0, 15)}***` : '(empty)',
-      cookieLength: gateCookie.length,
-      tokenMatch: gateCookie === gateToken,
-      allowed: gateAllowed,
-    });
-  }
 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
