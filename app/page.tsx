@@ -508,9 +508,9 @@ export default function HomePage() {
     };
 
     return (
-      <div className="relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
+      <div className="group relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
         {/* Arrows: centered over the image area (middle of first/last card image) */}
-        <div className="hidden md:block pointer-events-none">
+        <div className="hidden md:block pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <Button
             type="button"
             variant="outline"
