@@ -126,9 +126,16 @@ export function AIAdminDraft({
             Generating draft...
           </div>
         ) : error ? (
-          <div className="flex items-center text-destructive">
-            <AlertCircle className="h-4 w-4 mr-2" />
-            {error}
+          <div className="space-y-2">
+            <div className="flex items-center text-destructive">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              {error}
+            </div>
+            {error.includes('disabled') && (
+              <p className="text-xs text-muted-foreground">
+                To enable this feature, set <code className="bg-muted px-1 rounded">AI_ADMIN_DRAFT_ENABLED=true</code> in your environment variables and ensure <code className="bg-muted px-1 rounded">OPENAI_API_KEY</code> is configured.
+              </p>
+            )}
           </div>
         ) : (
           <>

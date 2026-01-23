@@ -41,6 +41,30 @@ All Firebase keys are prefixed with `NEXT_PUBLIC_` because they're used client-s
 - Secret: Get from [Stripe Dashboard](https://dashboard.stripe.com/apikeys) → Secret key
 - Publishable: Get from [Stripe Dashboard](https://dashboard.stripe.com/apikeys) → Publishable key
 
+### AI Features (Optional)
+These features use OpenAI's API to provide AI-powered assistance to admins.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `OPENAI_API_KEY` | OpenAI API key for AI features | - | Required if using AI features |
+| `AI_ADMIN_SUMMARY_ENABLED` | Enable AI summaries for admin review | `false` | Optional |
+| `AI_ADMIN_DRAFT_ENABLED` | Enable AI draft responses for support tickets | `false` | Optional |
+| `AI_HELP_CHAT_ENABLED` | Enable AI help chat (KB-grounded) | `false` | Optional |
+
+**To enable AI features:**
+1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Add to `.env.local`:
+   ```
+   OPENAI_API_KEY=sk-...
+   AI_ADMIN_SUMMARY_ENABLED=true
+   AI_ADMIN_DRAFT_ENABLED=true
+   AI_HELP_CHAT_ENABLED=true
+   ```
+3. Add the same variables to Netlify environment variables
+4. Redeploy
+
+**Note:** `OPENAI_API_KEY` is server-side only (never exposed to client). The feature flags control which AI features are active.
+
 ---
 
 ## 🌐 Netlify Environment Variables

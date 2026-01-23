@@ -23,7 +23,11 @@ export async function POST(request: Request, ctx: { params: { ticketId: string }
 
   // Feature flag check
   if (!isAIAdminDraftEnabled()) {
-    return json({ ok: false, error: 'AI admin draft feature is disabled' }, { status: 403 });
+    return json({ 
+      ok: false, 
+      error: 'AI admin draft feature is disabled',
+      message: 'To enable this feature, set AI_ADMIN_DRAFT_ENABLED=true in your environment variables. Also ensure OPENAI_API_KEY is configured.'
+    }, { status: 403 });
   }
 
   const ticketId = String(ctx?.params?.ticketId || '').trim();
