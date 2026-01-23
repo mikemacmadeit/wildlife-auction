@@ -380,28 +380,51 @@ export default function HomePage() {
     const itemClass = 'w-[280px] sm:w-[320px] lg:w-[340px] h-[420px]';
 
     return (
-      <div className="relative">
-        {/* Desktop arrows (eBay-style) */}
-        <div className="hidden md:flex absolute -top-12 right-0 items-center gap-2">
+      <div className="relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
+        {/* Arrows: centered over the image area (middle of first/last card image) */}
+        <div className="hidden md:block pointer-events-none">
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-9 w-9"
-            onClick={() => scrollerRef.current?.scrollBy({ left: -Math.round((scrollerRef.current?.clientWidth || 800) * 0.9), behavior: 'smooth' })}
+            className={cn(
+              'pointer-events-auto absolute left-2',
+              'top-[calc(var(--rail-card-w)*3/8)] -translate-y-1/2',
+              'h-10 w-10 rounded-full shadow-lg',
+              // High contrast on images: dark in light mode, light in dark mode.
+              'bg-black/70 text-white border-white/20 hover:bg-black/80',
+              'dark:bg-white/80 dark:text-black dark:border-black/20 dark:hover:bg-white/90'
+            )}
+            onClick={() =>
+              scrollerRef.current?.scrollBy({
+                left: -Math.round((scrollerRef.current?.clientWidth || 800) * 0.9),
+                behavior: 'smooth',
+              })
+            }
             aria-label="Scroll left"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" />
           </Button>
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-9 w-9"
-            onClick={() => scrollerRef.current?.scrollBy({ left: Math.round((scrollerRef.current?.clientWidth || 800) * 0.9), behavior: 'smooth' })}
+            className={cn(
+              'pointer-events-auto absolute right-2',
+              'top-[calc(var(--rail-card-w)*3/8)] -translate-y-1/2',
+              'h-10 w-10 rounded-full shadow-lg',
+              'bg-black/70 text-white border-white/20 hover:bg-black/80',
+              'dark:bg-white/80 dark:text-black dark:border-black/20 dark:hover:bg-white/90'
+            )}
+            onClick={() =>
+              scrollerRef.current?.scrollBy({
+                left: Math.round((scrollerRef.current?.clientWidth || 800) * 0.9),
+                behavior: 'smooth',
+              })
+            }
             aria-label="Scroll right"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
 
