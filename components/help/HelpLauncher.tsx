@@ -117,11 +117,15 @@ export function HelpLauncher() {
   };
 
   // Bottom-right positioning for mobile safety (above bottom nav on mobile)
+  // Also account for ScrollToTop button on browse page (bottom-24 mobile, bottom-8 desktop)
   const bottomOffset = useMemo(() => {
     // On mobile, account for bottom nav (h-16) + safe area + padding
     // On desktop, just use bottom padding
     if (!pathname) return 'bottom-4 md:bottom-6';
     if (pathname.startsWith('/dashboard') || pathname.startsWith('/seller')) return 'bottom-20 md:bottom-6';
+    // Browse page: position above ScrollToTop button (which is at bottom-24 mobile, bottom-8 desktop)
+    // ScrollToTop is h-12 (48px) mobile, h-14 (56px) desktop, so we need bottom-32 mobile, bottom-20 desktop
+    if (pathname.startsWith('/browse')) return 'bottom-32 md:bottom-20';
     return 'bottom-4 md:bottom-6';
   }, [pathname]);
 
