@@ -12,7 +12,7 @@ import { PublicEmailCaptureMount } from '@/components/marketing/PublicEmailCaptu
 import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { getSiteUrl } from '@/lib/site-url';
 import { cookies } from 'next/headers';
-import { SiteGateOverlay } from '@/components/site/SiteGateOverlay';
+import { SiteGateClient } from '@/components/site/SiteGateClient';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -93,19 +93,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const gateEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
-  const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
-  const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePassword ? `pw:${gatePassword}` : '');
-  const gateCookie = cookies().get('we:site_gate:v1')?.value || '';
-  const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.className} ${foundersGrotesk.variable}`}>
         <Providers>
-          {!gateAllowed ? (
-            <SiteGateOverlay />
-          ) : (
-          <div className="min-h-screen flex flex-col bg-background relative">
+          {gateEnabled ? (
+            <SiteGateClient>
+              <div className="min-h-screen flex flex-col bg-background relative">
             {/* Atmospheric overlay - subtle depth (light mode only) */}
             <div className="fixed inset-0 pointer-events-none z-0 dark:hidden">
               {/* Parchment micro-glow at top center (subtle highlight) */}
@@ -132,7 +127,20 @@ export default function RootLayout({
             <ConditionalFooter />
             <Toaster />
             <SonnerToaster />
-          </div>
+              </div>
+            </SiteGateClient>
+          ) : (
+            <div className="min-h-screen flex flex-col bg-background relative">
+              <ConditionalNavbar />
+              <PublicEmailCaptureMount />
+              <HelpLauncher />
+              <main className="flex-1 relative z-10">
+                {children}
+              </main>
+              <ConditionalFooter />
+              <Toaster />
+              <SonnerToaster />
+            </div>
           )}
         </Providers>
       </body>
