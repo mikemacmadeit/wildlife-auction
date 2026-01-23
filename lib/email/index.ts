@@ -37,6 +37,7 @@ import {
   getAdminListingApprovedEmail,
   getAdminListingRejectedEmail,
   getAdminDisputeOpenedEmail,
+  getAdminBreederPermitSubmittedEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
@@ -66,6 +67,7 @@ import {
   type AdminListingApprovedEmailData,
   type AdminListingRejectedEmailData,
   type AdminDisputeOpenedEmailData,
+  type AdminBreederPermitSubmittedEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -209,6 +211,16 @@ const savedSearchAlertSchema = z.object({
   resultsCount: z.number().int().nonnegative(),
   searchUrl: urlSchema,
   unsubscribeUrl: urlSchema.optional(),
+});
+
+const adminBreederPermitSubmittedSchema = z.object({
+  adminName: z.string().min(1),
+  sellerId: z.string().min(1),
+  sellerName: z.string().optional(),
+  permitNumber: z.string().optional(),
+  storagePath: z.string().min(1),
+  documentUrl: urlSchema.optional(),
+  adminComplianceUrl: urlSchema,
 });
 
 const messageReceivedSchema = z.object({
@@ -827,6 +839,25 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: AdminDisputeOpenedEmailData) => {
       const { subject, html } = getAdminDisputeOpenedEmail(data);
       return { subject, preheader: `Dispute opened: ${data.orderId}`, html };
+    },
+  },
+  {
+    type: 'admin_breeder_permit_submitted',
+    displayName: 'Admin: Breeder Permit Submitted',
+    description: 'Sent to super admins when a breeder permit document is submitted and requires review.',
+    schema: adminBreederPermitSubmittedSchema,
+    samplePayload: {
+      adminName: 'Admin',
+      sellerId: 'SELLER_123',
+      sellerName: 'Jordan Smith',
+      permitNumber: 'TPWD-123456',
+      storagePath: 'breederPermits/SELLER_123/permit.pdf',
+      documentUrl: 'https://storage.googleapis.com/example/permit.pdf',
+      adminComplianceUrl: 'https://wildlife.exchange/dashboard/admin/compliance',
+    },
+    render: (data: AdminBreederPermitSubmittedEmailData) => {
+      const { subject, html } = getAdminBreederPermitSubmittedEmail(data);
+      return { subject, preheader: `Breeder permit submitted`, html };
     },
   },
 ] as const;

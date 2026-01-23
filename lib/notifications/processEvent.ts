@@ -480,6 +480,21 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Admin.BreederPermit.Submitted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Admin.BreederPermit.Submitted' }>;
+      return {
+        template: 'admin_breeder_permit_submitted',
+        templatePayload: {
+          adminName: recipientName,
+          sellerId: p.sellerId,
+          sellerName: p.sellerName || undefined,
+          permitNumber: p.permitNumber ?? undefined,
+          storagePath: p.storagePath,
+          documentUrl: p.documentUrl ?? undefined,
+          adminComplianceUrl: p.adminComplianceUrl,
+        },
+      };
+    }
     default:
       return null;
   }
@@ -531,6 +546,17 @@ async function loadUserPrefs(db: FirebaseFirestore.Firestore, userId: string) {
   }
 
   return getDefaultNotificationPreferences();
+}
+
+async function isSuperAdminUser(db: FirebaseFirestore.Firestore, userId: string): Promise<boolean> {
+  try {
+    const snap = await db.collection('users').doc(userId).get();
+    if (!snap.exists) return false;
+    const u = snap.data() as any;
+    return u?.role === 'super_admin' || u?.superAdmin === true;
+  } catch {
+    return false;
+  }
 }
 
 async function listUserPushTokens(db: FirebaseFirestore.Firestore, userId: string): Promise<Array<{ token: string; platform?: string }>> {
@@ -601,8 +627,39 @@ export async function processEventDoc(params: {
   }
 
   const prefs = await loadUserPrefs(db, targetUserId);
-  const decision = decideChannels({ eventType: eventData.type, payload: eventData.payload, prefs });
+  const decisionBase = decideChannels({ eventType: eventData.type, payload: eventData.payload, prefs });
   const rule = getEventRule(eventData.type, eventData.payload);
+
+  // Admin events: ensure super admins ALWAYS get email, and keep admin-email noise down for regular admins.
+  const isAdminEvent = eventData.type.startsWith('Admin.');
+  const isSuperAdmin = isAdminEvent ? await isSuperAdminUser(db, targetUserId) : false;
+
+  const decision = (() => {
+    if (!isAdminEvent) return decisionBase;
+    if (isSuperAdmin) {
+      return {
+        ...decisionBase,
+        allow: true,
+        category: decisionBase.category,
+        urgency: decisionBase.urgency,
+        channels: {
+          ...decisionBase.channels,
+          // Always allow in-app for admins (keeps dashboards consistent)
+          inApp: { enabled: true },
+          // Force email for super admins regardless of preferences/quiet hours.
+          email: { enabled: true },
+        },
+      };
+    }
+    // Non-super admins: suppress admin emails (in-app only) to avoid noise.
+    return {
+      ...decisionBase,
+      channels: {
+        ...decisionBase.channels,
+        email: { enabled: false, reason: 'admin_email_super_admin_only' },
+      },
+    };
+  })();
 
   // If marketing event and user has marketing disabled, decision.allow will be false.
   if (!decision.allow) {
@@ -631,13 +688,16 @@ export async function processEventDoc(params: {
 
   // 2) Email job
   if (decision.channels.email.enabled) {
-    const allowed = await enforceRateLimit({
-      db,
-      userId: targetUserId,
-      channel: 'email',
-      perHour: rule.rateLimitPerUser.email?.perHour || 0,
-      perDay: rule.rateLimitPerUser.email?.perDay || 0,
-    });
+    const allowed =
+      isAdminEvent && isSuperAdmin
+        ? true
+        : await enforceRateLimit({
+            db,
+            userId: targetUserId,
+            channel: 'email',
+            perHour: rule.rateLimitPerUser.email?.perHour || 0,
+            perDay: rule.rateLimitPerUser.email?.perDay || 0,
+          });
     if (allowed) {
       const contact = await loadUserContact(db, targetUserId);
       const built = buildEmailJobPayload({ eventType: eventData.type, payload: eventData.payload as any, recipientName: contact.name });

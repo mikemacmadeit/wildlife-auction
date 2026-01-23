@@ -187,6 +187,16 @@ export interface AdminDisputeOpenedEmailData {
   adminOpsUrl: string;
 }
 
+export interface AdminBreederPermitSubmittedEmailData {
+  adminName: string;
+  sellerId: string;
+  sellerName?: string;
+  permitNumber?: string;
+  storagePath: string;
+  documentUrl?: string;
+  adminComplianceUrl: string;
+}
+
 export interface AuctionHighBidderEmailData {
   userName: string;
   listingTitle: string;
@@ -1554,6 +1564,46 @@ export function getAdminDisputeOpenedEmail(data: AdminDisputeOpenedEmailData): {
       ${renderButton(data.adminOpsUrl, 'Open admin')}
     </div>
   `;
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getAdminBreederPermitSubmittedEmail(
+  data: AdminBreederPermitSubmittedEmailData
+): { subject: string; html: string } {
+  const subject = `Admin: breeder permit submitted — ${data.sellerName || data.sellerId}`;
+  const preheader = `A new breeder permit document was submitted and needs review.`;
+  const origin = tryGetOrigin(data.adminComplianceUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Breeder permit submitted
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.adminName)} — a seller submitted a breeder permit document for review.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Seller
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Seller:</span> <strong>${escapeHtml(data.sellerName || data.sellerId)}</strong></div>
+            ${data.permitNumber ? `<div style="margin-top: 6px;"><span style="color:#5B564A;">Permit #:</span> <strong>${escapeHtml(data.permitNumber)}</strong></div>` : ''}
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Storage path:</span> <strong>${escapeHtml(data.storagePath)}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.adminComplianceUrl, 'Open compliance queue')}
+    </div>
+    ${data.documentUrl ? `<div style="margin: 10px 0 0 0;">${renderSecondaryButton(data.documentUrl, 'View document')}</div>` : ''}
+  `;
+
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 

@@ -43,6 +43,7 @@ export interface NotificationCategoryPreferences {
     adminApproval: boolean;
     listingApprovedRejected: boolean;
     disputes: boolean;
+    breederPermitSubmitted: boolean;
   };
 }
 
@@ -124,6 +125,7 @@ export const notificationPreferencesSchema = z.object({
           adminApproval: z.boolean().default(true),
           listingApprovedRejected: z.boolean().default(true),
           disputes: z.boolean().default(true),
+          breederPermitSubmitted: z.boolean().default(true),
         })
         .default({
           listingSubmitted: true,
@@ -131,6 +133,7 @@ export const notificationPreferencesSchema = z.object({
           adminApproval: true,
           listingApprovedRejected: true,
           disputes: true,
+          breederPermitSubmitted: true,
         }),
     })
     .default({
@@ -139,7 +142,14 @@ export const notificationPreferencesSchema = z.object({
       onboarding: { welcome: true, profileIncomplete: true },
       marketing: { weeklyDigest: false, savedSearchAlerts: false },
       messages: { messageReceived: true },
-      admin: { listingSubmitted: true, complianceReview: true, adminApproval: true, listingApprovedRejected: true, disputes: true },
+      admin: {
+        listingSubmitted: true,
+        complianceReview: true,
+        adminApproval: true,
+        listingApprovedRejected: true,
+        disputes: true,
+        breederPermitSubmitted: true,
+      },
     }),
 });
 

@@ -162,9 +162,9 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
       return {
         category: 'admin',
         urgency: 'high',
-        channels: ['inApp'],
+        channels: ['inApp', 'email'],
         dedupeWindowMs: 1000 * 60 * 10,
-        rateLimitPerUser: {},
+        rateLimitPerUser: { email: { perHour: 30, perDay: 200 } },
         allowDuringQuietHours: true,
       };
     case 'Order.Confirmed':
@@ -370,6 +370,7 @@ export function decideChannels(params: {
         if (params.eventType === 'Admin.Listing.Submitted') return cats.admin.listingSubmitted;
         if (params.eventType === 'Admin.Listing.ComplianceReviewRequired') return cats.admin.complianceReview;
         if (params.eventType === 'Admin.Listing.AdminApprovalRequired') return cats.admin.adminApproval;
+        if (params.eventType === 'Admin.BreederPermit.Submitted') return cats.admin.breederPermitSubmitted;
         if (
           params.eventType === 'Admin.Listing.Approved' ||
           params.eventType === 'Admin.Listing.Rejected' ||
