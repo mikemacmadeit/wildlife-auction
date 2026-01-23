@@ -167,8 +167,26 @@ export default function AdminUserDossierPage() {
 
   const canEditRole = isSuperAdmin;
 
+  // Loading state
+  if (adminLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+          <Card className="border-2 border-border/50 bg-card">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="font-semibold">Loading...</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   // Early return for non-admin users
-  if (!isAdmin && !adminLoading) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
@@ -207,17 +225,6 @@ export default function AdminUserDossierPage() {
           </div>
         </div>
 
-        {!adminLoading && !isAdmin && (
-          <Card className="border-2 border-border/50 bg-card">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-destructive">
-                <ShieldAlert className="h-4 w-4" />
-                <div className="font-semibold">Admin access required.</div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {error ? (
           <Card className="border-2 border-destructive/30 bg-destructive/5">
             <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
@@ -232,7 +239,8 @@ export default function AdminUserDossierPage() {
             </CardContent>
           </Card>
         ) : data ? (
-          <div className="space-y-6">
+          <>
+            <div className="space-y-6">
             {/* AI Summary - shown at top for quick context */}
             {uid && (
               <AIAdminSummary
@@ -462,7 +470,9 @@ export default function AdminUserDossierPage() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
 
+            <div className="space-y-6">
               <Card className="border-2">
                 <CardHeader>
                   <CardTitle>Admin actions</CardTitle>
@@ -733,7 +743,7 @@ export default function AdminUserDossierPage() {
               ) : null}
             </div>
           </div>
-        ) : null}
+        </div>
 
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <DialogContent className="sm:max-w-lg">
@@ -756,6 +766,8 @@ export default function AdminUserDossierPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </>
+        ) : null}
       </div>
     </div>
   );

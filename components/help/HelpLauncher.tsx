@@ -116,11 +116,13 @@ export function HelpLauncher() {
     setTourSeenState(true);
   };
 
-  const topOffset = useMemo(() => {
-    // Public pages have the sticky navbar (h-20). Keep the help button below it.
-    if (!pathname) return 'top-24';
-    if (pathname.startsWith('/dashboard') || pathname.startsWith('/seller')) return 'top-4';
-    return 'top-24';
+  // Bottom-right positioning for mobile safety (above bottom nav on mobile)
+  const bottomOffset = useMemo(() => {
+    // On mobile, account for bottom nav (h-16) + safe area + padding
+    // On desktop, just use bottom padding
+    if (!pathname) return 'bottom-4 md:bottom-6';
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/seller')) return 'bottom-20 md:bottom-6';
+    return 'bottom-4 md:bottom-6';
   }, [pathname]);
 
   // Don’t show on auth pages to reduce noise.
@@ -138,9 +140,9 @@ export function HelpLauncher() {
 
   return (
     <>
-      {/* Persistent launcher (consistent placement, minimal overlap risk) */}
+      {/* Persistent launcher (bottom-right, mobile-safe) */}
       {!tourOnly ? (
-        <div className={cn('fixed right-4 z-[60]', topOffset)}>
+        <div className={cn('fixed right-4 z-[60]', bottomOffset)}>
           <HelpButton onClick={() => setOpen(true)} />
         </div>
       ) : null}

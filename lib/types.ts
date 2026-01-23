@@ -1134,3 +1134,22 @@ export interface ComplianceDocument {
   uploadedAt: Date; // When uploaded
   metadata?: Record<string, any>; // Additional metadata
 }
+
+// Knowledge Base Article Types
+export type KBArticleAudience = 'buyer' | 'seller' | 'all';
+
+export interface KnowledgeBaseArticle {
+  id: string; // Document ID (same as slug for easy lookup)
+  slug: string; // Unique, stable identifier (e.g., "getting-started-buying")
+  title: string;
+  content: string; // Markdown or plain text
+  category: string; // e.g., "getting-started", "account", "listings", "bidding", "payments", etc.
+  audience: KBArticleAudience[]; // Array of audiences this article targets
+  tags: string[]; // Searchable tags
+  enabled: boolean; // Whether article is active and searchable
+  version: number; // Auto-incremented on each edit
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy?: string; // Admin UID who created
+  updatedBy?: string; // Admin UID who last updated
+}
