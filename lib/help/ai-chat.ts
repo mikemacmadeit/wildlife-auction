@@ -216,7 +216,27 @@ QUESTION CONTEXT: ${questionContext}
 
     const userPrompt = `User Question: ${options.userMessage}
 
-Provide an incredibly helpful, friendly, and comprehensive answer. Use the knowledge base articles as your primary source, but be thorough and practical. If the question is about a problem, walk through solutions step-by-step. If it's a "how-to" question, provide clear instructions. Be empathetic, encouraging, and proactive in helping solve their issue.`;
+${questionContext}
+
+Provide an incredibly helpful, friendly, and comprehensive answer. Use the knowledge base articles as your primary source, but be thorough and practical. 
+
+SPECIFIC GUIDANCE BASED ON QUESTION TYPE:
+${isProblem ? `- This is a PROBLEM/ISSUE question. Start with empathy ("I understand how frustrating that must be" or "That's really frustrating - let's get this sorted out"). Then provide step-by-step solutions in a clear, numbered format. Walk through each solution methodically, starting with quick fixes, then deeper solutions. Explain why each step helps. End with encouragement ("I'm here to help if you need anything else") and clear next steps.` : ''}
+
+${isHowTo ? `- This is a HOW-TO question. Start enthusiastically ("Great question!" or "I'd be happy to walk you through that!"). Provide clear, detailed step-by-step instructions. Number each step. Explain not just what to do, but why each step matters. Include tips, best practices, and common mistakes to avoid. Make it actionable and easy to follow. End with encouragement and offer to help with any step.` : ''}
+
+${isWhatWhy ? `- This is a WHAT/WHY question. Start warmly ("I'd be happy to explain!" or "Great question - let me break that down for you"). Provide comprehensive explanation with context. Explain the concept clearly, include relevant details, examples, and mention related information that might help. Be thorough but clear. Use examples when helpful. End by asking if they have other questions.` : ''}
+
+${!isProblem && !isHowTo && !isWhatWhy ? `- This is a general question. Provide comprehensive, helpful information. Be thorough, include context, examples when helpful, and related information. Be friendly and encouraging. End with an offer to help further.` : ''}
+
+GENERAL PRINCIPLES (apply to all):
+- Be empathetic, encouraging, and proactive
+- Anticipate follow-up questions the user might have
+- Provide actionable, practical guidance
+- Use numbered lists for steps
+- Include "why" behind recommendations
+- Mention related topics that might help
+- Always end with encouragement and offer to help further`;
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
