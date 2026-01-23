@@ -542,7 +542,8 @@ export default function HomePage() {
             variant="outline"
             size="icon"
             className={cn(
-              'pointer-events-auto absolute left-2 -translate-y-1/2',
+              // Anchor to the rail edge (gutter), not over the first card.
+              'pointer-events-auto absolute left-0 -translate-y-1/2 -translate-x-1/2',
               'h-10 w-10 rounded-full shadow-lg',
               // High contrast on images: dark in light mode, light in dark mode.
               'bg-black/70 text-white border-white/20 hover:bg-black/80',
@@ -563,7 +564,7 @@ export default function HomePage() {
             variant="outline"
             size="icon"
             className={cn(
-              'pointer-events-auto absolute right-2 -translate-y-1/2',
+              'pointer-events-auto absolute right-0 -translate-y-1/2 translate-x-1/2',
               'h-10 w-10 rounded-full shadow-lg',
               'bg-black/70 text-white border-white/20 hover:bg-black/80',
               'dark:bg-white/80 dark:text-black dark:border-black/20 dark:hover:bg-white/90'
@@ -585,7 +586,8 @@ export default function HomePage() {
           className={cn(
             // NOTE: no scroll-smooth here; it makes drag-scrolling feel like it "catches up" after release.
             // Add side gutters on desktop so the arrow buttons don't overlap card images.
-            'overflow-x-auto pb-2 -mx-4 px-4 md:px-14 we-scrollbar-hover snap-x snap-proximity',
+            // On desktop, remove the negative margins so cards don't slide under the edge arrows.
+            'overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-12 we-scrollbar-hover snap-x snap-proximity',
             // Desktop UX: grab cursor for draggable rails.
             'md:cursor-grab',
             isDragging && 'md:cursor-grabbing select-none'
