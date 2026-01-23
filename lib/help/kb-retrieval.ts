@@ -46,17 +46,32 @@ export async function retrieveKBArticles(
     const queryExpansions: string[] = [queryLower];
     
     // Common sign-in variations
-    if (queryLower.includes('sign') && queryLower.includes('in')) {
-      queryExpansions.push('sign in', 'signin', 'login', 'log in', 'authentication', 'account access');
+    if (queryLower.includes('sign') && (queryLower.includes('in') || queryLower.includes('up'))) {
+      queryExpansions.push('sign in', 'signin', 'login', 'log in', 'authentication', 'account access', 'sign up', 'register', 'registration');
     }
-    if (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot')) {
-      queryExpansions.push('troubleshoot', 'help', 'problem', 'issue', 'error');
+    if (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('unable')) {
+      queryExpansions.push('troubleshoot', 'help', 'problem', 'issue', 'error', 'fix', 'solution');
     }
     if (queryLower.includes('password')) {
-      queryExpansions.push('reset password', 'forgot password', 'password reset');
+      queryExpansions.push('reset password', 'forgot password', 'password reset', 'change password', 'password help');
     }
     if (queryLower.includes('email')) {
-      queryExpansions.push('email verification', 'verify email', 'email confirm');
+      queryExpansions.push('email verification', 'verify email', 'email confirm', 'email not working', 'email problems');
+    }
+    // Listing variations
+    if (queryLower.includes('list') && (queryLower.includes('animal') || queryLower.includes('item') || queryLower.includes('sell'))) {
+      queryExpansions.push('create listing', 'post listing', 'sell', 'how to sell', 'listing animal', 'create listing');
+    }
+    if (queryLower.includes('listing') && (queryLower.includes('not') || queryLower.includes('show') || queryLower.includes('appear'))) {
+      queryExpansions.push('listing not showing', 'listing not appearing', 'listing visibility', 'listing search');
+    }
+    // Contact/seller variations
+    if (queryLower.includes('contact') || queryLower.includes('seller') || queryLower.includes('message')) {
+      queryExpansions.push('contact seller', 'message seller', 'how to contact', 'seller communication');
+    }
+    // Buy/purchase variations
+    if (queryLower.includes('buy') || queryLower.includes('purchase') || queryLower.includes('order')) {
+      queryExpansions.push('how to buy', 'purchasing', 'checkout', 'making purchase', 'buying process');
     }
     
     const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2); // Ignore very short words
