@@ -223,8 +223,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                         className="object-cover"
                         style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                         sizes="96px"
-                        unoptimized
                         loading="lazy"
+                        quality={85}
                       />
                     </div>
                   </div>
@@ -310,8 +310,8 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                     className="object-cover transition-transform duration-500 group-hover:scale-110"
                     style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                     sizes="(max-width: 640px) 128px, (max-width: 768px) 176px, (max-width: 1024px) 288px, 320px"
-                    unoptimized
                     loading="lazy"
+                    quality={85}
                   />
                 </div>
               </div>
@@ -430,7 +430,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                           width={32}
                           height={32}
                           className="h-8 w-8 object-cover"
-                          unoptimized
+                          quality={75}
                         />
                       ) : (
                         <span className="text-xs font-bold text-muted-foreground">

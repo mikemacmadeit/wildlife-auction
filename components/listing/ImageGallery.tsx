@@ -94,8 +94,8 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               style={{ objectPosition: getObjectPosition(images[selectedIndex] || '') }}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-              unoptimized
               priority={selectedIndex === 0}
+              quality={90}
             />
           </div>
         </div>

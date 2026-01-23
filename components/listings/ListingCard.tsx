@@ -160,8 +160,8 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     className="object-cover transition-transform duration-500 group-hover:scale-110"
                     style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    unoptimized
                     loading="lazy"
+                    quality={85}
                   />
                 </div>
               </div>

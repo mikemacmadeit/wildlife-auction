@@ -16,20 +16,46 @@ const nextConfig = {
       // `unsafe-none` avoids the warning spam without impacting app correctness.
       {
         source: '/login',
-        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' }],
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' },
+        ],
       },
       {
         source: '/register',
-        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' }],
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' },
+        ],
       },
       {
         source: '/:path*',
-        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' }],
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          // Performance: Enable compression and caching
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      // Static assets: aggressive caching
+      {
+        source: '/images/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
       },
     ];
   },
   images: { 
-    unoptimized: true,
+    // Enable image optimization for better performance
+    // Note: Netlify supports Next.js image optimization out of the box
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60,
     // Some Next.js versions still validate remote image hosts against `images.domains`
     // even when using `remotePatterns` (especially during dev/HMR). Keep both to avoid
     // runtime crashes when rendering Firebase Storage URLs.
