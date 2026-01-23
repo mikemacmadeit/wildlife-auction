@@ -128,7 +128,7 @@ export default function AdminUserDossierPage() {
     setConfirmTitle(params.title);
     setConfirmDescription(params.description);
     setConfirmReason('');
-    setConfirmAction(() => params.action);
+    setConfirmAction(params.action);
     setConfirmOpen(true);
   };
 
