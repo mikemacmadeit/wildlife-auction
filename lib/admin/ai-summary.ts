@@ -201,7 +201,12 @@ function formatUserData(data: any): string {
   parts.push(`Status: ${data.status || 'active'}`);
   
   if (data.createdAt) {
-    parts.push(`Created: ${new Date(data.createdAt).toISOString()}`);
+    try {
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+      parts.push(`Created: ${createdAt.toISOString()}`);
+    } catch (e) {
+      // Ignore date parsing errors
+    }
   }
   
   if (data.summary) {
@@ -248,15 +253,24 @@ function formatListingData(data: any): string {
   }
   
   if (data.createdAt) {
-    parts.push(`Created: ${new Date(data.createdAt).toISOString()}`);
+    try {
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+      parts.push(`Created: ${createdAt.toISOString()}`);
+    } catch (e) {
+      // Ignore date parsing errors
+    }
   }
   
-  if (data.description) {
-    parts.push(`Description: ${data.description.substring(0, 200)}...`);
+  if (data.description && typeof data.description === 'string') {
+    parts.push(`Description: ${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}`);
   }
   
   if (data.attributes) {
-    parts.push(`Attributes: ${JSON.stringify(data.attributes)}`);
+    try {
+      parts.push(`Attributes: ${JSON.stringify(data.attributes)}`);
+    } catch (e) {
+      // Ignore JSON stringify errors
+    }
   }
   
   return parts.join('\n');
@@ -289,15 +303,30 @@ function formatOrderData(data: any): string {
   }
   
   if (data.createdAt) {
-    parts.push(`Created: ${new Date(data.createdAt).toISOString()}`);
+    try {
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+      parts.push(`Created: ${createdAt.toISOString()}`);
+    } catch (e) {
+      // Ignore date parsing errors
+    }
   }
   
   if (data.paidAt) {
-    parts.push(`Paid: ${new Date(data.paidAt).toISOString()}`);
+    try {
+      const paidAt = data.paidAt?.toDate ? data.paidAt.toDate() : new Date(data.paidAt);
+      parts.push(`Paid: ${paidAt.toISOString()}`);
+    } catch (e) {
+      // Ignore date parsing errors
+    }
   }
   
   if (data.deliveredAt) {
-    parts.push(`Delivered: ${new Date(data.deliveredAt).toISOString()}`);
+    try {
+      const deliveredAt = data.deliveredAt?.toDate ? data.deliveredAt.toDate() : new Date(data.deliveredAt);
+      parts.push(`Delivered: ${deliveredAt.toISOString()}`);
+    } catch (e) {
+      // Ignore date parsing errors
+    }
   }
   
   return parts.join('\n');
@@ -327,7 +356,12 @@ function formatSupportTicketData(data: any): string {
   }
   
   if (data.createdAt) {
-    parts.push(`Created: ${new Date(data.createdAt).toISOString()}`);
+    try {
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+      parts.push(`Created: ${createdAt.toISOString()}`);
+    } catch (e) {
+      // Ignore date parsing errors
+    }
   }
   
   return parts.join('\n');

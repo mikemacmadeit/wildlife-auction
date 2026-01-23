@@ -223,22 +223,46 @@ export async function POST(request: Request) {
     }
 
     // Generate new summary
-    const summaryResult = await generateAISummary({
-      entityType: entityType as EntityType,
-      entityData,
-      existingSummary: entityData.aiAdminSummary
-        ? {
-            summary: entityData.aiAdminSummary,
-            generatedAt: entityData.aiAdminSummaryAt?.toDate
-              ? entityData.aiAdminSummaryAt.toDate()
-              : new Date(entityData.aiAdminSummaryAt),
-            model: entityData.aiAdminSummaryModel || 'gpt-4o-mini',
-          }
-        : null,
-    });
+    let summaryResult;
+    try {
+      summaryResult = await generateAISummary({
+        entityType: entityType as EntityType,
+        entityData,
+        existingSummary: entityData.aiAdminSummary
+          ? {
+              summary: entityData.aiAdminSummary,
+              generatedAt: entityData.aiAdminSummaryAt?.toDate
+                ? entityData.aiAdminSummaryAt.toDate()
+                : new Date(entityData.aiAdminSummaryAt),
+              model: entityData.aiAdminSummaryModel || 'gpt-4o-mini',
+            }
+          : null,
+      });
+    } catch (summaryError: any) {
+      console.error('[AI Summary API] Error in generateAISummary:', summaryError);
+      return json(
+        { 
+          ok: false, 
+          error: 'Failed to generate summary', 
+          message: summaryError?.message || String(summaryError),
+          details: 'Check server logs for details'
+        }, 
+        { status: 500 }
+      );
+    }
 
     if (!summaryResult) {
-      return json({ ok: false, error: 'Failed to generate summary' }, { status: 500 });
+      // Check if feature is enabled and API key is configured
+      const isEnabled = process.env.AI_ADMIN_SUMMARY_ENABLED === 'true';
+      const hasKey = !!process.env.OPENAI_API_KEY;
+      
+      return json({ 
+        ok: false, 
+        error: 'Failed to generate summary',
+        reason: !isEnabled ? 'Feature disabled (AI_ADMIN_SUMMARY_ENABLED not set to true)' 
+               : !hasKey ? 'OpenAI API key not configured (OPENAI_API_KEY missing)'
+               : 'OpenAI API call failed or returned no result'
+      }, { status: 500 });
     }
 
     // Store summary in Firestore
