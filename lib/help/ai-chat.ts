@@ -210,7 +210,9 @@ TONE EXAMPLES:
 ❌ Bad: "According to the knowledge base..."
 
 Knowledge Base Articles:
-${kbContext}`;
+${kbContext}
+
+QUESTION CONTEXT: ${questionContext}
 
     const userPrompt = `User Question: ${options.userMessage}
 
