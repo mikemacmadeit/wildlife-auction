@@ -98,7 +98,7 @@ export async function generateKBGroundedChatResponse(
       const retrievalResult = await retrieveKBArticles({
         query: options.userMessage,
         audience: options.audience || 'all',
-        limit: 8,
+        limit: 6, // Reduced from 8 to 6 for faster retrieval and processing
         context: options.context,
       });
       articles = retrievalResult.articles;
@@ -299,8 +299,8 @@ GENERAL PRINCIPLES (apply to all):
         body: JSON.stringify({
           model: 'gpt-4o-mini', // Cost-effective, fast model
           messages,
-          max_tokens: 700, // Allow very comprehensive, detailed answers
-          temperature: 0.75, // Higher for more natural, empathetic, conversational, helpful tone
+          max_tokens: 550, // Reduced from 700 for faster responses while still comprehensive
+          temperature: 0.7, // Slightly reduced from 0.75 for faster, still natural responses
         }),
         signal: controller.signal,
       });

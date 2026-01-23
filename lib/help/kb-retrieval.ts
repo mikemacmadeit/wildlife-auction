@@ -41,7 +41,7 @@ export interface KBRetrievalResult {
 export async function retrieveKBArticles(
   options: KBRetrievalOptions
 ): Promise<KBRetrievalResult> {
-  const { query, audience = 'all', limit = 8, context } = options;
+  const { query, audience = 'all', limit = 6, context } = options; // Default reduced from 8 to 6 for speed
 
   try {
     const db = getAdminDb();
@@ -266,7 +266,7 @@ export function formatKBArticlesForPrompt(articles: KBRetrievalResult['articles'
 Category: ${article.category}
 Tags: ${article.tags.join(', ') || 'none'}
 Content:
-${article.content.slice(0, 3000)}${article.content.length > 3000 ? '...' : ''}
+${article.content.slice(0, 2500)}${article.content.length > 2500 ? '...' : ''}
 ---`;
   });
 

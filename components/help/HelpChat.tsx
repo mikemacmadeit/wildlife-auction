@@ -232,8 +232,13 @@ export function HelpChat({ onSwitchToSupport }: { onSwitchToSupport: () => void 
             ))}
             {loading && (
               <div className="flex justify-start gap-3">
-                <div className="bg-muted rounded-lg px-4 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <div className="bg-muted rounded-lg px-4 py-3 max-w-[80%]">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Thinking... I'm finding the best answer for you.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
