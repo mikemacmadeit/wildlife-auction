@@ -15,9 +15,9 @@ export function SiteGateClient({ children }: { children: React.ReactNode }) {
     };
 
     checkCookie();
-    // Check again after a short delay in case cookie was just set
-    const timer = setTimeout(checkCookie, 100);
-    return () => clearTimeout(timer);
+    // Check periodically in case cookie was just set
+    const interval = setInterval(checkCookie, 200);
+    return () => clearInterval(interval);
   }, []);
 
   if (allowed === null) {

@@ -50,7 +50,6 @@ export async function POST(req: Request) {
   const cookie = [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
-    'HttpOnly',
     'SameSite=Lax',
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
