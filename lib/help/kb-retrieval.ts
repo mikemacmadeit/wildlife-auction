@@ -42,36 +42,64 @@ export async function retrieveKBArticles(
     const db = getAdminDb();
     const queryLower = query.toLowerCase().trim();
     
-    // Expand query with common synonyms and variations
+    // Expand query with comprehensive synonyms and variations
     const queryExpansions: string[] = [queryLower];
     
-    // Common sign-in variations
-    if (queryLower.includes('sign') && (queryLower.includes('in') || queryLower.includes('up'))) {
-      queryExpansions.push('sign in', 'signin', 'login', 'log in', 'authentication', 'account access', 'sign up', 'register', 'registration');
+    // Authentication variations (very comprehensive)
+    if (queryLower.includes('sign') || queryLower.includes('login') || queryLower.includes('auth')) {
+      queryExpansions.push('sign in', 'signin', 'login', 'log in', 'authentication', 'account access', 'sign up', 'register', 'registration', 'account', 'access account');
     }
-    if (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('unable')) {
-      queryExpansions.push('troubleshoot', 'help', 'problem', 'issue', 'error', 'fix', 'solution');
+    if (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('unable') || queryLower.includes('wont') || queryLower.includes("won't")) {
+      queryExpansions.push('troubleshoot', 'help', 'problem', 'issue', 'error', 'fix', 'solution', 'not working', 'broken', 'failed');
     }
     if (queryLower.includes('password')) {
-      queryExpansions.push('reset password', 'forgot password', 'password reset', 'change password', 'password help');
+      queryExpansions.push('reset password', 'forgot password', 'password reset', 'change password', 'password help', 'lost password', 'password recovery');
     }
     if (queryLower.includes('email')) {
-      queryExpansions.push('email verification', 'verify email', 'email confirm', 'email not working', 'email problems');
+      queryExpansions.push('email verification', 'verify email', 'email confirm', 'email not working', 'email problems', 'email issues', 'verify account');
     }
-    // Listing variations
-    if (queryLower.includes('list') && (queryLower.includes('animal') || queryLower.includes('item') || queryLower.includes('sell'))) {
-      queryExpansions.push('create listing', 'post listing', 'sell', 'how to sell', 'listing animal', 'create listing');
+    
+    // Listing variations (comprehensive)
+    if (queryLower.includes('list') || queryLower.includes('sell') || queryLower.includes('post')) {
+      queryExpansions.push('create listing', 'post listing', 'sell', 'how to sell', 'listing animal', 'create listing', 'publish listing', 'add listing', 'new listing');
     }
-    if (queryLower.includes('listing') && (queryLower.includes('not') || queryLower.includes('show') || queryLower.includes('appear'))) {
-      queryExpansions.push('listing not showing', 'listing not appearing', 'listing visibility', 'listing search');
+    if (queryLower.includes('listing') && (queryLower.includes('not') || queryLower.includes('show') || queryLower.includes('appear') || queryLower.includes('visible'))) {
+      queryExpansions.push('listing not showing', 'listing not appearing', 'listing visibility', 'listing search', 'listing hidden', 'listing missing');
     }
+    
     // Contact/seller variations
-    if (queryLower.includes('contact') || queryLower.includes('seller') || queryLower.includes('message')) {
-      queryExpansions.push('contact seller', 'message seller', 'how to contact', 'seller communication');
+    if (queryLower.includes('contact') || queryLower.includes('seller') || queryLower.includes('message') || queryLower.includes('reach')) {
+      queryExpansions.push('contact seller', 'message seller', 'how to contact', 'seller communication', 'talk to seller', 'seller contact');
     }
+    
     // Buy/purchase variations
-    if (queryLower.includes('buy') || queryLower.includes('purchase') || queryLower.includes('order')) {
-      queryExpansions.push('how to buy', 'purchasing', 'checkout', 'making purchase', 'buying process');
+    if (queryLower.includes('buy') || queryLower.includes('purchase') || queryLower.includes('order') || queryLower.includes('checkout')) {
+      queryExpansions.push('how to buy', 'purchasing', 'checkout', 'making purchase', 'buying process', 'complete purchase', 'make purchase');
+    }
+    
+    // Payment variations
+    if (queryLower.includes('pay') || queryLower.includes('payment') || queryLower.includes('checkout') || queryLower.includes('card') || queryLower.includes('ach')) {
+      queryExpansions.push('payment methods', 'how to pay', 'payment options', 'checkout process', 'payment processing', 'credit card', 'bank transfer');
+    }
+    
+    // Delivery variations
+    if (queryLower.includes('deliver') || queryLower.includes('ship') || queryLower.includes('receive') || queryLower.includes('pickup')) {
+      queryExpansions.push('delivery', 'shipping', 'pickup', 'receive order', 'delivery time', 'when will I receive', 'delivery options');
+    }
+    
+    // Account/profile variations
+    if (queryLower.includes('account') || queryLower.includes('profile') || queryLower.includes('setup') || queryLower.includes('settings')) {
+      queryExpansions.push('account setup', 'profile setup', 'account settings', 'complete profile', 'account configuration');
+    }
+    
+    // Bidding variations
+    if (queryLower.includes('bid') || queryLower.includes('auction') || queryLower.includes('win')) {
+      queryExpansions.push('bidding', 'auctions', 'how to bid', 'place bid', 'winning auction', 'auction process');
+    }
+    
+    // Fees variations
+    if (queryLower.includes('fee') || queryLower.includes('cost') || queryLower.includes('price') || queryLower.includes('charge')) {
+      queryExpansions.push('fees', 'costs', 'pricing', 'seller fees', 'transaction fees', 'how much does it cost');
     }
     
     const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2); // Ignore very short words

@@ -94,10 +94,38 @@ export async function generateKBGroundedChatResponse(
       articles = retrievalResult.articles;
     }
 
+    // Intelligent fallback for common questions even if KB doesn't have exact match
     if (articles.length === 0) {
+      const queryLower = options.userMessage.toLowerCase();
+      
+      // Provide helpful fallback responses for very common questions
+      if (queryLower.includes('sign in') || queryLower.includes('login') || queryLower.includes('cant sign') || queryLower.includes("can't sign")) {
+        return {
+          answer: "I'd be happy to help you sign in! Here are the most common solutions: 1) Make sure your email is verified - check your inbox for a verification link. 2) If you forgot your password, click 'Forgot Password' on the sign-in page to reset it. 3) Check that you're using the correct email address (it's case-sensitive). 4) Try clearing your browser cache or using a different browser. 5) Make sure caps lock is off - passwords are case-sensitive. If none of these work, please use the 'Contact Support' option and we'll help you get signed in right away.",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      if (queryLower.includes('list') && (queryLower.includes('animal') || queryLower.includes('item') || queryLower.includes('sell'))) {
+        return {
+          answer: "To list an animal or item for sale: 1) Sign in and go to 'Create Listing' in your dashboard. 2) Choose your listing type (Auction or Fixed Price). 3) Select the category (Wildlife, Cattle, Horses, Equipment, etc.). 4) Add a clear title and detailed description. 5) Upload high-quality photos (at least 3-5 recommended). 6) Set your location and pricing. 7) Fill in category-specific attributes. 8) Review and publish - your listing will be reviewed by admin (usually within 24 hours). Make sure your email is verified and your payment account is connected before publishing. Need more details? Check the 'How to List an Animal' guide or contact support!",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      if (queryLower.includes('contact') && queryLower.includes('seller')) {
+        return {
+          answer: "To contact a seller: 1) Go to the listing page you're interested in. 2) Click 'Contact Seller' or 'Message Seller' button. 3) Write your message with your questions. 4) Send the message - the seller will be notified. You can also contact sellers through your order page after making a purchase. Sellers typically respond within 24-48 hours. Be specific with your questions and polite in your communication. If a seller doesn't respond after 3 days, you can contact support for assistance.",
+          sources: [],
+          kbAvailable: true,
+        };
+      }
+      
+      // Default helpful fallback
       return {
-        answer:
-          "I couldn't find specific information about that in our knowledge base. Please use the 'Contact Support' option to get help from our team, and we'll be happy to assist you.",
+        answer: `I want to help you with "${options.userMessage}". While I don't have specific information about that exact question in our knowledge base right now, here are some ways I can help: 1) Try rephrasing your question with different words. 2) Use the 'Contact Support' option for personalized help from our team. 3) Browse our Help articles for related topics. Our support team is here to help and typically responds within 1-2 business days. What specific issue are you trying to solve?`,
         sources: [],
         kbAvailable: true,
       };
