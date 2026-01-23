@@ -157,6 +157,17 @@ export async function generateKBGroundedChatResponse(
 
     // Format KB articles for prompt
     const kbContext = formatKBArticlesForPrompt(articles);
+    
+    // Add context about user's question type for better responses
+    const queryLower = options.userMessage.toLowerCase();
+    const isProblem = queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('problem') || queryLower.includes('issue') || queryLower.includes('error') || queryLower.includes('not working') || queryLower.includes('help');
+    const isHowTo = queryLower.includes('how') || queryLower.includes('step') || queryLower.includes('guide');
+    const isWhatWhy = queryLower.includes('what') || queryLower.includes('why') || queryLower.includes('explain') || queryLower.includes('tell me about');
+    
+    const questionContext = isProblem ? 'This is a PROBLEM/ISSUE question - the user needs troubleshooting help.' : 
+                           isHowTo ? 'This is a HOW-TO question - the user needs step-by-step instructions.' :
+                           isWhatWhy ? 'This is a WHAT/WHY question - the user needs explanation and context.' :
+                           'This is a general question - provide comprehensive, helpful information.';
 
     // Helpful, conversational prompt - be the best support assistant possible
     const systemPrompt = `You are an expert support assistant for Wildlife Exchange, a trusted marketplace for buying and selling animals, livestock, ranch equipment, and related items. Your goal is to be incredibly helpful, friendly, and solve user problems.
