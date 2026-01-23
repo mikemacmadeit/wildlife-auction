@@ -48,10 +48,7 @@ export function SiteGateOverlay() {
                   setError(data?.error || 'Invalid password');
                   return;
                 }
-                // Small delay to ensure cookie is set before reload
-                setTimeout(() => {
-                  window.location.reload();
-                }, 100);
+                window.location.reload();
               } catch (e: any) {
                 setError(e?.message || 'Failed to sign in');
               } finally {

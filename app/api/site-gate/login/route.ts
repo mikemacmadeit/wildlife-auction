@@ -47,13 +47,11 @@ export async function POST(req: Request) {
     return json({ error: 'Invalid password' }, { status: 401 });
   }
 
-  // httpOnly cookie so it's not readable by JS.
   const cookie = [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    'Secure',
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
     .join('; ');
