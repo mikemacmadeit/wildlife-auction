@@ -176,7 +176,7 @@ export function buildInAppNotification(params: {
         body: `Payment received for “${p.listingTitle}”. Funds are held securely until delivery and issue windows are complete.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View timeline',
-        metadata: { amount: p.amount, paymentMethod: p.paymentMethod },
+        metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount, paymentMethod: p.paymentMethod },
       };
     }
     case 'Order.Received': {
@@ -188,7 +188,7 @@ export function buildInAppNotification(params: {
         body: `The buyer confirmed receipt for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
-        metadata: { amount: p.amount },
+        metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },
       };
     }
     case 'Order.Preparing': {
@@ -200,6 +200,7 @@ export function buildInAppNotification(params: {
         body: `The seller is preparing your order for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
     case 'Order.InTransit': {
@@ -211,6 +212,7 @@ export function buildInAppNotification(params: {
         body: `Your order for “${p.listingTitle}” is in transit.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
     case 'Order.DeliveryConfirmed': {
@@ -222,7 +224,7 @@ export function buildInAppNotification(params: {
         body: `Delivery confirmed for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
-        metadata: { deliveryDate: p.deliveryDate },
+        metadata: { listingId: p.listingId, orderId: p.orderId, deliveryDate: p.deliveryDate },
       };
     }
     case 'Order.DeliveryCheckIn': {
@@ -234,7 +236,7 @@ export function buildInAppNotification(params: {
         body: `How did “${p.listingTitle}” go? Confirm receipt or report an issue.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'Open order',
-        metadata: { daysSinceDelivery: p.daysSinceDelivery },
+        metadata: { listingId: p.listingId, orderId: p.orderId, daysSinceDelivery: p.daysSinceDelivery },
       };
     }
     case 'Payout.Released': {
@@ -246,7 +248,7 @@ export function buildInAppNotification(params: {
         body: `Your payout for “${p.listingTitle}” was released.`,
         deepLinkUrl: `/seller/payouts`,
         linkLabel: 'View payouts',
-        metadata: { amount: p.amount, transferId: p.transferId },
+        metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount, transferId: p.transferId },
       };
     }
     case 'User.Welcome': {
@@ -317,7 +319,7 @@ export function buildInAppNotification(params: {
         body: `You received an offer of $${Number(p.amount).toLocaleString()} on “${p.listingTitle}”.`,
         deepLinkUrl: p.offerUrl,
         linkLabel: 'Review offer',
-        metadata: { offerId: p.offerId, amount: p.amount, expiresAt: p.expiresAt || null },
+        metadata: { listingId: p.listingId, offerId: p.offerId, amount: p.amount, expiresAt: p.expiresAt || null },
       };
     }
     case 'Offer.Countered': {
@@ -329,7 +331,7 @@ export function buildInAppNotification(params: {
         body: `Counter offer: $${Number(p.amount).toLocaleString()} for “${p.listingTitle}”.`,
         deepLinkUrl: p.offerUrl,
         linkLabel: 'View offer',
-        metadata: { offerId: p.offerId, amount: p.amount, expiresAt: p.expiresAt || null },
+        metadata: { listingId: p.listingId, offerId: p.offerId, amount: p.amount, expiresAt: p.expiresAt || null },
       };
     }
     case 'Offer.Accepted': {
@@ -341,7 +343,7 @@ export function buildInAppNotification(params: {
         body: `Offer accepted for “${p.listingTitle}” at $${Number(p.amount).toLocaleString()}.`,
         deepLinkUrl: p.offerUrl,
         linkLabel: 'Next steps',
-        metadata: { offerId: p.offerId, amount: p.amount },
+        metadata: { listingId: p.listingId, offerId: p.offerId, amount: p.amount },
       };
     }
     case 'Offer.Declined': {
@@ -353,7 +355,7 @@ export function buildInAppNotification(params: {
         body: `Offer declined for “${p.listingTitle}”.`,
         deepLinkUrl: p.offerUrl,
         linkLabel: 'View offers',
-        metadata: { offerId: p.offerId },
+        metadata: { listingId: p.listingId, offerId: p.offerId },
       };
     }
     case 'Offer.Expired': {
@@ -365,7 +367,7 @@ export function buildInAppNotification(params: {
         body: `Offer expired for “${p.listingTitle}”.`,
         deepLinkUrl: p.offerUrl,
         linkLabel: 'View offers',
-        metadata: { offerId: p.offerId },
+        metadata: { listingId: p.listingId, offerId: p.offerId },
       };
     }
     case 'Admin.Listing.Submitted': {

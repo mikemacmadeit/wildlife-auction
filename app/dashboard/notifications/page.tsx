@@ -12,7 +12,6 @@ import { collection, doc, onSnapshot, orderBy, query, limit, updateDoc, serverTi
 import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -30,11 +29,16 @@ import {
   ShieldAlert,
   DollarSign,
   Handshake,
+  Star,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import Image from 'next/image';
+import { getListingsByIds } from '@/lib/firebase/listings';
+import type { Listing } from '@/lib/types';
 
-type UiTab = 'all' | 'offers' | 'auctions' | 'orders';
+type UiFilter = 'all' | 'important' | 'buying' | 'selling' | 'recommended' | 'account';
 
 type UserNotification = {
   id: string;
@@ -46,6 +50,10 @@ type UserNotification = {
   linkLabel?: string;
   read?: boolean;
   createdAt?: any;
+  entityType?: string;
+  entityId?: string;
+  eventType?: string;
+  metadata?: Record<string, any>;
 };
 
 function toMillisSafe(v: any): number {
@@ -77,24 +85,101 @@ function timeAgo(n: UserNotification): string | null {
   }
 }
 
-function categoryFor(n: UserNotification): UiTab {
+function normalizeType(n: UserNotification): string {
+  const t = String(n.type || '').trim();
+  if (t) return t.toLowerCase();
+  const ev = String(n.eventType || '').trim();
+  if (!ev) return '';
+  return ev.toLowerCase().replaceAll('.', '_');
+}
+
+function listingIdFromUrl(url: string): string | null {
+  try {
+    const m = String(url || '').match(/\/listing\/([^/?#]+)/i);
+    return m?.[1] ? String(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function listingIdFor(n: UserNotification): string | null {
+  const meta = n.metadata || {};
+  const metaListingId = typeof (meta as any)?.listingId === 'string' ? String((meta as any).listingId) : null;
+  if (metaListingId) return metaListingId;
+  if (String(n.entityType || '').toLowerCase() === 'listing' && n.entityId) return String(n.entityId);
+  const urlId = n.deepLinkUrl ? listingIdFromUrl(n.deepLinkUrl) : null;
+  return urlId;
+}
+
+function filterFor(n: UserNotification): UiFilter {
   const c = String(n.category || '').toLowerCase();
-  if (c === 'offers') return 'offers';
-  if (c === 'auctions') return 'auctions';
-  if (c === 'orders') return 'orders';
-  // fallback based on type
-  const t = String(n.type || '');
-  if (t.startsWith('offer_')) return 'offers';
-  if (t.startsWith('auction_') || t.startsWith('bid_')) return 'auctions';
-  if (t.startsWith('order_') || t.startsWith('payout_')) return 'orders';
+  const t = normalizeType(n);
+
+  if (c === 'marketing' || t.startsWith('marketing_')) return 'recommended';
+  if (c === 'onboarding' || t === 'user_welcome' || t === 'profile_incomplete') return 'account';
+  if (c === 'admin' || t.startsWith('admin_') || t.startsWith('listing_') || t.startsWith('compliance_')) return 'account';
+
+  // Selling-side signals
+  if (t === 'bid_received') return 'selling';
+  if (t === 'offer_received') return 'selling';
+  if (t === 'order_received' || t === 'payout_released') return 'selling';
+
+  // Buying-side signals
+  if (t.startsWith('auction_') || t.startsWith('bid_')) return 'buying';
+  if (t.startsWith('offer_')) return 'buying';
+  if (t.startsWith('order_')) return 'buying';
+
+  // Messages: show under Important (and All)
+  if (t === 'message_received' || c === 'messages') return 'important';
+
   return 'all';
 }
 
-function iconFor(tab: UiTab) {
-  if (tab === 'offers') return Handshake;
-  if (tab === 'auctions') return Gavel;
-  if (tab === 'orders') return ShoppingBag;
+function iconForFilter(tab: UiFilter) {
+  if (tab === 'buying') return Gavel;
+  if (tab === 'selling') return ShoppingBag;
+  if (tab === 'recommended') return Star;
+  if (tab === 'account') return User;
+  if (tab === 'important') return AlertTriangle;
   return Bell;
+}
+
+function tagForNotification(n: UserNotification): { label: string; className: string } | null {
+  const t = normalizeType(n);
+
+  // eBay-style tags
+  if (t === 'auction_lost') {
+    return { label: 'GOT AWAY', className: 'bg-red-600 text-white border-red-700' };
+  }
+  if (t === 'auction_won') {
+    return { label: 'WON', className: 'bg-emerald-600 text-white border-emerald-700' };
+  }
+  if (t === 'auction_ending_soon') {
+    return { label: 'Watched item reminder', className: 'bg-sky-600 text-white border-sky-700' };
+  }
+  if (t === 'bid_outbid') {
+    return { label: 'Outbid', className: 'bg-amber-600 text-white border-amber-700' };
+  }
+  if (t === 'offer_received') {
+    return { label: 'Seller offer', className: 'bg-sky-600 text-white border-sky-700' };
+  }
+  if (t === 'offer_countered') {
+    return { label: 'Counter offer', className: 'bg-sky-600 text-white border-sky-700' };
+  }
+  if (t.startsWith('offer_')) {
+    return { label: 'Offer update', className: 'bg-sky-600 text-white border-sky-700' };
+  }
+  if (t.startsWith('order_')) {
+    return { label: 'Order update', className: 'bg-indigo-600 text-white border-indigo-700' };
+  }
+  if (t === 'payout_released') {
+    return { label: 'Payout released', className: 'bg-emerald-600 text-white border-emerald-700' };
+  }
+  if (t === 'message_received') {
+    return { label: 'Message', className: 'bg-violet-600 text-white border-violet-700' };
+  }
+
+  return null;
 }
 
 function styleForNotification(n: UserNotification): {
@@ -103,7 +188,7 @@ function styleForNotification(n: UserNotification): {
   unreadRowClass: string;
   newBadgeClass: string;
 } {
-  const type = String(n.type || '').toLowerCase();
+  const type = normalizeType(n);
   const category = String(n.category || '').toLowerCase();
 
   // Messages
@@ -195,10 +280,11 @@ function styleForNotification(n: UserNotification): {
 export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<UiTab>('all');
+  const [filter, setFilter] = useState<UiFilter>('all');
   const [items, setItems] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const autoMarkedReadRef = useRef(false);
+  const [listingById, setListingById] = useState<Record<string, Listing | null>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -247,29 +333,89 @@ export default function NotificationsPage() {
   }, [user?.uid, authLoading]);
 
   const filtered = useMemo(() => {
-    if (tab === 'all') return items;
-    return items.filter((n) => categoryFor(n) === tab);
-  }, [items, tab]);
+    if (filter === 'all') return items;
+    if (filter === 'important') {
+      // Important = unread OR high-signal transactional types
+      return items.filter((n) => {
+        if (n.read !== true) return true;
+        const t = normalizeType(n);
+        return (
+          t === 'message_received' ||
+          t === 'bid_outbid' ||
+          t === 'auction_won' ||
+          t === 'auction_ending_soon' ||
+          t.startsWith('order_') ||
+          t.startsWith('offer_') ||
+          t === 'payout_released' ||
+          t === 'listing_rejected' ||
+          t === 'compliance_rejected'
+        );
+      });
+    }
+    return items.filter((n) => filterFor(n) === filter);
+  }, [items, filter]);
 
   const unreadCount = useMemo(() => items.filter((n) => n.read !== true).length, [items]);
-  const tabCounts = useMemo(() => {
-    const offers = items.filter((n) => categoryFor(n) === 'offers').length;
-    const auctions = items.filter((n) => categoryFor(n) === 'auctions').length;
-    const orders = items.filter((n) => categoryFor(n) === 'orders').length;
-    return {
-      all: items.length,
-      offers,
-      auctions,
-      orders,
-    };
+  const filterCounts = useMemo(() => {
+    const all = items.length;
+    const important = items.filter((n) => {
+      if (n.read !== true) return true;
+      const t = normalizeType(n);
+      return t.startsWith('order_') || t.startsWith('offer_') || t === 'bid_outbid' || t === 'auction_won' || t === 'message_received';
+    }).length;
+    const buying = items.filter((n) => filterFor(n) === 'buying').length;
+    const selling = items.filter((n) => filterFor(n) === 'selling').length;
+    const recommended = items.filter((n) => filterFor(n) === 'recommended').length;
+    const account = items.filter((n) => filterFor(n) === 'account').length;
+    return { all, important, buying, selling, recommended, account };
   }, [items]);
 
-  const tabUnreadCounts = useMemo(() => {
-    const offers = items.filter((n) => n.read !== true && categoryFor(n) === 'offers').length;
-    const auctions = items.filter((n) => n.read !== true && categoryFor(n) === 'auctions').length;
-    const orders = items.filter((n) => n.read !== true && categoryFor(n) === 'orders').length;
-    return { all: unreadCount, offers, auctions, orders };
+  const filterUnreadCounts = useMemo(() => {
+    const all = unreadCount;
+    const important = items.filter((n) => n.read !== true).length; // important badge tracks unread, like eBay
+    const buying = items.filter((n) => n.read !== true && filterFor(n) === 'buying').length;
+    const selling = items.filter((n) => n.read !== true && filterFor(n) === 'selling').length;
+    const recommended = items.filter((n) => n.read !== true && filterFor(n) === 'recommended').length;
+    const account = items.filter((n) => n.read !== true && filterFor(n) === 'account').length;
+    return { all, important, buying, selling, recommended, account };
   }, [items, unreadCount]);
+
+  // Fetch listing thumbnails for the current feed (best-effort).
+  useEffect(() => {
+    if (!user?.uid) {
+      setListingById({});
+      return;
+    }
+    const ids = Array.from(
+      new Set(
+        (items || [])
+          .map((n) => listingIdFor(n))
+          .filter(Boolean)
+          .slice(0, 60) as string[]
+      )
+    );
+    const missing = ids.filter((id) => !(id in listingById));
+    if (!missing.length) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const fetched = await getListingsByIds(missing);
+        if (cancelled) return;
+        const next: Record<string, Listing | null> = {};
+        for (let i = 0; i < missing.length; i++) {
+          next[missing[i]] = fetched[i] as any;
+        }
+        setListingById((prev) => ({ ...prev, ...next }));
+      } catch {
+        // ignore; keep placeholders
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, listingById, user?.uid]);
 
   const markAllRead = useCallback(async () => {
     if (!user?.uid) return;
@@ -361,16 +507,7 @@ export default function NotificationsPage() {
 
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <Badge variant="secondary" className="font-semibold">
-                  {tabCounts.all} total
-                </Badge>
-                <Badge variant="outline" className="font-semibold">
-                  <Handshake className="h-3 w-3 mr-1" /> {tabCounts.offers} offers
-                </Badge>
-                <Badge variant="outline" className="font-semibold">
-                  <Gavel className="h-3 w-3 mr-1" /> {tabCounts.auctions} auctions
-                </Badge>
-                <Badge variant="outline" className="font-semibold">
-                  <ShoppingBag className="h-3 w-3 mr-1" /> {tabCounts.orders} orders
+                  {filterCounts.all} total
                 </Badge>
               </div>
             </div>
@@ -390,59 +527,45 @@ export default function NotificationsPage() {
           <CardTitle className="text-base">Inbox</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as UiTab)} className="w-full">
-            <div className="px-5 pb-4">
-              <TabsList className="grid grid-cols-4 w-full">
-                <TabsTrigger value="all" className="font-semibold">
-                  <span className="flex items-center justify-center gap-2">
-                    <Bell className="h-4 w-4" />
-                    All
-                    {tabUnreadCounts.all > 0 ? (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                        {tabUnreadCounts.all}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'important', label: 'Important' },
+                  { key: 'buying', label: 'Buying' },
+                  { key: 'selling', label: 'Selling' },
+                  { key: 'recommended', label: 'Recommended' },
+                  { key: 'account', label: 'Account' },
+                ] as const
+              ).map((f) => {
+                const Icon = iconForFilter(f.key);
+                const isActive = filter === f.key;
+                const unread = (filterUnreadCounts as any)[f.key] as number;
+                return (
+                  <Button
+                    key={f.key}
+                    type="button"
+                    variant={isActive ? 'default' : 'outline'}
+                    onClick={() => setFilter(f.key)}
+                    className="min-h-[40px] rounded-full font-semibold whitespace-nowrap"
+                  >
+                    <Icon className="h-4 w-4 mr-2" />
+                    {f.label}
+                    {unread > 0 ? (
+                      <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
+                        {unread}
                       </Badge>
                     ) : null}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger value="offers" className="font-semibold">
-                  <span className="flex items-center justify-center gap-2">
-                    <Handshake className="h-4 w-4" />
-                    Offers
-                    {tabUnreadCounts.offers > 0 ? (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                        {tabUnreadCounts.offers}
-                      </Badge>
-                    ) : null}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger value="auctions" className="font-semibold">
-                  <span className="flex items-center justify-center gap-2">
-                    <Gavel className="h-4 w-4" />
-                    Auctions
-                    {tabUnreadCounts.auctions > 0 ? (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                        {tabUnreadCounts.auctions}
-                      </Badge>
-                    ) : null}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger value="orders" className="font-semibold">
-                  <span className="flex items-center justify-center gap-2">
-                    <ShoppingBag className="h-4 w-4" />
-                    Orders
-                    {tabUnreadCounts.orders > 0 ? (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                        {tabUnreadCounts.orders}
-                      </Badge>
-                    ) : null}
-                  </span>
-                </TabsTrigger>
-              </TabsList>
+                  </Button>
+                );
+              })}
             </div>
+          </div>
 
-            <Separator />
+          <Separator />
 
-            <TabsContent value={tab} className="m-0">
+          <div className="m-0">
               {filtered.length === 0 ? (
                 <div className="p-10 text-center">
                   <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center mb-3">
@@ -457,12 +580,16 @@ export default function NotificationsPage() {
                 <div className="divide-y">
                   {filtered.map((n) => {
                     const isUnread = n.read !== true;
-                    const t = categoryFor(n);
+                    const tag = tagForNotification(n);
                     const s = styleForNotification(n);
-                    const Icon = s.Icon || iconFor(t);
+                    const Icon = s.Icon || AlertTriangle;
                     const href = n.deepLinkUrl || '';
                     const label = n.linkLabel || 'Open';
                     const ago = timeAgo(n);
+                    const listingId = listingIdFor(n);
+                    const listing = listingId ? listingById[listingId] : null;
+                    const coverUrl =
+                      listing?.photos?.[0]?.url || listing?.images?.[0] || '';
                     return (
                       <div
                         key={n.id}
@@ -472,13 +599,21 @@ export default function NotificationsPage() {
                           isUnread && 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary/50'
                         )}
                       >
-                        <div
-                          className={cn(
-                            'h-10 w-10 rounded-xl border flex items-center justify-center shadow-sm',
-                            isUnread ? s.chipClass : 'bg-muted/30 border-border/60 text-muted-foreground'
+                        <div className="h-12 w-12 rounded-xl overflow-hidden border border-border/60 bg-muted shrink-0">
+                          {coverUrl ? (
+                            <Image
+                              src={coverUrl}
+                              alt=""
+                              width={48}
+                              height={48}
+                              className="h-12 w-12 object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className={cn('h-12 w-12 flex items-center justify-center', isUnread ? s.chipClass : 'bg-muted/30')}>
+                              <Icon className={cn('h-5 w-5', isUnread ? undefined : 'text-muted-foreground')} />
+                            </div>
                           )}
-                        >
-                          <Icon className={cn('h-5 w-5', isUnread ? undefined : 'text-muted-foreground')} />
                         </div>
                         <div className="flex-1 min-w-0">
                           {href ? (
@@ -489,6 +624,18 @@ export default function NotificationsPage() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {tag ? (
+                                      <Badge variant="outline" className={cn('font-extrabold border', tag.className)}>
+                                        {tag.label}
+                                      </Badge>
+                                    ) : null}
+                                    {listingId ? (
+                                      <span className="text-xs text-muted-foreground truncate">
+                                        {listing?.title ? listing.title : null}
+                                      </span>
+                                    ) : null}
+                                  </div>
                                   <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90')}>
                                     {n.title}
                                   </div>
@@ -518,6 +665,13 @@ export default function NotificationsPage() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {tag ? (
+                                      <Badge variant="outline" className={cn('font-extrabold border', tag.className)}>
+                                        {tag.label}
+                                      </Badge>
+                                    ) : null}
+                                  </div>
                                   <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90')}>
                                     {n.title}
                                   </div>
@@ -540,8 +694,7 @@ export default function NotificationsPage() {
                   })}
                 </div>
               )}
-            </TabsContent>
-          </Tabs>
+          </div>
         </CardContent>
       </Card>
     </div>
