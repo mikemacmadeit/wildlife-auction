@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Search, PlusCircle, Package, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const navItems = [
   { href: '/browse', label: 'Browse', icon: Search },
@@ -15,13 +17,25 @@ const navItems = [
 export function BottomNav() {
   const pathname = usePathname();
 
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background md:hidden pb-safe">
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const nav = (
+    <nav
+      className={cn(
+        // Render via portal so it stays truly fixed even if a parent has transforms (mobile bug).
+        'fixed bottom-0 left-0 right-0 z-[60] md:hidden pb-safe',
+        'border-t border-border/60 bg-background/95 backdrop-blur'
+      )}
+    >
       <div className="grid grid-cols-4 h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-          
+
           return (
             <Link
               key={item.href}
@@ -29,18 +43,12 @@ export function BottomNav() {
               className={cn(
                 'flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-muted/50 active:bg-muted',
-                'min-h-[44px] touch-manipulation', // Minimum 44px for thumb-friendly
+                'min-h-[44px] touch-manipulation',
                 isActive && 'text-primary'
               )}
             >
-              <Icon className={cn(
-                'h-5 w-5',
-                isActive ? 'text-primary' : 'text-muted-foreground'
-              )} />
-              <span className={cn(
-                'text-xs font-medium',
-                isActive ? 'text-primary' : 'text-muted-foreground'
-              )}>
+              <Icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+              <span className={cn('text-xs font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>
                 {item.label}
               </span>
             </Link>
@@ -49,4 +57,7 @@ export function BottomNav() {
       </div>
     </nav>
   );
+
+  if (!mounted) return null;
+  return createPortal(nav, document.body);
 }
