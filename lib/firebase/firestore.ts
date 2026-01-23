@@ -50,6 +50,30 @@ function isPlainObject(value: any): boolean {
 }
 
 /**
+ * Firestore does not allow `undefined` values. Strip them recursively from plain objects/arrays.
+ * Important: only traverses plain objects so we don't corrupt Firestore SDK sentinels.
+ */
+function stripUndefinedDeep<T>(value: T): T {
+  if (value === undefined) return undefined as any;
+
+  if (Array.isArray(value)) {
+    // Firestore also rejects undefined array elements.
+    return value.filter((v) => v !== undefined).map((v) => stripUndefinedDeep(v)) as any;
+  }
+
+  if (isPlainObject(value)) {
+    const out: any = {};
+    for (const [k, v] of Object.entries(value as any)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefinedDeep(v);
+    }
+    return out;
+  }
+
+  return value;
+}
+
+/**
  * Convert Firestore Timestamp values into JS Date recursively.
  * This prevents runtime crashes when UI code calls `.getTime()` or date-fns on Timestamp-like values.
  */
@@ -153,10 +177,11 @@ export const updateDocument = async <T = DocumentData>(
 ): Promise<void> => {
   try {
     const docRef = doc(db, collectionName, documentId);
-    await updateDoc(docRef, {
-      ...data,
+    const sanitized = stripUndefinedDeep({
+      ...(data as any),
       updatedAt: Timestamp.now(),
     });
+    await updateDoc(docRef, sanitized as any);
   } catch (error) {
     console.error(`Error updating document ${documentId}:`, error);
     throw error;
@@ -174,10 +199,11 @@ export const setDocument = async <T = DocumentData>(
 ): Promise<void> => {
   try {
     const docRef = doc(db, collectionName, documentId);
-    await setDoc(docRef, {
-      ...data,
+    const sanitized = stripUndefinedDeep({
+      ...(data as any),
       updatedAt: Timestamp.now(),
-    }, { merge });
+    });
+    await setDoc(docRef, sanitized as any, { merge });
   } catch (error) {
     console.error(`Error setting document ${documentId}:`, error);
     throw error;
