@@ -14,11 +14,12 @@
 import { Handler, schedule } from '@netlify/functions';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '../../lib/firebase/admin';
-import { emitEventForUser } from '../../lib/notifications';
+import { emitAndProcessEventForUser } from '../../lib/notifications';
 import { stableHash } from '../../lib/notifications/eventKey';
 import { getSiteUrl } from '../../lib/site-url';
 import { AUCTION_RESULT_FINALIZED_VERSION } from '../../lib/auctions/finalizeAuction';
 import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
+import { tryDispatchEmailJobNow } from '../../lib/email/dispatchEmailJobNow';
 
 const MAX_PER_RUN = 50;
 const TIME_BUDGET_MS = 45_000;
@@ -114,7 +115,7 @@ const baseHandler: Handler = async () => {
         const finalUsd = finalPriceCents / 100;
 
         // Winner
-        await emitEventForUser({
+        const won = await emitAndProcessEventForUser({
           type: 'Auction.Won',
           actorId: null,
           entityType: 'listing',
@@ -131,10 +132,14 @@ const baseHandler: Handler = async () => {
           optionalHash,
         });
         queuedWon++;
+        // Best-effort: dispatch the winner email immediately (critical UX), without relying on schedulers.
+        if (won?.ok && won.created) {
+          void tryDispatchEmailJobNow({ db: db as any, jobId: won.eventId }).catch(() => {});
+        }
 
         // Losers
         for (const loserId of losers) {
-          await emitEventForUser({
+          await emitAndProcessEventForUser({
             type: 'Auction.Lost',
             actorId: null,
             entityType: 'listing',

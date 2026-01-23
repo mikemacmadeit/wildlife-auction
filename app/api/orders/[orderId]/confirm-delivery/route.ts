@@ -12,8 +12,9 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getSiteUrl } from '@/lib/site-url';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -177,7 +178,7 @@ export async function POST(
       const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
       const listingTitle = listingDoc.data()?.title || 'Unknown Listing';
 
-      await emitEventForUser({
+      const ev = await emitAndProcessEventForUser({
         type: 'Order.DeliveryConfirmed',
         actorId: adminId,
         entityType: 'order',
@@ -193,6 +194,9 @@ export async function POST(
         },
         optionalHash: `delivery:${now.toISOString()}`,
       });
+      if (ev?.ok && ev.created) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+      }
     } catch (emailError) {
       // Don't fail the confirmation if email fails
       console.error('Error emitting delivery_confirmed notification event:', emailError);

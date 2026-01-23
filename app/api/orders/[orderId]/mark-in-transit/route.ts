@@ -10,11 +10,12 @@
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -112,7 +113,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     try {
       const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
       const listingTitle = listingDoc.data()?.title || 'Your listing';
-      await emitEventForUser({
+      const ev = await emitAndProcessEventForUser({
         type: 'Order.InTransit',
         actorId: sellerId,
         entityType: 'order',
@@ -127,6 +128,9 @@ export async function POST(request: Request, { params }: { params: { orderId: st
         },
         optionalHash: `in_transit:${now.toISOString()}`,
       });
+      if (ev?.ok && ev.created) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+      }
     } catch (e) {
       console.error('Error emitting Order.InTransit notification event:', e);
     }

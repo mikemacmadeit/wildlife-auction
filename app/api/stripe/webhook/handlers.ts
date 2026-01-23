@@ -10,13 +10,14 @@ import Stripe from 'stripe';
 import { stripe, calculatePlatformFee } from '@/lib/stripe/config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 function extractStripeSettlementFieldsFromPaymentIntent(pi: any): {
   stripeChargeId?: string;
@@ -770,7 +771,7 @@ export async function handleCheckoutSessionCompleted(
       const sellerOrderUrl = `${base}/seller/orders/${orderRef.id}`;
 
       if (buyerId) {
-        await emitEventForUser({
+        const ev = await emitAndProcessEventForUser({
           type: 'Order.Confirmed',
           actorId: 'system',
           entityType: 'order',
@@ -787,10 +788,13 @@ export async function handleCheckoutSessionCompleted(
           },
           optionalHash: `checkout:${checkoutSessionId}`,
         });
+        if (ev?.ok && ev.created) {
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+        }
       }
 
       if (sellerId) {
-        await emitEventForUser({
+        const ev = await emitAndProcessEventForUser({
           type: 'Order.Received',
           actorId: 'system',
           entityType: 'order',
@@ -806,6 +810,9 @@ export async function handleCheckoutSessionCompleted(
           },
           optionalHash: `checkout:${checkoutSessionId}`,
         });
+        if (ev?.ok && ev.created) {
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+        }
       }
     } catch (notifError) {
       // Don't fail order creation if notification fails

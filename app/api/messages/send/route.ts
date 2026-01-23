@@ -9,9 +9,10 @@
 import { sanitizeMessage } from '@/lib/safety/sanitizeMessage';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { buildInAppNotification } from '@/lib/notifications/inApp';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
@@ -263,7 +264,7 @@ export async function POST(request: Request) {
       const listingData = listingDoc.exists ? listingDoc.data() : null;
       const listingTitle = listingData?.title || 'a listing';
 
-      const emitRes = await emitEventForUser({
+      const emitRes = await emitAndProcessEventForUser({
         type: 'Message.Received',
         actorId: senderId,
         entityType: 'message_thread',
@@ -316,6 +317,17 @@ export async function POST(request: Request) {
           .collection('notifications')
           .doc(notif.id)
           .set(notif as any, { merge: true });
+
+        // Best-effort: send the queued email job immediately so message emails don't depend on schedulers.
+        // Keep this bounded so messaging stays responsive.
+        try {
+          await Promise.race([
+            tryDispatchEmailJobNow({ db: db as any, jobId: emitRes.eventId }),
+            new Promise((resolve) => setTimeout(resolve, 1500)),
+          ]);
+        } catch {
+          // ignore
+        }
       }
     } catch (notifError) {
       // Don't fail message send if notification fails

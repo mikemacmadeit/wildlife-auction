@@ -12,8 +12,9 @@ import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { Timestamp } from 'firebase-admin/firestore';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -145,7 +146,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     // Notify seller that receipt was confirmed (in-app/email per preferences).
     try {
       const listingTitle = String(orderData?.listingSnapshot?.title || '').trim() || 'Your listing';
-      await emitEventForUser({
+      const ev = await emitAndProcessEventForUser({
         type: 'Order.Received',
         actorId: buyerId,
         entityType: 'order',
@@ -161,6 +162,9 @@ export async function POST(request: Request, { params }: { params: { orderId: st
         },
         optionalHash: `buyer_confirmed:${now.toISOString()}`,
       });
+      if (ev?.ok && ev.created) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+      }
     } catch (e) {
       console.warn('[confirm-receipt] Failed to emit Order.Received (best-effort)', { orderId, error: String(e) });
     }

@@ -8,11 +8,12 @@
  */
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import type { OrderStatus } from '@/lib/types';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -110,7 +111,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     // Notify buyer (email/in-app per preferences)
     try {
       const listingTitle = String(orderData?.listingSnapshot?.title || '').trim() || 'Your order';
-      await emitEventForUser({
+      const ev = await emitAndProcessEventForUser({
         type: 'Order.Preparing',
         actorId: sellerId,
         entityType: 'order',
@@ -125,6 +126,10 @@ export async function POST(request: Request, { params }: { params: { orderId: st
         },
         optionalHash: `preparing:${now.toISOString()}`,
       });
+      if (ev?.ok && ev.created) {
+        // Best-effort: don't rely on schedulers for order timeline emails.
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+      }
     } catch (e) {
       console.error('Error emitting Order.Preparing notification event:', e);
     }
