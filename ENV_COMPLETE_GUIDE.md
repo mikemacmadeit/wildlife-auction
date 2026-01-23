@@ -89,6 +89,30 @@ const firebaseConfig = {
 };
 ```
 
+### How to Get VAPID Key (for Push Notifications)
+
+The VAPID key is required for web push notifications. Here's how to get it:
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Select your project (`wildlife-exchange`)
+3. Click the gear icon ⚙️ → **Project settings**
+4. Click on the **Cloud Messaging** tab
+5. Scroll down to **Web Push certificates** section
+6. If you don't have a key pair yet:
+   - Click **Generate key pair** button
+   - A VAPID key will be generated (it looks like: `BEl62iUYgUivxIkv69yViEuiBIa40HI...`)
+7. Copy the **Key pair** value (this is your `NEXT_PUBLIC_FIREBASE_VAPID_KEY`)
+8. Add it to your `.env.local` file:
+   ```
+   NEXT_PUBLIC_FIREBASE_VAPID_KEY=BEl62iUYgUivxIkv69yViEuiBIa40HI...
+   ```
+
+**Note:** The VAPID key is safe to expose publicly (it's prefixed with `NEXT_PUBLIC_`). It's used to identify your app when sending push notifications.
+
+**Also add to Netlify:**
+- Add `NEXT_PUBLIC_FIREBASE_VAPID_KEY` to your Netlify environment variables
+- Redeploy after adding it
+
 ---
 
 ## 🔒 Security Best Practices
