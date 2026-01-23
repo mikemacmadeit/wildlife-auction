@@ -159,7 +159,9 @@ export default function AdminUserDossierPage() {
       body: JSON.stringify(body),
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || d?.ok !== true) throw new Error(d?.message || d?.error || 'Request failed');
+    if (!res.ok || d?.ok !== true) {
+      throw new Error(d?.message || d?.error || 'Request failed');
+    }
     return d;
   };
 
