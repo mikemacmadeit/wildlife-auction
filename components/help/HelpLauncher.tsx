@@ -125,15 +125,17 @@ export function HelpLauncher() {
     return 'bottom-4 md:bottom-6';
   }, [pathname]);
 
-  // Don’t show on auth pages to reduce noise.
+  // Don't show on auth pages to reduce noise.
   const hideOnAuthPages = pathname === '/login' || pathname === '/register';
   if (hideOnAuthPages) return null;
 
-  // Refine help scope: only show on pages with curated help content.
-  // Also: never show on homepage (per request).
+  // Never show on homepage (per request).
   if (pathname === '/') return null;
-  if (!helpKey) return null;
-  if (!ready) return null;
+
+  // Always show HelpLauncher on all pages (not just pages with helpKey)
+  // The HelpPanel will show chat and support tabs even without helpKey content
+  // Only wait for ready state if we have a helpKey (for tour banner)
+  if (helpKey && !ready) return null;
 
   // Seller overview: we want tour-only (no floating help button / panel).
   const tourOnly = helpKey === 'seller_overview';
@@ -141,6 +143,7 @@ export function HelpLauncher() {
   return (
     <>
       {/* Persistent launcher (bottom-right, mobile-safe) */}
+      {/* Always show help button, even if no helpKey (for chat and support tabs) */}
       {!tourOnly ? (
         <div className={cn('fixed right-4 z-[60]', bottomOffset)}>
           <HelpButton onClick={() => setOpen(true)} />
