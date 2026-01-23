@@ -404,7 +404,7 @@ export async function POST(request: Request) {
 
       // Seller: bid received (low priority but useful)
       if (sellerId) {
-        await emitEventForUser({
+        await emitAndProcessEventForUser({
           type: 'Auction.BidReceived',
           actorId: bidderId,
           entityType: 'listing',

@@ -12,7 +12,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib/auctions/proxyBidding';
 
 export const dynamic = 'force-dynamic';
@@ -212,7 +212,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ auctionId:
     // Notify (best-effort)
     const newBidderId = result.newBidderId || null;
     if (result.sellerId) {
-      await emitEventForUser({
+      await emitAndProcessEventForUser({
         type: 'Auction.BidReceived',
         actorId: userId,
         entityType: 'listing',
@@ -230,7 +230,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ auctionId:
     }
 
     if (result.prevBidderId && newBidderId && result.prevBidderId !== newBidderId) {
-      await emitEventForUser({
+      await emitAndProcessEventForUser({
         type: 'Auction.Outbid',
         actorId: userId,
         entityType: 'listing',
@@ -249,7 +249,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ auctionId:
     }
 
     if (newBidderId === userId) {
-      await emitEventForUser({
+      await emitAndProcessEventForUser({
         type: 'Auction.HighBidder',
         actorId: userId,
         entityType: 'listing',

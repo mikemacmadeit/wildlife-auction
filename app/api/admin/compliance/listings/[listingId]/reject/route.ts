@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
-import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
+import { emitAndProcessEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -78,7 +78,7 @@ export async function POST(request: Request, ctx: { params: { listingId: string 
   // Seller notification through canonical pipeline (idempotent, best-effort).
   try {
     const origin = getSiteUrl();
-    await emitEventForUser({
+    await emitAndProcessEventForUser({
       type: 'Listing.ComplianceRejected',
       actorId: actorUid,
       entityType: 'listing',
