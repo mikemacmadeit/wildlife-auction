@@ -167,6 +167,24 @@ export default function AdminUserDossierPage() {
 
   const canEditRole = isSuperAdmin;
 
+  // Early return for non-admin users
+  if (!isAdmin && !adminLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-6">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+          <Card className="border-2 border-border/50 bg-card">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-destructive">
+                <ShieldAlert className="h-4 w-4" />
+                <div className="font-semibold">Admin access required.</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
