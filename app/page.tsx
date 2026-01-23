@@ -432,20 +432,15 @@ export default function HomePage() {
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
-      // Desktop: allow grab-to-scroll with mouse/trackpad pointer.
       // Ignore non-primary buttons.
       if (e.button !== 0) return;
+      // IMPORTANT: do NOT setPointerCapture on pointerdown.
+      // Capturing here can cause the eventual click to target the scroller instead of the <Link>,
+      // making listings "unclickable". We only capture once we've crossed the drag threshold.
       beginDrag(e.clientX, e.clientY);
-
-      // Capture pointer so dragging continues even if leaving the element.
-      try {
-        (e.currentTarget as any)?.setPointerCapture?.(e.pointerId);
-      } catch {
-        // ignore
-      }
     };
 
-    const moveDrag = (e: { clientX: number; clientY: number; preventDefault?: () => void }) => {
+    const moveDrag = (e: { clientX: number; clientY: number; preventDefault?: () => void; pointerId?: number }) => {
       const el = scrollerRef.current;
       if (!el) return;
       if (!dragRef.current.active) return;
@@ -467,6 +462,14 @@ export default function HomePage() {
       if (Math.abs(dx) > 12) {
         if (!dragRef.current.dragged) dragRef.current.lastDragAtMs = Date.now();
         dragRef.current.dragged = true;
+        // Once we're truly dragging, capture the pointer so drag stays active outside the element.
+        try {
+          if (typeof e.pointerId === 'number') {
+            (el as any)?.setPointerCapture?.(e.pointerId);
+          }
+        } catch {
+          // ignore
+        }
       }
       if (!dragRef.current.dragged) return;
 
@@ -479,7 +482,7 @@ export default function HomePage() {
     };
 
     const onPointerMove = (e: React.PointerEvent) => {
-      moveDrag(e);
+      moveDrag({ clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, preventDefault: () => e.preventDefault() });
     };
 
     const endDrag = (e?: { pointerId?: number; currentTarget?: any }) => {
