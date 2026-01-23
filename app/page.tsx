@@ -365,7 +365,7 @@ export default function HomePage() {
     );
   };
 
-  const ListingRail = (props: { listings: Listing[]; emptyText: string; variant?: 'standard' | 'featured' }) => {
+  const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
     if (!props.listings.length) {
       return (
@@ -375,8 +375,9 @@ export default function HomePage() {
       );
     }
 
-    const isFeatured = props.variant === 'featured';
-    const itemClass = isFeatured ? 'min-w-[280px] sm:min-w-[340px] lg:min-w-[380px]' : 'min-w-[260px] sm:min-w-[300px] lg:min-w-[320px]';
+    // Homepage: enforce consistent card size/height (eBay-style rails).
+    // This avoids “some huge, some small” cards when different variants render.
+    const itemClass = 'w-[280px] sm:w-[320px] lg:w-[340px] h-[420px]';
 
     return (
       <div className="relative">
@@ -410,8 +411,8 @@ export default function HomePage() {
         >
           <div className="flex gap-4 min-w-max snap-x snap-mandatory">
             {props.listings.map((listing) => (
-              <div key={listing.id} className={cn('snap-start', itemClass)}>
-                {isFeatured ? <FeaturedListingCard listing={listing} /> : <ListingCard listing={listing} />}
+              <div key={listing.id} className={cn('snap-start flex-shrink-0 overflow-hidden', itemClass)}>
+                <ListingCard listing={listing} className="h-full" />
               </div>
             ))}
           </div>
@@ -937,7 +938,7 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            <ListingRail listings={featuredListings} emptyText="No featured listings right now." variant="featured" />
+            <ListingRail listings={featuredListings} emptyText="No featured listings right now." />
           </div>
         </section>
       )}
