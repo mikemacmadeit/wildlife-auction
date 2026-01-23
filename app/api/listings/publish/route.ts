@@ -16,7 +16,7 @@ import { logInfo, logError } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
 import { validateListingCompliance } from '@/lib/compliance/validation';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { emitEventToUsers } from '@/lib/notifications';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { getCategoryRequirements } from '@/lib/compliance/requirements';
@@ -540,6 +540,31 @@ export async function POST(request: Request) {
         const origin = 'https://wildlife.exchange';
         const adminUids = await listAdminRecipientUids(db as any);
         if (adminUids.length > 0) {
+          const fanout = async <TType extends any>(params: {
+            type: TType;
+            actorId: string | null;
+            entityType: any;
+            entityId: string;
+            targetUserIds: string[];
+            payload: any;
+            optionalHash?: string;
+          }) => {
+            // Emit + process inline so the navbar bell updates immediately (no cron delay).
+            await Promise.allSettled(
+              params.targetUserIds.map((uid) =>
+                emitAndProcessEventForUser({
+                  type: params.type as any,
+                  actorId: params.actorId,
+                  entityType: params.entityType as any,
+                  entityId: params.entityId,
+                  targetUserId: uid,
+                  payload: params.payload,
+                  optionalHash: params.optionalHash,
+                })
+              )
+            );
+          };
+
           const pendingReason: 'admin_approval' | 'compliance_review' | 'unknown' = requiresAdminApproval
             ? 'admin_approval'
             : complianceStatus === 'pending_review' || listingData.category === 'whitetail_breeder'
@@ -550,7 +575,7 @@ export async function POST(request: Request) {
           const adminQueueUrl = `${origin}/dashboard/admin/listings`;
           const adminComplianceUrl = `${origin}/dashboard/admin/compliance`;
 
-          await emitEventToUsers({
+          await fanout({
             type: 'Admin.Listing.Submitted',
             actorId: userId,
             entityType: 'listing',
@@ -573,7 +598,7 @@ export async function POST(request: Request) {
           });
 
           if (pendingReason === 'admin_approval') {
-            await emitEventToUsers({
+            await fanout({
               type: 'Admin.Listing.AdminApprovalRequired',
               actorId: userId,
               entityType: 'listing',
@@ -594,7 +619,7 @@ export async function POST(request: Request) {
           }
 
           if (pendingReason === 'compliance_review') {
-            await emitEventToUsers({
+            await fanout({
               type: 'Admin.Listing.ComplianceReviewRequired',
               actorId: userId,
               entityType: 'listing',
