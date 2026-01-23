@@ -149,7 +149,7 @@ export function ProfileCompletionModal({
   return (
     <>
       <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-extrabold">
             Complete Your Profile
@@ -432,12 +432,12 @@ export function ProfileCompletionModal({
             )}
           </Button>
         </form>
-      </DialogContent>
+        </DialogContent>
       </Dialog>
       
       {/* Avatar Crop Dialog */}
       {cropImageSrc && (
-      <AvatarCropDialog
+        <AvatarCropDialog
         open={cropDialogOpen}
         onOpenChange={setCropDialogOpen}
         imageSrc={cropImageSrc}
@@ -465,8 +465,8 @@ export function ProfileCompletionModal({
             setCropImageSrc(null);
           }
         }}
-      />
-    )}
-  </>
+        />
+      )}
+    </>
   );
 }
