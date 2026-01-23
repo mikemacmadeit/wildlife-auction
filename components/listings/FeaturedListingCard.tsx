@@ -140,7 +140,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
 
             {/* Real-time countdown timer for auctions - placed to avoid action buttons */}
             {hasCountdown && (
-              <div className="hidden sm:block absolute top-14 left-3 z-20">
+              <div className="absolute top-2 left-2 sm:top-14 sm:left-3 z-20">
                 <CountdownTimer
                   endsAt={listing.endsAt}
                   variant="badge"
@@ -168,6 +168,26 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </Badge>
               </div>
             )}
+
+            {/* Mobile: bids count + protected badge */}
+            {!sold.isSold && listing.type === 'auction' && (listing as any)?.metrics?.bidCount > 0 ? (
+              <div className="sm:hidden absolute bottom-2 left-2 z-20">
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
+                  {(listing as any)?.metrics?.bidCount} bids
+                </Badge>
+              </div>
+            ) : null}
+            {(listing as any)?.protectedTransactionEnabled && (listing as any)?.protectedTransactionDays ? (
+              <div className="sm:hidden absolute bottom-2 right-2 z-20">
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white font-semibold text-xs shadow-warm"
+                  title="Protected Transaction"
+                >
+                  Protected {(listing as any).protectedTransactionDays} Days
+                </Badge>
+              </div>
+            ) : null}
 
             {/* Subtle shimmer effect - warm tones */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-parchment/8 to-transparent z-5" />

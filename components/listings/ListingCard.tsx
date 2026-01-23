@@ -194,6 +194,26 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 />
               ) : null}
             </div>
+
+            {/* Mobile: show time left + bid count for auctions */}
+            {!sold.isSold && listing.type === 'auction' && listing.endsAt ? (
+              <div className="sm:hidden absolute top-2 left-2 z-20 flex items-center gap-1 flex-wrap">
+                <CountdownTimer
+                  endsAt={listing.endsAt}
+                  variant="badge"
+                  showIcon={true}
+                  pulseWhenEndingSoon={true}
+                  className="text-xs"
+                />
+                {(listing.metrics?.bidCount || 0) > 0 ? (
+                  <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    {listing.metrics?.bidCount} bids
+                  </Badge>
+                ) : null}
+              </div>
+            ) : null}
+
             {/* Type badge */}
             <div className="hidden sm:flex absolute bottom-2 right-2 z-20 flex-col gap-1 items-end">
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
@@ -210,6 +230,19 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 </Badge>
               )}
             </div>
+
+            {/* Mobile: show Protected badge when enabled */}
+            {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
+              <div className="sm:hidden absolute bottom-2 right-2 z-20">
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white font-semibold text-xs shadow-warm"
+                  title="Protected Transaction"
+                >
+                  Protected {listing.protectedTransactionDays} Days
+                </Badge>
+              </div>
+            ) : null}
 
             {/* Social proof (watchers + bids) */}
             {/* Keep SOLD on mobile; hide other social proof on mobile */}
