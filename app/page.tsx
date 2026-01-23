@@ -517,15 +517,15 @@ export default function HomePage() {
     };
 
     return (
-      <div className="group relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
+      <div className="group/rail relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
         {/* Arrows: centered over the image area (middle of first/last card image) */}
         <div
           className={cn(
             'hidden md:block absolute left-0 right-0 z-30',
             // Fade in only when hovering this rail
-            'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-            // Allow clicking buttons only when visible
-            'pointer-events-none group-hover:pointer-events-auto'
+            'opacity-0 group-hover/rail:opacity-100 transition-opacity duration-200',
+            // Do not block clicks on cards; only the buttons should be clickable.
+            'pointer-events-none'
           )}
           style={{ top: 'calc(var(--rail-card-w)*3/8)' }}
         >
@@ -534,7 +534,7 @@ export default function HomePage() {
             variant="outline"
             size="icon"
             className={cn(
-              'absolute left-2 -translate-y-1/2',
+              'pointer-events-auto absolute left-2 -translate-y-1/2',
               'h-10 w-10 rounded-full shadow-lg',
               // High contrast on images: dark in light mode, light in dark mode.
               'bg-black/70 text-white border-white/20 hover:bg-black/80',
@@ -555,7 +555,7 @@ export default function HomePage() {
             variant="outline"
             size="icon"
             className={cn(
-              'absolute right-2 -translate-y-1/2',
+              'pointer-events-auto absolute right-2 -translate-y-1/2',
               'h-10 w-10 rounded-full shadow-lg',
               'bg-black/70 text-white border-white/20 hover:bg-black/80',
               'dark:bg-white/80 dark:text-black dark:border-black/20 dark:hover:bg-white/90'
