@@ -703,7 +703,9 @@ export default function BrowsePage() {
       {/* Header */}
       <div
         ref={headerRef}
-        className="fixed top-0 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
+        // Mobile: keep the browse header fixed, but position it *below* the global navbar (h-20),
+        // otherwise the search bar appears "missing" because it's hidden behind the navbar.
+        className="fixed top-20 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
       >
         <div className="container mx-auto px-4 py-4">
           <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-3 sm:p-4">
