@@ -174,6 +174,7 @@ function NewListingPageContent() {
   const serverSaveTimerRef = useRef<any>(null);
   const lastServerSaveSigRef = useRef<string>('');
   const restoredOnceRef = useRef(false);
+  const exitingWithoutSavingRef = useRef(false);
 
   const hasAnyProgress = useMemo(() => {
     return Boolean(
@@ -264,6 +265,7 @@ function NewListingPageContent() {
   // Local autosave (fast, reliable). Runs even if the user isn't signed in yet.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (exitingWithoutSavingRef.current) return;
     if (!hasAnyProgress) return;
 
     if (localSaveTimerRef.current) clearTimeout(localSaveTimerRef.current);
@@ -294,6 +296,7 @@ function NewListingPageContent() {
   // Server autosave (debounced). Only updates an existing draft to avoid duplicates.
   useEffect(() => {
     if (!user?.uid) return;
+    if (exitingWithoutSavingRef.current) return;
     if (!listingId) return;
     if (!hasAnyProgress) return;
     // Whitetail drafts are gated on attestation.
@@ -2347,14 +2350,14 @@ function NewListingPageContent() {
     }
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (): Promise<boolean> => {
     if (!user) {
       toast({
         title: 'Sign in required',
         description: 'You must be signed in to save a draft.',
         variant: 'destructive',
       });
-      return;
+      return false;
     }
 
     // Whitetail-only hard gate (required even for draft creation)
@@ -2364,7 +2367,7 @@ function NewListingPageContent() {
         description: 'Please accept the seller attestation before saving a whitetail breeder listing draft.',
         variant: 'destructive',
       });
-      return;
+      return false;
     }
 
     try {
@@ -2377,7 +2380,7 @@ function NewListingPageContent() {
           title: 'Draft saved',
           description: 'Draft started. Choose a category to continue building your listing.',
         });
-        return;
+        return true;
       }
 
       const locationData: any = {
@@ -2459,6 +2462,7 @@ function NewListingPageContent() {
         title: 'Draft saved',
         description: 'Your listing has been saved as a draft. You can continue editing it later.',
       });
+      return true;
     } catch (error: any) {
       console.error('Error saving draft:', error);
       toast({
@@ -2466,6 +2470,7 @@ function NewListingPageContent() {
         description: error.message || 'An error occurred while saving your draft.',
         variant: 'destructive',
       });
+      return false;
     }
   };
 
@@ -2874,10 +2879,11 @@ function NewListingPageContent() {
             {user && (
               <Button
                 variant="default"
-                onClick={() => {
-                  handleSaveDraft();
+                onClick={async () => {
+                  const ok = await handleSaveDraft();
+                  if (!ok) return;
                   setShowExitDialog(false);
-                  setTimeout(() => router.back(), 500);
+                  setTimeout(() => router.back(), 250);
                 }}
                 className="w-full sm:w-auto"
               >
@@ -2888,6 +2894,12 @@ function NewListingPageContent() {
             <Button
               variant="outline"
               onClick={() => {
+                // User explicitly chose to leave without saving: clear local autosave immediately
+                // and suppress any in-flight autosave timers from re-writing it during navigation.
+                exitingWithoutSavingRef.current = true;
+                if (localSaveTimerRef.current) clearTimeout(localSaveTimerRef.current);
+                if (serverSaveTimerRef.current) clearTimeout(serverSaveTimerRef.current);
+                clearAutosave();
                 setShowExitDialog(false);
                 router.back();
               }}
