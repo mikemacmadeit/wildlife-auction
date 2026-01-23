@@ -108,10 +108,13 @@ export function useFavorites() {
         const newPendingIds = new Set(pending.keys());
         setPendingIds((prev) => {
           if (prev.size !== newPendingIds.size) return newPendingIds;
-          for (const id of newPendingIds) {
+          // Convert to arrays to avoid iteration issues
+          const newPendingIdsArray = Array.from(newPendingIds);
+          const prevArray = Array.from(prev);
+          for (const id of newPendingIdsArray) {
             if (!prev.has(id)) return newPendingIds;
           }
-          for (const id of prev) {
+          for (const id of prevArray) {
             if (!newPendingIds.has(id)) return newPendingIds;
           }
           return prev;
