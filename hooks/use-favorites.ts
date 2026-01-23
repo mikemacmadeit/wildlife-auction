@@ -91,10 +91,13 @@ export function useFavorites() {
           // Quick check: if sizes differ, definitely changed
           if (prev.size !== ids.size) return ids;
           // Deep check: compare all items
-          for (const id of ids) {
+          // Convert to arrays to avoid iteration issues
+          const idsArray = Array.from(ids);
+          const prevArray = Array.from(prev);
+          for (const id of idsArray) {
             if (!prev.has(id)) return ids;
           }
-          for (const id of prev) {
+          for (const id of prevArray) {
             if (!ids.has(id)) return ids;
           }
           // No change - return previous to prevent re-render
