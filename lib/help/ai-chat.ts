@@ -396,5 +396,12 @@ GENERAL PRINCIPLES (apply to all):
         kbAvailable: true,
       };
     }
+  } catch (error: any) {
+    console.error('[AI Help Chat] Fatal error:', error);
+    return {
+      answer: "I encountered an error processing your question. Please try again or contact support.",
+      sources: [],
+      kbAvailable: true,
+    };
   }
 }
