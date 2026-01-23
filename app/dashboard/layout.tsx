@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LayoutDashboard,
+  LayoutGrid,
   Package,
   DollarSign,
   FileCheck,
@@ -76,6 +77,7 @@ interface DashboardNavItem {
 // Base nav items (always visible)
 const baseNavItems: DashboardNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
+  { href: '/browse', label: 'Browse', icon: LayoutGrid },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
@@ -279,6 +281,13 @@ export default function DashboardLayout({
     
     return items;
   }, [showAdminNav, baseNavWithBadges, adminNavWithBadges]);
+
+  // Mobile bottom nav should be consistent across dashboard routes (avoid "tabs disappearing").
+  const bottomNavItems = useMemo(() => {
+    const want = ['/seller/overview', '/browse', '/dashboard/notifications', '/dashboard/messages', '/dashboard/watchlist'];
+    const m = new Map(navItems.map((i) => [i.href, i] as const));
+    return want.map((href) => m.get(href)).filter(Boolean) as DashboardNavItem[];
+  }, [navItems]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -900,7 +909,7 @@ export default function DashboardLayout({
         {/* Mobile Bottom Nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-card">
           <div className="grid grid-cols-5 h-16">
-            {navItems.slice(0, 5).map((item) => {
+            {bottomNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
