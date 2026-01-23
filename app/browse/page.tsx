@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -658,19 +658,51 @@ export default function BrowsePage() {
     return count;
   }, [filters, selectedType, searchQuery]);
 
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [mobileHeaderH, setMobileHeaderH] = useState(0);
+
+  // Mobile sticky header can be unreliable inside transformed/scroll containers on some devices.
+  // We use a fixed header on mobile and measure its height to offset the page content.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height || 0);
+      if (Number.isFinite(h)) setMobileHeaderH(h);
+    };
+
+    update();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => update());
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
+    <div
+      className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4 pt-[var(--browse-header-h)] md:pt-0"
+      style={{ ['--browse-header-h' as any]: `${mobileHeaderH}px` }}
+    >
       <ScrollToTop />
       
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
+      <div
+        ref={headerRef}
+        className="fixed top-0 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
+      >
         <div className="container mx-auto px-4 py-4">
-          <div className="rounded-2xl border border-border/60 bg-card/70 shadow-sm backdrop-blur-md p-3 sm:p-4">
+          <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-3 sm:p-4">
             <div className="flex flex-col gap-3">
               <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                 <div className="flex-1 w-full md:max-w-2xl">
                   <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-background/70" />
                     <Input
                       type="text"
                       placeholder="Search listings, species, breeds, and locations…"
@@ -678,8 +710,8 @@ export default function BrowsePage() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={cn(
                         'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
-                        'bg-background/70 border-border/60',
-                        'focus-visible:ring-primary/30 focus-visible:ring-2'
+                        'bg-background/10 border-background/25 text-background placeholder:text-background/60',
+                        'focus-visible:ring-background/30 focus-visible:ring-2'
                       )}
                     />
                   </div>
@@ -701,7 +733,7 @@ export default function BrowsePage() {
                     variant="outline"
                     onClick={clearFilters}
                     disabled={activeFilterCount === 0}
-                    className="min-h-[48px] px-4 font-semibold"
+                    className="min-h-[48px] px-4 font-semibold border-background/30 text-background hover:bg-background/10"
                   >
                     <X className="h-4 w-4 mr-2" />
                     Clear
@@ -717,7 +749,7 @@ export default function BrowsePage() {
                   className="w-full md:w-auto"
                 >
                   {/* No scroll bar needed: 4 tabs always fit */}
-                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-muted/40 rounded-xl p-1 border border-border/50">
+                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-background/10 rounded-xl p-1 border border-background/20">
                     <TabsTrigger value="all" className="rounded-lg font-semibold min-w-0">
                       All
                     </TabsTrigger>
