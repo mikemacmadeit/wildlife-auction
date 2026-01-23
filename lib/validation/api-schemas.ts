@@ -12,6 +12,11 @@ export const createCheckoutSessionSchema = z.object({
   listingId: z.string().min(1, 'Listing ID is required').max(100),
   offerId: z.string().max(100).optional(),
   /**
+   * Multi-quantity buy-now support (fixed listings only).
+   * Server will validate against listing availability.
+   */
+  quantity: z.number().int().positive().max(100).optional(),
+  /**
    * Payment method selection step.
    * - card: Credit/Debit via Stripe Checkout
    * - ach_debit: US bank account (ACH) via Stripe Checkout
@@ -30,6 +35,11 @@ export const createCheckoutSessionSchema = z.object({
 export const createWireIntentSchema = z.object({
   listingId: z.string().min(1, 'Listing ID is required').max(100),
   offerId: z.string().max(100).optional(),
+  /**
+   * Multi-quantity buy-now support (fixed listings only).
+   * Server will validate against listing availability.
+   */
+  quantity: z.number().int().positive().max(100).optional(),
   /**
    * Buyer acknowledgment required for animal categories.
    * Server will enforce when listing category is an animal category.

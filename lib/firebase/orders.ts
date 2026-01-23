@@ -29,6 +29,11 @@ export interface OrderDoc {
   amount: number;
   platformFee: number;
   sellerAmount: number;
+  /**
+   * Multi-quantity purchases (optional; back-compat: default 1).
+   */
+  quantity?: number;
+  unitPrice?: number;
   status:
     | 'pending'
     | 'awaiting_bank_transfer'
@@ -151,6 +156,8 @@ function toOrder(docId: string, data: OrderDoc): Order {
     amount: data.amount,
     platformFee: data.platformFee,
     sellerAmount: data.sellerAmount,
+    quantity: typeof (data as any).quantity === 'number' ? (data as any).quantity : undefined,
+    unitPrice: typeof (data as any).unitPrice === 'number' ? (data as any).unitPrice : undefined,
     status: data.status,
     stripeCheckoutSessionId: data.stripeCheckoutSessionId,
     stripePaymentIntentId: data.stripePaymentIntentId,

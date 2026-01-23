@@ -325,11 +325,13 @@ export function OfferPanel(props: { listing: Listing }) {
     setLoading(true);
     try {
       if (method === 'wire') {
-        const out = await createWireIntent(listing.id, offer.offerId, { buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined });
+        const out = await createWireIntent(listing.id, offer.offerId, undefined, {
+          buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
+        });
         setWireData(out);
         setWireDialogOpen(true);
       } else {
-        const { url } = await createCheckoutSession(listing.id, offer.offerId, method, {
+        const { url } = await createCheckoutSession(listing.id, offer.offerId, method, undefined, {
           buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
         });
         window.location.href = url;

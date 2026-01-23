@@ -86,12 +86,18 @@ export async function handleCheckoutSessionCompleted(
     const sellerStripeAccountId = session.metadata?.sellerStripeAccountId;
     const sellerAmountCents = session.metadata?.sellerAmount;
     const platformFeeCents = session.metadata?.platformFee;
+    const quantityMeta = session.metadata?.quantity;
+    const unitPriceMeta = session.metadata?.unitPrice;
     const sellerTierSnapshot = (session.metadata as any)?.sellerTierSnapshot || session.metadata?.sellerPlanSnapshot; // back-compat
     const platformFeePercentStr = session.metadata?.platformFeePercent; // Fee percent at checkout (immutable snapshot)
     const effectivePaymentMethod = inferEffectivePaymentMethodFromCheckoutSession(session);
     const isBankRails = effectivePaymentMethod === 'bank_transfer' || effectivePaymentMethod === 'wire';
     const paymentConfirmed = isCheckoutSessionPaid(session);
     const isAsync = !paymentConfirmed;
+    const quantityFromMeta =
+      typeof quantityMeta === 'string' && quantityMeta.trim() ? Math.max(1, Math.floor(Number(quantityMeta))) : 1;
+    const unitPriceFromMeta =
+      typeof unitPriceMeta === 'string' && unitPriceMeta.trim() ? Number(unitPriceMeta) : null;
 
     if (!listingId || !buyerId || !sellerId || !sellerStripeAccountId) {
       logError('Missing required metadata in checkout session', undefined, {
@@ -479,6 +485,8 @@ export async function handleCheckoutSessionCompleted(
       amount: amount / 100,
       platformFee: platformFee / 100,
       sellerAmount: sellerAmount / 100,
+      quantity: quantityFromMeta,
+      ...(typeof unitPriceFromMeta === 'number' && Number.isFinite(unitPriceFromMeta) ? { unitPrice: unitPriceFromMeta } : {}),
       status: orderStatus,
       paymentMethod: effectivePaymentMethod,
       stripeCheckoutSessionId: checkoutSessionId,
@@ -656,39 +664,101 @@ export async function handleCheckoutSessionCompleted(
           ? amount
           : null;
 
+    const listingIdStr = String(listingId || '');
+    const orderIdStr = String(orderRef.id || '');
+    const isMultiQty = (() => {
+      const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+      const qt =
+        typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
+          ? Math.max(1, Math.floor((listingData as any).quantityTotal))
+          : Math.max(1, Math.floor(attrsQty));
+      return qt > 1;
+    })();
+
     // For async payment methods, reserve the listing (do NOT mark sold until payment is confirmed).
     if (isAsync) {
-      const asyncReserveHours = parseInt(process.env.ASYNC_PAYMENT_RESERVATION_HOURS || '48', 10);
-      const until = Timestamp.fromMillis(Date.now() + Math.max(1, asyncReserveHours) * 60 * 60_000);
-      await listingRef.set(
-        {
-          purchaseReservedByOrderId: orderRef.id,
-          purchaseReservedAt: now,
-          purchaseReservedUntil: until,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
+      // For multi-quantity listings, reservation is handled at session creation (quantityAvailable + reservation doc).
+      // For legacy single-quantity listings, keep the existing listing-level reservation fields.
+      if (!isMultiQty) {
+        const asyncReserveHours = parseInt(process.env.ASYNC_PAYMENT_RESERVATION_HOURS || '48', 10);
+        const until = Timestamp.fromMillis(Date.now() + Math.max(1, asyncReserveHours) * 60 * 60_000);
+        await listingRef.set(
+          {
+            purchaseReservedByOrderId: orderRef.id,
+            purchaseReservedAt: now,
+            purchaseReservedUntil: until,
+            updatedAt: now,
+          },
+          { merge: true }
+        );
+      }
     } else {
       // Card flow: payment is already confirmed at checkout completion.
-      const listingUpdates: any = {
-        status: 'sold',
-        endedReason: 'sold',
-        endedAt: now,
-        soldAt: now,
-        saleType,
-        // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
-        offerReservedByOfferId: null,
-        offerReservedAt: null,
-        purchaseReservedByOrderId: null,
-        purchaseReservedAt: null,
-        purchaseReservedUntil: null,
-        updatedAt: now,
-      };
-      if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
-        listingUpdates.soldPriceCents = soldPriceCents;
+      if (!isMultiQty) {
+        const listingUpdates: any = {
+          status: 'sold',
+          endedReason: 'sold',
+          endedAt: now,
+          soldAt: now,
+          saleType,
+          // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
+          offerReservedByOfferId: null,
+          offerReservedAt: null,
+          purchaseReservedByOrderId: null,
+          purchaseReservedAt: null,
+          purchaseReservedUntil: null,
+          updatedAt: now,
+        };
+        if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
+          listingUpdates.soldPriceCents = soldPriceCents;
+        }
+        await listingRef.update(listingUpdates);
+      } else {
+        // Multi-quantity listings stay active until stock is depleted. We only clear legacy reservation fields
+        // and clean up the per-order reservation doc (best-effort).
+        try {
+          await listingRef.set(
+            {
+              purchaseReservedByOrderId: null,
+              purchaseReservedAt: null,
+              purchaseReservedUntil: null,
+              updatedAt: now,
+            },
+            { merge: true }
+          );
+        } catch {}
+        try {
+          await db.collection('listings').doc(listingIdStr).collection('purchaseReservations').doc(orderIdStr).delete();
+        } catch {}
+
+        // If quantityAvailable is now 0, mark sold-out.
+        try {
+          const snap = await listingRef.get();
+          const live = snap.exists ? (snap.data() as any) : null;
+          const avail =
+            typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)
+              ? Math.max(0, Math.floor(live.quantityAvailable))
+              : null;
+          if (avail === 0) {
+            const listingUpdates: any = {
+              status: 'sold',
+              endedReason: 'sold',
+              endedAt: now,
+              soldAt: now,
+              saleType,
+              offerReservedByOfferId: null,
+              offerReservedAt: null,
+              updatedAt: now,
+            };
+            if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
+              listingUpdates.soldPriceCents = soldPriceCents;
+            }
+            await listingRef.set(listingUpdates, { merge: true });
+          }
+        } catch {
+          // ignore
+        }
       }
-      await listingRef.update(listingUpdates);
     }
 
     // Emit canonical notification events for buyer and seller
@@ -926,11 +996,18 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     });
   }
 
-  // Determine listing type (public-safe) for sold metadata.
+  // Determine listing type + multi-quantity (public-safe) for sold metadata.
   let listingType: string | null = null;
+  let isMultiQty = false;
   try {
     const listingSnap = await db.collection('listings').doc(listingId).get();
-    if (listingSnap.exists) listingType = String((listingSnap.data() as any)?.type || '') || null;
+    if (listingSnap.exists) {
+      const d = listingSnap.data() as any;
+      listingType = String(d?.type || '') || null;
+      const attrsQty = Number(d?.attributes?.quantity ?? 1) || 1;
+      const qt = typeof d?.quantityTotal === 'number' && Number.isFinite(d.quantityTotal) ? Math.max(1, Math.floor(d.quantityTotal)) : Math.max(1, Math.floor(attrsQty));
+      isMultiQty = qt > 1;
+    }
   } catch {
     // ignore; fallback to unknown below
   }
@@ -943,25 +1020,72 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
           ? 'buy_now'
           : 'classified';
 
-  // Mark listing sold and clear reservation fields
-  const listingSoldUpdate: any = {
-    status: 'sold',
-    endedReason: 'sold',
-    endedAt: now,
-    soldAt: now,
-    saleType,
-    // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
-    offerReservedByOfferId: null,
-    offerReservedAt: null,
-    purchaseReservedByOrderId: null,
-    purchaseReservedAt: null,
-    purchaseReservedUntil: null,
-    updatedAt: now,
-  };
-  if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
-    listingSoldUpdate.soldPriceCents = amountCents;
+  const listingRef = db.collection('listings').doc(listingId);
+  if (!isMultiQty) {
+    // Mark listing sold and clear reservation fields (legacy single-quantity behavior)
+    const listingSoldUpdate: any = {
+      status: 'sold',
+      endedReason: 'sold',
+      endedAt: now,
+      soldAt: now,
+      saleType,
+      // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
+      offerReservedByOfferId: null,
+      offerReservedAt: null,
+      purchaseReservedByOrderId: null,
+      purchaseReservedAt: null,
+      purchaseReservedUntil: null,
+      updatedAt: now,
+    };
+    if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
+      listingSoldUpdate.soldPriceCents = amountCents;
+    }
+    await listingRef.set(listingSoldUpdate, { merge: true });
+  } else {
+    // Multi-quantity listings stay active until stock is depleted.
+    // Best-effort cleanup of per-order reservation doc.
+    try {
+      await listingRef.collection('purchaseReservations').doc(orderDoc.id).delete();
+    } catch {}
+
+    // Always clear legacy single-item reservation fields if present (avoid deadlocks).
+    await listingRef.set(
+      {
+        purchaseReservedByOrderId: null,
+        purchaseReservedAt: null,
+        purchaseReservedUntil: null,
+        // For offers, clear offer reservation so other units remain purchasable.
+        ...(offerId ? { offerReservedByOfferId: null, offerReservedAt: null } : {}),
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    // If sold out, mark listing sold.
+    try {
+      const snap = await listingRef.get();
+      const live = snap.exists ? (snap.data() as any) : null;
+      const avail = typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable) ? Math.max(0, Math.floor(live.quantityAvailable)) : null;
+      if (avail === 0) {
+        const listingSoldUpdate: any = {
+          status: 'sold',
+          endedReason: 'sold',
+          endedAt: now,
+          soldAt: now,
+          saleType,
+          offerReservedByOfferId: null,
+          offerReservedAt: null,
+          updatedAt: now,
+        };
+        if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
+          listingSoldUpdate.soldPriceCents = amountCents;
+        }
+        await listingRef.set(listingSoldUpdate, { merge: true });
+      }
+    } catch {
+      // ignore
+    }
   }
-  await db.collection('listings').doc(listingId).set(listingSoldUpdate, { merge: true });
 
   // If this originated from an offer, close it out (canonical record is now the order).
   if (offerId) {
@@ -1052,14 +1176,56 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
   );
 
   if (listingId) {
-    await db.collection('listings').doc(listingId).set(
-      {
-        purchaseReservedByOrderId: null,
-        purchaseReservedAt: null,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
+    const listingRef = db.collection('listings').doc(String(listingId));
+    const reservationRef = listingRef.collection('purchaseReservations').doc(orderDoc.id);
+    try {
+      await db.runTransaction(async (tx) => {
+        const ls = await tx.get(listingRef);
+        if (!ls.exists) return;
+        const live = ls.data() as any;
+        const rs = await tx.get(reservationRef);
+
+        // If this was a quantity reservation, restore inventory and delete the reservation doc.
+        if (rs.exists) {
+          const r = rs.data() as any;
+          const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
+          if (q > 0 && typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)) {
+            tx.set(
+              listingRef,
+              { quantityAvailable: Math.max(0, Math.floor(live.quantityAvailable)) + q, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
+              { merge: true }
+            );
+          }
+          tx.delete(reservationRef);
+        }
+
+        // Always clear legacy single-item reservation fields if they match this order.
+        if (live.purchaseReservedByOrderId === orderDoc.id) {
+          tx.set(
+            listingRef,
+            {
+              purchaseReservedByOrderId: null,
+              purchaseReservedAt: null,
+              purchaseReservedUntil: null,
+              updatedAt: Timestamp.fromDate(now),
+              updatedBy: 'system',
+            },
+            { merge: true }
+          );
+        }
+      });
+    } catch {
+      // Best-effort fallback: clear legacy reservation fields (avoid deadlocks).
+      await listingRef.set(
+        {
+          purchaseReservedByOrderId: null,
+          purchaseReservedAt: null,
+          purchaseReservedUntil: null,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    }
   }
 
   logInfo('Async payment failed: order cancelled and listing reservation cleared', {
@@ -1124,31 +1290,52 @@ export async function handleCheckoutSessionExpired(
 
   const now = new Date();
   await orderDoc.ref.set({ status: 'cancelled', updatedAt: now }, { merge: true });
+  const orderId = orderDoc.id;
 
   // Clear listing reservation if it matches this order (best-effort).
   if (listingId) {
     try {
       const listingRef = db.collection('listings').doc(String(listingId));
-      const listingSnap = await listingRef.get();
-      if (listingSnap.exists) {
+      const reservationRef = listingRef.collection('purchaseReservations').doc(orderId);
+
+      await db.runTransaction(async (tx) => {
+        const listingSnap = await tx.get(listingRef);
+        if (!listingSnap.exists) return;
         const l = listingSnap.data() as any;
-        if (l.purchaseReservedByOrderId === orderDoc.id) {
-          await listingRef.set(
+
+        const rs = await tx.get(reservationRef);
+        if (rs.exists) {
+          const r = rs.data() as any;
+          const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
+          if (q > 0 && typeof l?.quantityAvailable === 'number' && Number.isFinite(l.quantityAvailable)) {
+            tx.set(
+              listingRef,
+              { quantityAvailable: Math.max(0, Math.floor(l.quantityAvailable)) + q, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
+              { merge: true }
+            );
+          }
+          tx.delete(reservationRef);
+        }
+
+        if (l.purchaseReservedByOrderId === orderId) {
+          tx.set(
+            listingRef,
             {
               purchaseReservedByOrderId: null,
               purchaseReservedAt: null,
               purchaseReservedUntil: null,
-              updatedAt: now,
+              updatedAt: Timestamp.fromDate(now),
+              updatedBy: 'system',
             },
             { merge: true }
           );
         }
-      }
+      });
     } catch (e) {
       logWarn('Failed to clear listing reservation on checkout.session.expired', {
         requestId,
         route: '/api/stripe/webhook',
-        orderId: orderDoc.id,
+        orderId,
         listingId,
         error: String(e),
       });
@@ -1158,7 +1345,7 @@ export async function handleCheckoutSessionExpired(
   logInfo('Checkout session expired: order cancelled and reservation cleared', {
     requestId,
     route: '/api/stripe/webhook',
-    orderId: orderDoc.id,
+    orderId,
     checkoutSessionId,
     listingId,
   });
@@ -1292,9 +1479,16 @@ export async function handleWirePaymentIntentSucceeded(
     // IMPORTANT (diligence note): this is the authoritative place where a listing becomes `status: 'sold'`
     // for the wire-payment path (payment_intent.succeeded for wire rails).
     let listingType: string | null = null;
+    let isMultiQty = false;
     try {
       const listingSnap = await db.collection('listings').doc(listingId).get();
-      if (listingSnap.exists) listingType = String((listingSnap.data() as any)?.type || '') || null;
+      if (listingSnap.exists) {
+        const d = listingSnap.data() as any;
+        listingType = String(d?.type || '') || null;
+        const attrsQty = Number(d?.attributes?.quantity ?? 1) || 1;
+        const qt = typeof d?.quantityTotal === 'number' && Number.isFinite(d.quantityTotal) ? Math.max(1, Math.floor(d.quantityTotal)) : Math.max(1, Math.floor(attrsQty));
+        isMultiQty = qt > 1;
+      }
     } catch {
       // ignore
     }
@@ -1315,25 +1509,71 @@ export async function handleWirePaymentIntentSucceeded(
           ? paymentIntent.amount
           : null;
 
-    const listingSoldUpdate: any = {
-      status: 'sold',
-      endedReason: 'sold',
-      endedAt: now,
-      soldAt: now,
-      saleType,
-      // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
-      offerReservedByOfferId: null,
-      offerReservedAt: null,
-      purchaseReservedByOrderId: null,
-      purchaseReservedAt: null,
-      purchaseReservedUntil: null,
-      updatedAt: now,
-    };
-    if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
-      listingSoldUpdate.soldPriceCents = soldPriceCents;
-    }
+    const listingRef = db.collection('listings').doc(listingId);
 
-    await db.collection('listings').doc(listingId).set(listingSoldUpdate, { merge: true });
+    if (!isMultiQty) {
+      const listingSoldUpdate: any = {
+        status: 'sold',
+        endedReason: 'sold',
+        endedAt: now,
+        soldAt: now,
+        saleType,
+        // Clear any accepted-offer reservation once a listing is sold (prevents "stuck reserved" UX).
+        offerReservedByOfferId: null,
+        offerReservedAt: null,
+        purchaseReservedByOrderId: null,
+        purchaseReservedAt: null,
+        purchaseReservedUntil: null,
+        updatedAt: now,
+      };
+      if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
+        listingSoldUpdate.soldPriceCents = soldPriceCents;
+      }
+      await listingRef.set(listingSoldUpdate, { merge: true });
+    } else {
+      // Multi-quantity listings stay active until stock is depleted.
+      // Best-effort cleanup of per-order reservation doc.
+      try {
+        await listingRef.collection('purchaseReservations').doc(orderDoc.id).delete();
+      } catch {}
+
+      // Always clear legacy reservation fields if present.
+      await listingRef.set(
+        {
+          purchaseReservedByOrderId: null,
+          purchaseReservedAt: null,
+          purchaseReservedUntil: null,
+          ...(offerId ? { offerReservedByOfferId: null, offerReservedAt: null } : {}),
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // If sold out, mark listing sold.
+      try {
+        const snap = await listingRef.get();
+        const live = snap.exists ? (snap.data() as any) : null;
+        const avail = typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable) ? Math.max(0, Math.floor(live.quantityAvailable)) : null;
+        if (avail === 0) {
+          const listingSoldUpdate: any = {
+            status: 'sold',
+            endedReason: 'sold',
+            endedAt: now,
+            soldAt: now,
+            saleType,
+            offerReservedByOfferId: null,
+            offerReservedAt: null,
+            updatedAt: now,
+          };
+          if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
+            listingSoldUpdate.soldPriceCents = soldPriceCents;
+          }
+          await listingRef.set(listingSoldUpdate, { merge: true });
+        }
+      } catch {
+        // ignore
+      }
+    }
   }
 
   // If this originated from an offer, close it out (canonical record is now the order).
@@ -1405,14 +1645,41 @@ export async function handleWirePaymentIntentCanceled(
   await orderDoc.ref.set({ status: 'cancelled', updatedAt: now }, { merge: true });
 
   if (listingId) {
-    await db.collection('listings').doc(listingId).set(
-      {
-        purchaseReservedByOrderId: null,
-        purchaseReservedAt: null,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
+    const listingRef = db.collection('listings').doc(listingId);
+    const reservationRef = listingRef.collection('purchaseReservations').doc(orderDoc.id);
+    try {
+      await db.runTransaction(async (tx) => {
+        const ls = await tx.get(listingRef);
+        if (!ls.exists) return;
+        const live = ls.data() as any;
+        const rs = await tx.get(reservationRef);
+        if (rs.exists) {
+          const r = rs.data() as any;
+          const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
+          if (q > 0 && typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)) {
+            tx.set(
+              listingRef,
+              { quantityAvailable: Math.max(0, Math.floor(live.quantityAvailable)) + q, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
+              { merge: true }
+            );
+          }
+          tx.delete(reservationRef);
+        }
+
+        if (live.purchaseReservedByOrderId === orderDoc.id) {
+          tx.set(
+            listingRef,
+            { purchaseReservedByOrderId: null, purchaseReservedAt: null, purchaseReservedUntil: null, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
+            { merge: true }
+          );
+        }
+      });
+    } catch {
+      await listingRef.set(
+        { purchaseReservedByOrderId: null, purchaseReservedAt: null, purchaseReservedUntil: null, updatedAt: now },
+        { merge: true }
+      );
+    }
   }
 
   logInfo('Wire PI canceled: order cancelled and listing reservation cleared', {

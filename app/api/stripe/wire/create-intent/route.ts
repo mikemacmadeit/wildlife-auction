@@ -119,7 +119,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error, details: validation.details?.errors }, { status: 400 });
     }
 
-    const { listingId, offerId, buyerAcksAnimalRisk } = validation.data as any;
+    const { listingId, offerId, quantity: quantityRaw, buyerAcksAnimalRisk } = validation.data as any;
+    const requestedQuantity =
+      typeof quantityRaw === 'number' && Number.isFinite(quantityRaw) ? Math.max(1, Math.floor(quantityRaw)) : 1;
 
     // Rate limiting (post-auth, keyed per user+listing) to avoid shared-IP false positives.
     const rlKey = `wire:user:${buyerId}:listing:${String(listingId || 'unknown')}`;
@@ -187,8 +189,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // If a high-ticket checkout is pending for this listing, block additional checkouts
-    if (listingData.purchaseReservedByOrderId) {
+    // Multi-quantity is only supported for fixed, non-offer purchases right now.
+    const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+    const quantityTotal =
+      typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
+        ? Math.max(1, Math.floor((listingData as any).quantityTotal))
+        : Math.max(1, Math.floor(attrsQty));
+    const isMultiQuantityEligible = String((listingData as any)?.type || '') === 'fixed' && !offerId && quantityTotal > 1;
+    const quantityRequested = isMultiQuantityEligible ? Math.min(requestedQuantity, 100) : 1;
+
+    if (!isMultiQuantityEligible && requestedQuantity !== 1) {
+      return NextResponse.json({ error: 'Quantity is only supported for Buy Now listings', code: 'QUANTITY_NOT_SUPPORTED' }, { status: 400 });
+    }
+
+    // Legacy single-reservation guard only when not using multi-quantity.
+    if (!isMultiQuantityEligible && (listingData as any).purchaseReservedByOrderId) {
       return NextResponse.json(
         { error: 'Listing is reserved pending payment confirmation. Please try again later.' },
         { status: 409 }
@@ -262,7 +277,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'This listing type does not support wire transfer' }, { status: 400 });
     }
 
-    const amountCents = Math.round(purchaseAmountUsd * 100);
+    const amountCents = Math.round(purchaseAmountUsd * quantityRequested * 100);
 
     // NOTE: We intentionally do NOT enforce a hard minimum for wire here.
     // If product policy changes later, gate it here server-side.
@@ -332,6 +347,10 @@ export async function POST(request: Request) {
     // Create order ID now so we can tie PI metadata -> order
     const orderRef = db.collection('orders').doc();
     const orderId = orderRef.id;
+    // Wire/bank transfer is offline-like; hold reservation longer than card checkout.
+    const wireReserveHours = parseInt(process.env.WIRE_RESERVATION_HOURS || '48', 10);
+    const reserveUntilTs = Timestamp.fromMillis(Date.now() + Math.max(1, wireReserveHours) * 60 * 60_000);
+    const reservationRef = listingRef.collection('purchaseReservations').doc(orderId);
 
     logInfo('Creating wire transfer PaymentIntent', {
       route: '/api/stripe/wire/create-intent',
@@ -365,6 +384,8 @@ export async function POST(request: Request) {
         platformFee: String(platformFeeCents),
         sellerAmount: String(sellerAmountCents),
         paymentMethod: 'wire',
+        quantity: String(quantityRequested),
+        unitPrice: String(purchaseAmountUsd),
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmountUsd) } : {}),
       },
     });
@@ -386,7 +407,47 @@ export async function POST(request: Request) {
       const latestListing = await tx.get(listingRef);
       if (!latestListing.exists) throw new Error('Listing not found');
       const l = latestListing.data() as any;
-      if (l.purchaseReservedByOrderId) throw new Error('Listing is reserved pending payment confirmation');
+      const liveAttrsQty = Number(l?.attributes?.quantity ?? 1) || 1;
+      const liveQuantityTotal =
+        typeof l?.quantityTotal === 'number' && Number.isFinite(l.quantityTotal)
+          ? Math.max(1, Math.floor(l.quantityTotal))
+          : Math.max(1, Math.floor(liveAttrsQty));
+      const liveQuantityAvailable =
+        typeof l?.quantityAvailable === 'number' && Number.isFinite(l.quantityAvailable)
+          ? Math.max(0, Math.floor(l.quantityAvailable))
+          : liveQuantityTotal;
+      const multiQty = String(l?.type || '') === 'fixed' && !offerId && liveQuantityTotal > 1;
+
+      if (!multiQty) {
+        if (l.purchaseReservedByOrderId) throw new Error('Listing is reserved pending payment confirmation');
+      } else {
+        const q = Math.max(1, Math.min(quantityRequested, liveQuantityTotal));
+        if (q > liveQuantityAvailable) throw new Error('Not enough available quantity for this listing.');
+        tx.set(
+          listingRef,
+          {
+            quantityTotal: liveQuantityTotal,
+            quantityAvailable: liveQuantityAvailable - q,
+            updatedAt: Timestamp.now(),
+            updatedBy: 'system',
+          },
+          { merge: true }
+        );
+        tx.set(
+          reservationRef,
+          {
+            id: orderId,
+            orderId,
+            listingId,
+            buyerId,
+            quantity: q,
+            status: 'reserved',
+            createdAt: Timestamp.now(),
+            expiresAt: reserveUntilTs,
+          },
+          { merge: true }
+        );
+      }
 
       // Public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
       const photos = Array.isArray(l?.photos) ? l.photos : [];
@@ -433,6 +494,9 @@ export async function POST(request: Request) {
         amount: amountCents / 100,
         platformFee: platformFeeCents / 100,
         sellerAmount: sellerAmountCents / 100,
+        quantity: quantityRequested,
+        unitPrice: String((listingData as any)?.type || '') === 'fixed' ? purchaseAmountUsd : undefined,
+        reservationExpiresAt: reserveUntilTs,
         status: 'awaiting_wire',
         paymentMethod: 'wire',
         stripePaymentIntentId: pi.id,
@@ -467,16 +531,19 @@ export async function POST(request: Request) {
         wireReference: instructions.reference || null,
         wireInstructions: instructions,
       });
-
-      tx.set(
-        listingRef,
-        {
-          purchaseReservedByOrderId: orderId,
-          purchaseReservedAt: now,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
+      // Legacy single-item reservation only when not using multi-quantity.
+      if (!(String(l?.type || '') === 'fixed' && !offerId && liveQuantityTotal > 1)) {
+        tx.set(
+          listingRef,
+          {
+            purchaseReservedByOrderId: orderId,
+            purchaseReservedAt: now,
+            purchaseReservedUntil: reserveUntilTs,
+            updatedAt: now,
+          },
+          { merge: true }
+        );
+      }
 
       if (offerId && offerRef) {
         tx.set(

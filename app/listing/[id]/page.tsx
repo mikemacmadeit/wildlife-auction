@@ -141,6 +141,7 @@ export default function ListingDetailPage() {
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ amountUsd: number } | null>(null);
+  const [buyQuantity, setBuyQuantity] = useState<number>(1);
   const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<{
     attemptedMethod: PaymentMethodChoice;
@@ -240,10 +241,37 @@ export default function ListingDetailPage() {
   const checkoutAmountUsd = useMemo(() => {
     if (pendingCheckout?.amountUsd && Number.isFinite(pendingCheckout.amountUsd)) return pendingCheckout.amountUsd;
     if (!listing) return 0;
-    if (listing.type === 'fixed') return Number(listing.price || 0) || 0;
+    if (listing.type === 'fixed') {
+      const unit = Number(listing.price || 0) || 0;
+      const q = Number.isFinite(buyQuantity) ? Math.max(1, Math.floor(buyQuantity)) : 1;
+      return unit * q;
+    }
     if (listing.type === 'auction') return Number(winningBidAmount || listing.currentBid || listing.startingBid || 0) || 0;
     return 0;
-  }, [pendingCheckout?.amountUsd, listing, winningBidAmount]);
+  }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity]);
+
+  const buyNowAvailability = useMemo(() => {
+    if (!listing) return { total: 1, available: 1, canChooseQuantity: false };
+    const attrsQty = Number((listing as any)?.attributes?.quantity ?? 1) || 1;
+    const total =
+      typeof (listing as any)?.quantityTotal === 'number' && Number.isFinite((listing as any).quantityTotal)
+        ? Math.max(1, Math.floor((listing as any).quantityTotal))
+        : Math.max(1, Math.floor(attrsQty));
+    const available =
+      typeof (listing as any)?.quantityAvailable === 'number' && Number.isFinite((listing as any).quantityAvailable)
+        ? Math.max(0, Math.floor((listing as any).quantityAvailable))
+        : total;
+    return { total, available, canChooseQuantity: listing.type === 'fixed' && available > 1 };
+  }, [listing]);
+
+  // Keep quantity selection valid when listing loads/updates.
+  useEffect(() => {
+    const max = buyNowAvailability.available || 1;
+    setBuyQuantity((q) => {
+      const next = Number.isFinite(q) ? Math.max(1, Math.floor(q)) : 1;
+      return Math.min(next, Math.max(1, max));
+    });
+  }, [buyNowAvailability.available]);
 
   const isAnimalListing = useMemo(() => {
     if (!listing?.category) return false;
@@ -592,8 +620,15 @@ export default function ListingDetailPage() {
     // Do NOT check seller Stripe status client-side.
     // Buyers cannot read seller `/users/{uid}` (private fields like stripeAccountId), and `publicProfiles`
     // intentionally excludes Stripe IDs. The server-side checkout route (Admin SDK) is the source of truth.
-    const price = Number(listing!.price || 0);
-    setPendingCheckout({ amountUsd: Number.isFinite(price) ? price : 0 });
+    if (listing!.type === 'fixed' && buyNowAvailability.available <= 0) {
+      toast({
+        title: 'Sold out',
+        description: 'This listing is currently out of available quantity.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setPendingCheckout({ amountUsd: Number.isFinite(checkoutAmountUsd) ? checkoutAmountUsd : 0 });
     // Animal categories require an explicit buyer acknowledgment before checkout (server-enforced).
     if (isAnimalListing && !animalRiskAcked) setAnimalAckOpen(true);
     else setPaymentDialogOpen(true);
@@ -697,6 +732,7 @@ export default function ListingDetailPage() {
       }
 
       setIsPlacingBid(true);
+      const qty = listing.type === 'fixed' ? Math.max(1, Math.min(buyQuantity, buyNowAvailability.available || 1)) : 1;
 
       // Client-side eligibility guard for nicer UX (server also enforces).
       if (method !== 'card' && !eligiblePaymentMethods.includes(method as any)) {
@@ -708,12 +744,12 @@ export default function ListingDetailPage() {
       }
       if (method === 'wire') {
         const { createWireIntent } = await import('@/lib/stripe/api');
-        const out = await createWireIntent(listing.id, undefined, { buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined });
+        const out = await createWireIntent(listing.id, undefined, qty, { buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined });
         setWireData(out);
         setWireDialogOpen(true);
       } else {
         const { createCheckoutSession } = await import('@/lib/stripe/api');
-        const { url } = await createCheckoutSession(listing.id, undefined, method, {
+        const { url } = await createCheckoutSession(listing.id, undefined, method, qty, {
           buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
         });
         window.location.href = url;
@@ -1027,11 +1063,39 @@ export default function ListingDetailPage() {
               {!isSold && listing!.type !== 'auction' && (
                 <Card className="border-2">
                   <CardContent className="pt-6">
+                    {listing!.type === 'fixed' && buyNowAvailability.canChooseQuantity ? (
+                      <div className="mb-4 space-y-2">
+                        <Label className="text-sm font-semibold">Quantity</Label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={Math.max(1, buyNowAvailability.available)}
+                            value={buyQuantity}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              if (!Number.isFinite(n)) return;
+                              setBuyQuantity(Math.max(1, Math.min(Math.floor(n), Math.max(1, buyNowAvailability.available))));
+                            }}
+                            className="w-28"
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            {buyNowAvailability.available} available
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                     {listing!.type === 'fixed' && (
                       <Button 
                         size="lg" 
                         onClick={handleBuyNow}
-                        disabled={isPlacingBid || listing!.status !== 'active' || !!(listing as any).offerReservedByOfferId}
+                        disabled={
+                          isPlacingBid ||
+                          listing!.status !== 'active' ||
+                          !!(listing as any).offerReservedByOfferId ||
+                          buyNowAvailability.available <= 0
+                        }
                         className="w-full min-h-[52px] text-base font-bold shadow-lg"
                       >
                         {isPlacingBid ? (
@@ -1042,7 +1106,11 @@ export default function ListingDetailPage() {
                         ) : (
                           <>
                             <ShoppingCart className="mr-2 h-5 w-5" />
-                            {(listing as any).offerReservedByOfferId ? 'Reserved' : `Buy Now - $${listing!.price?.toLocaleString()}`}
+                            {(listing as any).offerReservedByOfferId
+                              ? 'Reserved'
+                              : buyQuantity > 1
+                              ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
+                              : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
                           </>
                         )}
                       </Button>
@@ -1606,10 +1674,39 @@ export default function ListingDetailPage() {
                       )}
 
                       {!isSold && listing!.type === 'fixed' && (
+                        <div className="space-y-3">
+                          {buyNowAvailability.canChooseQuantity ? (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold">Quantity</Label>
+                              <div className="flex items-center gap-3">
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={1}
+                                  max={Math.max(1, buyNowAvailability.available)}
+                                  value={buyQuantity}
+                                  onChange={(e) => {
+                                    const n = Number(e.target.value);
+                                    if (!Number.isFinite(n)) return;
+                                    setBuyQuantity(Math.max(1, Math.min(Math.floor(n), Math.max(1, buyNowAvailability.available))));
+                                  }}
+                                  className="w-32"
+                                />
+                                <div className="text-xs text-muted-foreground">
+                                  {buyNowAvailability.available} available
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
                         <Button 
                           size="lg" 
                           onClick={handleBuyNow}
-                          disabled={isPlacingBid || listing!.status !== 'active' || !!(listing as any).offerReservedByOfferId}
+                          disabled={
+                            isPlacingBid ||
+                            listing!.status !== 'active' ||
+                            !!(listing as any).offerReservedByOfferId ||
+                            buyNowAvailability.available <= 0
+                          }
                           className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >
                           {isPlacingBid ? (
@@ -1620,10 +1717,15 @@ export default function ListingDetailPage() {
                           ) : (
                             <>
                               <ShoppingCart className="mr-2 h-5 w-5" />
-                              {(listing as any).offerReservedByOfferId ? 'Reserved' : 'Buy Now'}
+                              {(listing as any).offerReservedByOfferId
+                                ? 'Reserved'
+                                : buyQuantity > 1
+                                ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
+                                : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
                             </>
                           )}
                         </Button>
+                        </div>
                       )}
 
                       {!isSold && listing!.type === 'classified' && (

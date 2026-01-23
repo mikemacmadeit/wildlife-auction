@@ -402,6 +402,14 @@ export interface Listing {
   // Category-specific attributes (replaces old metadata)
   subcategory?: string; // Optional subcategory within the 3 top categories
   attributes: ListingAttributes; // Category-specific structured attributes
+
+  /**
+   * Multi-quantity inventory (optional; back-compat):
+   * - If absent, fall back to `attributes.quantity` (default 1).
+   * - `quantityAvailable` is server-maintained and represents currently available units for purchase.
+   */
+  quantityTotal?: number;
+  quantityAvailable?: number;
   
   // Auction-specific
   endsAt?: Date; // Auction end time
@@ -632,6 +640,12 @@ export interface Order {
   amount: number;
   platformFee: number;
   sellerAmount: number;
+  /**
+   * Multi-quantity purchases (optional; back-compat: defaults to 1).
+   * For fixed-price listings, `unitPrice` is the per-unit price at time of checkout (snapshot).
+   */
+  quantity?: number;
+  unitPrice?: number;
   status: OrderStatus;
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;

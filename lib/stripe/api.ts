@@ -274,6 +274,7 @@ export async function createCheckoutSession(
   listingId: string,
   offerId?: string,
   paymentMethod?: 'card' | 'ach_debit',
+  quantity?: number,
   opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
@@ -297,6 +298,7 @@ export async function createCheckoutSession(
       listingId,
       ...(offerId ? { offerId } : {}),
       ...(paymentMethod ? { paymentMethod } : {}),
+      ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
       ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });
@@ -323,6 +325,7 @@ export async function createCheckoutSession(
 export async function createWireIntent(
   listingId: string,
   offerId?: string,
+  quantity?: number,
   opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{
   orderId: string;
@@ -350,6 +353,7 @@ export async function createWireIntent(
     body: JSON.stringify({
       listingId,
       ...(offerId ? { offerId } : {}),
+      ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
       ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });

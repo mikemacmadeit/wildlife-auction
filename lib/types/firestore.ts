@@ -173,6 +173,14 @@ export interface ListingDoc {
   purchaseReservedByOrderId?: string | null;
   purchaseReservedAt?: Timestamp | null;
   purchaseReservedUntil?: Timestamp | null;
+
+  /**
+   * Multi-quantity inventory (optional; back-compat):
+   * - If absent, UI/server may fall back to `attributes.quantity` (default 1).
+   * - quantityAvailable is decremented when a checkout/wire intent reserves units, and can be restored if reservation expires.
+   */
+  quantityTotal?: number;
+  quantityAvailable?: number;
 }
 
 /**

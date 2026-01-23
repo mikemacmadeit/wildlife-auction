@@ -380,6 +380,21 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     purchaseReservedByOrderId: typeof (doc as any).purchaseReservedByOrderId === 'string' ? (doc as any).purchaseReservedByOrderId : undefined,
     purchaseReservedAt: timestampToDate((doc as any).purchaseReservedAt),
     purchaseReservedUntil: timestampToDate((doc as any).purchaseReservedUntil),
+
+    // Multi-quantity inventory (optional; back-compat to attributes.quantity)
+    quantityTotal:
+      typeof (doc as any).quantityTotal === 'number' && Number.isFinite((doc as any).quantityTotal)
+        ? Math.max(1, Math.floor((doc as any).quantityTotal))
+        : Math.max(1, Math.floor(Number((attributes as any)?.quantity ?? 1) || 1)),
+    quantityAvailable:
+      typeof (doc as any).quantityAvailable === 'number' && Number.isFinite((doc as any).quantityAvailable)
+        ? Math.max(0, Math.floor((doc as any).quantityAvailable))
+        : Math.max(
+            0,
+            typeof (doc as any).quantityTotal === 'number' && Number.isFinite((doc as any).quantityTotal)
+              ? Math.max(1, Math.floor((doc as any).quantityTotal))
+              : Math.max(1, Math.floor(Number((attributes as any)?.quantity ?? 1) || 1))
+          ),
   };
 
   // Read-time guard: expired actives become virtual-ended in UI without writing to Firestore.

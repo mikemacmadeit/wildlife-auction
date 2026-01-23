@@ -154,11 +154,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { listingId, offerId, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
+    const { listingId, offerId, quantity: quantityRaw, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
     // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
     const normalizedPaymentMethod =
       paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');
     const paymentMethod = normalizedPaymentMethod as 'card' | 'ach_debit';
+    const requestedQuantity =
+      typeof quantityRaw === 'number' && Number.isFinite(quantityRaw) ? Math.max(1, Math.floor(quantityRaw)) : 1;
 
     // Rate limiting (post-auth, keyed per user+listing) to prevent shared-IP false positives.
     // This avoids scenarios where a legitimate first checkout attempt gets blocked by other users behind the same IP.
@@ -320,7 +322,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate listing type and get purchase amount
+    // Validate listing type and get purchase amount (UNIT price; total may be multiplied by quantity for fixed listings)
     let purchaseAmount: number;
     let auctionResultSnapshot: any | null = null;
     
@@ -401,6 +403,23 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Multi-quantity is only supported for fixed, non-offer checkouts right now.
+    // (Offers + auctions are always quantity=1.)
+    const isMultiQuantityEligible = listingData.type === 'fixed' && !offerId;
+    const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+    const quantityTotal =
+      typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
+        ? Math.max(1, Math.floor((listingData as any).quantityTotal))
+        : Math.max(1, Math.floor(attrsQty));
+    const quantityRequested = isMultiQuantityEligible ? Math.min(requestedQuantity, 100) : 1;
+
+    if (!isMultiQuantityEligible && requestedQuantity !== 1) {
+      return NextResponse.json({ error: 'Quantity is only supported for Buy Now listings', code: 'QUANTITY_NOT_SUPPORTED' }, { status: 400 });
+    }
+
+    // Total amount is per-unit price * quantity.
+    const purchaseTotalAmount = purchaseAmount * quantityRequested;
 
     // Prevent buying own listing
     if (listingData.sellerId === buyerId) {
@@ -595,7 +614,7 @@ export async function POST(request: Request) {
 
     // Calculate fees (flat fee for all sellers/categories; never trust client)
     const feePercent = MARKETPLACE_FEE_PERCENT;
-    const amount = Math.round(purchaseAmount * 100); // Convert to cents
+    const amount = Math.round(purchaseTotalAmount * 100); // Convert to cents
     const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
@@ -617,6 +636,8 @@ export async function POST(request: Request) {
     const nowTs = Timestamp.now();
     const reserveMinutes = parseInt(process.env.CHECKOUT_RESERVATION_MINUTES || '20', 10);
     const reserveUntilTs = Timestamp.fromMillis(Date.now() + Math.max(5, reserveMinutes) * 60_000);
+    const reservationCol = listingRef.collection('purchaseReservations');
+    const reservationRef = reservationCol.doc(orderId);
 
     // Atomically reserve listing and create order skeleton.
     // IMPORTANT: Firestore transactions require all reads to happen before any writes.
@@ -683,10 +704,53 @@ export async function POST(request: Request) {
       }
       if (!offerId && live.offerReservedByOfferId) throw new Error('Listing is reserved by an accepted offer');
 
-      // Block if purchase reservation is active (or clear if expired)
-      const reservedUntil = typeof live.purchaseReservedUntil?.toDate === 'function' ? live.purchaseReservedUntil.toDate() : null;
-      if (reservedUntil instanceof Date && reservedUntil.getTime() > Date.now()) {
-        throw new Error('Listing is reserved pending payment confirmation. Please try again later.');
+      const liveAttrsQty = Number(live?.attributes?.quantity ?? 1) || 1;
+      const liveQuantityTotal =
+        typeof live?.quantityTotal === 'number' && Number.isFinite(live.quantityTotal)
+          ? Math.max(1, Math.floor(live.quantityTotal))
+          : Math.max(1, Math.floor(liveAttrsQty));
+      const liveQuantityAvailable =
+        typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)
+          ? Math.max(0, Math.floor(live.quantityAvailable))
+          : liveQuantityTotal;
+      const multiQty = String(live?.type || '') === 'fixed' && !offerId && liveQuantityTotal > 1;
+
+      if (!multiQty) {
+        // Legacy single-reservation behavior.
+        const reservedUntil = typeof live.purchaseReservedUntil?.toDate === 'function' ? live.purchaseReservedUntil.toDate() : null;
+        if (reservedUntil instanceof Date && reservedUntil.getTime() > Date.now()) {
+          throw new Error('Listing is reserved pending payment confirmation. Please try again later.');
+        }
+      } else {
+        const q = Math.max(1, Math.min(quantityRequested, liveQuantityTotal));
+        if (q > liveQuantityAvailable) {
+          throw new Error('Not enough available quantity for this listing.');
+        }
+        // Reserve quantity by decrementing available + recording a reservation doc.
+        tx.set(
+          listingRef,
+          {
+            quantityTotal: liveQuantityTotal,
+            quantityAvailable: liveQuantityAvailable - q,
+            updatedAt: nowTs,
+            updatedBy: 'system',
+          },
+          { merge: true }
+        );
+        tx.set(
+          reservationRef,
+          {
+            id: orderId,
+            orderId,
+            listingId,
+            buyerId,
+            quantity: q,
+            status: 'reserved',
+            createdAt: nowTs,
+            expiresAt: reserveUntilTs,
+          },
+          { merge: true }
+        );
       }
 
       // Create order skeleton (will be finalized/updated by webhooks)
@@ -714,6 +778,9 @@ export async function POST(request: Request) {
         amount: amount / 100,
         platformFee: platformFee / 100,
         sellerAmount: sellerAmount / 100,
+        quantity: quantityRequested,
+        unitPrice: listingData.type === 'fixed' ? purchaseAmount : undefined,
+        reservationExpiresAt: reserveUntilTs,
         status: 'pending',
         paymentMethod,
         adminHold: false,
@@ -740,17 +807,19 @@ export async function POST(request: Request) {
         lastUpdatedByRole: 'buyer',
       });
 
-      // Reserve listing for this order
-      tx.set(
-        listingRef,
-        {
-          purchaseReservedByOrderId: orderId,
-          purchaseReservedAt: nowTs,
-          purchaseReservedUntil: reserveUntilTs,
-          updatedAt: nowTs,
-        },
-        { merge: true }
-      );
+      // Reserve listing for this order (legacy single-item behavior only).
+      if (!(String(live?.type || '') === 'fixed' && !offerId && (typeof live?.quantityTotal === 'number' ? live.quantityTotal : liveAttrsQty) > 1)) {
+        tx.set(
+          listingRef,
+          {
+            purchaseReservedByOrderId: orderId,
+            purchaseReservedAt: nowTs,
+            purchaseReservedUntil: reserveUntilTs,
+            updatedAt: nowTs,
+          },
+          { merge: true }
+        );
+      }
 
       // If offer checkout, lock offer against duplicate session creation and link orderId
       if (offerId && offerRef) {
@@ -764,6 +833,7 @@ export async function POST(request: Request) {
           const snap: any = await (tx as any).get(listingRef);
           if (snap?.exists) {
             const live = snap.data() as any;
+            // Legacy reservation rollback
             if (live.purchaseReservedByOrderId === orderId) {
               tx.set(
                 listingRef,
@@ -775,6 +845,26 @@ export async function POST(request: Request) {
                 },
                 { merge: true }
               );
+            }
+            // Multi-quantity reservation rollback (best-effort): restore quantityAvailable and remove reservation doc
+            try {
+              const rSnap: any = await (tx as any).get(reservationRef);
+              if (rSnap?.exists) {
+                const r = rSnap.data() as any;
+                const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
+                if (q > 0) {
+                  const avail =
+                    typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)
+                      ? Math.max(0, Math.floor(live.quantityAvailable))
+                      : null;
+                  if (avail !== null) {
+                    tx.set(listingRef, { quantityAvailable: avail + q, updatedAt: Timestamp.now(), updatedBy: 'system' }, { merge: true });
+                  }
+                }
+                tx.delete(reservationRef);
+              }
+            } catch {
+              // ignore
             }
           }
           tx.set(orderRef, { status: 'cancelled', updatedAt: Timestamp.now() }, { merge: true });
@@ -872,9 +962,9 @@ export async function POST(request: Request) {
                 : (listingData.description || '').substring(0, 500), // Stripe limit
               images: (listingData.images || []).slice(0, 1), // First image only
             },
-            unit_amount: amount,
+            unit_amount: Math.round(purchaseAmount * 100),
           },
-          quantity: 1,
+          quantity: quantityRequested,
         },
       ],
       mode: 'payment',
@@ -891,6 +981,8 @@ export async function POST(request: Request) {
         listingTitle: listingData.title,
         sellerAmount: sellerAmount.toString(), // Store seller amount in metadata for transfer
         platformFee: platformFee.toString(),
+        quantity: String(quantityRequested),
+        unitPrice: String(purchaseAmount),
         sellerTierSnapshot: sellerTier,
         sellerTierWeight: String(sellerTierWeight),
         platformFeePercent: feePercent.toString(), // Immutable snapshot at checkout time (flat)

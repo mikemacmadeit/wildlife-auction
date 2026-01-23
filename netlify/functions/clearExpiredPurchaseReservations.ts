@@ -30,6 +30,8 @@ const baseHandler: Handler = async () => {
   let cleared = 0;
   let noops = 0;
   let errors = 0;
+  let scannedOrders = 0;
+  let clearedOrders = 0;
 
   try {
     // Index needed: (purchaseReservedUntil).
@@ -122,8 +124,124 @@ const baseHandler: Handler = async () => {
       }
     }
 
+    // Multi-quantity reservations:
+    // These are recorded as `orders/{orderId}.reservationExpiresAt` + `listings/{listingId}/purchaseReservations/{orderId}` + `listings/{listingId}.quantityAvailable` decrement.
+    // We restore inventory for *pending* orders whose reservation has expired.
+    //
+    // Index needed: (status, reservationExpiresAt).
+    try {
+      if (Date.now() - start <= TIME_BUDGET_MS - 5_000) {
+        const ordersSnap = await db
+          .collection('orders')
+          .where('status', '==', 'pending')
+          .where('reservationExpiresAt', '<=', nowTs)
+          .orderBy('reservationExpiresAt', 'asc')
+          .limit(MAX_PER_RUN)
+          .get();
+
+        scannedOrders = ordersSnap.size;
+
+        for (const od of ordersSnap.docs) {
+          if (Date.now() - start > TIME_BUDGET_MS) break;
+
+          const orderId = od.id;
+          const orderRef = db.collection('orders').doc(orderId);
+
+          try {
+            const outcome = await db.runTransaction(async (tx) => {
+              const oSnap = await tx.get(orderRef);
+              if (!oSnap.exists) return 'noop_missing_order' as const;
+              const o = oSnap.data() as any;
+              if (String(o?.status || '') !== 'pending') return 'noop_not_pending' as const;
+
+              const listingId = o?.listingId ? String(o.listingId) : '';
+              if (!listingId) return 'noop_no_listing' as const;
+              const listingRef = db.collection('listings').doc(listingId);
+              const lSnap = await tx.get(listingRef);
+              if (!lSnap.exists) return 'noop_missing_listing' as const;
+              const l = lSnap.data() as any;
+
+              const reservationRef = listingRef.collection('purchaseReservations').doc(orderId);
+              const rSnap = await tx.get(reservationRef);
+              if (rSnap.exists) {
+                const r = rSnap.data() as any;
+                const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
+                if (q > 0 && typeof l?.quantityAvailable === 'number' && Number.isFinite(l.quantityAvailable)) {
+                  tx.set(
+                    listingRef,
+                    {
+                      quantityAvailable: Math.max(0, Math.floor(l.quantityAvailable)) + q,
+                      updatedAt: nowTs,
+                      updatedBy: 'system',
+                    },
+                    { merge: true }
+                  );
+                }
+                tx.delete(reservationRef);
+              }
+
+              // Also clear legacy single-item reservation if this order was holding it.
+              if (l.purchaseReservedByOrderId === orderId) {
+                tx.set(
+                  listingRef,
+                  {
+                    purchaseReservedByOrderId: null,
+                    purchaseReservedAt: null,
+                    purchaseReservedUntil: null,
+                    updatedAt: nowTs,
+                    updatedBy: 'system',
+                  },
+                  { merge: true }
+                );
+              }
+
+              tx.set(
+                orderRef,
+                {
+                  status: 'cancelled',
+                  updatedAt: nowTs,
+                  lastUpdatedByRole: 'buyer',
+                },
+                { merge: true }
+              );
+
+              return 'cleared_order' as const;
+            });
+
+            if (outcome === 'cleared_order') clearedOrders++;
+            else noops++;
+          } catch (e: any) {
+            errors++;
+            logWarn('clearExpiredPurchaseReservations: failed to clear order reservation', {
+              requestId,
+              route: 'clearExpiredPurchaseReservations',
+              orderId,
+              message: String(e?.message || e),
+            });
+          }
+        }
+      }
+    } catch (e: any) {
+      const code = String(e?.code || '');
+      const msg = String(e?.message || '');
+      const looksLikeIndex = code === 'failed-precondition' || /requires an index/i.test(msg);
+      if (looksLikeIndex) {
+        logWarn('clearExpiredPurchaseReservations: missing Firestore index for order reservations; skipping', {
+          requestId,
+          route: 'clearExpiredPurchaseReservations',
+          code,
+          message: msg,
+        });
+      } else {
+        throw e;
+      }
+    }
+
     logInfo('clearExpiredPurchaseReservations: completed', { requestId, route: 'clearExpiredPurchaseReservations', scanned, cleared, noops, errors });
-    return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, cleared, noops, errors }) };
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true, scanned, cleared, scannedOrders, clearedOrders, noops, errors }),
+    };
   } catch (e: any) {
     const code = String(e?.code || '');
     const msg = String(e?.message || '');
