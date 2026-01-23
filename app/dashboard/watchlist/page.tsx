@@ -79,18 +79,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 type TabType = 'active' | 'ended' | 'sold';
 type SortOption = 'newest' | 'oldest' | 'ending-soon' | 'price-low' | 'price-high' | 'title';
@@ -125,9 +114,7 @@ export default function WatchlistPage() {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -329,11 +316,6 @@ export default function WatchlistPage() {
         title: 'Removed from watchlist',
         description: 'This listing has been removed from your watchlist.',
       });
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(listingId);
-        return next;
-      });
     } catch (error) {
       console.error('Error removing from watchlist:', error);
       toast({
@@ -344,46 +326,6 @@ export default function WatchlistPage() {
     } finally {
       setRemovingId(null);
     }
-  };
-
-  const handleBulkRemove = async () => {
-    try {
-      const ids = Array.from(selectedIds);
-      await Promise.all(ids.map((id) => removeFavorite(id)));
-      toast({
-        title: 'Removed from watchlist',
-        description: `${ids.length} listing${ids.length === 1 ? '' : 's'} removed.`,
-      });
-      setSelectedIds(new Set());
-      setBulkRemoveOpen(false);
-    } catch (error) {
-      console.error('Error bulk removing:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to remove listings. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const toggleSelect = (listingId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(listingId)) {
-        next.delete(listingId);
-      } else {
-        next.add(listingId);
-      }
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    setSelectedIds(new Set(filteredAndSorted.map((l) => l.id)));
-  };
-
-  const deselectAll = () => {
-    setSelectedIds(new Set());
   };
 
   // Status badge component
@@ -527,26 +469,8 @@ export default function WatchlistPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {selectedIds.size > 0 && (
+            {filteredAndSorted.length > 0 && (
               <>
-                <Button variant="outline" size="sm" onClick={deselectAll}>
-                  Deselect All
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setBulkRemoveOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Remove {selectedIds.size}
-                </Button>
-              </>
-            )}
-            {selectedIds.size === 0 && filteredAndSorted.length > 0 && (
-              <>
-                <Button variant="outline" size="sm" onClick={selectAll}>
-                  Select All
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -687,8 +611,6 @@ export default function WatchlistPage() {
               <WatchlistGrid
                 listings={filteredAndSorted}
                 viewMode={viewMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
                 onRemove={handleRemove}
                 removingId={removingId}
                 StatusBadge={StatusBadge}
@@ -715,8 +637,6 @@ export default function WatchlistPage() {
               <WatchlistGrid
                 listings={filteredAndSorted}
                 viewMode={viewMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
                 onRemove={handleRemove}
                 removingId={removingId}
                 StatusBadge={StatusBadge}
@@ -743,8 +663,6 @@ export default function WatchlistPage() {
               <WatchlistGrid
                 listings={filteredAndSorted}
                 viewMode={viewMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
                 onRemove={handleRemove}
                 removingId={removingId}
                 StatusBadge={StatusBadge}
@@ -769,23 +687,6 @@ export default function WatchlistPage() {
         </Card>
       )}
 
-      {/* Bulk Remove Dialog */}
-      <AlertDialog open={bulkRemoveOpen} onOpenChange={setBulkRemoveOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove from watchlist?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {selectedIds.size} listing{selectedIds.size === 1 ? '' : 's'} from your watchlist? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkRemove} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
         </TabsContent>
       </Tabs>
     </div>
@@ -796,16 +697,12 @@ export default function WatchlistPage() {
 function WatchlistGrid({
   listings,
   viewMode,
-  selectedIds,
-  onToggleSelect,
   onRemove,
   removingId,
   StatusBadge,
 }: {
   listings: ListingWithStatus[];
   viewMode: ViewMode;
-  selectedIds: Set<string>;
-  onToggleSelect: (id: string) => void;
   onRemove: (id: string) => void;
   removingId: string | null;
   StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
@@ -823,17 +720,6 @@ function WatchlistGrid({
               transition={{ duration: 0.3, delay: index * 0.02 }}
               className="relative"
             >
-              {/* Selection checkbox (watchlist-only) */}
-              <div
-                className="absolute top-2 left-2 z-40"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                <Checkbox checked={selectedIds.has(listing.id)} onCheckedChange={() => onToggleSelect(listing.id)} />
-              </div>
-
               {/* Reuse browse list-view card 1:1 */}
               <ListItem listing={listing as any} />
             </motion.div>
@@ -851,8 +737,6 @@ function WatchlistGrid({
             key={listing.id}
             listing={listing}
             index={index}
-            isSelected={selectedIds.has(listing.id)}
-            onToggleSelect={() => onToggleSelect(listing.id)}
             onRemove={() => onRemove(listing.id)}
             isRemoving={removingId === listing.id}
             StatusBadge={StatusBadge}
@@ -866,8 +750,6 @@ function WatchlistGrid({
 type WatchlistCardProps = {
   listing: ListingWithStatus;
   index: number;
-  isSelected: boolean;
-  onToggleSelect: () => void;
   onRemove: () => void;
   isRemoving: boolean;
   StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
@@ -878,8 +760,6 @@ const WatchlistCard = React.forwardRef<HTMLDivElement, WatchlistCardProps>(funct
   {
     listing,
     index,
-    isSelected,
-    onToggleSelect,
     onRemove,
     isRemoving,
     StatusBadge,
@@ -986,21 +866,11 @@ const WatchlistCard = React.forwardRef<HTMLDivElement, WatchlistCardProps>(funct
           // Match browse gallery cards
           'overflow-hidden transition-all duration-300 flex flex-col h-full border border-border/50 bg-card',
           'hover:border-border/70 hover:shadow-lifted hover:-translate-y-0.5',
-          isSelected && 'border-primary ring-2 ring-primary/20',
           listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
             ? 'opacity-75'
             : ''
         )}
       >
-        {/* Checkbox overlay */}
-        <div className="absolute top-2 left-2 z-30">
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={onToggleSelect}
-            className="bg-background/90 backdrop-blur-sm"
-          />
-        </div>
-
         <Link href={`/listing/${listing.id}`} className="block flex-1">
           <div className="relative aspect-[4/3] w-full bg-muted overflow-hidden rounded-t-xl">
             {/* Subtle bottom overlay gradient - like browse */}
@@ -1172,34 +1042,7 @@ const WatchlistCard = React.forwardRef<HTMLDivElement, WatchlistCardProps>(funct
             </div>
           </div>
 
-          {/* Actions: use a grid so buttons never overlap/cram in tight columns */}
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t mt-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-center whitespace-nowrap"
-              onClick={(e) => {
-                e.preventDefault();
-                onRemove();
-              }}
-              disabled={isRemoving}
-            >
-              {isRemoving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Heart className="h-4 w-4 mr-2 fill-current text-destructive" />
-                  <span className="truncate">Remove</span>
-                </>
-              )}
-            </Button>
-            <Button variant="outline" size="sm" asChild className="w-full justify-center whitespace-nowrap">
-              <Link href={`/listing/${listing.id}`}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                <span className="truncate">View</span>
-              </Link>
-            </Button>
-          </div>
+          {/* No footer action buttons needed: click the heart to remove, click the card to view. */}
         </CardContent>
       </Card>
     </motion.div>
