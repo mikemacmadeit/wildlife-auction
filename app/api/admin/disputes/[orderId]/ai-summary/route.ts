@@ -62,7 +62,7 @@ export async function POST(
     const orderData = {
       ...orderDoc.data(),
       id: orderDoc.id,
-    };
+    } as any;
 
     // Check if order has a dispute
     const hasDispute = orderData.disputeStatus && 
