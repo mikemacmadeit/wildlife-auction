@@ -150,7 +150,14 @@ export async function retrieveKBArticles(
           score,
         };
       })
-      .filter((article: any) => article.score > 0 || article.category === 'troubleshooting') // Return articles with relevance OR troubleshooting articles for common issues
+      .filter((article: any) => {
+        // Return articles with relevance OR troubleshooting/getting-started for common questions
+        if (article.score > 0) return true;
+        if (article.category === 'troubleshooting') return true;
+        // Include getting-started articles for "how/what/why" questions
+        if (article.category === 'getting-started' && (queryLower.includes('how') || queryLower.includes('what') || queryLower.includes('why') || queryLower.includes('list') || queryLower.includes('sell'))) return true;
+        return false;
+      })
       .sort((a: any, b: any) => b.score - a.score) // Sort by relevance
       .slice(0, limit)
       .map((article: any) => ({
