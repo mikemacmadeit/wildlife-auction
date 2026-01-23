@@ -125,8 +125,10 @@ export function HelpLauncher() {
     if (pathname.startsWith('/dashboard') || pathname.startsWith('/seller')) return 'bottom-20 md:bottom-6';
     // Browse page: position above ScrollToTop button (which is at bottom-24 mobile, bottom-8 desktop)
     // ScrollToTop is h-12 (48px) mobile, h-14 (56px) desktop
-    // Help button is h-10 (40px), so we need: mobile: bottom-24 + 48px + gap = bottom-32 (128px), desktop: bottom-8 + 56px + gap = bottom-24 (96px)
-    if (pathname.startsWith('/browse')) return 'bottom-32 md:bottom-24';
+    // Help button is h-10 (40px), so we need:
+    // - Mobile: bottom-24 (96px) + 48px + 16px gap = bottom-32 (128px) ✓
+    // - Desktop: bottom-8 (32px) + 56px + 16px gap = bottom-28 (112px) to avoid overlap
+    if (pathname.startsWith('/browse')) return 'bottom-32 md:bottom-28';
     return 'bottom-4 md:bottom-6';
   }, [pathname]);
 
