@@ -1,7 +1,7 @@
 /**
- * AI Admin Summary Component
+ * AI Dispute Summary Component
  * 
- * Displays AI-generated summaries for admin review.
+ * Displays AI-generated dispute summaries for admin review.
  * READ-ONLY and ADVISORY - no actions, no user-facing language.
  */
 
@@ -10,55 +10,55 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw, AlertCircle, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 
-export type EntityType = 'user' | 'listing' | 'order' | 'support_ticket';
-
-interface AIAdminSummaryProps {
-  entityType: EntityType;
-  entityId: string;
+interface AIDisputeSummaryProps {
+  orderId: string;
   existingSummary?: string | null;
-  existingSummaryAt?: Date | string | null;
-  existingSummaryModel?: string | null;
-  onSummaryUpdated?: (summary: string, model: string, generatedAt: Date) => void;
+  existingFacts?: string[] | null;
+  existingReviewedAt?: Date | string | null;
+  existingModel?: string | null;
+  onSummaryUpdated?: (summary: string, facts: string[], model: string, generatedAt: Date) => void;
 }
 
-export function AIAdminSummary({
-  entityType,
-  entityId,
+export function AIDisputeSummary({
+  orderId,
   existingSummary,
-  existingSummaryAt,
-  existingSummaryModel,
+  existingFacts,
+  existingReviewedAt,
+  existingModel,
   onSummaryUpdated,
-}: AIAdminSummaryProps) {
+}: AIDisputeSummaryProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(existingSummary || null);
-  const [summaryAt, setSummaryAt] = useState<Date | null>(
-    existingSummaryAt
-      ? existingSummaryAt instanceof Date
-        ? existingSummaryAt
-        : new Date(existingSummaryAt)
+  const [facts, setFacts] = useState<string[]>(existingFacts || []);
+  const [reviewedAt, setReviewedAt] = useState<Date | null>(
+    existingReviewedAt
+      ? existingReviewedAt instanceof Date
+        ? existingReviewedAt
+        : new Date(existingReviewedAt)
       : null
   );
-  const [summaryModel, setSummaryModel] = useState<string | null>(existingSummaryModel || null);
+  const [model, setModel] = useState<string | null>(existingModel || null);
   const [error, setError] = useState<string | null>(null);
 
   // Update local state when props change
   useEffect(() => {
     setSummary(existingSummary || null);
-    setSummaryAt(
-      existingSummaryAt
-        ? existingSummaryAt instanceof Date
-          ? existingSummaryAt
-          : new Date(existingSummaryAt)
+    setFacts(existingFacts || []);
+    setReviewedAt(
+      existingReviewedAt
+        ? existingReviewedAt instanceof Date
+          ? existingReviewedAt
+          : new Date(existingReviewedAt)
         : null
     );
-    setSummaryModel(existingSummaryModel || null);
-  }, [existingSummary, existingSummaryAt, existingSummaryModel]);
+    setModel(existingModel || null);
+  }, [existingSummary, existingFacts, existingReviewedAt, existingModel]);
 
   const generateSummary = async (forceRegenerate = false) => {
     if (!user) {
@@ -75,15 +75,13 @@ export function AIAdminSummary({
 
     try {
       const token = await user.getIdToken();
-      const response = await fetch('/api/admin/ai-summary', {
+      const response = await fetch(`/api/admin/disputes/${orderId}/ai-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          entityType,
-          entityId,
           forceRegenerate,
         }),
       });
@@ -95,11 +93,12 @@ export function AIAdminSummary({
       }
 
       setSummary(data.summary);
-      setSummaryAt(new Date(data.generatedAt));
-      setSummaryModel(data.model);
+      setFacts(Array.isArray(data.facts) ? data.facts : []);
+      setReviewedAt(new Date(data.generatedAt));
+      setModel(data.model);
 
       if (onSummaryUpdated) {
-        onSummaryUpdated(data.summary, data.model, new Date(data.generatedAt));
+        onSummaryUpdated(data.summary, data.facts || [], data.model, new Date(data.generatedAt));
       }
 
       if (data.cached) {
@@ -110,7 +109,7 @@ export function AIAdminSummary({
       } else {
         toast({
           title: 'Summary generated',
-          description: 'AI summary has been generated successfully.',
+          description: 'AI dispute summary has been generated successfully.',
         });
       }
     } catch (err: any) {
@@ -126,9 +125,9 @@ export function AIAdminSummary({
     }
   };
 
-  // Auto-generate on mount if no summary exists
+  // Auto-generate on mount if no summary exists and order has dispute
   useEffect(() => {
-    if (!summary && !loading && user && entityId) {
+    if (!summary && !loading && user && orderId) {
       // Small delay to avoid race conditions
       const timer = setTimeout(() => {
         void generateSummary(false);
@@ -138,18 +137,25 @@ export function AIAdminSummary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show component even if feature is disabled, but with a message
-  const isFeatureDisabled = error && error.includes('disabled');
+  if (error && error.includes('disabled')) {
+    // Feature is disabled - don't show component
+    return null;
+  }
+
+  if (error && error.includes('does not have an active dispute')) {
+    // Order doesn't have a dispute - don't show component
+    return null;
+  }
 
   return (
-    <Card className="border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20">
+    <Card className="border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <CardTitle className="text-sm font-semibold">AI Summary (Internal – Advisory)</CardTitle>
+            <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <CardTitle className="text-sm font-semibold">AI Dispute Summary (Internal – Advisory)</CardTitle>
           </div>
-          {summary && !isFeatureDisabled && (
+          {summary && (
             <Button
               variant="ghost"
               size="sm"
@@ -166,24 +172,14 @@ export function AIAdminSummary({
           )}
         </div>
         <CardDescription className="text-xs mt-1">
-          AI-generated summary for internal admin review. This is informational only and does not affect any decisions.
+          AI-generated summary for internal admin review. This is informational only and does not affect any decisions or outcomes.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isFeatureDisabled ? (
-          <div className="flex items-start gap-2 text-sm text-muted-foreground py-2">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <div>
-              <div className="font-medium">AI Summary feature is disabled</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Enable AI_ADMIN_SUMMARY_ENABLED in environment variables to use this feature.
-              </div>
-            </div>
-          </div>
-        ) : loading && !summary ? (
+        {loading && !summary ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Generating summary...</span>
+            <span>Generating dispute summary...</span>
           </div>
         ) : error ? (
           <div className="flex items-start gap-2 text-sm text-destructive py-2">
@@ -194,14 +190,35 @@ export function AIAdminSummary({
             </div>
           </div>
         ) : summary ? (
-          <div className="space-y-2">
-            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{summary}</p>
-            {summaryAt && (
+          <div className="space-y-4">
+            {/* Summary Paragraph */}
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Summary</h4>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{summary}</p>
+            </div>
+
+            {/* Key Facts / Timeline */}
+            {facts.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Key Facts</h4>
+                <ul className="space-y-1.5">
+                  {facts.map((fact, idx) => (
+                    <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                      <span className="text-amber-600 dark:text-amber-400 mt-1 shrink-0">•</span>
+                      <span className="flex-1">{fact}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Metadata */}
+            {reviewedAt && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
                 <span>
-                  Generated {summaryAt.toLocaleDateString()} at {summaryAt.toLocaleTimeString()}
+                  Generated {reviewedAt.toLocaleDateString()} at {reviewedAt.toLocaleTimeString()}
                 </span>
-                {summaryModel && <span>• Model: {summaryModel}</span>}
+                {model && <span>• Model: {model}</span>}
               </div>
             )}
           </div>

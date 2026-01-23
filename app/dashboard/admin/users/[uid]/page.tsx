@@ -71,7 +71,8 @@ export default function AdminUserDossierPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/users/${uid}/dossier`, { headers: await authHeader() });
+      const headers = await authHeader();
+      const res = await fetch(`/api/admin/users/${uid}/dossier`, { headers });
       const jsonData = await res.json().catch(() => ({}));
       if (!res.ok || jsonData?.ok !== true) throw new Error(jsonData?.message || jsonData?.error || 'Failed to load dossier');
       setData(jsonData as any);
@@ -151,9 +152,10 @@ export default function AdminUserDossierPage() {
   };
 
   const postJson = async (path: string, body: any) => {
+    const headers = await authHeader();
     const res = await fetch(path, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...(await authHeader()) },
+      headers: { 'content-type': 'application/json', ...headers },
       body: JSON.stringify(body),
     });
     const d = await res.json().catch(() => ({}));

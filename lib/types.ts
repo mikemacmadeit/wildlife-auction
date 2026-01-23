@@ -776,6 +776,12 @@ export interface Order {
   aiAdminSummary?: string | null; // AI-generated summary for admin review
   aiAdminSummaryAt?: Date | null; // When summary was generated
   aiAdminSummaryModel?: string | null; // OpenAI model used (e.g., "gpt-4o-mini")
+  
+  // AI Dispute Summary (admin-only, read-only, optional)
+  aiDisputeSummary?: string | null; // AI-generated dispute summary for admin review
+  aiDisputeFacts?: string[] | null; // Key facts / timeline bullets extracted from dispute
+  aiDisputeReviewedAt?: Date | null; // When dispute summary was generated
+  aiDisputeModel?: string | null; // OpenAI model used (e.g., "gpt-4o-mini")
 }
 
 export interface FilterState {

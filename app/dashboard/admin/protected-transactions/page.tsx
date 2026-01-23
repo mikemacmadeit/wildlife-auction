@@ -51,6 +51,7 @@ import { Order, DisputeStatus, DisputeReason } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { releasePayment } from '@/lib/stripe/api';
 import Link from 'next/link';
+import { AIDisputeSummary } from '@/components/admin/AIDisputeSummary';
 
 interface OrderWithDetails extends Order {
   listingTitle?: string;
@@ -602,7 +603,7 @@ export default function AdminProtectedTransactionsPage() {
 
         {/* Dispute Resolution Dialog */}
         <Dialog open={showDisputeDialog} onOpenChange={setShowDisputeDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Resolve Dispute</DialogTitle>
               <DialogDescription>
@@ -611,6 +612,26 @@ export default function AdminProtectedTransactionsPage() {
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-4">
+                {/* AI Dispute Summary */}
+                {selectedOrder.id && (
+                  <AIDisputeSummary
+                    orderId={selectedOrder.id}
+                    existingSummary={(selectedOrder as any).aiDisputeSummary || null}
+                    existingFacts={(selectedOrder as any).aiDisputeFacts || null}
+                    existingReviewedAt={(selectedOrder as any).aiDisputeReviewedAt || null}
+                    existingModel={(selectedOrder as any).aiDisputeModel || null}
+                    onSummaryUpdated={(summary, facts, model, generatedAt) => {
+                      // Update order in local state
+                      if (selectedOrder) {
+                        (selectedOrder as any).aiDisputeSummary = summary;
+                        (selectedOrder as any).aiDisputeFacts = facts;
+                        (selectedOrder as any).aiDisputeReviewedAt = generatedAt;
+                        (selectedOrder as any).aiDisputeModel = model;
+                      }
+                    }}
+                  />
+                )}
+                
                 <div>
                   <p className="text-sm font-semibold mb-2">Dispute Details</p>
                   <div className="space-y-1 text-sm">

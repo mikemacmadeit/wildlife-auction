@@ -75,6 +75,7 @@ import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { isStripeTestModeClient } from '@/lib/stripe/mode';
 import { TestModePayoutHelperModal } from '@/components/admin/TestModePayoutHelperModal';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
+import { AIDisputeSummary } from '@/components/admin/AIDisputeSummary';
 
 interface OrderWithDetails extends Order {
   listingTitle?: string;
@@ -1178,7 +1179,7 @@ export default function AdminOpsPage() {
 
       {/* Resolve Dispute Dialog */}
       <Dialog open={!!resolveDialogOpen} onOpenChange={(open) => !open && setResolveDialogOpen(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Resolve Dispute</DialogTitle>
             <DialogDescription>
@@ -1186,6 +1187,34 @@ export default function AdminOpsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* AI Dispute Summary */}
+            {resolveDialogOpen && (
+              <AIDisputeSummary
+                orderId={resolveDialogOpen}
+                existingSummary={
+                  orders.find(o => o.id === resolveDialogOpen)?.aiDisputeSummary || null
+                }
+                existingFacts={
+                  orders.find(o => o.id === resolveDialogOpen)?.aiDisputeFacts || null
+                }
+                existingReviewedAt={
+                  orders.find(o => o.id === resolveDialogOpen)?.aiDisputeReviewedAt || null
+                }
+                existingModel={
+                  orders.find(o => o.id === resolveDialogOpen)?.aiDisputeModel || null
+                }
+                onSummaryUpdated={(summary, facts, model, generatedAt) => {
+                  // Update order in local state
+                  const order = orders.find(o => o.id === resolveDialogOpen);
+                  if (order) {
+                    (order as any).aiDisputeSummary = summary;
+                    (order as any).aiDisputeFacts = facts;
+                    (order as any).aiDisputeReviewedAt = generatedAt;
+                    (order as any).aiDisputeModel = model;
+                  }
+                }}
+              />
+            )}
             <div>
               <Label>Resolution</Label>
               <Select value={resolutionType} onValueChange={(v) => setResolutionType(v as any)}>
@@ -1447,6 +1476,27 @@ export default function AdminOpsPage() {
                     (selectedOrder as any).aiAdminSummary = summary;
                     (selectedOrder as any).aiAdminSummaryAt = generatedAt;
                     (selectedOrder as any).aiAdminSummaryModel = model;
+                  }}
+                />
+              )}
+
+              {/* AI Dispute Summary - Only show if order has an active dispute */}
+              {selectedOrder.id && selectedOrder.disputeStatus && 
+               selectedOrder.disputeStatus !== 'none' && 
+               selectedOrder.disputeStatus !== 'cancelled' &&
+               !selectedOrder.disputeStatus.startsWith('resolved_') && (
+                <AIDisputeSummary
+                  orderId={selectedOrder.id}
+                  existingSummary={(selectedOrder as any).aiDisputeSummary || null}
+                  existingFacts={(selectedOrder as any).aiDisputeFacts || null}
+                  existingReviewedAt={(selectedOrder as any).aiDisputeReviewedAt || null}
+                  existingModel={(selectedOrder as any).aiDisputeModel || null}
+                  onSummaryUpdated={(summary, facts, model, generatedAt) => {
+                    // Update local state
+                    (selectedOrder as any).aiDisputeSummary = summary;
+                    (selectedOrder as any).aiDisputeFacts = facts;
+                    (selectedOrder as any).aiDisputeReviewedAt = generatedAt;
+                    (selectedOrder as any).aiDisputeModel = model;
                   }}
                 />
               )}

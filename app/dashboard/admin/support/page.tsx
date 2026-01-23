@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { AIAdminDraft } from '@/components/admin/AIAdminDraft';
 
 type TicketRow = {
   ticketId: string;
@@ -332,6 +333,15 @@ export default function AdminSupportPage() {
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">{active.messagePreview}</CardContent>
               </Card>
+
+              <AIAdminDraft
+                ticketId={active.ticketId}
+                onDraftChange={(draft) => {
+                  // When draft is generated/updated, populate the reply field
+                  setReply(draft);
+                }}
+                disabled={sending}
+              />
 
               <div className="space-y-2">
                 <div className="text-sm font-semibold">Reply (emails the user)</div>
