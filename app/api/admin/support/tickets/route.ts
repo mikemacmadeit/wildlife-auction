@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
-import type { Query, CollectionReference } from 'firebase-admin/firestore';
+import type { Query, CollectionReference, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 function toInt(v: string | null, fallback: number) {
   const n = Number(v);
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
     }
     snap = await fq.get();
   }
-  const tickets = snap.docs.map((d) => {
+  const tickets = snap.docs.map((d: QueryDocumentSnapshot) => {
     const data: any = d.data();
     const createdAt = data?.createdAt?.toDate?.() || data?.createdAt || null;
     const updatedAt = data?.updatedAt?.toDate?.() || data?.updatedAt || null;
