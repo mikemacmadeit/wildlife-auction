@@ -98,6 +98,7 @@ export default function RootLayout({
   const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
   // Decode the cookie value since it's URL encoded when set
   const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';
+  const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
   
   // Debug logging (server-side, visible in build logs)
   if (gateEnabled && !gateAllowed) {
@@ -108,8 +109,6 @@ export default function RootLayout({
       match: gateCookie === gateToken,
     });
   }
-  
-  const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
