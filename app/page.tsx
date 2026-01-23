@@ -367,6 +367,13 @@ export default function HomePage() {
 
   const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
     const scrollerRef = useRef<HTMLDivElement | null>(null);
+    const dragRef = useRef<{
+      active: boolean;
+      startX: number;
+      startY: number;
+      startScrollLeft: number;
+      dragged: boolean;
+    }>({ active: false, startX: 0, startY: 0, startScrollLeft: 0, dragged: false });
     if (!props.listings.length) {
       return (
         <Card className="border-2 border-border/50">
@@ -378,6 +385,68 @@ export default function HomePage() {
     // Homepage: enforce consistent card size/height (eBay-style rails).
     // This avoids “some huge, some small” cards when different variants render.
     const itemClass = 'w-[280px] sm:w-[320px] lg:w-[340px] h-[420px]';
+
+    const onPointerDown = (e: React.PointerEvent) => {
+      // Desktop: allow grab-to-scroll with mouse/trackpad pointer.
+      // Ignore non-primary buttons.
+      if (e.button !== 0) return;
+      const el = scrollerRef.current;
+      if (!el) return;
+
+      dragRef.current.active = true;
+      dragRef.current.dragged = false;
+      dragRef.current.startX = e.clientX;
+      dragRef.current.startY = e.clientY;
+      dragRef.current.startScrollLeft = el.scrollLeft;
+
+      // Capture pointer so dragging continues even if leaving the element.
+      try {
+        (e.currentTarget as any)?.setPointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
+    };
+
+    const onPointerMove = (e: React.PointerEvent) => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      if (!dragRef.current.active) return;
+
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+
+      // If user is mostly scrolling vertically, don't hijack.
+      if (!dragRef.current.dragged) {
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+          dragRef.current.active = false;
+          return;
+        }
+      }
+
+      if (Math.abs(dx) > 4) dragRef.current.dragged = true;
+      if (!dragRef.current.dragged) return;
+
+      // Prevent selecting text/images while dragging.
+      e.preventDefault();
+      el.scrollLeft = dragRef.current.startScrollLeft - dx;
+    };
+
+    const endDrag = (e: React.PointerEvent) => {
+      // Release capture and end drag state.
+      dragRef.current.active = false;
+      try {
+        (e.currentTarget as any)?.releasePointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
+
+      // Reset dragged state shortly after to allow normal clicks.
+      if (dragRef.current.dragged) {
+        window.setTimeout(() => {
+          dragRef.current.dragged = false;
+        }, 0);
+      }
+    };
 
     return (
       <div className="relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
@@ -430,7 +499,25 @@ export default function HomePage() {
 
         <div
           ref={scrollerRef}
-          className="overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth we-scrollbar-hover"
+          className={cn(
+            'overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth we-scrollbar-hover',
+            // Desktop UX: grab cursor for draggable rails.
+            'md:cursor-grab'
+          )}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onPointerLeave={(e) => {
+            if (dragRef.current.active) endDrag(e);
+          }}
+          onClickCapture={(e) => {
+            // If a drag happened, suppress the click so we don't open a listing while scrolling.
+            if (dragRef.current.dragged) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
         >
           <div className="flex gap-4 min-w-max snap-x snap-mandatory">
             {props.listings.map((listing) => (
