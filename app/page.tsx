@@ -392,6 +392,7 @@ export default function HomePage() {
   const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
     const railListings = sortTrendingFirst(props.listings);
     const scrollerRef = useRef<HTMLDivElement | null>(null);
+    const [canScroll, setCanScroll] = useState(false);
     const dragRef = useRef<{
       active: boolean;
       startX: number;
@@ -412,6 +413,34 @@ export default function HomePage() {
       pendingScrollLeft: null,
     });
     const [isDragging, setIsDragging] = useState(false);
+
+    // If the row doesn't overflow horizontally (e.g. only 1–2 items),
+    // remove the desktop side gutters and hide arrows so the row aligns flush-left like others.
+    useEffect(() => {
+      if (!railListings.length) {
+        setCanScroll(false);
+        return;
+      }
+      const el = scrollerRef.current;
+      if (!el) return;
+
+      const compute = () => {
+        try {
+          setCanScroll(el.scrollWidth > el.clientWidth + 2);
+        } catch {
+          setCanScroll(false);
+        }
+      };
+
+      compute();
+      const t = window.setTimeout(compute, 250);
+      window.addEventListener('resize', compute);
+      return () => {
+        window.clearTimeout(t);
+        window.removeEventListener('resize', compute);
+      };
+    }, [railListings.length]);
+
     if (!railListings.length) {
       return (
         <Card className="border-2 border-border/50">
@@ -548,7 +577,7 @@ export default function HomePage() {
         {/* Arrows: sit in the rail gutters (ends of the section), not on top of card images */}
         <div
           className={cn(
-            'hidden md:block absolute left-0 right-0 z-30',
+            canScroll ? 'hidden md:block absolute left-0 right-0 z-30' : 'hidden',
             // Fade in only when hovering this rail
             'opacity-0 group-hover/rail:opacity-100 transition-opacity duration-200',
             // Do not block clicks on cards; only the buttons should be clickable.
@@ -606,7 +635,8 @@ export default function HomePage() {
             // NOTE: no scroll-smooth here; it makes drag-scrolling feel like it "catches up" after release.
             // Add side gutters on desktop so the arrow buttons don't overlap card images.
             // On desktop, remove the negative margins so cards don't slide under the edge arrows.
-            'overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-12 we-scrollbar-hover snap-x snap-proximity',
+            'overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 we-scrollbar-hover snap-x snap-proximity',
+            canScroll ? 'md:px-12' : 'md:px-0',
             // Desktop UX: grab cursor for draggable rails.
             'md:cursor-grab',
             isDragging && 'md:cursor-grabbing select-none'
