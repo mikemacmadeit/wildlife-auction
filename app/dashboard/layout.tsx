@@ -160,16 +160,18 @@ export default function DashboardLayout({
       if (item.href === '/dashboard/admin/listings') {
         return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
       }
-      if (item.href === '/dashboard/admin/notifications') {
-        // Super admin only: show unread ADMIN-category notifications as a red badge.
-        return {
-          ...item,
-          badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
-        };
-      }
+      // Admin notifications page is a TEST page, not a real notifications inbox
+      // So we don't show a badge for it
+      // if (item.href === '/dashboard/admin/notifications') {
+      //   // Super admin only: show unread ADMIN-category notifications as a red badge.
+      //   return {
+      //     ...item,
+      //     badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
+      //   };
+      // }
       return item;
     });
-  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount]);
+  }, [pendingApprovalsCount]);
 
   // Real-time badges (unread messages/notifications + pending approvals)
   useEffect(() => {
