@@ -169,9 +169,21 @@ export async function retrieveKBArticles(
         });
         
         // Boost score for troubleshooting category if query suggests a problem
-        if (article.category === 'troubleshooting' && (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('problem') || queryLower.includes('issue') || queryLower.includes('error'))) {
+        if (article.category === 'troubleshooting' && (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('problem') || queryLower.includes('issue') || queryLower.includes('error') || queryLower.includes('help') || queryLower.includes('not working'))) {
+          score += 3;
+        }
+        
+        // Boost score for getting-started articles for "how/what/why" questions
+        if (article.category === 'getting-started' && (queryLower.includes('how') || queryLower.includes('what') || queryLower.includes('why') || queryLower.includes('guide') || queryLower.includes('learn'))) {
           score += 2;
         }
+        
+        // Boost score for exact category matches
+        if (queryLower.includes('payment') && article.category === 'payments') score += 2;
+        if (queryLower.includes('deliver') && article.category === 'delivery') score += 2;
+        if (queryLower.includes('bid') && article.category === 'bidding') score += 2;
+        if (queryLower.includes('listing') && article.category === 'listings') score += 2;
+        if (queryLower.includes('account') && article.category === 'account') score += 2;
 
         return {
           ...article,
