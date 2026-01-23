@@ -111,15 +111,15 @@ export default function RootLayout({
     }
   }
   
+  // Read cookie and decode it (cookie is set with encodeURIComponent)
   const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
-  // Decode the cookie value since it's URL encoded when set
   const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';
   const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
   
   // Debug logging (server-side, visible in build logs)
   if (gateEnabled && !gateAllowed) {
     console.log('[Site Gate] Access check:', {
-      hasCookie: !!gateCookieRaw,
+      hasCookie: !!gateCookie,
       cookieValue: gateCookie ? `${gateCookie.substring(0, 5)}***` : '(empty)',
       expectedToken: gateToken ? `${gateToken.substring(0, 5)}***` : '(empty)',
       match: gateCookie === gateToken,

@@ -1,7 +1,5 @@
 export const runtime = 'nodejs';
 
-import { cookies } from 'next/headers';
-
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -88,36 +86,13 @@ export async function POST(req: Request) {
     }, { status: 401 });
   }
   
-  // Verify token generation is correct
-  // If using password-based token, verify it matches what we'd generate
-  if (!process.env.SITE_GATE_TOKEN) {
-    const expectedTokenFromNormalized = `pw:${normalizedExpected}`;
-    if (token !== expectedTokenFromNormalized) {
-      console.error('[Site Gate] CRITICAL: Token generation mismatch!', {
-        tokenFromFunction: token,
-        tokenFromNormalized: expectedTokenFromNormalized,
-        passwordEnv,
-        normalizedExpected,
-      });
-      // Use the correct token
-      const correctToken = expectedTokenFromNormalized;
-      // Continue with correct token
-    }
-  }
-
-  // Set cookie using Next.js cookies() API AND manual header to ensure it works
-  const cookieStore = cookies();
-  cookieStore.set(COOKIE_NAME, token, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
-  });
-
-  // Also set manually in headers as backup (Next.js should do this automatically, but ensure it works)
-  const cookieHeader = [
-    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
+  // Ensure token matches normalized password (double-check)
+  const finalToken = !process.env.SITE_GATE_TOKEN ? `pw:${normalizedExpected}` : token;
+  
+  // Set cookie using manual header (original working method)
+  // Cookie value is URL-encoded, layout will decode it
+  const cookie = [
+    `${COOKIE_NAME}=${encodeURIComponent(finalToken)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
@@ -129,8 +104,9 @@ export async function POST(req: Request) {
 
   console.log('[Site Gate] Setting cookie:', {
     cookieName: COOKIE_NAME,
-    token: token ? `${token.substring(0, 10)}***` : '(none)',
-    cookieHeader: cookieHeader.substring(0, 50) + '...',
+    token: finalToken ? `${finalToken.substring(0, 15)}***` : '(none)',
+    tokenLength: finalToken?.length || 0,
+    encoded: encodeURIComponent(finalToken).substring(0, 20),
   });
 
   return json(
@@ -138,7 +114,7 @@ export async function POST(req: Request) {
     {
       status: 200,
       headers: {
-        'Set-Cookie': cookieHeader,
+        'Set-Cookie': cookie,
       },
     }
   );
