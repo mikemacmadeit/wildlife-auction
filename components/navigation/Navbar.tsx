@@ -30,18 +30,49 @@ import {
 } from '@/components/ui/tooltip';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useAdmin } from '@/hooks/use-admin';
 import { signOutUser } from '@/lib/firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { NotificationsBell } from '@/components/navigation/NotificationsBell';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+
+  // Real-time: show admin approval workload on the global navbar bell
+  // so admins can see it while browsing (not just inside /dashboard).
+  useEffect(() => {
+    if (!user?.uid) {
+      setPendingApprovalsCount(0);
+      return;
+    }
+    if (adminLoading) return;
+    if (!isAdmin) {
+      setPendingApprovalsCount(0);
+      return;
+    }
+
+    try {
+      const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
+      return onSnapshot(
+        qPending,
+        (snap) => setPendingApprovalsCount(snap.size || 0),
+        () => setPendingApprovalsCount(0)
+      );
+    } catch {
+      setPendingApprovalsCount(0);
+      return;
+    }
+  }, [adminLoading, isAdmin, user?.uid]);
 
   const handleSignOut = async () => {
     try {
@@ -200,12 +231,17 @@ export function Navbar() {
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Notifications (mobile + desktop) */}
-            {user?.uid ? <NotificationsBell userId={user.uid} className="md:hidden" /> : null}
+            {/* Notifications (all sizes): includes admin pending-approval workload for admins */}
+            {user?.uid ? (
+              <NotificationsBell
+                userId={user.uid}
+                adminPendingApprovalsCount={pendingApprovalsCount}
+                adminPendingApprovalsHref="/dashboard/admin/listings"
+              />
+            ) : null}
 
             {/* Desktop Actions - User Menu */}
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
-              {user?.uid ? <NotificationsBell userId={user.uid} /> : null}
               <Button
                 asChild
                 size="default"

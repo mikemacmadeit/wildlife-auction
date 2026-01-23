@@ -45,7 +45,14 @@ function toAppPath(url: string): string | null {
   return null;
 }
 
-export function NotificationsBell(props: { userId: string; className?: string }) {
+export function NotificationsBell(props: {
+  userId: string;
+  className?: string;
+  // Optional: show admin "tasks" (e.g. pending listing approvals) on the main navbar bell.
+  // This is separate from notification docs because those queues are often computed from live data.
+  adminPendingApprovalsCount?: number;
+  adminPendingApprovalsHref?: string;
+}) {
   const { userId, className } = props;
   const router = useRouter();
 
@@ -53,6 +60,8 @@ export function NotificationsBell(props: { userId: string; className?: string })
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [open, setOpen] = useState(false);
   const prevOpenRef = useRef<boolean>(false);
+  const adminPendingApprovalsCount = Number(props.adminPendingApprovalsCount || 0) || 0;
+  const adminPendingApprovalsHref = String(props.adminPendingApprovalsHref || '').trim() || '/dashboard/admin/listings';
 
   useEffect(() => {
     if (!userId) return;
@@ -84,7 +93,8 @@ export function NotificationsBell(props: { userId: string; className?: string })
     }
   }, [userId]);
 
-  const hasUnread = unreadCount > 0;
+  const badgeCount = Math.max(0, unreadCount + adminPendingApprovalsCount);
+  const hasUnread = badgeCount > 0;
 
   // When opening the dropdown, mark the visible notifications as read (best-effort).
   // This ensures the bell badge clears promptly and matches user expectation.
@@ -148,7 +158,7 @@ export function NotificationsBell(props: { userId: string; className?: string })
                 'flex items-center justify-center'
               )}
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {badgeCount > 99 ? '99+' : badgeCount}
             </span>
           ) : null}
         </Button>
@@ -157,9 +167,26 @@ export function NotificationsBell(props: { userId: string; className?: string })
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Notifications</span>
-          {hasUnread ? <span className="text-xs text-muted-foreground">{unreadCount} unread</span> : null}
+          {hasUnread ? <span className="text-xs text-muted-foreground">{badgeCount} unread</span> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+
+        {adminPendingApprovalsCount > 0 ? (
+          <>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              onSelect={(e) => {
+                e.preventDefault();
+                router.push(adminPendingApprovalsHref);
+                setOpen(false);
+              }}
+            >
+              <span className="font-semibold">Admin approvals waiting</span>
+              <span className="text-xs font-bold text-destructive">{adminPendingApprovalsCount}</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
 
         {items.length === 0 ? (
           <div className="px-3 py-6 text-sm text-muted-foreground">No notifications yet.</div>
