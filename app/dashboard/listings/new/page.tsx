@@ -66,6 +66,7 @@ function NewListingPageContent() {
   const [sellerAnimalAckModalOpen, setSellerAnimalAckModalOpen] = useState(false);
   const [sellerAnimalAckModalChecked, setSellerAnimalAckModalChecked] = useState(false);
   const pendingPublishPayloadRef = useRef<Record<string, unknown> | null>(null);
+  const [tourRequestedStep, setTourRequestedStep] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';
     type: ListingType | '';
@@ -403,6 +404,18 @@ function NewListingPageContent() {
       console.warn('Failed to load user profile for payouts readiness', e);
     }
   };
+
+  // Listen for tour step advancement requests
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleTourAdvance = (e: CustomEvent<{ stepId: string }>) => {
+      setTourRequestedStep(e.detail.stepId);
+    };
+    window.addEventListener('tour:advance-form-step', handleTourAdvance as EventListener);
+    return () => {
+      window.removeEventListener('tour:advance-form-step', handleTourAdvance as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) {
