@@ -371,7 +371,26 @@ export default function HomePage() {
     );
   };
 
+  // Keep “Trending” cards at the front of each rail (stable within groups).
+  // Match the badge logic used by `components/listings/ListingCard.tsx`.
+  const isTrendingListing = (l: Listing): boolean => {
+    const watchers = typeof (l as any).watcherCount === 'number' ? (l as any).watcherCount : (l as any)?.metrics?.favorites || 0;
+    const bidCount = (l as any)?.metrics?.bidCount || 0;
+    const isSold = (l as any)?.status === 'sold';
+    return !isSold && (watchers >= 10 || bidCount >= 8);
+  };
+
+  const sortTrendingFirst = (list: Listing[]): Listing[] => {
+    const arr = Array.isArray(list) ? list : [];
+    if (arr.length <= 1) return arr;
+    return arr
+      .map((l, idx) => ({ l, idx, t: isTrendingListing(l) }))
+      .sort((a, b) => Number(b.t) - Number(a.t) || a.idx - b.idx)
+      .map((x) => x.l);
+  };
+
   const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
+    const railListings = sortTrendingFirst(props.listings);
     const scrollerRef = useRef<HTMLDivElement | null>(null);
     const dragRef = useRef<{
       active: boolean;
@@ -393,7 +412,7 @@ export default function HomePage() {
       pendingScrollLeft: null,
     });
     const [isDragging, setIsDragging] = useState(false);
-    if (!props.listings.length) {
+    if (!railListings.length) {
       return (
         <Card className="border-2 border-border/50">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">{props.emptyText}</CardContent>
@@ -624,7 +643,7 @@ export default function HomePage() {
           }}
         >
           <div className="flex gap-4 min-w-max">
-            {props.listings.map((listing) => (
+            {railListings.map((listing) => (
               <div key={listing.id} className={cn('snap-start flex-shrink-0 overflow-hidden', itemClass)}>
                 <ListingCard listing={listing} className="h-full" />
               </div>
