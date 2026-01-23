@@ -106,25 +106,26 @@ export async function generateKBGroundedChatResponse(
     // Format KB articles for prompt
     const kbContext = formatKBArticlesForPrompt(articles);
 
-    // Strict prompt - answer ONLY from KB, no general knowledge
-    const systemPrompt = `You are a helpful assistant for Wildlife Exchange. Your job is to answer user questions using ONLY the knowledge base articles provided below.
+    // Helpful prompt - use KB articles but be more flexible and helpful
+    const systemPrompt = `You are a helpful support assistant for Wildlife Exchange, a marketplace for buying and selling animals, livestock, and related items. Your job is to help users with their questions.
 
-CRITICAL RULES:
-1. Answer ONLY from the provided knowledge base articles
-2. Do NOT use any general knowledge or information not in the articles
-3. If the answer is not in the articles, say you're not sure and suggest contacting support
-4. Keep answers concise (2-4 sentences max)
-5. Be friendly, helpful, and professional
-6. Do NOT mention AI, automation, or that you're an AI
-7. Do NOT make up information
-8. If asked about features not in the articles, say you're not sure and suggest contacting support
+INSTRUCTIONS:
+1. Use the knowledge base articles below as your primary source of information
+2. If the articles contain relevant information, provide a helpful answer based on them
+3. If the articles don't have the exact answer but are related, provide helpful guidance based on what you know from the articles
+4. For common issues like sign-in problems, password issues, or account access, provide practical troubleshooting steps even if not explicitly in the articles
+5. Be friendly, empathetic, and professional
+6. Keep answers concise but complete (3-5 sentences)
+7. Always end with an offer to help further or suggest contacting support if needed
+8. Do NOT mention AI, automation, or that you're an AI
+9. If you truly cannot help, politely suggest contacting support
 
 Knowledge Base Articles:
 ${kbContext}`;
 
     const userPrompt = `User Question: ${options.userMessage}
 
-Answer the user's question using ONLY the information from the knowledge base articles above. If the answer is not in the articles, politely say you're not sure and suggest they contact support.`;
+Provide a helpful answer to the user's question. Use the knowledge base articles above as your guide. If the articles don't have the exact answer, provide helpful guidance based on what you know from the articles and common troubleshooting steps. Be empathetic and helpful.`;
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -145,8 +146,8 @@ Answer the user's question using ONLY the information from the knowledge base ar
             content: userPrompt,
           },
         ],
-        max_tokens: 300, // Keep answers concise
-        temperature: 0.3, // Low temperature for more factual, consistent responses
+        max_tokens: 400, // Allow more detailed helpful answers
+        temperature: 0.5, // Slightly higher for more natural, helpful responses
       }),
     });
 

@@ -41,7 +41,30 @@ export async function retrieveKBArticles(
   try {
     const db = getAdminDb();
     const queryLower = query.toLowerCase().trim();
+    
+    // Expand query with common synonyms and variations
+    const queryExpansions: string[] = [queryLower];
+    
+    // Common sign-in variations
+    if (queryLower.includes('sign') && queryLower.includes('in')) {
+      queryExpansions.push('sign in', 'signin', 'login', 'log in', 'authentication', 'account access');
+    }
+    if (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot')) {
+      queryExpansions.push('troubleshoot', 'help', 'problem', 'issue', 'error');
+    }
+    if (queryLower.includes('password')) {
+      queryExpansions.push('reset password', 'forgot password', 'password reset');
+    }
+    if (queryLower.includes('email')) {
+      queryExpansions.push('email verification', 'verify email', 'email confirm');
+    }
+    
     const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2); // Ignore very short words
+    const allQueryWords = new Set(queryWords);
+    queryExpansions.forEach(exp => {
+      exp.split(/\s+/).filter((w) => w.length > 2).forEach(word => allQueryWords.add(word));
+    });
+    const expandedQueryWords = Array.from(allQueryWords);
 
     // Start with enabled articles only
     // Note: Firestore doesn't support OR queries easily, so we fetch all enabled articles
@@ -82,32 +105,37 @@ export async function retrieveKBArticles(
           score += 10;
         }
 
-        // Word matches in title
-        queryWords.forEach((word) => {
+        // Word matches in title (use expanded words)
+        expandedQueryWords.forEach((word) => {
           if (titleLower.includes(word)) {
             score += 5;
           }
         });
 
-        // Word matches in tags
-        queryWords.forEach((word) => {
+        // Word matches in tags (use expanded words)
+        expandedQueryWords.forEach((word) => {
           if (tagsLower.includes(word)) {
             score += 3;
           }
         });
 
-        // Word matches in content
-        queryWords.forEach((word) => {
+        // Word matches in content (use expanded words)
+        expandedQueryWords.forEach((word) => {
           const matches = (contentLower.match(new RegExp(word, 'g')) || []).length;
           score += Math.min(matches, 5); // Cap content matches at 5 points per word
         });
+        
+        // Boost score for troubleshooting category if query suggests a problem
+        if (article.category === 'troubleshooting' && (queryLower.includes('cant') || queryLower.includes("can't") || queryLower.includes('cannot') || queryLower.includes('problem') || queryLower.includes('issue') || queryLower.includes('error'))) {
+          score += 2;
+        }
 
         return {
           ...article,
           score,
         };
       })
-      .filter((article: any) => article.score > 0) // Only return articles with some relevance
+      .filter((article: any) => article.score > 0 || article.category === 'troubleshooting') // Return articles with relevance OR troubleshooting articles for common issues
       .sort((a: any, b: any) => b.score - a.score) // Sort by relevance
       .slice(0, limit)
       .map((article: any) => ({
