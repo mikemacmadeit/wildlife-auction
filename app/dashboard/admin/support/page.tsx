@@ -549,8 +549,8 @@ export default function AdminSupportPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen} onOpenAutoFocus={(e) => e.preventDefault()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e: Event) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />

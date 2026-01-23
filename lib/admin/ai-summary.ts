@@ -420,7 +420,7 @@ Provide:
 
     // Parse summary and facts from response
     // Expected format: Summary paragraph, then bullet points
-    const lines = fullText.split('\n').filter(line => line.trim());
+    const lines = fullText.split('\n').filter((line: string) => line.trim());
     let summary = '';
     const facts: string[] = [];
 
@@ -769,7 +769,7 @@ function prepareTicketDataForDraft(
   }
 
   // Previous messages (if available) - last 2-3 for context
-  if (Array.isArray(context?.messages) && context.messages.length > 0) {
+  if (context && Array.isArray(context.messages) && context.messages.length > 0) {
     const recentMessages = context.messages.slice(-3);
     parts.push(`Previous Messages (${recentMessages.length}):`);
     recentMessages.forEach((msg: any, idx: number) => {
