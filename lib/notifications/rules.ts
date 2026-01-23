@@ -151,11 +151,12 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
     case 'Listing.ComplianceApproved':
     case 'Listing.ComplianceRejected':
       return {
-        category: 'admin',
+        // Seller-facing listing lifecycle updates. These should email by default.
+        category: 'onboarding',
         urgency: 'normal',
-        channels: ['inApp'],
-        dedupeWindowMs: 1000 * 60 * 60 * 24,
-        rateLimitPerUser: {},
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 6,
+        rateLimitPerUser: { email: { perHour: 6, perDay: 20 } },
         allowDuringQuietHours: true,
       };
     case 'Admin.BreederPermit.Submitted':

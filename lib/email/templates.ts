@@ -120,6 +120,19 @@ export interface OfferExpiredEmailData {
   offerUrl: string;
 }
 
+export interface ListingApprovedEmailData {
+  userName: string;
+  listingTitle: string;
+  listingUrl: string;
+}
+
+export interface ListingRejectedEmailData {
+  userName: string;
+  listingTitle: string;
+  editUrl: string;
+  reason?: string;
+}
+
 export interface AdminListingSubmittedEmailData {
   adminName: string;
   listingTitle: string;
@@ -1527,6 +1540,43 @@ export function getAdminListingRejectedEmail(data: AdminListingRejectedEmailData
     ${data.reason ? `<div style="margin: 0 0 14px 0; padding: 12px 14px; border: 1px solid #E6E1D6; border-radius: 12px; background: #FBFAF7; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;"><strong style="color:#22251F;">Reason:</strong> ${escapeHtml(data.reason)}</div>` : ''}
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.adminQueueUrl, 'Open queue')}
+    </div>
+  `;
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getListingApprovedEmail(data: ListingApprovedEmailData): { subject: string; html: string } {
+  const subject = `Your listing is approved — ${data.listingTitle}`;
+  const preheader = `Good news: your listing is now live.`;
+  const origin = tryGetOrigin(data.listingUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Listing approved
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — your listing “${escapeHtml(data.listingTitle)}” was approved and is now live.
+    </div>
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.listingUrl, 'View listing')}
+    </div>
+  `;
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getListingRejectedEmail(data: ListingRejectedEmailData): { subject: string; html: string } {
+  const subject = `Your listing needs changes — ${data.listingTitle}`;
+  const preheader = `Update your listing and resubmit for review.`;
+  const origin = tryGetOrigin(data.editUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Listing changes required
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — your listing “${escapeHtml(data.listingTitle)}” needs changes before it can be approved.
+    </div>
+    ${data.reason ? `<div style="margin: 0 0 14px 0; padding: 12px 14px; border: 1px solid #E6E1D6; border-radius: 12px; background: #FBFAF7; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;"><strong style="color:#22251F;">Reason:</strong> ${escapeHtml(data.reason)}</div>` : ''}
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.editUrl, 'Edit and resubmit')}
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };

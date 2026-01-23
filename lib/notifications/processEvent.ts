@@ -383,6 +383,29 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Listing.Approved': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Listing.Approved' }>;
+      return {
+        template: 'listing_approved',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          listingUrl: p.listingUrl,
+        },
+      };
+    }
+    case 'Listing.Rejected': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Listing.Rejected' }>;
+      return {
+        template: 'listing_rejected',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          editUrl: p.editUrl,
+          reason: (p as any).reason || undefined,
+        },
+      };
+    }
     case 'Admin.Listing.Submitted': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Admin.Listing.Submitted' }>;
       return {

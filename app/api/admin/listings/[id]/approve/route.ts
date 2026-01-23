@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { isAdminUid } from '@/app/api/admin/notifications/_admin';
-import { emitEventForUser, emitEventToUsers } from '@/lib/notifications';
+import { emitAndProcessEventForUser, emitEventToUsers } from '@/lib/notifications';
 import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { getSiteUrl } from '@/lib/site-url';
 import { createAuditLog } from '@/lib/audit/logger';
@@ -137,7 +137,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   // Seller notification through canonical pipeline (idempotent).
   try {
     const origin = getSiteUrl();
-    await emitEventForUser({
+    await emitAndProcessEventForUser({
       type: 'Listing.Approved',
       actorId: uid,
       entityType: 'listing',

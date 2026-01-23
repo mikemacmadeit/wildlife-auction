@@ -31,6 +31,8 @@ import {
   getOfferCounteredEmail,
   getOfferDeclinedEmail,
   getOfferExpiredEmail,
+  getListingApprovedEmail,
+  getListingRejectedEmail,
   getAdminListingSubmittedEmail,
   getAdminListingComplianceReviewEmail,
   getAdminListingAdminApprovalEmail,
@@ -61,6 +63,8 @@ import {
   type OfferCounteredEmailData,
   type OfferDeclinedEmailData,
   type OfferExpiredEmailData,
+  type ListingApprovedEmailData,
+  type ListingRejectedEmailData,
   type AdminListingSubmittedEmailData,
   type AdminListingComplianceReviewEmailData,
   type AdminListingAdminApprovalEmailData,
@@ -271,6 +275,19 @@ const offerExpiredSchema = z.object({
   userName: z.string().min(1),
   listingTitle: z.string().min(1),
   offerUrl: urlSchema,
+});
+
+const listingApprovedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  listingUrl: urlSchema,
+});
+
+const listingRejectedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  editUrl: urlSchema,
+  reason: z.string().optional(),
 });
 
 const adminListingSubmittedSchema = z.object({
@@ -718,6 +735,37 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: OfferExpiredEmailData) => {
       const { subject, html } = getOfferExpiredEmail(data);
       return { subject, preheader: `Offer expired`, html };
+    },
+  },
+  {
+    type: 'listing_approved',
+    displayName: 'Seller: Listing Approved',
+    description: 'Sent to the seller when their listing is approved and goes live.',
+    schema: listingApprovedSchema,
+    samplePayload: {
+      userName: 'Jordan',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
+    },
+    render: (data: ListingApprovedEmailData) => {
+      const { subject, html } = getListingApprovedEmail(data);
+      return { subject, preheader: `Your listing is approved`, html };
+    },
+  },
+  {
+    type: 'listing_rejected',
+    displayName: 'Seller: Listing Rejected',
+    description: 'Sent to the seller when their listing is rejected and needs edits.',
+    schema: listingRejectedSchema,
+    samplePayload: {
+      userName: 'Jordan',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      editUrl: 'https://wildlife.exchange/seller/listings/LISTING_123/edit',
+      reason: 'Missing required permit documentation.',
+    },
+    render: (data: ListingRejectedEmailData) => {
+      const { subject, html } = getListingRejectedEmail(data);
+      return { subject, preheader: `Listing changes required`, html };
     },
   },
   {
