@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 
 export function NotificationSettingsDialog(props: {
@@ -33,6 +33,9 @@ export function NotificationSettingsDialog(props: {
       <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Notification settings</DialogTitle>
+          <DialogDescription>
+            Manage your notification preferences for email and push notifications.
+          </DialogDescription>
         </DialogHeader>
         <NotificationPreferencesPanel embedded />
       </DialogContent>

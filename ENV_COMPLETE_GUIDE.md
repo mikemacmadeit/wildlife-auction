@@ -27,6 +27,7 @@ All Firebase keys are prefixed with `NEXT_PUBLIC_` because they're used client-s
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Messaging Sender ID | Same as above |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | App ID | Same as above |
 | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Analytics ID (optional) | Same as above |
+| `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | Web Push VAPID Key (for push notifications) | Firebase Console > Project Settings > Cloud Messaging > Web Push certificates |
 
 ### Stripe (Required for Payments)
 ✅ **Already configured with your live keys**
@@ -55,6 +56,7 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your_vapid_key_here
 ```
 
 ### Stripe Variables
