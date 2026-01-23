@@ -32,6 +32,7 @@ import { db } from '@/lib/firebase/config';
 import type { Message, MessageThread } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { analyzeThreadForModeration } from '@/lib/safety/moderationSignals';
 
 export default function AdminMessagesPage() {
   const MISSING_INDEX_FLAG_KEY = 'we:admin:missing_index:messageThreads_flagged_updatedAt:v1';
@@ -68,9 +69,10 @@ export default function AdminMessagesPage() {
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [adminNote, setAdminNote] = useState('');
-  const [disableReason, setDisableReason] = useState('');
-  const [disableTargetUid, setDisableTargetUid] = useState<string | null>(null);
-  const [disableOpen, setDisableOpen] = useState(false);
+  const [actionReason, setActionReason] = useState('');
+  const [actionTargetUid, setActionTargetUid] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<'mute_messaging' | 'disable_selling'>('mute_messaging');
+  const [actionOpen, setActionOpen] = useState(false);
 
   useEffect(() => {
     if (!adminLoading && isAdmin) {
@@ -257,24 +259,36 @@ export default function AdminMessagesPage() {
     await openThread(activeThread.id);
   };
 
-  const disableUser = async () => {
-    if (!disableTargetUid) return;
-    if (!disableReason.trim()) return;
+  const runUserAction = async () => {
+    if (!actionTargetUid) return;
+    if (!actionReason.trim()) return;
     if (!user) return;
 
     const token = await user.getIdToken();
-    const res = await fetch(`/api/admin/users/${disableTargetUid}/set-disabled`, {
+    const uid = actionTargetUid;
+
+    const endpoint =
+      actionType === 'mute_messaging'
+        ? `/api/admin/users/${uid}/set-messaging-muted`
+        : `/api/admin/users/${uid}/set-selling-disabled`;
+
+    const body =
+      actionType === 'mute_messaging'
+        ? { muted: true, reason: actionReason.trim() }
+        : { disabled: true, reason: actionReason.trim() };
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify({ disabled: true, reason: disableReason.trim() }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data?.message || data?.error || 'Failed to disable user');
+      throw new Error(data?.message || data?.error || 'Action failed');
     }
-    setDisableOpen(false);
-    setDisableReason('');
-    setDisableTargetUid(null);
+    setActionOpen(false);
+    setActionReason('');
+    setActionTargetUid(null);
   };
 
   if (adminLoading || loading) {
@@ -480,6 +494,7 @@ export default function AdminMessagesPage() {
                     <div className="space-y-3">
                       {activeMessages.map((m) => {
                         const isBuyer = m.senderId === activeThread.buyerId;
+                        const detected: any = (m as any)?.detectedViolations;
                         return (
                           <div
                             key={m.id}
@@ -509,7 +524,23 @@ export default function AdminMessagesPage() {
                                   {(m as any).violationCount} violation(s)
                                 </Badge>
                               ) : null}
+                              {detected?.phone ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  Phone
+                                </Badge>
+                              ) : null}
+                              {detected?.email ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  Email
+                                </Badge>
+                              ) : null}
                             </div>
+                            {Array.isArray(detected?.paymentKeywords) && detected.paymentKeywords.length ? (
+                              <div className="mt-2 text-xs text-muted-foreground">
+                                Keywords: <span className="font-semibold">{detected.paymentKeywords.slice(0, 10).join(', ')}</span>
+                                {detected.paymentKeywords.length > 10 ? '…' : ''}
+                              </div>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -519,6 +550,51 @@ export default function AdminMessagesPage() {
 
                 {/* Actions + next steps */}
                 <div className="space-y-4">
+                  {(() => {
+                    const sig = analyzeThreadForModeration(activeThread, activeMessages);
+                    const riskVariant = sig.risk === 'high' ? 'destructive' : sig.risk === 'medium' ? 'secondary' : 'outline';
+                    return (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Signals</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant={riskVariant as any}>
+                              {sig.risk.toUpperCase()} • {sig.score}/100
+                            </Badge>
+                            <Badge variant="outline">{sig.summary}</Badge>
+                            <Badge variant="outline">{sig.totalViolations} violations</Badge>
+                            <Badge variant="outline">{sig.redactedMessages} redacted</Badge>
+                          </div>
+
+                          {sig.paymentKeywords.length ? (
+                            <div>
+                              <div className="text-xs font-semibold text-muted-foreground">Circumvention keywords</div>
+                              <div className="mt-1 text-sm">{sig.paymentKeywords.join(', ')}</div>
+                            </div>
+                          ) : null}
+
+                          {sig.links.length ? (
+                            <div>
+                              <div className="text-xs font-semibold text-muted-foreground">Links</div>
+                              <div className="mt-1 space-y-1">
+                                {sig.links.slice(0, 4).map((u) => (
+                                  <div key={u} className="truncate">
+                                    <a href={u} target="_blank" className="underline underline-offset-4">
+                                      {u}
+                                    </a>
+                                  </div>
+                                ))}
+                                {sig.links.length > 4 ? <div className="text-xs text-muted-foreground">…</div> : null}
+                              </div>
+                            </div>
+                          ) : null}
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Report</CardTitle>
@@ -605,44 +681,72 @@ export default function AdminMessagesPage() {
                           <CheckCircle2 className="h-4 w-4 mr-2" />
                           Resolve
                         </Button>
-                        <AlertDialog open={disableOpen} onOpenChange={setDisableOpen}>
+                        <AlertDialog open={actionOpen} onOpenChange={setActionOpen}>
                           <AlertDialogTrigger asChild>
                             <Button
                               variant="outline"
                               className="border-destructive/40 text-destructive hover:text-destructive"
                               onClick={() => {
-                                // default to disabling the non-reporting party? we don't know reporter; start with seller for now.
-                                setDisableTargetUid(activeThread.sellerId);
-                                setDisableReason('Violation of messaging policy');
+                                setActionType('mute_messaging');
+                                setActionTargetUid(activeThread.sellerId);
+                                setActionReason('Circumvention attempt (off-platform contact/payment)');
                               }}
                             >
                               <UserX className="h-4 w-4 mr-2" />
-                              Disable user…
+                              User action…
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Disable a user</AlertDialogTitle>
+                              <AlertDialogTitle>User action</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This disables sign-in for the selected user. Provide a brief reason for the audit trail.
+                                Apply a targeted restriction (messaging mute / selling disabled). Provide a brief reason for the audit trail.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <div className="space-y-3">
                               <div className="text-sm space-y-1">
+                                <div className="font-semibold">Action</div>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    variant={actionType === 'mute_messaging' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setActionType('mute_messaging')}
+                                  >
+                                    Mute messaging
+                                  </Button>
+                                  <Button
+                                    variant={actionType === 'disable_selling' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setActionType('disable_selling')}
+                                  >
+                                    Disable selling
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="text-sm space-y-1">
                                 <div className="font-semibold">Target</div>
                                 <div className="flex flex-wrap gap-2">
-                                  <Button variant={disableTargetUid === activeThread.buyerId ? 'default' : 'outline'} size="sm" onClick={() => setDisableTargetUid(activeThread.buyerId)}>
+                                  <Button
+                                    variant={actionTargetUid === activeThread.buyerId ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setActionTargetUid(activeThread.buyerId)}
+                                  >
                                     Buyer
                                   </Button>
-                                  <Button variant={disableTargetUid === activeThread.sellerId ? 'default' : 'outline'} size="sm" onClick={() => setDisableTargetUid(activeThread.sellerId)}>
+                                  <Button
+                                    variant={actionTargetUid === activeThread.sellerId ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setActionTargetUid(activeThread.sellerId)}
+                                  >
                                     Seller
                                   </Button>
                                 </div>
-                                <div className="text-xs text-muted-foreground break-all">{disableTargetUid}</div>
+                                <div className="text-xs text-muted-foreground break-all">{actionTargetUid}</div>
                               </div>
                               <div className="space-y-2">
                                 <div className="text-sm font-semibold">Reason</div>
-                                <Textarea value={disableReason} onChange={(e) => setDisableReason(e.target.value)} placeholder="Required (shown in audit logs)" />
+                                <Textarea value={actionReason} onChange={(e) => setActionReason(e.target.value)} placeholder="Required (shown in audit logs)" />
                               </div>
                             </div>
                             <AlertDialogFooter>
@@ -650,13 +754,14 @@ export default function AdminMessagesPage() {
                               <AlertDialogAction
                                 onClick={async () => {
                                   try {
-                                    await disableUser();
+                                    await runUserAction();
                                   } catch (e: any) {
                                     console.error(e);
                                   }
                                 }}
+                                disabled={!actionTargetUid || !actionReason.trim()}
                               >
-                                Disable
+                                Confirm
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
