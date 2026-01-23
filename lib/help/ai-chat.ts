@@ -233,7 +233,7 @@ TONE EXAMPLES:
 Knowledge Base Articles:
 ${kbContext}
 
-QUESTION CONTEXT: ${questionContext}
+QUESTION CONTEXT: ${questionContext}`;
 
     const userPrompt = `User Question: ${options.userMessage}
 
