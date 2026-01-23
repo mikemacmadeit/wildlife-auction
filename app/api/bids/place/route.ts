@@ -14,7 +14,8 @@ import { checkRateLimitByKey, rateLimitMiddleware, RATE_LIMITS } from '@/lib/rat
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
-import { emitEventForUser } from '@/lib/notifications';
+import { emitAndProcessEventForUser, emitEventForUser } from '@/lib/notifications';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib/auctions/proxyBidding';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
@@ -420,9 +421,22 @@ export async function POST(request: Request) {
         });
       }
 
+      // Best-effort: attempt to dispatch bidder/outbid emails immediately (do NOT block bids on send failures).
+      const trySendEmailJob = async (eventId: string) => {
+        try {
+          // Keep this bounded: if email sending is slow, don't slow bidding.
+          await Promise.race([
+            tryDispatchEmailJobNow({ db: db as any, jobId: eventId }),
+            new Promise((resolve) => setTimeout(resolve, 1200)),
+          ]);
+        } catch {
+          // ignore
+        }
+      };
+
       // Previous high bidder: outbid (only if high bidder changed)
       if (prevBidderId && newBidderId && prevBidderId !== newBidderId) {
-        await emitEventForUser({
+        const outbidRes = await emitAndProcessEventForUser({
           type: 'Auction.Outbid',
           actorId: bidderId,
           entityType: 'listing',
@@ -439,11 +453,12 @@ export async function POST(request: Request) {
           },
           optionalHash: `bid:${result.bidId}`,
         });
+        if (outbidRes?.created) void trySendEmailJob(outbidRes.eventId);
       }
 
       // Bidder: winning vs immediately surpassed.
       if (newBidderId !== bidderId) {
-        await emitEventForUser({
+        const immediateOutbidRes = await emitAndProcessEventForUser({
           type: 'Auction.Outbid',
           actorId: bidderId,
           entityType: 'listing',
@@ -460,8 +475,9 @@ export async function POST(request: Request) {
           },
           optionalHash: `bid:${result.bidId}:immediate`,
         });
+        if (immediateOutbidRes?.created) void trySendEmailJob(immediateOutbidRes.eventId);
       } else {
-        await emitEventForUser({
+        const highBidderRes = await emitAndProcessEventForUser({
           type: 'Auction.HighBidder',
           actorId: bidderId,
           entityType: 'listing',
@@ -480,6 +496,7 @@ export async function POST(request: Request) {
           },
           optionalHash: `bid:${result.bidId}`,
         });
+        if (highBidderRes?.created) void trySendEmailJob(highBidderRes.eventId);
       }
     }
 

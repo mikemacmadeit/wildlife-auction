@@ -95,7 +95,8 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         channels: ['inApp', 'push', 'email'],
         dedupeWindowMs: 1000 * 60 * 5,
         rateLimitPerUser: { push: { perHour: 12, perDay: 50 }, email: { perHour: 4, perDay: 12 } },
-        allowDuringQuietHours: false,
+        // Bidding is time-sensitive; do not delay these during quiet hours.
+        allowDuringQuietHours: true,
       };
     case 'Auction.Outbid':
       return {
@@ -104,7 +105,8 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         channels: ['inApp', 'push', 'email'],
         dedupeWindowMs: 1000 * 60 * 2,
         rateLimitPerUser: { push: { perHour: 20, perDay: 80 }, email: { perHour: 6, perDay: 18 } },
-        allowDuringQuietHours: false,
+        // Bidding is time-sensitive; do not delay these during quiet hours.
+        allowDuringQuietHours: true,
       };
     case 'Auction.EndingSoon': {
       const threshold = (payload as any)?.threshold as string | undefined;
