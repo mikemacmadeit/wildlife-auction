@@ -180,7 +180,7 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         optionalHash: `offer:${offerId}:counter:${result.expiresAtIso}`,
       });
       if (ev?.ok && typeof ev?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
       }
     } catch {
       // best-effort

@@ -134,7 +134,7 @@ const baseHandler: Handler = async () => {
         queuedWon++;
         // Best-effort: dispatch the winner email immediately (critical UX), without relying on schedulers.
         if (won?.ok && won.created) {
-          void tryDispatchEmailJobNow({ db: db as any, jobId: won.eventId }).catch(() => {});
+          void tryDispatchEmailJobNow({ db: db as any, jobId: won.eventId, waitForJob: true }).catch(() => {});
         }
 
         // Losers

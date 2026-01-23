@@ -128,7 +128,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       });
       if (ev?.ok && ev.created) {
         // Best-effort: don't rely on schedulers for order timeline emails.
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
       }
     } catch (e) {
       console.error('Error emitting Order.Preparing notification event:', e);

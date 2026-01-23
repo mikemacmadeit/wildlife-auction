@@ -141,13 +141,13 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
               TPWD Breeder Permit
             </CardTitle>
             <CardDescription>
-              Upload your breeder permit. Admin will review and (if approved) you’ll receive a badge shown on your profile and listings.
-              {showDismissHint ? (
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Not a breeder or don’t plan to list whitetails? You can exit out of this box (click the X in the corner).
-                </div>
-              ) : null}
+              Upload your breeder permit. Admin will review and (if approved) you'll receive a badge shown on your profile and listings.
             </CardDescription>
+            {showDismissHint ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Not a breeder or don't plan to list whitetails? You can exit out of this box (click the X in the corner).
+              </p>
+            ) : null}
           </div>
           {permit?.status ? (
             <Badge variant={statusBadgeVariant(permit.status) as any} className="capitalize">

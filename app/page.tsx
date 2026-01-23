@@ -1436,7 +1436,7 @@ export default function HomePage() {
                   <CardContent className="p-0">
                     <div className="relative h-56 sm:h-72 bg-muted">
                       {fieldNotesFeatured.coverImage ? (
-                        <Image src={fieldNotesFeatured.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.02]" />
+                        <Image src={fieldNotesFeatured.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.02]" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" />
                       ) : null}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-5">

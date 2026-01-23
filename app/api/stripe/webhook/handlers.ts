@@ -789,7 +789,7 @@ export async function handleCheckoutSessionCompleted(
           optionalHash: `checkout:${checkoutSessionId}`,
         });
         if (ev?.ok && ev.created) {
-          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
         }
       }
 
@@ -811,7 +811,7 @@ export async function handleCheckoutSessionCompleted(
           optionalHash: `checkout:${checkoutSessionId}`,
         });
         if (ev?.ok && ev.created) {
-          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
         }
       }
     } catch (notifError) {

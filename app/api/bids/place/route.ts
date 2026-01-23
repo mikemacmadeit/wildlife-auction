@@ -424,10 +424,11 @@ export async function POST(request: Request) {
       // Best-effort: attempt to dispatch bidder/outbid emails immediately (do NOT block bids on send failures).
       const trySendEmailJob = async (eventId: string) => {
         try {
+          // Wait for job to be created and bypass deliverAfterAt delay for immediate dispatch
           // Keep this bounded: if email sending is slow, don't slow bidding.
           await Promise.race([
-            tryDispatchEmailJobNow({ db: db as any, jobId: eventId }),
-            new Promise((resolve) => setTimeout(resolve, 1200)),
+            tryDispatchEmailJobNow({ db: db as any, jobId: eventId, waitForJob: true }),
+            new Promise((resolve) => setTimeout(resolve, 3000)), // Increased timeout to allow job creation
           ]);
         } catch {
           // ignore

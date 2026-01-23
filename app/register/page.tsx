@@ -13,8 +13,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
-import { createUserDocument } from '@/lib/firebase/users';
+import { createUserDocument, getUserProfile } from '@/lib/firebase/users';
 import { getIdToken } from '@/lib/firebase/auth-helper';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { 
   User, 
   Mail, 
@@ -75,39 +76,32 @@ export default function RegisterPage() {
       .then((result) => {
         if (result?.user) {
           createUserDocument(result.user)
-            .then(() => {
-              // If the user accepted terms before redirecting to Google, record acceptance server-side now.
-              (async () => {
-                try {
-                  const agreed =
-                    typeof window !== 'undefined' && window.sessionStorage.getItem('we_agreed_terms') === '1';
-                  if (!agreed) {
-                    router.push('/legal/accept?next=/dashboard');
-                    return;
-                  }
-                  window.sessionStorage.removeItem('we_agreed_terms');
+            .then(async () => {
+              // Check if user has accepted terms by checking their profile
+              try {
+                const profile = await getUserProfile(result.user.uid);
+                const requiredVersion = LEGAL_VERSIONS.tos.version;
+                const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
 
-                  const token = await getIdToken(result.user, true);
-                  await fetch('/api/legal/accept', {
-                    method: 'POST',
-                    headers: {
-                      'content-type': 'application/json',
-                      authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                      docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
-                    }),
-                  });
-                } catch {
-                  // If acceptance write fails, RequireAuth gate will force acceptance later.
+                if (!hasAcceptedTerms) {
+                  // User hasn't accepted terms - redirect to acceptance page
+                  const nextUrl = getRedirectPath();
+                  router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+                  return;
                 }
-              })();
 
-              toast({
-                title: 'Welcome to Wildlife Exchange!',
-                description: 'Your account has been created successfully with Google.',
-              });
-              router.push(getRedirectPath());
+                // User has accepted terms - proceed normally
+                toast({
+                  title: 'Welcome to Wildlife Exchange!',
+                  description: 'Your account has been created successfully with Google.',
+                });
+                router.push(getRedirectPath());
+              } catch (error) {
+                console.error('Error checking user profile after Google redirect:', error);
+                // If we can't check profile, redirect to terms acceptance to be safe
+                const nextUrl = getRedirectPath();
+                router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+              }
             })
             .catch((error) => {
               console.error('Error creating user document after Google redirect:', error);
@@ -271,48 +265,42 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      if (!formData.agreeToTerms) {
-        toast({
-          title: 'Terms required',
-          description: 'You must agree to the Terms of Service and Marketplace Policies to create an account.',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-      try {
-        // Persist across Google redirect.
-        sessionStorage.setItem('we_agreed_terms', '1');
-      } catch {}
-
+      // No terms check here - allow Google sign up to proceed
+      // Terms acceptance will be required after sign up completes
       const userCredential = await signInWithGoogle();
 
       // Create user document in Firestore if it doesn't exist
       if (userCredential.user) {
         await createUserDocument(userCredential.user);
 
-        // Record legal acceptance server-side (best-effort; for redirect flows, see useEffect above).
+        // Check if user has accepted terms by checking their profile
         try {
-          const token = await getIdToken(userCredential.user, true);
-          await fetch('/api/legal/accept', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
-            }),
+          const profile = await getUserProfile(userCredential.user.uid);
+          const requiredVersion = LEGAL_VERSIONS.tos.version;
+          const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
+
+          if (!hasAcceptedTerms) {
+            // User hasn't accepted terms - redirect to acceptance page
+            const nextUrl = getRedirectPath();
+            router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+            setIsLoading(false);
+            return;
+          }
+
+          // User has accepted terms - proceed normally
+          toast({
+            title: 'Welcome to Wildlife Exchange!',
+            description: 'Your account has been created successfully.',
           });
-        } catch {}
 
-        toast({
-          title: 'Welcome to Wildlife Exchange!',
-          description: 'Your account has been created successfully.',
-        });
-
-        // Redirect to saved path or dashboard after successful registration
-        router.push(getRedirectPath());
+          // Redirect to saved path or dashboard after successful registration
+          router.push(getRedirectPath());
+        } catch (error) {
+          console.error('Error checking user profile after Google sign up:', error);
+          // If we can't check profile, redirect to terms acceptance to be safe
+          const nextUrl = getRedirectPath();
+          router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+        }
       }
     } catch (error: any) {
       // Don't show error if redirect was initiated (page will reload)

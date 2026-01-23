@@ -335,7 +335,7 @@ export async function POST(request: Request) {
           });
           // Best-effort: send the queued email job immediately (avoids relying on schedulers for time-sensitive offers).
           if (ev?.ok && typeof ev?.eventId === 'string') {
-            void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+            void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
           }
         }
       }

@@ -1435,28 +1435,33 @@ export default function BrowsePage() {
                 </div>
 
                 {/* Desktop/tablet: respect view mode */}
-                <div
-                  className={cn(
-                    'hidden md:block w-full',
-                    viewMode === 'card'
-                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6'
-                      : 'space-y-4'
-                  )}
-                >
-                  <AnimatePresence>
-                    {sortedListings.map((listing) =>
-                      viewMode === 'card' ? (
-                        listing.featured ? (
-                          <FeaturedListingCard key={listing.id} listing={listing} />
-                        ) : (
-                          <ListingCard key={listing.id} listing={listing} />
-                        )
-                      ) : (
+                {viewMode === 'card' ? (
+                  <div className="hidden md:block w-full">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-fr">
+                      <AnimatePresence>
+                        {sortedListings.map((listing) =>
+                          listing.featured ? (
+                            <div key={listing.id} className="min-w-0">
+                              <FeaturedListingCard listing={listing} />
+                            </div>
+                          ) : (
+                            <div key={listing.id} className="min-w-0">
+                              <ListingCard listing={listing} />
+                            </div>
+                          )
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="hidden md:block w-full space-y-4">
+                    <AnimatePresence>
+                      {sortedListings.map((listing) => (
                         <ListItem key={listing.id} listing={listing} />
-                      )
-                    )}
-                  </AnimatePresence>
-                </div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
                 
                 {/* Load More Button */}
                 {hasMore && (

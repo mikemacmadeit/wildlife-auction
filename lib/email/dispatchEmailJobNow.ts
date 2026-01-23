@@ -19,11 +19,23 @@ import { sendEmailHtml } from './sender';
 export async function tryDispatchEmailJobNow(params: {
   db: Firestore;
   jobId: string;
+  waitForJob?: boolean; // If true, wait up to 2s for job to be created
 }): Promise<{ ok: true; sent: boolean; messageId?: string } | { ok: false; error: string }> {
   const jobId = String(params.jobId || '').trim();
   if (!jobId) return { ok: false, error: 'Missing jobId' };
 
   const ref = params.db.collection('emailJobs').doc(jobId);
+
+  // If waitForJob is true, wait up to 2 seconds for the job to be created
+  if (params.waitForJob) {
+    const maxWait = 2000; // 2 seconds
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWait) {
+      const snap = await ref.get();
+      if (snap.exists) break;
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
+    }
+  }
 
   let job: any | null = null;
   try {
@@ -37,16 +49,20 @@ export async function tryDispatchEmailJobNow(params: {
       job = { id: snap.id, ...(cur || {}) };
       if (cur?.status !== 'queued') return; // already sent/processing/failed/skipped
 
+      // For immediate dispatch, always clear deliverAfterAt to bypass any delays
       const attempts = Number(cur?.attempts || 0);
-      tx.set(
-        ref,
-        {
-          status: 'processing',
-          attempts: attempts + 1,
-          lastAttemptAt: Timestamp.now(),
-        },
-        { merge: true }
-      );
+      const updateData: any = {
+        status: 'processing',
+        attempts: attempts + 1,
+        lastAttemptAt: Timestamp.now(),
+      };
+      
+      // Clear deliverAfterAt if it exists (allows immediate sending even if escalation delay was set)
+      if (cur.deliverAfterAt) {
+        updateData.deliverAfterAt = FieldValue.delete();
+      }
+      
+      tx.set(ref, updateData, { merge: true });
       job = { ...job, status: 'processing', attempts: attempts + 1, lastAttemptAt: Timestamp.now() };
     });
   } catch (e: any) {

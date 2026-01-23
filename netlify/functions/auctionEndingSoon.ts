@@ -10,7 +10,7 @@
 import { Handler, schedule } from '@netlify/functions';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '../../lib/firebase/admin';
-import { emitEventForUser } from '../../lib/notifications/emitEvent';
+import { emitAndProcessEventForUser } from '../../lib/notifications/emitEvent';
 import { getSiteUrl } from '../../lib/site-url';
 import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
 
@@ -106,7 +106,7 @@ const baseHandler: Handler = async () => {
 
       for (const threshold of matches) {
         for (const uid of Array.from(targets)) {
-          const res = await emitEventForUser({
+          const res = await emitAndProcessEventForUser({
             type: 'Auction.EndingSoon',
             actorId: null,
             entityType: 'listing',

@@ -129,7 +129,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
         optionalHash: `in_transit:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
       }
     } catch (e) {
       console.error('Error emitting Order.InTransit notification event:', e);

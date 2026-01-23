@@ -181,10 +181,10 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       });
 
       if (evBuyer?.ok && typeof evBuyer?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: evBuyer.eventId }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: evBuyer.eventId, waitForJob: true }).catch(() => {});
       }
       if (evSeller?.ok && typeof evSeller?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: evSeller.eventId }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: evSeller.eventId, waitForJob: true }).catch(() => {});
       }
     } catch {
       // best-effort

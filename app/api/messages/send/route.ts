@@ -322,8 +322,8 @@ export async function POST(request: Request) {
         // Keep this bounded so messaging stays responsive.
         try {
           await Promise.race([
-            tryDispatchEmailJobNow({ db: db as any, jobId: emitRes.eventId }),
-            new Promise((resolve) => setTimeout(resolve, 1500)),
+            tryDispatchEmailJobNow({ db: db as any, jobId: emitRes.eventId, waitForJob: true }),
+            new Promise((resolve) => setTimeout(resolve, 3000)), // Increased timeout to allow job creation
           ]);
         } catch {
           // ignore

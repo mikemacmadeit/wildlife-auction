@@ -195,7 +195,7 @@ export async function POST(
         optionalHash: `delivery:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
       }
     } catch (emailError) {
       // Don't fail the confirmation if email fails

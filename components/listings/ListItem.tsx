@@ -431,6 +431,7 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                           height={32}
                           className="h-8 w-8 object-cover"
                           quality={75}
+                          unoptimized
                         />
                       ) : (
                         <span className="text-xs font-bold text-muted-foreground">
