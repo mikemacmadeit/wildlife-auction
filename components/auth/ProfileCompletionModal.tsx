@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -147,7 +147,7 @@ export function ProfileCompletionModal({
   };
 
   return (
-    <>
+    <React.Fragment>
       <Dialog open={open} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -467,6 +467,6 @@ export function ProfileCompletionModal({
         }}
         />
       )}
-    </>
+    </React.Fragment>
   );
 }
