@@ -338,11 +338,197 @@ export default function MessagesPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
+          {/* Mobile: keep both panes mounted and slide between them for smoothness */}
+          <div className="lg:hidden relative overflow-hidden h-[calc(100dvh-220px)] min-h-0">
+            {/* Inbox pane */}
+            <Card
+              className={cn(
+                'absolute inset-0 flex flex-col min-h-0 transition-transform duration-200 ease-out will-change-transform',
+                selectedThreadId ? '-translate-x-full' : 'translate-x-0'
+              )}
+            >
+              <CardHeader className="pb-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-lg font-bold">Inbox</CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {inboxItems.reduce((sum, x) => sum + (x.unread || 0), 0)} unread
+                  </Badge>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search people, listings, messages..."
+                    className="pl-9"
+                  />
+                </div>
+                <Tabs value={inboxTab} onValueChange={(v) => setInboxTab(v as any)}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
+                    <TabsTrigger value="unread" className="flex-1">Unread</TabsTrigger>
+                    <TabsTrigger value="archived" className="flex-1">Archived</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 min-h-0">
+                {inboxItems.length === 0 ? (
+                  <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
+                ) : (
+                  <ScrollArea className="h-full">
+                    <div className="divide-y divide-border/50 pr-3">
+                      {inboxItems.map((item) => {
+                        const active = selectedThreadId === item.id || thread?.id === item.id;
+                        const updatedAt = item.updatedAtMs ? new Date(item.updatedAtMs) : null;
+                        return (
+                          <div
+                            key={item.id}
+                            className={cn('group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors', active && 'bg-muted/40')}
+                          >
+                            <div className="grid grid-cols-[48px_1fr_116px_44px] gap-3 items-start min-w-0">
+                              <button
+                                onClick={() => {
+                                  setSelectedThreadId(item.id);
+                                  router.replace(`/dashboard/messages?threadId=${item.id}`);
+                                }}
+                                className="contents text-left"
+                              >
+                                <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted">
+                                  {item.listingImageUrl ? (
+                                    <Image src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                                      <MessageSquare className="h-5 w-5" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Avatar className="h-6 w-6 shrink-0">
+                                      <AvatarImage src={item.otherAvatar} />
+                                      <AvatarFallback>{String(item.otherName || 'U').slice(0, 2).toUpperCase()}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0 flex-1 text-sm font-semibold truncate leading-5">{item.otherName}</div>
+                                    {item.archived ? (
+                                      <Badge variant="outline" className="text-[10px] shrink-0">
+                                        Archived
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">{item.listingTitle}</div>
+                                  {item.lastMessagePreview ? (
+                                    <div className="text-xs text-muted-foreground line-clamp-2 mt-2">{item.lastMessagePreview}</div>
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0 text-right">
+                                  <div className="text-[11px] text-muted-foreground whitespace-normal leading-tight">
+                                    {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: true }) : ''}
+                                  </div>
+                                  {item.unread > 0 ? (
+                                    <div className="mt-1 flex justify-end">
+                                      <Badge variant="destructive" className="h-5 px-2 text-xs font-semibold">
+                                        {item.unread}
+                                      </Badge>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-11 w-11 opacity-60 hover:opacity-100">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      if (!user?.uid) return;
+                                      try {
+                                        await markThreadAsRead(item.id, user.uid);
+                                      } catch {}
+                                    }}
+                                  >
+                                    <CheckCheck className="h-4 w-4 mr-2" />
+                                    Mark read
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      try {
+                                        await setThreadArchived(item.id, !item.archived);
+                                      } catch (e: any) {
+                                        toast({ title: 'Error', description: e?.message || 'Failed to update thread', variant: 'destructive' });
+                                      }
+                                    }}
+                                  >
+                                    {item.archived ? (
+                                      <>
+                                        <Inbox className="h-4 w-4 mr-2" /> Unarchive
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Archive className="h-4 w-4 mr-2" /> Archive
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Thread pane */}
+            <Card
+              className={cn(
+                'absolute inset-0 flex flex-col overflow-hidden min-h-0 transition-transform duration-200 ease-out will-change-transform',
+                selectedThreadId ? 'translate-x-0' : 'translate-x-full'
+              )}
+            >
+              <div className="border-b p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedThreadId(null);
+                    router.replace('/dashboard/messages');
+                  }}
+                >
+                  <Inbox className="h-4 w-4 mr-2" />
+                  Inbox
+                </Button>
+              </div>
+              {!thread ? (
+                <CardContent className="pt-12 pb-12 text-center">
+                  <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50" />
+                  <div className="font-semibold">Select a conversation</div>
+                  <div className="text-sm text-muted-foreground mt-1">Choose a thread from the inbox.</div>
+                </CardContent>
+              ) : (
+                <div className="flex-1 min-h-0">
+                  <MessageThreadComponent
+                    // Keep component mounted while sliding; don't key by thread.id on mobile.
+                    thread={thread}
+                    listingTitle={listing?.title || 'Listing'}
+                    listing={listing}
+                    otherPartyName={otherPartyName}
+                    otherPartyAvatar={otherPartyAvatar}
+                    orderStatus={orderStatus}
+                  />
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Desktop: original two-pane layout */}
           <Card
             className={cn(
-              'h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex flex-col min-h-0',
-              // Mobile: when a thread is selected, show thread view full-screen.
-              selectedThreadId ? 'hidden lg:flex' : 'flex'
+              'hidden lg:flex h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex-col min-h-0'
             )}
           >
             <CardHeader className="pb-3 space-y-3">
@@ -509,7 +695,6 @@ export default function MessagesPage() {
                     size="sm"
                     onClick={() => {
                       setSelectedThreadId(null);
-                      setThread(null);
                       router.replace('/dashboard/messages');
                     }}
                   >
