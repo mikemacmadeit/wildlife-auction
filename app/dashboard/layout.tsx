@@ -124,6 +124,7 @@ export default function DashboardLayout({
   const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
   const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+  const [unreadSupportTicketsCount, setUnreadSupportTicketsCount] = useState<number>(0);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
   const [navPrefsLoaded, setNavPrefsLoaded] = useState(false);
@@ -155,10 +156,20 @@ export default function DashboardLayout({
     void markNotificationsAsReadByTypes(user.uid, ['message_received']);
   }, [pathname, user?.uid]);
 
+  // Clear the Support badge when the admin views the Support page.
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!pathname?.startsWith('/dashboard/admin/support')) return;
+    void markNotificationsAsReadByTypes(user.uid, ['Admin.Support.TicketSubmitted' as any]);
+  }, [pathname, user?.uid]);
+
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
       if (item.href === '/dashboard/admin/listings') {
         return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
+      }
+      if (item.href === '/dashboard/admin/support') {
+        return { ...item, badge: unreadSupportTicketsCount > 0 ? unreadSupportTicketsCount : undefined };
       }
       // Admin notifications page is a TEST page, not a real notifications inbox
       // So we don't show a badge for it
@@ -171,7 +182,7 @@ export default function DashboardLayout({
       // }
       return item;
     });
-  }, [pendingApprovalsCount]);
+  }, [pendingApprovalsCount, unreadSupportTicketsCount]);
 
   // Real-time badges (unread messages/notifications + pending approvals)
   useEffect(() => {
@@ -181,6 +192,7 @@ export default function DashboardLayout({
       setUnreadOffersCount(0);
       setUnreadAdminNotificationsCount(0);
       setPendingApprovalsCount(0);
+      setUnreadSupportTicketsCount(0);
       return;
     }
 
@@ -243,6 +255,20 @@ export default function DashboardLayout({
       );
     } catch (e) {
       console.error('Failed to subscribe to unread offer notifications count:', e);
+    }
+
+    // 1e) Admin Support badge: unread support ticket notifications
+    if (showAdminNav) {
+      try {
+        // Use the notification type string directly (stored as event type)
+        unsubs.push(
+          subscribeToUnreadCountByType(user.uid, 'Admin.Support.TicketSubmitted' as any, (count) => {
+            setUnreadSupportTicketsCount(count || 0);
+          })
+        );
+      } catch (e) {
+        console.error('Failed to subscribe to unread support tickets count:', e);
+      }
     }
 
     // 2) Admin badge: pending listing approvals (drops as listings are approved/rejected)

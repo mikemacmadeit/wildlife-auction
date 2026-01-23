@@ -315,6 +315,15 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     reason: baseString,
     adminOpsUrl: urlSchema,
   }),
+  z.object({
+    type: z.literal('Admin.Support.TicketSubmitted'),
+    ticketId: baseString,
+    subject: baseString,
+    userId: baseString,
+    userName: baseString,
+    category: z.string().optional(),
+    adminSupportUrl: urlSchema,
+  }),
 ]);
 
 export const notificationEventTypeSchema = z.enum(NOTIFICATION_EVENT_TYPES);

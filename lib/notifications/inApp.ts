@@ -442,10 +442,22 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'admin_dispute_opened',
         title: 'Dispute opened',
-        body: p.listingTitle ? `Dispute opened for “${p.listingTitle}”.` : `A dispute was opened on an order.`,
+        body: p.listingTitle ? `Dispute opened for "${p.listingTitle}".` : `A dispute was opened on an order.`,
         deepLinkUrl: p.adminOpsUrl,
         linkLabel: 'Open admin',
         metadata: { orderId: p.orderId, buyerId: p.buyerId, disputeType: p.disputeType, reason: p.reason },
+      };
+    }
+    case 'Admin.Support.TicketSubmitted': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Support.TicketSubmitted' }>;
+      return {
+        ...base,
+        type: 'Admin.Support.TicketSubmitted',
+        title: 'New support ticket',
+        body: `${p.userName} submitted: "${p.subject}"`,
+        deepLinkUrl: p.adminSupportUrl,
+        linkLabel: 'Open support',
+        metadata: { ticketId: p.ticketId, userId: p.userId, category: p.category || null },
       };
     }
     case 'Auction.BidReceived': {

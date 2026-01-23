@@ -200,6 +200,36 @@ export async function POST(request: Request) {
     { merge: true }
   );
 
+  // Notify admins (email + in-app). Non-blocking.
+  try {
+    const { listAdminRecipientUids } = await import('@/lib/admin/adminRecipients');
+    const { emitEventToUsers } = await import('@/lib/notifications/emitEvent');
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://wildlife.exchange';
+    const adminUids = await listAdminRecipientUids(db as any);
+    if (adminUids.length > 0) {
+      await emitEventToUsers({
+        type: 'Admin.Support.TicketSubmitted',
+        actorId: uid,
+        entityType: 'system',
+        entityId: docRef.id,
+        targetUserIds: adminUids,
+        payload: {
+          type: 'Admin.Support.TicketSubmitted',
+          ticketId: docRef.id,
+          subject: parsed.data.subject,
+          userId: uid,
+          userName: name,
+          category: parsed.data.category || 'other',
+          adminSupportUrl: `${origin}/dashboard/admin/support`,
+        },
+        optionalHash: `admin_support_ticket:${docRef.id}`,
+      });
+    }
+  } catch (e: any) {
+    // Log but don't fail ticket creation
+    console.error('[Support Ticket] Failed to notify admins:', e);
+  }
+
   return json({ ok: true, ticketId: docRef.id }, { status: 201 });
 }
 

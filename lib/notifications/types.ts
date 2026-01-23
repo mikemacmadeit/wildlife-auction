@@ -60,6 +60,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Admin.Listing.Rejected',
   'Admin.Order.DisputeOpened',
   'Admin.BreederPermit.Submitted',
+  'Admin.Support.TicketSubmitted',
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -372,6 +373,15 @@ export type NotificationEventPayload =
       storagePath: string;
       documentUrl?: string | null;
       adminComplianceUrl: string;
+    }
+  | {
+      type: 'Admin.Support.TicketSubmitted';
+      ticketId: string;
+      subject: string;
+      userId: string;
+      userName: string;
+      category?: string;
+      adminSupportUrl: string;
     };
 
 // ------------------------
