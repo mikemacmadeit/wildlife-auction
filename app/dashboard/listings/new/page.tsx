@@ -499,8 +499,8 @@ function NewListingPageContent() {
                   e.preventDefault();
                   if (!canSelectWhitetail) {
                     toast({
-                      title: 'TPWD permit required',
-                      description: 'Submit your TPWD breeder permit (Seller Overview) and wait for verification to enable Whitetail listings.',
+                      title: 'TPWD Required',
+                      description: 'Upload and verify your TPWD breeder permit to create Whitetail listings.',
                     });
                     return;
                   }
@@ -521,8 +521,8 @@ function NewListingPageContent() {
               onClick={() => {
                 if (!canSelectWhitetail) {
                   toast({
-                    title: 'TPWD permit required',
-                    description: 'Submit your TPWD breeder permit (Seller Overview) and wait for verification to enable Whitetail listings.',
+                    title: 'TPWD Required',
+                    description: 'Upload and verify your TPWD breeder permit to create Whitetail listings.',
                   });
                   return;
                 }
@@ -568,23 +568,9 @@ function NewListingPageContent() {
                         variant="outline"
                         className="text-[11px] whitespace-nowrap px-2"
                       >
-                        TPWD PERMIT REQUIRED
+                        TPWD REQUIRED
                       </Badge>
-                      {!canSelectWhitetail ? (
-                        <Badge variant="secondary" className="text-[11px] capitalize">
-                          {whitetailPermitStatus || 'not submitted'}
-                        </Badge>
-                      ) : null}
                     </div>
-                    {!canSelectWhitetail ? (
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {whitetailPermitStatus === 'pending'
-                          ? 'Permit submitted — waiting on verification.'
-                          : whitetailPermitStatus === 'rejected'
-                            ? 'Permit rejected — resubmit in Seller Overview.'
-                            : 'Submit your TPWD breeder permit in Seller Overview to unlock.'}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               </CardContent>
