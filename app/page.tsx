@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
