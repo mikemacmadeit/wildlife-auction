@@ -48,7 +48,8 @@ export function SiteGateOverlay() {
                   setError(data?.error || 'Invalid password');
                   return;
                 }
-                window.location.reload();
+                // Redirect to home to force fresh server render with cookie
+                window.location.href = '/';
               } catch (e: any) {
                 setError(e?.message || 'Failed to sign in');
               } finally {
