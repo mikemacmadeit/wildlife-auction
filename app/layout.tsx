@@ -95,7 +95,9 @@ export default function RootLayout({
   const gateEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
   const gatePassword = String(process.env.SITE_GATE_PASSWORD || '').trim();
   const gateToken = String(process.env.SITE_GATE_TOKEN || '').trim() || (gatePassword ? `pw:${gatePassword}` : '');
-  const gateCookie = cookies().get('we:site_gate:v1')?.value || '';
+  const gateCookieRaw = cookies().get('we:site_gate:v1')?.value || '';
+  // Decode the cookie value since it's URL encoded when set
+  const gateCookie = gateCookieRaw ? decodeURIComponent(gateCookieRaw) : '';
   const gateAllowed = !gateEnabled || (gateToken && gateCookie === gateToken);
 
   return (

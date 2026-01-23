@@ -43,8 +43,30 @@ export async function POST(req: Request) {
   const password = String(body?.password || '').trim();
   const next = String(body?.next || '/').trim() || '/';
 
-  if (!password || password !== passwordEnv) {
-    return json({ error: 'Invalid password' }, { status: 401 });
+  // Debug logging (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Site Gate] Password check:', {
+      provided: password ? `${password.substring(0, 2)}***` : '(empty)',
+      expectedLength: passwordEnv.length,
+      match: password === passwordEnv,
+    });
+  }
+
+  if (!password) {
+    return json({ error: 'Password is required' }, { status: 401 });
+  }
+
+  if (password !== passwordEnv) {
+    return json({ 
+      error: 'Invalid password. Please check your password and try again.',
+      // Only show debug info in development
+      ...(process.env.NODE_ENV !== 'production' ? { 
+        debug: {
+          providedLength: password.length,
+          expectedLength: passwordEnv.length,
+        }
+      } : {})
+    }, { status: 401 });
   }
 
   // httpOnly cookie so it’s not readable by JS.
