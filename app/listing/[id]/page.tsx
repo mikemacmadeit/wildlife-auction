@@ -927,7 +927,7 @@ export default function ListingDetailPage() {
                   className={cn('h-10 w-10', isFavorite(listing!.id) && 'text-destructive border-destructive')}
                   title={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
                 >
-                  <Heart className={cn('h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
+                  <Heart className={cn('h-4 w-4 transition-colors duration-200', isFavorite(listing!.id) && 'fill-current')} />
                 </Button>
               </div>
             </div>
@@ -1749,7 +1749,7 @@ export default function ListingDetailPage() {
                     onClick={handleAddToWatchlist}
                     className={cn('w-full', isFavorite(listing!.id) && 'border-destructive text-destructive')}
                   >
-                    <Heart className={cn('mr-2 h-4 w-4', isFavorite(listing!.id) && 'fill-current')} />
+                    <Heart className={cn('mr-2 h-4 w-4 transition-colors duration-200', isFavorite(listing!.id) && 'fill-current')} />
                     {isFavorite(listing!.id) ? 'Watching' : 'Watch This Listing'}
                   </Button>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFavorites } from '@/hooks/use-favorites';
@@ -26,8 +26,9 @@ export function FavoriteButton({
   const { isFavorite, isPending, toggleFavorite } = useFavorites();
   const { toast } = useToast();
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
-  const isFavorited = isFavorite(listingId);
-  const pending = isPending(listingId);
+  // Memoize to prevent unnecessary re-renders
+  const isFavorited = useMemo(() => isFavorite(listingId), [isFavorite, listingId]);
+  const pending = useMemo(() => isPending(listingId), [isPending, listingId]);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -96,7 +97,7 @@ export function FavoriteButton({
         )}
         aria-label={isFavorited ? 'Remove from watchlist' : 'Add to watchlist'}
       >
-        <Heart className={cn('h-5 w-5 transition-all', isFavorited && 'fill-primary text-primary')} />
+        <Heart className={cn('h-5 w-5 transition-colors duration-200', isFavorited && 'fill-primary text-primary')} />
       </Button>
 
       <AuthPromptModal
