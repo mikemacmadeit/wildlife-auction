@@ -53,12 +53,9 @@ export async function POST(req: Request) {
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    // Use Secure in production so cookie only travels over HTTPS.
-    process.env.NODE_ENV === 'production' ? 'Secure' : '',
-    // 7 days
+    'Secure',
     `Max-Age=${7 * 24 * 60 * 60}`,
   ]
-    .filter(Boolean)
     .join('; ');
 
   return json(
