@@ -171,11 +171,13 @@ export default function SellerOverviewPage() {
   const [dashboardData, setDashboardData] = useState<SellerDashboardData | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [hideBreederPermitOnOverview, setHideBreederPermitOnOverview] = useState(false);
+  const [hidePayoutReadinessOnOverview, setHidePayoutReadinessOnOverview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectingStripe, setConnectingStripe] = useState(false);
 
   const breederPermitDismissKey = (sellerId: string) => `we:ui:dismissed:breeder_permit_overview:v1:${sellerId}`;
+  const payoutReadinessDismissKey = (sellerId: string) => `we:ui:dismissed:payout_readiness_overview:v1:${sellerId}`;
 
   // Allow sellers who will never need a TPWD breeder permit to dismiss the card on Overview only.
   useEffect(() => {
@@ -188,6 +190,33 @@ export default function SellerOverviewPage() {
       // ignore
     }
   }, [uid]);
+
+  const payoutsReady = useMemo(() => {
+    return Boolean(
+      userProfile?.stripeAccountId &&
+        userProfile?.stripeOnboardingStatus === 'complete' &&
+        userProfile?.chargesEnabled === true &&
+        userProfile?.payoutsEnabled === true &&
+        userProfile?.stripeDetailsSubmitted === true
+    );
+  }, [userProfile]);
+
+  // Allow sellers to dismiss payout readiness ONLY once they are fully payout-ready (Overview only).
+  useEffect(() => {
+    if (!uid) return;
+    if (typeof window === 'undefined') return;
+    if (!payoutsReady) {
+      // Never hide when not ready; this card is actionable and should remain visible.
+      setHidePayoutReadinessOnOverview(false);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(payoutReadinessDismissKey(uid));
+      setHidePayoutReadinessOnOverview(raw === '1');
+    } catch {
+      // ignore
+    }
+  }, [payoutsReady, uid]);
 
   // Fetch listings and orders
   useEffect(() => {
@@ -931,16 +960,45 @@ export default function SellerOverviewPage() {
         )}
 
         {/* Payout Readiness */}
-        {user && userProfile && (
+        {user && userProfile && !hidePayoutReadinessOnOverview && (
           <div className="grid grid-cols-1 gap-6 md:gap-8">
             <div data-tour="seller-payout-readiness">
-              <PayoutReadinessCard 
-                userProfile={userProfile} 
-                onRefresh={async () => {
-                  const profile = await getUserProfile(user.uid);
-                  setUserProfile(profile);
-                }} 
-              />
+              <div className="relative">
+                {uid && payoutsReady ? (
+                  <div className="absolute right-2 top-2 z-10">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label="Hide payout readiness card"
+                      onClick={() => {
+                        setHidePayoutReadinessOnOverview(true);
+                        if (typeof window !== 'undefined') {
+                          try {
+                            window.localStorage.setItem(payoutReadinessDismissKey(uid), '1');
+                          } catch {
+                            // ignore
+                          }
+                        }
+                        toast({
+                          title: 'Hidden',
+                          description: 'Payout readiness card hidden on Overview.',
+                        });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : null}
+                <PayoutReadinessCard
+                  userProfile={userProfile}
+                  onRefresh={async () => {
+                    const profile = await getUserProfile(user.uid);
+                    setUserProfile(profile);
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}
