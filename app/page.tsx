@@ -391,6 +391,24 @@ export default function HomePage() {
     // This avoids “some huge, some small” cards when different variants render.
     const itemClass = 'w-[280px] sm:w-[320px] lg:w-[340px] h-[420px]';
 
+    const startRafLoop = () => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      if (dragRef.current.rafId != null) return;
+
+      const tick = () => {
+        dragRef.current.rafId = null;
+        if (!dragRef.current.active) return;
+        if (dragRef.current.pendingScrollLeft != null) {
+          el.scrollLeft = dragRef.current.pendingScrollLeft;
+        }
+        // Keep ticking while active so the scroll updates feel continuous.
+        dragRef.current.rafId = window.requestAnimationFrame(tick);
+      };
+
+      dragRef.current.rafId = window.requestAnimationFrame(tick);
+    };
+
     const beginDrag = (clientX: number, clientY: number) => {
       const el = scrollerRef.current;
       if (!el) return;
@@ -448,14 +466,7 @@ export default function HomePage() {
 
       const nextLeft = dragRef.current.startScrollLeft - dx;
       dragRef.current.pendingScrollLeft = nextLeft;
-
-      if (dragRef.current.rafId == null) {
-        dragRef.current.rafId = window.requestAnimationFrame(() => {
-          dragRef.current.rafId = null;
-          if (dragRef.current.pendingScrollLeft == null) return;
-          el.scrollLeft = dragRef.current.pendingScrollLeft;
-        });
-      }
+      startRafLoop();
     };
 
     const onPointerMove = (e: React.PointerEvent) => {
@@ -473,6 +484,17 @@ export default function HomePage() {
       } catch {
         // ignore
       }
+
+      // Stop RAF loop if running.
+      if (dragRef.current.rafId != null) {
+        try {
+          window.cancelAnimationFrame(dragRef.current.rafId);
+        } catch {
+          // ignore
+        }
+        dragRef.current.rafId = null;
+      }
+      dragRef.current.pendingScrollLeft = null;
 
       // Mark the end of a drag so we can suppress the synthetic click that follows a drag.
       if (dragRef.current.dragged) {
@@ -537,11 +559,13 @@ export default function HomePage() {
         <div
           ref={scrollerRef}
           className={cn(
-            'overflow-x-auto pb-2 -mx-4 px-4 scroll-smooth we-scrollbar-hover',
+            // NOTE: no scroll-smooth here; it makes drag-scrolling feel like it "catches up" after release.
+            'overflow-x-auto pb-2 -mx-4 px-4 we-scrollbar-hover snap-x snap-proximity',
             // Desktop UX: grab cursor for draggable rails.
             'md:cursor-grab',
             isDragging && 'md:cursor-grabbing select-none'
           )}
+          style={isDragging ? ({ scrollBehavior: 'auto' } as any) : undefined}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={(e) => endDrag(e)}
@@ -572,7 +596,7 @@ export default function HomePage() {
             }
           }}
         >
-          <div className="flex gap-4 min-w-max snap-x snap-mandatory">
+          <div className="flex gap-4 min-w-max">
             {props.listings.map((listing) => (
               <div key={listing.id} className={cn('snap-start flex-shrink-0 overflow-hidden', itemClass)}>
                 <ListingCard listing={listing} className="h-full" />
