@@ -288,14 +288,6 @@ export function useFavorites() {
     },
     [] // Empty deps - function is stable, reads from ref
   );
-
-  // Also use ref for pendingIds to keep it stable
-  const pendingIdsRef = useRef<Set<string>>(new Set());
-  
-  // Keep pendingIdsRef in sync
-  useEffect(() => {
-    pendingIdsRef.current = pendingIds;
-  }, [pendingIds]);
   
   const isPending = useCallback(
     (listingId: string) => {
