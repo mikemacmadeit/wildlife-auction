@@ -1001,6 +1001,7 @@ export default function DashboardLayout({
           </div>
         </nav>
       </div>
+      </div>
     </div>
     </RequireAuth>
   );
