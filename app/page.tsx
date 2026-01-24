@@ -18,6 +18,7 @@ import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, ge
 import { db } from '@/lib/firebase/config';
 import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { User } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
