@@ -320,6 +320,14 @@ export default function AccountPage() {
 
     try {
       setSaving(true);
+      
+      // Check if displayNamePreference or businessName changed
+      const oldPreference = userProfile.profile?.preferences?.displayNamePreference || 'personal';
+      const newPreference = formData.preferences.displayNamePreference;
+      const oldBusinessName = userProfile.profile?.businessName || '';
+      const newBusinessName = formData.businessName || '';
+      const displayNameChanged = oldPreference !== newPreference || oldBusinessName !== newBusinessName;
+
       // Only send the fields we intend to update (avoid spraying the full doc back into Firestore).
       await updateUserProfile(user.uid, {
         displayName: formData.fullName,
@@ -339,6 +347,27 @@ export default function AccountPage() {
           preferences: formData.preferences,
         },
       } as any);
+
+      // If display name preference or business name changed, update existing listings
+      if (displayNameChanged) {
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch('/api/listings/update-seller-snapshots', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const result = await response.json();
+          if (result.ok && result.updated > 0) {
+            // Success - listings updated
+          }
+        } catch (e) {
+          // Non-blocking: log but don't fail the profile save
+          console.warn('Failed to update listing snapshots:', e);
+        }
+      }
 
       setIsEditing(false);
       toast({
