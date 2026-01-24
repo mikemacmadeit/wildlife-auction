@@ -239,7 +239,7 @@ export function Footer() {
             </p>
 
             {success ? (
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-4">
                 <div className="text-sm font-semibold text-[hsl(37_27%_92%)]">You’re in.</div>
                 <div className="text-sm text-[hsl(37_27%_78%)]">Check your inbox soon.</div>
               </div>
