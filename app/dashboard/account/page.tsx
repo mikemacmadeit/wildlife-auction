@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { 
   User, 
@@ -1091,44 +1090,42 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <RadioGroup
-                  value={formData.preferences.displayNamePreference}
-                  onValueChange={(value) => setFormData({
-                    ...formData,
-                    preferences: { ...formData.preferences, displayNamePreference: value as 'personal' | 'business' }
-                  })}
-                  className="space-y-3"
-                >
-                  <div className="flex items-center gap-3 p-4 rounded-lg border border-border/50 bg-background/50 hover:bg-background/70 transition-colors">
-                    <RadioGroupItem value="personal" id="display-personal" />
-                    <label htmlFor="display-personal" className="flex-1 cursor-pointer">
-                      <div className="font-semibold text-foreground">Personal Name</div>
-                      <div className="text-sm text-muted-foreground">
-                        Show your name: {formData.fullName || 'Your name'}
-                      </div>
-                    </label>
+                <div className={`flex items-center justify-between p-4 rounded-lg border border-border/50 bg-background/50 transition-colors ${!formData.businessName ? 'opacity-60' : ''}`}>
+                  <div className="flex-1">
+                    <div className="font-semibold text-foreground flex items-center gap-2 mb-1">
+                      Show Business Name
+                      {!formData.businessName && (
+                        <Badge variant="outline" className="text-xs">Set business name first</Badge>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {formData.businessName 
+                        ? `When enabled, your business name "${formData.businessName}" will appear instead of your personal name "${formData.fullName || 'your name'}" on listings and seller profiles.`
+                        : 'Add a business name in your profile to use this option.'}
+                    </div>
                   </div>
-                  <div className={`flex items-center gap-3 p-4 rounded-lg border border-border/50 bg-background/50 transition-colors ${!formData.businessName ? 'opacity-60' : 'hover:bg-background/70'}`}>
-                    <RadioGroupItem 
-                      value="business" 
-                      id="display-business" 
-                      disabled={!formData.businessName}
-                    />
-                    <label htmlFor="display-business" className={`flex-1 ${formData.businessName ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                      <div className="font-semibold text-foreground flex items-center gap-2">
-                        Business / Ranch Name
-                        {!formData.businessName && (
-                          <Badge variant="outline" className="text-xs">Set business name first</Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {formData.businessName 
-                          ? `Show your business name: ${formData.businessName}`
-                          : 'Add a business name in your profile to use this option'}
-                      </div>
-                    </label>
-                  </div>
-                </RadioGroup>
+                  <Switch 
+                    checked={formData.preferences.displayNamePreference === 'business'}
+                    onCheckedChange={(checked) => {
+                      if (!formData.businessName && checked) {
+                        toast({
+                          title: 'Business name required',
+                          description: 'Please add a business name in your profile first.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      setFormData({
+                        ...formData,
+                        preferences: { 
+                          ...formData.preferences, 
+                          displayNamePreference: checked ? 'business' : 'personal' 
+                        }
+                      });
+                    }}
+                    disabled={!formData.businessName}
+                  />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
