@@ -756,9 +756,9 @@ export default function BrowsePage() {
         // otherwise the search bar appears "missing" because it's hidden behind the navbar.
         className="fixed top-20 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
       >
-        <div className="container mx-auto px-4 py-2 md:py-4">
-          <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-2 sm:p-4">
-            <div className="flex flex-col gap-1 md:gap-3">
+        <div className="container mx-auto px-4 py-1 md:py-4">
+          <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-1.5 sm:p-4">
+            <div className="flex flex-col gap-0.5 md:gap-3">
               <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-between">
                 <div className="flex-1 w-full md:max-w-2xl">
                   {/* Mobile (eBay-style): full-width search + heart-in-search */}
@@ -1225,7 +1225,7 @@ export default function BrowsePage() {
       </Dialog>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-2 md:py-6">
         <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
           {/* Desktop filter rail */}
           <aside className="hidden lg:block">
@@ -1236,7 +1236,7 @@ export default function BrowsePage() {
 
           <div>
             {/* Results Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-3 md:mb-6 gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold mb-1 break-words">
               {loading
