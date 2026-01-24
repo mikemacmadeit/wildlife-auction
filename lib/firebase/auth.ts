@@ -286,136 +286,23 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
 
 /**
  * Get the result of a Google sign-in redirect
- * Call this on page load to handle redirect completion.
- * Waits for authStateReady() so Auth is fully initialized before consuming the result.
+ * Call this on page load to handle redirect completion
  */
 export const getGoogleRedirectResult = async (): Promise<UserCredential | null> => {
-  // Only run on client-side
-  if (typeof window === 'undefined' || !auth) {
-    console.log('[Google Sign-In] Skipping redirect check (server-side or auth not initialized)');
-    return null;
-  }
-
-  // Check if we were expecting a redirect
-  let wasExpectingRedirect = false;
   try {
-    wasExpectingRedirect = sessionStorage.getItem('we:google-signin-pending') === '1';
-    if (wasExpectingRedirect) {
-      console.log('[Google Sign-In] We were expecting a redirect (found sessionStorage flag)');
+    const result = await getRedirectResult(auth);
+    if (result) {
+      console.log('Google redirect sign-in successful:', result.user.email);
     }
-  } catch {
-    // Ignore storage errors
-  }
-
-  try {
-    console.log('[Google Sign-In] Checking for redirect result...');
-    
-    // CRITICAL: Call getRedirectResult IMMEDIATELY on page load
-    // Firebase processes redirects synchronously and the result must be consumed ASAP
-    // Do NOT wait for authStateReady - call it immediately
-    let result: UserCredential | null = null;
-    let lastError: any = null;
-    
-    try {
-      result = await getRedirectResult(auth);
-      if (result?.user) {
-        console.log('[Google Sign-In] Redirect result found immediately:', {
-          email: result.user.email,
-          uid: result.user.uid,
-          operationType: result.operationType,
-        });
-        // Clear the pending flag (both storages)
-        try {
-          sessionStorage.removeItem('we:google-signin-pending');
-          localStorage.removeItem('we:google-signin-pending');
-        } catch {
-          // Ignore
-        }
-        return result;
-      } else {
-        console.log('[Google Sign-In] getRedirectResult returned null (no redirect pending)');
-      }
-    } catch (err: any) {
-      lastError = err;
-      console.warn('[Google Sign-In] getRedirectResult failed:', err);
-      
-      // Check for specific error codes
-      if (err.code === 'auth/unauthorized-domain') {
-        console.error('[Google Sign-In] Domain not authorized. Check Firebase Console > Authentication > Settings > Authorized domains');
-      }
-    }
-    if (result?.user) {
-      console.log('[Google Sign-In] Redirect result received successfully:', {
-        email: result.user.email,
-        uid: result.user.uid,
-        emailVerified: result.user.emailVerified,
-        operationType: result.operationType,
-      });
-      // Clear the pending flag (both storages)
-      try {
-        sessionStorage.removeItem('we:google-signin-pending');
-        localStorage.removeItem('we:google-signin-pending');
-      } catch {
-        // Ignore
-      }
-      return result;
-    }
-    
-    // Check if user is already signed in (fallback for when redirect result is lost)
-    // This can happen if the redirect completed but getRedirectResult didn't return it
-    const currentUser = auth.currentUser;
-    if (currentUser && wasExpectingRedirect) {
-      console.log('[Google Sign-In] No redirect result, but currentUser exists and we were expecting redirect:', {
-        email: currentUser.email,
-        uid: currentUser.uid,
-        emailVerified: currentUser.emailVerified,
-      });
-      // Clear the pending flag since we found the user
-      try {
-        sessionStorage.removeItem('we:google-signin-pending');
-      } catch {
-        // Ignore
-      }
-      // Return null here - let the caller check getCurrentUser() separately
-      // This avoids double-processing
-    } else if (currentUser) {
-      console.log('[Google Sign-In] No redirect result, but currentUser exists (not from redirect):', currentUser.email);
-    } else {
-      console.log('[Google Sign-In] No redirect result and no currentUser');
-      if (wasExpectingRedirect) {
-        console.warn('[Google Sign-In] WARNING: We were expecting a redirect but found no result and no user!');
-      }
-    }
-    
-    if (lastError && !result) {
-      // If we got an error on the last attempt, log it
-      console.warn('[Google Sign-In] All attempts to get redirect result failed, last error:', lastError);
-    }
-    
-    console.log('[Google Sign-In] No redirect result found (user may have navigated directly or cancelled)');
-    return null;
+    return result;
   } catch (error: any) {
-    // Some errors are expected (e.g., user cancelled, no redirect pending)
-    const isExpectedError = 
-      error.code === 'auth/credential-already-in-use' ||
-      error.code === 'auth/email-already-in-use' ||
-      error.message?.includes('no pending') ||
-      error.message?.includes('no redirect') ||
-      error.code === 'auth/popup-closed-by-user' ||
-      error.code === 'auth/cancelled-popup-request';
-    
-    if (!isExpectedError) {
-      console.error('[Google Sign-In] Error getting redirect result:', error);
-      console.error('[Google Sign-In] Error details:', {
-        code: error.code,
-        message: error.message,
-        email: error.email,
-        credential: error.credential,
-        stack: error.stack,
-      });
-    } else {
-      console.log('[Google Sign-In] Expected error (no redirect pending or user cancelled):', error.code || error.message);
-    }
+    console.error('Error getting redirect result:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+    });
     // Don't throw - return null so the page can still load
     return null;
   }

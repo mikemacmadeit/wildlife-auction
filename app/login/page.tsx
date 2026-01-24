@@ -10,8 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult, getCurrentUser, onAuthStateChange } from '@/lib/firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
 import { createUserDocument } from '@/lib/firebase/users';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,7 +21,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [checkingRedirect, setCheckingRedirect] = useState(true);
   
   // Get redirect path from sessionStorage if available
   const getRedirectPath = () => {
@@ -43,246 +41,29 @@ export default function LoginPage() {
 
   // Handle Google redirect result on page load
   useEffect(() => {
-    let cancelled = false;
-    let authStateUnsubscribe: (() => void) | null = null;
-    
-    const checkRedirect = async () => {
-      try {
-        setCheckingRedirect(true);
-        console.log('[Login] Checking for Google redirect result...');
-        console.log('[Login] Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
-        
-        // Check if URL has OAuth callback indicators (hash fragments or query params)
-        const url = typeof window !== 'undefined' ? window.location.href : '';
-        const referrer = typeof window !== 'undefined' ? document.referrer : '';
-        
-        // Get auth domain to check if referrer is from Firebase auth handler
-        const authDomain = typeof window !== 'undefined' && auth?.app?.options?.authDomain;
-        const referrerIsFirebaseAuth = authDomain && referrer.includes(authDomain);
-        
-        const hasOAuthCallback = 
-          url.includes('#') || 
-          url.includes('__/auth/handler') || 
-          url.includes('authUser=') ||
-          url.includes('apiKey=') ||
-          referrer.includes('accounts.google.com') ||
-          referrer.includes('google.com') ||
-          referrerIsFirebaseAuth; // Coming from Firebase auth handler means we just processed OAuth
-        
-        // Check if we were expecting a redirect (use both sessionStorage and localStorage for reliability)
-        let wasExpectingRedirect = false;
-        try {
-          if (typeof window !== 'undefined') {
-            wasExpectingRedirect = 
-              sessionStorage.getItem('we:google-signin-pending') === '1' ||
-              localStorage.getItem('we:google-signin-pending') === '1';
-          }
-        } catch {
-          // Ignore storage errors
-        }
-        
-        console.log('[Login] OAuth callback detected:', {
-          hasOAuthCallback,
-          wasExpectingRedirect,
-          referrerIsFirebaseAuth,
-          authDomain,
-          url: url.substring(0, 100),
-          referrer: referrer.substring(0, 100),
-        });
-        
-        // CRITICAL: Call getRedirectResult IMMEDIATELY - no delays
-        // Firebase processes redirects synchronously on page load
-        // Any delay can cause the result to be lost
-        const result = await getGoogleRedirectResult();
-        if (cancelled) {
-          setCheckingRedirect(false);
-          return;
-        }
-        
-        let user = result?.user;
-        
-        // ALWAYS wait for auth state if we were expecting a redirect (even if OAuth callback not detected)
-        // This handles cases where the redirect completed but detection failed
-        if (!user && wasExpectingRedirect) {
-          console.log('[Login] We were expecting a redirect - waiting for auth state even though OAuth callback not detected');
-        }
-        
-        // If no redirect result but we detected OAuth callback OR were expecting redirect, wait for auth state to update
-        if (!user && (hasOAuthCallback || wasExpectingRedirect)) {
-          console.log('[Login] OAuth callback detected but no redirect result yet, waiting for auth state...');
-          
-          // Additional delay for Firebase to process the redirect
-          await new Promise(resolve => setTimeout(resolve, 300));
-          if (cancelled) {
-            setCheckingRedirect(false);
-            return;
-          }
-          
-          // Don't call getGoogleRedirectResult again - it can only be called once
-          // Instead, wait for auth state to update via onAuthStateChanged
-          // This is more reliable than getRedirectResult when the redirect completes
-          if (!user) {
-            console.log('[Login] Still no user, waiting for auth state change (Firebase processing redirect)...');
-            
-            // Check immediately first
-            const immediateCheck = getCurrentUser();
-            if (immediateCheck) {
-              user = immediateCheck ?? undefined;
-              console.log('[Login] User found on immediate check:', user.email);
-            } else {
-              // Wait for onAuthStateChanged to fire
-              await new Promise<void>((resolve) => {
-                if (typeof window === 'undefined' || !auth) {
-                  resolve();
-                  return;
-                }
-                
-                let resolved = false;
-                
-                // Use onAuthStateChange to wait for user to be set
-                const timeout = setTimeout(() => {
-                  if (resolved) return;
-                  resolved = true;
-                  console.log('[Login] Auth state wait timeout after 5 seconds');
-                  if (authStateUnsubscribe) {
-                    authStateUnsubscribe();
-                    authStateUnsubscribe = null;
-                  }
-                  resolve();
-                }, 5000);
-                
-                // Check one more time before subscribing (race condition protection)
-                const preCheckUser = getCurrentUser();
-                if (preCheckUser) {
-                  if (!resolved) {
-                    resolved = true;
-                    clearTimeout(timeout);
-                    console.log('[Login] User found before subscribing to auth state:', preCheckUser.email);
-                    resolve();
-                  }
-                  return;
-                }
-                
-                authStateUnsubscribe = onAuthStateChange((firebaseUser) => {
-                  if (firebaseUser && !resolved) {
-                    resolved = true;
-                    console.log('[Login] Auth state updated, user detected:', firebaseUser.email);
-                    clearTimeout(timeout);
-                    if (authStateUnsubscribe) {
-                      authStateUnsubscribe();
-                      authStateUnsubscribe = null;
-                    }
-                    resolve();
-                  }
-                });
+    getGoogleRedirectResult()
+      .then((result) => {
+        if (result?.user) {
+          createUserDocument(result.user)
+            .then(() => {
+              toast({
+                title: 'Welcome back!',
+                description: 'You have been successfully signed in with Google.',
               });
-              
-              // Final check after waiting
-              if (!user) {
-                const currentUserCheck = getCurrentUser();
-                user = currentUserCheck ?? undefined;
-                console.log('[Login] After auth state wait, currentUser:', user?.email || 'null');
-              }
-            }
-          }
-        }
-        
-        // Final check for current user (fallback)
-        if (!user) {
-          const finalUserCheck = getCurrentUser();
-          user = finalUserCheck ?? undefined;
-        }
-        
-        console.log('[Login] Redirect check complete:', {
-          hasRedirectResult: !!result?.user,
-          hasCurrentUser: !!user,
-          willProceed: !!user,
-          redirectUserEmail: result?.user?.email,
-          currentUserEmail: user?.email,
-          hadOAuthCallback: hasOAuthCallback,
-        });
-        
-        if (user) {
-          console.log('[Login] Google sign-in detected (redirect result or currentUser), creating user document...', {
-            email: user.email,
-            uid: user.uid,
-            emailVerified: user.emailVerified,
-            source: result?.user ? 'redirectResult' : 'currentUser',
-          });
-          
-          // Clear the pending redirect flag since we found the user (both storages)
-          try {
-            if (typeof window !== 'undefined') {
-              sessionStorage.removeItem('we:google-signin-pending');
-              localStorage.removeItem('we:google-signin-pending');
-            }
-          } catch {
-            // Ignore storage errors
-          }
-          
-          try {
-            await createUserDocument(user);
-            if (cancelled) {
-              setCheckingRedirect(false);
-              return;
-            }
-            
-            console.log('[Login] User document created successfully, redirecting...');
-            
-            await new Promise(resolve => setTimeout(resolve, 100));
-            if (cancelled) {
-              setCheckingRedirect(false);
-              return;
-            }
-            
-            toast({
-              title: 'Welcome back!',
-              description: 'You have been successfully signed in with Google.',
+              router.push(getRedirectPath());
+            })
+            .catch((error) => {
+              console.error('Error creating user document after Google redirect:', error);
+              toast({
+                title: 'Google sign-in failed',
+                description: 'Failed to set up user account. Please try again.',
+                variant: 'destructive',
+              });
             });
-            
-            const redirectPath = getRedirectPath();
-            console.log('[Login] Redirecting to:', redirectPath);
-            
-            if (typeof window !== 'undefined') {
-              window.location.href = redirectPath;
-            } else {
-              router.replace(redirectPath);
-            }
-            return;
-          } catch (error: any) {
-            console.error('[Login] Error creating user document after Google redirect:', error);
-            if (cancelled) {
-              setCheckingRedirect(false);
-              return;
-            }
-            toast({
-              title: 'Google sign-in failed',
-              description: error?.message || 'Failed to set up user account. Please try again.',
-              variant: 'destructive',
-            });
-          }
-        } else {
-          console.log('[Login] No redirect result found - user navigated directly or cancelled');
         }
-      } catch (error: any) {
-        if (cancelled) {
-          setCheckingRedirect(false);
-          return;
-        }
-        console.error('[Login] Error during Google redirect result check:', error);
-        
-        // Don't show error for certain cases (user might have cancelled or no redirect pending)
-        if (
-          error.code === 'auth/popup-closed-by-user' || 
-          error.code === 'auth/cancelled-popup-request' ||
-          error.message?.includes('no pending') ||
-          !error.code
-        ) {
-          console.log('[Login] Expected error (no redirect pending):', error.code || 'no code');
-          setCheckingRedirect(false);
-          return; // Silent fail for user cancellation or no redirect
-        }
-        
+      })
+      .catch((error: any) => {
+        console.error('Error during Google redirect result:', error);
         let errorMessage = 'An error occurred during Google sign-in. Please try again.';
         if (error.code === 'auth/unauthorized-domain') {
           errorMessage = 'Google sign-in is not enabled for this domain. Please contact support.';
@@ -296,23 +77,7 @@ export default function LoginPage() {
           description: errorMessage,
           variant: 'destructive',
         });
-      } finally {
-        if (!cancelled) {
-          setCheckingRedirect(false);
-        }
-      }
-    };
-    
-    void checkRedirect();
-    
-    return () => {
-      cancelled = true;
-      if (authStateUnsubscribe) {
-        authStateUnsubscribe();
-        authStateUnsubscribe = null;
-      }
-      setCheckingRedirect(false);
-    };
+      });
   }, [router, toast]);
 
   const validateForm = () => {
@@ -433,14 +198,11 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    console.log('[Login] handleGoogleSignIn called, initiating Google redirect...');
-    console.log('[Login] Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
 
     try {
       const userCredential = await signInWithGoogle();
 
-      // This code should never run for redirect flow (we throw REDIRECT_INITIATED)
-      console.log('[Login] Unexpected: signInWithGoogle returned without redirect');
+      // Create user document in Firestore if it doesn't exist (for new users)
       if (userCredential.user) {
         await createUserDocument(userCredential.user);
 
@@ -454,12 +216,8 @@ export default function LoginPage() {
     } catch (error: any) {
       // Don't show error if redirect was initiated (page will reload)
       if (error.message === 'REDIRECT_INITIATED') {
-        console.log('[Login] Redirect initiated successfully - page will reload after Google sign-in');
-        // Don't set isLoading to false - we're navigating away
         return; // Page will reload after redirect
       }
-      
-      console.error('[Login] Google sign-in error (not REDIRECT_INITIATED):', error);
 
       let errorMessage = 'An error occurred while signing in with Google. Please try again.';
       
@@ -490,15 +248,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-      {/* Show loading overlay while checking for redirect result */}
-      {checkingRedirect && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Completing sign-in...</p>
-          </div>
-        </div>
-      )}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -618,7 +367,7 @@ export default function LoginPage() {
                 variant="outline"
                 className="w-full min-h-[44px] font-semibold gap-2 border-2"
                 onClick={handleGoogleSignIn}
-                disabled={isLoading || checkingRedirect}
+                disabled={isLoading}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
