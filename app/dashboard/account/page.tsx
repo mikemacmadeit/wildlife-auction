@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -113,10 +112,19 @@ export default function AccountPage() {
 
       try {
         setLoading(true);
-        const profile = await getUserProfile(user.uid);
+        // Add timeout protection
+        const profilePromise = getUserProfile(user.uid);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile load timed out after 10 seconds')), 10000)
+        );
+        const profile = await Promise.race([profilePromise, timeoutPromise]) as any;
         setUserProfile(profile);
-        // Public trust badges are server-authored; load them (best-effort).
-        const trust = await getPublicSellerTrust(user.uid).catch(() => null);
+        // Public trust badges are server-authored; load them (best-effort) with timeout.
+        const trustPromise = getPublicSellerTrust(user.uid).catch(() => null);
+        const trustTimeout = new Promise((resolve) => 
+          setTimeout(() => resolve(null), 5000) // Shorter timeout for non-critical data
+        );
+        const trust = await Promise.race([trustPromise, trustTimeout]) as PublicSellerTrust;
         setPublicTrust(trust);
 
         if (profile) {
@@ -181,7 +189,7 @@ export default function AccountPage() {
     if (!authLoading) {
       fetchUserData();
     }
-  }, [user, authLoading, toast]);
+  }, [user?.uid, authLoading]); // FIXED: Remove toast dep (causes re-renders) and use stable user.uid
 
   const derivedBadgeIds = useMemo(() => {
     if (!user || !userProfile) return [];

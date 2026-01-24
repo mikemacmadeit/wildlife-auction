@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -814,7 +814,7 @@ export default function HomePage() {
           <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
         {/* Background Image with Dark Overlay */}
         <div className="absolute inset-0 z-0">
-          <Image
+          <SafeImage
             src="/images/Buck_1.webp"
             alt="Wildlife Exchange Hero Background"
             fill
@@ -1014,7 +1014,7 @@ export default function HomePage() {
                               <div className="flex items-center gap-3 min-w-0">
                                 <div className="relative h-14 w-14 rounded-2xl overflow-hidden bg-muted border border-border/60 shadow-sm shrink-0">
                                   {s.sellerPhotoURL ? (
-                                    <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="56px" unoptimized />
+                                    <SafeImage src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="56px" unoptimized />
                                   ) : (
                                     <div className="h-full w-full flex items-center justify-center text-base font-extrabold text-muted-foreground">
                                       {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
@@ -1553,7 +1553,7 @@ export default function HomePage() {
                   <CardContent className="p-0">
                     <div className="relative h-56 sm:h-72 bg-muted">
                       {fieldNotesFeatured.coverImage ? (
-                        <Image src={fieldNotesFeatured.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.02]" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" />
+                        <SafeImage src={fieldNotesFeatured.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.02]" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" />
                       ) : null}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-5">

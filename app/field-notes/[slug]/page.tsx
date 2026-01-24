@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { getFieldNoteBySlug, getFieldNotesIndex, toUrlSlug } from '@/lib/content/field-notes';
@@ -69,7 +69,7 @@ export default async function FieldNotePostPage({ params }: { params: { slug: st
             {/* Hero */}
             <div className="rounded-2xl border overflow-hidden bg-card">
               <div className="relative h-56 md:h-72 lg:h-80 bg-muted">
-                {post.coverImage ? <Image src={post.coverImage} alt="" fill className="object-cover" priority /> : null}
+                {post.coverImage ? <SafeImage src={post.coverImage} alt="" fill className="object-cover" priority /> : null}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
                 <div className="absolute inset-0 p-5 md:p-7 flex flex-col justify-end">
                   <div className="flex flex-wrap items-center gap-2 mb-3">

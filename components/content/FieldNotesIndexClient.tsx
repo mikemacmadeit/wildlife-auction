@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -100,7 +100,7 @@ export function FieldNotesIndexClient(props: { posts: FieldNoteIndexItem[] }) {
                 <CardContent className="p-4 space-y-3">
                   <div className="aspect-[16/9] w-full rounded-xl bg-muted overflow-hidden relative">
                     {p.coverImage ? (
-                      <Image src={p.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.03]" />
+                      <SafeImage src={p.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.03]" />
                     ) : null}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
                     <div className="absolute left-3 right-3 bottom-3 flex flex-wrap items-center gap-2">

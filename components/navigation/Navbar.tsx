@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut, BookOpen } from 'lucide-react';

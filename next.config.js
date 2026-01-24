@@ -11,6 +11,15 @@ const nextConfig = {
     // "Cross-Origin-Opener-Policy policy would block the window.closed/window.close call."
     // This is safe for the app and keeps popups working as expected.
     return [
+      // General pages - must come BEFORE specific auth routes
+      {
+        source: '/((?!login|register).*)',
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          // Performance: Enable compression and caching
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
       // Auth pages are the ones that open third-party popups; be extra permissive here.
       // In some environments, Chrome can still warn even with `same-origin-allow-popups`;
       // `unsafe-none` avoids the warning spam without impacting app correctness.
@@ -24,14 +33,6 @@ const nextConfig = {
         source: '/register',
         headers: [
           { key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' },
-        ],
-      },
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
-          // Performance: Enable compression and caching
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       // Static assets: aggressive caching
@@ -49,45 +50,37 @@ const nextConfig = {
       },
     ];
   },
-  images: { 
+  images: {
     // Enable image optimization for better performance
-    // Note: Netlify supports Next.js image optimization out of the box
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 60,
-    // Some Next.js versions still validate remote image hosts against `images.domains`
-    // even when using `remotePatterns` (especially during dev/HMR). Keep both to avoid
-    // runtime crashes when rendering Firebase Storage URLs.
-    domains: [
-      'images.unsplash.com',
-      'firebasestorage.googleapis.com',
-      'storage.googleapis.com',
-      'lh3.googleusercontent.com',
-    ],
+    // Configure remote patterns to allow Firebase Storage and other sources
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-        port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
-        port: '',
-        pathname: '/**',
+        pathname: '/v0/b/**',
       },
       {
         protocol: 'https',
         hostname: 'storage.googleapis.com',
-        port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
-        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'wildlife-exchange.firebasestorage.app',
         pathname: '/**',
       },
     ],

@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { getListingsByIds } from '@/lib/firebase/listings';
 import type { Listing } from '@/lib/types';
 
@@ -601,7 +601,7 @@ export default function NotificationsPage() {
                       >
                         <div className="h-12 w-12 rounded-xl overflow-hidden border border-border/60 bg-muted shrink-0">
                           {coverUrl ? (
-                            <Image
+                            <SafeImage
                               src={coverUrl}
                               alt=""
                               width={48}

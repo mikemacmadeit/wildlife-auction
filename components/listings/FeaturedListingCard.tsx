@@ -2,7 +2,6 @@
 
 import { forwardRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Listing } from '@/lib/types';
@@ -115,15 +114,12 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                     transformOrigin: coverObjectPosition || '50% 50%',
                   }}
                 >
-                  <Image
+                  <img
                     src={coverUrl}
                     alt={listing.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    unoptimized
-                    priority={index < 2}
+                    loading="lazy"
                   />
                 </div>
               </div>

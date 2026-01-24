@@ -1,5 +1,5 @@
 import { ExternalLink } from 'lucide-react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { cn } from '@/lib/utils';
 
 export type LinkPreview = {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -709,7 +709,7 @@ export default function BidsOffersPage() {
                           <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
                             <div className="flex items-start gap-3 min-w-0">
                               <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
+                                {(r as any).listingImage ? <SafeImage src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -806,7 +806,7 @@ export default function BidsOffersPage() {
                           <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
                             <div className="flex items-start gap-3 min-w-0">
                               <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
+                                {(r as any).listingImage ? <SafeImage src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -929,7 +929,7 @@ export default function BidsOffersPage() {
                           <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
                             <div className="flex items-start gap-3 min-w-0">
                               <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                {r.listingImage ? <Image src={r.listingImage} alt="" fill className="object-cover" /> : null}
+                                {r.listingImage ? <SafeImage src={r.listingImage} alt="" fill className="object-cover" /> : null}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">

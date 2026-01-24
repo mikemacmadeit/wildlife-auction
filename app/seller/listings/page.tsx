@@ -2,7 +2,6 @@
 
 import { useState, useMemo, memo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -184,7 +183,7 @@ const ListingRow = memo(({
       <div className="flex items-start gap-2">
         <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
           {getPrimaryListingImageUrl(listing) ? (
-            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
+            <img src={getPrimaryListingImageUrl(listing) as string} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
           ) : null}
         </div>
         <div className="flex flex-col gap-1 min-w-0 flex-1">
@@ -297,7 +296,7 @@ const MobileListingCard = memo(({
       <div className="flex items-start gap-2 flex-1 min-w-0">
         <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
           {getPrimaryListingImageUrl(listing) ? (
-            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
+            <img src={getPrimaryListingImageUrl(listing) as string} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
           ) : null}
         </div>
         <div className="flex-1 min-w-0">

@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -213,7 +213,7 @@ export default function BuyerOrderDetailPage() {
                 <div className="flex items-start gap-4">
                   <div className="relative h-28 w-28 md:h-36 md:w-36 rounded-2xl overflow-hidden border bg-muted shrink-0">
                     {listingCoverPhotoURL ? (
-                      <Image
+                      <SafeImage
                         src={listingCoverPhotoURL}
                         alt=""
                         fill

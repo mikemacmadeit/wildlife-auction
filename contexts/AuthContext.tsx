@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Ensure a Firestore `users/{uid}` doc exists for every signed-in user (server-side, rules-independent).
   // This unblocks admin tooling (Users directory) and keeps `publicProfiles` / `userSummaries` warm.
   useEffect(() => {
+    
     if (!initialized) return;
     if (!user?.uid) return;
     const key = `we:bootstrap-user:v1:${user.uid}`;

@@ -2,7 +2,6 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2, Gavel, Tag, Clock, Heart } from 'lucide-react';
 import { format } from 'date-fns';
@@ -216,15 +215,12 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                         transformOrigin: coverObjectPosition || '50% 50%',
                       }}
                     >
-                      <Image
+                      <img
                         src={coverUrl}
                         alt={listing.title}
-                        fill
-                        className="object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                         style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
-                        sizes="96px"
                         loading="lazy"
-                        quality={85}
                       />
                     </div>
                   </div>
@@ -303,15 +299,12 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                     transformOrigin: coverObjectPosition || '50% 50%',
                   }}
                 >
-                  <Image
+                  <img
                     src={coverUrl}
                     alt={listing.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
-                    sizes="(max-width: 640px) 128px, (max-width: 768px) 176px, (max-width: 1024px) 288px, 320px"
                     loading="lazy"
-                    quality={85}
                   />
                 </div>
               </div>
@@ -424,14 +417,11 @@ export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="h-8 w-8 rounded-full border bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
                       {typeof sellerPhotoUrl === 'string' && sellerPhotoUrl.trim() ? (
-                        <Image
+                        <img
                           src={sellerPhotoUrl}
                           alt="Seller profile"
-                          width={32}
-                          height={32}
                           className="h-8 w-8 object-cover"
-                          quality={75}
-                          unoptimized
+                          loading="lazy"
                         />
                       ) : (
                         <span className="text-xs font-bold text-muted-foreground">

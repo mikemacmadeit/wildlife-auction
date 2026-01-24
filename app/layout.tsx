@@ -49,6 +49,20 @@ const foundersGrotesk = localFont({
   fallback: ['sans-serif'],
 });
 
+const barlettaStamp = localFont({
+  src: './fonts/Barletta Stamp Shadow.otf',
+  variable: '--font-barletta-stamp',
+  display: 'swap',
+  fallback: ['serif'],
+});
+
+const barlettaInline = localFont({
+  src: './fonts/Barletta Inline.otf',
+  variable: '--font-barletta-inline',
+  display: 'swap',
+  fallback: ['serif'],
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: 'Wildlife Exchange | Texas Exotic & Breeder Animal Marketplace',
@@ -96,7 +110,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
-      <body className={`${inter.className} ${foundersGrotesk.variable}`}>
+      <body className={`${inter.className} ${foundersGrotesk.variable} ${barlettaStamp.variable} ${barlettaInline.variable}`}>
         <Providers>
           {gateEnabled ? (
             <SiteGateClient>
@@ -127,7 +141,7 @@ export default function RootLayout({
             <ConditionalFooter />
             <Toaster />
             <SonnerToaster />
-              </div>
+            </div>
             </SiteGateClient>
           ) : (
             <div className="min-h-screen flex flex-col bg-background relative">

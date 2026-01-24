@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapPin, 
@@ -2146,7 +2146,7 @@ export default function ListingDetailPage() {
                       <div className="flex gap-3 p-3">
                         <div className="relative h-16 w-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
                           {c.primaryImageUrl ? (
-                            <Image
+                            <SafeImage
                               src={c.primaryImageUrl}
                               alt={c.title}
                               fill

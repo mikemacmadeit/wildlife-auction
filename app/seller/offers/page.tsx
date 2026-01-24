@@ -13,7 +13,7 @@ import { getSellerOffers } from '@/lib/offers/api';
 import { SellerOfferDetailModal } from '@/components/offers/SellerOfferDetailModal';
 import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 
 type OfferRow = {
   offerId: string;
@@ -239,7 +239,7 @@ export default function SellerOffersPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="min-w-0 flex items-center gap-3">
                           <div className="relative h-12 w-12 overflow-hidden rounded-md border bg-muted/20 shrink-0">
-                            {o.listingImageUrl ? <Image src={o.listingImageUrl} alt="" fill className="object-cover" /> : null}
+                            {o.listingImageUrl ? <SafeImage src={o.listingImageUrl} alt="" fill className="object-cover" /> : null}
                           </div>
                         <div className="font-semibold truncate">{o.listingSnapshot?.title || 'Listing'}</div>
                         <div className="text-xs text-muted-foreground">

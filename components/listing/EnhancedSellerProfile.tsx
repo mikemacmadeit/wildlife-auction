@@ -26,7 +26,7 @@ import { getSellerReputation } from '@/lib/users/getSellerReputation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { SaveSellerButton } from '@/components/seller/SaveSellerButton';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 import type { PublicSellerTrust } from '@/lib/types';

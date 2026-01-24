@@ -2,27 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Barletta Stamp Shadow font face - for hero text */
-@font-face {
-  font-family: 'BarlettaStamp';
-  src: url('/fonts/Barletta Stamp Shadow.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-  font-feature-settings: normal;
-  unicode-range: U+0000-10FFFF;
-}
-
-/* Barletta Inline font face - for navbar */
-@font-face {
-  font-family: 'BarlettaInline';
-  src: url('/fonts/Barletta Inline.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-  font-feature-settings: normal;
-  unicode-range: U+0000-10FFFF;
-}
+/* Barletta fonts loaded via Next.js localFont in layout.tsx */
 
 @layer utilities {
   /* Founders Grotesk (loaded in app/layout.tsx as CSS variable) */
@@ -452,13 +432,13 @@
   
   /* Force BarlettaStamp font to load and be used */
   .font-barletta {
-    font-family: 'BarlettaStamp', serif !important;
+    font-family: var(--font-barletta-stamp), serif !important;
     font-synthesis: none;
   }
   
   /* Force BarlettaInline font to load and be used */
   .font-barletta-inline {
-    font-family: 'BarlettaInline', serif !important;
+    font-family: var(--font-barletta-inline), serif !important;
     font-synthesis: none;
   }
   

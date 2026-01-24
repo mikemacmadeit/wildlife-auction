@@ -14,6 +14,7 @@ export function useAdmin() {
   const [role, setRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
+    
     async function checkAdminStatus() {
       if (!user) {
         setIsAdmin(false);
@@ -56,24 +57,19 @@ export function useAdmin() {
           }
         }
 
-        // 2) Fallback: Firestore user profile
-        const profile = await getUserProfile(user.uid);
+        // 2) Fallback: Firestore user profile with timeout protection
+        const profilePromise = getUserProfile(user.uid);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Admin check timed out after 8 seconds')), 8000)
+        );
+        const profile = await Promise.race([profilePromise, timeoutPromise]) as any;
         
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('useAdmin - User profile:', {
-            userId: user.uid,
-            email: user.email,
-            role: profile?.role,
-            superAdmin: profile?.superAdmin,
-          });
-        }
+        // Profile loaded successfully (removed console spam)
         
         // Check role field first (new system)
         if (profile?.role) {
           const userRole = profile.role;
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('useAdmin - Found role:', userRole);
-          }
+          // Role found - removed excessive logging
           setRole(userRole);
           setIsAdmin(userRole === 'admin' || userRole === 'super_admin');
           setIsSuperAdmin(userRole === 'super_admin');
@@ -109,7 +105,7 @@ export function useAdmin() {
     if (!authLoading) {
       checkAdminStatus();
     }
-  }, [user, authLoading]);
+  }, [user?.uid, authLoading]); // FIXED: Use stable user.uid instead of user object
 
   return {
     isAdmin,

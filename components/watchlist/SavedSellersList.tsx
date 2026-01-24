@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useRouter } from 'next/navigation';
 import { collection, getCountFromServer, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -252,7 +252,7 @@ export function SavedSellersList(props: { className?: string }) {
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="relative h-12 w-12 rounded-full overflow-hidden bg-muted shrink-0 border">
                         {s.sellerPhotoURL ? (
-                          <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="48px" unoptimized />
+                          <SafeImage src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="48px" />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
                             {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}

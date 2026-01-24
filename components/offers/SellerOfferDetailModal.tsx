@@ -11,7 +11,7 @@ import { Loader2, CheckCircle2, XCircle, Handshake, Clock, ExternalLink } from '
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOffer, acceptOffer, counterOffer, declineOffer } from '@/lib/offers/api';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 
 type OfferDTO = {
   offerId: string;
@@ -162,7 +162,7 @@ export function SellerOfferDetailModal(props: {
                   <CardTitle className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative h-10 w-10 overflow-hidden rounded-md border bg-muted/20 shrink-0">
-                        {offer.listingImageUrl ? <Image src={offer.listingImageUrl} alt="" fill className="object-cover" /> : null}
+                        {offer.listingImageUrl ? <SafeImage src={offer.listingImageUrl} alt="" fill className="object-cover" /> : null}
                       </div>
                       <span className="min-w-0 truncate">Offer on {offer.listingSnapshot?.title || 'Listing'}</span>
                     </div>

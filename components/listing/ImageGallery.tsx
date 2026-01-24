@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, X, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';

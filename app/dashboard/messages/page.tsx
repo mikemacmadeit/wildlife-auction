@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { formatDistanceToNow } from 'date-fns';
 import {
   DropdownMenu,
@@ -268,7 +268,7 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [listingIdParam, sellerIdParam, toast, user]);
+  }, [listingIdParam, sellerIdParam, user?.uid]); // FIXED: Remove toast dep, use user.uid
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -287,7 +287,7 @@ export default function MessagesPage() {
         setSelectedThreadId(null);
       }
     }
-  }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread, threadIdParam]);
+  }, [authLoading, user?.uid, listingIdParam, sellerIdParam, threadIdParam]); // FIXED: Remove initializeThread dep, use user.uid
 
   // When selecting a thread from inbox, populate the thread/listing/name for the thread view.
   useEffect(() => {
@@ -473,7 +473,7 @@ export default function MessagesPage() {
                               <div className="contents">
                                 <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted">
                                   {item.listingImageUrl ? (
-                                    <Image src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
+                                    <SafeImage src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
                                   ) : (
                                     <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                                       <MessageSquare className="h-5 w-5" />
@@ -683,7 +683,7 @@ export default function MessagesPage() {
                               {/* Thumb */}
                               <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted">
                                 {item.listingImageUrl ? (
-                                  <Image src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
+                                  <SafeImage src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
                                 ) : (
                                   <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                                     <MessageSquare className="h-5 w-5" />

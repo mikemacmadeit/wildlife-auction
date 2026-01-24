@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { getFieldNotesAuthors, getFieldNotesByAuthorSlug } from '@/lib/content/field-notes';
@@ -67,7 +67,7 @@ export default async function FieldNotesAuthorPage({ params }: { params: { slug:
                 <CardContent className="p-4 space-y-3">
                   <div className="aspect-[16/9] w-full rounded-xl bg-muted overflow-hidden relative">
                     {p.coverImage ? (
-                      <Image src={p.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.03]" />
+                      <SafeImage src={p.coverImage} alt="" fill className="object-cover transition-transform group-hover:scale-[1.03]" />
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

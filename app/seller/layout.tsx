@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import {
   LayoutDashboard,
   LayoutGrid,
@@ -82,32 +82,15 @@ const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
-  { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
-  { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
-  { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
-  { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
-  { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
   { href: '/seller/sales', label: 'Sold', icon: DollarSign },
-  { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
-  { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
-  { href: '/dashboard/account', label: 'Settings', icon: Settings },
+  { href: '/seller/settings', label: 'Settings', icon: Settings },
 ];
 
 // Admin nav items (only visible to admins)
 const adminNavItems: SellerNavItem[] = [
-  { href: '/dashboard/admin/users', label: 'Users', icon: Users },
-  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
-  { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
-  { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
-  { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
-  { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
-  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
-  { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
-  { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
-  { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
+  { href: '/dashboard', label: 'Admin Dashboard', icon: Shield },
 ];
 
 export default function SellerLayout({
@@ -195,27 +178,17 @@ export default function SellerLayout({
     return items;
   }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
 
-  // Clear the Messages badge when the user views the Messages page.
+  // Seller-specific effects only
   useEffect(() => {
     if (!user?.uid) return;
-    if (!pathname?.startsWith('/dashboard/messages')) return;
-    void markNotificationsAsReadByTypes(user.uid, ['message_received']);
+    // Seller-specific logic here if needed
   }, [pathname, user?.uid]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
-      if (item.href === '/dashboard/admin/listings') {
-        return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
-      }
-      if (item.href === '/dashboard/admin/notifications') {
-        return {
-          ...item,
-          badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
-        };
-      }
-      return item;
+      return { ...item };
     });
-  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount]);
+  }, [adminNavItems]);
 
   // Real-time unread badge for Messages (same source of truth as notifications)
   useEffect(() => {
@@ -298,15 +271,15 @@ export default function SellerLayout({
 
   const mobileBottomNavItems = useMemo(() => {
     // Mobile UX: keep Browse one-tap away from seller backend.
-    // Use a fixed, predictable set regardless of the full sidebar/menu list.
+    // Use a fixed, predictable set of seller routes only.
     const byHref = new Map(navItems.map((n) => [n.href, n] as const));
     const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
     return [
       pick('/seller/overview', { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard }),
       pick('/seller/listings', { href: '/seller/listings', label: 'Listings', icon: Package }),
       pick('/browse', { href: '/browse', label: 'Browse', icon: Compass }),
-      pick('/dashboard/messages', { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare }),
-      pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
+      pick('/seller/sales', { href: '/seller/sales', label: 'Sales', icon: DollarSign }),
+      pick('/dashboard', { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid }),
     ];
   }, [navItems]);
 
@@ -351,7 +324,7 @@ export default function SellerLayout({
             <div className="relative h-10 w-10">
               <div className="relative h-full w-full">
                 <div className="h-full w-full dark:hidden">
-                  <Image
+                  <SafeImage
                     src="/images/Kudu.png"
                     alt="Wildlife Exchange Logo"
                     width={40}

@@ -2,7 +2,6 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
@@ -170,15 +169,12 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     transformOrigin: coverObjectPosition || '50% 50%',
                   }}
                 >
-                  <Image
+                  <img
                     src={coverUrl}
                     alt={listing.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     loading="lazy"
-                    quality={85}
                   />
                 </div>
               </div>

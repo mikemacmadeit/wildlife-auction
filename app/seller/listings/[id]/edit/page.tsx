@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { StepperForm } from '@/components/forms/StepperForm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -998,7 +998,7 @@ function EditListingPageContent() {
                   return (
                     <div key={idx} className="relative aspect-square rounded-md overflow-hidden border-2 border-border/50 group">
                       {isUrl ? (
-                        <Image
+                        <SafeImage
                           src={img}
                           alt={`Photo ${idx + 1}`}
                           fill
@@ -1475,7 +1475,7 @@ function EditListingPageContent() {
                       return (
                         <div key={idx} className="relative w-full aspect-square rounded-md overflow-hidden border border-border/50">
                           {isUrl ? (
-                            <Image
+                            <SafeImage
                               src={img}
                               alt={`Preview ${idx + 1}`}
                               fill

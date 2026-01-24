@@ -401,7 +401,7 @@ function NewListingPageContent() {
       setUserProfile(profile);
     } catch (e) {
       // Best-effort; don't block listing creation UX on profile fetch
-      console.warn('Failed to load user profile for payouts readiness', e);
+      // Failed to load user profile for payouts readiness
     }
   };
 
@@ -2266,10 +2266,10 @@ function NewListingPageContent() {
         // Clear local autosave so a published listing isn't restored as a "new listing" later.
         clearAutosave();
         // Redirect to seller listings dashboard so they can see their new listing
-        router.push('/seller/listings');
+        router.push('/dashboard/listings');
       }
     } catch (error: any) {
-      console.error('Error creating listing:', error);
+      // Error creating listing
 
       if (error?.code === 'SELLER_ANIMAL_ACK_REQUIRED') {
         pendingPublishPayloadRef.current = data;
@@ -2319,7 +2319,7 @@ function NewListingPageContent() {
             description: 'Your listing information has been restored. You can now publish it.',
           });
         } catch (e) {
-          console.error('Failed to restore form data:', e);
+          // Failed to restore form data
         }
       }
     }
@@ -2463,7 +2463,7 @@ function NewListingPageContent() {
       });
       return true;
     } catch (error: any) {
-      console.error('Error saving draft:', error);
+      // Error saving draft
       toast({
         title: 'Failed to save draft',
         description: error.message || 'An error occurred while saving your draft.',
@@ -2699,7 +2699,7 @@ function NewListingPageContent() {
         onOpenChange={(open) => {
           setShowPendingApprovalModal(open);
           if (!open) {
-            router.push('/seller/listings');
+            router.push('/dashboard/listings');
           }
         }}
       >
@@ -2723,12 +2723,12 @@ function NewListingPageContent() {
             {submittedListingId && (
               <Button
                 variant="outline"
-                onClick={() => router.push(`/seller/listings/${submittedListingId}/edit`)}
+                onClick={() => router.push(`/dashboard/listings`)}
               >
                 Edit listing
               </Button>
             )}
-            <Button onClick={() => router.push('/seller/listings')}>Go to seller listings</Button>
+            <Button onClick={() => router.push('/dashboard/listings')}>Go to My Listings</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2846,7 +2846,7 @@ function NewListingPageContent() {
             <div className="mb-6">
               <PayoutsNotReadyCallout
                 onConnect={() => setPayoutsGateOpen(true)}
-                onChecklist={() => router.push('/seller/overview')}
+                onChecklist={() => router.push('/dashboard/orders')}
               />
             </div>
           ) : null}

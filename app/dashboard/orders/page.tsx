@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -209,7 +209,7 @@ export default function OrdersPage() {
     } finally {
       if (!opts?.silent) setLoading(false);
     }
-  }, [enrichSnapshotsBestEffort, user]);
+  }, [user?.uid]); // FIXED: Remove function dep, use user.uid
 
   // Persist pending checkout state across navigation (prevents “it disappeared when I clicked away”).
   useEffect(() => {
@@ -363,10 +363,10 @@ export default function OrdersPage() {
 
   // Fetch orders when user is loaded
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && user?.uid) {
       void loadOrders();
     }
-  }, [authLoading, loadOrders]);
+  }, [authLoading, user?.uid]); // FIXED: Remove loadOrders dep, use user.uid and call loadOrders directly
 
   // Fail-safe: if an order exists but is still pending (common when create-session pre-created the order
   // and webhook delivery was delayed), attempt a one-time reconcile using the stored checkout session id.
@@ -987,7 +987,7 @@ export default function OrdersPage() {
                   <div className="flex items-start gap-3 min-w-0">
                     <div className="relative h-24 w-24 md:h-28 md:w-28 rounded-2xl overflow-hidden border bg-muted shrink-0 shadow-sm">
                       {order.listingPhotoURL ? (
-                        <Image
+                        <SafeImage
                           src={order.listingPhotoURL}
                           alt=""
                           fill
@@ -1221,7 +1221,7 @@ export default function OrdersPage() {
                 <div className="flex items-start gap-4">
                   <div className="relative h-24 w-24 rounded-2xl overflow-hidden border bg-muted shrink-0">
                     {selectedOrder.listingPhotoURL ? (
-                      <Image src={selectedOrder.listingPhotoURL} alt="" fill className="object-cover" sizes="96px" unoptimized />
+                      <SafeImage src={selectedOrder.listingPhotoURL} alt="" fill className="object-cover" sizes="96px" unoptimized />
                     ) : null}
                   </div>
                   <div className="min-w-0">

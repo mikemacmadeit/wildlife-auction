@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -338,7 +338,7 @@ export default function SellerSalesPage() {
                       <div className="flex gap-4 p-4">
                         <div className="relative h-24 w-24 shrink-0 rounded-lg overflow-hidden bg-muted border">
                           {cover ? (
-                            <Image
+                            <SafeImage
                               src={String(cover)}
                               alt={title}
                               fill

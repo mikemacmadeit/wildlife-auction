@@ -61,7 +61,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -229,7 +229,6 @@ export default function WatchlistPage() {
           }
         });
       } catch (err) {
-        console.error('Error fetching watchlist listings:', err);
         setError(err instanceof Error ? err.message : 'Failed to load watchlist');
       } finally {
         setLoading(false);
@@ -244,7 +243,7 @@ export default function WatchlistPage() {
       subs.forEach((unsubscribe) => unsubscribe());
       subs.clear();
     };
-  }, [favoriteIds, user, authLoading, favoritesLoading, enrichListing]);
+  }, [favoriteIds, user?.uid, authLoading, favoritesLoading]); // FIXED: Remove enrichListing dep, use user.uid
 
   // Categorize listings by tab
   const categorizedListings = useMemo(() => {
@@ -319,7 +318,6 @@ export default function WatchlistPage() {
         description: 'This listing has been removed from your watchlist.',
       });
     } catch (error) {
-      console.error('Error removing from watchlist:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove listing from watchlist. Please try again.',

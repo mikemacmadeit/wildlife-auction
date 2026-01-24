@@ -50,7 +50,7 @@ import { collection, query, where, getDocs, updateDoc, doc, Timestamp, orderBy }
 import { db } from '@/lib/firebase/config';
 import { Listing, Order, ComplianceStatus, DocumentType } from '@/lib/types';
 import { formatDistanceToNow, format } from 'date-fns';
-import Image from 'next/image';
+import { SafeImage } from '@/components/shared/SafeImage';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
