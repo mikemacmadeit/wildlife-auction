@@ -807,6 +807,38 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* Welcome Section - Below search bar */}
+          <section className="border-b border-border/50 bg-background py-6 md:py-8">
+            <div className="container mx-auto px-4">
+              <div className="max-w-4xl mx-auto space-y-4">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
+                  <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
+                  <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/browse" className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      Browse
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/dashboard/watchlist" className="flex items-center gap-2">
+                      <Heart className="h-4 w-4" />
+                      Watchlist
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/dashboard/messages" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Messages
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
         </>
       ) : showHero ? (
         <>
@@ -902,73 +934,8 @@ export default function HomePage() {
 
       {/* Signed-in only: Personalized home */}
       {effectiveUser ? (
-        <section className="py-6 md:py-12 border-b border-border/50 bg-background">
-          <div className="container mx-auto px-4">
-            {/* Desktop: Welcome section on left, stacked over first listing */}
-            <div className="hidden md:block relative">
-              <div className="absolute left-0 top-0 z-10 w-80">
-                <div className="space-y-4 bg-background/95 backdrop-blur-sm rounded-2xl border border-border/50 p-6 shadow-lg">
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
-                    <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
-                    <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button asChild variant="outline" className="min-h-[44px] justify-start">
-                      <Link href="/browse" className="flex items-center gap-2">
-                        <Search className="h-4 w-4" />
-                        Browse
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="min-h-[44px] justify-start">
-                      <Link href="/dashboard/watchlist" className="flex items-center gap-2">
-                        <Heart className="h-4 w-4" />
-                        Watchlist
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="min-h-[44px] justify-start">
-                      <Link href="/dashboard/messages" className="flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Messages
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile: Welcome section below search */}
-            <div className="md:hidden mb-6">
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-xl font-bold mb-1">Welcome back</h2>
-                  <p className="text-lg font-semibold text-foreground">{userDisplayName}</p>
-                  <p className="text-sm text-muted-foreground mt-1">Pick up where you left off.</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/browse" className="flex items-center gap-2">
-                      <Search className="h-4 w-4" />
-                      Browse
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/dashboard/watchlist" className="flex items-center gap-2">
-                      <Heart className="h-4 w-4" />
-                      Watchlist
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/dashboard/messages" className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Messages
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-8 md:pl-96">
+        <section className="py-10 md:py-12 border-b border-border/50 bg-background">
+          <div className="container mx-auto px-4 space-y-8">
               <div className="space-y-4">
                 <SectionHeader
                   title={mostWatched?.length ? "Trending now" : "Explore listings"}
