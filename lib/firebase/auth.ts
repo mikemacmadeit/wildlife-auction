@@ -202,35 +202,25 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
       // Use redirect as fallback
       console.log('Falling back to redirect for Google sign-in due to:', error.message || error.code);
       
-      // CRITICAL: Normalize URL before redirect to ensure URL matching
+      // CRITICAL: Log the exact URL when initiating redirect
       // Firebase stores redirect result keyed by the exact URL, so we need to ensure
       // the URL we redirect from matches the URL we check on
       if (typeof window !== 'undefined') {
         const currentUrl = window.location.href;
-        const normalizedUrl = window.location.origin + window.location.pathname;
-        
-        console.log('[Google Sign-In] Redirect URL info:', {
-          currentUrl,
-          normalizedUrl,
-          hasQuery: !!window.location.search,
-          hasHash: !!window.location.hash,
+        console.log('[Google Sign-In] Initiating redirect from URL:', currentUrl);
+        console.log('[Google Sign-In] URL components:', {
+          href: window.location.href,
+          origin: window.location.origin,
+          pathname: window.location.pathname,
+          search: window.location.search,
+          hash: window.location.hash,
         });
         
-        // If URL has query params or hash, normalize it by redirecting to clean URL first
-        // This ensures Firebase stores the result for the clean URL
-        if (window.location.search || window.location.hash) {
-          console.log('[Google Sign-In] URL has query/hash, normalizing before redirect...');
-          // Store original URL for potential use after redirect
-          try {
-            sessionStorage.setItem('we:google-signin-original-url', currentUrl);
-          } catch {
-            // Ignore storage errors
-          }
-          // Redirect to clean URL first, then initiate OAuth redirect
-          window.location.href = normalizedUrl;
-          // This will cause a page reload, and the user will need to click sign-in again
-          // But it ensures URL matching
-          throw new Error('REDIRECT_INITIATED');
+        // Store the URL we're redirecting from so we can verify it matches on return
+        try {
+          sessionStorage.setItem('we:google-signin-init-url', currentUrl);
+        } catch {
+          // Ignore storage errors
         }
       }
       
