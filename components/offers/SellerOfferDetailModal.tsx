@@ -90,6 +90,12 @@ export function SellerOfferDetailModal(props: {
       await acceptOffer(offer.offerId);
       toast({ title: 'Accepted', description: 'Offer accepted and listing reserved.' });
       await load();
+      // Close modal after accepting on mobile for better UX
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setTimeout(() => {
+          onOpenChange(false);
+        }, 500);
+      }
     } catch (e: any) {
       toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {

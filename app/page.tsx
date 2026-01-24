@@ -38,7 +38,7 @@ function toDateSafe(v: any): Date | null {
 }
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading, initialized } = useAuth();
   const { recentIds } = useRecentlyViewed();
   const { favoriteIds, isLoading: favoritesLoading } = useFavorites();
   const router = useRouter();
@@ -719,6 +719,10 @@ export default function HomePage() {
     }
   };
 
+  // Only show hero if user is definitely not signed in (initialized and no user)
+  // Don't show hero if still loading or if user exists
+  const showHero = initialized && !authLoading && !user;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Signed-in: Search bar and welcome section */}
@@ -773,7 +777,7 @@ export default function HomePage() {
             </div>
           </section>
         </>
-      ) : (
+      ) : showHero ? (
         <>
           {/* Hero Section - Only for non-signed-in users */}
           <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
@@ -863,7 +867,7 @@ export default function HomePage() {
         </div>
       </section>
         </>
-      )}
+      ) : null}
 
       {/* Signed-in only: Personalized home */}
       {user ? (

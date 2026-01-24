@@ -77,10 +77,38 @@ export function BuyerOfferDetailModal(props: {
     void load();
   }, [open, load]);
 
+  // Auto-redirect to checkout on mobile when offer becomes accepted (e.g., seller accepted buyer's offer)
+  const [hasRedirected, setHasRedirected] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      setHasRedirected(false);
+      return;
+    }
+    if (!offer) return;
+    if (offer.status !== 'accepted') {
+      setHasRedirected(false);
+      return;
+    }
+    if (!offer.listingId) return;
+    if (hasRedirected) return; // Prevent multiple redirects
+    
+    // Only auto-redirect on mobile
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+    if (isMobile) {
+      setHasRedirected(true);
+      // Close modal and redirect to listing page for checkout
+      onOpenChange(false);
+      setTimeout(() => {
+        router.push(`/listing/${offer.listingId}`);
+      }, 300);
+    }
+  }, [offer?.status, offer?.listingId, open, onOpenChange, router, hasRedirected]);
+
   useEffect(() => {
     setOffer(null);
     setCounterOpen(false);
     setCounterAmount('');
+    setHasRedirected(false);
   }, [offerId]);
 
   const canWithdraw = useMemo(() => offer?.status === 'open' || offer?.status === 'countered', [offer?.status]);
@@ -112,13 +140,33 @@ export function BuyerOfferDetailModal(props: {
   };
 
   const doAccept = async () => {
-    if (!offer?.offerId) return;
+    if (!offer?.offerId || !offer?.listingId) return;
+    const listingId = offer.listingId;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
     setActionLoading(true);
     try {
       await acceptOffer(String(offer.offerId));
       toast({ title: 'Accepted', description: 'You accepted the counter offer.' });
+      
+      // Reload to get updated status - wait a bit for server to update
+      await new Promise(resolve => setTimeout(resolve, 500));
       await load();
+      
+      // Double-check the offer is accepted after reload
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await load();
+      
       onDidMutate?.();
+      
+      // On mobile, immediately redirect to checkout after accepting
+      if (isMobile) {
+        // Close modal and redirect to listing page for checkout
+        onOpenChange(false);
+        // Small delay to allow modal close animation
+        setTimeout(() => {
+          router.push(`/listing/${listingId}`);
+        }, 200);
+      }
     } catch (e: any) {
       toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {

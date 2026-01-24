@@ -158,13 +158,17 @@ export function HelpLauncher() {
       ) : null}
 
       {/* First-time banner (only shows on pages with a tour) */}
+      {/* Hide on mobile for browse page */}
       {helpKey &&
       tour?.steps?.length &&
       tourSeen !== true &&
       tourBannerDismissed !== true &&
       !profileGateOpen &&
       tourPromptArmed ? (
-        <div className="fixed bottom-20 md:bottom-6 left-0 right-0 z-[55] px-4">
+        <div className={cn(
+          'fixed bottom-20 md:bottom-6 left-0 right-0 z-[55] px-4',
+          pathname?.startsWith('/browse') ? 'hidden md:block' : ''
+        )}>
           <div className="container mx-auto max-w-4xl">
             <FirstTimeTourBanner
               uid={uid}

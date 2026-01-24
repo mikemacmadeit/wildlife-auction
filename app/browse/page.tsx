@@ -758,29 +758,12 @@ export default function BrowsePage() {
       >
         <div className="container mx-auto px-4 py-2 md:py-4">
           <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-2 sm:p-4">
-            <div className="flex flex-col gap-2 md:gap-3">
-              <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            <div className="flex flex-col gap-1 md:gap-3">
+              <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-between">
                 <div className="flex-1 w-full md:max-w-2xl">
-                  {/* Mobile (eBay-style): back circle + search + heart-in-search */}
-                  <div className="md:hidden flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        try {
-                          router.back();
-                        } catch {
-                          router.push('/browse');
-                        }
-                      }}
-                      className="min-w-[44px] min-h-[44px] rounded-full border border-background/30 text-background hover:bg-background/10"
-                      aria-label="Back"
-                    >
-                      <ArrowLeft className="h-5 w-5" />
-                    </Button>
-
-                    <div className="relative flex-1">
+                  {/* Mobile (eBay-style): full-width search + heart-in-search */}
+                  <div className="md:hidden">
+                    <div className="relative w-full">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input
                         type="text"
@@ -788,7 +771,7 @@ export default function BrowsePage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className={cn(
-                          'pl-11 pr-12 min-h-[52px] text-base rounded-full',
+                          'pl-11 pr-12 min-h-[52px] text-base rounded-full w-full',
                           'bg-background text-foreground caret-foreground',
                           'border-border/70 placeholder:text-muted-foreground',
                           'focus-visible:ring-ring/40 focus-visible:ring-2'
@@ -855,7 +838,7 @@ export default function BrowsePage() {
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
+              <div className="flex flex-col md:flex-row gap-1 md:gap-2 md:items-center md:justify-between">
                 {/* Type Tabs */}
                 <Tabs
                   value={selectedType}

@@ -321,17 +321,29 @@ export function SavedSellersList(props: { className?: string }) {
                         Message
                       </Button>
                       <Button
-                        variant="destructive"
-                        className="min-h-[40px] w-full col-span-2 sm:col-auto sm:w-auto"
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-8 w-8 col-span-2 justify-center",
+                          "sm:h-auto sm:w-auto sm:min-h-[40px] sm:px-3 sm:col-auto",
+                          "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+                          "sm:!bg-destructive sm:!text-destructive-foreground sm:hover:!bg-destructive/90"
+                        )}
                         disabled={removing === s.sellerId}
                         onClick={() => onRemove(s.sellerId)}
+                        aria-label="Remove seller"
                       >
                         {removing === s.sellerId ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin sm:mr-2" />
+                            <span className="hidden sm:inline">Remove</span>
+                          </>
                         ) : (
-                          <Trash2 className="h-4 w-4 mr-2" />
+                          <>
+                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Remove</span>
+                          </>
                         )}
-                        Remove
                       </Button>
                     </div>
                   </div>

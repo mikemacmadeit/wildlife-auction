@@ -551,41 +551,41 @@ export default function BidsOffersPage() {
         </div>
 
         {/* Top summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           <Card className="border-border/60">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">Winning</div>
-                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <div className="text-xs sm:text-sm text-muted-foreground">Winning</div>
+                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
               </div>
-              <div className="text-2xl font-extrabold mt-1">{stats.bidWinning}</div>
+              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.bidWinning}</div>
             </CardContent>
           </Card>
           <Card className="border-border/60">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">Outbid</div>
-                <TrendingUp className="h-4 w-4 text-orange-600" />
+                <div className="text-xs sm:text-sm text-muted-foreground">Outbid</div>
+                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-600 flex-shrink-0" />
               </div>
-              <div className="text-2xl font-extrabold mt-1">{stats.bidOutbid}</div>
+              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.bidOutbid}</div>
             </CardContent>
           </Card>
           <Card className="border-border/60">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">Offers active</div>
-                <Handshake className="h-4 w-4 text-primary" />
+                <div className="text-xs sm:text-sm text-muted-foreground">Offers active</div>
+                <Handshake className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
               </div>
-              <div className="text-2xl font-extrabold mt-1">{stats.offerActive}</div>
+              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.offerActive}</div>
             </CardContent>
           </Card>
           <Card className="border-border/60">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">Accepted offers</div>
-                <Clock className="h-4 w-4 text-primary" />
+                <div className="text-xs sm:text-sm text-muted-foreground">Accepted offers</div>
+                <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
               </div>
-              <div className="text-2xl font-extrabold mt-1">{stats.offerAccepted}</div>
+              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.offerAccepted}</div>
             </CardContent>
           </Card>
         </div>

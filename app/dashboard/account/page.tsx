@@ -767,6 +767,46 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {/* Display Name Preference - Show in Profile tab for visibility */}
+                <div className="mt-6 p-4 rounded-lg border border-border/50 bg-background/50">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="font-semibold text-foreground flex items-center gap-2 mb-1">
+                        Use Business Name on Listings & Profile
+                        {!formData.businessName && (
+                          <Badge variant="outline" className="text-xs">Set business name first</Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {formData.businessName 
+                          ? `When enabled, "${formData.businessName}" will appear instead of "${formData.fullName || 'your name'}" on listing cards and your seller profile.`
+                          : 'Add a business name above to use this option.'}
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={formData.preferences.displayNamePreference === 'business'}
+                      onCheckedChange={(checked) => {
+                        if (!formData.businessName && checked) {
+                          toast({
+                            title: 'Business name required',
+                            description: 'Please add a business name first.',
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+                        setFormData({
+                          ...formData,
+                          preferences: { 
+                            ...formData.preferences, 
+                            displayNamePreference: checked ? 'business' : 'personal' 
+                          }
+                        });
+                      }}
+                      disabled={!formData.businessName || !isEditing}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-semibold flex items-center gap-2">

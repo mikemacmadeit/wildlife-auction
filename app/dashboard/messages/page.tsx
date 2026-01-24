@@ -131,8 +131,11 @@ export default function MessagesPage() {
           });
           return next;
         });
-        // If nothing selected yet, keep existing selection or default to first visible thread.
-        if (!selectedThreadId && data[0]?.id) setSelectedThreadId(data[0].id);
+        // Don't auto-select on mobile - let user choose
+        // Only auto-select on desktop if nothing is selected
+        if (!selectedThreadId && data[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+          setSelectedThreadId(data[0].id);
+        }
       },
       {
         onError: (e) => {
@@ -277,7 +280,12 @@ export default function MessagesPage() {
 
       // 2) Inbox mode (optionally with threadId deep link)
       setLoading(false);
-      if (threadIdParam) setSelectedThreadId(threadIdParam);
+      if (threadIdParam) {
+        setSelectedThreadId(threadIdParam);
+      } else {
+        // Ensure inbox is visible on mobile when no thread is selected
+        setSelectedThreadId(null);
+      }
     }
   }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread, threadIdParam]);
 
@@ -373,8 +381,20 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
       <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-6xl">
-        <div className="mb-4">
-          <Button variant="ghost" onClick={() => router.back()} className="mb-2">
+        <div className="mb-4 lg:mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => {
+              // On mobile, if a thread is selected, go back to inbox first
+              if (selectedThreadId && typeof window !== 'undefined' && window.innerWidth < 1024) {
+                setSelectedThreadId(null);
+                router.replace('/dashboard/messages');
+              } else {
+                router.back();
+              }
+            }} 
+            className="mb-2"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -383,12 +403,12 @@ export default function MessagesPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
           {/* Mobile: keep both panes mounted and slide between them for smoothness */}
-          <div className="lg:hidden relative overflow-hidden h-[calc(100dvh-200px)] min-h-0 touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="lg:hidden relative" style={{ height: 'calc(100dvh - 280px)', minHeight: '400px' }}>
             {/* Inbox pane */}
             <Card
               className={cn(
-                'absolute inset-0 flex flex-col min-h-0 transition-transform duration-300 ease-in-out',
-                'will-change-transform transform-gpu',
+                'absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out',
+                'will-change-transform transform-gpu z-10',
                 selectedThreadId ? '-translate-x-full' : 'translate-x-0'
               )}
             >
@@ -416,11 +436,11 @@ export default function MessagesPage() {
                   </TabsList>
                 </Tabs>
               </CardHeader>
-              <CardContent className="p-0 flex-1 min-h-0">
+              <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
                 {inboxItems.length === 0 ? (
                   <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
                 ) : (
-                  <ScrollArea className="h-full overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  <ScrollArea className="h-full" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                     <div className="divide-y divide-border/50 pr-3">
                       {inboxItems.map((item) => {
                         const active = selectedThreadId === item.id || thread?.id === item.id;
@@ -548,8 +568,8 @@ export default function MessagesPage() {
             {/* Thread pane */}
             <Card
               className={cn(
-                'absolute inset-0 flex flex-col overflow-hidden min-h-0 transition-transform duration-300 ease-in-out',
-                'will-change-transform transform-gpu',
+                'absolute inset-0 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out',
+                'will-change-transform transform-gpu z-20',
                 selectedThreadId ? 'translate-x-0' : 'translate-x-full'
               )}
             >
@@ -579,7 +599,7 @@ export default function MessagesPage() {
                   <div className="font-semibold">Loading conversation...</div>
                 </CardContent>
               ) : thread ? (
-                <div className="flex-1 min-h-0 overscroll-contain">
+                <div className="flex-1 min-h-0 overflow-hidden" style={{ touchAction: 'pan-y' }}>
                   <MessageThreadComponent
                     key={thread.id}
                     thread={thread}

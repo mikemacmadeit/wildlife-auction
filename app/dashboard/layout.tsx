@@ -765,16 +765,19 @@ export default function DashboardLayout({
       <div className="md:hidden sticky top-0 z-50 border-b border-border/50 bg-card">
         <div className="flex items-center justify-between h-16 px-4">
           <Link href="/" className="flex items-center gap-3 group">
-            <Image
-              src="/images/Kudu.png"
-              alt="Wildlife Exchange"
-              width={36}
-              height={36}
-              className="h-9 w-9 object-contain opacity-90 group-hover:opacity-100 transition-opacity"
-              priority
-              loading="eager"
+            <div
+              aria-hidden="true"
+              className="h-9 w-9 opacity-95 group-hover:opacity-100 transition-opacity"
               style={{
-                filter: 'brightness(0) saturate(100%) invert(31%) sepia(12%) saturate(1200%) hue-rotate(75deg) brightness(95%) contrast(90%)',
+                backgroundColor: 'hsl(var(--primary))',
+                WebkitMaskImage: "url('/images/Kudu.png')",
+                maskImage: "url('/images/Kudu.png')",
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
               }}
             />
             <div className="flex flex-col">

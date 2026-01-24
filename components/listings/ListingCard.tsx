@@ -264,7 +264,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
           </div>
 
           {/* Content */}
-          <div className="p-3 sm:p-4 flex-1 flex flex-col gap-2 sm:gap-3">
+          <div className="p-2.5 sm:p-4 flex-1 flex flex-col gap-1.5 sm:gap-3">
             {sold.isSold && (
               <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
                 <div className="font-semibold">{sold.soldPriceLabel}</div>
@@ -272,7 +272,7 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               </div>
             )}
             {/* Title */}
-            <h3 className="font-bold text-base line-clamp-2 leading-snug group-hover:text-primary transition-colors duration-300">
+            <h3 className="font-bold text-sm sm:text-base line-clamp-2 leading-snug sm:leading-snug group-hover:text-primary transition-colors duration-300">
               {listing.title}
             </h3>
 
@@ -311,9 +311,9 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
           </div>
 
             {/* Price and Seller Info */}
-            <div className="mt-auto pt-3 border-t border-border/50 flex items-center justify-between">
-              <div>
-                <div className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+            <div className="mt-auto pt-2 sm:pt-3 border-t border-border/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+              <div className="flex-shrink-0">
+                <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                   {priceDisplay}
                 </div>
                 {listing.type === 'auction' && listing.reservePrice && (
@@ -322,11 +322,11 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   </div>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col items-start sm:items-end gap-0.5 sm:gap-1 min-w-0 flex-1 sm:flex-initial">
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground max-w-[200px] truncate hover:underline"
+                    className="inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold text-muted-foreground min-w-0 flex-1 sm:flex-initial sm:max-w-[200px] hover:underline"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -336,14 +336,14 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     }}
                     aria-label="View seller profile"
                   >
-                    <Avatar className="h-6 w-6 border border-border/50">
+                    <Avatar className="h-5 w-5 sm:h-6 sm:w-6 border border-border/50 flex-shrink-0">
                       <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
-                      <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
+                      <AvatarFallback className="text-[9px] sm:text-[10px] font-bold">{sellerInitial}</AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{sellerName}</span>
+                    <span className="truncate min-w-0">{sellerName}</span>
                   </button>
                   {/* Seller Tier badge (Seller Tiers) */}
-                  <div className="hidden sm:block">
+                  <div className="hidden sm:block flex-shrink-0">
                     <SellerTierBadge tier={(listing as any).sellerTier} />
                   </div>
                 </div>
