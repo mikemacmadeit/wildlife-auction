@@ -108,11 +108,6 @@ export default function WatchlistPage() {
   const { user, loading: authLoading } = useAuth();
   const { favoriteIds, isLoading: favoritesLoading, removeFavorite, toggleFavorite } = useFavorites();
   const { toast } = useToast();
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('[WatchlistPage] favoriteIds:', favoriteIds, 'length:', favoriteIds?.length, 'favoritesLoading:', favoritesLoading);
-  }, [favoriteIds, favoritesLoading]);
   const [listings, setListings] = useState<ListingWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
