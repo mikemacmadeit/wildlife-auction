@@ -215,71 +215,46 @@ const isMobileDevice = (): boolean => {
 };
 
 /**
- * Sign in with Google using redirect only (more reliable across devices)
- *
- * NOTE:
- * - This always uses `signInWithRedirect`, even on desktop, to ensure consistent behavior.
- * - Callers should treat the `REDIRECT_INITIATED` error as a non-error and let the page reload.
- * - After redirect completes, `getGoogleRedirectResult` should be called on page load to finalize sign-in.
+ * Sign in with Google using popup
+ * Falls back to redirect if popup is blocked
  */
 export const signInWithGoogle = async (): Promise<UserCredential> => {
-  // Only run on client-side
-  if (typeof window === 'undefined') {
-    throw new Error('Google sign-in can only be initiated on the client-side');
-  }
-
-  if (!auth) {
-    console.error('[Google Sign-In] Auth instance is not available');
-    throw new Error('Firebase Auth is not initialized');
-  }
-
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
     prompt: 'select_account',
   });
-
+  
   try {
-    console.log('[Google Sign-In] Starting Google redirect flow for all devices');
-    console.log('[Google Sign-In] Auth domain:', auth.app.options.authDomain);
-    console.log('[Google Sign-In] Current URL:', window.location.href);
-    
-    // Mark that we're initiating a redirect so the return page knows to wait
-    // Use both sessionStorage and localStorage for reliability (localStorage persists better)
-    try {
-      sessionStorage.setItem('we:google-signin-pending', '1');
-      localStorage.setItem('we:google-signin-pending', '1');
-      console.log('[Google Sign-In] Set redirect pending flag in storage');
-    } catch {
-      // Ignore storage errors
-    }
-    
-    // signInWithRedirect is async but will redirect the page before resolving
-    // We need to catch any errors that occur before the redirect
-    await signInWithRedirect(auth, provider);
-    
-    // This line should never execute because signInWithRedirect redirects the page
-    // But if it does, we throw to indicate redirect was initiated
-    console.warn('[Google Sign-In] signInWithRedirect completed without redirecting (unexpected)');
-    throw new Error('REDIRECT_INITIATED');
+    // Try popup first (better UX)
+    return await signInWithPopup(auth, provider);
   } catch (error: any) {
-    // signInWithRedirect might throw before redirecting if there's a config issue
-    if (error.message !== 'REDIRECT_INITIATED') {
-      console.error('[Google Sign-In] Redirect initiation failed:', error);
-      console.error('[Google Sign-In] Error details:', {
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-      });
-      
-      // Check for common configuration errors
-      if (error.code === 'auth/unauthorized-domain') {
-        console.error('[Google Sign-In] Domain not authorized. Check Firebase Console > Authentication > Settings > Authorized domains');
-        console.error('[Google Sign-In] Current domain:', window.location.hostname);
-        console.error('[Google Sign-In] Auth domain:', auth.app.options.authDomain);
-      }
-    } else {
-      console.log('[Google Sign-In] Redirect initiated successfully');
+    console.error('Google sign-in popup error:', error);
+    
+    // If popup fails for any reason (blocked, unauthorized domain, illegal URL, etc.), fall back to redirect
+    if (
+      error.code === 'auth/popup-blocked' ||
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request' ||
+      error.code === 'auth/unauthorized-domain' ||
+      error.code === 'auth/operation-not-allowed' ||
+      error.message?.includes('illegal URL') ||
+      error.message?.includes('illegal') ||
+      error.message?.includes('iframe')
+    ) {
+      // Use redirect as fallback
+      console.log('Falling back to redirect for Google sign-in due to:', error.message || error.code);
+      await signInWithRedirect(auth, provider);
+      // Redirect will navigate away, so we throw a special error
+      // The page will reload after redirect completes
+      throw new Error('REDIRECT_INITIATED');
     }
+    // Re-throw other errors with more context
+    console.error('Google sign-in error details:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+    });
     throw error;
   }
 };
