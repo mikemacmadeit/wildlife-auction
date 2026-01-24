@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
+import { Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
@@ -292,12 +292,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
               ))}
             </div>
           )}
-
-          {/* Location */}
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
-          </div>
 
           {/* Reserved (offer accepted) - keep it in the content area for gallery cards */}
           {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
