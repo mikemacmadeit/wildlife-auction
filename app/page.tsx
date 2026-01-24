@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, Heart } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
@@ -42,6 +43,7 @@ export default function HomePage() {
   const { favoriteIds, isLoading: favoritesLoading } = useFavorites();
   const router = useRouter();
   const { toast } = useToast();
+  const [homeSearchQuery, setHomeSearchQuery] = useState('');
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [mostWatched, setMostWatched] = useState<Listing[]>([]);
@@ -705,10 +707,44 @@ export default function HomePage() {
     },
   };
 
+  // Get user display name (fallback to email if no display name)
+  const userDisplayName = user?.displayName || user?.email?.split('@')[0] || 'User';
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (homeSearchQuery.trim()) {
+      router.push(`/browse?search=${encodeURIComponent(homeSearchQuery.trim())}`);
+    } else {
+      router.push('/browse');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
+      {/* Signed-in: Search bar and welcome section */}
+      {user ? (
+        <>
+          {/* Search Bar */}
+          <section className="border-b border-border/50 bg-card/50 py-4 md:py-6">
+            <div className="container mx-auto px-4 max-w-4xl">
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search listings, species, breeds, and locations…"
+                  value={homeSearchQuery}
+                  onChange={(e) => setHomeSearchQuery(e.target.value)}
+                  className="pl-11 min-h-[52px] text-base rounded-xl bg-background"
+                />
+              </form>
+            </div>
+          </section>
+
+        </>
+      ) : (
+        <>
+          {/* Hero Section - Only for non-signed-in users */}
+          <section className="relative overflow-hidden min-h-[50vh] md:min-h-[60vh] flex items-center justify-center">
         {/* Background Image with Dark Overlay */}
         <div className="absolute inset-0 z-0">
           <Image
@@ -770,7 +806,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Trust Indicators */}
+      {/* Trust Indicators - Only for non-signed-in users */}
       <section className="py-8 md:py-12 border-b border-border/50 bg-card/50">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
@@ -794,34 +830,13 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+        </>
+      )}
 
       {/* Signed-in only: Personalized home */}
       {user ? (
         <section className="py-10 md:py-12 border-b border-border/50 bg-background">
           <div className="container mx-auto px-4 space-y-8">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="min-w-0">
-                <div className="text-sm text-muted-foreground">Welcome back</div>
-                <h1 className="text-3xl md:text-4xl font-bold font-founders truncate">
-                  {user.displayName ? user.displayName : '—'}
-                </h1>
-                <div className="text-sm text-muted-foreground mt-1">Pick up where you left off.</div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button asChild className="min-h-[44px] font-semibold">
-                  <Link href="/browse">
-                    <Search className="h-4 w-4 mr-2" />
-                    Browse
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="min-h-[44px] font-semibold">
-                  <Link href="/dashboard/watchlist">Watchlist</Link>
-                </Button>
-                <Button asChild variant="outline" className="min-h-[44px] font-semibold">
-                  <Link href="/dashboard/messages">Messages</Link>
-                </Button>
-              </div>
-            </div>
 
             <div className="space-y-4">
               <SectionHeader
