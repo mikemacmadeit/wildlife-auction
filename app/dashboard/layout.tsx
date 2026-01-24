@@ -764,13 +764,13 @@ export default function DashboardLayout({
       {/* Mobile Top Bar */}
       <div className="md:hidden sticky top-0 z-50 border-b border-border/50 bg-card">
         <div className="flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 group">
             <Image
               src="/images/Kudu.png"
               alt="Wildlife Exchange"
               width={36}
               height={36}
-              className="h-9 w-9 object-contain opacity-90"
+              className="h-9 w-9 object-contain opacity-90 group-hover:opacity-100 transition-opacity"
               priority
               loading="eager"
               style={{
@@ -778,21 +778,27 @@ export default function DashboardLayout({
               }}
             />
             <div className="flex flex-col">
-              <span className="text-base font-extrabold text-foreground leading-tight">
+              <span className="text-base font-extrabold text-foreground leading-tight group-hover:text-primary transition-colors">
                 Wildlife Exchange
               </span>
               <span className="text-[10px] text-muted-foreground font-medium">
                 Dashboard
               </span>
             </div>
-          </div>
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Menu</span>
+          </Link>
+          <div className="flex items-center gap-1">
+            <Link href="/" prefetch={false}>
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Home">
+                <Home className="h-5 w-5" />
               </Button>
-            </SheetTrigger>
+            </Link>
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Menu</span>
+                </Button>
+              </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0">
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between p-4 border-b border-border/50">
@@ -819,35 +825,37 @@ export default function DashboardLayout({
                           </button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-1 pt-1">
-                          {baseNavWithBadges.map((item) => {
-                            const Icon = item.icon;
-                            const active = isActive(item.href);
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                prefetch={false}
-                                onClick={(e) => {
-                                  setMobileMenuOpen(false);
-                                  hardNavigate(e, item.href);
-                                }}
-                                className={cn(
-                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
-                                  'hover:bg-background/50',
-                                  'min-h-[44px]',
-                                  active && 'bg-primary/10 text-primary border-primary'
-                                )}
-                              >
-                                <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                                <span className="flex-1 min-w-0 truncate whitespace-nowrap">{item.label}</span>
-                                {item.badge && item.badge > 0 && (
-                                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                    {item.badge}
-                                  </Badge>
-                                )}
-                              </Link>
-                            );
-                          })}
+                          {baseNavWithBadges
+                            .filter((item) => item.href !== '/browse') // Remove Browse from mobile menu since it's in bottom nav
+                            .map((item) => {
+                              const Icon = item.icon;
+                              const active = isActive(item.href);
+                              return (
+                                <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  prefetch={false}
+                                  onClick={(e) => {
+                                    setMobileMenuOpen(false);
+                                    hardNavigate(e, item.href);
+                                  }}
+                                  className={cn(
+                                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
+                                    'hover:bg-background/50',
+                                    'min-h-[44px]',
+                                    active && 'bg-primary/10 text-primary border-primary'
+                                  )}
+                                >
+                                  <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                                  <span className="flex-1 min-w-0 truncate whitespace-nowrap">{item.label}</span>
+                                  {item.badge && item.badge > 0 && (
+                                    <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </Link>
+                              );
+                            })}
                         </CollapsibleContent>
                       </Collapsible>
 

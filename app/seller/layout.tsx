@@ -35,6 +35,7 @@ import {
   Users,
   LifeBuoy,
   Compass,
+  Home,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -695,10 +696,10 @@ export default function SellerLayout({
       {/* Mobile Top Bar */}
       <div className="md:hidden sticky top-0 z-50 border-b border-border/50 bg-card">
         <div className="flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 group">
             <div
               aria-hidden="true"
-              className="h-9 w-9 opacity-95"
+              className="h-9 w-9 opacity-95 group-hover:opacity-100 transition-opacity"
               style={{
                 backgroundColor: 'hsl(var(--primary))',
                 WebkitMaskImage: "url('/images/Kudu.png')",
@@ -712,18 +713,18 @@ export default function SellerLayout({
               }}
             />
             <div className="flex flex-col">
-              <span className="text-base font-extrabold text-foreground leading-tight">
+              <span className="text-base font-extrabold text-foreground leading-tight group-hover:text-primary transition-colors">
                 Wildlife Exchange
               </span>
               <span className="text-[10px] text-muted-foreground font-medium">
                 Dashboard
               </span>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-1">
-            <Link href="/browse" prefetch={false} onClick={(e) => hardNavigate(e, '/browse')}>
-              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Browse listings">
-                <Compass className="h-5 w-5 text-primary" />
+            <Link href="/" prefetch={false}>
+              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Home">
+                <Home className="h-5 w-5 text-primary" />
               </Button>
             </Link>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -759,35 +760,37 @@ export default function SellerLayout({
                           </button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-1 pt-1">
-                          {baseNavWithBadges.map((item) => {
-                            const Icon = item.icon;
-                            const active = isActive(item.href);
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                prefetch={false}
-                                onClick={(e) => {
-                                  setMobileMenuOpen(false);
-                                  hardNavigate(e, item.href);
-                                }}
-                                className={cn(
-                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
-                                  'hover:bg-background/50',
-                                  'min-h-[44px]',
-                                  active && 'bg-primary/10 text-primary border-l-4 border-primary'
-                                )}
-                              >
-                                <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                                <span className="flex-1">{item.label}</span>
-                                {item.badge && item.badge > 0 && (
-                                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                    {item.badge}
-                                  </Badge>
-                                )}
-                              </Link>
-                            );
-                          })}
+                          {baseNavWithBadges
+                            .filter((item) => item.href !== '/browse') // Remove Browse from mobile menu since it's in bottom nav
+                            .map((item) => {
+                              const Icon = item.icon;
+                              const active = isActive(item.href);
+                              return (
+                                <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  prefetch={false}
+                                  onClick={(e) => {
+                                    setMobileMenuOpen(false);
+                                    hardNavigate(e, item.href);
+                                  }}
+                                  className={cn(
+                                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                                    'hover:bg-background/50',
+                                    'min-h-[44px]',
+                                    active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                                  )}
+                                >
+                                  <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                                  <span className="flex-1">{item.label}</span>
+                                  {item.badge && item.badge > 0 && (
+                                    <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                      {item.badge}
+                                    </Badge>
+                                  )}
+                                </Link>
+                              );
+                            })}
                         </CollapsibleContent>
                       </Collapsible>
 
