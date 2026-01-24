@@ -90,11 +90,11 @@ export function Footer() {
   };
 
   return (
-    <footer className="relative border-t border-border/50 bg-[hsl(75_8%_10%)] text-[hsl(37_27%_85%)]">
+    <footer className="relative border-t border-border/50 bg-[hsl(37_27%_98%)] dark:bg-[hsl(75_8%_10%)] text-[hsl(37_27%_15%)] dark:text-[hsl(37_27%_85%)]">
       {/* Subtle texture / glow */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 opacity-[0.35] [background:radial-gradient(80%_60%_at_20%_0%,hsl(90_12%_28%/.35)_0%,transparent_60%),radial-gradient(70%_60%_at_80%_10%,hsl(37_27%_70%/.18)_0%,transparent_55%)]" />
-        <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(to_right,hsl(37_27%_70%/.08)_1px,transparent_1px),linear-gradient(to_bottom,hsl(37_27%_70%/.08)_1px,transparent_1px)] [background-size:42px_42px]" />
+        <div className="absolute inset-0 opacity-[0.15] dark:opacity-[0.35] [background:radial-gradient(80%_60%_at_20%_0%,hsl(90_12%_45%/.15)_0%,transparent_60%),radial-gradient(70%_60%_at_80%_10%,hsl(37_27%_50%/.08)_0%,transparent_55%)] dark:[background:radial-gradient(80%_60%_at_20%_0%,hsl(90_12%_28%/.35)_0%,transparent_60%),radial-gradient(70%_60%_at_80%_10%,hsl(37_27%_70%/.18)_0%,transparent_55%)]" />
+        <div className="absolute inset-0 opacity-[0.08] dark:opacity-[0.18] [background-image:linear-gradient(to_right,hsl(37_27%_30%/.05)_1px,transparent_1px),linear-gradient(to_bottom,hsl(37_27%_30%/.05)_1px,transparent_1px)] dark:[background-image:linear-gradient(to_right,hsl(37_27%_70%/.08)_1px,transparent_1px),linear-gradient(to_bottom,hsl(37_27%_70%/.08)_1px,transparent_1px)] [background-size:42px_42px]" />
       </div>
 
       <div className="relative container mx-auto px-4 md:px-6 py-12">
@@ -104,7 +104,7 @@ export function Footer() {
             <Link href="/" className="inline-flex items-center gap-3 group">
               <div className="relative h-10 w-10">
                 <div
-                  className="h-full w-full bg-[hsl(37_27%_70%)]"
+                  className="h-full w-full bg-[hsl(37_27%_30%)] dark:bg-[hsl(37_27%_70%)]"
                   style={{
                     maskImage: 'url(/images/Kudu.png)',
                     maskSize: 'contain',
@@ -118,29 +118,29 @@ export function Footer() {
                 />
               </div>
               <div className="leading-tight">
-                <div className="text-lg font-extrabold tracking-tight text-[hsl(37_27%_88%)]">
+                <div className="text-lg font-extrabold tracking-tight text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">
                   Wildlife Exchange
                 </div>
-                <div className="text-xs text-[hsl(37_27%_78%)]">
+                <div className="text-xs text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]">
                   Texas marketplace • built for trust
                 </div>
               </div>
             </Link>
 
-            <p className="text-sm text-[hsl(37_27%_78%)] max-w-sm">
+            <p className="text-sm text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] max-w-sm">
               Texas marketplace for whitetail breeders, exotics, and cattle—built for trust and compliance.
             </p>
 
             <div className="flex items-center gap-2">
               <Badge
                 variant="secondary"
-                className="bg-white/10 text-[hsl(37_27%_88%)] border border-white/10"
+                className="bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
               >
                 Texas-only animals
               </Badge>
               <Badge
                 variant="secondary"
-                className="bg-white/10 text-[hsl(37_27%_88%)] border border-white/10"
+                className="bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
               >
                 Escrow + payout gating
               </Badge>
@@ -149,14 +149,14 @@ export function Footer() {
 
           {/* Marketplace */}
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-[hsl(37_27%_88%)]">Marketplace</div>
+            <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Marketplace</div>
             <ul className="space-y-2 text-sm">
               {links.marketplace.map((l) =>
                 l.href === '/dashboard/listings/new' ? (
                   <li key={l.href}>
                     <CreateListingGateLink
                       href={l.href}
-                      className="text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
+                      className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
                     >
                       {l.label}
                     </CreateListingGateLink>
@@ -165,7 +165,7 @@ export function Footer() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
+                      className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
                     >
                       {l.label}
                     </Link>
@@ -177,13 +177,13 @@ export function Footer() {
 
           {/* Trust */}
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-[hsl(37_27%_88%)]">Trust</div>
+            <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Trust</div>
             <ul className="space-y-2 text-sm">
               {links.trust.map((l) => (
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
+                    className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
                   >
                     {l.label}
                   </Link>
@@ -195,13 +195,13 @@ export function Footer() {
           {/* Legal + Support */}
           <div className="space-y-6">
             <div className="space-y-3">
-              <div className="text-sm font-semibold text-[hsl(37_27%_88%)]">Legal</div>
+              <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Legal</div>
               <ul className="space-y-2 text-sm">
                 {links.legal.map((l) => (
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
+                      className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
                     >
                       {l.label}
                     </Link>
@@ -211,13 +211,13 @@ export function Footer() {
             </div>
 
             <div className="space-y-3">
-              <div className="text-sm font-semibold text-[hsl(37_27%_88%)]">Support</div>
+              <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Support</div>
               <ul className="space-y-2 text-sm">
                 {links.support.map((l) => (
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
+                      className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
                     >
                       {l.label}
                     </Link>
@@ -289,11 +289,11 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          <div className="text-xs text-[hsl(37_27%_70%)]">
+        <div className="mt-10 pt-6 border-t border-black/10 dark:border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="text-xs text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
             © {currentYear()} Wildlife Exchange. All rights reserved.
           </div>
-          <div className="text-xs text-[hsl(37_27%_70%)]">
+          <div className="text-xs text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
             Texas-only for animal transactions. Equipment may be multi-state.
           </div>
         </div>
