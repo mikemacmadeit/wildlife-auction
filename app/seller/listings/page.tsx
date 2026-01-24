@@ -90,7 +90,7 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
     <Badge
       variant="outline"
       className={cn(
-        'font-semibold text-xs whitespace-nowrap truncate max-w-[160px]',
+        'font-semibold text-xs whitespace-nowrap',
         config.className
       )}
     >
@@ -102,11 +102,11 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
 const getTypeBadge = (type: string) => {
   const labels: Record<string, string> = {
     auction: 'Auction',
-    fixed: 'Fixed Price',
+    fixed: 'Fixed',
     classified: 'Classified',
   };
   return (
-    <Badge variant="outline" className="font-semibold text-xs whitespace-nowrap truncate max-w-[140px]">
+    <Badge variant="outline" className="font-semibold text-xs whitespace-nowrap">
       {labels[type] || type}
     </Badge>
   );
@@ -180,32 +180,36 @@ const ListingRow = memo(({
     key={listing.id}
     className="border-b border-border/30 hover:bg-background/50 group"
   >
-    <td className="p-4 align-middle">
-      <div className="flex items-start gap-3">
-        <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+    <td className="p-3 align-middle">
+      <div className="flex items-start gap-2">
+        <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
           {getPrimaryListingImageUrl(listing) ? (
             <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
           ) : null}
         </div>
-        <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-col gap-1 min-w-0 flex-1">
           <Link
             href={`/listing/${listing.id}`}
-            className="font-semibold text-foreground hover:text-primary group-hover:underline truncate"
+            className="font-semibold text-sm text-foreground hover:text-primary group-hover:underline truncate"
           >
             {listing.title}
           </Link>
           {listing.endsAt && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              <span>{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
+              <Calendar className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
             </div>
           )}
         </div>
       </div>
     </td>
-    <td className="p-4 align-middle">{getTypeBadge(listing.type)}</td>
-    <td className="p-4 align-middle">
-      <div className="font-bold text-foreground">
+    <td className="p-2 align-middle">
+      <div className="flex justify-start">
+        {getTypeBadge(listing.type)}
+      </div>
+    </td>
+    <td className="p-2 align-middle">
+      <div className="font-bold text-sm text-foreground whitespace-nowrap">
         {listing.type === 'auction'
           ? listing.currentBid
             ? `$${listing.currentBid.toLocaleString()}`
@@ -215,50 +219,54 @@ const ListingRow = memo(({
           : 'Contact'}
       </div>
     </td>
-    <td className="p-4 align-middle">
-      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+    <td className="p-2 align-middle">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
         <MapPin className="h-3 w-3 flex-shrink-0" />
-        <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
+        <span className="truncate">{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
       </div>
     </td>
-    <td className="p-4 align-middle">
-      {getStatusBadge({
-        status: effectiveStatus,
-        type: listing.type,
-        ended: isAuctionEnded(listing),
-      })}
+    <td className="p-2 align-middle">
+      <div className="flex justify-start">
+        {getStatusBadge({
+          status: effectiveStatus,
+          type: listing.type,
+          ended: isAuctionEnded(listing),
+        })}
+      </div>
     </td>
-    <td className="p-4 align-middle">
-      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Eye className="h-3 w-3" />
-          <span>{listing.metrics.views} views</span>
+    <td className="p-2 align-middle">
+      <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <Eye className="h-3 w-3 flex-shrink-0" />
+          <span>{listing.metrics.views}</span>
         </div>
         {listing.type === 'auction' && (
           <>
-            <div className="flex items-center gap-2">
-              <Users className="h-3 w-3" />
-              <span>{listing.metrics.favorites} watchers</span>
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
+              <Users className="h-3 w-3 flex-shrink-0" />
+              <span>{listing.metrics.favorites}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Gavel className="h-3 w-3" />
-              <span>{listing.metrics.bidCount} bids</span>
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
+              <Gavel className="h-3 w-3 flex-shrink-0" />
+              <span>{listing.metrics.bidCount}</span>
             </div>
           </>
         )}
       </div>
     </td>
-    <td className="p-4 align-middle">
-      <ListingRowActions
-        listingId={listing.id}
-        status={effectiveStatus}
-        onPromote={() => onPublish(listing)}
-        onResubmit={() => onResubmit(listing)}
-        resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
-        onDuplicate={() => onDuplicate(listing)}
-        onPause={() => onPause(listing)}
-        onDelete={() => onDelete(listing)}
-      />
+    <td className="p-2 align-middle">
+      <div className="flex justify-start">
+        <ListingRowActions
+          listingId={listing.id}
+          status={effectiveStatus}
+          onPromote={() => onPublish(listing)}
+          onResubmit={() => onResubmit(listing)}
+          resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
+          onDuplicate={() => onDuplicate(listing)}
+          onPause={() => onPause(listing)}
+          onDelete={() => onDelete(listing)}
+        />
+      </div>
     </td>
   </tr>
 ));
@@ -285,8 +293,8 @@ const MobileListingCard = memo(({
   onDelete: (listing: Listing) => void;
 }) => (
   <div key={listing.id} className="p-4 space-y-3">
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-start gap-3 flex-1 min-w-0">
+    <div className="flex items-start justify-between gap-2 min-w-0">
+      <div className="flex items-start gap-2 flex-1 min-w-0">
         <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
           {getPrimaryListingImageUrl(listing) ? (
             <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
@@ -295,11 +303,11 @@ const MobileListingCard = memo(({
         <div className="flex-1 min-w-0">
         <Link
           href={`/listing/${listing.id}`}
-          className="font-semibold text-foreground hover:text-primary block mb-1"
+          className="font-semibold text-sm text-foreground hover:text-primary block mb-1 truncate"
         >
           {listing.title}
         </Link>
-        <div className="flex items-center gap-2 mb-2 flex-nowrap min-w-0">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           {getTypeBadge(listing.type)}
           {getStatusBadge({
             status: effectiveStatus,
@@ -309,16 +317,18 @@ const MobileListingCard = memo(({
         </div>
         </div>
       </div>
-      <ListingRowActions
-        listingId={listing.id}
-        status={effectiveStatus}
-        onPromote={() => onPublish(listing)}
-        onResubmit={() => onResubmit(listing)}
-        resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
-        onDuplicate={() => onDuplicate(listing)}
-        onPause={() => onPause(listing)}
-        onDelete={() => onDelete(listing)}
-      />
+      <div className="flex-shrink-0">
+        <ListingRowActions
+          listingId={listing.id}
+          status={effectiveStatus}
+          onPromote={() => onPublish(listing)}
+          onResubmit={() => onResubmit(listing)}
+          resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
+          onDuplicate={() => onDuplicate(listing)}
+          onPause={() => onPause(listing)}
+          onDelete={() => onDelete(listing)}
+        />
+      </div>
     </div>
 
     <div className="flex items-center gap-4 text-sm">
@@ -753,29 +763,38 @@ function SellerListingsPageContent() {
           <Card className="border-2 border-border/50 bg-card">
             <CardContent className="p-0">
               {/* Desktop Table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
+              <div className="hidden md:block overflow-hidden">
+                <table className="w-full table-fixed">
+                  <colgroup>
+                    <col className="w-[30%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[10%]" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b-2 border-border/50 bg-background/50">
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-3 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Listing
                       </th>
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Type
                       </th>
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Price/Bid
                       </th>
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Location
                       </th>
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Status
                       </th>
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Metrics
                       </th>
-                      <th className="h-14 px-6 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Actions
                       </th>
                     </tr>
