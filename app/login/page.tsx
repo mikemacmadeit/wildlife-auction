@@ -90,17 +90,9 @@ export default function LoginPage() {
           referrer: referrer.substring(0, 100),
         });
         
-        // CRITICAL: Call getRedirectResult ASAP - Firebase stores redirect results
-        // and they must be consumed quickly. Minimal delay only.
-        // If we were expecting a redirect, use even shorter delay
-        const delay = (hasOAuthCallback || wasExpectingRedirect) ? 50 : (typeof window !== 'undefined' && window.innerWidth < 1024 ? 200 : 100);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        if (cancelled) {
-          setCheckingRedirect(false);
-          return;
-        }
-        
-        // Try getRedirectResult first
+        // CRITICAL: Call getRedirectResult IMMEDIATELY - no delays
+        // Firebase processes redirects synchronously on page load
+        // Any delay can cause the result to be lost
         const result = await getGoogleRedirectResult();
         if (cancelled) {
           setCheckingRedirect(false);

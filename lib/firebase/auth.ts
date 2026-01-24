@@ -310,29 +310,16 @@ export const getGoogleRedirectResult = async (): Promise<UserCredential | null> 
   try {
     console.log('[Google Sign-In] Checking for redirect result...');
     
-    // CRITICAL: getRedirectResult can ONLY be called ONCE per redirect
-    // If we call it and it returns null, calling it again will also return null
-    // So we MUST wait for authStateReady FIRST, then call it ONCE
-    console.log('[Google Sign-In] Waiting for auth state to be ready before calling getRedirectResult...');
-    
-    try {
-      await auth.authStateReady();
-      console.log('[Google Sign-In] Auth state is ready');
-    } catch (authReadyError: any) {
-      console.warn('[Google Sign-In] authStateReady failed, continuing anyway:', authReadyError);
-    }
-    
-    // Small delay to ensure Firebase has fully processed the redirect
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Call getRedirectResult ONCE (and only once) after auth is ready
+    // CRITICAL: Call getRedirectResult IMMEDIATELY on page load
+    // Firebase processes redirects synchronously and the result must be consumed ASAP
+    // Do NOT wait for authStateReady - call it immediately
     let result: UserCredential | null = null;
     let lastError: any = null;
     
     try {
       result = await getRedirectResult(auth);
       if (result?.user) {
-        console.log('[Google Sign-In] Redirect result found:', {
+        console.log('[Google Sign-In] Redirect result found immediately:', {
           email: result.user.email,
           uid: result.user.uid,
           operationType: result.operationType,
