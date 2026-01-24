@@ -794,7 +794,7 @@ export default function HomePage() {
           {/* Search Bar - Full width on desktop */}
           <section className="border-b border-border/50 bg-card/50 py-4 md:py-6">
             <div className="container mx-auto px-4">
-              <form onSubmit={handleSearchSubmit} className="relative max-w-4xl mx-auto">
+              <form onSubmit={handleSearchSubmit} className="relative w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
@@ -906,7 +906,7 @@ export default function HomePage() {
           <div className="container mx-auto px-4 space-y-8">
             {/* Welcome Section - Above trending listings */}
             <div className="space-y-4">
-              <div className="max-w-4xl mx-auto space-y-4">
+              <div className="w-full space-y-4">
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
                   <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>

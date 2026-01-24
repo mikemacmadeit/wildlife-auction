@@ -58,6 +58,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
+import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
 import {
   markNotificationsAsReadByTypes,
   subscribeToUnreadCount,
@@ -330,21 +331,6 @@ export default function SellerLayout({
     }
   };
 
-  // Workaround: some environments intermittently fail to fetch the Next.js RSC payload during client navigation,
-  // which spams console with "Failed to fetch RSC payload ... Falling back to browser navigation".
-  // Since the runtime already falls back, we proactively do a hard navigation for seller sidebar links.
-  const hardNavigate = useCallback((e: any, href: string) => {
-    try {
-      if (!href) return;
-      if (e?.defaultPrevented) return;
-      if (e?.button !== undefined && e.button !== 0) return;
-      if (e?.metaKey || e?.ctrlKey || e?.shiftKey || e?.altKey) return;
-      e?.preventDefault?.();
-      if (typeof window !== 'undefined') window.location.href = href;
-    } catch {
-      // best-effort
-    }
-  }, []);
 
   // Protect all seller routes - require authentication
   return (
@@ -770,10 +756,7 @@ export default function SellerLayout({
                                   key={item.href}
                                   href={item.href}
                                   prefetch={false}
-                                  onClick={(e) => {
-                                    setMobileMenuOpen(false);
-                                    hardNavigate(e, item.href);
-                                  }}
+                                  onClick={() => setMobileMenuOpen(false)}
                                   className={cn(
                                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                                     'hover:bg-background/50',
@@ -813,10 +796,7 @@ export default function SellerLayout({
                                 key={item.href}
                                 href={item.href}
                                 prefetch={false}
-                                onClick={(e) => {
-                                  setMobileMenuOpen(false);
-                                  hardNavigate(e, item.href);
-                                }}
+                                onClick={() => setMobileMenuOpen(false)}
                                 className={cn(
                                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                                   'hover:bg-background/50',
@@ -847,10 +827,7 @@ export default function SellerLayout({
                             key={item.href}
                             href={item.href}
                             prefetch={false}
-                            onClick={(e) => {
-                              setMobileMenuOpen(false);
-                              hardNavigate(e, item.href);
-                            }}
+                            onClick={() => setMobileMenuOpen(false)}
                             className={cn(
                               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',
@@ -886,7 +863,9 @@ export default function SellerLayout({
       )}>
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
-          {children}
+          <ProductionErrorBoundary>
+            {children}
+          </ProductionErrorBoundary>
         </main>
 
         {/* Mobile Bottom Nav */}
@@ -906,7 +885,6 @@ export default function SellerLayout({
                     'min-h-[44px] touch-manipulation',
                     active && 'text-primary'
                   )}
-                  onClick={(e) => hardNavigate(e, item.href)}
                 >
                   <div className="relative">
                     <Icon className={cn(

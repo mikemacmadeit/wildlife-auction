@@ -59,6 +59,7 @@ import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { QuickSetupTour } from '@/components/onboarding/QuickSetupTour';
+import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
 import { useQuickSetupTour } from '@/hooks/use-quick-setup-tour';
 import { db } from '@/lib/firebase/config';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
@@ -90,9 +91,9 @@ const baseNavItems: DashboardNavItem[] = [
   { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
   { href: '/seller/sales', label: 'Sold', icon: DollarSign },
   { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
-  { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
   { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
   { href: '/seller/reputation', label: 'Reputation', icon: Award },
+  { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
   { href: '/dashboard/account', label: 'Settings', icon: Settings },
 ];
 
@@ -379,22 +380,6 @@ export default function DashboardLayout({
     }
   };
 
-  // Workaround: some environments intermittently fail to fetch the Next.js RSC payload during client navigation,
-  // which spams console with "Failed to fetch RSC payload ... Falling back to browser navigation".
-  // Since the runtime already falls back, we proactively do a hard navigation for dashboard sidebar links.
-  const hardNavigate = useCallback((e: any, href: string) => {
-    try {
-      if (!href) return;
-      // Allow opening in new tab/window or with modifier keys.
-      if (e?.defaultPrevented) return;
-      if (e?.button !== undefined && e.button !== 0) return;
-      if (e?.metaKey || e?.ctrlKey || e?.shiftKey || e?.altKey) return;
-      e?.preventDefault?.();
-      if (typeof window !== 'undefined') window.location.href = href;
-    } catch {
-      // best-effort
-    }
-  }, []);
 
   // Don't show dashboard layout for listing creation page
   if (pathname === '/dashboard/listings/new') {
@@ -838,10 +823,7 @@ export default function DashboardLayout({
                                   key={item.href}
                                   href={item.href}
                                   prefetch={false}
-                                  onClick={(e) => {
-                                    setMobileMenuOpen(false);
-                                    hardNavigate(e, item.href);
-                                  }}
+                                  onClick={() => setMobileMenuOpen(false)}
                                   className={cn(
                                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
                                     'hover:bg-background/50',
@@ -881,10 +863,7 @@ export default function DashboardLayout({
                                 key={item.href}
                                 href={item.href}
                                 prefetch={false}
-                                onClick={(e) => {
-                                  setMobileMenuOpen(false);
-                                  hardNavigate(e, item.href);
-                                }}
+                                onClick={() => setMobileMenuOpen(false)}
                                 className={cn(
                                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
                                   'hover:bg-background/50',
@@ -915,10 +894,7 @@ export default function DashboardLayout({
                             key={item.href}
                             href={item.href}
                             prefetch={false}
-                            onClick={(e) => {
-                              setMobileMenuOpen(false);
-                              hardNavigate(e, item.href);
-                            }}
+                            onClick={() => setMobileMenuOpen(false)}
                             className={cn(
                               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
                               'hover:bg-background/50',
@@ -955,7 +931,9 @@ export default function DashboardLayout({
       >
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <ProductionErrorBoundary>
+            {children}
+          </ProductionErrorBoundary>
         </main>
 
         {/* Mobile Bottom Nav */}
@@ -975,7 +953,6 @@ export default function DashboardLayout({
                     'min-h-[44px] touch-manipulation',
                     active && 'text-primary'
                   )}
-                  onClick={(e) => hardNavigate(e, item.href)}
                 >
                   <div className="relative">
                     <Icon

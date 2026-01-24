@@ -1426,16 +1426,16 @@ export default function BrowsePage() {
                 {/* Desktop/tablet: respect view mode */}
                 {viewMode === 'card' ? (
                   <div className="hidden md:block w-full">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-fr">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                       <AnimatePresence>
                         {sortedListings.map((listing) =>
                           listing.featured ? (
-                            <div key={listing.id} className="min-w-0">
-                              <FeaturedListingCard listing={listing} />
+                            <div key={listing.id} className="w-full">
+                              <FeaturedListingCard listing={listing} className="h-full" />
                             </div>
                           ) : (
-                            <div key={listing.id} className="min-w-0">
-                              <ListingCard listing={listing} />
+                            <div key={listing.id} className="w-full">
+                              <ListingCard listing={listing} className="h-full" />
                             </div>
                           )
                         )}
