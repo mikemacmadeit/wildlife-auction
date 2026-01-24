@@ -170,7 +170,8 @@ export default function SellerLayout({
   }, [showAdminNav, navPrefsLoaded, userNavOpen, adminNavOpen]);
 
   const baseNavWithBadges = useMemo(() => {
-    return baseNavItems.map((item) => {
+    // Ensure all baseNavItems are included (no filtering) - Support must always be visible
+    const items = baseNavItems.map((item) => {
       if (item.href === '/dashboard/messages') {
         return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
       }
@@ -182,6 +183,13 @@ export default function SellerLayout({
       }
       return item;
     });
+    // Verify Support is included (defensive check)
+    const hasSupport = items.some(item => item.href === '/dashboard/support');
+    if (!hasSupport) {
+      console.warn('[SellerLayout] Support tab missing from baseNavWithBadges, adding it');
+      items.push({ href: '/dashboard/support', label: 'Support', icon: LifeBuoy });
+    }
+    return items;
   }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
 
   // Clear the Messages badge when the user views the Messages page.
