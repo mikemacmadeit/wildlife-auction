@@ -173,7 +173,16 @@ export const getCurrentUser = (): User | null => {
 };
 
 /**
- * Sign in with Google using popup
+ * Detect if user is on a mobile device
+ */
+const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+};
+
+/**
+ * Sign in with Google using popup on desktop, redirect on mobile
  * Falls back to redirect if popup is blocked
  */
 export const signInWithGoogle = async (): Promise<UserCredential> => {
@@ -182,8 +191,17 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     prompt: 'select_account',
   });
   
+  // Use redirect on mobile devices (popups don't work well on mobile)
+  if (isMobileDevice()) {
+    console.log('Mobile device detected, using redirect for Google sign-in');
+    await signInWithRedirect(auth, provider);
+    // Redirect will navigate away, so we throw a special error
+    // The page will reload after redirect completes
+    throw new Error('REDIRECT_INITIATED');
+  }
+  
   try {
-    // Try popup first (better UX)
+    // Try popup first on desktop (better UX)
     return await signInWithPopup(auth, provider);
   } catch (error: any) {
     console.error('Google sign-in popup error:', error);
