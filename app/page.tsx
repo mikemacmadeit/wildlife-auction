@@ -791,32 +791,33 @@ export default function HomePage() {
       ) : effectiveUser ? (
         <>
           {/* Signed-in: Search bar and welcome section */}
-          {/* Search Bar */}
+          {/* Search Bar - Full width on desktop */}
           <section className="border-b border-border/50 bg-card/50 py-4 md:py-6">
-            <div className="container mx-auto px-4 max-w-4xl">
-              <form onSubmit={handleSearchSubmit} className="relative">
+            <div className="container mx-auto px-4">
+              <form onSubmit={handleSearchSubmit} className="relative max-w-4xl mx-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search listings, species, breeds, and locations…"
                   value={homeSearchQuery}
                   onChange={(e) => setHomeSearchQuery(e.target.value)}
-                  className="pl-11 min-h-[52px] text-base rounded-xl bg-background"
+                  className="pl-11 min-h-[52px] text-base rounded-xl bg-background w-full"
                 />
               </form>
             </div>
           </section>
 
-          {/* Welcome Section - Mobile visible below search */}
+          {/* Welcome Section - Left aligned on desktop, below search on mobile */}
           <section className="border-b border-border/50 bg-background py-6 md:py-8">
-            <div className="container mx-auto px-4 max-w-4xl">
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
-                  <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
-                  <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
+            <div className="container mx-auto px-4">
+              <div className="max-w-4xl mx-auto md:flex md:items-start md:gap-8">
+                <div className="space-y-4 md:flex-shrink-0">
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
+                    <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
+                    <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
                   <Button asChild variant="outline" className="min-h-[44px]">
                     <Link href="/browse" className="flex items-center gap-2">
                       <Search className="h-4 w-4" />
