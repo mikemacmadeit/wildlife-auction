@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
 import { useToast } from '@/hooks/use-toast';
+import { getUserProfile } from '@/lib/firebase/users';
 
 function toDateSafe(v: any): Date | null {
   if (!v) return null;
@@ -63,6 +64,7 @@ export default function HomePage() {
   const activeCountBySellerIdRef = useRef<Record<string, number | null>>({});
   const [messagingSellerId, setMessagingSellerId] = useState<string | null>(null);
   const [newFromSavedSellers, setNewFromSavedSellers] = useState<Listing[]>([]);
+  const [userProfile, setUserProfile] = useState<any | null>(null);
 
   // Keep a ref in sync so effects can read the latest cache without depending on it.
   useEffect(() => {
@@ -734,8 +736,46 @@ export default function HomePage() {
   // Use the current user if available, otherwise fall back to last known user during loading
   const effectiveUser = user || (authLoading ? lastUserRef.current : null);
   
-  // Get user display name (fallback to email if no display name)
-  const userDisplayName = effectiveUser?.displayName || effectiveUser?.email?.split('@')[0] || 'User';
+  // Fetch user profile to get displayNamePreference and businessName
+  useEffect(() => {
+    if (!effectiveUser?.uid) {
+      setUserProfile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getUserProfile(effectiveUser.uid);
+        if (!cancelled) {
+          setUserProfile(profile);
+        }
+      } catch {
+        if (!cancelled) setUserProfile(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveUser?.uid]);
+  
+  // Get user display name for welcome section
+  // - If business name preference is enabled, show business name
+  // - Otherwise, show first name only
+  const userDisplayName = useMemo(() => {
+    if (!effectiveUser) return 'User';
+    
+    const displayNamePreference = userProfile?.profile?.preferences?.displayNamePreference || 'personal';
+    const businessName = userProfile?.profile?.businessName?.trim();
+    
+    if (displayNamePreference === 'business' && businessName) {
+      return businessName;
+    }
+    
+    // Extract first name from full name or display name
+    const fullName = userProfile?.profile?.fullName || effectiveUser.displayName || '';
+    const firstName = fullName.split(' ')[0] || effectiveUser.email?.split('@')[0] || 'User';
+    return firstName;
+  }, [effectiveUser, userProfile]);
 
   return (
     <div className="min-h-screen bg-background">
