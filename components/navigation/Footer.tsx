@@ -256,12 +256,12 @@ export function Footer() {
                     type="email"
                     inputMode="email"
                     autoComplete="email"
-                    className="min-h-[44px] bg-white/5 border-white/10 text-[hsl(37_27%_90%)] placeholder:text-[hsl(37_27%_70%)]"
+                    className="min-h-[44px] bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[hsl(37_27%_15%)] dark:text-[hsl(37_27%_90%)] placeholder:text-[hsl(37_27%_50%)] dark:placeholder:text-[hsl(37_27%_70%)]"
                   />
                   <Button
                     onClick={onSubmit}
                     disabled={loading}
-                    className="min-h-[44px] sm:min-w-[120px] font-semibold bg-[hsl(90_12%_35%)] hover:bg-[hsl(90_12%_40%)] text-white"
+                    className="min-h-[44px] sm:min-w-[120px] font-semibold bg-[hsl(90_12%_45%)] dark:bg-[hsl(90_12%_35%)] hover:bg-[hsl(90_12%_50%)] dark:hover:bg-[hsl(90_12%_40%)] text-white"
                   >
                     {loading ? (
                       <>
@@ -276,10 +276,10 @@ export function Footer() {
                     )}
                   </Button>
                 </div>
-                {error && <p className="text-xs text-red-200">{error}</p>}
-                <p className="text-[11px] leading-relaxed text-[hsl(37_27%_70%)]">
+                {error && <p className="text-xs text-red-600 dark:text-red-200">{error}</p>}
+                <p className="text-[11px] leading-relaxed text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
                   By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
-                  <Link href="/privacy" className="underline underline-offset-2 hover:text-[hsl(37_27%_92%)]">
+                  <Link href="/privacy" className="underline underline-offset-2 hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)]">
                     Privacy
                   </Link>
                   .
