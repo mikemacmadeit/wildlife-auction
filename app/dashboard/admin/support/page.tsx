@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { useAdmin } from '@/hooks/use-admin';
@@ -128,6 +128,7 @@ export default function AdminSupportPage() {
   const [sending, setSending] = useState(false);
   const [adminNote, setAdminNote] = useState('');
   const [updatingTicket, setUpdatingTicket] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -175,6 +176,10 @@ export default function AdminSupportPage() {
         if (!res.ok || body?.ok !== true) throw new Error(body?.error || body?.message || 'Failed to load ticket');
         setTicketDetail(body);
         setAdminNote(body.ticket?.adminNote || '');
+        // Scroll to bottom of message thread after loading
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
       } catch (e: any) {
         toast({ title: 'Failed to load ticket', description: e?.message || 'Please try again.', variant: 'destructive' });
       } finally {
@@ -264,8 +269,14 @@ export default function AdminSupportPage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || body?.ok !== true) throw new Error(body?.error || body?.message || 'Failed to send');
-      toast({ title: 'Reply sent', description: body?.emailed ? 'Emailed user successfully.' : 'Saved reply, but email failed.' });
+      toast({ 
+        title: 'Reply sent', 
+        description: body?.emailed 
+          ? 'Your reply has been sent to the user and is now visible in the message thread.' 
+          : 'Reply saved, but email failed. Check the message thread below.' 
+      });
       setReply('');
+      // Reload ticket detail to show the new message in the thread
       await loadTicketDetail(activeTicketId);
       await load();
     } catch (e: any) {
@@ -713,25 +724,56 @@ export default function AdminSupportPage() {
               {/* Message Thread */}
               <Card className="border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Message Thread</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Message Thread
+                    {ticketDetail.messages.length > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        {ticketDetail.messages.length} {ticketDetail.messages.length === 1 ? 'message' : 'messages'}
+                      </Badge>
+                    )}
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   {ticketDetail.messages.length === 0 ? (
-                    <div className="text-sm text-muted-foreground py-4">No messages yet.</div>
+                    <div className="text-sm text-muted-foreground py-4 text-center">No messages yet.</div>
                   ) : (
-                    ticketDetail.messages.map((msg) => (
-                      <div key={msg.id} className="space-y-2 pb-4 border-b border-border/50 last:border-0 last:pb-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={msg.kind === 'admin' ? 'default' : 'secondary'} className="text-xs">
-                              {msg.kind === 'admin' ? 'Admin' : 'User'}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">{toDateLabel(msg.createdAt)}</span>
+                    <div className="space-y-3">
+                      {ticketDetail.messages.map((msg) => {
+                        const isAdmin = msg.kind === 'admin';
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`rounded-lg border p-4 ${
+                              isAdmin
+                                ? 'bg-primary/5 border-primary/20'
+                                : 'bg-muted/30 border-border/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={isAdmin ? 'default' : 'secondary'}
+                                  className={`text-xs font-semibold ${isAdmin ? 'bg-primary text-primary-foreground' : ''}`}
+                                >
+                                  {isAdmin ? 'Admin Reply' : 'User'}
+                                </Badge>
+                                {isAdmin && user?.uid === msg.by && (
+                                  <Badge variant="outline" className="text-xs">
+                                    You
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-muted-foreground">{toDateLabel(msg.createdAt)}</span>
+                            </div>
+                            <div className={`text-sm whitespace-pre-wrap ${isAdmin ? 'font-medium' : ''}`}>
+                              {msg.body}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-sm whitespace-pre-wrap">{msg.body}</div>
-                      </div>
-                    ))
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
                   )}
                 </CardContent>
               </Card>
