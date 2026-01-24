@@ -195,13 +195,18 @@ export default function MessagesPage() {
       
       if (!threadSnapshot.empty) {
         const threadData = threadSnapshot.docs[0].data();
-        setThread({
+        const threadObj = {
           id: threadId,
           ...threadData,
           createdAt: threadData.createdAt?.toDate() || new Date(),
           updatedAt: threadData.updatedAt?.toDate() || new Date(),
           lastMessageAt: threadData.lastMessageAt?.toDate(),
-        } as MessageThread);
+        } as MessageThread;
+        setThread(threadObj);
+        // Mark thread as read when opening via deep link
+        markThreadAsRead(threadId, user.uid).catch(() => {});
+        // Clear message notification badge when viewing messages (best-effort)
+        markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
       }
 
       // Get other party name
@@ -260,6 +265,8 @@ export default function MessagesPage() {
     setThread(t);
     // Clear message notification badge when viewing messages (best-effort).
     markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
+    // Mark thread as read immediately when selected to clear unread badge
+    markThreadAsRead(selectedThreadId, user.uid).catch(() => {});
     const meta = metaByThreadId[selectedThreadId];
     setOtherPartyName(meta?.otherName || 'User');
     setOtherPartyAvatar(meta?.otherAvatar || undefined);
