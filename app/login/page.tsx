@@ -127,7 +127,7 @@ export default function LoginPage() {
             // Check immediately first
             const immediateCheck = getCurrentUser();
             if (immediateCheck) {
-              user = immediateCheck;
+              user = immediateCheck ?? undefined;
               console.log('[Login] User found on immediate check:', user.email);
             } else {
               // Wait for onAuthStateChanged to fire
@@ -179,7 +179,8 @@ export default function LoginPage() {
               
               // Final check after waiting
               if (!user) {
-                user = getCurrentUser();
+                const currentUserCheck = getCurrentUser();
+                user = currentUserCheck ?? undefined;
                 console.log('[Login] After auth state wait, currentUser:', user?.email || 'null');
               }
             }
@@ -188,7 +189,8 @@ export default function LoginPage() {
         
         // Final check for current user (fallback)
         if (!user) {
-          user = getCurrentUser();
+          const finalUserCheck = getCurrentUser();
+          user = finalUserCheck ?? undefined;
         }
         
         console.log('[Login] Redirect check complete:', {
@@ -205,7 +207,7 @@ export default function LoginPage() {
             email: user.email,
             uid: user.uid,
             emailVerified: user.emailVerified,
-            source: redirectUser ? 'redirectResult' : 'currentUser',
+            source: result?.user ? 'redirectResult' : 'currentUser',
           });
           
           // Clear the pending redirect flag since we found the user
