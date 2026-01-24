@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signUp, signInWithGoogle, getGoogleRedirectResult, getCurrentUser } from '@/lib/firebase/auth';
+import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
 import { createUserDocument, getUserProfile } from '@/lib/firebase/users';
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
@@ -70,44 +70,48 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle Google redirect result on page load (redirect result or currentUser fallback)
+  // Handle Google redirect result on page load
   useEffect(() => {
     getGoogleRedirectResult()
       .then((result) => {
-        const user = result?.user ?? getCurrentUser();
-        if (!user) return;
-        createUserDocument(user)
-          .then(async () => {
-            try {
-              const profile = await getUserProfile(user.uid);
-              const requiredVersion = LEGAL_VERSIONS.tos.version;
-              const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
+        if (result?.user) {
+          createUserDocument(result.user)
+            .then(async () => {
+              // Check if user has accepted terms by checking their profile
+              try {
+                const profile = await getUserProfile(result.user.uid);
+                const requiredVersion = LEGAL_VERSIONS.tos.version;
+                const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
 
-              if (!hasAcceptedTerms) {
+                if (!hasAcceptedTerms) {
+                  // User hasn't accepted terms - redirect to acceptance page
+                  const nextUrl = getRedirectPath();
+                  router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+                  return;
+                }
+
+                // User has accepted terms - proceed normally
+                toast({
+                  title: 'Welcome to Wildlife Exchange!',
+                  description: 'Your account has been created successfully with Google.',
+                });
+                router.push(getRedirectPath());
+              } catch (error) {
+                console.error('Error checking user profile after Google redirect:', error);
+                // If we can't check profile, redirect to terms acceptance to be safe
                 const nextUrl = getRedirectPath();
                 router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
-                return;
               }
-
+            })
+            .catch((error) => {
+              console.error('Error creating user document after Google redirect:', error);
               toast({
-                title: 'Welcome to Wildlife Exchange!',
-                description: 'Your account has been created successfully with Google.',
+                title: 'Google sign-up failed',
+                description: 'Failed to set up user account. Please try again.',
+                variant: 'destructive',
               });
-              router.push(getRedirectPath());
-            } catch (error) {
-              console.error('Error checking user profile after Google redirect:', error);
-              const nextUrl = getRedirectPath();
-              router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
-            }
-          })
-          .catch((error) => {
-            console.error('Error creating user document after Google redirect:', error);
-            toast({
-              title: 'Google sign-up failed',
-              description: 'Failed to set up user account. Please try again.',
-              variant: 'destructive',
             });
-          });
+        }
       })
       .catch((error: any) => {
         console.error('Error during Google redirect result:', error);

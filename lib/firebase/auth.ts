@@ -173,48 +173,6 @@ export const getCurrentUser = (): User | null => {
 };
 
 /**
- * Detect if user is on a mobile device or touch device
- * VERY aggressive detection - err on the side of using redirect
- */
-const isMobileDevice = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  
-  // Check user agent for mobile devices (case-insensitive, comprehensive)
-  const ua = (navigator.userAgent || navigator.vendor || (window as any).opera || '').toLowerCase();
-  const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet|kindle|silk|fennec/i.test(ua);
-  
-  // Check for touch capability (very common on mobile)
-  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || (window as any).DocumentTouch;
-  
-  // Check screen width (use 1024px threshold to catch tablets and small laptops)
-  const width = window.innerWidth || (window as any).screen?.width || 0;
-  const isSmallScreen = width < 1024 || (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches);
-  
-  // Check if it's a mobile browser by checking platform
-  const platform = navigator.platform || '';
-  const isMobilePlatform = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(platform);
-  
-  // VERY AGGRESSIVE: If screen is small OR has touch OR mobile UA OR mobile platform, use redirect
-  // This ensures we catch all mobile scenarios
-  const isMobile = isSmallScreen || hasTouch || isMobileUA || isMobilePlatform;
-  
-  if (isMobile) {
-    console.log('[Google Sign-In] Mobile detected - using redirect:', { 
-      width, 
-      hasTouch, 
-      isSmallScreen, 
-      isMobileUA, 
-      isMobilePlatform,
-      ua: ua.substring(0, 60) 
-    });
-  } else {
-    console.log('[Google Sign-In] Desktop detected - will try popup:', { width, hasTouch });
-  }
-  
-  return isMobile;
-};
-
-/**
  * Sign in with Google using popup
  * Falls back to redirect if popup is blocked
  */
