@@ -244,8 +244,11 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     console.log('[Google Sign-In] Current URL:', window.location.href);
     
     // Mark that we're initiating a redirect so the return page knows to wait
+    // Use both sessionStorage and localStorage for reliability (localStorage persists better)
     try {
       sessionStorage.setItem('we:google-signin-pending', '1');
+      localStorage.setItem('we:google-signin-pending', '1');
+      console.log('[Google Sign-In] Set redirect pending flag in storage');
     } catch {
       // Ignore storage errors
     }
@@ -356,9 +359,10 @@ export const getGoogleRedirectResult = async (): Promise<UserCredential | null> 
         emailVerified: result.user.emailVerified,
         operationType: result.operationType,
       });
-      // Clear the pending flag
+      // Clear the pending flag (both storages)
       try {
         sessionStorage.removeItem('we:google-signin-pending');
+        localStorage.removeItem('we:google-signin-pending');
       } catch {
         // Ignore
       }

@@ -55,18 +55,28 @@ export default function LoginPage() {
         // Check if URL has OAuth callback indicators (hash fragments or query params)
         const url = typeof window !== 'undefined' ? window.location.href : '';
         const referrer = typeof window !== 'undefined' ? document.referrer : '';
+        
+        // Get auth domain to check if referrer is from Firebase auth handler
+        const authDomain = typeof window !== 'undefined' && auth?.app?.options?.authDomain;
+        const referrerIsFirebaseAuth = authDomain && referrer.includes(authDomain);
+        
         const hasOAuthCallback = 
           url.includes('#') || 
           url.includes('__/auth/handler') || 
           url.includes('authUser=') ||
           url.includes('apiKey=') ||
           referrer.includes('accounts.google.com') ||
-          referrer.includes('google.com');
+          referrer.includes('google.com') ||
+          referrerIsFirebaseAuth; // Coming from Firebase auth handler means we just processed OAuth
         
-        // Check if we were expecting a redirect (sessionStorage flag)
+        // Check if we were expecting a redirect (use both sessionStorage and localStorage for reliability)
         let wasExpectingRedirect = false;
         try {
-          wasExpectingRedirect = typeof window !== 'undefined' && sessionStorage.getItem('we:google-signin-pending') === '1';
+          if (typeof window !== 'undefined') {
+            wasExpectingRedirect = 
+              sessionStorage.getItem('we:google-signin-pending') === '1' ||
+              localStorage.getItem('we:google-signin-pending') === '1';
+          }
         } catch {
           // Ignore storage errors
         }
@@ -74,6 +84,8 @@ export default function LoginPage() {
         console.log('[Login] OAuth callback detected:', {
           hasOAuthCallback,
           wasExpectingRedirect,
+          referrerIsFirebaseAuth,
+          authDomain,
           url: url.substring(0, 100),
           referrer: referrer.substring(0, 100),
         });
@@ -96,6 +108,12 @@ export default function LoginPage() {
         }
         
         let user = result?.user;
+        
+        // ALWAYS wait for auth state if we were expecting a redirect (even if OAuth callback not detected)
+        // This handles cases where the redirect completed but detection failed
+        if (!user && wasExpectingRedirect) {
+          console.log('[Login] We were expecting a redirect - waiting for auth state even though OAuth callback not detected');
+        }
         
         // If no redirect result but we detected OAuth callback OR were expecting redirect, wait for auth state to update
         if (!user && (hasOAuthCallback || wasExpectingRedirect)) {
@@ -210,10 +228,11 @@ export default function LoginPage() {
             source: result?.user ? 'redirectResult' : 'currentUser',
           });
           
-          // Clear the pending redirect flag since we found the user
+          // Clear the pending redirect flag since we found the user (both storages)
           try {
             if (typeof window !== 'undefined') {
               sessionStorage.removeItem('we:google-signin-pending');
+              localStorage.removeItem('we:google-signin-pending');
             }
           } catch {
             // Ignore storage errors
