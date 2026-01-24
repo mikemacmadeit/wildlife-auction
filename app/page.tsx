@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, MessageSquare, Heart } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, MessageSquare, Heart, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -707,9 +707,6 @@ export default function HomePage() {
     },
   };
 
-  // Get user display name (fallback to email if no display name)
-  const userDisplayName = user?.displayName || user?.email?.split('@')[0] || 'User';
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (homeSearchQuery.trim()) {
@@ -722,12 +719,37 @@ export default function HomePage() {
   // Only show hero if user is definitely not signed in (initialized and no user)
   // Don't show hero if still loading or if user exists
   const showHero = initialized && !authLoading && !user;
+  
+  // Use a ref to remember the last known user state to prevent flickering during navigation
+  const lastUserRef = useRef<User | null>(null);
+  useEffect(() => {
+    if (user) {
+      lastUserRef.current = user;
+    } else if (initialized && !authLoading) {
+      // Only clear if auth is fully initialized and confirmed no user
+      lastUserRef.current = null;
+    }
+  }, [user, initialized, authLoading]);
+  
+  // Use the current user if available, otherwise fall back to last known user during loading
+  const effectiveUser = user || (authLoading ? lastUserRef.current : null);
+  
+  // Get user display name (fallback to email if no display name)
+  const userDisplayName = effectiveUser?.displayName || effectiveUser?.email?.split('@')[0] || 'User';
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Signed-in: Search bar and welcome section */}
-      {user ? (
+      {/* Wait for auth to initialize on initial load */}
+      {!initialized && authLoading && !lastUserRef.current ? (
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      ) : effectiveUser ? (
         <>
+          {/* Signed-in: Search bar and welcome section */}
           {/* Search Bar */}
           <section className="border-b border-border/50 bg-card/50 py-4 md:py-6">
             <div className="container mx-auto px-4 max-w-4xl">
@@ -870,7 +892,7 @@ export default function HomePage() {
       ) : null}
 
       {/* Signed-in only: Personalized home */}
-      {user ? (
+      {effectiveUser ? (
         <section className="py-10 md:py-12 border-b border-border/50 bg-background">
           <div className="container mx-auto px-4 space-y-8">
 
