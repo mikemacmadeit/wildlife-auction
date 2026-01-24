@@ -310,46 +310,51 @@ export const getGoogleRedirectResult = async (): Promise<UserCredential | null> 
   try {
     console.log('[Google Sign-In] Checking for redirect result...');
     
-    // CRITICAL: Call getRedirectResult IMMEDIATELY on page load
-    // Firebase stores the redirect result and it must be consumed quickly
-    // Don't wait for authStateReady first - call it right away
+    // CRITICAL: getRedirectResult can ONLY be called ONCE per redirect
+    // If we call it and it returns null, calling it again will also return null
+    // So we MUST wait for authStateReady FIRST, then call it ONCE
+    console.log('[Google Sign-In] Waiting for auth state to be ready before calling getRedirectResult...');
+    
+    try {
+      await auth.authStateReady();
+      console.log('[Google Sign-In] Auth state is ready');
+    } catch (authReadyError: any) {
+      console.warn('[Google Sign-In] authStateReady failed, continuing anyway:', authReadyError);
+    }
+    
+    // Small delay to ensure Firebase has fully processed the redirect
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Call getRedirectResult ONCE (and only once) after auth is ready
     let result: UserCredential | null = null;
     let lastError: any = null;
     
-    // Try getRedirectResult immediately (Firebase processes redirects synchronously on page load)
     try {
       result = await getRedirectResult(auth);
       if (result?.user) {
-        console.log('[Google Sign-In] Redirect result found immediately');
+        console.log('[Google Sign-In] Redirect result found:', {
+          email: result.user.email,
+          uid: result.user.uid,
+          operationType: result.operationType,
+        });
+        // Clear the pending flag (both storages)
+        try {
+          sessionStorage.removeItem('we:google-signin-pending');
+          localStorage.removeItem('we:google-signin-pending');
+        } catch {
+          // Ignore
+        }
         return result;
+      } else {
+        console.log('[Google Sign-In] getRedirectResult returned null (no redirect pending)');
       }
     } catch (err: any) {
       lastError = err;
-      console.warn('[Google Sign-In] Immediate getRedirectResult failed:', err);
-    }
-    
-    // If no result, wait for auth to be ready and try again
-    if (!result?.user) {
-      console.log('[Google Sign-In] No immediate result, waiting for auth state...');
-      try {
-        await auth.authStateReady();
-        console.log('[Google Sign-In] Auth state is ready, retrying getRedirectResult...');
-      } catch (authReadyError: any) {
-        console.warn('[Google Sign-In] authStateReady failed, continuing anyway:', authReadyError);
-      }
+      console.warn('[Google Sign-In] getRedirectResult failed:', err);
       
-      // Small delay then retry
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      try {
-        result = await getRedirectResult(auth);
-        if (result?.user) {
-          console.log('[Google Sign-In] Redirect result found after authStateReady');
-          return result;
-        }
-      } catch (err: any) {
-        lastError = err;
-        console.warn('[Google Sign-In] Retry getRedirectResult failed:', err);
+      // Check for specific error codes
+      if (err.code === 'auth/unauthorized-domain') {
+        console.error('[Google Sign-In] Domain not authorized. Check Firebase Console > Authentication > Settings > Authorized domains');
       }
     }
     if (result?.user) {

@@ -120,24 +120,14 @@ export default function LoginPage() {
           console.log('[Login] OAuth callback detected but no redirect result yet, waiting for auth state...');
           
           // Additional delay for Firebase to process the redirect
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
           if (cancelled) {
             setCheckingRedirect(false);
             return;
           }
           
-          // Try getRedirectResult one more time after delay (sometimes Firebase needs a moment)
-          try {
-            const retryResult = await getGoogleRedirectResult();
-            if (retryResult?.user) {
-              user = retryResult.user;
-              console.log('[Login] Redirect result found on retry:', user.email);
-            }
-          } catch (retryError) {
-            console.warn('[Login] Retry getRedirectResult failed:', retryError);
-          }
-          
-          // If still no user, wait for auth state to update via onAuthStateChanged
+          // Don't call getGoogleRedirectResult again - it can only be called once
+          // Instead, wait for auth state to update via onAuthStateChanged
           // This is more reliable than getRedirectResult when the redirect completes
           if (!user) {
             console.log('[Login] Still no user, waiting for auth state change (Firebase processing redirect)...');
