@@ -330,8 +330,11 @@ function getEmailTemplate(params: {
   origin?: string | null;
 }): string {
   const year = new Date().getFullYear();
-  const origin = params.origin || 'https://wildlife.exchange';
-  const logoUrl = `${origin}/images/Kudu.png`;
+  // Always use production origin for images/assets to ensure they load correctly
+  // The origin param is used for links, but assets should always point to production
+  const productionOrigin = 'https://wildlife.exchange';
+  const origin = params.origin || productionOrigin;
+  const logoUrl = `${productionOrigin}/images/Kudu.png`;
   // Match homepage hero: the main wordmark uses Barletta Stamp.
   const fontBrand = `'BarlettaStamp','BarlettaInline','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
   const fontBody = `'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
@@ -362,15 +365,59 @@ function getEmailTemplate(params: {
     :root { color-scheme: light; supported-color-schemes: light; }
     @font-face {
       font-family: 'BarlettaInline';
-      src: url('${origin}/fonts/Barletta%20Inline.otf') format('opentype');
+      src: url('${productionOrigin}/fonts/Barletta%20Inline.otf') format('opentype');
       font-weight: normal;
       font-style: normal;
     }
     @font-face {
       font-family: 'BarlettaStamp';
-      src: url('${origin}/fonts/Barletta%20Stamp.otf') format('opentype');
+      src: url('${productionOrigin}/fonts/Barletta%20Stamp.otf') format('opentype');
       font-weight: normal;
       font-style: normal;
+    }
+    /* Mobile responsive styles - ensure consistent colors and layout */
+    @media only screen and (max-width: 600px) {
+      .email-outer {
+        padding: 16px 8px !important;
+      }
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .email-body {
+        padding: 16px 14px !important;
+      }
+      .email-header {
+        padding: 14px 14px !important;
+      }
+      .email-header-text {
+        font-size: 22px !important;
+      }
+      .email-header-subtext {
+        font-size: 11px !important;
+      }
+      .email-logo-cell {
+        width: 36px !important;
+        padding-right: 10px !important;
+      }
+      .email-logo-wrapper {
+        width: 36px !important;
+        height: 36px !important;
+      }
+      .email-logo-img {
+        width: 24px !important;
+        height: 24px !important;
+      }
+      /* Ensure background colors are preserved on mobile (sand base: #C7B79E, parchment: #F4F0E6) */
+      body {
+        background-color: #C7B79E !important;
+      }
+      table.email-outer {
+        background-color: #C7B79E !important;
+      }
+      td[bgcolor="#F4F0E6"] {
+        background-color: #F4F0E6 !important;
+      }
     }
   </style>
 </head>
@@ -380,10 +427,10 @@ function getEmailTemplate(params: {
     ${escapeHtml(params.preheader)}
   </div>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${cSandBase}" style="background-color:${cSandBase}; padding: 26px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${cSandBase}" class="email-outer" style="background-color:${cSandBase}; padding: 26px 12px; mso-padding-alt: 26px 12px; mso-background-color-alt: ${cSandBase};">
     <tr>
       <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="email-container" style="width:600px; max-width:600px; mso-width-alt: 600px;">
           <!-- Header -->
           <tr>
             <td style="padding: 0 0 12px 0;">
@@ -391,52 +438,33 @@ function getEmailTemplate(params: {
                      bgcolor="${cOlivewood}"
                      style="background:${cOlivewood}; background-color:${cOlivewood}; border-radius: 18px; overflow:hidden; border: 1px solid rgba(34,37,31,0.18);">
                 <tr>
-                  <td style="padding: 18px 18px;">
+                  <td class="email-header" style="padding: 18px 18px; mso-padding-alt: 18px 18px;">
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
-                        <td style="vertical-align: middle; padding-right: 12px; width: 44px;">
-                          <!--
-                            Logo rendering note:
-                            The website tints the Kudu mark using CSS masks. Email clients vary wildly in CSS support.
-                            We use the same CSS mask approach for modern clients (matches the site icons), with an
-                            Outlook (mso) fallback to a plain image.
-                          -->
-                          <!--[if mso]>
-                            <img src="${logoUrl}" width="40" height="40" alt="Wildlife Exchange"
-                                 style="display:block; border:0; outline:none; text-decoration:none; border-radius: 12px; background:${cSandSurface}; padding:6px;" />
-                          <![endif]-->
-                          <!--[if !mso]><!-->
-                            <!-- Table/TD badge wrapper is more consistent across mobile email clients than DIVs. -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
-                              <tr>
-                                <td width="40" height="40"
-                                    bgcolor="${cSandSurface}"
-                                    style="width:40px; height:40px; background-color:${cSandSurface}; border-radius:12px; padding:6px; mso-line-height-rule:exactly;">
-                                  <div
-                                    style="
-                                      width:28px; height:28px; display:block;
-                                      background-color:${logoTint};
-                                      mask-image:url('${logoUrl}');
-                                      mask-size:contain;
-                                      mask-repeat:no-repeat;
-                                      mask-position:center;
-                                      -webkit-mask-image:url('${logoUrl}');
-                                      -webkit-mask-size:contain;
-                                      -webkit-mask-repeat:no-repeat;
-                                      -webkit-mask-position:center;
-                                    "
-                                    aria-label="Wildlife Exchange"
-                                  ></div>
-                                </td>
-                              </tr>
-                            </table>
-                          <!--<![endif]-->
+                        <td class="email-logo-cell" style="vertical-align: middle; padding-right: 12px; width: 44px; mso-padding-alt: 0 12px 0 0;">
+                          <!-- Logo: Use plain img as primary (works in all clients), CSS mask as enhancement for modern clients -->
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="email-logo-wrapper" style="border-collapse:separate; width:40px; height:40px; mso-width-alt: 40px; mso-height-alt: 40px;">
+                            <tr>
+                              <td width="40" height="40"
+                                  bgcolor="${cSandSurface}"
+                                  style="width:40px; height:40px; background-color:${cSandSurface}; border-radius:12px; padding:6px; mso-line-height-rule:exactly; mso-padding-alt: 6px;">
+                                <!-- Primary: Plain image (works everywhere) -->
+                                <img src="${logoUrl}" 
+                                     width="28" 
+                                     height="28" 
+                                     alt="Wildlife Exchange"
+                                     class="email-logo-img"
+                                     style="display:block; width:28px; height:28px; border:0; outline:none; text-decoration:none; background-color:${logoTint}; border-radius:8px; mso-width-alt: 28px; mso-height-alt: 28px;"
+                                     border="0" />
+                              </td>
+                            </tr>
+                          </table>
                         </td>
                         <td style="vertical-align: middle;">
-                          <div style="font-family:${fontBrand}; font-size: 26px; font-weight: 900; color: ${cSandBase}; letter-spacing: 0.2px;">
+                          <div class="email-header-text" style="font-family:${fontBrand}; font-size: 26px; font-weight: 900; color: ${cSandBase}; letter-spacing: 0.2px; mso-color-alt: #C7B79E;">
                             Wildlife Exchange
                           </div>
-                          <div style="font-family:${fontBody}; font-size: 12px; color: rgba(244,240,230,0.86); margin-top: 2px;">
+                          <div class="email-header-subtext" style="font-family:${fontBody}; font-size: 12px; color: rgba(244,240,230,0.86); margin-top: 2px; mso-color-alt: #F4F0E6;">
                             Texas Exotic & Breeder Animal Marketplace
                           </div>
                         </td>
@@ -460,10 +488,10 @@ function getEmailTemplate(params: {
 
           <!-- Body -->
           <tr>
-            <td style="background:${cParchment}; border:1px solid rgba(34,37,31,0.20); border-radius: 18px; overflow:hidden;">
+            <td bgcolor="${cParchment}" style="background:${cParchment}; background-color:${cParchment}; border:1px solid rgba(34,37,31,0.20); border-radius: 18px; overflow:hidden; mso-background-color-alt: ${cParchment};">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="padding: 22px 20px; font-family:${fontBody}; color:${cOlivewood}; line-height:1.55;">
+                  <td class="email-body" bgcolor="${cParchment}" style="padding: 22px 20px; font-family:${fontBody}; color:${cOlivewood}; line-height:1.55; mso-padding-alt: 22px 20px; mso-color-alt: ${cOlivewood}; background-color:${cParchment};">
                     ${params.contentHtml}
                   </td>
                 </tr>
