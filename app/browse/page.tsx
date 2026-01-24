@@ -171,6 +171,12 @@ export default function BrowsePage() {
     const category = searchParams?.get('category');
     const state = searchParams?.get('state');
     const speciesId = searchParams?.get('speciesId');
+    const searchParam = searchParams?.get('search');
+
+    // Set search query from URL parameter
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
 
     setFilters((prev) => {
       const next: any = { ...(prev || {}) };

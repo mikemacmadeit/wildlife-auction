@@ -740,6 +740,38 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* Welcome Section - Mobile visible below search */}
+          <section className="border-b border-border/50 bg-background py-6 md:py-8">
+            <div className="container mx-auto px-4 max-w-4xl">
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
+                  <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
+                  <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/browse" className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      Browse
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/dashboard/watchlist" className="flex items-center gap-2">
+                      <Heart className="h-4 w-4" />
+                      Watchlist
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/dashboard/messages" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Messages
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
         </>
       ) : (
         <>
