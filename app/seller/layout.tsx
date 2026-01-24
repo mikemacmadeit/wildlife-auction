@@ -34,6 +34,7 @@ import {
   HelpCircle,
   Users,
   LifeBuoy,
+  Compass,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,7 +78,7 @@ interface SellerNavItem {
 // Base nav items (always visible)
 const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/browse', label: 'Browse', icon: LayoutGrid },
+  { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
@@ -301,7 +302,7 @@ export default function SellerLayout({
     return [
       pick('/seller/overview', { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard }),
       pick('/seller/listings', { href: '/seller/listings', label: 'Listings', icon: Package }),
-      pick('/browse', { href: '/browse', label: 'Browse', icon: LayoutGrid }),
+      pick('/browse', { href: '/browse', label: 'Browse', icon: Compass }),
       pick('/dashboard/messages', { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare }),
       pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
     ];
@@ -722,7 +723,7 @@ export default function SellerLayout({
           <div className="flex items-center gap-1">
             <Link href="/browse" prefetch={false} onClick={(e) => hardNavigate(e, '/browse')}>
               <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Browse listings">
-                <LayoutGrid className="h-5 w-5 text-primary" />
+                <Compass className="h-5 w-5 text-primary" />
               </Button>
             </Link>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

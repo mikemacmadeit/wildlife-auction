@@ -35,6 +35,7 @@ import {
   HelpCircle,
   LifeBuoy,
   Users,
+  Compass,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,7 +81,7 @@ interface DashboardNavItem {
 // Base nav items (always visible)
 const baseNavItems: DashboardNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/browse', label: 'Browse', icon: LayoutGrid },
+  { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
   { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
   { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
