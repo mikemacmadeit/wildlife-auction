@@ -374,14 +374,7 @@ export function useFavorites() {
     [favoriteIds, user, toast, syncWatchlistServer]
   );
 
-  // Memoize favoriteIdsArray and only update when Set actually changes
-  // Use a deep comparison to prevent unnecessary array recreation
-  const favoriteIdsArray = useMemo(() => {
-    const arr = Array.from(favoriteIds);
-    // Sort for consistent comparison
-    arr.sort();
-    return arr;
-  }, [favoriteIds]);
+  const favoriteIdsArray = useMemo(() => Array.from(favoriteIds), [favoriteIds]);
 
   return {
     favoriteIds: favoriteIdsArray,

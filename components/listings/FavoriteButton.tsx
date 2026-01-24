@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFavorites } from '@/hooks/use-favorites';
@@ -27,29 +27,9 @@ export function FavoriteButton({
   const { toast } = useToast();
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   
-  // Use local state to prevent flickering - only update when THIS listing's status changes
-  const [isFavorited, setIsFavorited] = useState(() => isFavorite(listingId));
-  const [pending, setPending] = useState(() => isPending(listingId));
-  const prevFavoriteRef = useRef(isFavorited);
-  const prevPendingRef = useRef(pending);
-  
-  // Sync local state with hook state, but only update when THIS listing's status changes
-  // This prevents all buttons from re-rendering when any favorite changes
-  useEffect(() => {
-    const currentFavorite = isFavorite(listingId);
-    const currentPending = isPending(listingId);
-    
-    // Only update if the value actually changed for THIS listing
-    if (currentFavorite !== prevFavoriteRef.current) {
-      setIsFavorited(currentFavorite);
-      prevFavoriteRef.current = currentFavorite;
-    }
-    
-    if (currentPending !== prevPendingRef.current) {
-      setPending(currentPending);
-      prevPendingRef.current = currentPending;
-    }
-  }, [isFavorite, isPending, listingId]);
+  // Use hook functions directly - they're now stable and won't cause unnecessary re-renders
+  const isFavorited = isFavorite(listingId);
+  const pending = isPending(listingId);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
