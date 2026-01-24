@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import { forwardRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -22,7 +22,7 @@ interface FeaturedListingCardProps {
   index?: number;
 }
 
-const FeaturedListingCardComponent = React.forwardRef<HTMLDivElement, FeaturedListingCardProps>(
+export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCardProps>(
   ({ listing, className, index = 0 }, ref) => {
   const router = useRouter();
   const sold = getSoldSummary(listing);
@@ -313,13 +313,4 @@ const FeaturedListingCardComponent = React.forwardRef<HTMLDivElement, FeaturedLi
     </motion.div>
   );
 });
-
-FeaturedListingCardComponent.displayName = 'FeaturedListingCard';
-
-// Memoize to prevent re-renders when parent re-renders but listing props haven't changed
-export const FeaturedListingCard = React.memo(FeaturedListingCardComponent, (prev, next) => {
-  // Only re-render if listing ID, className, or index changed
-  return prev.listing.id === next.listing.id && 
-         prev.className === next.className && 
-         prev.index === next.index;
-});
+FeaturedListingCard.displayName = 'FeaturedListingCard';

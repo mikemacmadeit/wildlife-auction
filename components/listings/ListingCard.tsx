@@ -22,7 +22,7 @@ interface ListingCardProps {
   className?: string;
 }
 
-const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
+export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
   ({ listing, className }, ref) => {
   const router = useRouter();
   // Phase 3A (A4): anon-safe trust signals come from listing.sellerSnapshot (copied at publish time).
@@ -409,11 +409,4 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
     </motion.div>
   );
 });
-
-ListingCardComponent.displayName = 'ListingCard';
-
-// Memoize to prevent re-renders when parent re-renders but listing props haven't changed
-export const ListingCard = React.memo(ListingCardComponent, (prev, next) => {
-  // Only re-render if listing ID or className changed
-  return prev.listing.id === next.listing.id && prev.className === next.className;
-});
+ListingCard.displayName = 'ListingCard';

@@ -24,7 +24,7 @@ interface ListItemProps {
   variant?: 'default' | 'browseMobile';
 }
 
-const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
+export const ListItem = React.forwardRef<HTMLDivElement, ListItemProps>(
   ({ listing, variant = 'default' }, ref) => {
   const router = useRouter();
   const sold = getSoldSummary(listing);
@@ -489,11 +489,4 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     </motion.div>
   );
 });
-
-ListItemComponent.displayName = 'ListItem';
-
-// Memoize to prevent re-renders when parent re-renders but listing props haven't changed
-export const ListItem = React.memo(ListItemComponent, (prev, next) => {
-  // Only re-render if listing ID or variant changed
-  return prev.listing.id === next.listing.id && prev.variant === next.variant;
-});
+ListItem.displayName = 'ListItem';
