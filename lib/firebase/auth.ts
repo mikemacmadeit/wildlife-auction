@@ -215,77 +215,28 @@ const isMobileDevice = (): boolean => {
 };
 
 /**
- * Sign in with Google using popup on desktop, redirect on mobile
- * Falls back to redirect if popup is blocked
+ * Sign in with Google using redirect only (more reliable across devices)
+ *
+ * NOTE:
+ * - This always uses `signInWithRedirect`, even on desktop, to ensure consistent behavior.
+ * - Callers should treat the `REDIRECT_INITIATED` error as a non-error and let the page reload.
+ * - After redirect completes, `getGoogleRedirectResult` should be called on page load to finalize sign-in.
  */
 export const signInWithGoogle = async (): Promise<UserCredential> => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
     prompt: 'select_account',
   });
-  
-  // Use redirect on mobile devices (popups don't work well on mobile)
-  if (isMobileDevice()) {
-    console.log('[Google Sign-In] Mobile device detected, using redirect flow');
-    try {
-      await signInWithRedirect(auth, provider);
-      // Redirect will navigate away, so we throw a special error
-      // The page will reload after redirect completes
-      throw new Error('REDIRECT_INITIATED');
-    } catch (error: any) {
-      // If redirect itself fails, log and re-throw
-      if (error.message !== 'REDIRECT_INITIATED') {
-        console.error('[Google Sign-In] Redirect initiation failed:', error);
-      }
-      throw error;
-    }
-  }
-  
+
   try {
-    // Try popup first on desktop (better UX)
-    console.log('[Google Sign-In] Desktop detected, attempting popup');
-    return await signInWithPopup(auth, provider);
+    console.log('[Google Sign-In] Starting Google redirect flow for all devices');
+    await signInWithRedirect(auth, provider);
+    // Redirect will navigate away, so we throw a special error so callers can ignore it.
+    throw new Error('REDIRECT_INITIATED');
   } catch (error: any) {
-    console.error('[Google Sign-In] Popup error:', error);
-    
-    // On mobile-like devices or if popup fails, ALWAYS fall back to redirect
-    // This catches cases where mobile detection might have missed something
-    const shouldUseRedirect = 
-      isMobileDevice() || // Double-check mobile (in case window size changed)
-      error.code === 'auth/popup-blocked' ||
-      error.code === 'auth/popup-closed-by-user' ||
-      error.code === 'auth/cancelled-popup-request' ||
-      error.code === 'auth/unauthorized-domain' ||
-      error.code === 'auth/operation-not-allowed' ||
-      error.message?.includes('illegal URL') ||
-      error.message?.includes('illegal') ||
-      error.message?.includes('iframe') ||
-      error.message?.includes('timeout') ||
-      error.message?.includes('popup') ||
-      !error.code; // If no error code, might be a mobile-specific issue
-    
-    if (shouldUseRedirect) {
-      // Use redirect as fallback
-      console.log('[Google Sign-In] Falling back to redirect due to:', error.message || error.code || 'unknown error');
-      try {
-        await signInWithRedirect(auth, provider);
-        // Redirect will navigate away, so we throw a special error
-        // The page will reload after redirect completes
-        throw new Error('REDIRECT_INITIATED');
-      } catch (redirectError: any) {
-        if (redirectError.message !== 'REDIRECT_INITIATED') {
-          console.error('[Google Sign-In] Redirect fallback failed:', redirectError);
-        }
-        throw redirectError;
-      }
+    if (error.message !== 'REDIRECT_INITIATED') {
+      console.error('[Google Sign-In] Redirect initiation failed:', error);
     }
-    // Re-throw other errors with more context
-    console.error('[Google Sign-In] Error details:', {
-      code: error.code,
-      message: error.message,
-      email: error.email,
-      credential: error.credential,
-    });
     throw error;
   }
 };
