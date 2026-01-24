@@ -110,7 +110,7 @@ export function StepperForm({
   };
 
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn('space-y-4 sm:space-y-6', className)}>
       {/* Enhanced Progress Bar */}
       {showProgress && (
         <div className="space-y-3">
@@ -183,31 +183,31 @@ export function StepperForm({
       </div>
 
       {/* Step Content with Better Spacing */}
-      <div className="min-h-[400px] py-6">
+      <div className="min-h-[300px] sm:min-h-[400px] py-4 sm:py-6">
         {currentStepData.content}
       </div>
 
       {/* Enhanced Navigation */}
-      <div className="flex items-center justify-between gap-4 pt-6 border-t">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-6 pb-6 sm:pb-4 border-t">
         <Button
           type="button"
           variant="outline"
           onClick={handlePrevious}
           disabled={isFirstStep || saving}
-          className="min-h-[48px] min-w-[120px]"
+          className="min-h-[48px] w-full sm:w-auto sm:min-w-[120px] order-2 sm:order-1"
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
           Previous
         </Button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
           {showSaveButton && onSave && (
             <Button
               type="button"
               variant="secondary"
               onClick={() => onSave()}
               disabled={saving}
-              className="min-h-[48px] min-w-[140px] font-semibold"
+              className="min-h-[48px] flex-1 sm:flex-none sm:min-w-[140px] font-semibold"
             >
               {saving ? (
                 <>
@@ -229,7 +229,7 @@ export function StepperForm({
             disabled={saving}
             {...(isLastStep && completeButtonDataTour ? { 'data-tour': completeButtonDataTour } : {})}
             className={cn(
-              "min-h-[48px] min-w-[150px] font-semibold shadow-lg hover:shadow-xl transition-shadow",
+              "min-h-[48px] flex-1 sm:flex-none sm:min-w-[150px] font-semibold shadow-lg hover:shadow-xl transition-shadow",
               isLastStep && "bg-gradient-to-r from-primary to-primary/90"
             )}
           >

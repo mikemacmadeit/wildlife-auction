@@ -1942,8 +1942,8 @@ function EditListingPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl space-y-6">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
+      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-4xl space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">

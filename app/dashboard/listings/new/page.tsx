@@ -2802,7 +2802,7 @@ function NewListingPageContent() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-4xl">
         {/* Show a subtle banner if not authenticated */}
         {!user && (
           <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
@@ -2827,7 +2827,7 @@ function NewListingPageContent() {
           </div>
         )}
         
-        <div className="bg-card rounded-lg border border-border/50 shadow-sm p-6 md:p-8">
+        <div className="bg-card rounded-lg border border-border/50 shadow-sm p-4 sm:p-6 md:p-8">
           {/* Publish loading overlay: show a centered spinner so users don't double-click Publish */}
           {isSubmitting ? (
             <div className="fixed inset-0 z-[100] bg-background/60 backdrop-blur-sm flex items-center justify-center">
