@@ -48,6 +48,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [optimisticReadThreads, setOptimisticReadThreads] = useState<Set<string>>(new Set());
   const [inboxTab, setInboxTab] = useState<'all' | 'unread' | 'archived'>('all');
   const [search, setSearch] = useState('');
   const [metaByThreadId, setMetaByThreadId] = useState<
@@ -64,7 +65,11 @@ export default function MessagesPage() {
 
     const rows = threads.map((t) => {
       const isBuyer = user?.uid ? t.buyerId === user.uid : true;
-      const unread = isBuyer
+      // Optimistically clear unread count if thread was marked as read
+      const isOptimisticallyRead = optimisticReadThreads.has(t.id);
+      const unread = isOptimisticallyRead
+        ? 0
+        : isBuyer
         ? (typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0)
         : (typeof (t as any).sellerUnreadCount === 'number' ? (t as any).sellerUnreadCount : 0);
       const meta = metaByThreadId[t.id];
@@ -100,7 +105,7 @@ export default function MessagesPage() {
 
     filtered.sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
     return filtered;
-  }, [inboxTab, metaByThreadId, search, threads, user?.uid]);
+  }, [inboxTab, metaByThreadId, optimisticReadThreads, search, threads, user?.uid]);
 
   // Real-time inbox subscription
   useEffect(() => {
@@ -112,6 +117,20 @@ export default function MessagesPage() {
       (data) => {
         setThreads(data);
         setLoading(false);
+        // Clear optimistic reads for threads that are now confirmed as read (unreadCount = 0)
+        setOptimisticReadThreads((prev) => {
+          const next = new Set(prev);
+          data.forEach((t) => {
+            const isBuyer = user.uid === t.buyerId;
+            const unread = isBuyer
+              ? (typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0)
+              : (typeof (t as any).sellerUnreadCount === 'number' ? (t as any).sellerUnreadCount : 0);
+            if (unread === 0) {
+              next.delete(t.id);
+            }
+          });
+          return next;
+        });
         // If nothing selected yet, keep existing selection or default to first visible thread.
         if (!selectedThreadId && data[0]?.id) setSelectedThreadId(data[0].id);
       },
@@ -203,8 +222,17 @@ export default function MessagesPage() {
           lastMessageAt: threadData.lastMessageAt?.toDate(),
         } as MessageThread;
         setThread(threadObj);
+        // Optimistically mark as read for immediate UI update
+        setOptimisticReadThreads((prev) => new Set(prev).add(threadId));
         // Mark thread as read when opening via deep link
-        markThreadAsRead(threadId, user.uid).catch(() => {});
+        markThreadAsRead(threadId, user.uid).catch(() => {
+          // On error, remove from optimistic set so it can retry
+          setOptimisticReadThreads((prev) => {
+            const next = new Set(prev);
+            next.delete(threadId);
+            return next;
+          });
+        });
         // Clear message notification badge when viewing messages (best-effort)
         markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
       }
@@ -263,10 +291,19 @@ export default function MessagesPage() {
     if (!t) return;
 
     setThread(t);
+    // Optimistically mark as read for immediate UI update
+    setOptimisticReadThreads((prev) => new Set(prev).add(selectedThreadId));
     // Clear message notification badge when viewing messages (best-effort).
     markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
     // Mark thread as read immediately when selected to clear unread badge
-    markThreadAsRead(selectedThreadId, user.uid).catch(() => {});
+    markThreadAsRead(selectedThreadId, user.uid).catch(() => {
+      // On error, remove from optimistic set so it can retry
+      setOptimisticReadThreads((prev) => {
+        const next = new Set(prev);
+        next.delete(selectedThreadId);
+        return next;
+      });
+    });
     const meta = metaByThreadId[selectedThreadId];
     setOtherPartyName(meta?.otherName || 'User');
     setOtherPartyAvatar(meta?.otherAvatar || undefined);
@@ -390,16 +427,20 @@ export default function MessagesPage() {
                         return (
                           <div
                             key={item.id}
-                            className={cn('group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors', active && 'bg-muted/40')}
+                            onClick={() => {
+                              if (!user?.uid) return;
+                              setSelectedThreadId(item.id);
+                              router.replace(`/dashboard/messages?threadId=${item.id}`);
+                              // Mark thread as read immediately when clicking to clear badge
+                              markThreadAsRead(item.id, user.uid).catch(() => {});
+                            }}
+                            className={cn(
+                              'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer',
+                              active && 'bg-muted/40'
+                            )}
                           >
                             <div className="grid grid-cols-[48px_1fr_116px_44px] gap-3 items-start min-w-0">
-                              <button
-                                onClick={() => {
-                                  setSelectedThreadId(item.id);
-                                  router.replace(`/dashboard/messages?threadId=${item.id}`);
-                                }}
-                                className="contents text-left"
-                              >
+                              <div className="contents">
                                 <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted">
                                   {item.listingImageUrl ? (
                                     <Image src={item.listingImageUrl} alt={item.listingTitle} fill sizes="48px" className="object-cover" />
@@ -439,10 +480,15 @@ export default function MessagesPage() {
                                     </div>
                                   ) : null}
                                 </div>
-                              </button>
+                              </div>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-11 w-11 opacity-60 hover:opacity-100">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-11 w-11 opacity-60 hover:opacity-100"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -575,16 +621,29 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={item.id}
-                          className={cn('group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors', active && 'bg-muted/40')}
+                          onClick={() => {
+                            if (!user?.uid) return;
+                            // Optimistically mark as read for immediate UI update
+                            setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
+                            setSelectedThreadId(item.id);
+                            router.replace(`/dashboard/messages?threadId=${item.id}`);
+                            // Mark thread as read in Firestore
+                            markThreadAsRead(item.id, user.uid).catch(() => {
+                              // On error, remove from optimistic set so it can retry
+                              setOptimisticReadThreads((prev) => {
+                                const next = new Set(prev);
+                                next.delete(item.id);
+                                return next;
+                              });
+                            });
+                          }}
+                          className={cn(
+                            'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer',
+                            active && 'bg-muted/40'
+                          )}
                         >
                           <div className="grid grid-cols-[48px_1fr_116px_44px] gap-3 items-start min-w-0">
-                            <button
-                              onClick={() => {
-                                setSelectedThreadId(item.id);
-                                router.replace(`/dashboard/messages?threadId=${item.id}`);
-                              }}
-                              className="contents text-left"
-                            >
+                            <div className="contents">
                               {/* Thumb */}
                               <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-muted">
                                 {item.listingImageUrl ? (
@@ -629,11 +688,16 @@ export default function MessagesPage() {
                                   </div>
                                 ) : null}
                               </div>
-                            </button>
+                            </div>
 
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-11 w-11 opacity-60 hover:opacity-100">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-11 w-11 opacity-60 hover:opacity-100"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
