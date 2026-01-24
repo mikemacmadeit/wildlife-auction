@@ -453,11 +453,19 @@ export async function POST(request: Request) {
     const completedSalesCount = Number(userData?.completedSalesCount || 0) || 0;
     const identityVerified = userData?.seller?.credentials?.identityVerified === true;
     const sellerVerified = userData?.seller?.verified === true || identityVerified;
-    const displayName =
-      (listingData?.sellerSnapshot?.displayName && String(listingData.sellerSnapshot.displayName)) ||
-      (userData?.displayName && String(userData.displayName)) ||
-      (userData?.profile?.fullName && String(userData.profile.fullName)) ||
-      'Seller';
+    
+    // Determine display name based on user's preference (business name vs personal name)
+    const displayNamePreference = userData?.profile?.preferences?.displayNamePreference || 'personal';
+    let displayName: string;
+    if (displayNamePreference === 'business' && userData?.profile?.businessName?.trim()) {
+      displayName = String(userData.profile.businessName).trim();
+    } else {
+      displayName =
+        (listingData?.sellerSnapshot?.displayName && String(listingData.sellerSnapshot.displayName)) ||
+        (userData?.displayName && String(userData.displayName)) ||
+        (userData?.profile?.fullName && String(userData.profile.fullName)) ||
+        'Seller';
+    }
 
     const sellerBadges: string[] = [];
     if ((decodedToken as any)?.email_verified === true) sellerBadges.push('Email verified');
