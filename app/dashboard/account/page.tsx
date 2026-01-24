@@ -380,9 +380,10 @@ export default function AccountPage() {
           messages: true,
           promotions: false,
         },
-        preferences: userProfile.profile?.preferences || {
-          verification: true,
-          transport: true,
+        preferences: {
+          verification: userProfile.profile?.preferences?.verification ?? true,
+          transport: userProfile.profile?.preferences?.transport ?? true,
+          displayNamePreference: userProfile.profile?.preferences?.displayNamePreference || 'personal',
         },
       });
     }
