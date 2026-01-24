@@ -756,10 +756,10 @@ export default function BrowsePage() {
         // otherwise the search bar appears "missing" because it's hidden behind the navbar.
         className="fixed top-20 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
       >
-        <div className="container mx-auto px-4 py-0.5 md:py-4">
-          <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-1 md:p-4">
+        <div className="container mx-auto px-4 py-0 md:py-4">
+          <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-0 md:p-4">
             <div className="flex flex-col gap-0 md:gap-3">
-              <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-between">
+              <div className="flex flex-col md:flex-row gap-0 md:gap-3 md:items-center md:justify-between p-1 md:p-0">
                 <div className="flex-1 w-full md:max-w-2xl">
                   {/* Mobile (eBay-style): full-width search + heart-in-search */}
                   <div className="md:hidden">
@@ -838,7 +838,7 @@ export default function BrowsePage() {
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-0 md:gap-2 md:items-center md:justify-between">
+              <div className="flex flex-col md:flex-row gap-0 md:gap-2 md:items-center md:justify-between px-1 pb-1 md:px-0 md:pb-0">
                 {/* Type Tabs */}
                 <Tabs
                   value={selectedType}
