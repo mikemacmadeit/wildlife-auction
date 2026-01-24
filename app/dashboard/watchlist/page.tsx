@@ -70,6 +70,8 @@ import { TrustBadges } from '@/components/trust/StatusBadge';
 import { getSoldSummary } from '@/lib/listings/sold';
 import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes } from '@/lib/types';
 import { ListItem } from '@/components/listings/ListItem';
+import { ListingCard } from '@/components/listings/ListingCard';
+import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -611,9 +613,6 @@ export default function WatchlistPage() {
               <WatchlistGrid
                 listings={filteredAndSorted}
                 viewMode={viewMode}
-                onRemove={handleRemove}
-                removingId={removingId}
-                StatusBadge={StatusBadge}
               />
             )}
           </TabsContent>
@@ -637,9 +636,6 @@ export default function WatchlistPage() {
               <WatchlistGrid
                 listings={filteredAndSorted}
                 viewMode={viewMode}
-                onRemove={handleRemove}
-                removingId={removingId}
-                StatusBadge={StatusBadge}
               />
             )}
           </TabsContent>
@@ -663,9 +659,6 @@ export default function WatchlistPage() {
               <WatchlistGrid
                 listings={filteredAndSorted}
                 viewMode={viewMode}
-                onRemove={handleRemove}
-                removingId={removingId}
-                StatusBadge={StatusBadge}
               />
             )}
           </TabsContent>
@@ -697,15 +690,9 @@ export default function WatchlistPage() {
 function WatchlistGrid({
   listings,
   viewMode,
-  onRemove,
-  removingId,
-  StatusBadge,
 }: {
   listings: ListingWithStatus[];
   viewMode: ViewMode;
-  onRemove: (id: string) => void;
-  removingId: string | null;
-  StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
 }) {
   if (viewMode === 'list') {
     return (
@@ -730,325 +717,23 @@ function WatchlistGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-fr">
       <AnimatePresence mode="popLayout">
-        {listings.map((listing, index) => (
-          <WatchlistCard
-            key={listing.id}
-            listing={listing}
-            index={index}
-            onRemove={() => onRemove(listing.id)}
-            isRemoving={removingId === listing.id}
-            StatusBadge={StatusBadge}
-          />
-        ))}
+        {listings.map((listing) =>
+          listing.featured ? (
+            <div key={listing.id} className="min-w-0">
+              <FeaturedListingCard listing={listing as any} />
+            </div>
+          ) : (
+            <div key={listing.id} className="min-w-0">
+              <ListingCard listing={listing as any} />
+            </div>
+          )
+        )}
       </AnimatePresence>
     </div>
   );
 }
 
-type WatchlistCardProps = {
-  listing: ListingWithStatus;
-  index: number;
-  onRemove: () => void;
-  isRemoving: boolean;
-  StatusBadge: ({ listing }: { listing: ListingWithStatus }) => JSX.Element | null;
-};
-
-// Watchlist Card Component (Grid View)
-const WatchlistCard = React.forwardRef<HTMLDivElement, WatchlistCardProps>(function WatchlistCard(
-  {
-    listing,
-    index,
-    onRemove,
-    isRemoving,
-    StatusBadge,
-  },
-  ref
-) {
-  const sold = getSoldSummary(listing as any);
-  const watchers =
-    typeof (listing as any).watcherCount === 'number' ? (listing as any).watcherCount : listing.metrics?.favorites || 0;
-  const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
-
-  const getCategoryName = (category: string) => {
-    switch (category) {
-      case 'wildlife_exotics':
-        return 'Wildlife & Exotics';
-      case 'cattle_livestock':
-        return 'Cattle & Livestock';
-      case 'ranch_equipment':
-        return 'Ranch Equipment & Attachments';
-      case 'ranch_vehicles':
-        return 'Ranch Vehicles & Trailers';
-      case 'horse_equestrian':
-        return 'Horse & Equestrian';
-      case 'sporting_working_dogs':
-        return 'Sporting & Working Dogs';
-      case 'hunting_outfitter_assets':
-        return 'Hunting & Outfitter Assets';
-      default:
-        return category;
-    }
-  };
-
-  const priceDisplay =
-    listing.type === 'auction'
-      ? listing.currentBid
-        ? formatCurrency(listing.currentBid)
-        : `Starting: ${formatCurrency(listing.startingBid || 0)}`
-      : formatCurrency(listing.price || 0);
-
-  const keyAttributes = useMemo(() => {
-    const attrs: any = listing.attributes || null;
-    if (!attrs) return null;
-
-    if (listing.category === 'wildlife_exotics') {
-      const a = attrs as WildlifeAttributes;
-      return [a.speciesId && `Species: ${a.speciesId}`, a.sex && `Sex: ${a.sex}`, a.quantity && `Qty: ${a.quantity}`]
-        .filter(Boolean)
-        .slice(0, 2);
-    }
-
-    if (listing.category === 'cattle_livestock') {
-      const a = attrs as CattleAttributes;
-      return [a.breed && `Breed: ${a.breed}`, a.sex && `Sex: ${a.sex}`, a.registered && 'Registered']
-        .filter(Boolean)
-        .slice(0, 2);
-    }
-
-    if (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles' || listing.category === 'hunting_outfitter_assets') {
-      const a = attrs as EquipmentAttributes;
-      return [a.equipmentType && a.equipmentType, a.year && `Year: ${a.year}`, a.condition && a.condition]
-        .filter(Boolean)
-        .slice(0, 2);
-    }
-
-    if (listing.category === 'sporting_working_dogs') {
-      const a: any = attrs;
-      return [a.breed && `Breed: ${a.breed}`, a.sex && `Sex: ${a.sex}`, a.quantity && `Qty: ${a.quantity}`]
-        .filter(Boolean)
-        .slice(0, 2);
-    }
-
-    if (listing.category === 'horse_equestrian') {
-      const a = attrs as HorseAttributes;
-      const sex =
-        a.sex === 'stallion' ? 'Stallion' :
-        a.sex === 'mare' ? 'Mare' :
-        a.sex === 'gelding' ? 'Gelding' :
-        a.sex ? String(a.sex) : null;
-      return [
-        sex && `Sex: ${sex}`,
-        a.registered ? 'Registered' : null,
-        a.age !== undefined && a.age !== null ? `Age: ${String(a.age)}` : null,
-      ]
-        .filter(Boolean)
-        .slice(0, 2);
-    }
-
-    return null;
-  }, [listing.attributes, listing.category]);
-
-  const sellerName = listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller';
-  const sellerVerified = listing.sellerSnapshot?.verified || listing.seller?.verified || false;
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-    >
-      <Card
-        className={cn(
-          // Match browse gallery cards
-          'overflow-hidden transition-all duration-300 flex flex-col h-full border border-border/50 bg-card',
-          'hover:border-border/70 hover:shadow-lifted hover:-translate-y-0.5',
-          listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
-            ? 'opacity-75'
-            : ''
-        )}
-      >
-        <Link href={`/listing/${listing.id}`} className="block flex-1">
-          <div className="relative aspect-[4/3] w-full bg-muted overflow-hidden rounded-t-xl">
-            {/* Subtle bottom overlay gradient - like browse */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent z-10" />
-            {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}
-
-            {listing.images && listing.images.length > 0 ? (
-              <Image
-                src={listing.images[0]}
-                alt={listing.title}
-                fill
-                className={cn(
-                  'object-cover transition-transform duration-500 group-hover:scale-110',
-                  listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold'
-                    ? 'grayscale'
-                    : 'group-hover:scale-105'
-                )}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                unoptimized
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Package className="h-12 w-12 text-muted-foreground" />
-              </div>
-            )}
-
-            {/* Heart overlay (matches browse gallery; removes from watchlist) */}
-            <div className="absolute top-2 right-2 z-30" onClick={(e) => e.preventDefault()}>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 rounded-full bg-card/95 backdrop-blur-sm border border-border/50"
-                onClick={() => onRemove()}
-                disabled={isRemoving}
-                title="Remove from watchlist"
-              >
-                {isRemoving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4 fill-current text-destructive" />}
-              </Button>
-            </div>
-
-            {/* Countdown badge for auctions */}
-            {!sold.isSold && listing.type === 'auction' && listing.endsAt && !listing.isEnded && (
-              <div className="absolute top-2 left-2 z-20">
-                <CountdownTimer endsAt={listing.endsAt} variant="badge" showIcon={true} pulseWhenEndingSoon={true} className="text-xs" />
-              </div>
-            )}
-
-            {/* Type/status/featured bottom-right (matches browse) */}
-            <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end max-w-[70%]">
-              <div className="max-w-full [&>*]:max-w-full [&>*]:truncate">
-                <StatusBadge listing={listing} />
-              </div>
-              {listing.featured && (
-                <Badge variant="default" className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 max-w-full truncate">
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  Featured
-                </Badge>
-              )}
-              <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm max-w-full truncate">
-                {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
-              </Badge>
-              {(listing as any).protectedTransactionEnabled && (listing as any).protectedTransactionDays ? (
-                <Badge variant="default" className="bg-green-600 text-white font-semibold text-xs shadow-warm max-w-full truncate">
-                  Protected {(listing as any).protectedTransactionDays} Days
-                </Badge>
-              ) : null}
-            </div>
-
-            {/* Social proof bottom-left */}
-            <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5 max-w-[75%]">
-              {sold.isSold && (
-                <Badge className="bg-destructive text-destructive-foreground text-xs shadow-warm">SOLD</Badge>
-              )}
-              {watchers > 0 && (
-                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
-                  <Heart className="h-3 w-3 mr-1" />
-                  {watchers} watching
-                </Badge>
-              )}
-              {!sold.isSold && listing.type === 'auction' && bidCount > 0 && (
-                <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  {bidCount} bids
-                </Badge>
-              )}
-              {!sold.isSold && (watchers >= 10 || bidCount >= 8) && (
-                <Badge variant="default" className="text-xs shadow-warm">
-                  <Zap className="h-3 w-3 mr-1" />
-                  Trending
-                </Badge>
-              )}
-            </div>
-
-            {/* Subtle treatment for ended/sold listings (no big X overlay) */}
-            {(listing.statusBadge === 'ended' || listing.statusBadge === 'expired' || listing.statusBadge === 'sold') && (
-              <div className="absolute inset-0 z-10 pointer-events-none">
-                <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background/70 to-transparent" />
-                <div className="absolute bottom-2 left-2">
-                  {listing.statusBadge === 'sold' ? (
-                    <Badge className="bg-destructive text-destructive-foreground font-extrabold tracking-wide">
-                      SOLD
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="bg-background/85 backdrop-blur-sm font-extrabold tracking-wide">
-                      ENDED
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </Link>
-
-        <CardContent className="p-4 flex-1 flex flex-col gap-3">
-          {sold.isSold && (
-            <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
-              <div className="font-semibold">{sold.soldPriceLabel}</div>
-              {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
-            </div>
-          )}
-
-          <h3 className="font-bold text-base line-clamp-2 leading-snug hover:text-primary transition-colors duration-300">
-            {listing.title}
-          </h3>
-
-          {keyAttributes && keyAttributes.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-              {keyAttributes.map((attr: any, idx: number) => (
-                <span key={idx} className="px-2 py-0.5 bg-muted rounded-md">
-                  {attr}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {listing.location && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground min-w-0">
-              <MapPin className="h-4 w-4" />
-              <span className="truncate">
-                {listing.location.city}, {listing.location.state}
-              </span>
-            </div>
-          )}
-
-          <TrustBadges
-            verified={listing.trust?.verified || false}
-            transport={listing.trust?.transportReady || false}
-            size="sm"
-            className="flex-wrap gap-1.5"
-            showIcons={false}
-          />
-
-          <div className="mt-auto pt-3 border-t border-border/50 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                {priceDisplay}
-              </div>
-            </div>
-            <div className="min-w-0 text-right">
-              <div className="text-xs text-muted-foreground font-semibold">Sold by</div>
-              <div className="text-xs font-semibold truncate">{sellerName}</div>
-              {sellerVerified ? (
-                <Badge variant="secondary" className="text-[10px] font-semibold mt-1">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Verified
-                </Badge>
-              ) : null}
-            </div>
-          </div>
-
-          {/* No footer action buttons needed: click the heart to remove, click the card to view. */}
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-});
-
-WatchlistCard.displayName = 'WatchlistCard';
-
 // Watchlist list view now reuses `ListItem` (browse list view) for perfect visual parity.
+// Watchlist grid view now uses `ListingCard` and `FeaturedListingCard` (same as browse) for perfect visual parity.
