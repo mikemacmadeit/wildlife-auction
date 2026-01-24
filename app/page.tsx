@@ -1172,6 +1172,7 @@ export default function HomePage() {
                 <ListingRail listings={newFromSavedSellers} emptyText="No active listings from your saved sellers yet." />
               </div>
             ) : null}
+            </div>
           </div>
         </section>
       ) : null}
