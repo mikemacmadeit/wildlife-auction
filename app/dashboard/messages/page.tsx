@@ -429,10 +429,19 @@ export default function MessagesPage() {
                             key={item.id}
                             onClick={() => {
                               if (!user?.uid) return;
+                              // Optimistically mark as read for immediate UI update
+                              setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
                               setSelectedThreadId(item.id);
                               router.replace(`/dashboard/messages?threadId=${item.id}`);
-                              // Mark thread as read immediately when clicking to clear badge
-                              markThreadAsRead(item.id, user.uid).catch(() => {});
+                              // Mark thread as read in Firestore
+                              markThreadAsRead(item.id, user.uid).catch(() => {
+                                // On error, remove from optimistic set so it can retry
+                                setOptimisticReadThreads((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(item.id);
+                                  return next;
+                                });
+                              });
                             }}
                             className={cn(
                               'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer',
@@ -556,16 +565,21 @@ export default function MessagesPage() {
                   Inbox
                 </Button>
               </div>
-              {!thread ? (
+              {!thread && !selectedThreadId ? (
                 <CardContent className="pt-12 pb-12 text-center">
                   <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50" />
                   <div className="font-semibold">Select a conversation</div>
                   <div className="text-sm text-muted-foreground mt-1">Choose a thread from the inbox.</div>
                 </CardContent>
-              ) : (
+              ) : !thread && selectedThreadId ? (
+                <CardContent className="pt-12 pb-12 text-center">
+                  <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50 animate-pulse" />
+                  <div className="font-semibold">Loading conversation...</div>
+                </CardContent>
+              ) : thread ? (
                 <div className="flex-1 min-h-0">
                   <MessageThreadComponent
-                    // Keep component mounted while sliding; don't key by thread.id on mobile.
+                    key={thread.id}
                     thread={thread}
                     listingTitle={listing?.title || 'Listing'}
                     listing={listing}
@@ -574,7 +588,7 @@ export default function MessagesPage() {
                     orderStatus={orderStatus}
                   />
                 </div>
-              )}
+              ) : null}
             </Card>
           </div>
 
@@ -744,10 +758,10 @@ export default function MessagesPage() {
             </CardContent>
           </Card>
 
+          {/* Desktop thread view - hidden on mobile (mobile uses sliding panes above) */}
           <Card
             className={cn(
-              'h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex flex-col overflow-hidden min-h-0',
-              selectedThreadId ? 'flex' : 'hidden lg:flex'
+              'hidden lg:flex h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex-col overflow-hidden min-h-0'
             )}
           >
             {!thread ? (
