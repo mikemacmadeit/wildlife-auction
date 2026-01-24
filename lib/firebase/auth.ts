@@ -173,12 +173,24 @@ export const getCurrentUser = (): User | null => {
 };
 
 /**
- * Detect if user is on a mobile device
+ * Detect if user is on a mobile device or touch device
+ * More aggressive detection to catch all mobile scenarios
  */
 const isMobileDevice = (): boolean => {
   if (typeof window === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+  
+  // Check user agent for mobile devices
+  const ua = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+  const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i.test(ua.toLowerCase());
+  
+  // Check for touch capability
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
+  // Check screen width (mobile is typically < 768px)
+  const isSmallScreen = window.innerWidth < 768 || (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+  
+  // If any mobile indicator is true, treat as mobile
+  return isMobileUA || (hasTouch && isSmallScreen);
 };
 
 /**
@@ -193,18 +205,27 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
   
   // Use redirect on mobile devices (popups don't work well on mobile)
   if (isMobileDevice()) {
-    console.log('Mobile device detected, using redirect for Google sign-in');
-    await signInWithRedirect(auth, provider);
-    // Redirect will navigate away, so we throw a special error
-    // The page will reload after redirect completes
-    throw new Error('REDIRECT_INITIATED');
+    console.log('[Google Sign-In] Mobile device detected, using redirect flow');
+    try {
+      await signInWithRedirect(auth, provider);
+      // Redirect will navigate away, so we throw a special error
+      // The page will reload after redirect completes
+      throw new Error('REDIRECT_INITIATED');
+    } catch (error: any) {
+      // If redirect itself fails, log and re-throw
+      if (error.message !== 'REDIRECT_INITIATED') {
+        console.error('[Google Sign-In] Redirect initiation failed:', error);
+      }
+      throw error;
+    }
   }
   
   try {
     // Try popup first on desktop (better UX)
+    console.log('[Google Sign-In] Desktop detected, attempting popup');
     return await signInWithPopup(auth, provider);
   } catch (error: any) {
-    console.error('Google sign-in popup error:', error);
+    console.error('[Google Sign-In] Popup error:', error);
     
     // If popup fails for any reason (blocked, unauthorized domain, illegal URL, etc.), fall back to redirect
     if (
@@ -215,17 +236,25 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
       error.code === 'auth/operation-not-allowed' ||
       error.message?.includes('illegal URL') ||
       error.message?.includes('illegal') ||
-      error.message?.includes('iframe')
+      error.message?.includes('iframe') ||
+      error.message?.includes('timeout')
     ) {
       // Use redirect as fallback
-      console.log('Falling back to redirect for Google sign-in due to:', error.message || error.code);
-      await signInWithRedirect(auth, provider);
-      // Redirect will navigate away, so we throw a special error
-      // The page will reload after redirect completes
-      throw new Error('REDIRECT_INITIATED');
+      console.log('[Google Sign-In] Falling back to redirect due to:', error.message || error.code);
+      try {
+        await signInWithRedirect(auth, provider);
+        // Redirect will navigate away, so we throw a special error
+        // The page will reload after redirect completes
+        throw new Error('REDIRECT_INITIATED');
+      } catch (redirectError: any) {
+        if (redirectError.message !== 'REDIRECT_INITIATED') {
+          console.error('[Google Sign-In] Redirect fallback failed:', redirectError);
+        }
+        throw redirectError;
+      }
     }
     // Re-throw other errors with more context
-    console.error('Google sign-in error details:', {
+    console.error('[Google Sign-In] Error details:', {
       code: error.code,
       message: error.message,
       email: error.email,
