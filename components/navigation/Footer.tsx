@@ -234,13 +234,13 @@ export function Footer() {
               <Mail className="h-4 w-4 text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]" />
             </div>
 
-            <p className="text-sm text-[hsl(37_27%_78%)]">
+            <p className="text-sm text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]">
               Get weekly drops, ranch inventory, and market insights—Texas-only.
             </p>
 
             {success ? (
               <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-4">
-                <div className="text-sm font-semibold text-[hsl(37_27%_92%)]">You’re in.</div>
+                <div className="text-sm font-semibold text-[hsl(37_27%_15%)] dark:text-[hsl(37_27%_92%)]">You're in.</div>
                 <div className="text-sm text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]">Check your inbox soon.</div>
               </div>
             ) : (
@@ -301,4 +301,3 @@ export function Footer() {
     </footer>
   );
 }
-
