@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [checkingRedirect, setCheckingRedirect] = useState(true);
   
   // Get redirect path from sessionStorage if available
   const getRedirectPath = () => {
@@ -41,29 +42,100 @@ export default function LoginPage() {
 
   // Handle Google redirect result on page load
   useEffect(() => {
-    getGoogleRedirectResult()
-      .then((result) => {
-        if (result?.user) {
-          createUserDocument(result.user)
-            .then(() => {
-              toast({
-                title: 'Welcome back!',
-                description: 'You have been successfully signed in with Google.',
-              });
-              router.push(getRedirectPath());
-            })
-            .catch((error) => {
-              console.error('Error creating user document after Google redirect:', error);
-              toast({
-                title: 'Google sign-in failed',
-                description: 'Failed to set up user account. Please try again.',
-                variant: 'destructive',
-              });
-            });
+    let cancelled = false;
+    
+    const checkRedirect = async () => {
+      try {
+        setCheckingRedirect(true);
+        console.log('[Login] Checking for Google redirect result...');
+        
+        // Wait for Firebase auth to be fully ready - longer delay on mobile
+        const delay = typeof window !== 'undefined' && window.innerWidth < 1024 ? 500 : 200;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        if (cancelled) {
+          setCheckingRedirect(false);
+          return;
         }
-      })
-      .catch((error: any) => {
-        console.error('Error during Google redirect result:', error);
+        
+        const result = await getGoogleRedirectResult();
+        if (cancelled) {
+          setCheckingRedirect(false);
+          return;
+        }
+        
+        if (result?.user) {
+          console.log('[Login] Google redirect result received, creating user document...', {
+            email: result.user.email,
+            uid: result.user.uid,
+            emailVerified: result.user.emailVerified,
+          });
+          
+          try {
+            await createUserDocument(result.user);
+            if (cancelled) {
+              setCheckingRedirect(false);
+              return;
+            }
+            
+            console.log('[Login] User document created successfully, redirecting...');
+            
+            // Small delay to ensure state is updated before navigation
+            await new Promise(resolve => setTimeout(resolve, 100));
+            if (cancelled) {
+              setCheckingRedirect(false);
+              return;
+            }
+            
+            toast({
+              title: 'Welcome back!',
+              description: 'You have been successfully signed in with Google.',
+            });
+            
+            // Use replace to avoid back button issues and prevent redirect loops
+            const redirectPath = getRedirectPath();
+            console.log('[Login] Redirecting to:', redirectPath);
+            
+            // Use window.location for more reliable redirect on mobile
+            if (typeof window !== 'undefined') {
+              window.location.href = redirectPath;
+            } else {
+              router.replace(redirectPath);
+            }
+            return; // Don't set checkingRedirect to false - we're navigating away
+          } catch (error: any) {
+            console.error('[Login] Error creating user document after Google redirect:', error);
+            if (cancelled) {
+              setCheckingRedirect(false);
+              return;
+            }
+            toast({
+              title: 'Google sign-in failed',
+              description: error?.message || 'Failed to set up user account. Please try again.',
+              variant: 'destructive',
+            });
+          }
+        } else {
+          console.log('[Login] No redirect result found - user navigated directly or cancelled');
+        }
+      } catch (error: any) {
+        if (cancelled) {
+          setCheckingRedirect(false);
+          return;
+        }
+        console.error('[Login] Error during Google redirect result check:', error);
+        
+        // Don't show error for certain cases (user might have cancelled or no redirect pending)
+        if (
+          error.code === 'auth/popup-closed-by-user' || 
+          error.code === 'auth/cancelled-popup-request' ||
+          error.message?.includes('no pending') ||
+          !error.code
+        ) {
+          console.log('[Login] Expected error (no redirect pending):', error.code || 'no code');
+          setCheckingRedirect(false);
+          return; // Silent fail for user cancellation or no redirect
+        }
+        
         let errorMessage = 'An error occurred during Google sign-in. Please try again.';
         if (error.code === 'auth/unauthorized-domain') {
           errorMessage = 'Google sign-in is not enabled for this domain. Please contact support.';
@@ -77,7 +149,19 @@ export default function LoginPage() {
           description: errorMessage,
           variant: 'destructive',
         });
-      });
+      } finally {
+        if (!cancelled) {
+          setCheckingRedirect(false);
+        }
+      }
+    };
+    
+    void checkRedirect();
+    
+    return () => {
+      cancelled = true;
+      setCheckingRedirect(false);
+    };
   }, [router, toast]);
 
   const validateForm = () => {
@@ -248,6 +332,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
+      {/* Show loading overlay while checking for redirect result */}
+      {checkingRedirect && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Completing sign-in...</p>
+          </div>
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -367,7 +460,7 @@ export default function LoginPage() {
                 variant="outline"
                 className="w-full min-h-[44px] font-semibold gap-2 border-2"
                 onClick={handleGoogleSignIn}
-                disabled={isLoading}
+                disabled={isLoading || checkingRedirect}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>

@@ -296,19 +296,37 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
  */
 export const getGoogleRedirectResult = async (): Promise<UserCredential | null> => {
   try {
+    console.log('[Google Sign-In] Checking for redirect result...');
     const result = await getRedirectResult(auth);
     if (result) {
-      console.log('Google redirect sign-in successful:', result.user.email);
+      console.log('[Google Sign-In] Redirect result received successfully:', {
+        email: result.user.email,
+        uid: result.user.uid,
+        emailVerified: result.user.emailVerified,
+      });
+      return result;
+    } else {
+      console.log('[Google Sign-In] No redirect result found (user may have navigated directly or cancelled)');
+      return null;
     }
-    return result;
   } catch (error: any) {
-    console.error('Error getting redirect result:', error);
-    console.error('Error details:', {
-      code: error.code,
-      message: error.message,
-      email: error.email,
-      credential: error.credential,
-    });
+    // Some errors are expected (e.g., user cancelled, no redirect pending)
+    const isExpectedError = 
+      error.code === 'auth/credential-already-in-use' ||
+      error.code === 'auth/email-already-in-use' ||
+      error.message?.includes('no pending');
+    
+    if (!isExpectedError) {
+      console.error('[Google Sign-In] Error getting redirect result:', error);
+      console.error('[Google Sign-In] Error details:', {
+        code: error.code,
+        message: error.message,
+        email: error.email,
+        credential: error.credential,
+      });
+    } else {
+      console.log('[Google Sign-In] Expected error (no redirect pending or user cancelled):', error.code);
+    }
     // Don't throw - return null so the page can still load
     return null;
   }
