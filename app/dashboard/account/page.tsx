@@ -57,6 +57,7 @@ export default function AccountPage() {
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile');
   const [saving, setSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
@@ -615,7 +616,7 @@ export default function AccountPage() {
         </motion.div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 h-auto bg-card border border-border/50 p-1">
             <TabsTrigger value="profile" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
               Profile
