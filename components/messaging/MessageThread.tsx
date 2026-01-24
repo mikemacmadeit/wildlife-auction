@@ -480,7 +480,7 @@ export function MessageThreadComponent({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overscroll-contain">
       {/* Header */}
       <div className="border-b p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -586,7 +586,8 @@ export function MessageThreadComponent({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain touch-pan-y"
+        style={{ WebkitOverflowScrolling: 'touch' }}
         onScroll={() => {
           const sc = scrollRef.current;
           if (!sc) return;
@@ -736,6 +737,7 @@ export function MessageThreadComponent({
           accept="image/*"
           multiple
           className="hidden"
+          aria-label="Upload images"
           onChange={(e) => void handleFilesSelected(e.target.files)}
         />
 

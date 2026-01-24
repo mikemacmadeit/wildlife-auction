@@ -371,8 +371,8 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
+      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-6xl">
         <div className="mb-4">
           <Button variant="ghost" onClick={() => router.back()} className="mb-2">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -383,11 +383,12 @@ export default function MessagesPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
           {/* Mobile: keep both panes mounted and slide between them for smoothness */}
-          <div className="lg:hidden relative overflow-hidden h-[calc(100dvh-220px)] min-h-0">
+          <div className="lg:hidden relative overflow-hidden h-[calc(100dvh-200px)] min-h-0 touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
             {/* Inbox pane */}
             <Card
               className={cn(
-                'absolute inset-0 flex flex-col min-h-0 transition-transform duration-200 ease-out will-change-transform',
+                'absolute inset-0 flex flex-col min-h-0 transition-transform duration-300 ease-in-out',
+                'will-change-transform transform-gpu',
                 selectedThreadId ? '-translate-x-full' : 'translate-x-0'
               )}
             >
@@ -419,7 +420,7 @@ export default function MessagesPage() {
                 {inboxItems.length === 0 ? (
                   <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
                 ) : (
-                  <ScrollArea className="h-full">
+                  <ScrollArea className="h-full overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div className="divide-y divide-border/50 pr-3">
                       {inboxItems.map((item) => {
                         const active = selectedThreadId === item.id || thread?.id === item.id;
@@ -547,7 +548,8 @@ export default function MessagesPage() {
             {/* Thread pane */}
             <Card
               className={cn(
-                'absolute inset-0 flex flex-col overflow-hidden min-h-0 transition-transform duration-200 ease-out will-change-transform',
+                'absolute inset-0 flex flex-col overflow-hidden min-h-0 transition-transform duration-300 ease-in-out',
+                'will-change-transform transform-gpu',
                 selectedThreadId ? 'translate-x-0' : 'translate-x-full'
               )}
             >
@@ -577,7 +579,7 @@ export default function MessagesPage() {
                   <div className="font-semibold">Loading conversation...</div>
                 </CardContent>
               ) : thread ? (
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overscroll-contain">
                   <MessageThreadComponent
                     key={thread.id}
                     thread={thread}
