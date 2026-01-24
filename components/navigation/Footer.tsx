@@ -230,8 +230,8 @@ export function Footer() {
           {/* Newsletter */}
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-[hsl(37_27%_88%)]">Newsletter</div>
-              <Mail className="h-4 w-4 text-[hsl(37_27%_78%)]" />
+              <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">Newsletter</div>
+              <Mail className="h-4 w-4 text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]" />
             </div>
 
             <p className="text-sm text-[hsl(37_27%_78%)]">
