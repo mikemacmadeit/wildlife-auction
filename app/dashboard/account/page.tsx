@@ -637,7 +637,7 @@ export default function AccountPage() {
             {/* Profile Header Card */}
             <Card className="border-2 border-border/50 bg-card">
               <CardContent className="pt-8 pb-8 px-6">
-                <div className="flex items-start justify-between gap-4 flex-col md:flex-row">
+                <div className="flex items-center md:items-start justify-center md:justify-between gap-4 flex-col md:flex-row">
                   <div className="flex flex-col md:flex-row items-center md:items-start gap-6 flex-1">
                   {/* Avatar */}
                   <div className="relative group">
@@ -702,7 +702,7 @@ export default function AccountPage() {
                         )}
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+                    <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto md:mx-0">
                       {formData.bio}
                     </p>
                     {isEditing && avatarUploading && (
