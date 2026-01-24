@@ -103,9 +103,13 @@ export default function SellerProfilePage() {
   const isSelf = !!user?.uid && !!sellerId && user.uid === sellerId;
 
   const displayName = useMemo(() => {
+    // Respect displayNamePreference setting (business name vs personal name)
+    const displayNamePreference = profile?.profile?.preferences?.displayNamePreference || 'personal';
+    if (displayNamePreference === 'business' && profile?.profile?.businessName?.trim()) {
+      return String(profile.profile.businessName).trim();
+    }
     return (
       profile?.displayName ||
-      profile?.profile?.businessName ||
       profile?.profile?.fullName ||
       'Seller'
     );

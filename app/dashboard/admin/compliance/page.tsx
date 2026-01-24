@@ -131,6 +131,18 @@ export default function AdminCompliancePage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // DIAGNOSTIC: Log admin page state
+  useEffect(() => {
+    console.log('[ADMIN COMPLIANCE PAGE] State:', {
+      pathname: typeof window !== 'undefined' ? window.location.pathname : 'SSR',
+      userId: user?.uid,
+      email: user?.email,
+      adminLoading,
+      isAdmin,
+      timestamp: new Date().toISOString(),
+    });
+  }, [user?.uid, user?.email, adminLoading, isAdmin]);
   const [activeTab, setActiveTab] = useState<TabType>('listings');
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -535,14 +547,24 @@ export default function AdminCompliancePage() {
   }, [orders, searchQuery]);
 
   if (adminLoading) {
+    console.log('[ADMIN COMPLIANCE PAGE] Rendering loading spinner - adminLoading=true');
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading admin status...</p>
+          <p className="text-xs text-muted-foreground mt-2">User: {user?.email || 'Unknown'}</p>
+        </div>
       </div>
     );
   }
 
   if (!isAdmin) {
+    console.warn('[ADMIN COMPLIANCE PAGE] Access denied - isAdmin=false', {
+      userId: user?.uid,
+      email: user?.email,
+      adminLoading,
+    });
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>
@@ -550,13 +572,23 @@ export default function AdminCompliancePage() {
             <div className="text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-              <p className="text-muted-foreground">You don't have permission to access this page.</p>
+              <p className="text-muted-foreground mb-4">You don't have permission to access this page.</p>
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-4 bg-muted rounded text-left text-xs font-mono">
+                  <div>User ID: {user?.uid || 'None'}</div>
+                  <div>Email: {user?.email || 'None'}</div>
+                  <div>Admin Loading: {adminLoading ? 'true' : 'false'}</div>
+                  <div>Is Admin: {isAdmin ? 'true' : 'false'}</div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  console.log('[ADMIN COMPLIANCE PAGE] Rendering main content - isAdmin=true');
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">

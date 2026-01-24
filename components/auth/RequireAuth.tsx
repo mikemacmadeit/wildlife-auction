@@ -15,15 +15,16 @@ interface RequireAuthProps {
  * Redirects to /login if user is not authenticated
  */
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, initialized } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Only redirect if auth is fully initialized and no user
+    if (initialized && !loading && !user) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, loading, initialized, router]);
 
   // Enforce latest Terms acceptance for continued use (dashboard + other gated pages).
   useEffect(() => {
@@ -60,7 +61,15 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }
 
   if (!user) {
-    return null; // Will redirect via useEffect
+    // Show loading state while redirecting (never return null)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting to login...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

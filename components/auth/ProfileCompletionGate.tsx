@@ -83,9 +83,11 @@ export function ProfileCompletionGate() {
     }
   }, [gateOpen]);
 
-  if (!isAuthedArea) return null;
-  if (!initialized || loading) return null;
-  if (!user) return null;
+  // Never return null - always render something (even if just a fragment)
+  // This ensures the layout never goes blank due to this component
+  if (!isAuthedArea) return <></>;
+  if (!initialized || loading) return <></>;
+  if (!user) return <></>;
 
   return (
     <ProfileCompletionModal

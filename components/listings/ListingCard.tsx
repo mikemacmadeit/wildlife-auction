@@ -395,11 +395,6 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
                       ID verified
                     </Badge>
                   )}
-                  {sellerBadges.includes('TPWD breeder permit') && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      TPWD permit
-                    </Badge>
-                  )}
                 </div>
               </div>
             </div>
@@ -409,4 +404,11 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
     </motion.div>
   );
 });
+
 ListingCard.displayName = 'ListingCard';
+
+// Memoize to prevent re-renders when parent re-renders but listing props haven't changed
+export const MemoizedListingCard = React.memo(ListingCard, (prev, next) => {
+  // Only re-render if listing ID or className changed
+  return prev.listing.id === next.listing.id && prev.className === next.className;
+});

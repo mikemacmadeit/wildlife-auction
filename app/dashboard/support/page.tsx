@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, LifeBuoy, Send, MessageSquare } from 'lucide-react';
+import { DashboardPageShell } from '@/components/dashboard/DashboardPageShell';
 
 type TicketRow = {
   ticketId: string;
@@ -37,6 +38,7 @@ function toDateLabel(v: any): string {
 }
 
 export default function SupportPage() {
+  console.log('[PAGE RENDER] SupportPage', { timestamp: Date.now() });
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const sp = useSearchParams();
@@ -117,43 +119,59 @@ export default function SupportPage() {
     }
   }, [form, loadTickets, toast, user]);
 
-  if (loading) {
-    return (
-      <div className="min-h-[300px] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  // Use DashboardPageShell to ensure never blank
+  const isLoading = loading || ticketsLoading;
+  const isEmpty = !isLoading && !user;
 
-  if (!user) {
+  if (isLoading || !user) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="font-semibold">Sign in required</div>
-            <div className="text-sm text-muted-foreground mt-1">Please sign in to create and manage support tickets.</div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+          <DashboardPageShell
+            title="support"
+            loading={isLoading}
+            isEmpty={isEmpty}
+            emptyState={isEmpty ? {
+              icon: LifeBuoy,
+              title: 'Sign in required',
+              description: 'Please sign in to create and manage support tickets.',
+              action: {
+                label: 'Sign In',
+                href: '/login',
+              },
+            } : undefined}
+            debugLabel="SupportPage"
+          >
+            <></>
+          </DashboardPageShell>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2">
-            <LifeBuoy className="h-5 w-5 text-primary" />
-            <h1 className="text-3xl font-extrabold">Support</h1>
-          </div>
-          <p className="text-muted-foreground mt-1">Create a ticket or track your existing requests.</p>
-        </div>
-        <Button variant="outline" onClick={loadTickets} disabled={ticketsLoading} className="min-h-[44px] font-semibold">
-          {ticketsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
-        </Button>
-      </div>
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+        <DashboardPageShell
+          title="support"
+          loading={false}
+          debugLabel="SupportPage"
+        >
+          <div className="space-y-6">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2">
+                  <LifeBuoy className="h-5 w-5 text-primary" />
+                  <h1 className="text-3xl font-extrabold">Support</h1>
+                </div>
+                <p className="text-muted-foreground mt-1">Create a ticket or track your existing requests.</p>
+              </div>
+              <Button variant="outline" onClick={loadTickets} disabled={ticketsLoading} className="min-h-[44px] font-semibold">
+                {ticketsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+              </Button>
+            </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
           <TabsTrigger value="new" className="font-semibold">
             New ticket
@@ -265,8 +283,11 @@ export default function SupportPage() {
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </DashboardPageShell>
+      </div>
     </div>
   );
 }

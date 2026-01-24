@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils';
 import { getMinIncrementCents } from '@/lib/auctions/proxyBidding';
 import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
+import { DashboardPageShell } from '@/components/dashboard/DashboardPageShell';
 
 type OfferRow = {
   offerId: string;
@@ -146,6 +147,7 @@ function badgeVariantForUnifiedStatus(status: UnifiedRow['status']) {
 }
 
 export default function BidsOffersPage() {
+  console.log('[PAGE RENDER] BidsOffersPage', { timestamp: Date.now() });
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
@@ -477,35 +479,84 @@ export default function BidsOffersPage() {
     }
   };
 
-  if (authLoading) {
+  // Use DashboardPageShell to ensure never blank
+  const isLoading = authLoading || loading;
+  const isEmpty = !isLoading && !user;
+
+  if (isLoading || !user) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+          <DashboardPageShell
+            title="bids & offers"
+            loading={isLoading}
+            isEmpty={isEmpty}
+            emptyState={isEmpty ? {
+              icon: Gavel,
+              title: 'Sign in required',
+              description: 'You must be signed in to manage bids and offers.',
+              action: {
+                label: 'Sign In',
+                href: '/login',
+              },
+            } : undefined}
+            debugLabel="BidsOffersPage"
+          >
+            <></>
+          </DashboardPageShell>
+        </div>
       </div>
     );
   }
 
+  // Legacy check - should not be reached due to shell above, but keep for safety
   if (!user) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>Sign in required</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">You must be signed in to manage bids and offers.</p>
-            <Button asChild className="w-full">
-              <Link href="/login">Go to login</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+          <DashboardPageShell
+            title="bids & offers"
+            isEmpty={true}
+            emptyState={{
+              icon: Gavel,
+              title: 'Sign in required',
+              description: 'You must be signed in to manage bids and offers.',
+              action: {
+                label: 'Sign In',
+                href: '/login',
+              },
+            }}
+            debugLabel="BidsOffersPage"
+          >
+            <></>
+          </DashboardPageShell>
+        </div>
       </div>
     );
   }
 
+  // Keep original return for content (wrapped in shell)
+  const hasContent = rows.length > 0 || bids.length > 0 || offers.length > 0;
+
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+        <DashboardPageShell
+          title="bids & offers"
+          loading={false}
+          isEmpty={!hasContent && !loading}
+          emptyState={!hasContent && !loading ? {
+            icon: Gavel,
+            title: 'No bids or offers yet',
+            description: 'Start bidding on auctions or making offers to see them here.',
+            action: {
+              label: 'Browse Listings',
+              href: '/browse',
+            },
+          } : undefined}
+          debugLabel="BidsOffersPage"
+        >
+          <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -1190,6 +1241,8 @@ export default function BidsOffersPage() {
         />
 
         <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
+          </div>
+        </DashboardPageShell>
       </div>
     </div>
   );

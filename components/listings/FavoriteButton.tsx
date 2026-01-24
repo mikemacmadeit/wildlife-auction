@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFavorites } from '@/hooks/use-favorites';
@@ -16,7 +16,7 @@ interface FavoriteButtonProps {
   className?: string;
 }
 
-export function FavoriteButton({ 
+function FavoriteButtonComponent({ 
   listingId, 
   variant = 'icon',
   size = 'md',
@@ -26,7 +26,8 @@ export function FavoriteButton({
   const { isFavorite, isPending, toggleFavorite } = useFavorites();
   const { toast } = useToast();
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
-  // Memoize to prevent unnecessary re-renders
+  // isFavorite is now stable (reads from ref), so this won't cause re-renders unless this listing's status changed
+  // Use useMemo to prevent re-renders when other listings' favorite status changes
   const isFavorited = useMemo(() => isFavorite(listingId), [isFavorite, listingId]);
   const pending = useMemo(() => isPending(listingId), [isPending, listingId]);
 
@@ -109,3 +110,11 @@ export function FavoriteButton({
     </>
   );
 }
+
+// Memoize to prevent re-renders when parent re-renders but props haven't changed
+export const FavoriteButton = memo(FavoriteButtonComponent, (prev, next) => {
+  return prev.listingId === next.listingId && 
+         prev.variant === next.variant && 
+         prev.size === next.size && 
+         prev.className === next.className;
+});

@@ -74,6 +74,8 @@ export default function HomePage() {
 
   // Fetch listings from Firestore
   useEffect(() => {
+    let mounted = true;
+
     async function fetchListings() {
       try {
         setLoading(true);
@@ -84,9 +86,19 @@ export default function HomePage() {
           listEndingSoonAuctions({ limitCount: 8 }),
         ]);
 
+        if (!mounted) return;
+
         const [dataRes, mwRes, esRes] = results;
 
-        if (dataRes.status === 'fulfilled') setListings(dataRes.value);
+        // Always set safe defaults - never leave undefined
+        if (dataRes.status === 'fulfilled') {
+          setListings(dataRes.value ?? []);
+        } else {
+          console.error('[HOMEPAGE] Error fetching listings:', dataRes.reason);
+          setListings([]); // Always render something
+          setError(dataRes.reason instanceof Error ? dataRes.reason.message : 'Failed to load listings');
+        }
+
         if (mwRes.status === 'fulfilled') {
           // Hide the section unless there is actual watch activity.
           const filtered = (mwRes.value || []).filter((l: any) => {
@@ -94,27 +106,37 @@ export default function HomePage() {
             return watchers > 0;
           });
           setMostWatched(filtered);
-        }
-        if (esRes.status === 'fulfilled') setEndingSoon(esRes.value);
-
-        // Only surface an error if the *primary* listings query failed.
-        if (dataRes.status === 'rejected') {
-          const err = dataRes.reason;
-          console.error('Error fetching listings:', err);
-          setError(err instanceof Error ? err.message : 'Failed to load listings');
         } else {
-          // Non-blocking: log secondary section failures but keep page usable.
-          if (mwRes.status === 'rejected') console.warn('Most watched unavailable:', mwRes.reason);
-          if (esRes.status === 'rejected') console.warn('Ending soon unavailable:', esRes.reason);
+          console.warn('[HOMEPAGE] Most watched unavailable:', mwRes.reason);
+          setMostWatched([]); // Always set safe default
+        }
+
+        if (esRes.status === 'fulfilled') {
+          setEndingSoon(esRes.value ?? []);
+        } else {
+          console.warn('[HOMEPAGE] Ending soon unavailable:', esRes.reason);
+          setEndingSoon([]); // Always set safe default
         }
       } catch (err) {
-        console.error('Error fetching listings:', err);
+        console.error('[HOMEPAGE] Unexpected error fetching listings:', err);
+        if (!mounted) return;
+        // Always set safe defaults on error
+        setListings([]);
+        setMostWatched([]);
+        setEndingSoon([]);
         setError(err instanceof Error ? err.message : 'Failed to load listings');
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
+
     fetchListings();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Fetch Field Notes (Featured + Editor picks) from server (client page cannot read filesystem)
@@ -791,26 +813,26 @@ export default function HomePage() {
       ) : effectiveUser ? (
         <>
           {/* Signed-in: Search bar and welcome section */}
-          {/* Search Bar */}
+          {/* Search Bar - Full Width within container */}
           <section className="border-b border-border/50 bg-card/50 py-4 md:py-6">
-            <div className="container mx-auto px-4 max-w-4xl">
-              <form onSubmit={handleSearchSubmit} className="relative">
+            <div className="container mx-auto px-4">
+              <form onSubmit={handleSearchSubmit} className="relative w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search listings, species, breeds, and locations…"
                   value={homeSearchQuery}
                   onChange={(e) => setHomeSearchQuery(e.target.value)}
-                  className="pl-11 min-h-[52px] text-base rounded-xl bg-background"
+                  className="pl-11 min-h-[52px] text-base rounded-xl bg-background w-full"
                 />
               </form>
             </div>
           </section>
 
-          {/* Welcome Section - Mobile visible below search */}
+          {/* Welcome Section - Full Width within container */}
           <section className="border-b border-border/50 bg-background py-6 md:py-8">
-            <div className="container mx-auto px-4 max-w-4xl">
-              <div className="space-y-4">
+            <div className="container mx-auto px-4">
+              <div className="w-full space-y-4">
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
                   <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>

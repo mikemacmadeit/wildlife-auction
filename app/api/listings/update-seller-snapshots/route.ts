@@ -38,23 +38,25 @@ export async function POST(request: Request) {
         'Seller';
     }
 
-    // Get all active listings for this user
+    // Get all active and pending listings for this user (sold listings keep their snapshot for historical accuracy)
     const listingsRef = db.collection('listings');
-    const activeListingsQuery = listingsRef
-      .where('sellerId', '==', userId)
-      .where('status', '==', 'active');
-
-    const snapshot = await activeListingsQuery.get();
+    const [activeSnapshot, pendingSnapshot] = await Promise.all([
+      listingsRef.where('sellerId', '==', userId).where('status', '==', 'active').get(),
+      listingsRef.where('sellerId', '==', userId).where('status', '==', 'pending').get(),
+    ]);
     
-    if (snapshot.empty) {
-      return json({ ok: true, updated: 0, message: 'No active listings to update' });
+    // Combine both snapshots
+    const allDocs = [...activeSnapshot.docs, ...pendingSnapshot.docs];
+    
+    if (allDocs.length === 0) {
+      return json({ ok: true, updated: 0, message: 'No active or pending listings to update' });
     }
 
     // Update each listing's sellerSnapshot.displayName
     const batch = db.batch();
     let updateCount = 0;
 
-    snapshot.docs.forEach((doc) => {
+    allDocs.forEach((doc) => {
       const listingData = doc.data();
       // Only update if the display name has actually changed
       if (listingData.sellerSnapshot?.displayName !== displayName) {

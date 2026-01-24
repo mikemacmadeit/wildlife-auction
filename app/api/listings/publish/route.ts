@@ -460,10 +460,11 @@ export async function POST(request: Request) {
     if (displayNamePreference === 'business' && userData?.profile?.businessName?.trim()) {
       displayName = String(userData.profile.businessName).trim();
     } else {
+      // When preference is 'personal', use personal name (don't use old sellerSnapshot)
       displayName =
-        (listingData?.sellerSnapshot?.displayName && String(listingData.sellerSnapshot.displayName)) ||
         (userData?.displayName && String(userData.displayName)) ||
         (userData?.profile?.fullName && String(userData.profile.fullName)) ||
+        userData?.email?.split('@')[0] ||
         'Seller';
     }
 

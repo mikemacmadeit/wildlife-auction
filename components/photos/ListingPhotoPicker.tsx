@@ -210,6 +210,8 @@ export function ListingPhotoPicker(props: {
         multiple
         className="hidden"
         disabled={uploading}
+        aria-label="Upload photos"
+        title="Upload photos"
         onChange={async (e) => {
           const files = Array.from(e.target.files || []);
           await handleUploadFiles(files);

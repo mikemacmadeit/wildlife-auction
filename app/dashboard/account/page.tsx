@@ -362,7 +362,12 @@ export default function AccountPage() {
           });
           const result = await response.json();
           if (result.ok && result.updated > 0) {
-            // Success - listings updated
+            toast({
+              title: 'Listings updated',
+              description: `Updated ${result.updated} listing${result.updated !== 1 ? 's' : ''} with your ${formData.preferences.displayNamePreference === 'business' ? 'business' : 'personal'} name.`,
+            });
+          } else if (result.ok && result.updated === 0) {
+            // No listings to update - this is fine, just don't show a toast
           }
         } catch (e) {
           // Non-blocking: log but don't fail the profile save
@@ -494,7 +499,7 @@ export default function AccountPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
           <p className="text-muted-foreground">Loading profile...</p>
@@ -506,8 +511,8 @@ export default function AccountPage() {
   // Not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
-        <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl">
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
           <Card>
             <CardContent className="pt-12 pb-12 text-center">
               <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -521,8 +526,8 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl space-y-6 md:space-y-8">
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -815,7 +820,7 @@ export default function AccountPage() {
                     </div>
                     <Switch 
                       checked={formData.preferences.displayNamePreference === 'business'}
-                      onCheckedChange={(checked) => {
+                      onCheckedChange={async (checked) => {
                         if (!formData.businessName && checked) {
                           toast({
                             title: 'Business name required',
@@ -831,10 +836,81 @@ export default function AccountPage() {
                             displayNamePreference: checked ? 'business' : 'personal' 
                           }
                         });
+                        
+                        // If editing, immediately update existing listings when toggle changes
+                        if (isEditing && user) {
+                          try {
+                            const token = await user.getIdToken();
+                            const response = await fetch('/api/listings/update-seller-snapshots', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                              },
+                            });
+                            const result = await response.json();
+                            if (result.ok && result.updated > 0) {
+                              toast({
+                                title: 'Listings updated',
+                                description: `Updated ${result.updated} listing${result.updated !== 1 ? 's' : ''} with ${checked ? 'business' : 'personal'} name.`,
+                              });
+                            }
+                          } catch (e) {
+                            // Non-blocking - will update on save anyway
+                            console.warn('Failed to update listing snapshots:', e);
+                          }
+                        }
                       }}
                       disabled={!formData.businessName || !isEditing}
                     />
                   </div>
+                  {isEditing && formData.businessName && (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          if (!user) return;
+                          try {
+                            const token = await user.getIdToken();
+                            const response = await fetch('/api/listings/update-seller-snapshots', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                              },
+                            });
+                            const result = await response.json();
+                            if (result.ok) {
+                              if (result.updated > 0) {
+                                toast({
+                                  title: 'Listings updated',
+                                  description: `Updated ${result.updated} listing${result.updated !== 1 ? 's' : ''} with your ${formData.preferences.displayNamePreference === 'business' ? 'business' : 'personal'} name.`,
+                                });
+                              } else {
+                                toast({
+                                  title: 'No updates needed',
+                                  description: 'All your listings already have the correct name.',
+                                });
+                              }
+                            } else {
+                              throw new Error(result.error || 'Failed to update');
+                            }
+                          } catch (e) {
+                            toast({
+                              title: 'Update failed',
+                              description: e instanceof Error ? e.message : 'Failed to update listings. Please try again.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                        className="text-xs"
+                      >
+                        Update existing listings
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

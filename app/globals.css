@@ -473,4 +473,42 @@
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
   }
+
+  /* CRITICAL FIX: Force dashboard main element to be visible */
+  .dashboard-main-visible {
+    min-height: 100vh !important;
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    overflow: auto !important;
+  }
+  
+  .dashboard-main-content {
+    flex: 1 1 auto !important;
+    min-height: 100% !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+}
+
+/* Fix for main content wrapper width collapse - OUTSIDE layer for maximum specificity */
+@media (min-width: 768px) {
+  div.dashboard-main-content-wrapper {
+    width: calc(100vw - 256px) !important;
+    flex: 1 1 auto !important;
+    min-width: calc(100vw - 256px) !important;
+    max-width: calc(100vw - 256px) !important;
+  }
+  div.dashboard-main-content-wrapper.collapsed {
+    width: calc(100vw - 80px) !important;
+    min-width: calc(100vw - 80px) !important;
+    max-width: calc(100vw - 80px) !important;
+  }
 }

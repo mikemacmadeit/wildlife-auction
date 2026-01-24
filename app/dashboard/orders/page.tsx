@@ -641,7 +641,7 @@ export default function OrdersPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
           <p className="text-muted-foreground">Loading orders...</p>
@@ -653,8 +653,8 @@ export default function OrdersPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6">
-        <div className="container mx-auto px-4 py-6">
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
           <Card>
             <CardContent className="pt-12 pb-12 text-center">
               <XCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
@@ -670,8 +670,8 @@ export default function OrdersPage() {
   // Not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6">
-        <div className="container mx-auto px-4 py-6">
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
           <Card>
             <CardContent className="pt-12 pb-12 text-center">
               <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -797,9 +797,8 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="min-h-screen bg-gradient-to-b from-muted/20 via-background to-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 space-y-6 max-w-6xl">
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">My Purchases</h1>
@@ -1369,7 +1368,6 @@ export default function OrdersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
       </div>
     </div>
   );

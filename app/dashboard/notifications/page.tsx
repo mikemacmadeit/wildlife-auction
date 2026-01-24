@@ -37,6 +37,7 @@ import { formatDistanceToNow } from 'date-fns';
 import Image from 'next/image';
 import { getListingsByIds } from '@/lib/firebase/listings';
 import type { Listing } from '@/lib/types';
+import { DashboardPageShell } from '@/components/dashboard/DashboardPageShell';
 
 type UiFilter = 'all' | 'important' | 'buying' | 'selling' | 'recommended' | 'account';
 
@@ -278,6 +279,7 @@ function styleForNotification(n: UserNotification): {
 }
 
 export default function NotificationsPage() {
+  console.log('[PAGE RENDER] NotificationsPage', { timestamp: Date.now() });
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [filter, setFilter] = useState<UiFilter>('all');
@@ -446,11 +448,13 @@ export default function NotificationsPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <div className="flex items-center justify-center min-h-[360px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <div className="text-sm text-muted-foreground">Loading notifications…</div>
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+          <div className="flex items-center justify-center min-h-[360px]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+              <div className="text-sm text-muted-foreground">Loading notifications…</div>
+            </div>
           </div>
         </div>
       </div>
@@ -459,68 +463,78 @@ export default function NotificationsPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <Card className="border-border/60">
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">Sign in to see notifications</h2>
-              <p className="text-muted-foreground mb-6">Auction updates, order status, and important account alerts.</p>
-              <Button asChild>
-                <Link href="/login">Sign In</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+          <Card className="border-border/60">
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h2 className="text-2xl font-bold mb-2">Sign in to see notifications</h2>
+                <p className="text-muted-foreground mb-6">Auction updates, order status, and important account alerts.</p>
+                <Button asChild>
+                  <Link href="/login">Sign In</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-8 max-w-5xl space-y-6">
-      <Card className="border-2 border-border/60 overflow-hidden">
-        <CardContent className="p-5 md:p-6">
-          <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center">
-                  <Bell className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
-                    Notifications
-                    {unreadCount > 0 ? (
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+        <DashboardPageShell
+          title="notifications"
+          loading={false}
+          isEmpty={false}
+          debugLabel="NotificationsPage"
+        >
+          <div className="space-y-6">
+            <Card className="border-2 border-border/60 overflow-hidden">
+              <CardContent className="p-5 md:p-6">
+                <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+                        <Bell className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
+                          Notifications
+                          {unreadCount > 0 ? (
+                            <Badge variant="secondary" className="font-semibold">
+                              {unreadCount} unread
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="font-semibold text-muted-foreground">
+                              All caught up
+                            </Badge>
+                          )}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                          Auction signals, order updates, messages, and trust alerts—built for speed.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
                       <Badge variant="secondary" className="font-semibold">
-                        {unreadCount} unread
+                        {filterCounts.all} total
                       </Badge>
-                    ) : (
-                      <Badge variant="outline" className="font-semibold text-muted-foreground">
-                        All caught up
-                      </Badge>
-                    )}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Auction signals, order updates, messages, and trust alerts—built for speed.
-                  </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0} className="font-semibold min-h-[44px]">
+                      <CheckCheck className="h-4 w-4 mr-2" />
+                      Mark all read
+                    </Button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap text-xs">
-                <Badge variant="secondary" className="font-semibold">
-                  {filterCounts.all} total
-                </Badge>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0} className="font-semibold min-h-[44px]">
-                <CheckCheck className="h-4 w-4 mr-2" />
-                Mark all read
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
 
       <Card className="border-2 border-border/60 overflow-hidden">
         <CardHeader className="pb-4">
@@ -697,6 +711,9 @@ export default function NotificationsPage() {
           </div>
         </CardContent>
       </Card>
+          </div>
+        </DashboardPageShell>
+      </div>
     </div>
   );
 }

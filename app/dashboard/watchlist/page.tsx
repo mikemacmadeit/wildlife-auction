@@ -13,7 +13,8 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { getListingsByIds, subscribeToListing } from '@/lib/firebase/listings';
@@ -72,6 +73,7 @@ import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAt
 import { ListItem } from '@/components/listings/ListItem';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
+import { DashboardPageShell } from '@/components/dashboard/DashboardPageShell';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -104,6 +106,7 @@ interface ListingWithStatus extends Listing {
   statusBadge: 'active' | 'ending-soon' | 'ended' | 'sold' | 'expired';
 }
 
+// Force this to be a client component that doesn't suspend
 export default function WatchlistPage() {
   const { user, loading: authLoading } = useAuth();
   const { favoriteIds, isLoading: favoritesLoading, removeFavorite, toggleFavorite } = useFavorites();
@@ -129,7 +132,7 @@ export default function WatchlistPage() {
   // Real-time subscriptions
   const subscriptionsRef = useRef<Map<string, () => void>>(new Map());
 
-  function toMillisSafe(value: any): number {
+  const toMillisSafe = useCallback((value: any): number => {
     if (!value) return 0;
     if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : 0;
     if (typeof value?.toDate === 'function') {
@@ -149,7 +152,7 @@ export default function WatchlistPage() {
       return Number.isFinite(d.getTime()) ? d.getTime() : 0;
     }
     return 0;
-  }
+  }, []);
 
   // Calculate listing statuses
   const enrichListing = useCallback((listing: Listing): ListingWithStatus => {
@@ -180,39 +183,88 @@ export default function WatchlistPage() {
       timeUntilEnd,
       statusBadge,
     };
-  }, []);
+  }, [toMillisSafe]);
+
+  // Guard against re-fetching and re-subscribing
+  const isFetchingRef = useRef<string | null>(null);
+  const favoriteIdsStringRef = useRef<string>('');
 
   // Fetch listings when favorite IDs change
   useEffect(() => {
+    // Wait for auth and favorites to load
+    if (authLoading || favoritesLoading) {
+      // Ensure loading state is set while waiting
+      setLoading(true);
+      return;
+    }
+
+    if (!user) {
+      setLoading(false);
+      setListings([]);
+      setError('Please sign in to view your watchlist');
+      // Clean up subscriptions
+      subscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
+      subscriptionsRef.current.clear();
+      isFetchingRef.current = null;
+      return;
+    }
+
+    // Create stable string key from favoriteIds array
+    const favoriteIdsKey = favoriteIds.sort().join(',');
+    
+    // If we're already fetching/subscribed for these IDs, skip
+    if (isFetchingRef.current === favoriteIdsKey && favoriteIdsStringRef.current === favoriteIdsKey) {
+      return;
+    }
+
+    // If favoriteIds is empty, clear everything
+    if (favoriteIds.length === 0) {
+      setListings([]);
+      setLoading(false);
+      setError(null);
+      // Clean up subscriptions
+      subscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
+      subscriptionsRef.current.clear();
+      isFetchingRef.current = null;
+      favoriteIdsStringRef.current = '';
+      return;
+    }
+
+    // Mark as fetching
+    isFetchingRef.current = favoriteIdsKey;
+    favoriteIdsStringRef.current = favoriteIdsKey;
+    let mounted = true;
+
     const fetchListings = async () => {
-      if (authLoading || favoritesLoading) {
-        return;
-      }
-
-      if (!user) {
-        setLoading(false);
-        setError('Please sign in to view your watchlist');
-        return;
-      }
-
-      if (favoriteIds.length === 0) {
-        setListings([]);
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
+        
         const fetchedListings = await getListingsByIds(favoriteIds);
+        
+        if (!mounted) return; // Component unmounted
+        
         const validListings = fetchedListings.filter((listing) => listing !== null) as Listing[];
         const enriched = validListings.map(enrichListing);
+        
+        if (!mounted) return; // Component unmounted
+        
         setListings(enriched);
 
-        // Subscribe to real-time updates for each listing
+        // Clean up old subscriptions for listings no longer in favorites
+        const currentListingIds = new Set(enriched.map(l => l.id));
+        subscriptionsRef.current.forEach((unsubscribe, listingId) => {
+          if (!currentListingIds.has(listingId)) {
+            unsubscribe();
+            subscriptionsRef.current.delete(listingId);
+          }
+        });
+
+        // Subscribe to real-time updates for each listing (only if not already subscribed)
         enriched.forEach((listing) => {
           if (!subscriptionsRef.current.has(listing.id)) {
             const unsubscribe = subscribeToListing(listing.id, (updatedListing) => {
+              if (!mounted) return; // Component unmounted
               if (updatedListing) {
                 setListings((prev) => {
                   const index = prev.findIndex((l) => l.id === updatedListing.id);
@@ -229,20 +281,27 @@ export default function WatchlistPage() {
           }
         });
       } catch (err) {
-        console.error('Error fetching watchlist listings:', err);
+        console.error('[WatchlistPage] Error fetching watchlist listings:', err);
+        if (!mounted) return;
         setError(err instanceof Error ? err.message : 'Failed to load watchlist');
+        setListings([]); // Set safe default
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchListings();
 
-    // Cleanup subscriptions on unmount
-    const subs = subscriptionsRef.current;
+    // Cleanup subscriptions on unmount or when dependencies change
     return () => {
-      subs.forEach((unsubscribe) => unsubscribe());
-      subs.clear();
+      mounted = false;
+      // Only cleanup if this is no longer the active fetch
+      if (isFetchingRef.current !== favoriteIdsKey) {
+        subscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
+        subscriptionsRef.current.clear();
+      }
     };
   }, [favoriteIds, user, authLoading, favoritesLoading, enrichListing]);
 
@@ -308,7 +367,7 @@ export default function WatchlistPage() {
     });
 
     return result;
-  }, [categorizedListings, activeTab, searchQuery, sortBy]);
+  }, [categorizedListings, activeTab, searchQuery, sortBy, toMillisSafe]);
 
   const handleRemove = async (listingId: string) => {
     try {
@@ -330,359 +389,183 @@ export default function WatchlistPage() {
     }
   };
 
-  // Status badge component
-  const StatusBadge = ({ listing }: { listing: ListingWithStatus }) => {
-    switch (listing.statusBadge) {
-      case 'sold':
-        return (
-          <Badge variant="default" className="bg-green-600 text-white">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Sold
-          </Badge>
-        );
-      case 'expired':
-        return (
-          <Badge variant="outline" className="bg-background/80 backdrop-blur-sm">
-            <Clock className="h-3 w-3 mr-1" />
-            Ended
-          </Badge>
-        );
-      case 'ended':
-        return (
-          <Badge variant="secondary">
-            <Clock className="h-3 w-3 mr-1" />
-            Ended
-          </Badge>
-        );
-      case 'ending-soon':
-        return (
-          <Badge variant="default" className="bg-orange-500 text-white animate-pulse">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Ending Soon
-          </Badge>
-        );
-      default:
-        return null;
-    }
-  };
-
-  if (authLoading || favoritesLoading || loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading your watchlist...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Heart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">Sign in to view your watchlist</h2>
-              <p className="text-muted-foreground mb-6">
-                Save listings you're interested in and view them all in one place.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <Button asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/register">Sign Up</Link>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
-              <p className="text-destructive mb-4">{error}</p>
-              <Button onClick={() => window.location.reload()}>Retry</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+  // Use DashboardPageShell to ensure never blank
+  const isLoading = authLoading || favoritesLoading || loading;
+  const isEmpty = !isLoading && !error && !user;
   const totalCount = listings.length;
   const activeCount = categorizedListings.active.length;
   const endedCount = categorizedListings.ended.length;
   const soldCount = categorizedListings.sold.length;
 
+  // Compute empty state
+  const emptyState = isEmpty
+    ? {
+        icon: Heart,
+        title: 'Sign in to view your watchlist',
+        description: "Save listings you're interested in and view them all in one place.",
+        action: {
+          label: 'Sign In',
+          href: '/login',
+        },
+      }
+    : !isLoading && !error && user && totalCount === 0
+    ? {
+        icon: Heart,
+        title: 'Your watchlist is empty',
+        description: "Start saving listings you're interested in by clicking the heart icon on any listing.",
+        action: {
+          label: 'Browse Listings',
+          href: '/browse',
+        },
+      }
+    : undefined;
+
   return (
-    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-8">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
-      <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
-        <div className="mb-6 flex items-center justify-end">
-          <TabsList className="grid grid-cols-3 w-full max-w-xl">
-            <TabsTrigger value="watchlist" className="font-semibold">
-              Saved listings
-            </TabsTrigger>
-            <TabsTrigger value="saved-sellers" className="font-semibold">
-              Saved sellers
-            </TabsTrigger>
-            <TabsTrigger value="saved-searches" className="font-semibold">
-              Saved searches
-            </TabsTrigger>
-          </TabsList>
-        </div>
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+        <DashboardPageShell
+          loading={isLoading}
+          error={error}
+          empty={emptyState}
+        >
+          <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
+              <TabsTrigger value="saved-sellers">Saved Sellers</TabsTrigger>
+              <TabsTrigger value="saved-searches">Saved Searches</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="saved-searches">
-          <Card className="border-2 border-border/50 bg-card">
-            <CardContent className="p-4 sm:p-6">
-              <SavedSearchesPanel variant="tab" />
-            </CardContent>
-          </Card>
-        </TabsContent>
+            <TabsContent value="watchlist" className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-extrabold">My Watchlist</h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {totalCount} {totalCount === 1 ? 'listing' : 'listings'} saved
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  >
+                    {viewMode === 'grid' ? <ListIcon className="h-4 w-4" /> : <Grid3x3 className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
 
-        <TabsContent value="saved-sellers">
-          <SavedSellersList />
-        </TabsContent>
-
-        <TabsContent value="watchlist">
-      {/* Header */}
-      <div className="mb-4 md:mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-              <Heart className="h-8 w-8 text-primary fill-current" />
-              Saved Listings
-            </h1>
-            <p className="text-muted-foreground">
-              {totalCount === 0
-                ? 'No listings saved yet'
-                : `${totalCount} ${totalCount === 1 ? 'listing' : 'listings'} saved`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {filteredAndSorted.length > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    // Export to CSV
-                    const csv = [
-                      ['Title', 'Category', 'Type', 'Price', 'Status', 'Location', 'Ends At'].join(','),
-                      ...filteredAndSorted.map((listing) => {
-                        const price = listing.type === 'auction'
-                          ? (listing.currentBid || listing.startingBid || 0)
-                          : (listing.price || 0);
-                        return [
-                          `"${listing.title}"`,
-                          listing.category,
-                          listing.type,
-                          price,
-                          listing.statusBadge,
-                          `"${listing.location.city}, ${listing.location.state}"`,
-                          listing.endsAt ? format(listing.endsAt, 'yyyy-MM-dd HH:mm') : '',
-                        ].join(',');
-                      }),
-                    ].join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `watchlist-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    toast({
-                      title: 'Exported',
-                      description: 'Watchlist exported to CSV',
-                    });
-                  }}
-                >
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Search and Filters */}
-        {totalCount > 0 && (
-          <div className="flex flex-col md:flex-row gap-3 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search watchlist..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SortAsc className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="ending-soon">Ending Soon</SelectItem>
-                <SelectItem value="price-low">Price: Low to High</SelectItem>
-                <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="title">Title A-Z</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid3x3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                <ListIcon className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      {totalCount > 0 ? (
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="active" className="relative">
-              Active
-              {activeCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
-                  {activeCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="ended" className="relative">
-              Ended
-              {endedCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
-                  {endedCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="sold" className="relative">
-              Sold
-              {soldCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
-                  {soldCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="active" className="mt-6">
-            {filteredAndSorted.length === 0 ? (
+              {/* Filters and Search */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-center py-12">
-                    <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h2 className="text-xl font-semibold mb-2">
-                      {searchQuery ? 'No matching listings' : 'No active listings'}
-                    </h2>
-                    <p className="text-muted-foreground">
-                      {searchQuery
-                        ? 'Try adjusting your search query.'
-                        : 'All your watched listings have ended or been sold.'}
-                    </p>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search listings..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="newest">Newest First</SelectItem>
+                        <SelectItem value="oldest">Oldest First</SelectItem>
+                        <SelectItem value="ending-soon">Ending Soon</SelectItem>
+                        <SelectItem value="price-low">Price: Low to High</SelectItem>
+                        <SelectItem value="price-high">Price: High to Low</SelectItem>
+                        <SelectItem value="title">Title A-Z</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFilters(!showFilters)}
+                    >
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filters
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            ) : (
-              <WatchlistGrid
-                listings={filteredAndSorted}
-                viewMode={viewMode}
-              />
-            )}
-          </TabsContent>
 
-          <TabsContent value="ended" className="mt-6">
-            {filteredAndSorted.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-12">
-                    <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h2 className="text-xl font-semibold mb-2">No ended listings</h2>
-                    <p className="text-muted-foreground">
-                      {searchQuery
-                        ? 'Try adjusting your search query.'
-                        : 'Listings that have ended will appear here.'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <WatchlistGrid
-                listings={filteredAndSorted}
-                viewMode={viewMode}
-              />
-            )}
-          </TabsContent>
+              {/* Tabs for Active/Ended/Sold */}
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+                <TabsList>
+                  <TabsTrigger value="active">
+                    Active ({activeCount})
+                  </TabsTrigger>
+                  <TabsTrigger value="ended">
+                    Ended ({endedCount})
+                  </TabsTrigger>
+                  <TabsTrigger value="sold">
+                    Sold ({soldCount})
+                  </TabsTrigger>
+                </TabsList>
 
-          <TabsContent value="sold" className="mt-6">
-            {filteredAndSorted.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-12">
-                    <CheckCircle2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h2 className="text-xl font-semibold mb-2">No sold listings</h2>
-                    <p className="text-muted-foreground">
-                      {searchQuery
-                        ? 'Try adjusting your search query.'
-                        : 'Listings that have been sold will appear here.'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <WatchlistGrid
-                listings={filteredAndSorted}
-                viewMode={viewMode}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h2 className="text-xl font-semibold mb-2">Your watchlist is empty</h2>
-              <p className="text-muted-foreground mb-6">
-                Start saving listings you're interested in by clicking the heart icon on any listing.
-              </p>
-              <Button asChild>
-                <Link href="/browse">Browse Listings</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <TabsContent value="active" className="mt-6">
+                  {filteredAndSorted.length > 0 ? (
+                    <WatchlistGrid listings={filteredAndSorted} viewMode={viewMode} />
+                  ) : (
+                    <Card>
+                      <CardContent className="py-12 text-center">
+                        <Heart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-lg font-semibold">No active listings</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Your active watchlist items will appear here.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
 
-        </TabsContent>
-      </Tabs>
+                <TabsContent value="ended" className="mt-6">
+                  {filteredAndSorted.length > 0 ? (
+                    <WatchlistGrid listings={filteredAndSorted} viewMode={viewMode} />
+                  ) : (
+                    <Card>
+                      <CardContent className="py-12 text-center">
+                        <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-lg font-semibold">No ended listings</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Ended listings will appear here.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="sold" className="mt-6">
+                  {filteredAndSorted.length > 0 ? (
+                    <WatchlistGrid listings={filteredAndSorted} viewMode={viewMode} />
+                  ) : (
+                    <Card>
+                      <CardContent className="py-12 text-center">
+                        <CheckCircle2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-lg font-semibold">No sold listings</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Sold listings will appear here.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+
+            <TabsContent value="saved-sellers">
+              <SavedSellersList />
+            </TabsContent>
+
+            <TabsContent value="saved-searches">
+              <SavedSearchesPanel />
+            </TabsContent>
+          </Tabs>
+        </DashboardPageShell>
       </div>
     </div>
   );

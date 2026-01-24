@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ArrowLeft, Archive, Inbox, MoreVertical, Search, CheckCheck } from 'lucide-react';
 import { MessageThreadComponent } from '@/components/messaging/MessageThread';
 import { getOrCreateThread, markThreadAsRead, setThreadArchived, subscribeToAllUserThreads } from '@/lib/firebase/messages';
+import { DashboardPageShell } from '@/components/dashboard/DashboardPageShell';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
 import { markNotificationsAsReadByType } from '@/lib/firebase/notifications';
@@ -58,6 +59,12 @@ export default function MessagesPage() {
     >
   >({});
   const metaFetchInFlightRef = useRef<Set<string>>(new Set());
+  const selectedThreadIdRef = useRef<string | null>(null);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
 
   const inboxItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -107,21 +114,48 @@ export default function MessagesPage() {
     return filtered;
   }, [inboxTab, metaByThreadId, optimisticReadThreads, search, threads, user?.uid]);
 
-  // Real-time inbox subscription
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (listingIdParam && sellerIdParam) return; // deep-link mode uses initializeThread
+  // Real-time inbox subscription - guard against double-subscribe
+  const subscriptionRef = useRef<(() => void) | null>(null);
+  const isSubscribedRef = useRef<string | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userUidRef = useRef<string | null>(null);
 
-    const unsub = subscribeToAllUserThreads(
-      user.uid,
-      (data) => {
-        setThreads(data);
+  // Keep userUidRef in sync
+  useEffect(() => {
+    userUidRef.current = user?.uid || null;
+  }, [user?.uid]);
+
+  // Stable callback using ref to avoid dependency issues
+  const handleThreadsUpdateRef = useRef<((data: MessageThread[]) => void) | null>(null);
+  
+  useEffect(() => {
+    handleThreadsUpdateRef.current = (data: MessageThread[]) => {
+      const uid = userUidRef.current;
+      if (!uid || isSubscribedRef.current !== uid) return;
+      
+      // Debounce rapid updates (subscribeToAllUserThreads fires for buyer AND seller separately)
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateRef.current;
+      
+      // If updates are coming too fast (< 100ms), batch them
+      if (timeSinceLastUpdate < 100 && updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      
+      const applyUpdate = () => {
+        if (isSubscribedRef.current !== uid) return; // Guard against stale updates
+        
+        console.log('[MessagesPage] Received threads data', (data || []).length, 'threads');
+        setThreads(data || []);
         setLoading(false);
+        lastUpdateRef.current = Date.now();
+        
         // Clear optimistic reads for threads that are now confirmed as read (unreadCount = 0)
         setOptimisticReadThreads((prev) => {
           const next = new Set(prev);
-          data.forEach((t) => {
-            const isBuyer = user.uid === t.buyerId;
+          (data || []).forEach((t) => {
+            const isBuyer = uid === t.buyerId;
             const unread = isBuyer
               ? (typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0)
               : (typeof (t as any).sellerUnreadCount === 'number' ? (t as any).sellerUnreadCount : 0);
@@ -131,22 +165,111 @@ export default function MessagesPage() {
           });
           return next;
         });
+        
         // Don't auto-select on mobile - let user choose
-        // Only auto-select on desktop if nothing is selected
-        if (!selectedThreadId && data[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+        // Only auto-select on desktop if nothing is selected (use ref to avoid dependency)
+        if (!selectedThreadIdRef.current && data?.[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024) {
           setSelectedThreadId(data[0].id);
         }
-      },
+      };
+      
+      if (timeSinceLastUpdate < 100) {
+        updateTimeoutRef.current = setTimeout(applyUpdate, 100 - timeSinceLastUpdate);
+      } else {
+        applyUpdate();
+      }
+    };
+  }, []); // Empty deps - we use refs for current values
+
+  useEffect(() => {
+    const uid = user?.uid;
+    
+    if (!uid) {
+      setLoading(false);
+      setThreads([]);
+      isSubscribedRef.current = null;
+      if (subscriptionRef.current) {
+        subscriptionRef.current();
+        subscriptionRef.current = null;
+      }
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+        updateTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    if (listingIdParam && sellerIdParam) {
+      // deep-link mode uses initializeThread - don't subscribe
+      // But clean up if we were subscribed
+      if (isSubscribedRef.current === uid) {
+        if (subscriptionRef.current) {
+          subscriptionRef.current();
+          subscriptionRef.current = null;
+        }
+        isSubscribedRef.current = null;
+      }
+      return;
+    }
+
+    // If we're already subscribed for this uid, do nothing
+    if (isSubscribedRef.current === uid && subscriptionRef.current) {
+      return;
+    }
+
+    // Clean up any existing subscription
+    if (subscriptionRef.current) {
+      subscriptionRef.current();
+      subscriptionRef.current = null;
+    }
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+
+    // Mark this uid as active
+    isSubscribedRef.current = uid;
+    console.log('[MessagesPage] Subscribing to threads for user', uid);
+    setLoading(true);
+    lastUpdateRef.current = 0;
+
+    // Use stable callback wrapper
+    const stableCallback = (data: MessageThread[]) => {
+      if (handleThreadsUpdateRef.current) {
+        handleThreadsUpdateRef.current(data);
+      }
+    };
+
+    const unsub = subscribeToAllUserThreads(
+      uid,
+      stableCallback,
       {
         onError: (e) => {
           console.error('[dashboard/messages] subscribeToAllUserThreads error', e);
+          setLoading(false);
+          setThreads([]); // Always set safe default
         },
       }
     );
 
-    return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listingIdParam, sellerIdParam, user?.uid]);
+    subscriptionRef.current = unsub;
+
+    return () => {
+      // Only cleanup if this is still the active subscription
+      if (isSubscribedRef.current === uid) {
+        console.log('[MessagesPage] Cleaning up subscription for', uid);
+        isSubscribedRef.current = null;
+        if (subscriptionRef.current) {
+          subscriptionRef.current();
+          subscriptionRef.current = null;
+        }
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+          updateTimeoutRef.current = null;
+        }
+      }
+    };
+  }, [user?.uid, listingIdParam, sellerIdParam]);
 
   // Best-effort meta hydration for thread list (names + listing title + listing image).
   useEffect(() => {
@@ -193,6 +316,10 @@ export default function MessagesPage() {
         };
       }
       setMetaByThreadId((prev) => ({ ...prev, ...next }));
+      need.forEach((t) => metaFetchInFlightRef.current.delete(t.id));
+    }).catch(() => {
+      // Ignore errors
+      need.forEach((t) => metaFetchInFlightRef.current.delete(t.id));
     });
   }, [metaByThreadId, threads, user?.uid]);
 
@@ -329,59 +456,69 @@ export default function MessagesPage() {
     });
   }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
+  // Use DashboardPageShell to ensure never blank
+  const isLoading = authLoading || loading;
+  const hasError = false; // Messages page handles errors inline
+  const isEmpty = !isLoading && !user;
 
-  if (!user) {
+  // Early return for loading/auth states using shell
+  if (isLoading || !user) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <Card>
-          <CardContent className="pt-12 pb-12 text-center">
-            <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-            <h3 className="text-lg font-semibold mb-2">Sign in required</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              You must be signed in to send messages
-            </p>
-            <Button asChild>
-              <Link href="/login">Sign In</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+          <DashboardPageShell
+            title="messages"
+            loading={isLoading}
+            isEmpty={isEmpty}
+            emptyState={isEmpty ? {
+              icon: MessageSquare,
+              title: 'Sign in required',
+              description: 'You must be signed in to send messages',
+              action: {
+                label: 'Sign In',
+                href: '/login',
+              },
+            } : undefined}
+            debugLabel="MessagesPage"
+          >
+            <></>
+          </DashboardPageShell>
+        </div>
       </div>
     );
   }
 
   if ((listingIdParam && sellerIdParam) && (!thread || !listing)) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6">
-        <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl">
-          <Card>
-            <CardContent className="pt-12 pb-12 text-center">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No conversation found</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {listingIdParam ? 'Failed to load conversation' : 'Select a listing to start messaging'}
-              </p>
-              <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Go Back
-              </Button>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+          <DashboardPageShell
+            title="messages"
+            isEmpty={true}
+            emptyState={{
+              icon: MessageSquare,
+              title: 'No conversation found',
+              description: listingIdParam ? 'Failed to load conversation' : 'Select a listing to start messaging',
+            }}
+            debugLabel="MessagesPage"
+          >
+            <></>
+          </DashboardPageShell>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
-      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-6xl">
-        <div className="mb-4 lg:mb-6">
+    <div className="min-h-screen bg-background pb-20 md:pb-6 w-full">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+        <DashboardPageShell
+          title="messages"
+          loading={false}
+          debugLabel="MessagesPage"
+        >
+          <div className="space-y-6">
+            <div className="mb-4 lg:mb-6">
           <Button 
             variant="ghost" 
             onClick={() => {
@@ -398,10 +535,10 @@ export default function MessagesPage() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-2xl font-bold">Messages</h1>
-        </div>
+              <h1 className="text-2xl font-bold">Messages</h1>
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
           {/* Mobile: keep both panes mounted and slide between them for smoothness */}
           <div className="lg:hidden relative" style={{ height: 'calc(100dvh - 280px)', minHeight: '400px' }}>
             {/* Inbox pane */}
@@ -823,7 +960,9 @@ export default function MessagesPage() {
               </>
             )}
           </Card>
-        </div>
+            </div>
+          </div>
+        </DashboardPageShell>
       </div>
     </div>
   );

@@ -27,6 +27,8 @@ export function useFavorites() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
   const pendingOpsRef = useRef<Map<string, { desired: boolean; startedAt: number }>>(new Map());
+  // Use ref to store current favoriteIds so isFavorite function can be stable
+  const favoriteIdsRef = useRef<Set<string>>(new Set());
 
   const PENDING_TTL_MS = 15_000;
 
@@ -34,7 +36,9 @@ export function useFavorites() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setFavoriteIds(new Set());
+      const emptySet = new Set();
+      favoriteIdsRef.current = emptySet;
+      setFavoriteIds(emptySet);
       setIsLoading(false);
     }
   }, [user, authLoading]);
@@ -89,16 +93,25 @@ export function useFavorites() {
         // Only update state if the Set actually changed to prevent unnecessary re-renders
         setFavoriteIds((prev) => {
           // Quick check: if sizes differ, definitely changed
-          if (prev.size !== ids.size) return ids;
+          if (prev.size !== ids.size) {
+            favoriteIdsRef.current = ids;
+            return ids;
+          }
           // Deep check: compare all items
           // Convert to arrays to avoid iteration issues
           const idsArray = Array.from(ids);
           const prevArray = Array.from(prev);
           for (const id of idsArray) {
-            if (!prev.has(id)) return ids;
+            if (!prev.has(id)) {
+              favoriteIdsRef.current = ids;
+              return ids;
+            }
           }
           for (const id of prevArray) {
-            if (!ids.has(id)) return ids;
+            if (!ids.has(id)) {
+              favoriteIdsRef.current = ids;
+              return ids;
+            }
           }
           // No change - return previous to prevent re-render
           return prev;
@@ -186,6 +199,7 @@ export function useFavorites() {
         } else {
           next.add(listingId);
         }
+        favoriteIdsRef.current = next;
         return next;
       });
 
@@ -218,6 +232,7 @@ export function useFavorites() {
           } else {
             next.delete(listingId); // Remove
           }
+          favoriteIdsRef.current = next;
           return next;
         });
 
@@ -239,11 +254,12 @@ export function useFavorites() {
     [favoriteIds, user, toast]
   );
 
+  // Stable function that reads from ref to prevent re-renders when favoriteIds changes
   const isFavorite = useCallback(
     (listingId: string) => {
-      return favoriteIds.has(listingId);
+      return favoriteIdsRef.current.has(listingId);
     },
-    [favoriteIds]
+    [] // Empty deps - function is stable, reads from ref
   );
 
   const isPending = useCallback(
@@ -263,7 +279,11 @@ export function useFavorites() {
       if (favoriteIds.has(listingId)) return; // Already favorite
 
       // Optimistic update
-      setFavoriteIds((prev) => new Set(prev).add(listingId));
+      setFavoriteIds((prev) => {
+        const next = new Set(prev).add(listingId);
+        favoriteIdsRef.current = next;
+        return next;
+      });
 
       try {
         await syncWatchlistServer(listingId, 'add');
@@ -272,6 +292,7 @@ export function useFavorites() {
         setFavoriteIds((prev) => {
           const next = new Set(prev);
           next.delete(listingId);
+          favoriteIdsRef.current = next;
           return next;
         });
 
@@ -300,6 +321,7 @@ export function useFavorites() {
       setFavoriteIds((prev) => {
         const next = new Set(prev);
         next.delete(listingId);
+        favoriteIdsRef.current = next;
         return next;
       });
 
@@ -307,7 +329,11 @@ export function useFavorites() {
         await syncWatchlistServer(listingId, 'remove');
       } catch (error: any) {
         // Rollback
-        setFavoriteIds((prev) => new Set(prev).add(listingId));
+        setFavoriteIds((prev) => {
+          const next = new Set(prev).add(listingId);
+          favoriteIdsRef.current = next;
+          return next;
+        });
 
         toast({
           title: 'Error',
