@@ -147,12 +147,21 @@ export function HelpLauncher() {
   // Seller overview: we want tour-only (no floating help button / panel).
   const tourOnly = helpKey === 'seller_overview';
 
+  const isBrowsePage = pathname?.startsWith('/browse');
+
   return (
     <>
       {/* Persistent launcher (bottom-right, mobile-safe) */}
       {/* Always show help button, even if no helpKey (for chat and support tabs) */}
       {!tourOnly ? (
-        <div className={cn('fixed right-4 z-[60]', bottomOffset)}>
+        <div
+          className={cn(
+            'fixed right-4 z-[60]',
+            bottomOffset,
+            // Hide help button on mobile for browse page only
+            isBrowsePage ? 'hidden md:block' : ''
+          )}
+        >
           <HelpButton onClick={() => setOpen(true)} />
         </div>
       ) : null}

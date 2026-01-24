@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
+import { signUp, signInWithGoogle, getGoogleRedirectResult, getCurrentUser } from '@/lib/firebase/auth';
 import { createUserDocument, getUserProfile } from '@/lib/firebase/users';
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
@@ -70,48 +70,44 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle Google redirect result on page load
+  // Handle Google redirect result on page load (redirect result or currentUser fallback)
   useEffect(() => {
     getGoogleRedirectResult()
       .then((result) => {
-        if (result?.user) {
-          createUserDocument(result.user)
-            .then(async () => {
-              // Check if user has accepted terms by checking their profile
-              try {
-                const profile = await getUserProfile(result.user.uid);
-                const requiredVersion = LEGAL_VERSIONS.tos.version;
-                const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
+        const user = result?.user ?? getCurrentUser();
+        if (!user) return;
+        createUserDocument(user)
+          .then(async () => {
+            try {
+              const profile = await getUserProfile(user.uid);
+              const requiredVersion = LEGAL_VERSIONS.tos.version;
+              const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
 
-                if (!hasAcceptedTerms) {
-                  // User hasn't accepted terms - redirect to acceptance page
-                  const nextUrl = getRedirectPath();
-                  router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
-                  return;
-                }
-
-                // User has accepted terms - proceed normally
-                toast({
-                  title: 'Welcome to Wildlife Exchange!',
-                  description: 'Your account has been created successfully with Google.',
-                });
-                router.push(getRedirectPath());
-              } catch (error) {
-                console.error('Error checking user profile after Google redirect:', error);
-                // If we can't check profile, redirect to terms acceptance to be safe
+              if (!hasAcceptedTerms) {
                 const nextUrl = getRedirectPath();
                 router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+                return;
               }
-            })
-            .catch((error) => {
-              console.error('Error creating user document after Google redirect:', error);
+
               toast({
-                title: 'Google sign-up failed',
-                description: 'Failed to set up user account. Please try again.',
-                variant: 'destructive',
+                title: 'Welcome to Wildlife Exchange!',
+                description: 'Your account has been created successfully with Google.',
               });
+              router.push(getRedirectPath());
+            } catch (error) {
+              console.error('Error checking user profile after Google redirect:', error);
+              const nextUrl = getRedirectPath();
+              router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
+            }
+          })
+          .catch((error) => {
+            console.error('Error creating user document after Google redirect:', error);
+            toast({
+              title: 'Google sign-up failed',
+              description: 'Failed to set up user account. Please try again.',
+              variant: 'destructive',
             });
-        }
+          });
       })
       .catch((error: any) => {
         console.error('Error during Google redirect result:', error);
@@ -362,33 +358,21 @@ export default function RegisterPage() {
             <div className="flex items-center gap-3 mb-8">
               <div className="relative h-14 w-14">
                 <div className="absolute inset-0 bg-primary/10 blur-xl rounded-full" />
-                <div className="relative h-full w-full">
-                  <div className="h-full w-full dark:hidden">
-                    <Image
-                      src="/images/Kudu.png"
-                      alt="Wildlife Exchange Logo"
-                      width={56}
-                      height={56}
-                      className="h-full w-full object-contain opacity-90"
-                      style={{
-                        filter: 'brightness(0) saturate(100%) invert(31%) sepia(12%) saturate(1200%) hue-rotate(75deg) brightness(95%) contrast(90%)',
-                      }}
-                    />
-                  </div>
-                  <div 
-                    className="hidden dark:block h-full w-full bg-primary"
-                    style={{
-                      maskImage: 'url(/images/Kudu.png)',
-                      maskSize: 'contain',
-                      maskRepeat: 'no-repeat',
-                      maskPosition: 'center',
-                      WebkitMaskImage: 'url(/images/Kudu.png)',
-                      WebkitMaskSize: 'contain',
-                      WebkitMaskRepeat: 'no-repeat',
-                      WebkitMaskPosition: 'center',
-                    }}
-                  />
-                </div>
+                <div
+                  aria-hidden="true"
+                  className="relative h-full w-full opacity-95"
+                  style={{
+                    backgroundColor: 'hsl(var(--primary))',
+                    WebkitMaskImage: "url('/images/Kudu.png')",
+                    maskImage: "url('/images/Kudu.png')",
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskPosition: 'center',
+                    maskPosition: 'center',
+                    WebkitMaskSize: 'contain',
+                    maskSize: 'contain',
+                  }}
+                />
               </div>
               <span className="text-3xl font-extrabold text-foreground">
                 Wildlife Exchange
@@ -423,14 +407,19 @@ export default function RegisterPage() {
                   Create Account
                 </CardTitle>
                 <div className="lg:hidden">
-                  <Image
-                    src="/images/Kudu.png"
-                    alt="Wildlife Exchange Logo"
-                    width={40}
-                    height={40}
-                    className="h-8 w-8 object-contain opacity-90"
+                  <div
+                    aria-hidden="true"
+                    className="h-8 w-8 opacity-95"
                     style={{
-                      filter: 'brightness(0) saturate(100%) invert(31%) sepia(12%) saturate(1200%) hue-rotate(75deg) brightness(95%) contrast(90%)',
+                      backgroundColor: 'hsl(var(--primary))',
+                      WebkitMaskImage: "url('/images/Kudu.png')",
+                      maskImage: "url('/images/Kudu.png')",
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskPosition: 'center',
+                      WebkitMaskSize: 'contain',
+                      maskSize: 'contain',
                     }}
                   />
                 </div>

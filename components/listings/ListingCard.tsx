@@ -29,10 +29,27 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
   const watchers = typeof listing.watcherCount === 'number' ? listing.watcherCount : listing.metrics?.favorites || 0;
+  const bidCount = typeof listing.metrics?.bidCount === 'number' ? listing.metrics.bidCount : 0;
   const sold = useMemo(() => getSoldSummary(listing), [listing]);
   const sellerName = listing.sellerSnapshot?.displayName || listing.seller?.name || 'Seller';
   const sellerInitial = String(sellerName || 'S').trim().slice(0, 1).toUpperCase();
   const sellerPhotoUrl = listing.sellerSnapshot?.photoURL || '';
+
+  const listingTypeLabel =
+    listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified';
+
+  const hasLocation = listing.location?.city || listing.location?.state;
+  const locationLabel = hasLocation
+    ? `${listing.location?.city || 'Unknown'}, ${listing.location?.state || 'Unknown'}`
+    : null;
+
+  const mobileMetaParts: string[] = [];
+  if (watchers > 0) mobileMetaParts.push(`${watchers} watching`);
+  mobileMetaParts.push(listingTypeLabel);
+  if (listing.type === 'auction' && bidCount > 0) {
+    mobileMetaParts.push(`${bidCount} bids`);
+  }
+  const mobileMeta = mobileMetaParts.join(' • ');
 
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
@@ -275,6 +292,20 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             <h3 className="font-bold text-sm sm:text-base line-clamp-2 leading-snug sm:leading-snug group-hover:text-primary transition-colors duration-300">
               {listing.title}
             </h3>
+
+            {/* Mobile: compact location + watchers/type/bids meta */}
+            <div className="sm:hidden flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+              {locationLabel && (
+                <div className="truncate">
+                  {locationLabel}
+                </div>
+              )}
+              {mobileMeta && (
+                <div className="truncate">
+                  {mobileMeta}
+                </div>
+              )}
+            </div>
 
           {/* Key Attributes */}
           {keyAttributes && keyAttributes.length > 0 && (
