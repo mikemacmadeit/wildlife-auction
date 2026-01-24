@@ -427,7 +427,8 @@ export default function WatchlistPage() {
   const soldCount = categorizedListings.sold.length;
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-8">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
       <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
         <div className="mb-6 flex items-center justify-end">
           <TabsList className="grid grid-cols-3 w-full max-w-xl">
@@ -457,7 +458,7 @@ export default function WatchlistPage() {
 
         <TabsContent value="watchlist">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4 md:mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
@@ -682,6 +683,7 @@ export default function WatchlistPage() {
 
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
@@ -696,7 +698,7 @@ function WatchlistGrid({
 }) {
   if (viewMode === 'list') {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 md:space-y-4 pb-4">
         <AnimatePresence mode="popLayout">
           {listings.map((listing, index) => (
             <motion.div
@@ -717,7 +719,7 @@ function WatchlistGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-fr">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 auto-rows-fr pb-4">
       <AnimatePresence mode="popLayout">
         {listings.map((listing) =>
           listing.featured ? (
