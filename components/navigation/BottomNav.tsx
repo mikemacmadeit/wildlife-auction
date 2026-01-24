@@ -28,7 +28,7 @@ export function BottomNav() {
       className={cn(
         // Render via portal so it stays truly fixed even if a parent has transforms (mobile bug).
         'fixed bottom-0 left-0 right-0 z-[60] md:hidden pb-safe',
-        'border-t border-border/60 bg-background/95 backdrop-blur'
+        'border-t border-border/40 bg-background/80 backdrop-blur-md'
       )}
     >
       <div className="grid grid-cols-4 h-16">

@@ -890,7 +890,7 @@ export default function SellerLayout({
         </main>
 
         {/* Mobile Bottom Nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-card">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-card/80 backdrop-blur-md">
           <div className="grid grid-cols-5 h-16">
             {mobileBottomNavItems.map((item) => {
               const Icon = item.icon;
