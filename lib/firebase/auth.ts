@@ -201,6 +201,39 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     ) {
       // Use redirect as fallback
       console.log('Falling back to redirect for Google sign-in due to:', error.message || error.code);
+      
+      // CRITICAL: Normalize URL before redirect to ensure URL matching
+      // Firebase stores redirect result keyed by the exact URL, so we need to ensure
+      // the URL we redirect from matches the URL we check on
+      if (typeof window !== 'undefined') {
+        const currentUrl = window.location.href;
+        const normalizedUrl = window.location.origin + window.location.pathname;
+        
+        console.log('[Google Sign-In] Redirect URL info:', {
+          currentUrl,
+          normalizedUrl,
+          hasQuery: !!window.location.search,
+          hasHash: !!window.location.hash,
+        });
+        
+        // If URL has query params or hash, normalize it by redirecting to clean URL first
+        // This ensures Firebase stores the result for the clean URL
+        if (window.location.search || window.location.hash) {
+          console.log('[Google Sign-In] URL has query/hash, normalizing before redirect...');
+          // Store original URL for potential use after redirect
+          try {
+            sessionStorage.setItem('we:google-signin-original-url', currentUrl);
+          } catch {
+            // Ignore storage errors
+          }
+          // Redirect to clean URL first, then initiate OAuth redirect
+          window.location.href = normalizedUrl;
+          // This will cause a page reload, and the user will need to click sign-in again
+          // But it ensures URL matching
+          throw new Error('REDIRECT_INITIATED');
+        }
+      }
+      
       await signInWithRedirect(auth, provider);
       // Redirect will navigate away, so we throw a special error
       // The page will reload after redirect completes
@@ -223,14 +256,32 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
  */
 export const getGoogleRedirectResult = async (): Promise<UserCredential | null> => {
   try {
+    // Log URL info for debugging URL mismatch issues
+    if (typeof window !== 'undefined') {
+      console.log('[Google Sign-In] Checking redirect result on URL:', window.location.href);
+      console.log('[Google Sign-In] URL components:', {
+        href: window.location.href,
+        origin: window.location.origin,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      });
+    }
+    
     const result = await getRedirectResult(auth);
     if (result) {
-      console.log('Google redirect sign-in successful:', result.user.email);
+      console.log('[Google Sign-In] Redirect result found:', {
+        email: result.user.email,
+        uid: result.user.uid,
+        operationType: result.operationType,
+      });
+    } else {
+      console.log('[Google Sign-In] No redirect result found (null returned)');
     }
     return result;
   } catch (error: any) {
-    console.error('Error getting redirect result:', error);
-    console.error('Error details:', {
+    console.error('[Google Sign-In] Error getting redirect result:', error);
+    console.error('[Google Sign-In] Error details:', {
       code: error.code,
       message: error.message,
       email: error.email,
