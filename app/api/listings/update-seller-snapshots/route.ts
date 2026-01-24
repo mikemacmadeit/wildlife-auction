@@ -7,7 +7,7 @@
 
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
-import { json, requireAuth } from '../_util';
+import { json, requireAuth } from '../../offers/_util';
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
