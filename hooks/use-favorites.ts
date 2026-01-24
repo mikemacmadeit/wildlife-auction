@@ -27,28 +27,14 @@ export function useFavorites() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
   const pendingOpsRef = useRef<Map<string, { desired: boolean; startedAt: number }>>(new Map());
-  // Use refs to store current values so functions can be stable
-  const favoriteIdsRef = useRef<Set<string>>(new Set());
-  const pendingIdsRef = useRef<Set<string>>(new Set());
 
   const PENDING_TTL_MS = 15_000;
-  
-  // Keep refs in sync with state
-  useEffect(() => {
-    favoriteIdsRef.current = favoriteIds;
-  }, [favoriteIds]);
-  
-  useEffect(() => {
-    pendingIdsRef.current = pendingIds;
-  }, [pendingIds]);
 
   // Logged-out: no watchlist (auth required)
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      const emptySet = new Set();
-      favoriteIdsRef.current = emptySet;
-      setFavoriteIds(emptySet);
+      setFavoriteIds(new Set());
       setIsLoading(false);
     }
   }, [user, authLoading]);
@@ -62,9 +48,7 @@ export function useFavorites() {
         unsubscribeRef.current = null;
       }
       pendingOpsRef.current.clear();
-      const emptyPending = new Set();
-      pendingIdsRef.current = emptyPending;
-      setPendingIds(emptyPending);
+      setPendingIds(new Set());
       return;
     }
 
@@ -105,25 +89,16 @@ export function useFavorites() {
         // Only update state if the Set actually changed to prevent unnecessary re-renders
         setFavoriteIds((prev) => {
           // Quick check: if sizes differ, definitely changed
-          if (prev.size !== ids.size) {
-            favoriteIdsRef.current = ids;
-            return ids;
-          }
+          if (prev.size !== ids.size) return ids;
           // Deep check: compare all items
           // Convert to arrays to avoid iteration issues
           const idsArray = Array.from(ids);
           const prevArray = Array.from(prev);
           for (const id of idsArray) {
-            if (!prev.has(id)) {
-              favoriteIdsRef.current = ids;
-              return ids;
-            }
+            if (!prev.has(id)) return ids;
           }
           for (const id of prevArray) {
-            if (!ids.has(id)) {
-              favoriteIdsRef.current = ids;
-              return ids;
-            }
+            if (!ids.has(id)) return ids;
           }
           // No change - return previous to prevent re-render
           return prev;
@@ -132,24 +107,15 @@ export function useFavorites() {
         // Only update pendingIds if it actually changed
         const newPendingIds = new Set(pending.keys());
         setPendingIds((prev) => {
-          if (prev.size !== newPendingIds.size) {
-            pendingIdsRef.current = newPendingIds;
-            return newPendingIds;
-          }
+          if (prev.size !== newPendingIds.size) return newPendingIds;
           // Convert to arrays to avoid iteration issues
           const newPendingIdsArray = Array.from(newPendingIds);
           const prevArray = Array.from(prev);
           for (const id of newPendingIdsArray) {
-            if (!prev.has(id)) {
-              pendingIdsRef.current = newPendingIds;
-              return newPendingIds;
-            }
+            if (!prev.has(id)) return newPendingIds;
           }
           for (const id of prevArray) {
-            if (!newPendingIds.has(id)) {
-              pendingIdsRef.current = newPendingIds;
-              return newPendingIds;
-            }
+            if (!newPendingIds.has(id)) return newPendingIds;
           }
           return prev;
         });
@@ -206,15 +172,11 @@ export function useFavorites() {
         return existingPending.desired ? 'added' : 'removed';
       }
 
-      const isCurrentlyFavorite = favoriteIdsRef.current.has(listingId);
+      const isCurrentlyFavorite = favoriteIds.has(listingId);
       const action: 'added' | 'removed' = isCurrentlyFavorite ? 'removed' : 'added';
       const desired = !isCurrentlyFavorite;
       pendingOpsRef.current.set(listingId, { desired, startedAt: Date.now() });
-      setPendingIds((prev) => {
-        const next = new Set(prev).add(listingId);
-        pendingIdsRef.current = next;
-        return next;
-      });
+      setPendingIds((prev) => new Set(prev).add(listingId));
 
       // Optimistic update
       setFavoriteIds((prev) => {
@@ -224,7 +186,6 @@ export function useFavorites() {
         } else {
           next.add(listingId);
         }
-        favoriteIdsRef.current = next;
         return next;
       });
 
@@ -237,7 +198,6 @@ export function useFavorites() {
           if (!prev.has(listingId)) return prev; // No change needed
           const next = new Set(prev);
           next.delete(listingId);
-          pendingIdsRef.current = next;
           return next;
         });
         return action;
@@ -247,7 +207,6 @@ export function useFavorites() {
           if (!prev.has(listingId)) return prev; // No change needed
           const next = new Set(prev);
           next.delete(listingId);
-          pendingIdsRef.current = next;
           return next;
         });
 
@@ -259,7 +218,6 @@ export function useFavorites() {
           } else {
             next.delete(listingId); // Remove
           }
-          favoriteIdsRef.current = next;
           return next;
         });
 
@@ -281,19 +239,18 @@ export function useFavorites() {
     [favoriteIds, user, toast]
   );
 
-  // Stable function that reads from ref to prevent re-renders when favoriteIds changes
   const isFavorite = useCallback(
     (listingId: string) => {
-      return favoriteIdsRef.current.has(listingId);
+      return favoriteIds.has(listingId);
     },
-    [] // Empty deps - function is stable, reads from ref
+    [favoriteIds]
   );
-  
+
   const isPending = useCallback(
     (listingId: string) => {
-      return pendingIdsRef.current.has(listingId);
+      return pendingIds.has(listingId);
     },
-    [] // Empty deps - function is stable, reads from ref
+    [pendingIds]
   );
 
   const addFavorite = useCallback(
@@ -303,14 +260,10 @@ export function useFavorites() {
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
-      if (favoriteIdsRef.current.has(listingId)) return; // Already favorite
+      if (favoriteIds.has(listingId)) return; // Already favorite
 
       // Optimistic update
-      setFavoriteIds((prev) => {
-        const next = new Set(prev).add(listingId);
-        favoriteIdsRef.current = next;
-        return next;
-      });
+      setFavoriteIds((prev) => new Set(prev).add(listingId));
 
       try {
         await syncWatchlistServer(listingId, 'add');
@@ -319,7 +272,6 @@ export function useFavorites() {
         setFavoriteIds((prev) => {
           const next = new Set(prev);
           next.delete(listingId);
-          favoriteIdsRef.current = next;
           return next;
         });
 
@@ -342,13 +294,12 @@ export function useFavorites() {
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
-      if (!favoriteIdsRef.current.has(listingId)) return; // Not favorite
+      if (!favoriteIds.has(listingId)) return; // Not favorite
 
       // Optimistic update
       setFavoriteIds((prev) => {
         const next = new Set(prev);
         next.delete(listingId);
-        favoriteIdsRef.current = next;
         return next;
       });
 
@@ -356,11 +307,7 @@ export function useFavorites() {
         await syncWatchlistServer(listingId, 'remove');
       } catch (error: any) {
         // Rollback
-        setFavoriteIds((prev) => {
-          const next = new Set(prev).add(listingId);
-          favoriteIdsRef.current = next;
-          return next;
-        });
+        setFavoriteIds((prev) => new Set(prev).add(listingId));
 
         toast({
           title: 'Error',
