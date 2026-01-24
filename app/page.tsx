@@ -790,7 +790,7 @@ export default function HomePage() {
         </div>
       ) : effectiveUser ? (
         <>
-          {/* Signed-in: Search bar and welcome section */}
+          {/* Signed-in: Search bar */}
           {/* Search Bar - Full width on desktop */}
           <section className="border-b border-border/50 bg-card/50 py-4 md:py-6">
             <div className="container mx-auto px-4">
@@ -804,39 +804,6 @@ export default function HomePage() {
                   className="pl-11 min-h-[52px] text-base rounded-xl bg-background w-full"
                 />
               </form>
-            </div>
-          </section>
-
-          {/* Welcome Section - Below search bar */}
-          <section className="border-b border-border/50 bg-background py-6 md:py-8">
-            <div className="container mx-auto px-4">
-              <div className="max-w-4xl mx-auto space-y-4">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
-                  <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
-                  <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/browse" className="flex items-center gap-2">
-                      <Search className="h-4 w-4" />
-                      Browse
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/dashboard/watchlist" className="flex items-center gap-2">
-                      <Heart className="h-4 w-4" />
-                      Watchlist
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/dashboard/messages" className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Messages
-                    </Link>
-                  </Button>
-                </div>
-              </div>
             </div>
           </section>
         </>
@@ -936,6 +903,37 @@ export default function HomePage() {
       {effectiveUser ? (
         <section className="py-10 md:py-12 border-b border-border/50 bg-background">
           <div className="container mx-auto px-4 space-y-8">
+            {/* Welcome Section - Above trending listings */}
+            <div className="space-y-4">
+              <div className="max-w-4xl mx-auto space-y-4">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
+                  <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
+                  <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/browse" className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      Browse
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/dashboard/watchlist" className="flex items-center gap-2">
+                      <Heart className="h-4 w-4" />
+                      Watchlist
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-[44px]">
+                    <Link href="/dashboard/messages" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Messages
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+
               <div className="space-y-4">
                 <SectionHeader
                   title={mostWatched?.length ? "Trending now" : "Explore listings"}
