@@ -106,7 +106,26 @@ interface ListingWithStatus extends Listing {
 
 export default function WatchlistPage() {
   const { user, loading: authLoading } = useAuth();
-  const { favoriteIds, isLoading: favoritesLoading, removeFavorite, toggleFavorite } = useFavorites();
+  const { favoriteIdsRef, isLoading: favoritesLoading, removeFavorite, toggleFavorite } = useFavorites();
+  // Use ref instead of state to avoid re-renders - poll for changes
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  
+  // Poll favoriteIdsRef to update local state (doesn't cause re-renders in other components)
+  useEffect(() => {
+    const updateIds = () => {
+      const ids = Array.from(favoriteIdsRef.current).sort();
+      setFavoriteIds(prev => {
+        if (prev.length !== ids.length || prev.some((id, i) => id !== ids[i])) {
+          return ids;
+        }
+        return prev;
+      });
+    };
+    
+    updateIds();
+    const interval = setInterval(updateIds, 200);
+    return () => clearInterval(interval);
+  }, [favoriteIdsRef]);
   const { toast } = useToast();
   const [listings, setListings] = useState<ListingWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -428,9 +447,9 @@ export default function WatchlistPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+      <div className="container pl-4 pr-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
       <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
-        <div className="mb-6 flex items-center justify-end">
+        <div className="mb-6 flex items-center justify-start">
           <TabsList className="grid grid-cols-3 w-full max-w-xl">
             <TabsTrigger value="watchlist" className="font-semibold">
               Saved listings

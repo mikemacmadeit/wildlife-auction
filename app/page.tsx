@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
+import React, { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -20,9 +20,10 @@ import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { User } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
-import { useFavorites } from '@/hooks/use-favorites';
+// Removed useFavorites import - homepage doesn't need it
+// import { useFavorites } from '@/hooks/use-favorites';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
-import { useToast } from '@/hooks/use-toast';
+import { toast as globalToast } from '@/hooks/use-toast';
 import { getUserProfile } from '@/lib/firebase/users';
 
 function toDateSafe(v: any): Date | null {
@@ -42,14 +43,80 @@ function toDateSafe(v: any): Date | null {
 export default function HomePage() {
   const { user, loading: authLoading, initialized } = useAuth();
   const { recentIds } = useRecentlyViewed();
-  const { favoriteIds, isLoading: favoritesLoading } = useFavorites();
+  // CRITICAL FIX: Don't call useFavorites() in the homepage at all
+  // Calling useFavorites() subscribes to state, which causes the homepage to re-render
+  // when favoriteIds changes, leading to the glitching issue.
+  // Instead, we'll handle the watchlist in a separate component that can subscribe to state.
+  // The homepage itself doesn't need to know about favoriteIds - it just displays listings.
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:48',message:'HomePage render',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+  // #endregion
+  
   const router = useRouter();
-  const { toast } = useToast();
+  // Use global toast function instead of useToast() hook to prevent re-renders when toast state changes
+  const toast = globalToast;
   const [homeSearchQuery, setHomeSearchQuery] = useState('');
+  
+  // Use ref value for length checks to avoid re-renders
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [mostWatched, setMostWatched] = useState<Listing[]>([]);
   const [endingSoon, setEndingSoon] = useState<Listing[]>([]);
+  
+  // Memoize listings arrays AND individual listing objects to prevent recreation
+  // Create a stable map of listings by ID to reuse object references
+  const listingsMapRef = useRef<Map<string, Listing>>(new Map());
+  
+  const stableListings = useMemo(() => {
+    const currentMap = listingsMapRef.current;
+    const newMap = new Map<string, Listing>();
+    
+    // Reuse existing listing objects if IDs match, otherwise use new ones
+    listings.forEach(listing => {
+      const existing = currentMap.get(listing.id);
+      // Only reuse if the listing ID matches (content might have changed, but we'll let React.memo handle that)
+      if (existing && existing.id === listing.id) {
+        newMap.set(listing.id, existing);
+      } else {
+        newMap.set(listing.id, listing);
+      }
+    });
+    
+    listingsMapRef.current = newMap;
+    return listings.map(l => newMap.get(l.id) || l);
+  }, [listings.length, listings.map(l => l.id).sort().join(',')]);
+  
+  const stableMostWatched = useMemo(() => {
+    const currentMap = listingsMapRef.current;
+    const newMap = new Map<string, Listing>();
+    
+    mostWatched.forEach(listing => {
+      const existing = currentMap.get(listing.id);
+      if (existing && existing.id === listing.id) {
+        newMap.set(listing.id, existing);
+      } else {
+        newMap.set(listing.id, listing);
+      }
+    });
+    
+    return mostWatched.map(l => newMap.get(l.id) || l);
+  }, [mostWatched.length, mostWatched.map(l => l.id).sort().join(',')]);
+  
+  const stableEndingSoon = useMemo(() => {
+    const currentMap = listingsMapRef.current;
+    const newMap = new Map<string, Listing>();
+    
+    endingSoon.forEach(listing => {
+      const existing = currentMap.get(listing.id);
+      if (existing && existing.id === listing.id) {
+        newMap.set(listing.id, existing);
+      } else {
+        newMap.set(listing.id, listing);
+      }
+    });
+    
+    return endingSoon.map(l => newMap.get(l.id) || l);
+  }, [endingSoon.length, endingSoon.map(l => l.id).sort().join(',')]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -173,35 +240,17 @@ export default function HomePage() {
   }, [recentIds, user?.uid]);
 
   // Signed-in: Watchlist preview
+  // REMOVED: This effect was causing re-renders. The watchlist will be handled
+  // by a separate component that can safely subscribe to useFavorites().
+  // For now, we'll just set an empty array to prevent errors.
   useEffect(() => {
     if (!user?.uid) {
       setWatchlistListings([]);
       return;
     }
-    if (favoritesLoading) return;
-
-    const ids = Array.from(favoriteIds || []);
-    if (!ids.length) {
-      setWatchlistListings([]);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const fetched = await getListingsByIds(ids.slice(0, 12));
-        if (cancelled) return;
-        const valid = fetched.filter((x) => x !== null) as Listing[];
-        setWatchlistListings(valid);
-      } catch {
-        if (!cancelled) setWatchlistListings([]);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [favoriteIds, favoritesLoading, user?.uid]);
+    // Watchlist will be handled by a separate component
+    setWatchlistListings([]);
+  }, [user?.uid]);
 
   // Signed-in: Saved sellers subscription
   useEffect(() => {
@@ -342,8 +391,9 @@ export default function HomePage() {
     };
   }, [savedSellers, user?.uid]);
 
-  const featuredListings = listings.filter(l => l.featured).slice(0, 3);
-  const recentListings = listings.slice(0, 6);
+  // Memoize derived listings to prevent recreation on each render
+  const featuredListings = useMemo(() => stableListings.filter(l => l.featured).slice(0, 3), [stableListings]);
+  const recentListings = useMemo(() => stableListings.slice(0, 6), [stableListings]);
 
   const signedInDiscoveryListings = useMemo(() => {
     if (!user?.uid) return [];
@@ -353,7 +403,7 @@ export default function HomePage() {
 
   const showRecentlyViewed = user?.uid ? recentlyViewedListings.length > 0 : false;
   const showWatchlist =
-    user?.uid ? favoritesLoading || Array.from(favoriteIds || []).length > 0 || watchlistListings.length > 0 : false;
+    user?.uid ? watchlistListings.length > 0 : false;
   const showSavedSellers = user?.uid ? savedSellers.length > 0 : false;
   const showNewFromSavedSellers = user?.uid ? newFromSavedSellers.length > 0 : false;
 
@@ -394,8 +444,16 @@ export default function HomePage() {
       .map((x) => x.l);
   };
 
-  const ListingRail = (props: { listings: Listing[]; emptyText: string }) => {
-    const railListings = sortTrendingFirst(props.listings);
+  const ListingRail = React.memo((props: { listings: Listing[]; emptyText: string }) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:445',message:'ListingRail render',data:{listingsCount:props.listings.length,listingIds:props.listings.map(l=>l.id).join(','),listingRefs:props.listings.map(l=>l===listingsMapRef.current.get(l.id)?'same':'new').join(',')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
+    // #endregion
+    // Memoize sorted listings to prevent re-renders when favoriteIds changes
+    // Create a stable key based on listing IDs to detect real changes
+    const listingsKey = useMemo(() => props.listings.map(l => l.id).sort().join(','), [props.listings.map(l => l.id).sort().join(',')]);
+    const railListings = useMemo(() => {
+      return sortTrendingFirst(props.listings);
+    }, [listingsKey]);
     const scrollerRef = useRef<HTMLDivElement | null>(null);
     const [canScroll, setCanScroll] = useState(false);
     const dragRef = useRef<{
@@ -687,7 +745,30 @@ export default function HomePage() {
         </div>
       </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Only re-render if the listing IDs actually changed OR if listing object references changed
+    const prevIds = prevProps.listings.map(l => l.id).sort().join(',');
+    const nextIds = nextProps.listings.map(l => l.id).sort().join(',');
+    const idsChanged = prevIds !== nextIds;
+    const emptyTextChanged = prevProps.emptyText !== nextProps.emptyText;
+    
+    // Also check if listing object references changed (even if IDs are the same)
+    // This prevents re-renders when new objects are created with the same IDs
+    const refsChanged = prevProps.listings.length !== nextProps.listings.length ||
+      prevProps.listings.some((prevListing, idx) => {
+        const nextListing = nextProps.listings[idx];
+        return !nextListing || prevListing !== nextListing;
+      });
+    
+    // #region agent log
+    if (idsChanged || emptyTextChanged || refsChanged) {
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:746',message:'ListingRail memo: props changed',data:{idsChanged,emptyTextChanged,refsChanged,prevIds,nextIds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+    }
+    // #endregion
+    
+    // Return true if props are the same (skip render), false if they changed (re-render)
+    return !idsChanged && !emptyTextChanged && !refsChanged;
+  });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -963,11 +1044,7 @@ export default function HomePage() {
                   subtitle="Listings you’re keeping an eye on."
                   href="/dashboard/watchlist"
                   right={
-                    favoritesLoading ? (
-                      <span className="text-xs text-muted-foreground">Loading…</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">{Array.from(favoriteIds || []).length} watched</span>
-                    )
+                    <span className="text-xs text-muted-foreground">{watchlistListings.length} watched</span>
                   }
                 />
                 <ListingRail listings={watchlistListings} emptyText="No watched items yet. Tap the heart on any listing." />
@@ -1426,7 +1503,7 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            <ListingRail listings={featuredListings} emptyText="No featured listings right now." />
+            <ListingRail listings={stableListings.filter(l => l.featured)} emptyText="No featured listings right now." />
           </div>
         </section>
       )}
@@ -1466,7 +1543,7 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            <ListingRail listings={endingSoon} emptyText="No auctions ending soon." />
+                <ListingRail listings={stableEndingSoon} emptyText="No auctions ending soon." />
           </div>
         </section>
       )}

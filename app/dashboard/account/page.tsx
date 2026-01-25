@@ -362,11 +362,23 @@ export default function AccountPage() {
           });
           const result = await response.json();
           if (result.ok && result.updated > 0) {
-            // Success - listings updated
+            toast({
+              title: 'Listings updated',
+              description: `Updated display name on ${result.updated} listing${result.updated !== 1 ? 's' : ''}. Changes will appear after the page refreshes.`,
+            });
+          } else if (result.ok && result.updated === 0) {
+            // No listings to update - this is fine
+          } else {
+            console.warn('Failed to update listing snapshots:', result);
           }
         } catch (e) {
           // Non-blocking: log but don't fail the profile save
           console.warn('Failed to update listing snapshots:', e);
+          toast({
+            title: 'Profile saved',
+            description: 'Your profile was saved, but we couldn\'t update your listings. Please refresh the page to see changes.',
+            variant: 'destructive',
+          });
         }
       }
 

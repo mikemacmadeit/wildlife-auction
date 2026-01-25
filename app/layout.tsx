@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { Providers } from '@/components/providers';
+import { FavoritesInitializer } from '@/components/favorites/FavoritesInitializer';
 import { PublicEmailCaptureMount } from '@/components/marketing/PublicEmailCaptureMount';
 import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { getSiteUrl } from '@/lib/site-url';
@@ -99,6 +100,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.className} ${foundersGrotesk.variable}`}>
         <Providers>
+          <FavoritesInitializer />
           {gateEnabled ? (
             <SiteGateClient>
               <div className="min-h-screen flex flex-col bg-background relative">

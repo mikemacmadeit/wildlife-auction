@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -22,9 +22,35 @@ interface ListingCardProps {
   className?: string;
 }
 
-export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
+const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
   ({ listing, className }, ref) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListingCard.tsx:27',message:'ListingCard render',data:{listingId:listing.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+  // #endregion
   const router = useRouter();
+  // CRITICAL: Don't call useFavorites() here - it subscribes to state and causes re-renders
+  // Access the ref directly from the module-level export to avoid subscribing to state
+  const favoriteIdsRef = (globalThis as any).__favoritesRef as React.MutableRefObject<Set<string>> | undefined;
+  const isFavoriteRef = useRef((listingId: string) => {
+    return favoriteIdsRef?.current?.has(listingId) ?? false;
+  });
+  // Update the ref function to use the latest favoriteIdsRef
+  if (favoriteIdsRef) {
+    isFavoriteRef.current = (listingId: string) => favoriteIdsRef.current.has(listingId);
+  }
+  
+  // Track this listing's favorite status locally - only check on mount, no polling
+  // The FavoriteButton handles its own optimistic updates, so we don't need to poll here
+  const [localIsFavorited] = useState(() => isFavoriteRef.current(listing.id));
+  
+  // Only check the ref once on mount - no polling to avoid re-renders
+  // The FavoriteButton component will handle its own state updates
+  
+  // Don't memoize FavoriteButton - it's already memoized internally
+  // Memoizing here with stale dependencies causes issues
+  const favoriteButton = (
+    <FavoriteButton key={listing.id} listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
+  );
   // Phase 3A (A4): anon-safe trust signals come from listing.sellerSnapshot (copied at publish time).
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
@@ -189,8 +215,9 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
             )}
             
             {/* Action Buttons - Always visible (watchlist must be easy to find) */}
+            {/* Use memoized FavoriteButton to prevent re-renders when other listings change */}
             <div className="absolute top-2 right-2 z-30 flex gap-2 opacity-100 transition-opacity duration-300">
-              <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
+              {favoriteButton}
             </div>
             
             {/* Top-left row: Trending (if applicable) + auction timer (same line) */}
@@ -408,5 +435,24 @@ export const ListingCard = React.forwardRef<HTMLDivElement, ListingCardProps>(
       </Link>
     </motion.div>
   );
+});
+
+// Memoize with custom comparison to prevent re-renders when favoriteIds changes
+// Only re-render if listing ID or className changed (listing object reference may change but content is same)
+// This prevents re-renders when other listings' favorite status changes
+export const ListingCard = React.memo(ListingCardComponent, (prevProps, nextProps) => {
+  // Only re-render if listing ID or className actually changed
+  const listingIdSame = prevProps.listing.id === nextProps.listing.id;
+  const classNameSame = prevProps.className === nextProps.className;
+  
+  // #region agent log
+  if (!listingIdSame || !classNameSame) {
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListingCard.tsx:442',message:'ListingCard memo: props changed',data:{listingId:nextProps.listing.id,listingIdSame,classNameSame},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  } else {
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListingCard.tsx:445',message:'ListingCard memo: props same, skipping render',data:{listingId:nextProps.listing.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  }
+  // #endregion
+  
+  return listingIdSame && classNameSame;
 });
 ListingCard.displayName = 'ListingCard';

@@ -1,10 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { startTransition } from 'react';
 import { collection, doc, onSnapshot, serverTimestamp, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/hooks/use-auth';
-import { useToast } from '@/hooks/use-toast';
+import { toast as globalToast } from '@/hooks/use-toast';
+
+// Module-level refs that are initialized immediately (before any hook calls)
+// This ensures they're always available, even if no component calls useFavorites()
+const moduleFavoriteIdsRef = { current: new Set<string>() };
+const modulePendingIdsRef = { current: new Set<string>() };
+let moduleToggleFavorite: ((listingId: string) => Promise<'added' | 'removed'>) | null = null;
+
+// Initialize global exports immediately
+(globalThis as any).__favoritesRef = moduleFavoriteIdsRef;
+(globalThis as any).__pendingIdsRef = modulePendingIdsRef;
 
 /**
  * Custom hook for managing favorite/watchlist listings.
@@ -21,12 +32,32 @@ import { useToast } from '@/hooks/use-toast';
  */
 export function useFavorites() {
   const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
+  // Use global toast function instead of useToast() hook to prevent FavoritesInitializer
+  // from subscribing to toast state changes, which causes re-renders
+  const toast = globalToast;
+  // Use ref for user to keep callbacks stable and prevent FavoritesInitializer from re-rendering
+  const userRef = useRef(user);
+  userRef.current = user;
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  // Use ref for isLoading to avoid causing re-renders in FavoritesInitializer
+  // Components that need isLoading can poll the ref or use a separate hook instance
+  const isLoadingRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
   const pendingOpsRef = useRef<Map<string, { desired: boolean; startedAt: number }>>(new Map());
+  // Use module-level refs that are shared across all hook instances
+  // This ensures components can access them without calling the hook
+  const favoriteIdsRef = moduleFavoriteIdsRef;
+  const pendingIdsRef = modulePendingIdsRef;
+  
+  // Update global exports to point to module-level refs (they're already set, but ensure they're current)
+  (globalThis as any).__favoritesRef = favoriteIdsRef;
+  (globalThis as any).__pendingIdsRef = pendingIdsRef;
+  
+  // Don't sync ref from state - we update the ref directly and never update state
+  // This prevents FavoritesInitializer from re-rendering when favoriteIds changes
+  // The ref is the source of truth, state is just for backward compatibility
 
   const PENDING_TTL_MS = 15_000;
 
@@ -34,8 +65,13 @@ export function useFavorites() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setFavoriteIds(new Set());
-      setIsLoading(false);
+      const emptySet = new Set<string>();
+      favoriteIdsRef.current = emptySet;
+      // Don't call setFavoriteIds - it causes re-renders in all components using the hook
+      // Components will read from favoriteIdsRef.current via isFavorite callback
+      isLoadingRef.current = false;
+      // Don't call setIsLoading - it causes FavoritesInitializer to re-render
+      // Components that need isLoading can poll isLoadingRef.current
     }
   }, [user, authLoading]);
 
@@ -48,12 +84,16 @@ export function useFavorites() {
         unsubscribeRef.current = null;
       }
       pendingOpsRef.current.clear();
-      setPendingIds(new Set());
+      pendingIdsRef.current = new Set(); // Update ref immediately
+      // Don't call setPendingIds - it causes re-renders in all components using the hook
+      // Components will read from pendingIdsRef.current via isPending callback
       return;
     }
 
     // Logged-in mode: subscribe to Firestore
-    setIsLoading(true);
+    isLoadingRef.current = true;
+    // Don't call setIsLoading - it causes FavoritesInitializer to re-render
+    // Components that need isLoading can poll isLoadingRef.current
     const watchlistRef = collection(db, 'users', user.uid, 'watchlist');
 
     // Subscribe to real-time updates
@@ -86,45 +126,61 @@ export function useFavorites() {
           else ids.delete(listingId);
         }
 
-        // Only update state if the Set actually changed to prevent unnecessary re-renders
-        setFavoriteIds((prev) => {
-          // Quick check: if sizes differ, definitely changed
-          if (prev.size !== ids.size) return ids;
+        // Check if the Set actually changed BEFORE calling setState to prevent unnecessary re-renders
+        // Use ref to check current state without triggering React's state update mechanism
+        const currentIds = favoriteIdsRef.current;
+        let hasChanged = false;
+        
+        if (currentIds.size !== ids.size) {
+          hasChanged = true;
+        } else {
           // Deep check: compare all items
-          // Convert to arrays to avoid iteration issues
           const idsArray = Array.from(ids);
-          const prevArray = Array.from(prev);
           for (const id of idsArray) {
-            if (!prev.has(id)) return ids;
+            if (!currentIds.has(id)) {
+              hasChanged = true;
+              break;
+            }
           }
-          for (const id of prevArray) {
-            if (!ids.has(id)) return ids;
+          if (!hasChanged) {
+            const currentArray = Array.from(currentIds);
+            for (const id of currentArray) {
+              if (!ids.has(id)) {
+                hasChanged = true;
+                break;
+              }
+            }
           }
-          // No change - return previous to prevent re-render
-          return prev;
-        });
+        }
+        
+        // Only call setState if something actually changed
+        if (hasChanged) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:125',message:'Set changed - updating state',data:{prevSize:currentIds.size,newSize:ids.size,idsArray:Array.from(ids).join(',')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+          favoriteIdsRef.current = ids; // Update ref immediately
+          // Don't call setFavoriteIds - it causes re-renders in all components using the hook
+          // Components will read from favoriteIdsRef.current via isFavorite callback
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:119',message:'No change detected - skipping setState',data:{size:currentIds.size},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+        }
 
-        // Only update pendingIds if it actually changed
-        const newPendingIds = new Set(pending.keys());
-        setPendingIds((prev) => {
-          if (prev.size !== newPendingIds.size) return newPendingIds;
-          // Convert to arrays to avoid iteration issues
-          const newPendingIdsArray = Array.from(newPendingIds);
-          const prevArray = Array.from(prev);
-          for (const id of newPendingIdsArray) {
-            if (!prev.has(id)) return newPendingIds;
-          }
-          for (const id of prevArray) {
-            if (!newPendingIds.has(id)) return newPendingIds;
-          }
-          return prev;
-        });
+        // Update pendingIds ref immediately (doesn't cause re-renders)
+        pendingIdsRef.current = new Set(pending.keys());
+        // Don't call setPendingIds - it causes re-renders in all components using the hook
+        // Components will read from pendingIdsRef.current via isPending callback
 
-        setIsLoading(false);
+        isLoadingRef.current = false;
+        // Don't call setIsLoading - it causes FavoritesInitializer to re-render
+        // Components that need isLoading can poll isLoadingRef.current
       },
       (error) => {
         console.error('Error subscribing to watchlist:', error);
-        setIsLoading(false);
+        isLoadingRef.current = false;
+        // Don't call setIsLoading - it causes FavoritesInitializer to re-render
+        // Components that need isLoading can poll isLoadingRef.current
       }
     );
 
@@ -137,10 +193,14 @@ export function useFavorites() {
     };
   }, [user, authLoading]);
 
+  // Update userRef when user changes (already declared above)
+  userRef.current = user;
+  
   const syncWatchlistServer = useCallback(
     async (listingId: string, action: 'add' | 'remove') => {
-      if (!user) throw new Error('Authentication required');
-      const token = await user.getIdToken();
+      const currentUser = userRef.current;
+      if (!currentUser) throw new Error('Authentication required');
+      const token = await currentUser.getIdToken();
       const res = await fetch('/api/watchlist/toggle', {
         method: 'POST',
         headers: {
@@ -155,12 +215,16 @@ export function useFavorites() {
       }
       return json;
     },
-    [user]
+    [] // Empty deps - use userRef.current instead
   );
 
   const toggleFavorite = useCallback(
     async (listingId: string): Promise<'added' | 'removed'> => {
-      if (!user) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:168',message:'toggleFavorite called',data:{listingId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
+      // #endregion
+      const currentUser = userRef.current;
+      if (!currentUser) {
         const err: any = new Error('Authentication required');
         err.code = 'AUTH_REQUIRED';
         throw err;
@@ -172,54 +236,56 @@ export function useFavorites() {
         return existingPending.desired ? 'added' : 'removed';
       }
 
-      const isCurrentlyFavorite = favoriteIds.has(listingId);
+      const isCurrentlyFavorite = favoriteIdsRef.current.has(listingId);
       const action: 'added' | 'removed' = isCurrentlyFavorite ? 'removed' : 'added';
       const desired = !isCurrentlyFavorite;
       pendingOpsRef.current.set(listingId, { desired, startedAt: Date.now() });
-      setPendingIds((prev) => new Set(prev).add(listingId));
+      pendingIdsRef.current = new Set(pendingIdsRef.current).add(listingId); // Update ref immediately
+      // Don't call setPendingIds - it causes re-renders in all components using the hook
 
       // Optimistic update
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        if (isCurrentlyFavorite) {
-          next.delete(listingId);
-        } else {
-          next.add(listingId);
-        }
-        return next;
-      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:182',message:'Optimistic update - toggleFavorite',data:{listingId,action,isCurrentlyFavorite,currentFavoriteIdsCount:favoriteIdsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      const next = new Set(favoriteIdsRef.current);
+      if (isCurrentlyFavorite) {
+        next.delete(listingId);
+      } else {
+        next.add(listingId);
+      }
+      favoriteIdsRef.current = next; // Update ref immediately
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:189',message:'Optimistic update applied',data:{listingId,prevSize:favoriteIdsRef.current.size,nextSize:next.size,wasFavorite:isCurrentlyFavorite},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      // Don't call setFavoriteIds - it causes re-renders in all components using the hook
+      // Components will read from favoriteIdsRef.current via isFavorite callback
 
       try {
         await syncWatchlistServer(listingId, isCurrentlyFavorite ? 'remove' : 'add');
         // Success - optimistic update was correct, Firestore will update via onSnapshot
         // Clear pending immediately since server confirmed the change
         pendingOpsRef.current.delete(listingId);
-        setPendingIds((prev) => {
-          if (!prev.has(listingId)) return prev; // No change needed
-          const next = new Set(prev);
-          next.delete(listingId);
-          return next;
-        });
+        const nextPending = new Set(pendingIdsRef.current);
+        nextPending.delete(listingId);
+        pendingIdsRef.current = nextPending; // Update ref immediately
+        // Don't call setPendingIds - it causes re-renders in all components using the hook
         return action;
       } catch (error: any) {
         pendingOpsRef.current.delete(listingId);
-        setPendingIds((prev) => {
-          if (!prev.has(listingId)) return prev; // No change needed
-          const next = new Set(prev);
-          next.delete(listingId);
-          return next;
-        });
+        const nextPending = new Set(pendingIdsRef.current);
+        nextPending.delete(listingId);
+        pendingIdsRef.current = nextPending; // Update ref immediately
+        // Don't call setPendingIds - it causes re-renders in all components using the hook
 
         // Rollback optimistic update
-        setFavoriteIds((prev) => {
-          const next = new Set(prev);
-          if (isCurrentlyFavorite) {
-            next.add(listingId); // Restore
-          } else {
-            next.delete(listingId); // Remove
-          }
-          return next;
-        });
+        const rollbackSet = new Set(favoriteIdsRef.current);
+        if (isCurrentlyFavorite) {
+          rollbackSet.add(listingId); // Restore
+        } else {
+          rollbackSet.delete(listingId); // Remove
+        }
+        favoriteIdsRef.current = rollbackSet;
+        // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
         // Show error toast
         const errorMessage =
@@ -236,44 +302,56 @@ export function useFavorites() {
         throw error;
       }
     },
-    [favoriteIds, user, toast]
+    [syncWatchlistServer] // Remove user and toast - user is accessed via userRef, toast is global
   );
 
+  // Use ref-based check to avoid dependency on favoriteIds state, preventing unnecessary re-renders
   const isFavorite = useCallback(
     (listingId: string) => {
-      return favoriteIds.has(listingId);
+      const result = favoriteIdsRef.current.has(listingId);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:242',message:'isFavorite called',data:{listingId,result,favoriteIdsSize:favoriteIdsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      return result;
     },
-    [favoriteIds]
+    [] // Empty deps - use ref instead to keep callback stable
   );
 
+  // Use ref-based check to avoid dependency on pendingIds state, preventing unnecessary re-renders
   const isPending = useCallback(
     (listingId: string) => {
-      return pendingIds.has(listingId);
+      return pendingIdsRef.current.has(listingId);
     },
-    [pendingIds]
+    [] // Empty deps - use ref instead to keep callback stable
   );
 
   const addFavorite = useCallback(
     async (listingId: string) => {
-      if (!user) {
+      const currentUser = userRef.current;
+      if (!currentUser) {
         const err: any = new Error('Authentication required');
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
-      if (favoriteIds.has(listingId)) return; // Already favorite
+      if (favoriteIdsRef.current.has(listingId)) return; // Already favorite
 
       // Optimistic update
-      setFavoriteIds((prev) => new Set(prev).add(listingId));
+      const next = new Set(favoriteIdsRef.current);
+      next.add(listingId);
+      favoriteIdsRef.current = next;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:210',message:'Optimistic update - adding',data:{listingId,prevSize:favoriteIdsRef.current.size,newSize:next.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
       try {
         await syncWatchlistServer(listingId, 'add');
       } catch (error: any) {
         // Rollback
-        setFavoriteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(listingId);
-          return next;
-        });
+        const rollbackSet = new Set(favoriteIdsRef.current);
+        rollbackSet.delete(listingId);
+        favoriteIdsRef.current = rollbackSet;
+        // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
         toast({
           title: 'Error',
@@ -284,30 +362,36 @@ export function useFavorites() {
         throw error;
       }
     },
-    [favoriteIds, user, toast, syncWatchlistServer]
+    [syncWatchlistServer] // Remove user and toast - user is accessed via userRef, toast is global
   );
 
   const removeFavorite = useCallback(
     async (listingId: string) => {
-      if (!user) {
+      const currentUser = userRef.current;
+      if (!currentUser) {
         const err: any = new Error('Authentication required');
         err.code = 'AUTH_REQUIRED';
         throw err;
       }
-      if (!favoriteIds.has(listingId)) return; // Not favorite
+      if (!favoriteIdsRef.current.has(listingId)) return; // Not favorite
 
       // Optimistic update
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        next.delete(listingId);
-        return next;
-      });
+      const next = new Set(favoriteIdsRef.current);
+      next.delete(listingId);
+      favoriteIdsRef.current = next;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:330',message:'Optimistic update - removing',data:{listingId,prevSize:favoriteIdsRef.current.size,newSize:next.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
       try {
         await syncWatchlistServer(listingId, 'remove');
       } catch (error: any) {
         // Rollback
-        setFavoriteIds((prev) => new Set(prev).add(listingId));
+        const rollbackSet = new Set(favoriteIdsRef.current);
+        rollbackSet.add(listingId);
+        favoriteIdsRef.current = rollbackSet;
+        // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
         toast({
           title: 'Error',
@@ -318,11 +402,27 @@ export function useFavorites() {
         throw error;
       }
     },
-    [favoriteIds, user, toast, syncWatchlistServer]
+    [syncWatchlistServer] // Remove user and toast - user is accessed via userRef, toast is global
   );
 
-  const favoriteIdsArray = useMemo(() => Array.from(favoriteIds), [favoriteIds]);
+  // Generate favoriteIds array from ref (components that need it will poll or use the ref directly)
+  // We still need to return something for backward compatibility, but it won't cause re-renders
+  // since we're not updating the state
+  const favoriteIdsArray = useMemo(() => {
+    return Array.from(favoriteIdsRef.current).sort();
+  }, []); // Empty deps - components should use favoriteIdsRef directly or poll
 
+  // Export toggleFavorite at module level so components can use it without calling the hook
+  // Store it in module-level variable and update globalThis
+  moduleToggleFavorite = toggleFavorite;
+  (globalThis as any).__toggleFavorite = toggleFavorite;
+  
+  // Keep it updated when toggleFavorite changes
+  useEffect(() => {
+    moduleToggleFavorite = toggleFavorite;
+    (globalThis as any).__toggleFavorite = toggleFavorite;
+  }, [toggleFavorite]);
+  
   return {
     favoriteIds: favoriteIdsArray,
     isFavorite,
@@ -331,5 +431,7 @@ export function useFavorites() {
     addFavorite,
     removeFavorite,
     isLoading,
+    // Export ref for components that need to read favoriteIds without subscribing to state
+    favoriteIdsRef,
   };
 }
