@@ -722,6 +722,29 @@ service cloud.firestore {
     }
 
     // ============================================
+    // SELLER PERMITS COLLECTION
+    // ============================================
+    match /sellerPermits/{sellerId} {
+      // Allow read: seller can read their own permit, admins can read all
+      allow read: if isAuthenticated() && (request.auth.uid == sellerId || isAdmin());
+      
+      // Allow create: seller can create their own permit document
+      allow create: if isAuthenticated() && request.auth.uid == sellerId &&
+        request.resource.data.sellerId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      
+      // Allow update: only seller (for resubmission) or admin (for approval/rejection)
+      // Sellers can only update if status is still pending
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == sellerId && resource.data.status == 'pending' && request.resource.data.status == 'pending') ||
+        isAdmin()
+      );
+      
+      // No delete allowed
+      allow delete: if false;
+    }
+
+    // ============================================
     // NOTIFICATIONS COLLECTION
     // ============================================
     match /notifications/{notificationId} {
