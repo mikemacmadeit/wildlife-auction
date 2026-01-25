@@ -121,7 +121,7 @@ export default function DiagnosticsPage() {
       }
       
       // Check if children are mounted
-      const hasContent = main?.children.length > 0 || dashboardMain?.children.length > 0;
+      const hasContent = (main?.children?.length ?? 0) > 0 || (dashboardMain?.children?.length ?? 0) > 0;
       setChildrenMounted(hasContent);
       
       setContainers(containerInfos);
