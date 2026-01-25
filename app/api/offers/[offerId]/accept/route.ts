@@ -87,6 +87,18 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         return { ok: false as const, status: 409, body: { error: 'Offer has expired' } };
       }
 
+      // Check if offer is already accepted
+      if (offer.status === 'accepted') {
+        return { 
+          ok: false as const, 
+          status: 400, 
+          body: { 
+            error: 'This offer has already been accepted. Please proceed to checkout to complete your purchase.',
+            code: 'ALREADY_ACCEPTED'
+          } 
+        };
+      }
+
       if (offer.status !== 'open' && offer.status !== 'countered') {
         return { ok: false as const, status: 400, body: { error: `Offer cannot be accepted from status ${offer.status}` } };
       }

@@ -61,11 +61,17 @@ export default function BuyerOfferDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, offerId]);
 
-  const canWithdraw = useMemo(() => offer?.status === 'open' || offer?.status === 'countered', [offer?.status]);
+  // Only allow withdrawal for open or countered offers (not accepted)
+  const canWithdraw = useMemo(
+    () => (offer?.status === 'open' || offer?.status === 'countered') && offer?.status !== 'accepted',
+    [offer?.status]
+  );
+  // Only allow responding to counter if offer is countered (not accepted)
   const canRespondToCounter = useMemo(
-    () => offer?.status === 'countered' && offer?.lastActorRole === 'seller',
+    () => offer?.status === 'countered' && offer?.lastActorRole === 'seller' && offer?.status !== 'accepted',
     [offer?.status, offer?.lastActorRole]
   );
+  // Checkout is available when offer is accepted
   const canCheckout = useMemo(() => offer?.status === 'accepted', [offer?.status]);
 
   const doAccept = async () => {
