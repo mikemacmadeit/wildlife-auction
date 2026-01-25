@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { uploadSellerPermitDocument, type DocumentUploadProgress } from '@/lib/firebase/storage-documents';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 type PermitStatus = 'pending' | 'verified' | 'rejected';
@@ -91,32 +91,35 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
     load();
     
     // Set up real-time listener for immediate updates
-    const { doc, onSnapshot } = require('firebase/firestore');
-    const { db } = require('@/lib/firebase/config');
     const permitRef = doc(db, 'sellerPermits', user.uid);
     
     const unsubscribe = onSnapshot(
       permitRef,
       (snap) => {
+        console.log('[BreederPermitCard] Real-time snapshot received:', { exists: snap.exists(), id: snap.id });
         if (!snap.exists()) {
+          console.log('[BreederPermitCard] Permit document does not exist');
           setPermit(null);
+          setLoading(false);
           return;
         }
         const data = snap.data() as any;
+        console.log('[BreederPermitCard] Raw permit data from Firestore:', data);
         const permitData: SellerPermit = {
           sellerId: user.uid,
-          status: data?.status || 'pending',
+          status: (data?.status || 'pending') as PermitStatus,
           permitNumber: data?.permitNumber || null,
           documentUrl: data?.documentUrl || null,
           storagePath: data?.storagePath || null,
           rejectionReason: data?.rejectionReason || null,
-          expiresAt: data?.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : (data?.expiresAt instanceof Date ? data.expiresAt.toISOString() : null),
-          uploadedAt: data?.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data?.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
-          reviewedAt: data?.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data?.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : null),
+          expiresAt: data?.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : (data?.expiresAt instanceof Date ? data.expiresAt.toISOString() : (typeof data?.expiresAt === 'string' ? data.expiresAt : null)),
+          uploadedAt: data?.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data?.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : (typeof data?.uploadedAt === 'string' ? data.uploadedAt : null)),
+          reviewedAt: data?.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data?.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : (typeof data?.reviewedAt === 'string' ? data.reviewedAt : null)),
           reviewedBy: data?.reviewedBy || null,
-          updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data?.updatedAt instanceof Date ? data.updatedAt.toISOString() : null),
+          updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data?.updatedAt instanceof Date ? data.updatedAt.toISOString() : (typeof data?.updatedAt === 'string' ? data.updatedAt : null)),
         };
-        console.log('[BreederPermitCard] Real-time permit update:', permitData);
+        console.log('[BreederPermitCard] Processed permit data:', permitData);
+        console.log('[BreederPermitCard] Status:', permitData.status);
         setPermit(permitData);
         setPermitNumber(String(permitData.permitNumber || ''));
         setExpiresAt(permitData.expiresAt ? String(permitData.expiresAt).slice(0, 10) : '');
@@ -124,15 +127,54 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
       },
       (error) => {
         console.error('[BreederPermitCard] Error in real-time listener:', error);
-        // Fall back to periodic refresh if listener fails
-        const interval = setInterval(() => {
-          load();
-        }, 10000); // Refresh every 10 seconds as fallback
-        return () => clearInterval(interval);
+        console.error('[BreederPermitCard] Error code:', error?.code);
+        console.error('[BreederPermitCard] Error message:', error?.message);
+        
+        // If permission denied, try a one-time fetch as fallback
+        if (error?.code === 'permission-denied') {
+          console.warn('[BreederPermitCard] Permission denied, falling back to one-time fetch');
+          getDoc(permitRef)
+            .then((snap) => {
+              if (snap.exists()) {
+                const data = snap.data() as any;
+                const permitData: SellerPermit = {
+                  sellerId: user.uid,
+                  status: (data?.status || 'pending') as PermitStatus,
+                  permitNumber: data?.permitNumber || null,
+                  documentUrl: data?.documentUrl || null,
+                  storagePath: data?.storagePath || null,
+                  rejectionReason: data?.rejectionReason || null,
+                  expiresAt: data?.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : null,
+                  uploadedAt: data?.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : null,
+                  reviewedAt: data?.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : null,
+                  reviewedBy: data?.reviewedBy || null,
+                  updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : null,
+                };
+                setPermit(permitData);
+                setPermitNumber(String(permitData.permitNumber || ''));
+                setExpiresAt(permitData.expiresAt ? String(permitData.expiresAt).slice(0, 10) : '');
+              }
+              setLoading(false);
+            })
+            .catch((fetchError) => {
+              console.error('[BreederPermitCard] Fallback fetch also failed:', fetchError);
+              setLoading(false);
+            });
+        } else {
+          // For other errors, fall back to periodic refresh
+          const interval = setInterval(() => {
+            console.log('[BreederPermitCard] Periodic refresh triggered');
+            load();
+          }, 10000); // Refresh every 10 seconds as fallback
+          return () => clearInterval(interval);
+        }
       }
     );
     
-    return () => unsubscribe();
+    return () => {
+      console.log('[BreederPermitCard] Cleaning up real-time listener');
+      unsubscribe();
+    };
   }, [user?.uid, load]);
 
   const onFile = (f: File | null) => {
