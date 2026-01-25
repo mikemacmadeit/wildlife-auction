@@ -46,15 +46,16 @@ export function getOrderTrustState(order: Order): OrderTrustState {
     return 'awaiting_payment';
   }
 
+  // Delivery progression (check BEFORE payment_received to catch in_transit status)
+  // Note: `in_transit` status is set via seller action when they mark "in transit"
+  if (status === 'in_transit' || (order as any).inTransitAt) return 'in_transit';
+
   // Payment received (funds held)
   if (status === 'paid' || status === 'paid_held') {
     // If the seller explicitly marked they are preparing, reflect that.
     if ((order as any).sellerPreparingAt) return 'preparing_delivery';
     return 'payment_received';
   }
-
-  // Delivery progression (note: `in_transit` may be set via seller action; see Phase 2C)
-  if (status === 'in_transit' || (order as any).inTransitAt) return 'in_transit';
 
   // Treat buyer confirmation as a delivery marker as well (prevents "stuck" states if seller doesn't mark delivered).
   const hasDeliveredMarker =

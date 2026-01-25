@@ -150,7 +150,8 @@ export function TransactionTimeline(props: {
       order.status === 'ready_to_release' ||
       order.status === 'completed';
 
-    const hasInTransit = order.status === 'in_transit' || !!(order as any).inTransitAt;
+    // Check for in_transit status - use both status field and timestamp
+    const hasInTransit = order.status === 'in_transit' || !!(order as any).inTransitAt || !!order.inTransitAt;
     const hasDelivered =
       !!order.deliveredAt ||
       !!order.deliveryConfirmedAt ||
@@ -250,14 +251,34 @@ export function TransactionTimeline(props: {
       },
     ];
 
-    const currentRank = trust === 'awaiting_payment' ? 0 : rank;
+    // Ensure currentRank reflects the actual order status, not just trust state
+    // If order status is 'in_transit' but trust state hasn't caught up, use status directly
+    let currentRank = trust === 'awaiting_payment' ? 0 : rank;
+    
+    // Override: If order status is explicitly 'in_transit', ensure rank is 3
+    if (order.status === 'in_transit' && currentRank < 3) {
+      currentRank = 3;
+    }
+    
+    // Override: If order status is 'delivered', ensure rank is at least 4
+    if (order.status === 'delivered' && currentRank < 4) {
+      currentRank = 4;
+    }
 
     return baseSteps
       .filter((s) => s.show !== false)
       .map((s) => {
-        // If order is delivered but no explicit in_transit, we still show In transit as done? Keep it simple:
-        const effectiveRank =
-          s.key === 'in_transit' && hasDelivered && !hasInTransit ? 3 : s.rank;
+        // Ensure effectiveRank correctly reflects order status
+        let effectiveRank = s.rank;
+        
+        // If this is the "in_transit" step and order status is 'in_transit', ensure it's active
+        if (s.key === 'in_transit' && order.status === 'in_transit') {
+          effectiveRank = 3;
+        }
+        // If order is delivered but no explicit in_transit marker, still show in_transit as done
+        else if (s.key === 'in_transit' && hasDelivered && !hasInTransit) {
+          effectiveRank = 3;
+        }
         return {
           key: s.key,
           title: s.title,
