@@ -83,6 +83,14 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.InTransit' }>;
       return `In transit: "${p.listingTitle}". View order: ${p.orderUrl}`;
     }
+    case 'Order.Delivered': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Delivered' }>;
+      return `Order delivered: "${p.listingTitle}". Please confirm receipt: ${p.orderUrl}`;
+    }
+    case 'Order.Accepted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Accepted' }>;
+      return `Buyer accepted order for "${p.listingTitle}". Funds will be released soon: ${p.orderUrl}`;
+    }
     case 'Order.DeliveryCheckIn': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryCheckIn' }>;
       return `Quick check-in: confirm receipt or report an issue for "${p.listingTitle}". ${p.orderUrl}`;
@@ -218,6 +226,31 @@ function buildEmailJobPayload(params: {
           buyerName: recipientName,
           orderId: p.orderId,
           listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.Delivered': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Delivered' }>;
+      return {
+        template: 'order_delivered',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.Accepted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.Accepted' }>;
+      return {
+        template: 'order_accepted',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
           orderUrl: p.orderUrl,
         },
       };

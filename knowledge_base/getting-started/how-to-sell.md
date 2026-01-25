@@ -142,7 +142,7 @@ Complete guide to becoming a successful seller on Wildlife Exchange.
 ### Choose Category
 
 **Select the right category:**
-- **Wildlife & Exotics** - Game animals, exotic species
+- **Registered & Specialty Livestock** - Game animals, registered ranch species
 - **Cattle & Livestock** - Cattle, goats, sheep, pigs
 - **Horses & Equestrian** - Horses, ponies, donkeys
 - **Ranch Equipment** - Tractors, trailers, tools

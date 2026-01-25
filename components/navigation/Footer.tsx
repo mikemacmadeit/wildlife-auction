@@ -128,7 +128,7 @@ export function Footer() {
             </Link>
 
             <p className="text-sm text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] max-w-sm">
-              Texas marketplace for whitetail breeders, exotics, and cattle—built for trust and compliance.
+              Texas marketplace for whitetail breeders, registered livestock, and cattle—built for trust and compliance.
             </p>
 
             <div className="flex items-center gap-2">
@@ -142,7 +142,7 @@ export function Footer() {
                 variant="secondary"
                 className="bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
               >
-                Escrow + payout gating
+                Delayed settlement + payout gating
               </Badge>
             </div>
           </div>

@@ -31,7 +31,9 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.Received',
   'Order.Preparing',
   'Order.InTransit',
+  'Order.Delivered',
   'Order.DeliveryConfirmed',
+  'Order.Accepted',
   'Order.DeliveryCheckIn',
   'Payout.Released',
 
@@ -213,12 +215,27 @@ export type NotificationEventPayload =
       orderUrl: string;
     }
   | {
+      type: 'Order.Delivered';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
       type: 'Order.DeliveryConfirmed';
       orderId: string;
       listingId: string;
       listingTitle: string;
       orderUrl: string;
       deliveryDate: string;
+    }
+  | {
+      type: 'Order.Accepted';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      amount: number;
     }
   | {
       type: 'Order.DeliveryCheckIn';

@@ -262,7 +262,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 <Badge 
                   variant="default" 
                   className="bg-green-600 text-white font-semibold text-xs shadow-warm"
-                  title="Protected Transaction: Funds held for payout release until protection period ends or buyer accepts early. Evidence required for disputes."
+                  title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Evidence required for disputes."
                 >
                   Protected {listing.protectedTransactionDays} Days
                 </Badge>

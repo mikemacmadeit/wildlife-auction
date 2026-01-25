@@ -40,6 +40,21 @@ export interface OrderReceivedEmailData {
   orderUrl: string;
 }
 
+export interface OrderDeliveredEmailData {
+  buyerName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
+export interface OrderAcceptedEmailData {
+  sellerName: string;
+  orderId: string;
+  listingTitle: string;
+  amount: number;
+  orderUrl: string;
+}
+
 export interface PayoutNotificationEmailData {
   sellerName: string;
   orderId: string;
@@ -473,7 +488,7 @@ function getEmailTemplate(params: {
                             Wildlife Exchange
                           </div>
                           <div class="email-header-subtext" style="font-family:${fontBody}; font-size: 12px; color: rgba(244,240,230,0.86); margin-top: 2px; mso-color-alt: #F4F0E6;">
-                            Texas Exotic & Breeder Animal Marketplace
+                            Texas Livestock & Ranch Marketplace
                           </div>
                         </td>
                         <td align="right" style="vertical-align: middle;">
@@ -1878,6 +1893,75 @@ export function getOrderReceivedEmail(data: OrderReceivedEmailData): { subject: 
 
     <div style="margin: 18px 0 0 0;">
       ${renderButton(data.orderUrl, 'View order')}
+    </div>
+  `;
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOrderDeliveredEmail(data: OrderDeliveredEmailData): { subject: string; html: string } {
+  const subject = `Order delivered — ${data.listingTitle}`;
+  const preheader = `The seller marked your order as delivered. Please confirm receipt.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Order delivered
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.buyerName)} — the seller marked your order as delivered. Please confirm receipt or report any issues.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Order
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'Confirm receipt')}
+    </div>
+  `;
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOrderAcceptedEmail(data: OrderAcceptedEmailData): { subject: string; html: string } {
+  const subject = `Order accepted — ${data.listingTitle}`;
+  const preheader = `The buyer accepted your order. Funds will be released soon.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Order accepted
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.sellerName)} — the buyer accepted your order. Funds will be released soon.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Order
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Amount:</span> <strong>$${Number(data.amount).toLocaleString()}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.orderUrl, 'View sale')}
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };

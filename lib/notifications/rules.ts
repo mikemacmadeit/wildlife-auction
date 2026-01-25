@@ -215,6 +215,24 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
+    case 'Order.Delivered':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email', 'sms'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
+    case 'Order.Accepted':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email', 'sms'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 }, sms: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
     case 'Order.DeliveryConfirmed':
       return {
         category: 'orders',
@@ -361,6 +379,10 @@ export function decideChannels(params: {
       case 'orders': {
         if (params.eventType === 'Order.Confirmed') return cats.orders.confirmed;
         if (params.eventType === 'Order.Received') return cats.orders.confirmed;
+        if (params.eventType === 'Order.Preparing') return cats.orders.confirmed;
+        if (params.eventType === 'Order.InTransit') return cats.orders.confirmed;
+        if (params.eventType === 'Order.Delivered') return cats.orders.confirmed;
+        if (params.eventType === 'Order.Accepted') return cats.orders.confirmed;
         if (params.eventType === 'Order.DeliveryConfirmed') return cats.orders.deliveryConfirmed;
         if (params.eventType === 'Order.DeliveryCheckIn') return cats.orders.deliveryCheckIn;
         if (params.eventType === 'Payout.Released') return cats.orders.payoutReleased;

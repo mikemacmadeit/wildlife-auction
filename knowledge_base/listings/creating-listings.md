@@ -29,7 +29,7 @@ Learn how to create and publish listings on Wildlife Exchange.
 ### 2. Select Category
 
 Choose the appropriate category:
-- Wildlife & Exotics
+- Registered & Specialty Livestock
 - Cattle & Livestock
 - Horses & Equestrian
 - Ranch Equipment

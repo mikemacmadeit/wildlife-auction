@@ -134,6 +134,21 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     orderUrl: urlSchema,
   }),
   z.object({
+    type: z.literal('Order.Delivered'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    orderUrl: urlSchema,
+  }),
+  z.object({
+    type: z.literal('Order.Accepted'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    orderUrl: urlSchema,
+    amount: z.number().finite().nonnegative(),
+  }),
+  z.object({
     type: z.literal('Order.DeliveryConfirmed'),
     orderId: baseString,
     listingId: baseString,

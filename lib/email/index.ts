@@ -22,6 +22,8 @@ import {
   getBidPlacedEmail,
   getDeliveryCheckInEmail,
   getOrderReceivedEmail,
+  getOrderDeliveredEmail,
+  getOrderAcceptedEmail,
   getProfileIncompleteReminderEmail,
   getWeeklyDigestEmail,
   getSavedSearchAlertEmail,
@@ -56,6 +58,8 @@ import {
   type BidPlacedEmailData,
   type DeliveryCheckInEmailData,
   type OrderReceivedEmailData,
+  type OrderDeliveredEmailData,
+  type OrderAcceptedEmailData,
   type ProfileIncompleteReminderEmailData,
   type WeeklyDigestEmailData,
   type SavedSearchAlertEmailData,
@@ -201,6 +205,21 @@ const orderReceivedSchema = z.object({
   sellerName: z.string().min(1),
   orderId: z.string().min(1),
   listingTitle: z.string().min(1),
+  orderUrl: urlSchema,
+});
+
+const orderDeliveredSchema = z.object({
+  buyerName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().min(1),
+  orderUrl: urlSchema,
+});
+
+const orderAcceptedSchema = z.object({
+  sellerName: z.string().min(1),
+  orderId: z.string().min(1),
+  listingTitle: z.string().min(1),
+  amount: z.number().finite().nonnegative(),
   orderUrl: urlSchema,
 });
 
@@ -614,6 +633,39 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: OrderReceivedEmailData) => {
       const { subject, html } = getOrderReceivedEmail(data);
       return { subject, preheader: `Receipt confirmed: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'order_delivered',
+    displayName: 'Order Delivered',
+    description: 'Sent to buyer when seller marks the order as delivered.',
+    schema: orderDeliveredSchema,
+    samplePayload: {
+      buyerName: 'Alex Johnson',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: OrderDeliveredEmailData) => {
+      const { subject, html } = getOrderDeliveredEmail(data);
+      return { subject, preheader: `Order delivered: ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'order_accepted',
+    displayName: 'Order Accepted',
+    description: 'Sent to seller when buyer accepts the order.',
+    schema: orderAcceptedSchema,
+    samplePayload: {
+      sellerName: 'Jordan Smith',
+      orderId: 'ORD_123456',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      amount: 5000,
+      orderUrl: 'https://wildlife.exchange/seller/orders/ORD_123456',
+    },
+    render: (data: OrderAcceptedEmailData) => {
+      const { subject, html } = getOrderAcceptedEmail(data);
+      return { subject, preheader: `Order accepted: ${data.listingTitle}`, html };
     },
   },
   {

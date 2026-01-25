@@ -3,7 +3,7 @@ title: "How Payment Protection Works"
 slug: "payment-protection-explained"
 category: "payments"
 audience: ["buyer", "all"]
-tags: ["payments", "protection", "security", "buyer protection", "safe", "escrow", "secure"]
+tags: ["payments", "protection", "security", "buyer protection", "safe", "secure", "delayed settlement"]
 enabled: true
 version: 1
 ---
@@ -15,7 +15,7 @@ Understanding how Wildlife Exchange protects your payments and purchases.
 ## What Is Payment Protection?
 
 **Payment protection means:**
-- Your money is held securely until delivery confirmed
+- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
 - You can inspect item before funds are released
 - Dispute process available if issues arise
 - Refund available if problems can't be resolved
@@ -34,8 +34,8 @@ Understanding how Wildlife Exchange protects your payments and purchases.
 
 **When you complete checkout:**
 - Payment is processed immediately (cards) or pending (ACH/wire)
-- Funds are held by Wildlife Exchange
-- Not released to seller yet
+- Payments are processed through the platform
+- Not released to seller until marketplace rules are met
 - Secure and encrypted
 
 **What happens:**
@@ -47,8 +47,8 @@ Understanding how Wildlife Exchange protects your payments and purchases.
 ### Step 2: Funds Are Held
 
 **During this time:**
-- Funds are secure and protected
-- Seller can't access funds yet
+- Payments are secure and protected
+- Seller can't access funds until marketplace rules are met
 - You can inspect item
 - Dispute available if needed
 - Protection window active
@@ -103,9 +103,9 @@ Understanding how Wildlife Exchange protects your payments and purchases.
 
 ### Funds Held Securely
 
-**Your money is:**
-- Held in secure account
-- Not released until you confirm
+**Your payments are:**
+- Processed through secure platform
+- Not released until marketplace rules are met
 - Protected from fraud
 - Available for refund if needed
 - Managed professionally

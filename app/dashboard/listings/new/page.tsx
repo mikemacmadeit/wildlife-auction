@@ -807,9 +807,9 @@ function NewListingPageContent() {
                     />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="text-base font-bold leading-tight">Wildlife &amp; Exotics</h3>
+                    <h3 className="text-base font-bold leading-tight">Registered &amp; Specialty Livestock</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
-                      Axis deer, blackbuck, fallow deer, and other exotic species
+                      Axis deer, blackbuck, fallow deer, and other registered ranch species
                     </p>
                   </div>
                 </div>
@@ -1261,9 +1261,7 @@ function NewListingPageContent() {
                 if (!attrs.speciesId) errs.push('Species');
                 if (!attrs.sex) errs.push('Sex');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                if (attrs.animalIdDisclosure !== true) errs.push('Animal Identification Disclosure');
-                if (attrs.healthDisclosure !== true) errs.push('Health Disclosure');
-                if (attrs.transportDisclosure !== true) errs.push('Transport Disclosure');
+                // Disclosures are now handled in the final seller acknowledgment step, not in step validation
                 return errs;
               }
               if (formData.category === 'cattle_livestock') {
@@ -1274,8 +1272,7 @@ function NewListingPageContent() {
                 // Registered is modeled as a checkbox; defaulting to false is acceptable, but if it's still unset, flag it.
                 if ((attrs as any).registered !== true && (attrs as any).registered !== false) errs.push('Registered');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                if (!attrs.identificationDisclosure) errs.push('Identification Disclosure');
-                if (!attrs.healthDisclosure) errs.push('Health Disclosure');
+                // Disclosures are now handled in the final seller acknowledgment step, not in step validation
                 const hasAge =
                   typeof (attrs as any).age === 'number'
                     ? Number.isFinite((attrs as any).age)
@@ -1292,11 +1289,7 @@ function NewListingPageContent() {
                 if (attrs.registered !== true && attrs.registered !== false) errs.push('Registered');
                 if (attrs.registered === true && !String(attrs.registrationNumber || '').trim()) errs.push('Registration Number');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                const d = attrs.disclosures || {};
-                if (!d.identificationDisclosure) errs.push('Identification Disclosure');
-                if (!d.healthDisclosure) errs.push('Health Disclosure');
-                if (!d.transportDisclosure) errs.push('Transport Disclosure');
-                if (!d.titleOrLienDisclosure) errs.push('Title/Lien Disclosure');
+                // Disclosures are now handled in the final seller acknowledgment step, not in step validation
                 return errs;
               }
               if (formData.category === 'sporting_working_dogs') {
@@ -1411,9 +1404,7 @@ function NewListingPageContent() {
           if (!attrs.speciesId) errors.push('Species');
           if (!attrs.sex) errors.push('Sex');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
-          if (attrs.animalIdDisclosure !== true) errors.push('Animal Identification Disclosure');
-          if (attrs.healthDisclosure !== true) errors.push('Health Disclosure');
-          if (attrs.transportDisclosure !== true) errors.push('Transport Disclosure');
+          // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -1431,8 +1422,7 @@ function NewListingPageContent() {
           if (!attrs.sex) errors.push('Sex');
           if ((attrs as any).registered !== true && (attrs as any).registered !== false) errors.push('Registered');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
-          if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
-          if (!attrs.healthDisclosure) errors.push('Health Disclosure');
+          // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           const hasAge =
             typeof (attrs as any).age === 'number'
               ? Number.isFinite((attrs as any).age)
@@ -1457,11 +1447,7 @@ function NewListingPageContent() {
           if (attrs.registered !== true && attrs.registered !== false) errors.push('Registered');
           if (attrs.registered === true && !String(attrs.registrationNumber || '').trim()) errors.push('Registration Number');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
-          const d = attrs.disclosures || {};
-          if (!d.identificationDisclosure) errors.push('Identification Disclosure');
-          if (!d.healthDisclosure) errors.push('Health Disclosure');
-          if (!d.transportDisclosure) errors.push('Transport Disclosure');
-          if (!d.titleOrLienDisclosure) errors.push('Title/Lien Disclosure');
+          // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -2309,6 +2295,44 @@ function NewListingPageContent() {
     },
   ];
 
+  // Determine which steps are completed based on form data (for new listings)
+  // A step is "completed" if it has been filled in with required data
+  const completedStepIds = useMemo(() => {
+    const completed: string[] = [];
+    
+    // Step 1: Category - completed if category is selected
+    if (formData.category) {
+      completed.push('category');
+      
+      // Step 2: Listing Type - completed if type is selected (requires category first)
+      if (formData.type) {
+        completed.push('type');
+        
+        // Step 3: Specifications - completed if we have category (attributes validation happens in step)
+        // We consider it completed if category is set, allowing navigation back
+        completed.push('attributes');
+        
+        // Step 4: Details - completed if title and description are filled
+        if (formData.title?.trim() && formData.description?.trim()) {
+          completed.push('details');
+          
+          // Step 5: Photos - completed if at least one photo is selected
+          if (formData.photoIds.length > 0) {
+            completed.push('media');
+            
+            // Step 6: Verification & Transportation - accessible once photos are done (optional)
+            completed.push('verification');
+            
+            // Step 7: Review - accessible once verification is accessible (final step)
+            completed.push('review');
+          }
+        }
+      }
+    }
+    
+    return completed;
+  }, [formData.category, formData.type, formData.title, formData.description, formData.photoIds.length]);
+
   const handleComplete = async (data: Record<string, unknown>) => {
     // Hard guard: prevents double click / double submit creating duplicate drafts.
     if (submittingRef.current) return;
@@ -2407,11 +2431,30 @@ function NewListingPageContent() {
       if (formData.category === 'horse_equestrian') normalizedAttributes.speciesId = 'horse';
       if (formData.category === 'sporting_working_dogs') {
         normalizedAttributes.speciesId = 'dog';
-        // Set disclosures when seller acknowledgment is accepted (they're checked in the final step)
-        if (requiresSellerAnimalAck && sellerAnimalAckAcceptedNow) {
+      }
+      
+      // Set disclosures when seller acknowledgment is accepted (they're checked in the final step)
+      if (requiresSellerAnimalAck && sellerAnimalAckAcceptedNow) {
+        if (formData.category === 'sporting_working_dogs') {
           normalizedAttributes.identificationDisclosure = true;
           normalizedAttributes.healthDisclosure = true;
           normalizedAttributes.transportDisclosure = true;
+        } else if (formData.category === 'wildlife_exotics') {
+          normalizedAttributes.animalIdDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+          normalizedAttributes.transportDisclosure = true;
+        } else if (formData.category === 'cattle_livestock') {
+          normalizedAttributes.identificationDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+        } else if (formData.category === 'horse_equestrian') {
+          // Horse disclosures are nested in a disclosures object
+          normalizedAttributes.disclosures = {
+            ...(normalizedAttributes.disclosures || {}),
+            identificationDisclosure: true,
+            healthDisclosure: true,
+            transportDisclosure: true,
+            titleOrLienDisclosure: true,
+          };
         }
       }
 
@@ -2655,11 +2698,30 @@ function NewListingPageContent() {
       if (formData.category === 'horse_equestrian') normalizedAttributes.speciesId = 'horse';
       if (formData.category === 'sporting_working_dogs') {
         normalizedAttributes.speciesId = 'dog';
-        // Set disclosures when seller acknowledgment is accepted (for draft saves, they'll be set at publish time)
-        if (sellerAnimalAttestationAccepted) {
+      }
+      
+      // Set disclosures when seller acknowledgment is accepted (for draft saves, they'll be set at publish time)
+      if (sellerAnimalAttestationAccepted) {
+        if (formData.category === 'sporting_working_dogs') {
           normalizedAttributes.identificationDisclosure = true;
           normalizedAttributes.healthDisclosure = true;
           normalizedAttributes.transportDisclosure = true;
+        } else if (formData.category === 'wildlife_exotics') {
+          normalizedAttributes.animalIdDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+          normalizedAttributes.transportDisclosure = true;
+        } else if (formData.category === 'cattle_livestock') {
+          normalizedAttributes.identificationDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+        } else if (formData.category === 'horse_equestrian') {
+          // Horse disclosures are nested in a disclosures object
+          normalizedAttributes.disclosures = {
+            ...(normalizedAttributes.disclosures || {}),
+            identificationDisclosure: true,
+            healthDisclosure: true,
+            transportDisclosure: true,
+            titleOrLienDisclosure: true,
+          };
         }
       }
 
@@ -2929,6 +2991,7 @@ function NewListingPageContent() {
                       I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
                       Wildlife Exchange does not take custody of animals.
                     </div>
+                    {/* Category-specific disclosures */}
                     {formData.category === 'sporting_working_dogs' && (
                       <div className="mt-3 pt-3 border-t border-border/40">
                         <div className="font-medium mb-1">Required disclosures:</div>
@@ -2936,6 +2999,36 @@ function NewListingPageContent() {
                           <div>• I have accurately disclosed identification details (if applicable).</div>
                           <div>• I have disclosed any known health issues and represented the dog honestly.</div>
                           <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                        </div>
+                      </div>
+                    )}
+                    {formData.category === 'wildlife_exotics' && (
+                      <div className="mt-3 pt-3 border-t border-border/40">
+                        <div className="font-medium mb-1">Required disclosures:</div>
+                        <div className="text-sm space-y-1">
+                          <div>• I confirm that animals are properly identified/tagged as required by TAHC regulations.</div>
+                          <div>• I acknowledge health disclosure requirements for registered livestock.</div>
+                          <div>• I confirm that transfer is Texas-only unless otherwise permitted by regulations.</div>
+                        </div>
+                      </div>
+                    )}
+                    {formData.category === 'cattle_livestock' && (
+                      <div className="mt-3 pt-3 border-t border-border/40">
+                        <div className="font-medium mb-1">Required disclosures:</div>
+                        <div className="text-sm space-y-1">
+                          <div>• I confirm that animals have proper ear tags/brand identification as required.</div>
+                          <div>• I acknowledge health disclosure requirements for livestock.</div>
+                        </div>
+                      </div>
+                    )}
+                    {formData.category === 'horse_equestrian' && (
+                      <div className="mt-3 pt-3 border-t border-border/40">
+                        <div className="font-medium mb-1">Required disclosures:</div>
+                        <div className="text-sm space-y-1">
+                          <div>• I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).</div>
+                          <div>• I have disclosed any known health issues and represented the horse honestly.</div>
+                          <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                          <div>• I disclose any liens/encumbrances (or confirm there are none).</div>
                         </div>
                       </div>
                     )}
@@ -2965,16 +3058,36 @@ function NewListingPageContent() {
                 sellerAnimalAckForceRef.current = true;
                 setSellerAnimalAttestationAccepted(true);
                 
-                // For dog listings, update formData to include disclosures (payload will pick them up from formData)
-                if (formData.category === 'sporting_working_dogs') {
+                // For all animal categories, update formData to include disclosures (payload will pick them up from formData)
+                const category = formData.category;
+                const updatedAttributes: any = { ...formData.attributes };
+                
+                if (category === 'sporting_working_dogs') {
+                  updatedAttributes.identificationDisclosure = true;
+                  updatedAttributes.healthDisclosure = true;
+                  updatedAttributes.transportDisclosure = true;
+                } else if (category === 'wildlife_exotics') {
+                  updatedAttributes.animalIdDisclosure = true;
+                  updatedAttributes.healthDisclosure = true;
+                  updatedAttributes.transportDisclosure = true;
+                } else if (category === 'cattle_livestock') {
+                  updatedAttributes.identificationDisclosure = true;
+                  updatedAttributes.healthDisclosure = true;
+                } else if (category === 'horse_equestrian') {
+                  // Horse disclosures are nested in a disclosures object
+                  updatedAttributes.disclosures = {
+                    ...(updatedAttributes.disclosures || {}),
+                    identificationDisclosure: true,
+                    healthDisclosure: true,
+                    transportDisclosure: true,
+                    titleOrLienDisclosure: true,
+                  };
+                }
+                
+                if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'horse_equestrian') {
                   setFormData({
                     ...formData,
-                    attributes: {
-                      ...formData.attributes,
-                      identificationDisclosure: true,
-                      healthDisclosure: true,
-                      transportDisclosure: true,
-                    } as any,
+                    attributes: updatedAttributes,
                   });
                 }
                 
@@ -3162,6 +3275,8 @@ function NewListingPageContent() {
             suppressValidationToast={true}
             completeButtonDataTour="listing-publish"
             activeStepId={tourRequestedStep}
+            allowStepJump={true}
+            completedStepIds={completedStepIds}
             onValidationError={(stepId) => {
               setValidationAttempted((prev) => ({ ...prev, [stepId]: true }));
             }}

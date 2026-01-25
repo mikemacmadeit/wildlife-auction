@@ -54,7 +54,7 @@ export default function SellerPolicyPage() {
         <Card>
           <CardHeader>
             <CardTitle>2) Animal-specific seller obligations</CardTitle>
-            <CardDescription>Applies to whitetail, exotics, livestock, horses, and dogs.</CardDescription>
+            <CardDescription>Applies to whitetail, registered livestock, cattle, horses, and dogs.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <ul className="list-disc ml-5 space-y-1">

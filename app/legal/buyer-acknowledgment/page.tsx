@@ -51,7 +51,7 @@ export default function BuyerAcknowledgmentPage() {
         <Card>
           <CardHeader>
             <CardTitle>2) Live animal transactions & assumption of risk</CardTitle>
-            <CardDescription>Applies to whitetail, exotics, livestock, horses, and dogs.</CardDescription>
+            <CardDescription>Applies to whitetail, registered livestock, cattle, horses, and dogs.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>

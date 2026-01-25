@@ -142,10 +142,10 @@ Wildlife Exchange accepts multiple secure payment methods for your convenience.
 6. **You have protection** during the delivery window
 
 **Payment protection:**
-- Funds held until delivery confirmed
+- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
 - Dispute process available if issues arise
 - Refund available if item not as described
-- Secure escrow-like protection
+- Secure delayed settlement protection
 
 ## Troubleshooting
 

@@ -14,6 +14,9 @@ import { OrderStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 const markDeliveredSchema = z.object({
   deliveryProofUrls: z.array(z.string().url()).optional(),
@@ -147,6 +150,32 @@ export async function POST(
       });
     } catch {
       // best-effort
+    }
+
+    // Emit notification to buyer
+    try {
+      const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
+      const listingTitle = listingDoc.data()?.title || 'Your order';
+      const ev = await emitAndProcessEventForUser({
+        type: 'Order.Delivered',
+        actorId: sellerId,
+        entityType: 'order',
+        entityId: orderId,
+        targetUserId: orderData.buyerId,
+        payload: {
+          type: 'Order.Delivered',
+          orderId,
+          listingId: orderData.listingId,
+          listingTitle,
+          orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
+        },
+        optionalHash: `delivered:${now.toISOString()}`,
+      });
+      if (ev?.ok && ev.created) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+      }
+    } catch (e) {
+      console.error('Error emitting Order.Delivered notification event:', e);
     }
 
     return json({

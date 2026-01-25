@@ -213,7 +213,7 @@ export default function TermsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>Payments are processed by Stripe. Wildlife Exchange may collect marketplace fees.</p>
             <p>
-              Wildlife Exchange may hold and release funds based on marketplace workflow rules (for example, dispute windows or required document uploads).
+              Wildlife Exchange processes payments through the platform and releases funds according to marketplace workflow rules (for example, dispute windows or required document uploads).
               This relates to payment settlement only and does not mean Wildlife Exchange takes custody of any animal or good.
             </p>
           </CardContent>

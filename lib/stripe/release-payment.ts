@@ -130,11 +130,77 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
     };
   }
 
+  // In test mode, bypass settlement checks - funds are available immediately for testing
+  const secret = String(process.env.STRIPE_SECRET_KEY || '');
+  const isTestMode = secret.startsWith('sk_test_') || secret.includes('_test_');
+  
+  if (isTestMode) {
+    // In test mode, still fetch the charge ID for source_transaction, but mark funds as available immediately
+    try {
+      const pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge'],
+      })) as any;
+      
+      const charges: any[] = Array.isArray(pi?.charges?.data) ? pi.charges.data : [];
+      const charge =
+        pi?.latest_charge && typeof pi.latest_charge === 'object'
+          ? pi.latest_charge
+          : (charges.length > 0 ? charges[charges.length - 1] : null);
+      const chargeId = charge?.id ? String(charge.id) : null;
+      
+      return {
+        isAvailableNow: true, // Always available in test mode
+        availableOnUnix: null,
+        availableOnIso: null,
+        minutesUntilAvailable: null,
+        paymentIntentId,
+        chargeId,
+        balanceTransactionId: null,
+        balanceTransactionStatus: 'available', // Mark as available in test mode
+      };
+    } catch {
+      // If we can't fetch, still return available in test mode
+      return {
+        isAvailableNow: true,
+        availableOnUnix: null,
+        availableOnIso: null,
+        minutesUntilAvailable: null,
+        paymentIntentId,
+        chargeId: null,
+        balanceTransactionId: null,
+        balanceTransactionStatus: 'available',
+      };
+    }
+  }
+
   // Prefer latest_charge (Stripe-recommended), with balance_transaction expanded for settlement timing.
   // Fallback to charges.data for older objects / edge cases.
-  const pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
-    expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
-  })) as any;
+  // Try to get chargeId first (for source_transaction), then get balance transaction details
+  let pi: any;
+  try {
+    pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
+    })) as any;
+  } catch {
+    // If expanded retrieval fails, try without expansion to at least get chargeId
+    try {
+      pi = (await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge'],
+      })) as any;
+    } catch {
+      // If that also fails, return minimal info but don't block
+      return {
+        isAvailableNow: true, // Don't block if we can't check
+        availableOnUnix: null,
+        availableOnIso: null,
+        minutesUntilAvailable: null,
+        paymentIntentId,
+        chargeId: null,
+        balanceTransactionId: null,
+        balanceTransactionStatus: null,
+      };
+    }
+  }
 
   const charges: any[] = Array.isArray(pi?.charges?.data) ? pi.charges.data : [];
   const charge =
@@ -143,16 +209,23 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
       : (charges.length > 0 ? charges[charges.length - 1] : null); // most recent attempt
   const chargeId = charge?.id ? String(charge.id) : null;
 
+  // Try to get balance transaction details, but don't fail if we can't
   const btRaw = charge?.balance_transaction || null;
   let bt: any = null;
   let balanceTransactionId: string | null = null;
   let balanceTransactionStatus: string | null = null;
-  if (typeof btRaw === 'string') {
-    balanceTransactionId = btRaw;
-    bt = await stripe.balanceTransactions.retrieve(btRaw);
-  } else if (btRaw && typeof btRaw === 'object') {
-    bt = btRaw;
-    balanceTransactionId = bt?.id ? String(bt.id) : null;
+  
+  try {
+    if (typeof btRaw === 'string') {
+      balanceTransactionId = btRaw;
+      bt = await stripe.balanceTransactions.retrieve(btRaw);
+    } else if (btRaw && typeof btRaw === 'object') {
+      bt = btRaw;
+      balanceTransactionId = bt?.id ? String(bt.id) : null;
+    }
+  } catch {
+    // If we can't get balance transaction, we still have chargeId for source_transaction
+    // Don't fail - we can still attempt the transfer
   }
 
   balanceTransactionStatus = typeof bt?.status === 'string' ? String(bt.status) : null; // 'available' | 'pending' | unknown
@@ -160,6 +233,7 @@ async function getStripeSettlementStatusForPaymentIntent(paymentIntentId: string
   const nowUnix = Math.floor(Date.now() / 1000);
   // Prefer Stripe's explicit status when present.
   // If status is missing, fall back to `available_on` timestamp.
+  // If we have a chargeId, we can use source_transaction even if funds are pending
   const isAvailableNow =
     balanceTransactionStatus === 'available'
       ? true
@@ -551,9 +625,13 @@ export async function releasePaymentForOrder(
         settlementForTransfer = await getStripeSettlementStatusForPaymentIntent(paymentIntentId);
         canUseSourceTransaction = !!settlementForTransfer.chargeId;
         
-        // Only block if funds are pending AND we cannot use source_transaction
+        // In test mode, always allow transfers (funds are available immediately)
+        // In production, only block if funds are pending AND we cannot use source_transaction
         // When source_transaction is available, Stripe will handle settlement timing automatically
-        if (!settlementForTransfer.isAvailableNow && !canUseSourceTransaction) {
+        const secret = String(process.env.STRIPE_SECRET_KEY || '');
+        const isTestMode = secret.startsWith('sk_test_') || secret.includes('_test_');
+        
+        if (!settlementForTransfer.isAvailableNow && !canUseSourceTransaction && !isTestMode) {
           console.warn('[releasePaymentForOrder] Stripe settlement pending; blocking transfer (no source_transaction available)', {
             orderId,
             paymentIntentId,
@@ -586,6 +664,16 @@ export async function releasePaymentForOrder(
               transferIdempotencyKey: `transfer:${orderId}`,
             },
           };
+        }
+        
+        // In test mode, log that we're proceeding despite pending funds
+        if (isTestMode && !settlementForTransfer.isAvailableNow) {
+          console.log('[releasePaymentForOrder] Test mode: proceeding with transfer despite pending settlement', {
+            orderId,
+            paymentIntentId,
+            chargeId: settlementForTransfer.chargeId,
+            balanceTransactionStatus: settlementForTransfer.balanceTransactionStatus,
+          });
         }
         
         // Log when we're using source_transaction to bypass settlement delay

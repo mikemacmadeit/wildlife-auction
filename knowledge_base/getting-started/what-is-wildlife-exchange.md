@@ -30,7 +30,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 ## What You Can Buy
 
 **Animals & Livestock:**
-- Wildlife & Exotics - Game animals, exotic species
+- Registered & Specialty Livestock - Game animals, registered ranch species
 - Cattle & Livestock - Cattle, goats, sheep, pigs, etc.
 - Horses & Equestrian - Horses, ponies, donkeys, mules
 - Sporting & Working Dogs - Hunting dogs, working breeds
@@ -47,7 +47,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 1. **Browse listings** - Search and filter to find what you want
 2. **Contact sellers** - Ask questions before buying
 3. **Make purchase** - Buy now, bid in auction, or make an offer
-4. **Secure payment** - Payment held until delivery confirmed
+4. **Secure payment** - Payments are processed through the platform and released according to marketplace confirmation and dispute rules
 5. **Receive item** - Pickup, delivery, or professional transport
 6. **Confirm delivery** - Inspect and confirm receipt
 7. **Funds released** - Seller gets paid after confirmation
@@ -68,7 +68,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 ### Security & Protection
 
 **Buyer Protection:**
-- Funds held securely until delivery confirmed
+- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
 - Inspection period to verify item
 - Dispute process if issues arise
 - Refund available if problems can't be resolved
@@ -77,7 +77,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 - Verified buyers
 - Secure payment processing
 - Dispute resolution process
-- Payment held until delivery confirmed
+- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
 
 ### Verification & Trust
 
@@ -123,7 +123,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 - Encrypted and secure
 - Processed through trusted processors
 - Protected by fraud detection
-- Held until delivery confirmed
+- Processed through the platform and released according to marketplace confirmation and dispute rules
 
 ## Why Use Wildlife Exchange?
 

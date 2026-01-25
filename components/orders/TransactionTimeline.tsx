@@ -120,7 +120,7 @@ export function TransactionTimeline(props: {
 
   const steps: TimelineStep[] = useMemo(() => {
     const buyerCopy = {
-      paymentReceived: 'Funds are held securely until delivery and issue windows are complete.',
+      paymentReceived: 'Payments are processed through the platform and released according to marketplace confirmation and dispute rules.',
       prepare: 'Seller is preparing delivery. You’ll confirm receipt once it arrives.',
       inTransit: 'Your order is on the way.',
       delivered: 'Delivery is marked. Confirm receipt or report an issue if needed.',
@@ -242,7 +242,7 @@ export function TransactionTimeline(props: {
         description:
           order.status === 'refunded'
             ? 'Payment was refunded.'
-            : 'Escrow released to the seller. Transaction complete.',
+            : 'Payment released to the seller. Transaction complete.',
         icon: order.status === 'refunded' ? <Undo2 className="h-4 w-4" /> : <DollarSign className="h-4 w-4" />,
         rank: 7,
         // Always show the final step so buyers understand the end-state.

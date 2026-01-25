@@ -3,7 +3,7 @@ import { EXOTIC_SPECIES_OPTIONS } from '@/lib/taxonomy/exotic-species';
 
 export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
-  { value: 'wildlife_exotics', label: 'Wildlife & Exotics' },
+  { value: 'wildlife_exotics', label: 'Registered & Specialty Livestock' },
   { value: 'cattle_livestock', label: 'Cattle & Livestock' },
   { value: 'horse_equestrian', label: 'Horse & Equestrian' },
   { value: 'sporting_working_dogs', label: 'Sporting & Working Dogs' },

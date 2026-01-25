@@ -140,7 +140,7 @@ export default function CompliancePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Exotic animal listings require the following disclosures:
+                Registered livestock listings require the following disclosures:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
                 <li>Animal identification disclosure (proper tagging/identification)</li>
@@ -152,7 +152,7 @@ export default function CompliancePage() {
               <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
                 Species must be from the controlled list (Axis, Fallow, Blackbuck, Aoudad, Nilgai, etc.). 
-                "Other Exotic" species require admin review before listing goes live.
+                "Other" specialty species require admin review before listing goes live.
               </AlertDescription>
             </Alert>
           </CardContent>

@@ -215,6 +215,30 @@ export function buildInAppNotification(params: {
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
+    case 'Order.Delivered': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.Delivered' }>;
+      return {
+        ...base,
+        type: 'order_delivered',
+        title: 'Order delivered',
+        body: `The seller marked your order for "${p.listingTitle}" as delivered. Please confirm receipt.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.Accepted': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.Accepted' }>;
+      return {
+        ...base,
+        type: 'order_accepted',
+        title: 'Order accepted',
+        body: `The buyer accepted your order for "${p.listingTitle}". Funds will be released soon.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'View sale',
+        metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },
+      };
+    }
     case 'Order.DeliveryConfirmed': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryConfirmed' }>;
       return {

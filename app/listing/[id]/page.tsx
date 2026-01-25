@@ -879,7 +879,7 @@ export default function ListingDetailPage() {
                     <Badge
                       variant="default"
                       className="bg-green-600 text-white font-medium gap-1"
-                      title="Protected Transaction: Funds held for payout release until protection period ends or buyer accepts early. Evidence required for disputes."
+                      title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Evidence required for disputes."
                     >
                       <Shield className="h-3 w-3" />
                       Protected {listing!.protectedTransactionDays} Days
@@ -1893,8 +1893,8 @@ export default function ListingDetailPage() {
                         </TooltipProvider>
                       </li>
                       <li>
-                        <span className="font-semibold">Escrow & payout gating:</span>{' '}
-                        Funds are held for payout release. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
+                        <span className="font-semibold">Delayed settlement & payout gating:</span>{' '}
+                        Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
                       </li>
                       <li>
                         <span className="font-semibold">Coordination:</span>{' '}

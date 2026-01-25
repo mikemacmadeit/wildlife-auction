@@ -927,7 +927,7 @@ export default function HomePage() {
               </h1>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
-              Wildlife-first marketplace for Texas livestock, horses &amp; ranch assets
+              Texas-only marketplace for registered livestock, horses &amp; ranch assets
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               <Button
@@ -1240,7 +1240,7 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto md:hidden">
             {[
               { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-9 h-9 icon-primary-color mask-icon-whitetail-breeder" /> },
-              { href: '/browse?category=wildlife_exotics', label: 'Wildlife & Exotics', icon: <div className="w-9 h-9 icon-primary-color mask-icon-fallow" /> },
+              { href: '/browse?category=wildlife_exotics', label: 'Registered & Specialty Livestock', icon: <div className="w-9 h-9 icon-primary-color mask-icon-fallow" /> },
               { href: '/browse?category=cattle_livestock', label: 'Cattle & Livestock', icon: <div className="w-9 h-9 icon-primary-color mask-icon-bull" /> },
               {
                 href: '/browse?category=horse_equestrian',
@@ -1307,7 +1307,7 @@ export default function HomePage() {
               </Link>
             </motion.div>
 
-            {/* Wildlife & Exotics */}
+            {/* Registered & Specialty Livestock */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1319,9 +1319,9 @@ export default function HomePage() {
                     <div className="flex items-center gap-4 md:flex-col md:text-center">
                       <div className="w-16 h-16 icon-primary-color mask-icon-fallow flex-shrink-0" />
                       <div className="min-w-0 flex-1 space-y-1">
-                        <h3 className="text-lg font-bold leading-tight">Wildlife &amp; Exotics</h3>
+                        <h3 className="text-lg font-bold leading-tight">Registered &amp; Specialty Livestock</h3>
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          Axis deer, blackbuck, fallow deer, and other exotic species
+                          Axis deer, blackbuck, fallow deer, and other registered ranch species
                         </p>
                       </div>
                     </div>
@@ -1733,7 +1733,7 @@ export default function HomePage() {
                   Texas-only for animal transactions
                 </span>
                 <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
-                  Escrow + payout gating
+                  Delayed settlement + payout gating
                 </span>
                 <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
                   Equipment can be multi-state

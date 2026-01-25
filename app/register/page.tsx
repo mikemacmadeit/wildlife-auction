@@ -386,7 +386,7 @@ export default function RegisterPage() {
               Create your Wildlife Exchange account
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Join Texas&apos; premier marketplace for exotic and breeder animal sales. Connect with verified sellers and serious buyers.
+              Join Texas&apos; premier marketplace for registered livestock and breeder animal sales. Connect with verified sellers and serious buyers.
             </p>
             <div className="space-y-4 pt-4">
               {[

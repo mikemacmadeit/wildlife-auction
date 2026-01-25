@@ -176,7 +176,7 @@ export default function HowItWorksPage() {
               transition={{ duration: 0.6, delay: 0.6 }}
               className="text-base md:text-lg text-muted-foreground max-w-3xl mx-auto pt-4"
             >
-              Wildlife Exchange connects breeders, ranchers, and buyers across Texas. Whether you're selling trophy whitetail, exotic species, cattle, or equipment, our platform makes listing and buying straightforward and secure.
+              Wildlife Exchange connects breeders, ranchers, and buyers across Texas. Whether you're selling trophy whitetail, registered livestock, cattle, or equipment, our platform makes listing and buying straightforward and secure.
             </motion.p>
 
             <motion.div

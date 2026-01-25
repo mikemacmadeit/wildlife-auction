@@ -12,6 +12,9 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { getSiteUrl } from '@/lib/site-url';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -133,6 +136,34 @@ export async function POST(
     }
 
     await orderRef.update(updateData);
+
+    // Emit notification to seller
+    try {
+      const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
+      const listingTitle = listingDoc.data()?.title || 'Your listing';
+      const amount = typeof orderData.amount === 'number' ? orderData.amount : 0;
+      const ev = await emitAndProcessEventForUser({
+        type: 'Order.Accepted',
+        actorId: buyerId,
+        entityType: 'order',
+        entityId: orderId,
+        targetUserId: orderData.sellerId,
+        payload: {
+          type: 'Order.Accepted',
+          orderId,
+          listingId: orderData.listingId,
+          listingTitle,
+          orderUrl: `${getSiteUrl()}/seller/orders/${orderId}`,
+          amount,
+        },
+        optionalHash: `accepted:${now.toISOString()}`,
+      });
+      if (ev?.ok && ev.created) {
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+      }
+    } catch (e) {
+      console.error('Error emitting Order.Accepted notification event:', e);
+    }
 
     return json({
       success: true,

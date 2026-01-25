@@ -53,16 +53,16 @@ const foundersGrotesk = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
-  title: 'Wildlife Exchange | Texas Exotic & Breeder Animal Marketplace',
-  description: 'Buy and sell exotics, breeder stock, and ranch essentials across Texas. Auctions, fixed price, and classifieds—built for serious buyers and sellers.',
+  title: 'Wildlife Exchange | Texas Livestock & Ranch Marketplace',
+  description: 'Buy and sell registered livestock, breeder stock, and ranch essentials across Texas. Auctions, fixed price, and classifieds—built for serious buyers and sellers.',
   // Icons can be added when favicon files are placed in /public/logos/
   // icons: {
   //   icon: '/logos/favicon.ico',
   //   apple: '/logos/apple-touch-icon.png',
   // },
   openGraph: {
-    title: 'Wildlife Exchange | Texas Exotic & Breeder Animal Marketplace',
-    description: 'Texas marketplace for exotic and breeder animal sales. Verified sellers, transparent listings, secure transactions.',
+    title: 'Wildlife Exchange | Texas Livestock & Ranch Marketplace',
+    description: 'Texas-only marketplace for registered livestock and ranch animal sales. Verified sellers, transparent listings, secure transactions.',
     type: 'website',
     // Uncomment and update when OG image is added to /public/images/
     // images: [
@@ -70,14 +70,14 @@ export const metadata: Metadata = {
     //     url: '/images/og-image.jpg',
     //     width: 1200,
     //     height: 630,
-    //     alt: 'Wildlife Exchange - Texas Exotic & Breeder Animal Marketplace',
+    //     alt: 'Wildlife Exchange - Texas Livestock & Ranch Marketplace',
     //   },
     // ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Wildlife Exchange | Texas Exotic & Breeder Animal Marketplace',
-    description: 'Texas marketplace for exotic and breeder animal sales. Verified sellers, transparent listings.',
+    title: 'Wildlife Exchange | Texas Livestock & Ranch Marketplace',
+    description: 'Texas-only marketplace for registered livestock and ranch animal sales. Verified sellers, transparent listings.',
     // Uncomment when Twitter image is added
     // images: ['/images/og-image.jpg'],
   },

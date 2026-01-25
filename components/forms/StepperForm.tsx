@@ -22,6 +22,7 @@ interface StepperFormProps {
   className?: string;
   showProgress?: boolean;
   allowStepJump?: boolean; // Allow clicking on any step to jump to it
+  completedStepIds?: string[]; // Optional: restrict step jumping to only these completed step IDs (for new listings)
   onSave?: () => void | Promise<void>; // Optional save handler for any step (uses parent's formData)
   saving?: boolean; // Loading state for save operation
   showSaveButton?: boolean; // Whether to show save button on each step
@@ -41,6 +42,7 @@ export function StepperForm({
   className,
   showProgress = true,
   allowStepJump = false,
+  completedStepIds = [],
   onSave,
   saving = false,
   showSaveButton = false,
@@ -104,9 +106,22 @@ export function StepperForm({
   };
 
   const handleStepClick = (index: number) => {
-    if (allowStepJump && index !== currentStep) {
-      setCurrentStep(index);
+    if (!allowStepJump) return;
+    if (index === currentStep) return;
+    
+    // If completedStepIds is provided, only allow jumping to completed steps or the current step
+    if (completedStepIds.length > 0) {
+      const stepId = steps[index].id;
+      const isCompleted = completedStepIds.includes(stepId);
+      const isCurrentOrBefore = index <= currentStep;
+      
+      // Allow clicking on: completed steps, current step, or any step before current
+      if (!isCompleted && !isCurrentOrBefore) {
+        return; // Don't allow jumping to uncompleted future steps
+      }
     }
+    
+    setCurrentStep(index);
   };
 
   return (
@@ -126,46 +141,60 @@ export function StepperForm({
           
           {/* Step Indicators */}
           <div className="flex items-center justify-between pt-2">
-            {steps.map((step, index) => (
-              <div
-                key={step.id}
-                className={cn(
-                  'flex flex-col items-center flex-1',
-                  index < steps.length - 1 && 'pr-2'
-                )}
-              >
+            {steps.map((step, index) => {
+              // Determine if this step is clickable
+              const isClickable = allowStepJump && (() => {
+                if (completedStepIds.length === 0) return true; // All steps clickable if no restrictions
+                const isCompleted = completedStepIds.includes(step.id);
+                const isCurrentOrBefore = index <= currentStep;
+                return isCompleted || isCurrentOrBefore;
+              })();
+              
+              return (
                 <div
-                  onClick={() => handleStepClick(index)}
+                  key={step.id}
                   className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
-                    index < currentStep
-                      ? 'bg-primary text-primary-foreground'
-                      : index === currentStep
-                      ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                      : 'bg-muted text-muted-foreground',
-                    attention.has(step.id) && index !== currentStep
-                      ? 'ring-4 ring-destructive/20 border border-destructive text-destructive bg-destructive/10'
-                      : null,
-                    allowStepJump && 'cursor-pointer hover:scale-110 hover:ring-2 hover:ring-primary/30'
+                    'flex flex-col items-center flex-1',
+                    index < steps.length - 1 && 'pr-2'
                   )}
                 >
-                  {index < currentStep ? '✓' : index + 1}
+                  <div
+                    onClick={() => handleStepClick(index)}
+                    className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
+                      index < currentStep
+                        ? 'bg-primary text-primary-foreground'
+                        : index === currentStep
+                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
+                        : 'bg-muted text-muted-foreground',
+                      attention.has(step.id) && index !== currentStep
+                        ? 'ring-4 ring-destructive/20 border border-destructive text-destructive bg-destructive/10'
+                        : null,
+                      isClickable
+                        ? 'cursor-pointer hover:scale-110 hover:ring-2 hover:ring-primary/30'
+                        : 'cursor-not-allowed opacity-50'
+                    )}
+                  >
+                    {index < currentStep ? '✓' : index + 1}
+                  </div>
+                  <span
+                    onClick={() => handleStepClick(index)}
+                    className={cn(
+                      'text-xs mt-1 text-center hidden sm:block truncate max-w-[80px]',
+                      index === currentStep
+                        ? 'font-semibold text-foreground'
+                        : 'text-muted-foreground',
+                      attention.has(step.id) && index !== currentStep ? 'font-semibold text-destructive' : null,
+                      isClickable
+                        ? 'cursor-pointer hover:text-foreground transition-colors'
+                        : 'cursor-not-allowed opacity-50'
+                    )}
+                  >
+                    {step.title}
+                  </span>
                 </div>
-                <span
-                  onClick={() => handleStepClick(index)}
-                  className={cn(
-                    'text-xs mt-1 text-center hidden sm:block truncate max-w-[80px]',
-                    index === currentStep
-                      ? 'font-semibold text-foreground'
-                      : 'text-muted-foreground',
-                    attention.has(step.id) && index !== currentStep ? 'font-semibold text-destructive' : null,
-                    allowStepJump && 'cursor-pointer hover:text-foreground transition-colors'
-                  )}
-                >
-                  {step.title}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

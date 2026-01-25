@@ -41,7 +41,7 @@ Select how you want to sell:
 
 Choose the appropriate category for your animal:
 
-- **Wildlife & Exotics** - Exotic animals, game animals
+- **Registered & Specialty Livestock** - Registered ranch species, game animals
 - **Cattle & Livestock** - Cattle, goats, sheep, pigs, etc.
 - **Horses & Equestrian** - Horses, ponies, donkeys, mules
 - **Sporting & Working Dogs** - Hunting dogs, working dogs, etc.

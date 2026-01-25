@@ -174,11 +174,11 @@ export default function WildlifeExoticsBrowsePage() {
           <div className="flex items-center gap-3 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
             <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
-              Wildlife & Exotics
+              Registered & Specialty Livestock
             </h1>
           </div>
           <p className="text-base md:text-lg text-muted-foreground">
-            Browse axis deer, blackbuck, fallow deer, and other exotic species
+            Browse axis deer, blackbuck, fallow deer, and other registered ranch species
           </p>
         </div>
 
@@ -239,7 +239,7 @@ export default function WildlifeExoticsBrowsePage() {
               <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">No listings found</h3>
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? 'Try adjusting your search query.' : 'No wildlife & exotics listings available at this time.'}
+                {searchQuery ? 'Try adjusting your search query.' : 'No registered & specialty livestock listings available at this time.'}
               </p>
             </CardContent>
           </Card>

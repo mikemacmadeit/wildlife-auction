@@ -102,21 +102,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, currentSpeciesId]);
 
-  // Ensure wildlife exotics disclosure fields default to false (not undefined) for proper validation
-  const currentAnimalIdDisclosure = (attributes as Partial<WildlifeAttributes>).animalIdDisclosure;
-  const currentHealthDisclosure = (attributes as Partial<WildlifeAttributes>).healthDisclosure;
-  const currentTransportDisclosure = (attributes as Partial<WildlifeAttributes>).transportDisclosure;
-  useEffect(() => {
-    if (category !== 'wildlife_exotics') return;
-    const updates: Partial<WildlifeAttributes> = {};
-    if (currentAnimalIdDisclosure === undefined) updates.animalIdDisclosure = false;
-    if (currentHealthDisclosure === undefined) updates.healthDisclosure = false;
-    if (currentTransportDisclosure === undefined) updates.transportDisclosure = false;
-    if (Object.keys(updates).length > 0) {
-      onChange({ ...attributes, ...updates });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, currentAnimalIdDisclosure, currentHealthDisclosure, currentTransportDisclosure]);
+  // Disclosures are now handled in the final seller acknowledgment step, not in the attributes form
 
 
   if (category === 'horse_equestrian') {
@@ -272,30 +258,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           <p className="text-xs text-muted-foreground">At least one identifier is strongly recommended (microchip/brand/tattoo/markings).</p>
         </div>
 
-        <div className={cn('space-y-3 p-4 border rounded-lg bg-muted/50', hasError('Disclosures') ? 'border-destructive border-2' : 'border-border/60')}>
-          <div className="font-semibold text-sm">Required disclosures</div>
-          <div className="space-y-2">
-            {[
-              { key: 'identificationDisclosure', label: 'I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).' },
-              { key: 'healthDisclosure', label: 'I have disclosed any known health issues and represented the horse honestly.' },
-              { key: 'transportDisclosure', label: 'I understand transfers are Texas-only on this platform and transport is my responsibility.' },
-              { key: 'titleOrLienDisclosure', label: 'I disclose any liens/encumbrances (or confirm there are none).' },
-            ].map((d) => (
-              <div key={d.key} className="flex items-start gap-2">
-                <Checkbox
-                  id={`horse-disclosure-${d.key}`}
-                  checked={Boolean((attributes as any)?.disclosures?.[d.key])}
-                  onCheckedChange={(v) =>
-                    updateAttribute('disclosures', { ...(attributes as any)?.disclosures, [d.key]: Boolean(v) })
-                  }
-                />
-                <Label htmlFor={`horse-disclosure-${d.key}`} className="text-sm leading-relaxed">
-                  {d.label}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Disclosures are now handled in the final seller acknowledgment step, not in the attributes form */}
 
         <div className="space-y-2">
           <Label htmlFor="horse-quantity" className="text-base font-semibold">
@@ -572,7 +535,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         <Alert className="bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            <strong>TAHC Compliance:</strong> Exotic animal transactions are Texas-only. You must provide identification, health, and transport disclosures.
+            <strong>TAHC Compliance:</strong> Registered livestock transactions are Texas-only. You must provide identification, health, and transport disclosures.
           </AlertDescription>
         </Alert>
 
@@ -690,64 +653,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
-        <div
-          className={cn(
-            'space-y-4 p-4 border rounded-lg bg-muted/50',
-            (hasError('Animal Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) &&
-              'border-destructive border-2'
-          )}
-        >
-          <Label className="text-base font-semibold">
-            TAHC Compliance Disclosures <span className="text-destructive">*</span>
-          </Label>
-          {(hasError('Animal Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? (
-            <p className="text-sm text-destructive">All disclosures are required</p>
-          ) : null}
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="animal-id-disclosure"
-                checked={Boolean((attributes as Partial<WildlifeAttributes>).animalIdDisclosure)}
-                onCheckedChange={(checked) => updateAttribute('animalIdDisclosure', Boolean(checked))}
-                className={hasError('Animal Identification Disclosure') ? 'border-destructive' : ''}
-              />
-              <Label htmlFor="animal-id-disclosure" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Animal Identification Disclosure</div>
-                <div className="text-sm text-muted-foreground">
-                  I confirm that animals are properly identified/tagged as required by TAHC regulations
-                </div>
-              </Label>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="health-disclosure"
-                checked={Boolean((attributes as Partial<WildlifeAttributes>).healthDisclosure)}
-                onCheckedChange={(checked) => updateAttribute('healthDisclosure', Boolean(checked))}
-                className={hasError('Health Disclosure') ? 'border-destructive' : ''}
-              />
-              <Label htmlFor="health-disclosure" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Health Disclosure</div>
-                <div className="text-sm text-muted-foreground">
-                  I acknowledge health disclosure requirements for exotic animals
-                </div>
-              </Label>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="transport-disclosure"
-                checked={Boolean((attributes as Partial<WildlifeAttributes>).transportDisclosure)}
-                onCheckedChange={(checked) => updateAttribute('transportDisclosure', Boolean(checked))}
-                className={hasError('Transport Disclosure') ? 'border-destructive' : ''}
-              />
-              <Label htmlFor="transport-disclosure" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Transport Disclosure (Texas-Only)</div>
-                <div className="text-sm text-muted-foreground">
-                  I confirm that transfer is Texas-only unless otherwise permitted by regulations
-                </div>
-              </Label>
-            </div>
-          </div>
-        </div>
+        {/* Disclosures are now handled in the final seller acknowledgment step, not in the attributes form */}
       </div>
     );
   }
@@ -933,49 +839,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
-        <div
-          className={cn(
-            'space-y-4 p-4 border rounded-lg bg-muted/50',
-            (hasError('Identification Disclosure') || hasError('Health Disclosure')) && 'border-destructive border-2'
-          )}
-        >
-          <Label className="text-base font-semibold">
-            Compliance Disclosures <span className="text-destructive">*</span>
-          </Label>
-          {(hasError('Identification Disclosure') || hasError('Health Disclosure')) ? (
-            <p className="text-sm text-destructive">All disclosures are required</p>
-          ) : null}
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="identification-disclosure"
-                checked={(attributes as Partial<CattleAttributes>).identificationDisclosure || false}
-                onCheckedChange={(checked) => updateAttribute('identificationDisclosure', checked)}
-                className={hasError('Identification Disclosure') ? 'border-destructive' : ''}
-              />
-              <Label htmlFor="identification-disclosure" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Identification Disclosure</div>
-                <div className="text-sm text-muted-foreground">
-                  I confirm that animals have proper ear tags/brand identification as required
-                </div>
-              </Label>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="cattle-health-disclosure"
-                checked={(attributes as Partial<CattleAttributes>).healthDisclosure || false}
-                onCheckedChange={(checked) => updateAttribute('healthDisclosure', checked)}
-                className={hasError('Health Disclosure') ? 'border-destructive' : ''}
-              />
-              <Label htmlFor="cattle-health-disclosure" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Health Disclosure</div>
-                <div className="text-sm text-muted-foreground">
-                  I acknowledge health disclosure requirements for livestock
-                </div>
-              </Label>
-            </div>
-          </div>
-        </div>
+        {/* Disclosures are now handled in the final seller acknowledgment step, not in the attributes form */}
       </div>
     );
   }

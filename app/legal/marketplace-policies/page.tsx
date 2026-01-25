@@ -43,7 +43,7 @@ export default function MarketplacePoliciesPage() {
           </CardHeader>
           <CardContent className="space-y-5 text-sm text-muted-foreground">
             <div className="space-y-2">
-              <div className="font-semibold text-foreground">Animal categories (whitetail, exotics, livestock, horses, dogs)</div>
+              <div className="font-semibold text-foreground">Animal categories (whitetail, registered livestock, cattle, horses, dogs)</div>
               <ul className="list-disc ml-5 space-y-1">
                 <li>Wildlife Exchange does not take custody, possession, or control of any animal at any time.</li>
                 <li>Health, genetics, temperament, training, and legality representations are made solely by the seller.</li>
@@ -71,8 +71,8 @@ export default function MarketplacePoliciesPage() {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Prohibited listings include (not exhaustive): hunting tags/licenses/permits for sale, wild-caught protected wildlife,
-                venison/meat products, illegal wildlife products, stolen goods, and any listing that violates applicable law.
+                Prohibited listings include (not exhaustive): hunting tags/licenses/permits for sale, wild-caught protected species,
+                venison/meat products, illegal animal products, stolen goods, endangered or protected species, and any listing that violates applicable law.
               </AlertDescription>
             </Alert>
             <p>
