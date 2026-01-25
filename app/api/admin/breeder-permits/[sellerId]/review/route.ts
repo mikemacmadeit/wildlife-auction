@@ -33,9 +33,18 @@ export async function POST(request: Request, { params }: { params: { sellerId: s
 
   const permitRef = db.collection('sellerPermits').doc(sellerId);
   const snap = await permitRef.get();
-  if (!snap.exists) return json({ ok: false, error: 'Permit submission not found' }, { status: 404 });
+  if (!snap.exists) {
+    console.error(`[breeder-permits/review] Permit not found for sellerId: ${sellerId}`);
+    return json({ ok: false, error: 'Permit submission not found' }, { status: 404 });
+  }
 
   const before = snap.data() as any;
+  console.log(`[breeder-permits/review] Before update for sellerId ${sellerId}:`, {
+    currentStatus: before?.status,
+    newStatus: status,
+    hasExpiresAt: !!expiresAt,
+  });
+  
   const now = Timestamp.now();
 
   const update: Record<string, any> = {
@@ -48,6 +57,12 @@ export async function POST(request: Request, { params }: { params: { sellerId: s
   };
 
   await permitRef.update(update);
+  console.log(`[breeder-permits/review] Updated sellerPermits document for sellerId ${sellerId} with status: ${status}`);
+  
+  // Verify the update was successful
+  const verifySnap = await permitRef.get();
+  const verifyData = verifySnap.data() as any;
+  console.log(`[breeder-permits/review] Verification - permit status after update:`, verifyData?.status);
 
   // Update public seller trust badge (server-authored doc).
   try {
