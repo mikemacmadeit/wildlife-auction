@@ -14,6 +14,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { uploadSellerPermitDocument, type DocumentUploadProgress } from '@/lib/firebase/storage-documents';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 type PermitStatus = 'pending' | 'verified' | 'rejected';
 
@@ -63,10 +65,13 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
       const res = await fetch('/api/seller/breeder-permit', { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || json?.message || 'Failed to load breeder permit');
-      setPermit(json?.permit || null);
-      setPermitNumber(String(json?.permit?.permitNumber || ''));
-      setExpiresAt(json?.permit?.expiresAt ? String(json.permit.expiresAt).slice(0, 10) : '');
+      const permitData = json?.permit || null;
+      console.log('[BreederPermitCard] Loaded permit:', permitData);
+      setPermit(permitData);
+      setPermitNumber(String(permitData?.permitNumber || ''));
+      setExpiresAt(permitData?.expiresAt ? String(permitData.expiresAt).slice(0, 10) : '');
     } catch (e: any) {
+      console.error('[BreederPermitCard] Error loading permit:', e);
       setPermit(null);
       setError(e?.message || 'Failed to load breeder permit');
     } finally {
@@ -74,13 +79,60 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
     }
   }, [user?.uid]);
 
+  // Use real-time listener for immediate updates when permit is approved
   useEffect(() => {
     if (!user?.uid) {
       setLoading(false);
       setPermit(null);
       return;
     }
+    
+    // Initial load
     load();
+    
+    // Set up real-time listener for immediate updates
+    const { doc, onSnapshot } = require('firebase/firestore');
+    const { db } = require('@/lib/firebase/config');
+    const permitRef = doc(db, 'sellerPermits', user.uid);
+    
+    const unsubscribe = onSnapshot(
+      permitRef,
+      (snap) => {
+        if (!snap.exists()) {
+          setPermit(null);
+          return;
+        }
+        const data = snap.data() as any;
+        const permitData: SellerPermit = {
+          sellerId: user.uid,
+          status: data?.status || 'pending',
+          permitNumber: data?.permitNumber || null,
+          documentUrl: data?.documentUrl || null,
+          storagePath: data?.storagePath || null,
+          rejectionReason: data?.rejectionReason || null,
+          expiresAt: data?.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : (data?.expiresAt instanceof Date ? data.expiresAt.toISOString() : null),
+          uploadedAt: data?.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data?.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
+          reviewedAt: data?.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data?.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : null),
+          reviewedBy: data?.reviewedBy || null,
+          updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data?.updatedAt instanceof Date ? data.updatedAt.toISOString() : null),
+        };
+        console.log('[BreederPermitCard] Real-time permit update:', permitData);
+        setPermit(permitData);
+        setPermitNumber(String(permitData.permitNumber || ''));
+        setExpiresAt(permitData.expiresAt ? String(permitData.expiresAt).slice(0, 10) : '');
+        setLoading(false);
+      },
+      (error) => {
+        console.error('[BreederPermitCard] Error in real-time listener:', error);
+        // Fall back to periodic refresh if listener fails
+        const interval = setInterval(() => {
+          load();
+        }, 10000); // Refresh every 10 seconds as fallback
+        return () => clearInterval(interval);
+      }
+    );
+    
+    return () => unsubscribe();
   }, [user?.uid, load]);
 
   const onFile = (f: File | null) => {

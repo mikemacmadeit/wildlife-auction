@@ -273,15 +273,6 @@ export default function AdminCompliancePage() {
   const loadPendingOrders = async () => {
     // Get whitetail_breeder orders that need transfer approval
     const ordersRef = collection(db, 'orders');
-    const q = query(
-      ordersRef,
-      where('transferPermitRequired', '==', true),
-      where('transferPermitStatus', 'in', ['none', 'uploaded']),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const snapshot = await getDocs(q);
-    const pendingOrders: Order[] = [];
     
     // Helper function to safely convert Firestore Timestamp to Date
     const toDate = (value: any): Date | undefined => {
@@ -291,31 +282,104 @@ export default function AdminCompliancePage() {
       return undefined;
     };
     
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      pendingOrders.push({
-        id: docSnap.id,
-        ...data,
-        createdAt: toDate(data.createdAt) || new Date(),
-        updatedAt: toDate(data.updatedAt) || new Date(),
-        paidAt: toDate(data.paidAt),
-      } as Order);
-    });
+    let pendingOrders: Order[] = [];
+    
+    // Try the composite index query first, fall back if index is missing
+    try {
+      const q = query(
+        ordersRef,
+        where('transferPermitRequired', '==', true),
+        where('transferPermitStatus', 'in', ['none', 'uploaded']),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        pendingOrders.push({
+          id: docSnap.id,
+          ...data,
+          createdAt: toDate(data.createdAt) || new Date(),
+          updatedAt: toDate(data.updatedAt) || new Date(),
+          paidAt: toDate(data.paidAt),
+        } as Order);
+      });
+    } catch (error: any) {
+      // Check if it's a missing index error
+      const errorMsg = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      const isMissingIndex = errorCode === 'failed-precondition' || 
+                            errorMsg.includes('requires an index') || 
+                            errorMsg.includes('failed-precondition');
+      
+      if (isMissingIndex) {
+        console.warn('Composite index missing for orders query, using fallback:', error);
+        // Fallback: query without orderBy, then sort in memory
+        try {
+          const qFallback = query(
+            ordersRef,
+            where('transferPermitRequired', '==', true),
+            where('transferPermitStatus', 'in', ['none', 'uploaded'])
+          );
+          const snapshot = await getDocs(qFallback);
+          const allOrders: Order[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            allOrders.push({
+              id: docSnap.id,
+              ...data,
+              createdAt: toDate(data.createdAt) || new Date(),
+              updatedAt: toDate(data.updatedAt) || new Date(),
+              paidAt: toDate(data.paidAt),
+            } as Order);
+          });
+          // Sort by createdAt descending in memory
+          allOrders.sort((a, b) => {
+            const aTime = a.createdAt?.getTime() || 0;
+            const bTime = b.createdAt?.getTime() || 0;
+            return bTime - aTime;
+          });
+          pendingOrders = allOrders;
+        } catch (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          toast({
+            title: 'Error loading orders',
+            description: 'Failed to load orders requiring transfer approval. Please create the required Firestore index.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        // Re-throw if it's not a missing index error
+        throw error;
+      }
+    }
     
     setOrders(pendingOrders);
   };
 
   const loadBreederPermits = async () => {
     if (!user?.uid) return;
-    const token = await user.getIdToken();
-    const res = await fetch('/api/admin/breeder-permits?status=pending&limit=50', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const jsonRes = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(jsonRes?.error || jsonRes?.message || `Failed to load breeder permits (HTTP ${res.status})`);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/admin/breeder-permits?status=pending&limit=50', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const jsonRes = await res.json().catch(() => null);
+      if (!res.ok) {
+        console.error('Failed to load breeder permits:', jsonRes);
+        throw new Error(jsonRes?.error || jsonRes?.message || `Failed to load breeder permits (HTTP ${res.status})`);
+      }
+      const permits = Array.isArray(jsonRes?.permits) ? jsonRes.permits : [];
+      console.log('[Admin Compliance] Loaded breeder permits:', permits.length, permits);
+      setBreederPermits(permits);
+    } catch (error) {
+      console.error('Error loading breeder permits:', error);
+      setBreederPermits([]);
+      toast({
+        title: 'Error loading permits',
+        description: error instanceof Error ? error.message : 'Failed to load breeder permits',
+        variant: 'destructive',
+      });
     }
-    setBreederPermits(Array.isArray(jsonRes?.permits) ? jsonRes.permits : []);
   };
 
   const loadApprovedPermits = async () => {
@@ -1172,10 +1236,16 @@ export default function AdminCompliancePage() {
                           body: JSON.stringify({ status: 'verified' }),
                         });
                         const j = await res.json().catch(() => ({}));
-                        if (!res.ok) throw new Error(j?.error || j?.message || 'Failed to approve permit');
-                        toast({ title: 'Approved', description: 'Breeder permit verified. Badge applied.' });
+                        if (!res.ok) {
+                          console.error('[Admin Compliance] Failed to approve permit:', j);
+                          throw new Error(j?.error || j?.message || 'Failed to approve permit');
+                        }
+                        console.log('[Admin Compliance] Permit approved successfully:', selectedPermit.sellerId, j);
+                        toast({ title: 'Approved', description: 'Breeder permit verified. Badge applied. The seller can now create whitetail listings.' });
                         setPermitDialogOpen(false);
-                        await loadBreederPermits();
+                        setSelectedPermit(null);
+                        // Reload both pending and approved permits to reflect the change
+                        await Promise.all([loadBreederPermits(), loadApprovedPermits()]);
                       } catch (e: any) {
                         toast({ title: 'Error', description: e?.message || 'Failed to approve permit', variant: 'destructive' });
                       } finally {
