@@ -75,8 +75,10 @@ export async function POST(request: Request) {
       const trustDoc = await db.collection('publicSellerTrust').doc(userId).get();
       if (trustDoc.exists) {
         const trustData = trustDoc.data();
-        completedSalesCount = typeof trustData?.completedSalesCount === 'number' ? trustData.completedSalesCount : 0;
-        badges = Array.isArray(trustData?.badgeIds) ? (trustData.badgeIds as string[]) : [];
+        if (trustData) {
+          completedSalesCount = typeof trustData.completedSalesCount === 'number' ? trustData.completedSalesCount : 0;
+          badges = Array.isArray(trustData.badgeIds) ? (trustData.badgeIds as string[]) : [];
+        }
       }
     } catch {
       // Best effort - use defaults if we can't read it
