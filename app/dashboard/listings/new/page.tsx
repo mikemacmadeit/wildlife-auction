@@ -465,34 +465,124 @@ function NewListingPageContent() {
     // Real-time listener for TPWD permit status (controls whitetail category gating in Create Listing)
     // This ensures the category becomes available immediately when a permit is approved
     const permitRef = doc(db, 'sellerPermits', user.uid);
-    const unsubscribe = onSnapshot(
+    const trustRef = doc(db, 'publicSellerTrust', user.uid);
+    
+    // Listen to both sellerPermits and publicSellerTrust for redundancy
+    const unsubscribePermit = onSnapshot(
       permitRef,
       (snap) => {
         if (!snap.exists()) {
-          setTpwdPermit(null);
+          console.log('[TPWD Permit] Document does not exist for user:', user.uid);
+          // Don't set to null here - check trust doc first as fallback
           return;
         }
         const data = snap.data() as any;
+        console.log('[TPWD Permit] Document data:', { 
+          status: data?.status, 
+          expiresAt: data?.expiresAt,
+          hasStatus: !!data?.status 
+        });
+        
         if (!data?.status) {
-          setTpwdPermit(null);
+          console.warn('[TPWD Permit] Document exists but has no status field');
           return;
         }
-        setTpwdPermit({
+        
+        const permitData = {
           status: data.status,
           rejectionReason: data.rejectionReason || null,
           expiresAt: data.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : (data.expiresAt instanceof Date ? data.expiresAt.toISOString() : null),
           uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
           reviewedAt: data.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : null),
-        });
+        };
+        
+        console.log('[TPWD Permit] Setting permit data from sellerPermits:', permitData);
+        setTpwdPermit(permitData);
       },
       (error) => {
-        console.error('Error listening to breeder permit:', error);
-        setTpwdPermit(null);
+        console.error('[TPWD Permit] Error listening to breeder permit:', error);
+        // If there's a permissions error, try to fetch once as a fallback
+        if (error?.code === 'permission-denied') {
+          console.warn('[TPWD Permit] Permission denied, attempting one-time fetch as fallback');
+          getDoc(permitRef)
+            .then((snap) => {
+              if (snap.exists()) {
+                const data = snap.data() as any;
+                if (data?.status) {
+                  setTpwdPermit({
+                    status: data.status,
+                    rejectionReason: data.rejectionReason || null,
+                    expiresAt: data.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : (data.expiresAt instanceof Date ? data.expiresAt.toISOString() : null),
+                    uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
+                    reviewedAt: data.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : null),
+                  });
+                }
+              }
+            })
+            .catch((fetchError) => {
+              console.error('[TPWD Permit] Fallback fetch also failed:', fetchError);
+            });
+        }
       }
     );
     
-    return () => unsubscribe();
-  }, [user?.uid]);
+    // Also listen to publicSellerTrust as a fallback - this is updated when permit is approved
+    const unsubscribeTrust = onSnapshot(
+      trustRef,
+      (snap) => {
+        if (!snap.exists()) {
+          // If trust doc doesn't exist and permit doc also doesn't exist, then no permit
+          getDoc(permitRef).then((permitSnap) => {
+            if (!permitSnap.exists()) {
+              setTpwdPermit(null);
+            }
+          });
+          return;
+        }
+        const data = snap.data() as any;
+        const badgeIds = Array.isArray(data?.badgeIds) ? data.badgeIds : [];
+        const hasPermitBadge = badgeIds.includes('tpwd_breeder_permit_verified');
+        const permitInfo = data?.tpwdBreederPermit;
+        
+        // If we have the badge, but don't have permit data from sellerPermits, infer it from trust doc
+        if (hasPermitBadge && permitInfo) {
+          const currentPermit = tpwdPermit;
+          // Only update if we don't already have permit data or if status is different
+          if (!currentPermit || currentPermit.status !== 'verified') {
+            const expiresAt = permitInfo?.expiresAt?.toDate 
+              ? permitInfo.expiresAt.toDate().toISOString() 
+              : (permitInfo?.expiresAt instanceof Date ? permitInfo.expiresAt.toISOString() : null);
+            
+            const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+            
+            if (!isExpired) {
+              console.log('[TPWD Permit] Setting permit data from publicSellerTrust (fallback):', {
+                status: 'verified',
+                expiresAt,
+              });
+              setTpwdPermit({
+                status: 'verified',
+                rejectionReason: null,
+                expiresAt,
+                uploadedAt: null,
+                reviewedAt: permitInfo?.verifiedAt?.toDate 
+                  ? permitInfo.verifiedAt.toDate().toISOString() 
+                  : (permitInfo?.verifiedAt instanceof Date ? permitInfo.verifiedAt.toISOString() : null),
+              });
+            }
+          }
+        }
+      },
+      (error) => {
+        console.error('[TPWD Permit] Error listening to publicSellerTrust:', error);
+      }
+    );
+    
+    return () => {
+      unsubscribePermit();
+      unsubscribeTrust();
+    };
+  }, [user?.uid, tpwdPermit]);
 
   const payoutsReady =
     !!userProfile?.stripeAccountId &&
@@ -508,6 +598,16 @@ function NewListingPageContent() {
     : false;
   
   const canSelectWhitetail = whitetailPermitStatus === 'verified' && !isPermitExpired;
+  
+  // Debug logging for permit status
+  useEffect(() => {
+    console.log('[TPWD Permit Status]', {
+      whitetailPermitStatus,
+      isPermitExpired,
+      canSelectWhitetail,
+      permitData: tpwdPermit,
+    });
+  }, [whitetailPermitStatus, isPermitExpired, canSelectWhitetail, tpwdPermit]);
 
   const numberFromInput = (raw: string): number | null => {
     const s = String(raw || '').trim();

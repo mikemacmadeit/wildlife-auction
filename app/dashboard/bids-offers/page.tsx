@@ -33,7 +33,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { getMyBids, placeBidServer, type MyBidRow } from '@/lib/api/bids';
-import { getMyOffers } from '@/lib/offers/api';
+import { getMyOffers, getSellerOffers } from '@/lib/offers/api';
 import { createCheckoutSession, createWireIntent } from '@/lib/stripe/api';
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
@@ -185,9 +185,10 @@ export default function BidsOffersPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const [bidsRes, offersRes] = await Promise.allSettled([
+      const [bidsRes, buyerOffersRes, sellerOffersRes] = await Promise.allSettled([
         getMyBids({ limit: 100 }),
         getMyOffers({ limit: 100 }),
+        getSellerOffers({ limit: 100 }),
       ]);
 
       // Bids: never let offers failure blank out bids
@@ -202,12 +203,16 @@ export default function BidsOffersPage() {
         toast({ title: 'Bids unavailable', description: bidsRes.reason?.message || 'Failed to load bids', variant: 'destructive' });
       }
 
-      // Offers: surface common blocker (email not verified)
-      if (offersRes.status === 'fulfilled') {
-        setOffers((offersRes.value?.offers || []) as OfferRow[]);
+      // Offers: combine buyer and seller offers, surface common blocker (email not verified)
+      const buyerOffers = buyerOffersRes.status === 'fulfilled' ? (buyerOffersRes.value?.offers || []) : [];
+      const sellerOffers = sellerOffersRes.status === 'fulfilled' ? (sellerOffersRes.value?.offers || []) : [];
+      const allOffers = [...buyerOffers, ...sellerOffers] as OfferRow[];
+      
+      if (buyerOffersRes.status === 'fulfilled' || sellerOffersRes.status === 'fulfilled') {
+        setOffers(allOffers);
       } else {
         setOffers([]);
-        const msg = String(offersRes.reason?.message || 'Failed to load offers');
+        const msg = String(buyerOffersRes.reason?.message || sellerOffersRes.reason?.message || 'Failed to load offers');
         toast({
           title: msg.toLowerCase().includes('verify') ? 'Email verification required' : 'Offers unavailable',
           description: msg.toLowerCase().includes('verify')
@@ -351,9 +356,28 @@ export default function BidsOffersPage() {
   const normalizedQuery = query.trim().toLowerCase();
 
   const needsAction = useMemo(() => {
+    if (!user?.uid) return [];
     const list = rows.filter((r) => {
       if (r.type === 'bid') return r.status === 'OUTBID';
-      return r.status === 'COUNTERED' || r.status === 'ACCEPTED';
+      // For offers: determine if user is seller or buyer, then filter accordingly
+      if (r.type === 'offer') {
+        const offerRow = r.raw as OfferRow;
+        const rawStatus = String(offerRow.status || '').toLowerCase();
+        const isSellerOffer = offerRow.sellerId === user.uid;
+        
+        if (isSellerOffer) {
+          // Seller needs action: new offers (status 'open') or buyer countered seller's counter
+          // offerStatusFromRow maps both to 'SENT', but we also check raw status for accuracy
+          return (
+            r.status === 'SENT' &&
+            (rawStatus === 'open' || (rawStatus === 'countered' && offerRow.lastActorRole === 'buyer'))
+          );
+        } else {
+          // Buyer needs action: seller countered (COUNTERED) or accepted (ACCEPTED)
+          return r.status === 'COUNTERED' || r.status === 'ACCEPTED';
+        }
+      }
+      return false;
     });
     // Prioritize urgent ending soon items first
     return list.sort((a, b) => {
@@ -361,7 +385,7 @@ export default function BidsOffersPage() {
       const bLeft = b.timeLeftMs === null ? Number.POSITIVE_INFINITY : b.timeLeftMs;
       return aLeft - bLeft;
     });
-  }, [rows]);
+  }, [rows, user?.uid]);
 
   const bidRows = useMemo(() => {
     const now = Date.now();

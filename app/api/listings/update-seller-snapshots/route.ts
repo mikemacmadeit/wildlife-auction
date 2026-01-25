@@ -36,53 +36,112 @@ export async function POST(request: Request) {
       // Request body parsing failed or no body, continue to Firestore read
     }
 
-    // If display name wasn't provided in body, read from Firestore
-    if (!displayName) {
-      const userDoc = await db.collection('users').doc(userId).get();
-      if (!userDoc.exists) {
-        return json({ ok: false, error: 'User not found' }, { status: 404 });
-      }
-
-      const userData = userDoc.data();
-      const displayNamePreference = userData?.profile?.preferences?.displayNamePreference || 'personal';
-      
-      // Determine display name based on preference
-      if (displayNamePreference === 'business' && userData?.profile?.businessName?.trim()) {
-        displayName = String(userData.profile.businessName).trim();
-      } else {
-        displayName =
-          (userData?.displayName && String(userData.displayName)) ||
-          (userData?.profile?.fullName && String(userData.profile.fullName)) ||
-          userData?.email?.split('@')[0] ||
-          'Seller';
-      }
+    // Always read user profile to get complete sellerSnapshot data and verify displayName
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return json({ ok: false, error: 'User not found' }, { status: 404 });
     }
 
-    // Get ALL listings for this user (not just active/pending - update all to ensure consistency)
-    // This ensures that if a listing status changes later, it will still have the correct display name
+    const userData = userDoc.data();
+    const displayNamePreference = userData?.profile?.preferences?.displayNamePreference || 'personal';
+    
+    // Always recalculate displayName from Firestore to ensure it matches current preference
+    // This ensures consistency even if the request body has stale data
+    let calculatedDisplayName: string;
+    if (displayNamePreference === 'business' && userData?.profile?.businessName?.trim()) {
+      calculatedDisplayName = String(userData.profile.businessName).trim();
+    } else {
+      calculatedDisplayName =
+        (userData?.displayName && String(userData.displayName)) ||
+        (userData?.profile?.fullName && String(userData.profile.fullName)) ||
+        userData?.email?.split('@')[0] ||
+        'Seller';
+    }
+    
+    // Use calculated displayName (from Firestore) to ensure it's always correct
+    // The request body displayName is just a hint to avoid race conditions, but we verify against Firestore
+    displayName = calculatedDisplayName;
+    
+    // Get other sellerSnapshot fields from user profile for complete update
+    const sellerVerified = userData?.seller?.verified === true || userData?.verified === true;
+    const photoURL = typeof userData?.photoURL === 'string' && userData.photoURL.trim().length > 0 
+      ? String(userData.photoURL) 
+      : null;
+    
+    // Get completed sales count and badges from publicSellerTrust (read once)
+    let completedSalesCount = 0;
+    let badges: string[] = [];
+    try {
+      const trustDoc = await db.collection('publicSellerTrust').doc(userId).get();
+      if (trustDoc.exists) {
+        const trustData = trustDoc.data();
+        completedSalesCount = typeof trustData?.completedSalesCount === 'number' ? trustData.completedSalesCount : 0;
+        badges = Array.isArray(trustData?.badgeIds) ? trustData.badgeIds : [];
+      }
+    } catch {
+      // Best effort - use defaults if we can't read it
+    }
+
+    // Get ALL listings for this user (regardless of status) - update all to ensure consistency
+    // This ensures that when a user toggles the business name preference, ALL their listings
+    // (including drafts, removed, etc.) are updated immediately
     const listingsRef = db.collection('listings');
     
-    // Query for listings by status - we'll query multiple statuses to get all visible listings
-    // Statuses that appear on browse/homepage: active, pending, sold, ended, expired
-    // We'll query these explicitly to avoid index issues
-    const statusesToUpdate: string[] = ['active', 'pending', 'sold', 'ended', 'expired'];
-    const allDocs: any[] = [];
+    // Query ALL listings by sellerId (no status filter) to update every single listing
+    // We'll fetch a large batch and process them
+    let allDocs: any[] = [];
     
-    // Firestore 'in' operator supports up to 10 values, so we can query all statuses at once
     try {
-      const statusQuery = listingsRef
-        .where('sellerId', '==', userId)
-        .where('status', 'in', statusesToUpdate);
-      const statusSnapshot = await statusQuery.get();
-      allDocs.push(...statusSnapshot.docs);
+      // Query all listings by sellerId (no status filter) - use orderBy to enable pagination
+      // Note: This requires a Firestore index on (sellerId, createdAt) or (sellerId, updatedAt)
+      // If the index doesn't exist, we'll fall back to status-based queries
+      let query = listingsRef.where('sellerId', '==', userId).orderBy('updatedAt', 'desc').limit(1000);
+      let snapshot = await query.get();
+      allDocs = snapshot.docs;
+      
+      // If we got 1000 results, there might be more - fetch remaining in batches
+      while (snapshot.docs.length === 1000) {
+        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        const nextQuery = listingsRef
+          .where('sellerId', '==', userId)
+          .orderBy('updatedAt', 'desc')
+          .startAfter(lastDoc)
+          .limit(1000);
+        const nextSnapshot = await nextQuery.get();
+        
+        if (nextSnapshot.docs.length > 0) {
+          allDocs.push(...nextSnapshot.docs);
+          snapshot = nextSnapshot;
+        } else {
+          break;
+        }
+      }
     } catch (error: any) {
-      // If 'in' query fails (e.g., missing index), fall back to individual queries
-      console.warn('[update-seller-snapshots] Status "in" query failed, falling back to individual queries:', error);
-      const queries = statusesToUpdate.map(status => 
-        listingsRef.where('sellerId', '==', userId).where('status', '==', status).get()
-      );
-      const results = await Promise.all(queries);
-      results.forEach(snapshot => allDocs.push(...snapshot.docs));
+      console.warn('[update-seller-snapshots] Query with orderBy failed, trying without orderBy:', error);
+      // If orderBy query fails (e.g., missing index), try without orderBy
+      try {
+        const query = listingsRef.where('sellerId', '==', userId).limit(1000);
+        const snapshot = await query.get();
+        allDocs = snapshot.docs;
+        
+        // Paginate if needed (without orderBy, we can't use startAfter reliably, so just get first 1000)
+        // For most users, 1000 listings should be enough. If they have more, they'll need to run this multiple times
+        // or we can implement a more sophisticated pagination strategy
+      } catch (fallbackError: any) {
+        console.error('[update-seller-snapshots] Query failed:', fallbackError);
+        // Last resort: try querying by individual statuses
+        const statusesToUpdate: string[] = ['active', 'pending', 'sold', 'ended', 'expired', 'draft', 'removed'];
+        try {
+          const queries = statusesToUpdate.map(status => 
+            listingsRef.where('sellerId', '==', userId).where('status', '==', status).limit(500).get()
+          );
+          const results = await Promise.all(queries);
+          results.forEach(snapshot => allDocs.push(...snapshot.docs));
+        } catch (finalError) {
+          console.error('[update-seller-snapshots] All query strategies failed:', finalError);
+          return json({ ok: false, error: 'Failed to query listings', message: String(fallbackError?.message || finalError) }, { status: 500 });
+        }
+      }
     }
     
     // Remove duplicates (in case a listing appears in multiple queries)
@@ -118,15 +177,16 @@ export async function POST(request: Request) {
         const existingSnapshot = listingData.sellerSnapshot || {};
         
         // Always update to ensure consistency - this is critical when toggling preferences
+        // Use the latest data from user profile to ensure all sellerSnapshot fields are up to date
         batch.update(doc.ref, {
           sellerSnapshot: {
-            ...existingSnapshot,
-            displayName: displayName,
-            // Preserve other sellerSnapshot fields if they exist, otherwise set defaults
-            verified: existingSnapshot.verified !== undefined ? existingSnapshot.verified : false,
-            photoURL: existingSnapshot.photoURL || null,
-            completedSalesCount: existingSnapshot.completedSalesCount !== undefined ? existingSnapshot.completedSalesCount : 0,
-            badges: Array.isArray(existingSnapshot.badges) ? existingSnapshot.badges : [],
+            displayName: displayName, // Always use the calculated displayName
+            verified: sellerVerified, // Use current verification status
+            photoURL: photoURL, // Use current photo URL
+            completedSalesCount: completedSalesCount, // Use current sales count
+            badges: badges, // Use current badges
+            // Preserve any other fields that might exist
+            ...(existingSnapshot.updatedAt ? { updatedAt: existingSnapshot.updatedAt } : {}),
           },
           updatedAt: Timestamp.now(),
         });
