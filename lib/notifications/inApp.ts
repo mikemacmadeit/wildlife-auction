@@ -183,7 +183,7 @@ export function buildInAppNotification(params: {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.Received' }>;
       return {
         ...base,
-        type: 'order_received',
+        type: 'order_created', // Map to order_created for seller sales notifications (Order.Received = new sale for seller)
         title: 'Receipt confirmed',
         body: `The buyer confirmed receipt for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
