@@ -117,14 +117,31 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
       const token = await user.getIdToken();
       const res = await enablePushForCurrentDevice({ idToken: token, platform: 'web' });
       if (!res.ok) {
-        toast({ title: 'Push not enabled', description: res.error || 'Failed to enable push.', variant: 'destructive' });
+        // Show error with code if available for better debugging
+        const errorMessage = res.code 
+          ? `${res.error || 'Failed to enable push'} (Error code: ${res.code})`
+          : res.error || 'Failed to enable push.';
+        toast({ 
+          title: 'Push not enabled', 
+          description: errorMessage, 
+          variant: 'destructive',
+          duration: 5000, // Show longer so user can read the error code
+        });
         return false;
       }
       toast({ title: 'Push enabled', description: 'This device can now receive push notifications.' });
       setPrefs((p) => ({ ...p, channels: { ...p.channels, push: true } }));
       return true;
     } catch (e: any) {
-      toast({ title: 'Push not enabled', description: e?.message || 'Failed to enable push.', variant: 'destructive' });
+      const errorMessage = e?.code 
+        ? `${e?.message || 'Failed to enable push'} (Error code: ${e.code})`
+        : e?.message || 'Failed to enable push.';
+      toast({ 
+        title: 'Push not enabled', 
+        description: errorMessage, 
+        variant: 'destructive',
+        duration: 5000,
+      });
       return false;
     } finally {
       setPushEnabling(false);
@@ -282,8 +299,10 @@ export function NotificationPreferencesPanel(props: { embedded?: boolean }) {
                         setPrefs((p) => ({ ...p, channels: { ...p.channels, push: false } }));
                         return;
                       }
+                      // enablePush already shows error toast, but ensure we don't leave toggle in enabled state if it fails
                       const ok = await enablePush();
                       if (!ok) {
+                        // Error toast is already shown in enablePush function
                         setPrefs((p) => ({ ...p, channels: { ...p.channels, push: false } }));
                       }
                     }}

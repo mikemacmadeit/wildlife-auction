@@ -100,6 +100,22 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, currentSpeciesId]);
 
+  // Ensure wildlife exotics disclosure fields default to false (not undefined) for proper validation
+  const currentAnimalIdDisclosure = (attributes as Partial<WildlifeAttributes>).animalIdDisclosure;
+  const currentHealthDisclosure = (attributes as Partial<WildlifeAttributes>).healthDisclosure;
+  const currentTransportDisclosure = (attributes as Partial<WildlifeAttributes>).transportDisclosure;
+  useEffect(() => {
+    if (category !== 'wildlife_exotics') return;
+    const updates: Partial<WildlifeAttributes> = {};
+    if (currentAnimalIdDisclosure === undefined) updates.animalIdDisclosure = false;
+    if (currentHealthDisclosure === undefined) updates.healthDisclosure = false;
+    if (currentTransportDisclosure === undefined) updates.transportDisclosure = false;
+    if (Object.keys(updates).length > 0) {
+      onChange({ ...attributes, ...updates });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, currentAnimalIdDisclosure, currentHealthDisclosure, currentTransportDisclosure]);
+
 
   if (category === 'horse_equestrian') {
     return (
@@ -689,8 +705,8 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="animal-id-disclosure"
-                checked={(attributes as Partial<WildlifeAttributes>).animalIdDisclosure || false}
-                onCheckedChange={(checked) => updateAttribute('animalIdDisclosure', checked)}
+                checked={Boolean((attributes as Partial<WildlifeAttributes>).animalIdDisclosure)}
+                onCheckedChange={(checked) => updateAttribute('animalIdDisclosure', Boolean(checked))}
                 className={hasError('Animal Identification Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="animal-id-disclosure" className="cursor-pointer flex-1">
@@ -703,8 +719,8 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="health-disclosure"
-                checked={(attributes as Partial<WildlifeAttributes>).healthDisclosure || false}
-                onCheckedChange={(checked) => updateAttribute('healthDisclosure', checked)}
+                checked={Boolean((attributes as Partial<WildlifeAttributes>).healthDisclosure)}
+                onCheckedChange={(checked) => updateAttribute('healthDisclosure', Boolean(checked))}
                 className={hasError('Health Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="health-disclosure" className="cursor-pointer flex-1">
@@ -717,8 +733,8 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="transport-disclosure"
-                checked={(attributes as Partial<WildlifeAttributes>).transportDisclosure || false}
-                onCheckedChange={(checked) => updateAttribute('transportDisclosure', checked)}
+                checked={Boolean((attributes as Partial<WildlifeAttributes>).transportDisclosure)}
+                onCheckedChange={(checked) => updateAttribute('transportDisclosure', Boolean(checked))}
                 className={hasError('Transport Disclosure') ? 'border-destructive' : ''}
               />
               <Label htmlFor="transport-disclosure" className="cursor-pointer flex-1">

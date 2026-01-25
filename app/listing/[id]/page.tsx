@@ -805,8 +805,10 @@ export default function ListingDetailPage() {
 
     try {
       // Navigate to messages page with thread creation
-      router.push(`/dashboard/messages?listingId=${listing.id}&sellerId=${listing.sellerId}`);
+      // Use router.push which works on both mobile and desktop
+      await router.push(`/dashboard/messages?listingId=${encodeURIComponent(listing.id)}&sellerId=${encodeURIComponent(listing.sellerId)}`);
     } catch (error: any) {
+      console.error('[ContactSeller] Navigation error:', error);
       toast({
         title: 'Error',
         description: 'Failed to open messaging. Please try again.',

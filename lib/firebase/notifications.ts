@@ -281,8 +281,19 @@ export function subscribeToUnreadCountByTypes(
       const unread = snapshot.docs.filter((d) => {
         const data = d.data() as any;
         const t = String(data?.type || '');
-        return uniq.has(t as NotificationType) && data?.read !== true;
+        const matches = uniq.has(t as NotificationType) && data?.read !== true;
+        // #region agent log
+        if (types.includes('Admin.Support.TicketSubmitted' as NotificationType)) {
+          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notifications.ts:281',message:'Support ticket notification filter check',data:{notificationType:t,matches,read:data?.read,types:Array.from(uniq),hasInSet:uniq.has(t as NotificationType)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        }
+        // #endregion
+        return matches;
       }).length;
+      // #region agent log
+      if (types.includes('Admin.Support.TicketSubmitted' as NotificationType)) {
+        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notifications.ts:286',message:'Support ticket unread count calculated',data:{unread,totalDocs:snapshot.docs.length,types:Array.from(uniq)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      }
+      // #endregion
       callback(unread);
     },
     (error) => {

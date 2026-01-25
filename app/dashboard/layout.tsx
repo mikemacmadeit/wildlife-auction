@@ -125,6 +125,7 @@ export default function DashboardLayout({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
   const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
+  const [unreadSupportTicketsCount, setUnreadSupportTicketsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
@@ -191,9 +192,19 @@ export default function DashboardLayout({
           badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
         };
       }
+      if (item.href === '/dashboard/admin/support') {
+        const badge = isAdmin && unreadSupportTicketsCount > 0 ? unreadSupportTicketsCount : undefined;
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:195',message:'Admin support badge calculation',data:{isAdmin,unreadSupportTicketsCount,badge,itemHref:item.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        return {
+          ...item,
+          badge,
+        };
+      }
       return item;
     });
-  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount]);
+  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount, isAdmin, unreadSupportTicketsCount]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -202,11 +213,18 @@ export default function DashboardLayout({
   }, [pathname, user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    if (!pathname?.startsWith('/dashboard/admin/support')) return;
+    void markNotificationsAsReadByTypes(user.uid, ['Admin.Support.TicketSubmitted' as NotificationType]);
+  }, [pathname, user?.uid]);
+
+  useEffect(() => {
     if (!user?.uid) {
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
       setUnreadAdminNotificationsCount(0);
+      setUnreadSupportTicketsCount(0);
       return;
     }
 
@@ -231,6 +249,20 @@ export default function DashboardLayout({
         );
       }
 
+      if (showAdminNav && isAdmin) {
+        // Subscribe to support ticket notifications
+        // Using subscribeToUnreadCountByTypes with client-side filtering since Admin.Support.TicketSubmitted
+        // is not in the NotificationType union but is used as a string in the notification system
+        unsubs.push(
+          subscribeToUnreadCountByTypes(user.uid, ['Admin.Support.TicketSubmitted' as NotificationType], (count) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:253',message:'Support tickets notification count callback',data:{count,userId:user.uid,isAdmin,showAdminNav},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            setUnreadSupportTicketsCount(count || 0);
+          })
+        );
+      }
+
       const offerTypes: NotificationType[] = [
         'bid_outbid',
         'bid_received',
@@ -251,9 +283,10 @@ export default function DashboardLayout({
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
+      setUnreadSupportTicketsCount(0);
       return;
     }
-  }, [user?.uid, showAdminNav, isSuperAdmin]);
+  }, [user?.uid, showAdminNav, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (!showAdminNav) return;

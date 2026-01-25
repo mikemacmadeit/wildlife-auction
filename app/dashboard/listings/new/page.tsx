@@ -48,6 +48,31 @@ import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
 // Seller Tiers model: no listing limits.
 
+// Helper function to format number with commas for display
+function formatPriceWithCommas(value: string): string {
+  if (!value || value.trim() === '') return '';
+  // Remove all non-digit characters except decimal point
+  const cleaned = value.replace(/[^\d.]/g, '');
+  if (!cleaned) return '';
+  // Split by decimal point
+  const parts = cleaned.split('.');
+  // Format the integer part with commas
+  const integerPart = parts[0] || '0';
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Rejoin with decimal part if it exists (limit to 2 decimal places)
+  if (parts.length > 1) {
+    const decimalPart = parts[1].slice(0, 2); // Limit to 2 decimal places
+    return `${formattedInteger}.${decimalPart}`;
+  }
+  return formattedInteger;
+}
+
+// Helper function to parse price string (remove commas) for saving
+function parsePriceString(value: string): string {
+  // Remove all commas and other non-numeric characters except decimal point
+  return value.replace(/[^\d.]/g, '');
+}
+
 function NewListingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -372,11 +397,11 @@ function NewListingPageContent() {
         };
 
         if (formData.type === 'fixed') {
-          listingData.price = parseFloat(formData.price || '0');
+          listingData.price = parseFloat(parsePriceString(formData.price || '0') || '0');
         } else if (formData.type === 'auction') {
-          listingData.startingBid = parseFloat(formData.startingBid || '0');
+          listingData.startingBid = parseFloat(parsePriceString(formData.startingBid || '0') || '0');
           if (formData.reservePrice) {
-            listingData.reservePrice = parseFloat(formData.reservePrice);
+            listingData.reservePrice = parseFloat(parsePriceString(formData.reservePrice));
           }
         }
 
@@ -470,7 +495,9 @@ function NewListingPageContent() {
   };
 
   const isPositiveMoney = (raw: string): boolean => {
-    const n = numberFromInput(raw);
+    // Remove commas before validation
+    const cleaned = parsePriceString(raw);
+    const n = numberFromInput(cleaned);
     return typeof n === 'number' && n > 0;
   };
 
@@ -1046,9 +1073,9 @@ function NewListingPageContent() {
                 if (!attrs.speciesId) errs.push('Species');
                 if (!attrs.sex) errs.push('Sex');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                if (!attrs.animalIdDisclosure) errs.push('Animal Identification Disclosure');
-                if (!attrs.healthDisclosure) errs.push('Health Disclosure');
-                if (!attrs.transportDisclosure) errs.push('Transport Disclosure');
+                if (attrs.animalIdDisclosure !== true) errs.push('Animal Identification Disclosure');
+                if (attrs.healthDisclosure !== true) errs.push('Health Disclosure');
+                if (attrs.transportDisclosure !== true) errs.push('Transport Disclosure');
                 return errs;
               }
               if (formData.category === 'cattle_livestock') {
@@ -1198,9 +1225,9 @@ function NewListingPageContent() {
           if (!attrs.speciesId) errors.push('Species');
           if (!attrs.sex) errors.push('Sex');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
-          if (!attrs.animalIdDisclosure) errors.push('Animal Identification Disclosure');
-          if (!attrs.healthDisclosure) errors.push('Health Disclosure');
-          if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
+          if (attrs.animalIdDisclosure !== true) errors.push('Animal Identification Disclosure');
+          if (attrs.healthDisclosure !== true) errors.push('Health Disclosure');
+          if (attrs.transportDisclosure !== true) errors.push('Transport Disclosure');
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -1401,11 +1428,15 @@ function NewListingPageContent() {
               </div>
               <Input
                 id="price"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 data-tour="listing-price"
                 placeholder="0.00"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                value={formatPriceWithCommas(formData.price)}
+                onChange={(e) => {
+                  const parsed = parsePriceString(e.target.value);
+                  setFormData({ ...formData, price: parsed });
+                }}
                 className={cn(
                   "min-h-[48px] text-base",
                   validationAttempted.details && !isPositiveMoney(formData.price) && 'border-destructive ring-2 ring-destructive/20 focus-visible:ring-destructive'
@@ -1430,11 +1461,15 @@ function NewListingPageContent() {
                 </div>
                 <Input
                   id="starting-bid"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   data-tour="listing-price"
                   placeholder="0.00"
-                  value={formData.startingBid}
-                  onChange={(e) => setFormData({ ...formData, startingBid: e.target.value })}
+                  value={formatPriceWithCommas(formData.startingBid)}
+                  onChange={(e) => {
+                    const parsed = parsePriceString(e.target.value);
+                    setFormData({ ...formData, startingBid: parsed });
+                  }}
                   className={cn(
                     "min-h-[48px] text-base",
                     validationAttempted.details &&
@@ -1459,10 +1494,14 @@ function NewListingPageContent() {
                 </div>
                 <Input
                   id="reserve-price"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="0.00"
-                  value={formData.reservePrice}
-                  onChange={(e) => setFormData({ ...formData, reservePrice: e.target.value })}
+                  value={formatPriceWithCommas(formData.reservePrice)}
+                  onChange={(e) => {
+                    const parsed = parsePriceString(e.target.value);
+                    setFormData({ ...formData, reservePrice: parsed });
+                  }}
                   className="min-h-[48px] text-base"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -1538,12 +1577,14 @@ function NewListingPageContent() {
                     </Label>
                     <Input
                       id="best-offer-min"
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0"
-                      value={formData.bestOffer.minPrice}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bestOffer: { ...formData.bestOffer, minPrice: e.target.value } })
-                      }
+                      value={formatPriceWithCommas(formData.bestOffer.minPrice)}
+                      onChange={(e) => {
+                        const parsed = parsePriceString(e.target.value);
+                        setFormData({ ...formData, bestOffer: { ...formData.bestOffer, minPrice: parsed } });
+                      }}
                       className="min-h-[44px]"
                     />
                   </div>
@@ -1553,15 +1594,17 @@ function NewListingPageContent() {
                     </Label>
                     <Input
                       id="best-offer-auto"
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0"
-                      value={formData.bestOffer.autoAcceptPrice}
-                      onChange={(e) =>
+                      value={formatPriceWithCommas(formData.bestOffer.autoAcceptPrice)}
+                      onChange={(e) => {
+                        const parsed = parsePriceString(e.target.value);
                         setFormData({
                           ...formData,
-                          bestOffer: { ...formData.bestOffer, autoAcceptPrice: e.target.value },
-                        })
-                      }
+                          bestOffer: { ...formData.bestOffer, autoAcceptPrice: parsed },
+                        });
+                      }}
                       className="min-h-[44px]"
                     />
                   </div>
@@ -1968,9 +2011,9 @@ function NewListingPageContent() {
               type: (formData.type || 'fixed') as any,
               category: (formData.category || 'wildlife_exotics') as any,
               status: 'draft' as any,
-              price: formData.type !== 'auction' ? Number(parseFloat(formData.price || '0') || 0) : undefined,
-              startingBid: formData.type === 'auction' ? Number(parseFloat(formData.startingBid || '0') || 0) : undefined,
-              reservePrice: formData.type === 'auction' && formData.reservePrice ? Number(parseFloat(formData.reservePrice) || 0) : undefined,
+              price: formData.type !== 'auction' ? Number(parseFloat(parsePriceString(formData.price || '0') || '0') || 0) : undefined,
+              startingBid: formData.type === 'auction' ? Number(parseFloat(parsePriceString(formData.startingBid || '0') || '0') || 0) : undefined,
+              reservePrice: formData.type === 'auction' && formData.reservePrice ? Number(parseFloat(parsePriceString(formData.reservePrice) || '0') || 0) : undefined,
               images: formData.images || [],
               location: formData.location,
               sellerId: user?.uid || 'preview',
@@ -2099,11 +2142,19 @@ function NewListingPageContent() {
 
     // Seller acknowledgment is requested at publish-time (modal), not as a step.
     if (requiresSellerAnimalAck && !sellerAnimalAckAcceptedNow) {
-      pendingPublishPayloadRef.current = data;
-      setSellerAnimalAckModalChecked(false);
-      setSellerAnimalAckModalOpen(true);
+      // Only show modal if we don't already have a pending payload (prevents double-opening)
+      if (!pendingPublishPayloadRef.current) {
+        pendingPublishPayloadRef.current = data;
+        setSellerAnimalAckModalChecked(false);
+        setSellerAnimalAckModalOpen(true);
+      }
       submittingRef.current = false;
       return;
+    }
+    
+    // Clear pending payload if acknowledgment is accepted
+    if (requiresSellerAnimalAck && sellerAnimalAckAcceptedNow) {
+      pendingPublishPayloadRef.current = null;
     }
 
     // Validate photos
@@ -2193,23 +2244,23 @@ function NewListingPageContent() {
 
       // Add pricing based on type
       if (formData.type === 'fixed') {
-        listingData.price = parseFloat(formData.price || '0');
+        listingData.price = parseFloat(parsePriceString(formData.price || '0') || '0');
         if (formData.bestOffer.enabled) {
           const bo: any = {
             enabled: true,
             allowCounter: formData.bestOffer.allowCounter !== false,
             offerExpiryHours: formData.bestOffer.offerExpiryHours || 48,
           };
-          if (formData.bestOffer.minPrice) bo.minPrice = parseFloat(formData.bestOffer.minPrice);
-          if (formData.bestOffer.autoAcceptPrice) bo.autoAcceptPrice = parseFloat(formData.bestOffer.autoAcceptPrice);
+          if (formData.bestOffer.minPrice) bo.minPrice = parseFloat(parsePriceString(formData.bestOffer.minPrice));
+          if (formData.bestOffer.autoAcceptPrice) bo.autoAcceptPrice = parseFloat(parsePriceString(formData.bestOffer.autoAcceptPrice));
           listingData.bestOfferSettings = bo;
         } else {
           listingData.bestOfferSettings = { enabled: false, allowCounter: true, offerExpiryHours: 48 };
         }
       } else if (formData.type === 'auction') {
-        listingData.startingBid = parseFloat(formData.startingBid || '0');
+        listingData.startingBid = parseFloat(parsePriceString(formData.startingBid || '0') || '0');
         if (formData.reservePrice) {
-          listingData.reservePrice = parseFloat(formData.reservePrice);
+          listingData.reservePrice = parseFloat(parsePriceString(formData.reservePrice));
         }
       }
 
@@ -2428,11 +2479,11 @@ function NewListingPageContent() {
       } as any;
 
       if (formData.type === 'fixed') {
-        listingData.price = parseFloat(formData.price || '0');
+        listingData.price = parseFloat(parsePriceString(formData.price || '0') || '0');
       } else if (formData.type === 'auction') {
-        listingData.startingBid = parseFloat(formData.startingBid || '0');
+        listingData.startingBid = parseFloat(parsePriceString(formData.startingBid || '0') || '0');
         if (formData.reservePrice) {
-          listingData.reservePrice = parseFloat(formData.reservePrice);
+          listingData.reservePrice = parseFloat(parsePriceString(formData.reservePrice));
         }
       }
 
@@ -2631,8 +2682,9 @@ function NewListingPageContent() {
         open={sellerAnimalAckModalOpen}
         onOpenChange={(open) => {
           setSellerAnimalAckModalOpen(open);
-          if (!open) {
-            // Keep the pending payload so user can reopen by clicking Publish again.
+          if (!open && !sellerAnimalAckForceRef.current) {
+            // Only reset checkbox if modal is closed without accepting (e.g., Cancel or outside click)
+            // Don't reset if we're closing because user accepted (sellerAnimalAckForceRef will be true)
             setSellerAnimalAckModalChecked(false);
           }
         }}
@@ -2650,8 +2702,8 @@ function NewListingPageContent() {
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="seller-animal-ack-modal"
-                  checked={sellerAnimalAckModalChecked}
-                  onCheckedChange={(checked) => setSellerAnimalAckModalChecked(checked === true)}
+                  checked={Boolean(sellerAnimalAckModalChecked)}
+                  onCheckedChange={(checked) => setSellerAnimalAckModalChecked(Boolean(checked))}
                 />
                 <Label htmlFor="seller-animal-ack-modal" className="cursor-pointer leading-relaxed">
                   I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
@@ -2675,16 +2727,22 @@ function NewListingPageContent() {
             </Button>
             <Button
               type="button"
-              disabled={!sellerAnimalAckModalChecked}
+              disabled={!Boolean(sellerAnimalAckModalChecked)}
               onClick={async () => {
+                // Set ref first to prevent onOpenChange from resetting checkbox
                 sellerAnimalAckForceRef.current = true;
                 setSellerAnimalAttestationAccepted(true);
-                setSellerAnimalAckModalOpen(false);
                 const payload = pendingPublishPayloadRef.current;
+                // Close modal - onOpenChange won't reset checkbox because ref is true
+                setSellerAnimalAckModalOpen(false);
+                // Clear pending payload to prevent re-triggering
+                pendingPublishPayloadRef.current = null;
                 // Re-run publish using the original submit payload (so we don't lose stepper state)
                 if (payload) {
-                  // Let state updates enqueue, but rely on the ref for correctness.
-                  Promise.resolve().then(() => void handleComplete(payload));
+                  // Use setTimeout to ensure state updates have propagated
+                  setTimeout(() => {
+                    void handleComplete(payload);
+                  }, 0);
                 }
               }}
             >

@@ -16,10 +16,10 @@ import { app } from '@/lib/firebase/config';
 export async function enablePushForCurrentDevice(params: {
   idToken: string;
   platform?: string;
-}): Promise<{ ok: boolean; tokenId?: string; error?: string }> {
+}): Promise<{ ok: boolean; tokenId?: string; error?: string; code?: string }> {
   try {
     const supported = await isSupported();
-    if (!supported) return { ok: false, error: 'Push not supported in this browser' };
+    if (!supported) return { ok: false, error: 'Push not supported in this browser', code: 'NOT_SUPPORTED' };
 
     // If previously denied, browsers will not prompt again. Provide actionable guidance.
     const existingPerm = Notification.permission;
@@ -30,6 +30,7 @@ export async function enablePushForCurrentDevice(params: {
         ok: false,
         error:
           'Notification permission is blocked in your browser. Enable notifications for wildlife.exchange in your browser/site settings, then try again.',
+        code: 'PERMISSION_DENIED',
       };
     }
 
@@ -43,11 +44,12 @@ export async function enablePushForCurrentDevice(params: {
           perm === 'default'
             ? 'Notification permission was dismissed. Please click Allow when prompted.'
             : 'Notification permission denied',
+        code: perm === 'default' ? 'PERMISSION_DISMISSED' : 'PERMISSION_DENIED',
       };
     }
 
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-    if (!vapidKey) return { ok: false, error: 'Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY' };
+    if (!vapidKey) return { ok: false, error: 'Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY', code: 'MISSING_VAPID_KEY' };
 
     let reg: ServiceWorkerRegistration;
     try {
@@ -58,7 +60,7 @@ export async function enablePushForCurrentDevice(params: {
         path: '/firebase-messaging-sw.js',
         message: e?.message || String(e),
       });
-      return { ok: false, error: 'Failed to register push service worker (/firebase-messaging-sw.js)' };
+      return { ok: false, error: 'Failed to register push service worker (/firebase-messaging-sw.js)', code: 'SERVICE_WORKER_REGISTRATION_FAILED' };
     }
 
     const messaging = getMessaging(app);
@@ -69,10 +71,12 @@ export async function enablePushForCurrentDevice(params: {
       // eslint-disable-next-line no-console
       console.error('[push] getToken failed', {
         message: e?.message || String(e),
+        code: e?.code,
       });
-      return { ok: false, error: e?.message || 'Failed to get push token' };
+      const errorCode = e?.code || 'GET_TOKEN_FAILED';
+      return { ok: false, error: e?.message || 'Failed to get push token', code: errorCode };
     }
-    if (!fcmToken) return { ok: false, error: 'Failed to get push token' };
+    if (!fcmToken) return { ok: false, error: 'Failed to get push token', code: 'NO_TOKEN_RECEIVED' };
 
     const res = await fetch('/api/push/register', {
       method: 'POST',
@@ -91,13 +95,13 @@ export async function enablePushForCurrentDevice(params: {
         code: data?.code,
         message: data?.message,
       });
-      return { ok: false, error: data?.error || `Failed to register token (HTTP ${res.status})` };
+      return { ok: false, error: data?.error || `Failed to register token (HTTP ${res.status})`, code: data?.code || 'TOKEN_REGISTRATION_FAILED' };
     }
     return { ok: true, tokenId: data.tokenId };
   } catch (e: any) {
     // eslint-disable-next-line no-console
-    console.error('[push] enablePushForCurrentDevice failed', { message: e?.message || String(e) });
-    return { ok: false, error: e?.message || 'Failed to enable push' };
+    console.error('[push] enablePushForCurrentDevice failed', { message: e?.message || String(e), code: e?.code });
+    return { ok: false, error: e?.message || 'Failed to enable push', code: e?.code || 'UNKNOWN_ERROR' };
   }
 }
 

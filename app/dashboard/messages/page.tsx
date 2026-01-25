@@ -302,6 +302,10 @@ export default function MessagesPage() {
           lastMessageAt: threadData.lastMessageAt?.toDate(),
         } as MessageThread;
         setThread(threadObj);
+        // Set selectedThreadId so mobile view shows the thread pane
+        setSelectedThreadId(threadId);
+        // Update URL to include threadId for proper deep linking and refresh support
+        router.replace(`/dashboard/messages?threadId=${encodeURIComponent(threadId)}`);
         // Optimistically mark as read for immediate UI update
         setOptimisticReadThreads((prev) => new Set(prev).add(threadId));
         // Mark thread as read when opening via deep link
@@ -315,6 +319,12 @@ export default function MessagesPage() {
         });
         // Clear message notification badge when viewing messages (best-effort)
         markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
+      } else {
+        // Thread was created but not found in query - still set selectedThreadId
+        // This can happen if the thread was just created and hasn't propagated yet
+        setSelectedThreadId(threadId);
+        // Update URL to include threadId
+        router.replace(`/dashboard/messages?threadId=${encodeURIComponent(threadId)}`);
       }
 
       // Get other party name
@@ -594,10 +604,11 @@ export default function MessagesPage() {
                   <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
                 ) : (
                   <ScrollArea className="h-full" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-                    <div className="divide-y divide-border/50 pr-3">
-                      {inboxItems.map((item) => {
+                    <div className="divide-y divide-border/50 px-3">
+                      {inboxItems.map((item, index) => {
                         const active = selectedThreadId === item.id || thread?.id === item.id;
                         const updatedAt = item.updatedAtMs ? new Date(item.updatedAtMs) : null;
+                        const isFirst = index === 0;
                         return (
                           <div
                             key={item.id}
@@ -630,7 +641,8 @@ export default function MessagesPage() {
                             }}
                             className={cn(
                               'group w-full min-w-0 p-3 hover:bg-muted/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg',
-                              active && 'glass bg-card/70 backdrop-blur-xl border-primary/20 shadow-lifted'
+                              isFirst && 'pt-4',
+                              active && 'glass bg-card/70 backdrop-blur-xl border border-primary/20 shadow-lifted'
                             )}
                             style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
                           >
@@ -829,10 +841,11 @@ export default function MessagesPage() {
               ) : (
                 <ScrollArea className="h-full">
                   {/* Keep a small right padding so the scrollbar never overlays content. */}
-                  <div className="divide-y divide-border/50 pr-3">
-                    {inboxItems.map((item) => {
+                  <div className="divide-y divide-border/50 px-3">
+                    {inboxItems.map((item, index) => {
                       const active = selectedThreadId === item.id || thread?.id === item.id;
                       const updatedAt = item.updatedAtMs ? new Date(item.updatedAtMs) : null;
+                      const isFirst = index === 0;
                       return (
                         <div
                           key={item.id}
@@ -865,7 +878,8 @@ export default function MessagesPage() {
                           }}
                           className={cn(
                             'group w-full min-w-0 p-3 hover:bg-muted/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-lg',
-                            active && 'glass bg-card/70 backdrop-blur-xl border-primary/20 shadow-lifted'
+                            isFirst && 'pt-4',
+                            active && 'glass bg-card/70 backdrop-blur-xl border border-primary/20 shadow-lifted'
                           )}
                           style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
                         >
