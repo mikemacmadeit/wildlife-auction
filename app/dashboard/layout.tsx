@@ -215,7 +215,7 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!user?.uid) return;
     if (!pathname?.startsWith('/dashboard/admin/support')) return;
-    void markNotificationsAsReadByTypes(user.uid, ['Admin.Support.TicketSubmitted' as NotificationType]);
+    void markNotificationsAsReadByTypes(user.uid, ['admin_support_ticket_submitted']);
   }, [pathname, user?.uid]);
 
   useEffect(() => {
@@ -251,13 +251,9 @@ export default function DashboardLayout({
 
       if (showAdminNav && isAdmin) {
         // Subscribe to support ticket notifications
-        // Using subscribeToUnreadCountByTypes with client-side filtering since Admin.Support.TicketSubmitted
-        // is not in the NotificationType union but is used as a string in the notification system
         unsubs.push(
-          subscribeToUnreadCountByTypes(user.uid, ['Admin.Support.TicketSubmitted' as NotificationType], (count) => {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:253',message:'Support tickets notification count callback',data:{count,userId:user.uid,isAdmin,showAdminNav},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
+          subscribeToUnreadCountByTypes(user.uid, ['admin_support_ticket_submitted'], (count) => {
+            console.log('[Dashboard Layout] Support tickets notification count:', count);
             setUnreadSupportTicketsCount(count || 0);
           })
         );

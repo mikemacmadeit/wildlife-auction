@@ -464,7 +464,7 @@ export function buildInAppNotification(params: {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Admin.Support.TicketSubmitted' }>;
       return {
         ...base,
-        type: 'Admin.Support.TicketSubmitted',
+        type: 'admin_support_ticket_submitted',
         title: 'New support ticket',
         body: `${p.userName} submitted: "${p.subject}"`,
         deepLinkUrl: p.adminSupportUrl,
