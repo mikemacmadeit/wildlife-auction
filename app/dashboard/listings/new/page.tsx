@@ -2965,33 +2965,17 @@ function NewListingPageContent() {
                 sellerAnimalAckForceRef.current = true;
                 setSellerAnimalAttestationAccepted(true);
                 
-                // For dog listings, set the disclosure fields when acknowledgment is accepted
-                // Update formData and also update the pending payload directly to ensure disclosures are included
+                // For dog listings, update formData to include disclosures (payload will pick them up from formData)
                 if (formData.category === 'sporting_working_dogs') {
-                  const updatedAttributes = {
-                    ...formData.attributes,
-                    identificationDisclosure: true,
-                    healthDisclosure: true,
-                    transportDisclosure: true,
-                  } as any;
-                  
                   setFormData({
                     ...formData,
-                    attributes: updatedAttributes,
+                    attributes: {
+                      ...formData.attributes,
+                      identificationDisclosure: true,
+                      healthDisclosure: true,
+                      transportDisclosure: true,
+                    } as any,
                   });
-                  
-                  // Also update the pending payload to include disclosures
-                  if (pendingPublishPayloadRef.current) {
-                    const payload = pendingPublishPayloadRef.current as any;
-                    if (payload.attributes) {
-                      payload.attributes = {
-                        ...payload.attributes,
-                        identificationDisclosure: true,
-                        healthDisclosure: true,
-                        transportDisclosure: true,
-                      };
-                    }
-                  }
                 }
                 
                 const payload = pendingPublishPayloadRef.current;
@@ -2999,7 +2983,7 @@ function NewListingPageContent() {
                 setSellerAnimalAckModalOpen(false);
                 // Clear pending payload to prevent re-triggering
                 pendingPublishPayloadRef.current = null;
-                // Re-run publish using the original submit payload (so we don't lose stepper state)
+                // Re-run publish - handleComplete will create new payload from updated formData
                 if (payload) {
                   // Use setTimeout to ensure state updates have propagated
                   setTimeout(() => {
