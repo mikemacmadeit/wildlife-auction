@@ -329,7 +329,7 @@ export default function SellerLayout({
       {/* Desktop Sidebar - fixed on desktop to stay above content */}
       <aside
         className={cn(
-          'hidden md:flex md:flex-col',
+          'hidden md:flex md:flex-col md:h-screen',
           sidebarCollapsed ? 'md:w-20' : 'md:w-64',
           'border-r border-border/50 bg-card',
           'md:fixed md:inset-y-0 md:left-0'
