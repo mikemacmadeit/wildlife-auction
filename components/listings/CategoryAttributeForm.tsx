@@ -1112,28 +1112,31 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
-        <div className={cn('space-y-3 p-4 border rounded-lg bg-muted/50', hasError('Disclosures') ? 'border-destructive border-2' : 'border-border/60')}>
+        <div className={cn('space-y-3 p-4 border rounded-lg bg-muted/50', (hasError('Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? 'border-destructive border-2' : 'border-border/60')}>
           <div className="font-semibold text-sm">Required disclosures</div>
           {(hasError('Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? (
-            <p className="text-sm text-destructive">All disclosures are required</p>
+            <p className="text-sm text-destructive">This disclosure is required</p>
           ) : null}
-          <div className="space-y-2">
-            {[
-              { key: 'identificationDisclosure', label: 'I have accurately disclosed identification details (if applicable).' },
-              { key: 'healthDisclosure', label: 'I have disclosed any known health issues and represented the dog honestly.' },
-              { key: 'transportDisclosure', label: 'I understand transfers are Texas-only on this platform and transport is my responsibility.' },
-            ].map((d) => (
-              <div key={d.key} className="flex items-start gap-2">
-                <Checkbox
-                  id={`dog-disclosure-${d.key}`}
-                  checked={Boolean((attributes as any)?.[d.key])}
-                  onCheckedChange={(v) => updateAttribute(d.key, Boolean(v))}
-                />
-                <Label htmlFor={`dog-disclosure-${d.key}`} className="text-sm leading-relaxed">
-                  {d.label}
-                </Label>
-              </div>
-            ))}
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="dog-combined-disclosure"
+              checked={Boolean(
+                (attributes as any)?.identificationDisclosure &&
+                (attributes as any)?.healthDisclosure &&
+                (attributes as any)?.transportDisclosure
+              )}
+              onCheckedChange={(checked) => {
+                const value = Boolean(checked);
+                // Set all three disclosures together
+                updateAttribute('identificationDisclosure', value);
+                updateAttribute('healthDisclosure', value);
+                updateAttribute('transportDisclosure', value);
+              }}
+              className={(hasError('Identification Disclosure') || hasError('Health Disclosure') || hasError('Transport Disclosure')) ? 'border-destructive' : ''}
+            />
+            <Label htmlFor="dog-combined-disclosure" className="text-sm leading-relaxed cursor-pointer">
+              I have accurately disclosed identification details (if applicable). I have disclosed any known health issues and represented the dog honestly. I understand transfers are Texas-only on this platform and transport is my responsibility.
+            </Label>
           </div>
         </div>
       </div>
