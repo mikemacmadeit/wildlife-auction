@@ -2405,7 +2405,15 @@ function NewListingPageContent() {
 
       const normalizedAttributes: any = { ...(formData.attributes as any) };
       if (formData.category === 'horse_equestrian') normalizedAttributes.speciesId = 'horse';
-      if (formData.category === 'sporting_working_dogs') normalizedAttributes.speciesId = 'dog';
+      if (formData.category === 'sporting_working_dogs') {
+        normalizedAttributes.speciesId = 'dog';
+        // Set disclosures when seller acknowledgment is accepted (they're checked in the final step)
+        if (requiresSellerAnimalAck && sellerAnimalAckAcceptedNow) {
+          normalizedAttributes.identificationDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+          normalizedAttributes.transportDisclosure = true;
+        }
+      }
 
       const listingData = {
         title: formData.title,
@@ -2645,7 +2653,15 @@ function NewListingPageContent() {
 
       const normalizedAttributes: any = { ...(formData.attributes as any) };
       if (formData.category === 'horse_equestrian') normalizedAttributes.speciesId = 'horse';
-      if (formData.category === 'sporting_working_dogs') normalizedAttributes.speciesId = 'dog';
+      if (formData.category === 'sporting_working_dogs') {
+        normalizedAttributes.speciesId = 'dog';
+        // Set disclosures when seller acknowledgment is accepted (for draft saves, they'll be set at publish time)
+        if (sellerAnimalAttestationAccepted) {
+          normalizedAttributes.identificationDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+          normalizedAttributes.transportDisclosure = true;
+        }
+      }
 
       const listingData = {
         title: formData.title || 'Draft Listing',
