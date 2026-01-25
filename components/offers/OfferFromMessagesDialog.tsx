@@ -39,6 +39,7 @@ export function OfferFromMessagesDialog(props: {
   const [selectedListingId, setSelectedListingId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(1);
 
   useEffect(() => {
     if (!open) return;
@@ -77,7 +78,9 @@ export function OfferFromMessagesDialog(props: {
         const offerable = all.filter(isOfferableListing);
         if (cancelled) return;
         setListings(offerable);
-        setSelectedListingId(offerable[0]?.id || '');
+        const firstId = offerable[0]?.id || '';
+        setSelectedListingId(firstId);
+        setQuantity(1);
       } catch (e: any) {
         if (cancelled) return;
         setListings([]);
@@ -182,6 +185,11 @@ export function OfferFromMessagesDialog(props: {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
+                {selected && selected.quantityTotal && selected.quantityTotal > 1 && quantity > 1 ? (
+                  <div className="text-xs text-muted-foreground">
+                    ${Number(amount || 0).toLocaleString()} × {quantity} = ${(Number(amount || 0) * quantity).toLocaleString()} total
+                  </div>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <div className="text-sm font-semibold">Selected listing</div>
@@ -191,6 +199,33 @@ export function OfferFromMessagesDialog(props: {
                 </div>
               </div>
             </div>
+
+            {selected && selected.quantityTotal && selected.quantityTotal > 1 ? (
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">Quantity</div>
+                <Select
+                  value={String(quantity)}
+                  onValueChange={(v) => setQuantity(Number(v))}
+                  disabled={submitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: Math.min(selected.quantityAvailable ?? selected.quantityTotal, 10) }, (_, i) => i + 1).map((qty) => (
+                      <SelectItem key={qty} value={String(qty)}>
+                        {qty} {qty === 1 ? 'item' : 'items'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  {selected.quantityAvailable !== undefined && selected.quantityAvailable < selected.quantityTotal
+                    ? `${selected.quantityAvailable} available`
+                    : `${selected.quantityTotal} total`}
+                </div>
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <div className="text-sm font-semibold">Message (optional)</div>

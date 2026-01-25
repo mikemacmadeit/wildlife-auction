@@ -37,6 +37,7 @@ export default function MessagesPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
   const listingIdParam = searchParams?.get('listingId') || null;
   const sellerIdParam = searchParams?.get('sellerId') || null;
   const threadIdParam = searchParams?.get('threadId') || null;
@@ -61,6 +62,19 @@ export default function MessagesPage() {
   const metaFetchInFlightRef = useRef<Set<string>>(new Set());
   const selectedThreadIdRef = useRef<string | null>(null);
   const pathnameRef = useRef<string | null>(null);
+  const isNavigatingAwayRef = useRef<boolean>(false);
+  const subscriptionCallbackThrottleRef = useRef<number | null>(null);
+
+  // Track pathname changes and detect navigation away
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    // If pathname changes away from messages, mark as navigating away
+    if (pathname !== '/dashboard/messages') {
+      isNavigatingAwayRef.current = true;
+    } else {
+      isNavigatingAwayRef.current = false;
+    }
+  }, [pathname]);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -73,9 +87,6 @@ export default function MessagesPage() {
 
   // Reset state when navigating away from messages page
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:70',message:'Pathname changed',data:{pathname,isMessagesPage:pathname === '/dashboard/messages'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     if (typeof window !== 'undefined' && pathname && pathname !== '/dashboard/messages') {
       setSelectedThreadId(null);
       setThread(null);
@@ -144,18 +155,29 @@ export default function MessagesPage() {
 
   // Real-time inbox subscription
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:141',message:'Threads subscription effect triggered',data:{hasUser:!!user?.uid,listingIdParam,sellerIdParam,pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     if (!user?.uid) return;
     if (listingIdParam && sellerIdParam) return; // deep-link mode uses initializeThread
 
     const unsub = subscribeToAllUserThreads(
       user.uid,
       (data) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:147',message:'Threads subscription callback',data:{threadCount:data.length,selectedThreadId:selectedThreadIdRef.current,pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
+        // Throttle subscription callbacks to prevent excessive re-renders
+        if (subscriptionCallbackThrottleRef.current) {
+          return;
+        }
+        subscriptionCallbackThrottleRef.current = window.setTimeout(() => {
+          subscriptionCallbackThrottleRef.current = null;
+        }, 100); // Throttle to max once per 100ms
+        
+        // Check if we're navigating away or not on messages page
+        const currentPathname = typeof window !== 'undefined' ? window.location.pathname : pathnameRef.current;
+        const isOnMessagesPage = currentPathname === '/dashboard/messages';
+        
+        // Skip all processing if navigating away or not on messages page
+        if (isNavigatingAwayRef.current || !isOnMessagesPage) {
+          return;
+        }
+        
         setThreads(data);
         setLoading(false);
         // Clear optimistic reads for threads that are now confirmed as read (unreadCount = 0)
@@ -176,8 +198,6 @@ export default function MessagesPage() {
         // Only auto-select on desktop if nothing is selected AND we're still on the messages page
         // (use refs to avoid stale closure and pathname check to prevent redirects when navigating away)
         const currentSelectedId = selectedThreadIdRef.current;
-        const currentPathname = pathnameRef.current;
-        const isOnMessagesPage = currentPathname === '/dashboard/messages';
         if (!currentSelectedId && data[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024 && isOnMessagesPage) {
           setSelectedThreadId(data[0].id);
         }
@@ -196,9 +216,10 @@ export default function MessagesPage() {
     );
 
     return () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:193',message:'Threads subscription cleanup',data:{pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
+      if (subscriptionCallbackThrottleRef.current) {
+        clearTimeout(subscriptionCallbackThrottleRef.current);
+        subscriptionCallbackThrottleRef.current = null;
+      }
       unsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -327,9 +348,6 @@ export default function MessagesPage() {
   }, [listingIdParam, sellerIdParam, toast, user]);
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:310',message:'URL params sync effect triggered',data:{authLoading,hasUser:!!user,listingIdParam,sellerIdParam,threadIdParam,pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     if (!authLoading && user) {
       // 1) Listing deep-link => create/open thread
       if (listingIdParam && sellerIdParam) {
@@ -343,9 +361,6 @@ export default function MessagesPage() {
         // Sync URL param to state (only if different to avoid unnecessary updates)
         const currentId = selectedThreadIdRef.current;
         if (currentId !== threadIdParam) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:323',message:'Setting selectedThreadId from URL param',data:{threadIdParam,currentId,pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-          // #endregion
           setSelectedThreadId(threadIdParam);
         }
       }
@@ -409,54 +424,48 @@ export default function MessagesPage() {
     }).catch(() => {});
   }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
 
-  // #region agent log
+  // Fix: Ensure sidebar clicks work - prevent messages page from blocking sidebar navigation
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const sidebar = document.querySelector('aside');
-      const sidebarLink = target.closest('aside a, aside button');
-      const messagesContainer = document.querySelector('[data-messages-container]');
-      const clickX = e.clientX;
-      const clickY = e.clientY;
-      const sidebarRect = sidebar?.getBoundingClientRect();
-      const containerRect = messagesContainer?.getBoundingClientRect();
-      const isInSidebarArea = sidebarRect && clickX >= sidebarRect.left && clickX <= sidebarRect.right && clickY >= sidebarRect.top && clickY <= sidebarRect.bottom;
-      
-      // Check computed styles
-      const targetStyles = window.getComputedStyle(target);
-      const sidebarStyles = sidebar ? window.getComputedStyle(sidebar) : null;
-      const containerStyles = messagesContainer ? window.getComputedStyle(messagesContainer) : null;
-      
-      // Check if any element in the path blocks pointer events
-      let blockingElement: HTMLElement | null = null;
-      let path = e.composedPath() as HTMLElement[];
-      for (const el of path) {
-        if (el === sidebar) break;
-        if (el === messagesContainer) {
-          const styles = window.getComputedStyle(el);
-          if (styles.pointerEvents === 'none') {
-            blockingElement = el;
-            break;
-          }
-        }
-        if (el instanceof HTMLElement) {
-          const styles = window.getComputedStyle(el);
-          const zIndex = parseInt(styles.zIndex) || 0;
-          if (zIndex > 1000 && styles.pointerEvents !== 'none' && el !== sidebar) {
-            const rect = el.getBoundingClientRect();
-            if (clickX >= rect.left && clickX <= rect.right && clickY >= rect.top && clickY <= rect.bottom) {
-              blockingElement = el;
-            }
-          }
+    // Ensure mobile container doesn't block clicks on desktop
+    const ensureMobileContainerNotBlocking = () => {
+      const mobileContainer = document.querySelector('[data-mobile-container]');
+      if (mobileContainer instanceof HTMLElement) {
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+        if (isDesktop) {
+          mobileContainer.style.pointerEvents = 'none';
+          mobileContainer.style.display = 'none';
+        } else {
+          mobileContainer.style.pointerEvents = 'auto';
+          mobileContainer.style.display = '';
         }
       }
-      
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:410',message:'Click event detailed',data:{target:target.tagName,targetId:target.id,targetClass:target.className,selectedThreadId,isSidebarLink:!!sidebarLink,isInSidebarArea,clickX,clickY,sidebarLeft:sidebarRect?.left,sidebarRight:sidebarRect?.right,containerLeft:containerRect?.left,containerRight:containerRect?.right,sidebarZIndex:sidebarStyles?.zIndex,containerZIndex:containerStyles?.zIndex,sidebarPointerEvents:sidebarStyles?.pointerEvents,containerPointerEvents:containerStyles?.pointerEvents,blockingElement:blockingElement?.tagName,blockingElementClass:blockingElement?.className,blockingElementZIndex:blockingElement ? window.getComputedStyle(blockingElement).zIndex : null,pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     };
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
-  }, [selectedThreadId, pathname]);
-  // #endregion
+    
+    // Ensure messages container doesn't create a blocking layer
+    // The sidebar is fixed with zIndex: 10000, so it should be above everything
+    const ensureMessagesContainerNotBlocking = () => {
+      const messagesContainer = document.querySelector('[data-messages-container]');
+      if (messagesContainer instanceof HTMLElement) {
+        // Don't create a new stacking context that might interfere
+        messagesContainer.style.isolation = 'auto';
+      }
+    };
+    
+    // Set immediately and on resize
+    ensureMobileContainerNotBlocking();
+    ensureMessagesContainerNotBlocking();
+    
+    const handleResize = () => {
+      ensureMobileContainerNotBlocking();
+      ensureMessagesContainerNotBlocking();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [selectedThreadId]);
+
 
   if (authLoading || loading) {
     return (
@@ -508,26 +517,18 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="bg-background pb-20 md:pb-6 min-h-screen" data-messages-container style={{ pointerEvents: 'auto', position: 'relative', zIndex: 0 }}>
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8" style={{ pointerEvents: 'auto' }}>
+    <div className="bg-background pb-20 md:pb-6 min-h-screen" data-messages-container>
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         <div className="mb-4 lg:mb-6">
           <Button 
             variant="ghost" 
             onClick={() => {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:442',message:'Back button clicked',data:{selectedThreadId,isMobile:typeof window !== 'undefined' && window.innerWidth < 1024,pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-              // #endregion
               // On mobile, if a thread is selected, go back to inbox first
               if (selectedThreadId && typeof window !== 'undefined' && window.innerWidth < 1024) {
                 setSelectedThreadId(null);
-                // Use push to update URL without query params, but stay on messages page
                 router.push('/dashboard/messages');
               } else {
                 // Navigate away from messages page entirely
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'messages/page.tsx:461',message:'Navigating away from messages',data:{target:'/seller/overview',currentPathname:pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-                // #endregion
-                // Use router.push - it should work with Next.js navigation
                 router.push('/seller/overview');
               }
             }} 
@@ -542,7 +543,15 @@ export default function MessagesPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
           {/* Mobile: keep both panes mounted and slide between them for smoothness */}
-          <div className="lg:hidden relative overflow-hidden" style={{ height: 'calc(100dvh - 280px)', minHeight: '400px', maxHeight: 'calc(100dvh - 280px)' }}>
+          <div 
+            className="lg:hidden relative overflow-hidden" 
+            style={{ 
+              height: 'calc(100dvh - 280px)', 
+              minHeight: '400px', 
+              maxHeight: 'calc(100dvh - 280px)'
+            }}
+            data-mobile-container
+          >
             {/* Inbox pane */}
             <Card
               className={cn(

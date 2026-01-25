@@ -404,15 +404,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Multi-quantity is only supported for fixed, non-offer checkouts right now.
-    // (Offers + auctions are always quantity=1.)
+    // Multi-quantity support:
+    // - For offers: use offer.quantity (if present, otherwise default to 1)
+    // - For fixed listings without offers: use requestedQuantity
+    // - For auctions: always 1
+    const offerQuantity = offerData && typeof offerData.quantity === 'number' && offerData.quantity >= 1 ? Math.floor(offerData.quantity) : 1;
     const isMultiQuantityEligible = listingData.type === 'fixed' && !offerId;
     const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
     const quantityTotal =
       typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
         ? Math.max(1, Math.floor((listingData as any).quantityTotal))
         : Math.max(1, Math.floor(attrsQty));
-    const quantityRequested = isMultiQuantityEligible ? Math.min(requestedQuantity, 100) : 1;
+    const quantityRequested = offerId ? offerQuantity : (isMultiQuantityEligible ? Math.min(requestedQuantity, 100) : 1);
 
     if (!isMultiQuantityEligible && requestedQuantity !== 1) {
       return NextResponse.json({ error: 'Quantity is only supported for Buy Now listings', code: 'QUANTITY_NOT_SUPPORTED' }, { status: 400 });

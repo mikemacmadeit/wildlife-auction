@@ -134,8 +134,18 @@ export function MessageThreadComponent({
 
   const messages = useMemo(() => {
     const byId = new Map<string, Message>();
+    // Add older messages first
     for (const m of olderMessages) byId.set(m.id, m);
-    for (const m of latestMessages) byId.set(m.id, m);
+    // Add latest messages (will overwrite older if same ID, which shouldn't happen)
+    for (const m of latestMessages) {
+      // If we have an optimistic message and a real message with similar content/timestamp from same sender, prefer real one
+      const existing = byId.get(m.id);
+      if (existing && existing.id.startsWith('optimistic-') && m.senderId === existing.senderId) {
+        // Real message arrived - remove optimistic, use real
+        byId.delete(existing.id);
+      }
+      byId.set(m.id, m);
+    }
     const out = Array.from(byId.values());
     out.sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0));
     return out;
@@ -296,6 +306,33 @@ export function MessageThreadComponent({
     if ((!body && uploaded.length === 0) || !user || sending || stillUploading) return;
 
     setSending(true);
+    
+    // Create optimistic message immediately for instant UI feedback
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      threadId: thread.id,
+      senderId: user.uid,
+      recipientId: user.uid === thread.buyerId ? thread.sellerId : thread.buyerId,
+      listingId: thread.listingId,
+      body: body,
+      createdAt: new Date(),
+      ...(uploaded.length ? { attachments: uploaded } : {}),
+    };
+    
+    // Add optimistic message to UI immediately
+    setLatestMessages((prev) => [...prev, optimisticMessage]);
+    setMessageInput('');
+    
+    // Clear attachments + revoke local URLs
+    const attachmentsToClear = [...attachments];
+    setAttachments([]);
+    for (const a of attachmentsToClear) {
+      try {
+        URL.revokeObjectURL(a.localUrl);
+      } catch {}
+    }
+    
     try {
       // stop typing indicator
       try {
@@ -317,17 +354,13 @@ export function MessageThreadComponent({
         orderStatus,
         { attachments: uploaded.length ? uploaded : undefined }
       );
-      setMessageInput('');
-      // clear attachments + revoke local URLs
-      setAttachments((prev) => {
-        for (const a of prev) {
-          try {
-            URL.revokeObjectURL(a.localUrl);
-          } catch {}
-        }
-        return [];
-      });
+      
+      // Optimistic message will be automatically replaced when real message arrives via onSnapshot
+      // The subscription callback handles matching and removal
     } catch (error: any) {
+      // Remove optimistic message on error
+      setLatestMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      
       const code = typeof error?.code === 'string' ? error.code : '';
       toast({
         title: 'Error sending message',

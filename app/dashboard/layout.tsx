@@ -409,11 +409,6 @@ export default function DashboardLayout({
                         key={item.href}
                         href={item.href}
                         prefetch={true}
-                        onClick={(e) => {
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:408',message:'Sidebar Link onClick',data:{href:item.href,currentPath:typeof window !== 'undefined' ? window.location.pathname : '',defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                          // #endregion
-                        }}
                         className={cn(
                           'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
@@ -460,6 +455,20 @@ export default function DashboardLayout({
                         key={item.href}
                         href={item.href}
                         prefetch={true}
+                        onClick={(e) => {
+                          const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
+                          // #region agent log
+                          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:464',message:'Admin Sidebar Link onClick',data:{href:item.href,pathnameBefore,defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                          // #endregion
+                          // Track navigation result after a short delay
+                          setTimeout(() => {
+                            const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
+                            const navigationOccurred = pathnameBefore !== pathnameAfter;
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:464',message:'Admin Sidebar Link navigation result',data:{href:item.href,pathnameBefore,pathnameAfter,navigationOccurred,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                            // #endregion
+                          }, 100);
+                        }}
                         className={cn(
                           'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
@@ -518,6 +527,20 @@ export default function DashboardLayout({
                         key={item.href}
                         href={item.href}
                         prefetch={true}
+                        onClick={(e) => {
+                          const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
+                          // #region agent log
+                          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:522',message:'Admin Sidebar Link onClick (collapsed)',data:{href:item.href,pathnameBefore,defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                          // #endregion
+                          // Track navigation result after a short delay
+                          setTimeout(() => {
+                            const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
+                            const navigationOccurred = pathnameBefore !== pathnameAfter;
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:522',message:'Admin Sidebar Link navigation result (collapsed)',data:{href:item.href,pathnameBefore,pathnameAfter,navigationOccurred,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                            // #endregion
+                          }, 100);
+                        }}
                         className={cn(
                           'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
@@ -625,7 +648,21 @@ export default function DashboardLayout({
                             key={item.href}
                             href={item.href}
                             prefetch={true}
-                            onClick={() => setMobileMenuOpen(false)}
+                            onClick={(e) => {
+                              setMobileMenuOpen(false);
+                              const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:629',message:'Admin Mobile Sidebar Link onClick',data:{href:item.href,pathnameBefore,defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                              // #endregion
+                              // Track navigation result after a short delay
+                              setTimeout(() => {
+                                const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
+                                const navigationOccurred = pathnameBefore !== pathnameAfter;
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:629',message:'Admin Mobile Sidebar Link navigation result',data:{href:item.href,pathnameBefore,pathnameAfter,navigationOccurred,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                                // #endregion
+                              }, 100);
+                            }}
                             className={cn(
                               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',

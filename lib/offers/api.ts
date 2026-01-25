@@ -32,11 +32,12 @@ export async function createOffer(
   listingId: string,
   amount: number,
   note?: string,
-  preferredPaymentMethod?: 'card' | 'ach_debit' | 'wire'
+  preferredPaymentMethod?: 'card' | 'ach_debit' | 'wire',
+  quantity?: number
 ) {
   return authedFetch(`${API_BASE}/create`, {
     method: 'POST',
-    body: JSON.stringify({ listingId, amount, note, preferredPaymentMethod }),
+    body: JSON.stringify({ listingId, amount, note, preferredPaymentMethod, quantity }),
   });
 }
 

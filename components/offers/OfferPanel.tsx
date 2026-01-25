@@ -61,6 +61,7 @@ export function OfferPanel(props: { listing: Listing }) {
   const [step, setStep] = useState<'edit' | 'review'>('edit');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [quantity, setQuantity] = useState<number>(1);
   const [offerLimit, setOfferLimit] = useState<{ limit: number; used: number; left: number } | null>(null);
   const [preferredPaymentMethod, setPreferredPaymentMethod] = useState<PaymentMethodChoice | null>(null);
   const [offerPaymentDialogOpen, setOfferPaymentDialogOpen] = useState(false);
@@ -202,7 +203,8 @@ export function OfferPanel(props: { listing: Listing }) {
           listing.id,
           n,
           note.trim() ? note.trim() : undefined,
-          preferredPaymentMethod
+          preferredPaymentMethod,
+          listing.quantityTotal && listing.quantityTotal > 1 ? quantity : undefined
         );
         if ((res as any)?.offerLimit) setOfferLimit((res as any).offerLimit);
         const newOfferId = String((res as any)?.offerId || (res as any)?.id || '');
@@ -562,9 +564,14 @@ export function OfferPanel(props: { listing: Listing }) {
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold">Total</div>
                   <div className="text-sm font-extrabold">
-                    ${Number(amount || 0).toLocaleString()}
+                    ${(Number(amount || 0) * (listing.quantityTotal && listing.quantityTotal > 1 ? quantity : 1)).toLocaleString()}
                   </div>
                 </div>
+                {listing.quantityTotal && listing.quantityTotal > 1 && quantity > 1 ? (
+                  <div className="text-xs text-muted-foreground">
+                    ${Number(amount || 0).toLocaleString()} × {quantity} items
+                  </div>
+                ) : null}
                 <div className="text-xs text-muted-foreground">
                   You will only be charged if the seller accepts your offer.
                 </div>
