@@ -477,7 +477,8 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-8 max-w-5xl space-y-6">
+    <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
       <Card className="border-2 border-border/60 overflow-hidden">
         <CardContent className="p-5 md:p-6">
           <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
@@ -697,6 +698,7 @@ export default function NotificationsPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

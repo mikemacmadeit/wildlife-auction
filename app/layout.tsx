@@ -13,6 +13,7 @@ import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { getSiteUrl } from '@/lib/site-url';
 import { cookies } from 'next/headers';
 import { SiteGateClient } from '@/components/site/SiteGateClient';
+import { VisibilityDiagnostics } from '@/lib/dev/visibility-diagnostics';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -127,6 +128,7 @@ export default function RootLayout({
             <ConditionalFooter />
             <Toaster />
             <SonnerToaster />
+            <VisibilityDiagnostics enabled={process.env.NODE_ENV === 'development'} />
               </div>
             </SiteGateClient>
           ) : (
@@ -140,6 +142,7 @@ export default function RootLayout({
               <ConditionalFooter />
               <Toaster />
               <SonnerToaster />
+              <VisibilityDiagnostics enabled={process.env.NODE_ENV === 'development'} />
             </div>
           )}
         </Providers>

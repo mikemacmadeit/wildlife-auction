@@ -798,8 +798,7 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="min-h-screen bg-gradient-to-b from-muted/20 via-background to-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 space-y-6 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">My Purchases</h1>
@@ -1369,7 +1368,6 @@ export default function OrdersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
       </div>
     </div>
   );

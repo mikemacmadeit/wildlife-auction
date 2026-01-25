@@ -139,7 +139,8 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl space-y-6">
+    <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
@@ -267,6 +268,7 @@ export default function SupportPage() {
           )}
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

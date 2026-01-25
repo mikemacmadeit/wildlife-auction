@@ -28,6 +28,28 @@ export class ProductionErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('[ProductionErrorBoundary] Component error:', error, errorInfo);
+    
+    // Send to error tracking service if available
+    if (typeof window !== 'undefined') {
+      // Try Sentry if available
+      if ((window as any).Sentry) {
+        (window as any).Sentry.captureException(error, {
+          contexts: { react: errorInfo },
+          tags: { errorBoundary: true },
+        });
+      }
+      
+      // Also try to send to any custom error handler
+      try {
+        const errorEvent = new CustomEvent('app:error', {
+          detail: { error, errorInfo, source: 'ProductionErrorBoundary' },
+        });
+        window.dispatchEvent(errorEvent);
+      } catch (e) {
+        // Ignore if custom event fails
+      }
+    }
+    
     this.props.onError?.(error);
   }
 

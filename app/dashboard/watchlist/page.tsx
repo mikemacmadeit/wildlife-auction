@@ -427,8 +427,8 @@ export default function WatchlistPage() {
   const soldCount = categorizedListings.sold.length;
 
   return (
-    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-8">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+    <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
       <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
         <div className="mb-6 flex items-center justify-end">
           <TabsList className="grid grid-cols-3 w-full max-w-xl">

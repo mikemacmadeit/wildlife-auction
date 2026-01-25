@@ -60,7 +60,15 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }
 
   if (!user) {
-    return null; // Will redirect via useEffect
+    // Show redirecting state instead of null to prevent blank page
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting to login...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

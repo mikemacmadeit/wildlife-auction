@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -25,7 +25,6 @@ import {
   LogOut,
   ChevronDown,
   Search,
-  Home,
   Heart,
   Shield,
   CheckCircle,
@@ -33,9 +32,10 @@ import {
   Mail,
   Bell,
   HelpCircle,
-  LifeBuoy,
   Users,
+  LifeBuoy,
   Compass,
+  Home,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -58,11 +58,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
-import { QuickSetupTour } from '@/components/onboarding/QuickSetupTour';
 import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
-import { useQuickSetupTour } from '@/hooks/use-quick-setup-tour';
-import { db } from '@/lib/firebase/config';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import {
   markNotificationsAsReadByTypes,
   subscribeToUnreadCount,
@@ -71,16 +67,18 @@ import {
   subscribeToUnreadCountByTypes,
 } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
+import { db } from '@/lib/firebase/config';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
-interface DashboardNavItem {
+interface SellerNavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
 }
 
-// Base nav items (always visible)
-const baseNavItems: DashboardNavItem[] = [
+// Base nav items (always visible) - handles both /dashboard/* and /seller/* routes
+const baseNavItems: SellerNavItem[] = [
   { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/browse', label: 'Browse', icon: Compass },
   { href: '/seller/listings', label: 'My Listings', icon: Package },
@@ -98,18 +96,18 @@ const baseNavItems: DashboardNavItem[] = [
 ];
 
 // Admin nav items (only visible to admins)
-const adminNavItems: DashboardNavItem[] = [
+const adminNavItems: SellerNavItem[] = [
   { href: '/dashboard/admin/users', label: 'Users', icon: Users },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
+  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
   { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
   { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
   { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
-  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
 ];
 
 export default function DashboardLayout({
@@ -120,8 +118,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { isAdmin, isSuperAdmin, loading: adminLoading, role } = useAdmin();
-  const { shouldShow: showTour, markDismissed, markCompleted } = useQuickSetupTour();
+  const { isAdmin, isSuperAdmin } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
@@ -129,14 +126,44 @@ export default function DashboardLayout({
   const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
   const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
-  const [unreadSupportTicketsCount, setUnreadSupportTicketsCount] = useState<number>(0);
+  const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
   const [navPrefsLoaded, setNavPrefsLoaded] = useState(false);
 
-  // IMPORTANT: Don't gate admin nav rendering on adminLoading/authLoading.
-  // We only show admin items once isAdmin flips true, and we keep them visible thereafter.
-  const showAdminNav = isAdmin === true;
+  useEffect(() => {
+    setAdminEverTrue(false);
+    setPendingApprovalsCount(0);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (isAdmin === true) setAdminEverTrue(true);
+  }, [isAdmin]);
+
+  const showAdminNav = isAdmin === true || adminEverTrue;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const userOpen = window.localStorage.getItem('we:nav:v1:seller:user_open');
+      const adminOpen = window.localStorage.getItem('we:nav:v1:seller:admin_open');
+      if (userOpen !== null) setUserNavOpen(userOpen === '1');
+      if (adminOpen !== null) setAdminNavOpen(adminOpen === '1');
+      setNavPrefsLoaded(true);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!navPrefsLoaded) return;
+    try {
+      window.localStorage.setItem('we:nav:v1:seller:user_open', userNavOpen ? '1' : '0');
+      window.localStorage.setItem('we:nav:v1:seller:admin_open', adminNavOpen ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }, [showAdminNav, navPrefsLoaded, userNavOpen, adminNavOpen]);
 
   const baseNavWithBadges = useMemo(() => {
     return baseNavItems.map((item) => {
@@ -153,100 +180,60 @@ export default function DashboardLayout({
     });
   }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
 
-  // Clear the Messages badge when the user views the Messages page.
-  // This mirrors the "badge disappears when clicked" expectation.
+  const adminNavWithBadges = useMemo(() => {
+    return adminNavItems.map((item) => {
+      if (item.href === '/dashboard/admin/listings') {
+        return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
+      }
+      if (item.href === '/dashboard/admin/notifications') {
+        return {
+          ...item,
+          badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
+        };
+      }
+      return item;
+    });
+  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount]);
+
   useEffect(() => {
     if (!user?.uid) return;
     if (!pathname?.startsWith('/dashboard/messages')) return;
     void markNotificationsAsReadByTypes(user.uid, ['message_received']);
   }, [pathname, user?.uid]);
 
-  // Clear the Support badge when the admin views the Support page.
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (!pathname?.startsWith('/dashboard/admin/support')) return;
-    void markNotificationsAsReadByTypes(user.uid, ['Admin.Support.TicketSubmitted' as any]);
-  }, [pathname, user?.uid]);
-
-  const adminNavWithBadges = useMemo(() => {
-    return adminNavItems.map((item) => {
-      if (item.href === '/dashboard/admin/listings') {
-        return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
-      }
-      if (item.href === '/dashboard/admin/support') {
-        return { ...item, badge: unreadSupportTicketsCount > 0 ? unreadSupportTicketsCount : undefined };
-      }
-      // Admin notifications page is a TEST page, not a real notifications inbox
-      // So we don't show a badge for it
-      // if (item.href === '/dashboard/admin/notifications') {
-      //   // Super admin only: show unread ADMIN-category notifications as a red badge.
-      //   return {
-      //     ...item,
-      //     badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
-      //   };
-      // }
-      return item;
-    });
-  }, [pendingApprovalsCount, unreadSupportTicketsCount]);
-
-  // Real-time badges (unread messages/notifications + pending approvals)
   useEffect(() => {
     if (!user?.uid) {
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
       setUnreadAdminNotificationsCount(0);
-      setPendingApprovalsCount(0);
-      setUnreadSupportTicketsCount(0);
       return;
     }
 
-    const unsubs: Array<() => void> = [];
-
-    // 1) Messages badge: unread MESSAGE notifications only (keeps sidebar consistent with Messages page)
     try {
+      const unsubs: Array<() => void> = [];
       unsubs.push(
         subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
           setUnreadMessagesCount(count || 0);
         })
       );
-    } catch (e) {
-      console.error('Failed to subscribe to unread notifications count:', e);
-    }
-
-    // 1b) Notifications badge: all unread (includes messages; acceptable for now)
-    try {
       unsubs.push(
         subscribeToUnreadCount(user.uid, (count) => {
           setUnreadNotificationsCount(count || 0);
         })
       );
-    } catch (e) {
-      console.error('Failed to subscribe to unread total notifications count:', e);
-    }
 
-    // 1d) Admin notifications badge (super admin): unread ADMIN-category notifications only
-    // NOTE: Admin notifications page is a TEST page, not a real notifications inbox
-    // So we don't subscribe to admin notifications count for the badge
-    // if (showAdminNav && isSuperAdmin) {
-    //   try {
-    //     unsubs.push(
-    //       subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
-    //         setUnreadAdminNotificationsCount(count || 0);
-    //       })
-    //     );
-    //   } catch (e) {
-    //     console.error('Failed to subscribe to unread admin notifications count:', e);
-    //   }
-    // }
+      if (showAdminNav && isSuperAdmin) {
+        unsubs.push(
+          subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
+            setUnreadAdminNotificationsCount(count || 0);
+          })
+        );
+      }
 
-    // 1c) Bids & Offers badge: unread bid/offer notifications (eBay-like: "you have activity")
-    try {
-      const bidOfferTypes: NotificationType[] = [
-        // bids (from auction events)
+      const offerTypes: NotificationType[] = [
         'bid_outbid',
         'bid_received',
-        // offers
         'offer_received',
         'offer_countered',
         'offer_accepted',
@@ -254,122 +241,62 @@ export default function DashboardLayout({
         'offer_expired',
       ];
       unsubs.push(
-        subscribeToUnreadCountByTypes(user.uid, bidOfferTypes, (count) => {
+        subscribeToUnreadCountByTypes(user.uid, offerTypes, (count) => {
           setUnreadOffersCount(count || 0);
         })
       );
+      return () => unsubs.forEach((fn) => fn());
     } catch (e) {
-      console.error('Failed to subscribe to unread offer notifications count:', e);
+      console.error('Failed to subscribe to unread message count:', e);
+      setUnreadMessagesCount(0);
+      setUnreadNotificationsCount(0);
+      setUnreadOffersCount(0);
+      return;
     }
+  }, [user?.uid, showAdminNav, isSuperAdmin]);
 
-    // 1e) Admin Support badge: unread support ticket notifications
-    if (showAdminNav) {
-      try {
-        // Use the notification type string directly (stored as event type)
-        unsubs.push(
-          subscribeToUnreadCountByType(user.uid, 'Admin.Support.TicketSubmitted' as any, (count) => {
-            setUnreadSupportTicketsCount(count || 0);
-          })
-        );
-      } catch (e) {
-        console.error('Failed to subscribe to unread support tickets count:', e);
-      }
+  useEffect(() => {
+    if (!showAdminNav) return;
+    try {
+      const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
+      const unsub = onSnapshot(
+        qPending,
+        (snap) => setPendingApprovalsCount(snap.size || 0),
+        () => setPendingApprovalsCount(0)
+      );
+      return () => unsub();
+    } catch {
+      setPendingApprovalsCount(0);
+      return;
     }
+  }, [showAdminNav]);
 
-    // 2) Admin badge: pending listing approvals (drops as listings are approved/rejected)
-    if (showAdminNav) {
-      try {
-        const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
-        unsubs.push(
-          onSnapshot(
-            qPending,
-            (snap) => setPendingApprovalsCount(snap.size || 0),
-            (err) => {
-              console.error('Failed to subscribe to pending listings:', err);
-              setPendingApprovalsCount(0);
-            }
-          )
-        );
-      } catch (e) {
-        console.error('Failed to subscribe to pending listings:', e);
-      }
-    }
-
-    return () => {
-      unsubs.forEach((fn) => {
-        try {
-          fn();
-        } catch {}
-      });
-    };
-  }, [user?.uid, showAdminNav]);
-
-  // Combine nav items - add admin items if user is admin
-  // Use useMemo to ensure it updates when isAdmin changes
   const navItems = useMemo(() => {
-    // Always include base items
-    const items = baseNavWithBadges.slice();
-    
-    // Add admin items as soon as we know the user is admin.
-    // Do NOT wait on adminLoading here; it can lag behind isAdmin due to authLoading.
-    if (showAdminNav) {
-      items.push(...adminNavWithBadges);
-    }
-    
-    return items;
+    return showAdminNav ? [...baseNavWithBadges, ...adminNavWithBadges] : baseNavWithBadges;
   }, [showAdminNav, baseNavWithBadges, adminNavWithBadges]);
 
-  // Mobile bottom nav should be consistent across dashboard routes (avoid "tabs disappearing").
-  const bottomNavItems = useMemo(() => {
-    const want = ['/seller/overview', '/browse', '/dashboard/notifications', '/dashboard/messages', '/dashboard/watchlist'];
-    const m = new Map(navItems.map((i) => [i.href, i] as const));
-    return want.map((href) => m.get(href)).filter(Boolean) as DashboardNavItem[];
+  const mobileBottomNavItems = useMemo(() => {
+    const byHref = new Map(navItems.map((n) => [n.href, n] as const));
+    const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
+    return [
+      pick('/seller/overview', { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard }),
+      pick('/seller/listings', { href: '/seller/listings', label: 'Listings', icon: Package }),
+      pick('/browse', { href: '/browse', label: 'Browse', icon: Compass }),
+      pick('/dashboard/messages', { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare }),
+      pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
+    ];
   }, [navItems]);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Persist admin-only nav grouping collapse state (per device)
-  useEffect(() => {
-    if (!showAdminNav) return;
-    if (typeof window === 'undefined') return;
-    try {
-      const rawUser = window.localStorage.getItem('we:nav:v1:dashboard:user_open');
-      const rawAdmin = window.localStorage.getItem('we:nav:v1:dashboard:admin_open');
-      if (rawUser === '0' || rawUser === '1') setUserNavOpen(rawUser === '1');
-      if (rawAdmin === '0' || rawAdmin === '1') setAdminNavOpen(rawAdmin === '1');
-    } catch {
-      // ignore
+  const isActive = useCallback((href: string) => {
+    if (href === '/seller/overview') {
+      return pathname === '/seller' || pathname === '/seller/overview' || pathname === '/dashboard';
     }
-    // Mark loaded so we don't overwrite saved prefs with defaults on first admin render.
-    setNavPrefsLoaded(true);
-    // only run when admin nav becomes available
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAdminNav]);
-
-  useEffect(() => {
-    if (!showAdminNav) return;
-    if (!navPrefsLoaded) return;
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('we:nav:v1:dashboard:user_open', userNavOpen ? '1' : '0');
-      window.localStorage.setItem('we:nav:v1:dashboard:admin_open', adminNavOpen ? '1' : '0');
-    } catch {
-      // ignore
-    }
-  }, [showAdminNav, navPrefsLoaded, userNavOpen, adminNavOpen]);
-
-  const isActive = useCallback(
-    (href: string) => {
-      if (href === '/seller/overview') {
-        return pathname === '/seller' || pathname === '/seller/overview' || pathname === '/dashboard';
-      }
-      return pathname?.startsWith(href);
-    },
-    [pathname]
-  );
+    return pathname?.startsWith(href);
+  }, [pathname]);
 
   const handleSignOut = async () => {
     try {
@@ -380,37 +307,24 @@ export default function DashboardLayout({
     }
   };
 
-
-  // Don't show dashboard layout for listing creation page
-  if (pathname === '/dashboard/listings/new') {
-    return (
-      <RequireAuth>
-        <ProfileCompletionGate />
-        {children}
-      </RequireAuth>
-    );
-  }
-
+  // Protect all seller routes - require authentication
   return (
     <RequireAuth>
       <ProfileCompletionGate />
-      <QuickSetupTour
-        open={showTour}
-        onClose={markDismissed}
-        onComplete={markCompleted}
-      />
-      <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Desktop Sidebar */}
+      <div className="min-h-screen bg-background flex flex-col md:flex-row relative" style={{ isolation: 'isolate' }}>
+      {/* Desktop Sidebar - fixed on desktop to stay above content */}
       <aside
         className={cn(
-          'hidden md:flex md:flex-col md:w-64 md:fixed md:inset-y-0 md:left-0 md:z-40',
+          'hidden md:flex md:flex-col',
+          sidebarCollapsed ? 'md:w-20' : 'md:w-64',
           'border-r border-border/50 bg-card',
-          sidebarCollapsed && 'md:w-20'
+          'md:fixed md:inset-y-0 md:left-0'
         )}
+        style={{ pointerEvents: 'auto', zIndex: 10000, isolation: 'isolate' }}
       >
-        {/* Logo Section */}
-        <div className="flex items-center justify-between h-20 px-4 border-b border-border/50">
-          <Link href="/" prefetch className="flex items-center gap-3 group flex-shrink-0">
+            {/* Logo Section */}
+            <div className="flex items-center justify-between h-20 px-4 border-b border-border/50">
+              <Link href="/" prefetch className="flex items-center gap-3 group flex-shrink-0">
             <div className="relative h-10 w-10">
               <div className="relative h-full w-full">
                 <div className="h-full w-full dark:hidden">
@@ -425,7 +339,7 @@ export default function DashboardLayout({
                     }}
                   />
                 </div>
-                <div
+                <div 
                   className="hidden dark:block h-full w-full bg-primary"
                   style={{
                     maskImage: 'url(/images/Kudu.png)',
@@ -467,7 +381,6 @@ export default function DashboardLayout({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {/* Admin-only: split into collapsible "User" + "Admin" sections to keep the toolbar compact */}
           {showAdminNav && !sidebarCollapsed ? (
             <div className="space-y-2">
               <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
@@ -497,23 +410,19 @@ export default function DashboardLayout({
                         href={item.href}
                         prefetch={true}
                         className={cn(
-                          // Reserve left-accent space even when inactive to prevent layout "jump"
-                          // when toggling active state (some labels were reflowing).
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold min-w-0 border-l-4 border-transparent',
-                          'hover:bg-background/50 hover:text-foreground transition-colors',
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                          'hover:bg-background/50',
                           'min-h-[44px]',
-                          active && 'bg-primary/10 text-primary border-primary'
+                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
                         )}
                       >
                         <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                        <span className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                          <span className="truncate whitespace-nowrap">{item.label}</span>
-                          {item.badge && item.badge > 0 && (
-                            <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
-                              {item.badge}
-                            </Badge>
-                          )}
-                        </span>
+                        <span className="flex-1">{item.label}</span>
+                        {item.badge && item.badge > 0 && (
+                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                            {item.badge}
+                          </Badge>
+                        )}
                       </Link>
                     );
                   })}
@@ -547,21 +456,19 @@ export default function DashboardLayout({
                         href={item.href}
                         prefetch={true}
                         className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold min-w-0 border-l-4 border-transparent',
-                          'hover:bg-background/50 hover:text-foreground transition-colors',
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                          'hover:bg-background/50',
                           'min-h-[44px]',
-                          active && 'bg-primary/10 text-primary border-primary'
+                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
                         )}
                       >
                         <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                        <span className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                          <span className="truncate whitespace-nowrap">{item.label}</span>
-                          {item.badge && item.badge > 0 && (
-                            <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
-                              {item.badge}
-                            </Badge>
-                          )}
-                        </span>
+                        <span className="flex-1">{item.label}</span>
+                        {item.badge && item.badge > 0 && (
+                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                            {item.badge}
+                          </Badge>
+                        )}
                       </Link>
                     );
                   })}
@@ -569,7 +476,7 @@ export default function DashboardLayout({
               </Collapsible>
             </div>
           ) : (
-            <>
+            <div className="space-y-1">
               {baseNavWithBadges.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
@@ -579,218 +486,83 @@ export default function DashboardLayout({
                     href={item.href}
                     prefetch={true}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold min-w-0 border-l-4 border-transparent',
-                      'hover:bg-background/50 hover:text-foreground transition-colors',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                      'hover:bg-background/50',
                       'min-h-[44px]',
-                      active && 'bg-primary/10 text-primary border-primary'
+                      active && 'bg-primary/10 text-primary border-l-4 border-primary'
                     )}
                   >
                     <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                    {!sidebarCollapsed && (
-                      <span className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                        <span className="truncate whitespace-nowrap">{item.label}</span>
-                        {item.badge && item.badge > 0 && (
-                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </span>
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge && item.badge > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                        {item.badge}
+                      </Badge>
                     )}
                   </Link>
                 );
               })}
-          
-          {/* Admin Section */}
-          {showAdminNav && (
-            <>
-              {!sidebarCollapsed && (
-                <div className="px-3 py-2 mt-2">
-                  <Separator className="mb-2" />
-                  <div className="px-3 py-1.5">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Admin
-                    </span>
-                  </div>
-                </div>
-              )}
-              {sidebarCollapsed && (
-                <div className="px-3 py-2 mt-2">
-                  <Separator />
-                </div>
-              )}
-              {adminNavWithBadges.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    prefetch={true}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold min-w-0 border-l-4 border-transparent',
-                      'hover:bg-background/50 hover:text-foreground transition-colors',
-                      'min-h-[44px]',
-                      active && 'bg-primary/10 text-primary border-primary'
-                    )}
-                  >
-                    <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                    {!sidebarCollapsed && (
-                      <span className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                        <span className="truncate whitespace-nowrap">{item.label}</span>
+              {showAdminNav && (
+                <>
+                  <Separator className="my-2" />
+                  {adminNavWithBadges.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        prefetch={true}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                          'hover:bg-background/50',
+                          'min-h-[44px]',
+                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                        )}
+                      >
+                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        <span className="flex-1">{item.label}</span>
                         {item.badge && item.badge > 0 && (
-                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs font-semibold">
+                          <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
                             {item.badge}
                           </Badge>
                         )}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </>
-          )}
-            </>
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           )}
         </nav>
-
-        {/* Theme Toggle */}
-        <div className="px-3 pb-3 border-t border-border/50 pt-3">
-          <div className={cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-lg',
-            'min-h-[44px]',
-            sidebarCollapsed && 'justify-center'
-          )}>
-            {!sidebarCollapsed && (
-              <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">
-                Theme
-              </span>
-            )}
-            <ThemeToggle />
-          </div>
-        </div>
-
-        {/* User Profile Section */}
-        <div className="p-3 border-t border-border/50">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className={cn(
-                  'w-full min-h-[44px] font-semibold gap-2 justify-start',
-                  sidebarCollapsed && 'px-0 justify-center'
-                )}
-              >
-                <User className="h-5 w-5 flex-shrink-0" />
-                {!sidebarCollapsed && (
-                  <div className="flex flex-col items-start flex-1 min-w-0">
-                    <span className="text-sm font-semibold truncate w-full">
-                      {user?.displayName || user?.email?.split('@')[0] || 'Account'}
-                    </span>
-                    {user?.email && (
-                      <span className="text-xs text-muted-foreground truncate w-full">
-                        {user.email}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {!sidebarCollapsed && <ChevronDown className="h-4 w-4 flex-shrink-0 opacity-50" />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="start" className="w-56">
-              {user ? (
-                <>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {user.displayName || 'User'}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground truncate">
-                        {user.email}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/account" className="flex items-center gap-2 cursor-pointer">
-                      <Settings className="h-4 w-4" />
-                      Account Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem asChild>
-                    <Link href="/register" className="flex items-center gap-2 cursor-pointer">
-                      <User className="h-4 w-4" />
-                      Sign Up
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/login" className="flex items-center gap-2 cursor-pointer">
-                      <User className="h-4 w-4" />
-                      Sign In
-                    </Link>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </aside>
 
-      {/* Mobile Top Bar */}
-      <div className="md:hidden sticky top-0 z-50 border-b border-border/50 bg-card">
-        <div className="flex items-center justify-between h-16 px-4">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div
-              aria-hidden="true"
-              className="h-9 w-9 opacity-95 group-hover:opacity-100 transition-opacity"
-              style={{
-                backgroundColor: 'hsl(var(--primary))',
-                WebkitMaskImage: "url('/images/Kudu.png')",
-                maskImage: "url('/images/Kudu.png')",
-                WebkitMaskRepeat: 'no-repeat',
-                maskRepeat: 'no-repeat',
-                WebkitMaskPosition: 'center',
-                maskPosition: 'center',
-                WebkitMaskSize: 'contain',
-                maskSize: 'contain',
-              }}
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between h-16 px-4 border-b border-border/50 bg-card">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="relative h-8 w-8">
+            <Image
+              src="/images/Kudu.png"
+              alt="Wildlife Exchange"
+              width={32}
+              height={32}
+              className="h-full w-full object-contain"
             />
-            <div className="flex flex-col">
-              <span className="text-base font-extrabold text-foreground leading-tight group-hover:text-primary transition-colors">
-                Wildlife Exchange
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium">
-                Dashboard
-              </span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-1">
-            <Link href="/" prefetch={false}>
-              <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Home">
-                <Home className="h-5 w-5" />
+          </div>
+          <span className="text-lg font-bold">Wildlife Exchange</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-5 w-5" />
               </Button>
-            </Link>
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Menu</span>
-                </Button>
-              </SheetTrigger>
+            </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0">
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between p-4 border-b border-border/50">
-                  <span className="text-lg font-extrabold text-foreground">Menu</span>
+                  <span className="text-lg font-bold">Menu</span>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -802,108 +574,91 @@ export default function DashboardLayout({
                 <nav className="flex-1 overflow-y-auto p-4 space-y-2">
                   {showAdminNav ? (
                     <>
-                      <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider hover:bg-background/50"
-                          >
-                            <span>User</span>
-                            <ChevronDown className={cn('h-4 w-4 transition-transform', userNavOpen ? 'rotate-180' : 'rotate-0')} />
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-1 pt-1">
-                          {baseNavWithBadges
-                            .filter((item) => item.href !== '/browse') // Remove Browse from mobile menu since it's in bottom nav
-                            .map((item) => {
-                              const Icon = item.icon;
-                              const active = isActive(item.href);
-                              return (
-                                <Link
-                                  key={item.href}
-                                  href={item.href}
-                                  prefetch={false}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                  className={cn(
-                                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
-                                    'hover:bg-background/50',
-                                    'min-h-[44px]',
-                                    active && 'bg-primary/10 text-primary border-primary'
-                                  )}
-                                >
-                                  <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                                  <span className="flex-1 min-w-0 truncate whitespace-nowrap">{item.label}</span>
-                                  {item.badge && item.badge > 0 && (
-                                    <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                      {item.badge}
-                                    </Badge>
-                                  )}
-                                </Link>
-                              );
-                            })}
-                        </CollapsibleContent>
-                      </Collapsible>
-
-                      <Collapsible open={adminNavOpen} onOpenChange={setAdminNavOpen}>
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider hover:bg-background/50"
-                          >
-                            <span>Admin</span>
-                            <ChevronDown className={cn('h-4 w-4 transition-transform', adminNavOpen ? 'rotate-180' : 'rotate-0')} />
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-1 pt-1">
-                          {adminNavWithBadges.map((item) => {
-                            const Icon = item.icon;
-                            const active = isActive(item.href);
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                prefetch={false}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className={cn(
-                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
-                                  'hover:bg-background/50',
-                                  'min-h-[44px]',
-                                  active && 'bg-primary/10 text-primary border-primary'
-                                )}
-                              >
-                                <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                                <span className="flex-1 min-w-0 truncate whitespace-nowrap">{item.label}</span>
-                                {item.badge && item.badge > 0 && (
-                                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                    {item.badge}
-                                  </Badge>
-                                )}
-                              </Link>
-                            );
-                          })}
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </>
-                  ) : (
-                    <div className="space-y-1">
-                      {navItems.map((item) => {
+                      <div className="px-3 pt-1 mb-2">
+                        <Separator />
+                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 mb-1">
+                          User
+                        </div>
+                      </div>
+                      {baseNavWithBadges.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
                         return (
                           <Link
                             key={item.href}
                             href={item.href}
-                            prefetch={false}
+                            prefetch={true}
                             onClick={() => setMobileMenuOpen(false)}
                             className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold min-w-0 border-l-4 border-transparent',
+                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',
                               'min-h-[44px]',
-                              active && 'bg-primary/10 text-primary border-primary'
+                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
                             )}
                           >
                             <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
-                            <span className="flex-1 min-w-0 truncate whitespace-nowrap">{item.label}</span>
+                            <span className="flex-1">{item.label}</span>
+                            {item.badge && item.badge > 0 && (
+                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                {item.badge}
+                              </Badge>
+                            )}
+                          </Link>
+                        );
+                      })}
+                      <div className="px-3 pt-1 mt-4 mb-2">
+                        <Separator />
+                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 mb-1">
+                          Admin
+                        </div>
+                      </div>
+                      {adminNavWithBadges.map((item) => {
+                        const Icon = item.icon;
+                        const active = isActive(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            prefetch={true}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                              'hover:bg-background/50',
+                              'min-h-[44px]',
+                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                            )}
+                          >
+                            <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                            <span className="flex-1">{item.label}</span>
+                            {item.badge && item.badge > 0 && (
+                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                                {item.badge}
+                              </Badge>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <div className="space-y-1">
+                      {baseNavWithBadges.map((item) => {
+                        const Icon = item.icon;
+                        const active = isActive(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            prefetch={true}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                              'hover:bg-background/50',
+                              'min-h-[44px]',
+                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                            )}
+                          >
+                            <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                            <span className="flex-1">{item.label}</span>
                             {item.badge && item.badge > 0 && (
                               <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
                                 {item.badge}
@@ -921,32 +676,31 @@ export default function DashboardLayout({
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div
-        className={cn(
-          'flex-1 flex flex-col',
-          'md:ml-64',
-          sidebarCollapsed && 'md:ml-20'
-        )}
-      >
+      {/* Main Content Area - flex-1 takes remaining space, margin for fixed sidebar */}
+      <div className={cn(
+        'flex-1 flex flex-col min-w-0 min-h-0',
+        sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
+      )}>
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-h-0 min-w-0 pb-20 md:pb-0 relative">
           <ProductionErrorBoundary>
-            {children}
+            <div className="relative">
+              {children}
+            </div>
           </ProductionErrorBoundary>
         </main>
 
         {/* Mobile Bottom Nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-card/80 backdrop-blur-md">
           <div className="grid grid-cols-5 h-16">
-            {bottomNavItems.map((item) => {
+            {mobileBottomNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch={false}
+                  prefetch={true}
                   className={cn(
                     'flex flex-col items-center justify-center gap-1',
                     'hover:bg-background/50 active:bg-background',
@@ -982,7 +736,6 @@ export default function DashboardLayout({
         </nav>
       </div>
       </div>
-    </div>
     </RequireAuth>
   );
 }

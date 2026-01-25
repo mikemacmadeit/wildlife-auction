@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,10 +35,11 @@ export default function MessagesPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const listingIdParam = searchParams?.get('listingId');
-  const sellerIdParam = searchParams?.get('sellerId');
-  const threadIdParam = searchParams?.get('threadId');
+  const listingIdParam = searchParams?.get('listingId') || null;
+  const sellerIdParam = searchParams?.get('sellerId') || null;
+  const threadIdParam = searchParams?.get('threadId') || null;
 
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
@@ -58,10 +59,36 @@ export default function MessagesPage() {
     >
   >({});
   const metaFetchInFlightRef = useRef<Set<string>>(new Set());
+  const selectedThreadIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
+
+  // Reset state when navigating away from messages page
+  useEffect(() => {
+    if (typeof window !== 'undefined' && pathname && pathname !== '/dashboard/messages') {
+      setSelectedThreadId(null);
+      setThread(null);
+      setListing(null);
+    }
+  }, [pathname]);
+
+  // Emergency escape: keyboard shortcut to leave messages
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        router.push('/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [router]);
 
   const inboxItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const isBuyerFor = (t: MessageThread) => (user?.uid ? t.buyerId === user.uid : true);
 
     const rows = threads.map((t) => {
       const isBuyer = user?.uid ? t.buyerId === user.uid : true;
@@ -132,21 +159,28 @@ export default function MessagesPage() {
           return next;
         });
         // Don't auto-select on mobile - let user choose
-        // Only auto-select on desktop if nothing is selected
-        if (!selectedThreadId && data[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+        // Only auto-select on desktop if nothing is selected (use ref to avoid stale closure)
+        const currentSelectedId = selectedThreadIdRef.current;
+        if (!currentSelectedId && data[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024) {
           setSelectedThreadId(data[0].id);
         }
       },
       {
         onError: (e) => {
           console.error('[dashboard/messages] subscribeToAllUserThreads error', e);
+          setLoading(false);
+          toast({
+            title: 'Connection error',
+            description: 'Unable to load messages. Please refresh the page.',
+            variant: 'destructive',
+          });
         },
       }
     );
 
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listingIdParam, sellerIdParam, user?.uid]);
+  }, [listingIdParam, sellerIdParam, user?.uid]); // Note: selectedThreadId intentionally excluded to prevent re-subscription loops
 
   // Best-effort meta hydration for thread list (names + listing title + listing image).
   useEffect(() => {
@@ -193,7 +227,7 @@ export default function MessagesPage() {
         };
       }
       setMetaByThreadId((prev) => ({ ...prev, ...next }));
-    });
+    }).catch(() => {});
   }, [metaByThreadId, threads, user?.uid]);
 
   const initializeThread = useCallback(async () => {
@@ -281,23 +315,41 @@ export default function MessagesPage() {
       // 2) Inbox mode (optionally with threadId deep link)
       setLoading(false);
       if (threadIdParam) {
-        setSelectedThreadId(threadIdParam);
-      } else {
-        // Ensure inbox is visible on mobile when no thread is selected
-        setSelectedThreadId(null);
+        // Sync URL param to state (only if different to avoid unnecessary updates)
+        const currentId = selectedThreadIdRef.current;
+        if (currentId !== threadIdParam) {
+          setSelectedThreadId(threadIdParam);
+        }
       }
+      // Don't clear selectedThreadId when threadIdParam is null - let user selections persist
+      // Only clear on explicit navigation away from messages page (handled by pathname effect)
     }
-  }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread, threadIdParam]);
+  }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread, threadIdParam]); // Use ref for comparison to prevent effect loop
 
   // When selecting a thread from inbox, populate the thread/listing/name for the thread view.
   useEffect(() => {
     if (!user?.uid) return;
     if (listingIdParam && sellerIdParam) return; // handled by initializeThread flow
-    if (!selectedThreadId) return;
+    if (!selectedThreadId) {
+      setThread(null);
+      setListing(null);
+      return;
+    }
+
+    // Clear thread immediately if it doesn't match selectedThreadId to prevent showing stale data
+    if (thread && thread.id !== selectedThreadId) {
+      setThread(null);
+      setListing(null);
+    }
 
     const t = threads.find((x) => x.id === selectedThreadId) || null;
-    if (!t) return;
+    if (!t) {
+      // Thread not found yet - might still be loading
+      // Don't clear thread state, just wait for it to appear in threads array
+      return;
+    }
 
+    // Set thread immediately when found
     setThread(t);
     // Optimistically mark as read for immediate UI update
     setOptimisticReadThreads((prev) => new Set(prev).add(selectedThreadId));
@@ -326,7 +378,7 @@ export default function MessagesPage() {
       setListing(listingRes.status === 'fulfilled' ? listingRes.value : null);
       const otherProfile = otherRes.status === 'fulfilled' ? otherRes.value : null;
       setOtherPartyAvatar(otherProfile?.photoURL || undefined);
-    });
+    }).catch(() => {});
   }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
 
   if (authLoading || loading) {
@@ -379,8 +431,11 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
-      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-6xl">
+    <div 
+      className="bg-background pb-20 md:pb-6 relative" 
+      style={{ minHeight: '100vh', zIndex: 1, position: 'relative' }}
+    >
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8 relative" style={{ position: 'relative', zIndex: 1 }}>
         <div className="mb-4 lg:mb-6">
           <Button 
             variant="ghost" 
@@ -390,27 +445,33 @@ export default function MessagesPage() {
                 setSelectedThreadId(null);
                 router.replace('/dashboard/messages');
               } else {
-                router.back();
+                // Use push instead of back to ensure navigation works even without history
+                router.push('/dashboard');
               }
             }} 
             className="mb-2"
+            aria-label="Go back to dashboard"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
             Back
           </Button>
           <h1 className="text-2xl font-bold">Messages</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0 relative" style={{ position: 'relative', zIndex: 1 }}>
           {/* Mobile: keep both panes mounted and slide between them for smoothness */}
-          <div className="lg:hidden relative" style={{ height: 'calc(100dvh - 280px)', minHeight: '400px' }}>
+          <div className="lg:hidden relative overflow-hidden" style={{ height: 'calc(100dvh - 280px)', minHeight: '400px', pointerEvents: 'auto', position: 'relative', zIndex: 1 }}>
             {/* Inbox pane */}
             <Card
               className={cn(
                 'absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out',
-                'will-change-transform transform-gpu z-10',
+                'will-change-transform transform-gpu',
                 selectedThreadId ? '-translate-x-full' : 'translate-x-0'
               )}
+              style={{ 
+                pointerEvents: selectedThreadId ? 'none' : 'auto',
+                zIndex: selectedThreadId ? 1 : 2
+              }}
             >
               <CardHeader className="pb-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -420,12 +481,13 @@ export default function MessagesPage() {
                   </Badge>
                 </div>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search people, listings, messages..."
                     className="pl-9"
+                    aria-label="Search conversations"
                   />
                 </div>
                 <Tabs value={inboxTab} onValueChange={(v) => setInboxTab(v as any)}>
@@ -448,7 +510,12 @@ export default function MessagesPage() {
                         return (
                           <div
                             key={item.id}
-                            onClick={() => {
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Open conversation with ${item.otherName} about ${item.listingTitle}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               if (!user?.uid) return;
                               // Optimistically mark as read for immediate UI update
                               setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
@@ -464,10 +531,17 @@ export default function MessagesPage() {
                                 });
                               });
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                (e.currentTarget as HTMLElement).click();
+                              }
+                            }}
                             className={cn(
-                              'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer',
+                              'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                               active && 'bg-muted/40'
                             )}
+                            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
                           >
                             <div className="grid grid-cols-[48px_1fr_116px_44px] gap-3 items-start min-w-0">
                               <div className="contents">
@@ -528,7 +602,14 @@ export default function MessagesPage() {
                                       if (!user?.uid) return;
                                       try {
                                         await markThreadAsRead(item.id, user.uid);
-                                      } catch {}
+                                        setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
+                                      } catch (e: any) {
+                                        toast({
+                                          title: 'Error',
+                                          description: e?.message || 'Failed to mark thread as read',
+                                          variant: 'destructive',
+                                        });
+                                      }
                                     }}
                                   >
                                     <CheckCheck className="h-4 w-4 mr-2" />
@@ -569,9 +650,13 @@ export default function MessagesPage() {
             <Card
               className={cn(
                 'absolute inset-0 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out',
-                'will-change-transform transform-gpu z-20',
+                'will-change-transform transform-gpu',
                 selectedThreadId ? 'translate-x-0' : 'translate-x-full'
               )}
+              style={{ 
+                pointerEvents: selectedThreadId ? 'auto' : 'none',
+                zIndex: selectedThreadId ? 2 : 1
+              }}
             >
               <div className="border-b p-3">
                 <Button
@@ -582,8 +667,9 @@ export default function MessagesPage() {
                     setSelectedThreadId(null);
                     router.replace('/dashboard/messages');
                   }}
+                  aria-label="Return to inbox"
                 >
-                  <Inbox className="h-4 w-4 mr-2" />
+                  <Inbox className="h-4 w-4 mr-2" aria-hidden="true" />
                   Inbox
                 </Button>
               </div>
@@ -619,6 +705,7 @@ export default function MessagesPage() {
             className={cn(
               'hidden lg:flex h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex-col min-h-0'
             )}
+            style={{ position: 'relative', zIndex: 1 }}
           >
             <CardHeader className="pb-3 space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -628,12 +715,13 @@ export default function MessagesPage() {
                 </Badge>
               </div>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search people, listings, messages..."
                   className="pl-9"
+                  aria-label="Search conversations"
                 />
               </div>
               <Tabs value={inboxTab} onValueChange={(v) => setInboxTab(v as any)}>
@@ -657,7 +745,12 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={item.id}
-                          onClick={() => {
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Open conversation with ${item.otherName} about ${item.listingTitle}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             if (!user?.uid) return;
                             // Optimistically mark as read for immediate UI update
                             setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
@@ -673,10 +766,17 @@ export default function MessagesPage() {
                               });
                             });
                           }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              (e.currentTarget as HTMLElement).click();
+                            }
+                          }}
                           className={cn(
-                            'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer',
+                            'group w-full min-w-0 p-3 hover:bg-muted/30 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                             active && 'bg-muted/40'
                           )}
+                          style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
                         >
                           <div className="grid grid-cols-[48px_1fr_116px_44px] gap-3 items-start min-w-0">
                             <div className="contents">
@@ -743,7 +843,14 @@ export default function MessagesPage() {
                                     if (!user?.uid) return;
                                     try {
                                       await markThreadAsRead(item.id, user.uid);
-                                    } catch {}
+                                      setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
+                                    } catch (e: any) {
+                                      toast({
+                                        title: 'Error',
+                                        description: e?.message || 'Failed to mark thread as read',
+                                        variant: 'destructive',
+                                      });
+                                    }
                                   }}
                                 >
                                   <CheckCheck className="h-4 w-4 mr-2" />
@@ -785,43 +892,32 @@ export default function MessagesPage() {
             className={cn(
               'hidden lg:flex h-[calc(100dvh-220px)] lg:h-[calc(100vh-220px)] flex-col overflow-hidden min-h-0'
             )}
+            style={{ position: 'relative', zIndex: 1 }}
           >
-            {!thread ? (
+            {!thread && !selectedThreadId ? (
               <CardContent className="pt-12 pb-12 text-center">
                 <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50" />
                 <div className="font-semibold">Select a conversation</div>
                 <div className="text-sm text-muted-foreground mt-1">Choose a thread from the inbox.</div>
               </CardContent>
-            ) : (
-              <>
-                {/* Mobile: back to inbox */}
-                <div className="lg:hidden border-b p-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedThreadId(null);
-                      router.replace('/dashboard/messages');
-                    }}
-                  >
-                    <Inbox className="h-4 w-4 mr-2" />
-                    Inbox
-                  </Button>
-                </div>
-                <div className="flex-1 min-h-0">
-                  <MessageThreadComponent
-                    key={thread.id}
-                    thread={thread}
-                    listingTitle={listing?.title || 'Listing'}
-                    listing={listing}
-                    otherPartyName={otherPartyName}
-                    otherPartyAvatar={otherPartyAvatar}
-                    orderStatus={orderStatus}
-                  />
-                </div>
-              </>
-            )}
+            ) : !thread && selectedThreadId ? (
+              <CardContent className="pt-12 pb-12 text-center">
+                <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-50 animate-pulse" />
+                <div className="font-semibold">Loading conversation...</div>
+              </CardContent>
+            ) : thread ? (
+              <div className="flex-1 min-h-0">
+                <MessageThreadComponent
+                  key={thread.id}
+                  thread={thread}
+                  listingTitle={listing?.title || 'Listing'}
+                  listing={listing}
+                  otherPartyName={otherPartyName}
+                  otherPartyAvatar={otherPartyAvatar}
+                  orderStatus={orderStatus}
+                />
+              </div>
+            ) : null}
           </Card>
         </div>
       </div>
