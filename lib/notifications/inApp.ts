@@ -184,7 +184,7 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_created', // Map to order_created for seller sales notifications (Order.Received = new sale for seller)
-        title: 'Receipt confirmed',
+        title: 'New sale!',
         body: `The buyer confirmed receipt for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
