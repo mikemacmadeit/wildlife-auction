@@ -1,4 +1,5 @@
 import { User as FirebaseUser } from 'firebase/auth';
+import { collection, doc } from 'firebase/firestore';
 import { auth, db } from './config';
 import { getDocument, setDocument, updateDocument } from './firestore';
 import { PublicSellerTrust, UserProfile } from '@/lib/types';
@@ -140,9 +141,10 @@ export const createUserDocument = async (
       
       // Initialize canonical notification preferences with all notifications enabled
       const { getDefaultNotificationPreferences } = await import('@/lib/notifications/preferences');
+      const { setDoc } = await import('firebase/firestore');
       const defaultPrefs = getDefaultNotificationPreferences();
-      const prefsRef = db.collection('users').doc(user.uid).collection('notificationPreferences').doc('default');
-      await prefsRef.set(defaultPrefs);
+      const prefsRef = doc(db, 'users', user.uid, 'notificationPreferences', 'default');
+      await setDoc(prefsRef, defaultPrefs);
       // Mirror a safe subset for public profile reads.
       await upsertPublicProfile(user.uid, userData);
     } catch (error) {
