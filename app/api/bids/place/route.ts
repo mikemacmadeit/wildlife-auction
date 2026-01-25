@@ -457,7 +457,29 @@ export async function POST(request: Request) {
         if (outbidRes?.created) void trySendEmailJob(outbidRes.eventId);
       }
 
-      // Bidder: winning vs immediately surpassed.
+      // Bidder: always send Bid.Placed confirmation, then conditionally send HighBidder/Outbid
+      const isHighBidder = newBidderId === bidderId;
+      const bidPlacedRes = await emitAndProcessEventForUser({
+        type: 'Bid.Placed',
+        actorId: bidderId,
+        entityType: 'listing',
+        entityId: listingId,
+        targetUserId: bidderId,
+        payload: {
+          type: 'Bid.Placed',
+          listingId,
+          listingTitle,
+          listingUrl,
+          bidAmount: result.newCurrentBid,
+          currentBidAmount: result.newCurrentBid,
+          isHighBidder,
+          ...(endsAtIso ? { endsAt: endsAtIso } : {}),
+        },
+        optionalHash: `bid:${result.bidId}:placed`,
+      });
+      if (bidPlacedRes?.created) void trySendEmailJob(bidPlacedRes.eventId);
+
+      // Bidder: winning vs immediately surpassed (additional notification).
       if (newBidderId !== bidderId) {
         const immediateOutbidRes = await emitAndProcessEventForUser({
           type: 'Auction.Outbid',

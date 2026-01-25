@@ -117,6 +117,21 @@ function buildEmailJobPayload(params: {
         },
       };
     }
+    case 'Bid.Placed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Bid.Placed' }>;
+      return {
+        template: 'bid_placed',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          bidAmount: p.bidAmount,
+          currentBidAmount: p.currentBidAmount,
+          isHighBidder: p.isHighBidder,
+          listingUrl: p.listingUrl,
+          auctionEndsAt: p.endsAt || undefined,
+        },
+      };
+    }
     case 'Auction.HighBidder': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Auction.HighBidder' }>;
       return {
@@ -332,6 +347,19 @@ function buildEmailJobPayload(params: {
           listingTitle: p.listingTitle,
           amount: p.amount,
           offerUrl: p.offerUrl,
+        },
+      };
+    }
+    case 'Offer.Submitted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Offer.Submitted' }>;
+      return {
+        template: 'offer_submitted',
+        templatePayload: {
+          userName: recipientName,
+          listingTitle: p.listingTitle,
+          amount: p.amount,
+          offerUrl: p.offerUrl,
+          expiresAt: p.expiresAt || undefined,
         },
       };
     }

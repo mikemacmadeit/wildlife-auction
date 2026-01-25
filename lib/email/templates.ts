@@ -92,6 +92,14 @@ export interface OfferAcceptedEmailData {
   offerUrl: string;
 }
 
+export interface OfferSubmittedEmailData {
+  userName: string;
+  listingTitle: string;
+  amount: number;
+  offerUrl: string;
+  expiresAt?: string;
+}
+
 export interface OfferReceivedEmailData {
   userName: string;
   listingTitle: string;
@@ -788,6 +796,85 @@ export function getAuctionWinnerEmail(data: AuctionWinnerEmailData): { subject: 
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
+export interface BidPlacedEmailData {
+  userName: string;
+  listingTitle: string;
+  bidAmount: number;
+  currentBidAmount: number;
+  isHighBidder: boolean;
+  listingUrl: string;
+  auctionEndsAt?: Date | string;
+}
+
+export function getBidPlacedEmail(data: BidPlacedEmailData): { subject: string; html: string } {
+  const subject = data.isHighBidder 
+    ? `Bid placed — you're winning: ${data.listingTitle}`
+    : `Bid placed: ${data.listingTitle}`;
+  const preheader = data.isHighBidder
+    ? `Your bid is currently the high bid.`
+    : `Your bid has been placed successfully.`;
+  const origin = tryGetOrigin(data.listingUrl);
+
+  const endsAtLine = data.auctionEndsAt
+    ? `<div style="margin-top: 6px;"><span style="color:#5B564A;">Ends:</span> <strong>${escapeHtml(
+        typeof data.auctionEndsAt === 'string' 
+          ? new Date(data.auctionEndsAt).toLocaleString()
+          : data.auctionEndsAt.toLocaleString()
+      )}</strong></div>`
+    : '';
+
+  const statusMessage = data.isHighBidder
+    ? `Hi ${escapeHtml(data.userName)} — your bid has been placed and you're currently the high bidder!`
+    : `Hi ${escapeHtml(data.userName)} — your bid has been placed successfully.`;
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      ${data.isHighBidder ? 'Bid placed — you\'re winning!' : 'Bid placed'}
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      ${statusMessage}
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#E2D6C2; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Bid details
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Your bid:</span> <strong>$${data.bidAmount.toLocaleString(
+              'en-US',
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            )}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Current high bid:</span> <strong>$${data.currentBidAmount.toLocaleString(
+              'en-US',
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            )}</strong></div>
+            ${endsAtLine}
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    ${data.isHighBidder 
+      ? `<div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
+          Tip: If you can't watch the finish, set a maximum you're comfortable paying so you're not caught off guard.
+        </div>`
+      : `<div style="margin: 14px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
+          You'll be notified if someone outbids you or if you win the auction.
+        </div>`
+    }
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.listingUrl, 'View listing')}
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
 export function getAuctionOutbidEmail(data: AuctionOutbidEmailData): { subject: string; html: string } {
   const subject = `You’ve been outbid — ${data.listingTitle}`;
   const preheader = `You’ve been outbid. Review the current high bid and decide your next move.`;
@@ -1293,6 +1380,49 @@ export function getOfferAcceptedEmail(data: OfferAcceptedEmailData): { subject: 
 
     <div style="margin-top: 12px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       Tip: If you’re the buyer, you can proceed to checkout from the offer page. If you’re the seller, you can track the accepted offer there.
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getOfferSubmittedEmail(data: OfferSubmittedEmailData): { subject: string; html: string } {
+  const subject = `Offer submitted — ${data.listingTitle}`;
+  const preheader = `Your offer of $${Number(data.amount).toLocaleString()} has been submitted to the seller.`;
+  const origin = tryGetOrigin(data.offerUrl);
+
+  const expires =
+    data.expiresAt && data.expiresAt.trim()
+      ? `<div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
+          Expires: <span style="font-weight:800; color:#22251F;">${escapeHtml(new Date(data.expiresAt).toLocaleString())}</span>
+        </div>`
+      : '';
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Offer submitted
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — your offer on <span style="font-weight:700; color:#22251F;">${escapeHtml(data.listingTitle)}</span> has been submitted.
+    </div>
+
+    <div style="margin: 12px 0 0 0; padding: 12px 14px; border: 1px solid #E6E1D6; border-radius: 12px; background: #FBFAF7;">
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; text-transform: uppercase; letter-spacing: .08em; font-weight: 800;">
+        Your offer
+      </div>
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 20px; color:#22251F; font-weight: 900; margin-top: 2px;">
+        $${escapeHtml(Number(data.amount).toLocaleString())}
+      </div>
+      ${expires}
+    </div>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.offerUrl, 'View your offer')}
+    </div>
+    <div style="margin: 10px 0 0 0;">
+      <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; line-height: 1.5;">
+        The seller will be notified and can accept, counter, or decline your offer. You'll receive an email when they respond.
+      </div>
     </div>
   `;
 

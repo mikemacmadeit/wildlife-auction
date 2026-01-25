@@ -369,64 +369,68 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
           </div>
 
             {/* Price and Seller Info */}
-            <div className="mt-auto pt-2 sm:pt-3 border-t border-border/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
-              <div className="flex-shrink-0">
-                <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {priceDisplay}
-                </div>
-                {listing.type === 'auction' && listing.reservePrice && (
-                  <div className="hidden sm:block text-xs text-muted-foreground font-medium mt-0.5">
-                    Reserve: ${listing.reservePrice.toLocaleString()}
+            <div className="mt-auto pt-2 sm:pt-3 border-t border-border/50">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 min-w-0">
+                {/* Price Section */}
+                <div className="flex-shrink-0 min-w-0 max-w-[60%] sm:max-w-[65%]">
+                  <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent break-words truncate">
+                    {priceDisplay}
                   </div>
-                )}
-              </div>
-              <div className="flex flex-col items-start sm:items-end gap-0.5 sm:gap-1 min-w-0 flex-1 sm:flex-initial">
-                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold text-muted-foreground min-w-0 flex-1 sm:flex-initial sm:max-w-[200px] hover:underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const sellerId = listing.sellerId;
-                      if (!sellerId) return;
-                      router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
-                    }}
-                    aria-label="View seller profile"
-                  >
-                    <Avatar className="h-5 w-5 sm:h-6 sm:w-6 border border-border/50 flex-shrink-0">
-                      <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
-                      <AvatarFallback className="text-[9px] sm:text-[10px] font-bold">{sellerInitial}</AvatarFallback>
-                    </Avatar>
-                    <span className="truncate min-w-0">{sellerName}</span>
-                  </button>
-                  {/* Seller Tier badge (Seller Tiers) */}
-                  <div className="hidden sm:block flex-shrink-0">
-                    <SellerTierBadge tier={(listing as any).sellerTier} />
-                  </div>
+                  {listing.type === 'auction' && listing.reservePrice && (
+                    <div className="hidden sm:block text-xs text-muted-foreground font-medium mt-0.5 truncate">
+                      Reserve: ${listing.reservePrice.toLocaleString()}
+                    </div>
+                  )}
                 </div>
-                <div className="hidden sm:flex items-center gap-1.5 flex-wrap justify-end">
-                  {listing.sellerSnapshot?.verified && (
-                    <Badge variant="secondary" className="text-[10px] font-semibold">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
-                  )}
-                  {sellerTxCount !== null && sellerTxCount > 0 && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      {sellerTxCount} tx
-                    </Badge>
-                  )}
-                  {sellerBadges.includes('Identity verified') && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      ID verified
-                    </Badge>
-                  )}
-                  {sellerBadges.includes('TPWD breeder permit') && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      TPWD permit
-                    </Badge>
-                  )}
+                {/* Seller Section */}
+                <div className="flex flex-col items-start sm:items-end gap-1.5 sm:gap-1.5 min-w-0 flex-shrink-0 max-w-[40%] sm:max-w-[35%]">
+                  <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold text-muted-foreground min-w-0 hover:underline overflow-hidden max-w-full"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const sellerId = listing.sellerId;
+                        if (!sellerId) return;
+                        router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                      }}
+                      aria-label="View seller profile"
+                    >
+                      <Avatar className="h-5 w-5 sm:h-6 sm:w-6 border border-border/50 flex-shrink-0">
+                        <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
+                        <AvatarFallback className="text-[9px] sm:text-[10px] font-bold">{sellerInitial}</AvatarFallback>
+                      </Avatar>
+                      <span className="truncate block min-w-0">{sellerName}</span>
+                    </button>
+                    {/* Seller Tier badge (Seller Tiers) */}
+                    <div className="hidden sm:block flex-shrink-0">
+                      <SellerTierBadge tier={(listing as any).sellerTier} />
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-1.5 flex-wrap justify-end max-w-full">
+                    {listing.sellerSnapshot?.verified && (
+                      <Badge variant="secondary" className="text-[10px] font-semibold flex-shrink-0">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
+                    )}
+                    {sellerTxCount !== null && sellerTxCount > 0 && (
+                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
+                        {sellerTxCount} tx
+                      </Badge>
+                    )}
+                    {sellerBadges.includes('Identity verified') && (
+                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
+                        ID verified
+                      </Badge>
+                    )}
+                    {sellerBadges.includes('TPWD breeder permit') && (
+                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
+                        TPWD permit
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

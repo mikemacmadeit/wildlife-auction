@@ -35,8 +35,8 @@ export async function GET() {
 
   const body = `
 /* eslint-disable */
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.7.0/firebase-messaging-compat.js');
 
 firebase.initializeApp(${JSON.stringify(cfg)});
 const messaging = firebase.messaging();

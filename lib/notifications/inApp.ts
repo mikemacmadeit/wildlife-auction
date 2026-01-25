@@ -310,6 +310,18 @@ export function buildInAppNotification(params: {
         },
       };
     }
+    case 'Offer.Submitted': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Offer.Submitted' }>;
+      return {
+        ...base,
+        type: 'offer_submitted',
+        title: 'Offer submitted',
+        body: `Your offer of $${Number(p.amount).toLocaleString()} on "${p.listingTitle}" has been submitted.`,
+        deepLinkUrl: p.offerUrl,
+        linkLabel: 'View offer',
+        metadata: { listingId: p.listingId, offerId: p.offerId, amount: p.amount, expiresAt: p.expiresAt || null },
+      };
+    }
     case 'Offer.Received': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Offer.Received' }>;
       return {
@@ -458,6 +470,17 @@ export function buildInAppNotification(params: {
         deepLinkUrl: p.adminSupportUrl,
         linkLabel: 'Open support',
         metadata: { ticketId: p.ticketId, userId: p.userId, category: p.category || null },
+      };
+    }
+    case 'Bid.Placed': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Bid.Placed' }>;
+      return {
+        title: p.isHighBidder ? 'Bid placed — you\'re winning!' : 'Bid placed',
+        body: p.isHighBidder
+          ? `Your bid of $${p.bidAmount.toLocaleString()} on ${p.listingTitle} is currently the high bid.`
+          : `Your bid of $${p.bidAmount.toLocaleString()} on ${p.listingTitle} has been placed.`,
+        actionUrl: p.listingUrl,
+        actionLabel: 'View listing',
       };
     }
     case 'Auction.BidReceived': {

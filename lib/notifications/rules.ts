@@ -148,6 +148,15 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: {},
         allowDuringQuietHours: true,
       };
+    case 'Bid.Placed':
+      return {
+        category: 'auctions',
+        urgency: 'normal',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 5,
+        rateLimitPerUser: { email: { perHour: 6, perDay: 20 } },
+        allowDuringQuietHours: true,
+      };
     case 'Listing.Approved':
     case 'Listing.Rejected':
     case 'Listing.ComplianceApproved':
@@ -279,6 +288,7 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         // Messaging should be immediate; do not delay during quiet hours.
         allowDuringQuietHours: true,
       };
+    case 'Offer.Submitted':
     case 'Offer.Received':
     case 'Offer.Countered':
     case 'Offer.Accepted':

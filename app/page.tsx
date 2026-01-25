@@ -986,7 +986,7 @@ export default function HomePage() {
           <div className="container mx-auto px-4 space-y-8">
             {/* Welcome Section - Above trending listings */}
             <div className="space-y-4">
-              <div className="max-w-4xl mx-auto space-y-4">
+              <div className="space-y-4">
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
                   <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>

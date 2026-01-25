@@ -413,7 +413,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto pl-0 pr-3 py-4 space-y-1">
           {showAdminNav && !sidebarCollapsed ? (
             <div className="space-y-2">
               <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
@@ -443,13 +443,13 @@ export default function DashboardLayout({
                         href={item.href}
                         prefetch={true}
                         className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                          'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
                           'min-h-[44px]',
                           active && 'bg-primary/10 text-primary border-l-4 border-primary'
                         )}
                       >
-                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                         <span className="flex-1">{item.label}</span>
                         {item.badge && item.badge > 0 && (
                           <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
@@ -503,13 +503,13 @@ export default function DashboardLayout({
                           }, 100);
                         }}
                         className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                          'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
                           'min-h-[44px]',
                           active && 'bg-primary/10 text-primary border-l-4 border-primary'
                         )}
                       >
-                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                         <span className="flex-1">{item.label}</span>
                         {item.badge && item.badge > 0 && (
                           <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
@@ -533,13 +533,13 @@ export default function DashboardLayout({
                     href={item.href}
                     prefetch={true}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                      'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                       'hover:bg-background/50',
                       'min-h-[44px]',
                       active && 'bg-primary/10 text-primary border-l-4 border-primary'
                     )}
                   >
-                    <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                    <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                     <span className="flex-1">{item.label}</span>
                     {item.badge && item.badge > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
@@ -575,13 +575,13 @@ export default function DashboardLayout({
                           }, 100);
                         }}
                         className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                          'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
                           'min-h-[44px]',
                           active && 'bg-primary/10 text-primary border-l-4 border-primary'
                         )}
                       >
-                        <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                        <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                         <span className="flex-1">{item.label}</span>
                         {item.badge && item.badge > 0 && (
                           <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
@@ -651,13 +651,13 @@ export default function DashboardLayout({
                             prefetch={true}
                             onClick={() => setMobileMenuOpen(false)}
                             className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                              'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',
                               'min-h-[44px]',
                               active && 'bg-primary/10 text-primary border-l-4 border-primary'
                             )}
                           >
-                            <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                            <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && item.badge > 0 && (
                               <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
@@ -697,13 +697,13 @@ export default function DashboardLayout({
                               }, 100);
                             }}
                             className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                              'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',
                               'min-h-[44px]',
                               active && 'bg-primary/10 text-primary border-l-4 border-primary'
                             )}
                           >
-                            <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                            <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && item.badge > 0 && (
                               <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
@@ -726,13 +726,13 @@ export default function DashboardLayout({
                             prefetch={true}
                             onClick={() => setMobileMenuOpen(false)}
                             className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-semibold',
+                              'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
                               'hover:bg-background/50',
                               'min-h-[44px]',
                               active && 'bg-primary/10 text-primary border-l-4 border-primary'
                             )}
                           >
-                            <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary')} />
+                            <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
                             <span className="flex-1">{item.label}</span>
                             {item.badge && item.badge > 0 && (
                               <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">

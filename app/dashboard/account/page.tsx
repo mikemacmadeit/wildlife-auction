@@ -352,6 +352,11 @@ export default function AccountPage() {
       // If display name preference or business name changed, update existing listings
       if (displayNameChanged) {
         try {
+          // Calculate the new display name to pass to API (avoids race condition with Firestore read)
+          const newDisplayName = formData.preferences.displayNamePreference === 'business' && formData.businessName?.trim()
+            ? formData.businessName.trim()
+            : formData.fullName || userProfile.displayName || userProfile.email?.split('@')[0] || 'Seller';
+          
           const token = await user.getIdToken();
           const response = await fetch('/api/listings/update-seller-snapshots', {
             method: 'POST',
@@ -359,6 +364,7 @@ export default function AccountPage() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
+            body: JSON.stringify({ displayName: newDisplayName }),
           });
           const result = await response.json();
           if (result.ok && result.updated > 0) {
@@ -367,9 +373,17 @@ export default function AccountPage() {
               description: `Updated display name on ${result.updated} listing${result.updated !== 1 ? 's' : ''}. Changes will appear after the page refreshes.`,
             });
           } else if (result.ok && result.updated === 0) {
-            // No listings to update - this is fine
+            toast({
+              title: 'Profile saved',
+              description: 'No listings found to update. New listings will use your business name preference.',
+            });
           } else {
             console.warn('Failed to update listing snapshots:', result);
+            toast({
+              title: 'Profile saved',
+              description: result?.error || 'Could not update listings. Please refresh the page or try again.',
+              variant: 'destructive',
+            });
           }
         } catch (e) {
           // Non-blocking: log but don't fail the profile save

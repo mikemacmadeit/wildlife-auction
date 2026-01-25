@@ -514,25 +514,25 @@ export function MessageThreadComponent({
 
   return (
     <div className="flex flex-col h-full overscroll-contain">
-      {/* Header */}
-      <div className="border-b p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Avatar>
+      {/* Header - Compact on mobile */}
+      <div className="border-b md:p-4 p-3 flex items-center justify-between bg-background flex-shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+          <Avatar className="h-8 w-8 md:h-10 md:w-10 flex-shrink-0">
             <AvatarImage src={otherPartyAvatar} />
-            <AvatarFallback>{otherPartyName.substring(0, 2).toUpperCase()}</AvatarFallback>
+            <AvatarFallback className="text-xs md:text-sm">{otherPartyName.substring(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <div>
-            <p className="font-semibold">{otherPartyName}</p>
-            <p className="text-sm text-muted-foreground">{listingTitle}</p>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm md:text-base truncate">{otherPartyName}</p>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">{listingTitle}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           {/* Offers entry point (buyer-only). Shows seller store listings where Best Offer is enabled. */}
           {user?.uid && thread?.buyerId === user.uid ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setOfferOpen(true)}>
-                <Tag className="h-4 w-4 mr-2" />
-                Offer
+              <Button variant="outline" size="sm" onClick={() => setOfferOpen(true)} className="h-8 md:h-9 px-2 md:px-3 text-xs md:text-sm">
+                <Tag className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+                <span className="hidden md:inline">Offer</span>
               </Button>
               <OfferFromMessagesDialog
                 open={offerOpen}
@@ -545,9 +545,9 @@ export function MessageThreadComponent({
 
           <AlertDialog open={reportOpen} onOpenChange={setReportOpen}>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Flag className="h-4 w-4 mr-2" />
-                Report
+              <Button variant="outline" size="sm" className="h-8 md:h-9 px-2 md:px-3 text-xs md:text-sm">
+                <Flag className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+                <span className="hidden md:inline">Report</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -605,21 +605,25 @@ export function MessageThreadComponent({
         </div>
       </div>
 
-      {/* Safety Notice */}
-      {!isPaid && (
-        <Alert className="m-4 border-orange-200 bg-orange-50 text-orange-950 dark:border-orange-900/50 dark:bg-orange-950/25 dark:text-orange-50">
-          <AlertTriangle className="h-4 w-4 text-orange-700 dark:text-orange-300" />
-          <AlertDescription className="text-sm text-orange-950 dark:text-orange-50">
-            <strong>For your safety:</strong> Keep communication and payment on Wildlife Exchange. 
-            Contact info unlocks after payment is completed.
-          </AlertDescription>
-        </Alert>
+      {/* Safety Notice - Ultra compact on mobile, hidden after first message */}
+      {!isPaid && messages.length === 0 && (
+        <div className="md:m-4 mx-2 mt-1.5 mb-0.5">
+          <Alert className="border-orange-200 bg-orange-50 text-orange-950 dark:border-orange-900/50 dark:bg-orange-950/25 dark:text-orange-50 md:py-3 py-1 md:px-4 px-2.5">
+            <AlertTriangle className="h-2.5 w-2.5 md:h-4 md:w-4 text-orange-700 dark:text-orange-300 flex-shrink-0" />
+            <AlertDescription className="text-[10px] md:text-sm text-orange-950 dark:text-orange-50 leading-tight">
+              <span className="hidden md:inline">
+                <strong className="font-semibold">For your safety:</strong> Keep communication and payment on Wildlife Exchange. Contact info unlocks after payment is completed.
+              </span>
+              <span className="md:hidden font-medium">Contact unlocks after payment.</span>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
-      {/* Messages */}
+      {/* Messages - iPhone-like on mobile */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain touch-pan-y"
+        className="flex-1 overflow-y-auto md:p-4 px-3 py-2 md:space-y-4 space-y-3 overscroll-contain touch-pan-y bg-background"
         style={{ WebkitOverflowScrolling: 'touch' }}
         onScroll={() => {
           const sc = scrollRef.current;
@@ -667,20 +671,20 @@ export function MessageThreadComponent({
             return (
               <div
                 key={message.id}
-                className={cn('flex gap-2', isSender ? 'justify-end' : 'justify-start')}
+                className={cn('flex gap-1 md:gap-2', isSender ? 'justify-end' : 'justify-start')}
               >
                 {!isSender && (
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 self-end mb-0.5">
                     <AvatarImage src={otherPartyAvatar} />
-                    <AvatarFallback>{otherPartyName.substring(0, 2).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="text-[9px] md:text-xs">{otherPartyName.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 )}
                 <div
                   className={cn(
-                    'max-w-[75%] rounded-lg p-3',
+                    'max-w-[82%] md:max-w-[75%] rounded-2xl md:rounded-lg md:p-3 px-3.5 py-2.5 md:py-3',
                     isSender
-                      ? 'bg-primary/10 border border-primary/20'
-                      : 'bg-muted border border-border'
+                      ? 'bg-primary text-primary-foreground md:bg-primary/10 md:text-foreground md:border md:border-primary/20'
+                      : 'bg-muted text-foreground md:border md:border-border'
                   )}
                 >
                   {atts.length ? (
@@ -701,7 +705,7 @@ export function MessageThreadComponent({
                       ))}
                     </div>
                   ) : null}
-                  <p className="text-sm whitespace-pre-wrap break-words">
+                  <p className="text-sm md:text-sm text-[16px] md:text-[15px] whitespace-pre-wrap break-words leading-relaxed">
                     {tokens.map((t, idx) =>
                       t.type === 'link' ? (
                         <a
@@ -709,7 +713,12 @@ export function MessageThreadComponent({
                           href={t.href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="underline underline-offset-2 text-primary hover:text-primary/80"
+                          className={cn(
+                            "underline underline-offset-2",
+                            isSender 
+                              ? "text-primary-foreground/90 hover:text-primary-foreground md:text-primary md:hover:text-primary/80"
+                              : "text-primary hover:text-primary/80"
+                          )}
                         >
                           {t.value}
                         </a>
@@ -724,7 +733,12 @@ export function MessageThreadComponent({
                       Contact details redacted
                     </Badge>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className={cn(
+                    "text-[11px] md:text-xs mt-1",
+                    isSender 
+                      ? "text-primary-foreground/70 md:text-muted-foreground"
+                      : "text-muted-foreground"
+                  )}>
                     {createdAt ? formatDistanceToNow(createdAt, { addSuffix: true }) : '—'}
                   </p>
                   {(() => {
@@ -751,8 +765,8 @@ export function MessageThreadComponent({
                   })()}
                 </div>
                 {isSender && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/20">You</AvatarFallback>
+                  <Avatar className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 self-end mb-0.5">
+                    <AvatarFallback className="bg-primary/20 text-[9px] md:text-xs">You</AvatarFallback>
                   </Avatar>
                 )}
               </div>
@@ -762,8 +776,8 @@ export function MessageThreadComponent({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t p-4">
+      {/* Input - Compact on mobile, iPhone-like */}
+      <div className="border-t md:p-4 p-2.5 md:pb-4 pb-2.5 bg-background">
         <input
           ref={fileInputRef}
           type="file"
@@ -810,19 +824,19 @@ export function MessageThreadComponent({
           </div>
         ) : null}
 
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2 md:gap-2 items-end">
           <Button
             type="button"
             variant="outline"
-            className="h-[44px] w-[44px] px-0"
+            className="h-[40px] w-[40px] md:h-[44px] md:w-[44px] px-0 flex-shrink-0 rounded-full md:rounded-md"
             onClick={handlePickImages}
             disabled={sending}
             aria-label="Add photos"
           >
-            <ImageIcon className="h-4 w-4" />
+            <ImageIcon className="h-4.5 w-4.5 md:h-4 md:w-4" />
           </Button>
           <Textarea
-            placeholder="Write a message…"
+            placeholder="Message"
             value={messageInput}
             onChange={(e) => {
               setMessageInput(e.target.value);
@@ -845,7 +859,7 @@ export function MessageThreadComponent({
               }
             }}
             disabled={sending}
-            className="min-h-[44px] max-h-[140px] resize-none text-base"
+            className="min-h-[40px] md:min-h-[44px] max-h-[140px] md:max-h-[140px] resize-none text-[16px] md:text-base rounded-2xl md:rounded-md py-2.5 md:py-3 px-4 md:px-3"
           />
           <Button
             onClick={handleSend}
@@ -854,18 +868,18 @@ export function MessageThreadComponent({
               (attachments.length > 0 && attachments.some((a) => a.uploading)) ||
               (!messageInput.trim() && attachments.filter((a) => !!a.attachment).length === 0)
             }
-            className="h-[44px] w-[44px] px-0"
+            className="h-[40px] w-[40px] md:h-[44px] md:w-[44px] px-0 flex-shrink-0 rounded-full md:rounded-md"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-4.5 w-4.5 md:h-4 md:w-4" />
           </Button>
         </div>
-        {!isPaid && (
-          <p className="text-xs text-muted-foreground mt-2">
+        {!isPaid && messages.length > 0 && (
+          <p className="text-[10px] md:text-xs text-muted-foreground mt-1.5 md:mt-2 text-center">
             Contact details are hidden until payment is completed.
           </p>
         )}
         {isOtherTyping ? (
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-[11px] md:text-xs text-muted-foreground mt-1.5 md:mt-2">
             {otherPartyName} is typing…
           </p>
         ) : null}

@@ -236,59 +236,61 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             </div>
 
             {/* Price and Seller Info - Enhanced */}
-            <div className="mt-auto pt-3 sm:pt-4 border-t border-border/50 flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {priceDisplay}
-                </div>
-                {quantity && quantity > 1 ? (
-                  <div className="text-xs text-muted-foreground font-medium">
-                    Qty: {quantity}
+            <div className="mt-auto pt-3 sm:pt-4 border-t border-border/50">
+              <div className="flex items-center justify-between gap-3 min-w-0">
+                <div className="space-y-1 flex-shrink-0 min-w-0 max-w-[60%] sm:max-w-[65%]">
+                  <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent break-words truncate">
+                    {priceDisplay}
                   </div>
-                ) : null}
-                {listing.type === 'auction' && listing.reservePrice ? (
-                  <div className="text-xs text-muted-foreground font-medium">
-                    Reserve: ${listing.reservePrice.toLocaleString()}
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end">
-                  {listing.sellerSnapshot?.verified && (
-                    <Badge variant="secondary" className="text-[10px] font-semibold">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
-                  )}
-                  {sellerTxCount !== null && sellerTxCount > 0 && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      {sellerTxCount} tx
-                    </Badge>
-                  )}
-                  {sellerBadges.includes('Identity verified') && (
-                    <Badge variant="outline" className="text-[10px] font-semibold">
-                      ID verified
-                    </Badge>
-                  )}
+                  {quantity && quantity > 1 ? (
+                    <div className="text-xs text-muted-foreground font-medium truncate">
+                      Qty: {quantity}
+                    </div>
+                  ) : null}
+                  {listing.type === 'auction' && listing.reservePrice ? (
+                    <div className="text-xs text-muted-foreground font-medium truncate">
+                      Reserve: ${listing.reservePrice.toLocaleString()}
+                    </div>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-end gap-2 text-xs text-muted-foreground font-medium max-w-[220px] truncate text-right hover:underline"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const sellerId = listing.sellerId;
-                    if (!sellerId) return;
-                    router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
-                  }}
-                  aria-label="View seller profile"
-                >
-                  <Avatar className="h-6 w-6 border border-border/50">
-                    <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
-                    <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
-                  </Avatar>
-                  <span className="truncate">{sellerName}</span>
-                </button>
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0 min-w-0 max-w-[40%] sm:max-w-[35%]">
+                  <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end max-w-full">
+                    {listing.sellerSnapshot?.verified && (
+                      <Badge variant="secondary" className="text-[10px] font-semibold flex-shrink-0">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
+                    )}
+                    {sellerTxCount !== null && sellerTxCount > 0 && (
+                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
+                        {sellerTxCount} tx
+                      </Badge>
+                    )}
+                    {sellerBadges.includes('Identity verified') && (
+                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
+                        ID verified
+                      </Badge>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-end gap-2 text-xs text-muted-foreground font-medium truncate text-right hover:underline overflow-hidden max-w-full"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const sellerId = listing.sellerId;
+                      if (!sellerId) return;
+                      router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                    }}
+                    aria-label="View seller profile"
+                  >
+                    <Avatar className="h-6 w-6 border border-border/50 flex-shrink-0">
+                      <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
+                      <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
+                    </Avatar>
+                    <span className="truncate block min-w-0">{sellerName}</span>
+                  </button>
+                </div>
               </div>
             </div>
 

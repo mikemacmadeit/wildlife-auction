@@ -42,7 +42,7 @@ import { UserProfile } from '@/lib/types';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { cn } from '@/lib/utils';
 import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
@@ -71,6 +71,20 @@ function formatPriceWithCommas(value: string): string {
 function parsePriceString(value: string): string {
   // Remove all commas and other non-numeric characters except decimal point
   return value.replace(/[^\d.]/g, '');
+}
+
+// Helper function to check if a category requires quantity
+function categoryRequiresQuantity(category: ListingCategory | ''): boolean {
+  return (
+    category === 'whitetail_breeder' ||
+    category === 'wildlife_exotics' ||
+    category === 'cattle_livestock' ||
+    category === 'horse_equestrian' ||
+    category === 'sporting_working_dogs' ||
+    category === 'hunting_outfitter_assets' ||
+    category === 'ranch_equipment' ||
+    category === 'ranch_vehicles'
+  );
 }
 
 function NewListingPageContent() {
@@ -108,8 +122,7 @@ function NewListingPageContent() {
     photos: ListingPhotoSnapshot[];
     coverPhotoId?: string;
     verification: boolean;
-    transport: boolean;
-    sellerOffersDelivery: boolean;
+    transportType: 'seller' | 'buyer' | null;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
     bestOffer: {
@@ -141,8 +154,7 @@ function NewListingPageContent() {
     photos: [],
     coverPhotoId: undefined,
     verification: false,
-    transport: false,
-    sellerOffersDelivery: false,
+    transportType: null as 'seller' | 'buyer' | null,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
     bestOffer: {
@@ -229,7 +241,7 @@ function NewListingPageContent() {
       photoIds: formData.photoIds,
       coverPhotoId: formData.coverPhotoId,
       verification: formData.verification,
-      transport: formData.transport,
+      transportType: formData.transportType,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
       protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,
@@ -376,8 +388,8 @@ function NewListingPageContent() {
           trust: {
             verified: formData.verification,
             insuranceAvailable: false,
-            transportReady: formData.transport,
-            sellerOffersDelivery: formData.sellerOffersDelivery,
+            transportReady: formData.transportType !== null,
+            sellerOffersDelivery: formData.transportType === 'seller',
           },
           protectedTransactionEnabled: formData.protectedTransactionEnabled,
           protectedTransactionDays: formData.protectedTransactionDays,
@@ -449,33 +461,37 @@ function NewListingPageContent() {
       return;
     }
     refreshUserProfile();
-    // Load TPWD permit status (controls whitetail category gating in Create Listing)
-    (async () => {
-      try {
-        const token = await user.getIdToken();
-        const res = await fetch('/api/seller/breeder-permit', { headers: { Authorization: `Bearer ${token}` } });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
+    
+    // Real-time listener for TPWD permit status (controls whitetail category gating in Create Listing)
+    // This ensures the category becomes available immediately when a permit is approved
+    const permitRef = doc(db, 'sellerPermits', user.uid);
+    const unsubscribe = onSnapshot(
+      permitRef,
+      (snap) => {
+        if (!snap.exists()) {
           setTpwdPermit(null);
           return;
         }
-        const p = json?.permit || null;
-        if (!p || !p.status) {
+        const data = snap.data() as any;
+        if (!data?.status) {
           setTpwdPermit(null);
           return;
         }
         setTpwdPermit({
-          status: p.status,
-          rejectionReason: p.rejectionReason || null,
-          expiresAt: p.expiresAt || null,
-          uploadedAt: p.uploadedAt || null,
-          reviewedAt: p.reviewedAt || null,
+          status: data.status,
+          rejectionReason: data.rejectionReason || null,
+          expiresAt: data.expiresAt?.toDate ? data.expiresAt.toDate().toISOString() : (data.expiresAt instanceof Date ? data.expiresAt.toISOString() : null),
+          uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
+          reviewedAt: data.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : null),
         });
-      } catch {
+      },
+      (error) => {
+        console.error('Error listening to breeder permit:', error);
         setTpwdPermit(null);
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    );
+    
+    return () => unsubscribe();
   }, [user?.uid]);
 
   const payoutsReady =
@@ -485,7 +501,13 @@ function NewListingPageContent() {
     userProfile?.chargesEnabled === true;
 
   const whitetailPermitStatus = tpwdPermit?.status || null;
-  const canSelectWhitetail = whitetailPermitStatus === 'verified';
+  
+  // Check if permit is verified AND not expired
+  const isPermitExpired = tpwdPermit?.expiresAt 
+    ? new Date(tpwdPermit.expiresAt).getTime() < Date.now()
+    : false;
+  
+  const canSelectWhitetail = whitetailPermitStatus === 'verified' && !isPermitExpired;
 
   const numberFromInput = (raw: string): number | null => {
     const s = String(raw || '').trim();
@@ -548,6 +570,10 @@ function NewListingPageContent() {
                     ...formData,
                     category: 'whitetail_breeder',
                     location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                    attributes: {
+                      ...formData.attributes,
+                      quantity: 1, // Initialize quantity to 1 immediately
+                    },
                   });
                 }
               }}
@@ -569,7 +595,11 @@ function NewListingPageContent() {
                 setFormData({ 
                   ...formData, 
                   category: 'whitetail_breeder',
-                  location: { ...formData.location, state: 'TX' } // Force TX for animals
+                  location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  attributes: {
+                    ...formData.attributes,
+                    quantity: 1, // Initialize quantity to 1 immediately
+                  },
                 });
               }}
             >
@@ -627,6 +657,10 @@ function NewListingPageContent() {
                     ...formData,
                     category: 'wildlife_exotics',
                     location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                    attributes: {
+                      ...formData.attributes,
+                      quantity: 1, // Initialize quantity to 1 immediately
+                    },
                   });
                 }
               }}
@@ -639,7 +673,11 @@ function NewListingPageContent() {
                 setFormData({ 
                   ...formData, 
                   category: 'wildlife_exotics',
-                  location: { ...formData.location, state: 'TX' } // Force TX for animals
+                  location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  attributes: {
+                    ...formData.attributes,
+                    quantity: 1, // Initialize quantity to 1 immediately
+                  },
                 });
               }}
             >
@@ -688,7 +726,7 @@ function NewListingPageContent() {
                   setFormData({
                     ...formData,
                     category: 'horse_equestrian',
-                    attributes: { ...(formData.attributes as any), speciesId: 'horse' },
+                    attributes: { ...(formData.attributes as any), speciesId: 'horse', quantity: 1 }, // Initialize quantity to 1 immediately
                     location: { ...formData.location, state: 'TX' }, // Force TX for horses
                   });
                 }
@@ -702,7 +740,7 @@ function NewListingPageContent() {
                 setFormData({
                   ...formData,
                   category: 'horse_equestrian',
-                  attributes: { ...(formData.attributes as any), speciesId: 'horse' },
+                  attributes: { ...(formData.attributes as any), speciesId: 'horse', quantity: 1 }, // Initialize quantity to 1 immediately
                   location: { ...formData.location, state: 'TX' }, // Force TX for horses
                 });
               }}
@@ -764,7 +802,7 @@ function NewListingPageContent() {
                 setFormData({
                   ...formData,
                   category: 'sporting_working_dogs',
-                  attributes: { ...(formData.attributes as any), speciesId: 'dog' },
+                  attributes: { ...(formData.attributes as any), speciesId: 'dog', quantity: 1 }, // Initialize quantity to 1 immediately
                   location: { ...formData.location, state: 'TX' }, // Force TX for animals
                 });
               }}
@@ -802,6 +840,10 @@ function NewListingPageContent() {
                     ...formData,
                     category: 'cattle_livestock',
                     location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                    attributes: {
+                      ...formData.attributes,
+                      quantity: 1, // Initialize quantity to 1 immediately
+                    },
                   });
                 }
               }}
@@ -814,7 +856,11 @@ function NewListingPageContent() {
                 setFormData({ 
                   ...formData, 
                   category: 'cattle_livestock',
-                  location: { ...formData.location, state: 'TX' } // Force TX for animals
+                  location: { ...formData.location, state: 'TX' }, // Force TX for animals
+                  attributes: {
+                    ...formData.attributes,
+                    quantity: 1, // Initialize quantity to 1 immediately
+                  },
                 });
               }}
             >
@@ -860,7 +906,14 @@ function NewListingPageContent() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setFormData({ ...formData, category: 'hunting_outfitter_assets' });
+                  setFormData({ 
+                    ...formData, 
+                    category: 'hunting_outfitter_assets',
+                    attributes: {
+                      ...formData.attributes,
+                      quantity: 1, // Initialize quantity to 1 immediately
+                    },
+                  });
                 }
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
@@ -868,7 +921,14 @@ function NewListingPageContent() {
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
-              onClick={() => setFormData({ ...formData, category: 'hunting_outfitter_assets' })}
+              onClick={() => setFormData({ 
+                ...formData, 
+                category: 'hunting_outfitter_assets',
+                attributes: {
+                  ...formData.attributes,
+                  quantity: 1, // Initialize quantity to 1 immediately
+                },
+              })}
             >
               <CardContent className="p-4">
                 {formData.category === 'hunting_outfitter_assets' && (
@@ -899,7 +959,14 @@ function NewListingPageContent() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setFormData({ ...formData, category: 'ranch_equipment' });
+                  setFormData({ 
+                    ...formData, 
+                    category: 'ranch_equipment',
+                    attributes: {
+                      ...formData.attributes,
+                      quantity: 1, // Initialize quantity to 1 immediately
+                    },
+                  });
                 }
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
@@ -907,7 +974,14 @@ function NewListingPageContent() {
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
-              onClick={() => setFormData({ ...formData, category: 'ranch_equipment' })}
+              onClick={() => setFormData({ 
+                ...formData, 
+                category: 'ranch_equipment',
+                attributes: {
+                  ...formData.attributes,
+                  quantity: 1, // Initialize quantity to 1 immediately
+                },
+              })}
             >
               <CardContent className="p-4">
                 {formData.category === 'ranch_equipment' && (
@@ -951,7 +1025,14 @@ function NewListingPageContent() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setFormData({ ...formData, category: 'ranch_vehicles' });
+                  setFormData({ 
+                    ...formData, 
+                    category: 'ranch_vehicles',
+                    attributes: {
+                      ...formData.attributes,
+                      quantity: 1, // Initialize quantity to 1 immediately
+                    },
+                  });
                 }
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
@@ -959,7 +1040,14 @@ function NewListingPageContent() {
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
-              onClick={() => setFormData({ ...formData, category: 'ranch_vehicles' })}
+              onClick={() => setFormData({ 
+                ...formData, 
+                category: 'ranch_vehicles',
+                attributes: {
+                  ...formData.attributes,
+                  quantity: 1, // Initialize quantity to 1 immediately
+                },
+              })}
             >
               <CardContent className="p-4">
                 {formData.category === 'ranch_vehicles' && (
@@ -1618,13 +1706,27 @@ function NewListingPageContent() {
                       type="number"
                       min={1}
                       max={168}
-                      value={String(formData.bestOffer.offerExpiryHours)}
-                      onChange={(e) =>
+                      value={formData.bestOffer.offerExpiryHours > 0 ? String(formData.bestOffer.offerExpiryHours) : ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty string during editing, only convert to number when there's a value
+                        const numValue = value === '' ? 0 : Number(value);
                         setFormData({
                           ...formData,
-                          bestOffer: { ...formData.bestOffer, offerExpiryHours: Number(e.target.value || 48) },
-                        })
-                      }
+                          bestOffer: { ...formData.bestOffer, offerExpiryHours: numValue },
+                        });
+                      }}
+                      onBlur={(e) => {
+                        // When user leaves the field, default to 48 if empty or invalid
+                        const value = e.target.value;
+                        const numValue = Number(value);
+                        if (!value || isNaN(numValue) || numValue < 1) {
+                          setFormData({
+                            ...formData,
+                            bestOffer: { ...formData.bestOffer, offerExpiryHours: 48 },
+                          });
+                        }
+                      }}
                       className="min-h-[44px]"
                     />
                     <div className="text-xs text-muted-foreground">Default: 48 hours</div>
@@ -1804,8 +1906,8 @@ function NewListingPageContent() {
     },
     {
       id: 'verification',
-      title: 'Verification & Add-ons',
-      description: 'Optional: Add verification and protection',
+      title: 'Verification & Transportation',
+      description: 'Optional: Add verification and set transportation',
       content: (
         <div className="space-y-6">
           <Card className="p-4">
@@ -1832,44 +1934,46 @@ function NewListingPageContent() {
             </div>
           </Card>
 
-          <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="transport"
-                checked={formData.transport}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, transport: checked as boolean })
+          {/* Transportation Section */}
+          <Card className="p-4 border-2">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-base mb-1">Transportation</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select who will handle transportation. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                </p>
+              </div>
+              <RadioGroup
+                value={formData.transportType || ''}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, transportType: value === 'seller' || value === 'buyer' ? value : null })
                 }
-              />
-              <Label htmlFor="transport" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Delivery details available</div>
-                <div className="text-sm text-muted-foreground">
-                  Buyer and seller coordinate pickup/delivery details directly. The platform does not arrange transport.
+                className="space-y-3"
+              >
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                  <RadioGroupItem value="seller" id="transport-seller" className="mt-1" />
+                  <Label htmlFor="transport-seller" className="cursor-pointer flex-1">
+                    <div className="font-medium mb-1">Seller Transport</div>
+                    <div className="text-sm text-muted-foreground">
+                      You (the seller) will deliver. Buyer and seller coordinate delivery details directly.
+                    </div>
+                  </Label>
                 </div>
-              </Label>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="seller-offers-delivery"
-                checked={formData.sellerOffersDelivery}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, sellerOffersDelivery: checked as boolean })
-                }
-              />
-              <Label htmlFor="seller-offers-delivery" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Seller offers delivery</div>
-                <div className="text-sm text-muted-foreground">
-                  Seller-provided delivery only. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                  <RadioGroupItem value="buyer" id="transport-buyer" className="mt-1" />
+                  <Label htmlFor="transport-buyer" className="cursor-pointer flex-1">
+                    <div className="font-medium mb-1">Buyer Transport</div>
+                    <div className="text-sm text-muted-foreground">
+                      Buyer must handle transportation. Buyer arranges pickup/delivery.
+                    </div>
+                  </Label>
                 </div>
-              </Label>
+              </RadioGroup>
             </div>
           </Card>
         </div>
       ),
-      validate: () => true, // Verification options are optional
+      validate: () => true, // Verification and transportation options are optional
     },
     {
       id: 'review',
@@ -1915,8 +2019,8 @@ function NewListingPageContent() {
                           </Badge>
                         )}
                         {formData.verification && <Badge>Verification</Badge>}
-                        {formData.transport && <Badge variant="outline">Transport Ready</Badge>}
-                        {formData.sellerOffersDelivery && <Badge variant="outline">Seller offers delivery</Badge>}
+                        {formData.transportType === 'seller' && <Badge variant="outline">Seller Transport</Badge>}
+                        {formData.transportType === 'buyer' && <Badge variant="outline">Buyer Transport</Badge>}
                         {formData.protectedTransactionEnabled && (
                           <Badge variant="outline">
                             Protected ({formData.protectedTransactionDays ?? '—'} days)
@@ -2020,8 +2124,8 @@ function NewListingPageContent() {
               trust: {
                 verified: !!formData.verification,
                 insuranceAvailable: false,
-                transportReady: !!formData.transport,
-                sellerOffersDelivery: !!formData.sellerOffersDelivery,
+                transportReady: formData.transportType !== null,
+                sellerOffersDelivery: formData.transportType === 'seller',
               },
               attributes: (formData.attributes || {}) as any,
               durationDays: formData.durationDays,
@@ -2060,7 +2164,9 @@ function NewListingPageContent() {
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Options</div>
                   <div className="mt-2 space-y-1">
                     <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
-                    <div><span className="text-muted-foreground">Transport ready:</span> <span className="font-medium">{formData.transport ? 'Yes' : 'No'}</span></div>
+                    <div><span className="text-muted-foreground">Transportation:</span> <span className="font-medium">
+                      {formData.transportType === 'seller' ? 'Seller Transport' : formData.transportType === 'buyer' ? 'Buyer Transport' : 'Not specified'}
+                    </span></div>
                     <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
                     {formData.type === 'fixed' && (
                       <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
@@ -2222,8 +2328,8 @@ function NewListingPageContent() {
         trust: {
           verified: formData.verification,
           insuranceAvailable: false,
-          transportReady: formData.transport,
-          sellerOffersDelivery: formData.sellerOffersDelivery,
+          transportReady: formData.transportType !== null,
+          sellerOffersDelivery: formData.transportType === 'seller',
         },
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
@@ -2457,8 +2563,8 @@ function NewListingPageContent() {
         trust: {
           verified: formData.verification,
           insuranceAvailable: false,
-          transportReady: formData.transport,
-          sellerOffersDelivery: formData.sellerOffersDelivery,
+          transportReady: formData.transportType !== null,
+          sellerOffersDelivery: formData.transportType === 'seller',
         },
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,

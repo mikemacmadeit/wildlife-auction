@@ -317,9 +317,32 @@ export async function POST(request: Request) {
           });
         }
       } else {
-        // Regular offer: notify seller.
+        // Regular offer: notify buyer (confirmation) and seller.
+        if (buyerId) {
+          const buyerEv = await emitAndProcessEventForUser({
+            type: 'Offer.Submitted',
+            actorId: buyerId || null,
+            entityType: 'listing',
+            entityId: listingId,
+            targetUserId: buyerId,
+            payload: {
+              type: 'Offer.Submitted',
+              offerId: result.offerId,
+              listingId,
+              listingTitle,
+              offerUrl: `${base}/dashboard/offers`,
+              amount,
+              expiresAt: result.offerDoc?.expiresAt?.toDate?.().toISOString?.() || undefined,
+            },
+            optionalHash: `offer:${result.offerId}:submitted`,
+          });
+          // Best-effort: send the queued email job immediately (avoids relying on schedulers for time-sensitive offers).
+          if (buyerEv?.ok && typeof buyerEv?.eventId === 'string') {
+            void tryDispatchEmailJobNow({ db: db as any, jobId: buyerEv.eventId, waitForJob: true }).catch(() => {});
+          }
+        }
         if (sellerId) {
-          const ev = await emitAndProcessEventForUser({
+          const sellerEv = await emitAndProcessEventForUser({
             type: 'Offer.Received',
             actorId: buyerId || null,
             entityType: 'listing',
@@ -337,8 +360,8 @@ export async function POST(request: Request) {
             optionalHash: `offer:${result.offerId}:received`,
           });
           // Best-effort: send the queued email job immediately (avoids relying on schedulers for time-sensitive offers).
-          if (ev?.ok && typeof ev?.eventId === 'string') {
-            void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+          if (sellerEv?.ok && typeof sellerEv?.eventId === 'string') {
+            void tryDispatchEmailJobNow({ db: db as any, jobId: sellerEv.eventId, waitForJob: true }).catch(() => {});
           }
         }
       }

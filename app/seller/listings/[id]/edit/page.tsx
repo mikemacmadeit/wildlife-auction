@@ -49,7 +49,20 @@ function EditListingPageContent() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [listingData, setListingData] = useState<{ metrics?: { bidCount?: number; views?: number; favorites?: number }; status?: string; currentBid?: number; type?: string } | null>(null);
+  const [listingData, setListingData] = useState<{ metrics?: { bidCount?: number; views?: number; favorites?: number }; status?: string; currentBid?: number; type?: string; currentBidderId?: string } | null>(null);
+  
+  // Helper to determine if listing has bids (eBay rule: once bids exist, more fields are locked)
+  const hasBids = (() => {
+    if (!listingData) return false;
+    const bidCount = listingData.metrics?.bidCount || 0;
+    const hasBidder = Boolean(listingData.currentBidderId);
+    const hasCurrentBid = Number(listingData.currentBid || 0) > 0;
+    return bidCount > 0 || hasBidder || hasCurrentBid;
+  })();
+  
+  const isActiveAuction = listingData?.status === 'active' && listingData?.type === 'auction';
+  const isActiveAuctionWithBids = isActiveAuction && hasBids;
+  const isActiveListing = listingData?.status === 'active';
   const [formData, setFormData] = useState<{
     type: ListingType | '';
     category: ListingCategory | '';
@@ -63,8 +76,7 @@ function EditListingPageContent() {
     location: { city: string; state: string; zip: string };
     images: string[];
     verification: boolean;
-    transport: boolean;
-    sellerOffersDelivery: boolean;
+    transportType: 'seller' | 'buyer' | null;
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
     bestOffer: {
@@ -93,8 +105,7 @@ function EditListingPageContent() {
     },
     images: [],
     verification: false,
-    transport: false,
-    sellerOffersDelivery: false,
+    transportType: null as 'seller' | 'buyer' | null,
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
     bestOffer: {
@@ -181,8 +192,11 @@ function EditListingPageContent() {
           },
           images: listing.images || [],
           verification: listing.trust?.verified || false,
-          transport: listing.trust?.transportReady || false,
-          sellerOffersDelivery: listing.trust?.sellerOffersDelivery || false,
+          transportType: (() => {
+            if (listing.trust?.transportReady && listing.trust?.sellerOffersDelivery) return 'seller';
+            if (listing.trust?.transportReady && !listing.trust?.sellerOffersDelivery) return 'buyer';
+            return null;
+          })(),
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
@@ -214,8 +228,11 @@ function EditListingPageContent() {
           location: listing.location,
           images: listing.images || [],
           verification: listing.trust?.verified || false,
-          transport: listing.trust?.transportReady || false,
-          sellerOffersDelivery: listing.trust?.sellerOffersDelivery || false,
+          transportType: (() => {
+            if (listing.trust?.transportReady && listing.trust?.sellerOffersDelivery) return 'seller';
+            if (listing.trust?.transportReady && !listing.trust?.sellerOffersDelivery) return 'buyer';
+            return null;
+          })(),
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
@@ -292,7 +309,7 @@ function EditListingPageContent() {
                 }
                 setFormData(next);
               }}
-              disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
+              disabled={isActiveListing}
             >
               {[
               { value: 'auction', label: 'Auction', desc: 'Bidders compete, highest bid wins' },
@@ -323,9 +340,9 @@ function EditListingPageContent() {
                   formData.category === 'whitetail_breeder'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({ 
                     ...formData, 
                     category: 'whitetail_breeder',
@@ -369,9 +386,9 @@ function EditListingPageContent() {
                   formData.category === 'wildlife_exotics'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({ 
                     ...formData, 
                     category: 'wildlife_exotics',
@@ -412,9 +429,9 @@ function EditListingPageContent() {
                   formData.category === 'horse_equestrian'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({
                     ...formData,
                     category: 'horse_equestrian',
@@ -453,9 +470,9 @@ function EditListingPageContent() {
                   formData.category === 'sporting_working_dogs'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({
                     ...formData,
                     category: 'sporting_working_dogs',
@@ -483,9 +500,9 @@ function EditListingPageContent() {
                   formData.category === 'cattle_livestock'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({ 
                     ...formData, 
                     category: 'cattle_livestock',
@@ -526,9 +543,9 @@ function EditListingPageContent() {
                   formData.category === 'hunting_outfitter_assets'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({
                     ...formData,
                     category: 'hunting_outfitter_assets',
@@ -556,9 +573,9 @@ function EditListingPageContent() {
                   formData.category === 'ranch_equipment'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({ 
                     ...formData, 
                     category: 'ranch_equipment',
@@ -599,9 +616,9 @@ function EditListingPageContent() {
                   formData.category === 'ranch_vehicles'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                } ${listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0) return;
+                  if (isActiveAuctionWithBids) return;
                   setFormData({
                     ...formData,
                     category: 'ranch_vehicles',
@@ -626,15 +643,37 @@ function EditListingPageContent() {
             </div>
           </div>
 
-          {/* Status - Read-only for active listings with bids */}
-          {listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0 && (
+          {/* Status - Read-only for active listings with bids (eBay rules) */}
+          {isActiveAuctionWithBids && (
             <Card className="border-2 border-primary/20 bg-primary/5">
               <CardContent className="pt-4 pb-4 px-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-1">
-                    <p className="font-semibold text-foreground mb-1">Limited Editing</p>
+                    <p className="font-semibold text-foreground mb-1">Limited Editing (eBay Policy)</p>
                     <p className="text-sm text-muted-foreground">
-                      This listing has {listingData.metrics?.bidCount || 0} bid(s). You can edit description, photos, and add-ons, but type and pricing cannot be changed.
+                      This auction has {listingData.metrics?.bidCount || 0} bid(s). Following eBay rules, you can only edit:
+                    </p>
+                    <ul className="text-sm text-muted-foreground mt-2 ml-4 list-disc space-y-1">
+                      <li>Description</li>
+                      <li>Photos</li>
+                      <li>Some attributes</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      <strong>Locked fields:</strong> Title, Category, Type, Starting Bid, Reserve Price, Duration, Location, Trust badges
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {isActiveAuction && !hasBids && (
+            <Card className="border-2 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/25">
+              <CardContent className="pt-4 pb-4 px-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground mb-1">Auction Started</p>
+                    <p className="text-sm text-muted-foreground">
+                      This auction is active. Once bids are placed, title, category, and pricing will be locked per eBay policy.
                     </p>
                   </div>
                 </div>
@@ -658,11 +697,18 @@ function EditListingPageContent() {
               placeholder="e.g., Trophy Whitetail Buck"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              disabled={isActiveAuctionWithBids}
               className={cn(
                 "min-h-[48px] text-base bg-background",
-                publishMissingFields.includes('title') ? 'ring-2 ring-destructive border-destructive' : null
+                publishMissingFields.includes('title') ? 'ring-2 ring-destructive border-destructive' : null,
+                isActiveAuctionWithBids ? 'opacity-60 cursor-not-allowed' : ''
               )}
             />
+            {isActiveAuctionWithBids && (
+              <p className="text-xs text-muted-foreground">
+                Title cannot be changed once an auction has bids (eBay policy).
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -718,7 +764,7 @@ function EditListingPageContent() {
                       placeholder="0.00"
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
+                      disabled={isActiveListing}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
                         publishMissingFields.includes('price') ? 'ring-2 ring-destructive border-destructive' : null
@@ -737,7 +783,7 @@ function EditListingPageContent() {
                       placeholder="0.00"
                       value={formData.startingBid}
                       onChange={(e) => setFormData({ ...formData, startingBid: e.target.value })}
-                      disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
+                      disabled={isActiveListing}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
                         publishMissingFields.includes('startingBid') ? 'ring-2 ring-destructive border-destructive' : null
@@ -754,7 +800,7 @@ function EditListingPageContent() {
                       placeholder="0.00"
                       value={formData.reservePrice}
                       onChange={(e) => setFormData({ ...formData, reservePrice: e.target.value })}
-                      disabled={listingData?.status === 'active' && (listingData?.metrics?.bidCount || 0) > 0}
+                      disabled={isActiveListing}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
                         publishMissingFields.includes('reservePrice') ? 'ring-2 ring-destructive border-destructive' : null
@@ -920,9 +966,11 @@ function EditListingPageContent() {
                     location: { ...formData.location, city: e.target.value },
                   })
                 }
+                disabled={isActiveAuctionWithBids}
                 className={cn(
                   "min-h-[48px] text-base bg-background",
-                  publishMissingFields.includes('location.city') ? 'ring-2 ring-destructive border-destructive' : null
+                  publishMissingFields.includes('location.city') ? 'ring-2 ring-destructive border-destructive' : null,
+                  isActiveAuctionWithBids ? 'opacity-60 cursor-not-allowed' : ''
                 )}
               />
             </div>
@@ -938,10 +986,11 @@ function EditListingPageContent() {
                     location: { ...formData.location, state: e.target.value },
                   })
                 }
-                disabled={['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category)}
+                disabled={['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) || isActiveAuctionWithBids}
                 className={cn(
                   "min-h-[48px] text-base bg-background",
-                  publishMissingFields.includes('location.state') ? 'ring-2 ring-destructive border-destructive' : null
+                  publishMissingFields.includes('location.state') ? 'ring-2 ring-destructive border-destructive' : null,
+                  isActiveAuctionWithBids ? 'opacity-60 cursor-not-allowed' : ''
                 )}
               />
               {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) && (
@@ -962,7 +1011,11 @@ function EditListingPageContent() {
                     location: { ...formData.location, zip: e.target.value },
                   })
                 }
-                className="min-h-[48px] text-base bg-background"
+                disabled={isActiveAuctionWithBids}
+                className={cn(
+                  "min-h-[48px] text-base bg-background",
+                  isActiveAuctionWithBids ? 'opacity-60 cursor-not-allowed' : ''
+                )}
               />
             </div>
           </div>
@@ -1308,6 +1361,7 @@ function EditListingPageContent() {
                 onCheckedChange={(checked) =>
                   setFormData({ ...formData, verification: checked as boolean })
                 }
+                disabled={isActiveAuctionWithBids}
               />
               <Label htmlFor="verification" className="cursor-pointer flex-1">
                 <div className="font-medium mb-1">Professional Verification ($100)</div>
@@ -1324,39 +1378,42 @@ function EditListingPageContent() {
             </div>
           </Card>
 
-          <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="transport"
-                checked={formData.transport}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, transport: checked as boolean })
+          {/* Transportation Section */}
+          <Card className="p-4 border-2">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-base mb-1">Transportation</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select who will handle transportation. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                </p>
+              </div>
+              <RadioGroup
+                value={formData.transportType || ''}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, transportType: value === 'seller' || value === 'buyer' ? value : null })
                 }
-              />
-              <Label htmlFor="transport" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Delivery details available</div>
-                <div className="text-sm text-muted-foreground">
-                  Buyer and seller coordinate pickup/delivery details directly. The platform does not arrange transport.
+                disabled={isActiveAuctionWithBids}
+                className="space-y-3"
+              >
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                  <RadioGroupItem value="seller" id="transport-seller" className="mt-1" />
+                  <Label htmlFor="transport-seller" className="cursor-pointer flex-1">
+                    <div className="font-medium mb-1">Seller Transport</div>
+                    <div className="text-sm text-muted-foreground">
+                      You (the seller) will deliver. Buyer and seller coordinate delivery details directly.
+                    </div>
+                  </Label>
                 </div>
-              </Label>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="seller-offers-delivery"
-                checked={formData.sellerOffersDelivery}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, sellerOffersDelivery: checked as boolean })
-                }
-              />
-              <Label htmlFor="seller-offers-delivery" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Seller offers delivery</div>
-                <div className="text-sm text-muted-foreground">
-                  Seller-provided delivery only. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                <div className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                  <RadioGroupItem value="buyer" id="transport-buyer" className="mt-1" />
+                  <Label htmlFor="transport-buyer" className="cursor-pointer flex-1">
+                    <div className="font-medium mb-1">Buyer Transport</div>
+                    <div className="text-sm text-muted-foreground">
+                      Buyer must handle transportation. Buyer arranges pickup/delivery.
+                    </div>
+                  </Label>
                 </div>
-              </Label>
+              </RadioGroup>
             </div>
           </Card>
 
@@ -1505,11 +1562,11 @@ function EditListingPageContent() {
                 {formData.verification && (
                   <Badge variant="secondary" className="font-semibold">Verification</Badge>
                 )}
-                {formData.transport && (
-                  <Badge variant="secondary" className="font-semibold">Transport Ready</Badge>
+                {formData.transportType === 'seller' && (
+                  <Badge variant="secondary" className="font-semibold">Seller Transport</Badge>
                 )}
-                {formData.sellerOffersDelivery && (
-                  <Badge variant="secondary" className="font-semibold">Seller offers delivery</Badge>
+                {formData.transportType === 'buyer' && (
+                  <Badge variant="secondary" className="font-semibold">Buyer Transport</Badge>
                 )}
               </div>
             </CardContent>
@@ -1532,8 +1589,8 @@ function EditListingPageContent() {
       trust: {
         verified: formData.verification,
         insuranceAvailable: false,
-        transportReady: formData.transport,
-        sellerOffersDelivery: formData.sellerOffersDelivery,
+        transportReady: formData.transportType !== null,
+        sellerOffersDelivery: formData.transportType === 'seller',
       },
       attributes: formData.attributes as ListingAttributes,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
@@ -1641,7 +1698,7 @@ function EditListingPageContent() {
       location: formData.location,
       images: formData.images || [],
       verification: formData.verification,
-      transport: formData.transport,
+      transportType: formData.transportType,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
       protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,

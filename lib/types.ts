@@ -991,7 +991,11 @@ export type NotificationType =
   | 'listing_rejected'
   | 'payout_released'
   | 'compliance_approved'
-  | 'compliance_rejected';
+  | 'compliance_rejected'
+  // Admin notifications
+  | 'admin_breeder_permit_submitted'
+  | 'admin_listing_submitted'
+  | 'admin_support_ticket_submitted';
 
 export interface Notification {
   id: string;

@@ -19,6 +19,7 @@ import {
   getAuctionHighBidderEmail,
   getAuctionEndingSoonEmail,
   getAuctionLostEmail,
+  getBidPlacedEmail,
   getDeliveryCheckInEmail,
   getOrderReceivedEmail,
   getProfileIncompleteReminderEmail,
@@ -26,6 +27,7 @@ import {
   getSavedSearchAlertEmail,
   getMessageReceivedEmail,
   getVerifyEmailEmail,
+  getOfferSubmittedEmail,
   getOfferAcceptedEmail,
   getOfferReceivedEmail,
   getOfferCounteredEmail,
@@ -51,6 +53,7 @@ import {
   type AuctionHighBidderEmailData,
   type AuctionEndingSoonEmailData,
   type AuctionLostEmailData,
+  type BidPlacedEmailData,
   type DeliveryCheckInEmailData,
   type OrderReceivedEmailData,
   type ProfileIncompleteReminderEmailData,
@@ -58,6 +61,7 @@ import {
   type SavedSearchAlertEmailData,
   type MessageReceivedEmailData,
   type VerifyEmailEmailData,
+  type OfferSubmittedEmailData,
   type OfferAcceptedEmailData,
   type OfferReceivedEmailData,
   type OfferCounteredEmailData,
@@ -159,6 +163,16 @@ const auctionHighBidderSchema = z.object({
   auctionEndsAt: dateSchema.optional(),
 });
 
+const bidPlacedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  bidAmount: z.number().finite().nonnegative(),
+  currentBidAmount: z.number().finite().nonnegative(),
+  isHighBidder: z.boolean(),
+  listingUrl: urlSchema,
+  auctionEndsAt: dateSchema.optional(),
+});
+
 const auctionEndingSoonSchema = z.object({
   userName: z.string().min(1),
   listingTitle: z.string().min(1),
@@ -240,6 +254,14 @@ const verifyEmailSchema = z.object({
   userName: z.string().min(1),
   verifyUrl: urlSchema,
   dashboardUrl: urlSchema,
+});
+
+const offerSubmittedSchema = z.object({
+  userName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  amount: z.number().finite().nonnegative(),
+  offerUrl: urlSchema,
+  expiresAt: dateSchema.optional(),
 });
 
 const offerAcceptedSchema = z.object({
@@ -509,6 +531,25 @@ export const EMAIL_EVENT_REGISTRY = [
     },
   },
   {
+    type: 'bid_placed',
+    displayName: 'Bid: Placed',
+    description: 'Sent to confirm a bid was placed successfully.',
+    schema: bidPlacedSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Blackbuck Trophy Buck',
+      bidAmount: 9900,
+      currentBidAmount: 9900,
+      isHighBidder: true,
+      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      auctionEndsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+    },
+    render: (data: BidPlacedEmailData) => {
+      const { subject, html } = getBidPlacedEmail(data);
+      return { subject, preheader: data.isHighBidder ? `You're winning: ${data.listingTitle}` : `Bid placed: ${data.listingTitle}`, html };
+    },
+  },
+  {
     type: 'auction_ending_soon',
     displayName: 'Auction: Ending Soon',
     description: 'Sent when an auction is ending soon (24h/1h/10m/2m thresholds).',
@@ -671,6 +712,23 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: OfferAcceptedEmailData) => {
       const { subject, html } = getOfferAcceptedEmail(data);
       return { subject, preheader: `Offer accepted`, html };
+    },
+  },
+  {
+    type: 'offer_submitted',
+    displayName: 'Offer: Submitted',
+    description: 'Sent to a buyer when they submit an offer (confirmation).',
+    schema: offerSubmittedSchema,
+    samplePayload: {
+      userName: 'Alex',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      amount: 8500,
+      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    },
+    render: (data: OfferSubmittedEmailData) => {
+      const { subject, html } = getOfferSubmittedEmail(data);
+      return { subject, preheader: `Offer submitted`, html };
     },
   },
   {

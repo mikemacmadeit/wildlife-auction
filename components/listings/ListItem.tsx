@@ -418,6 +418,25 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     className="flex-wrap gap-2"
                   />
                 </div>
+
+                {/* Watchers and Badges */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {watchers > 0 && (
+                    <Badge variant="secondary" className="text-[11px] font-semibold">
+                      <Heart className="h-3 w-3 mr-1" />
+                      {watchers} {watchers === 1 ? 'watching' : 'watching'}
+                    </Badge>
+                  )}
+                  {(listing as any)?.protectedTransactionEnabled && (listing as any)?.protectedTransactionDays ? (
+                    <Badge
+                      variant="default"
+                      className="bg-green-600 text-white font-semibold text-[11px]"
+                      title="Protected Transaction"
+                    >
+                      Protected {(listing as any).protectedTransactionDays} Days
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
 
               {/* Right: less important info (seller, etc.) */}

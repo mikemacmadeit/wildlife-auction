@@ -68,12 +68,14 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
       category === 'ranch_vehicles';
 
     if (!needsQuantity) return;
-    if (typeof currentQuantity === 'number' && Number.isFinite(currentQuantity) && currentQuantity >= 1) return;
-
-    // Default to 1 (and persist it into parent form state)
-    updateAttribute('quantity', 1);
+    // Always set quantity to 1 if it's not already a valid number >= 1
+    // This ensures quantity is in state immediately when category is selected
+    if (typeof currentQuantity !== 'number' || !Number.isFinite(currentQuantity) || currentQuantity < 1) {
+      // Default to 1 (and persist it into parent form state)
+      updateAttribute('quantity', 1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, currentQuantity]);
+  }, [category]); // Only depend on category, not currentQuantity, to ensure it runs immediately when category changes
 
   const currentRegistered = (attributes as any)?.registered;
   useEffect(() => {

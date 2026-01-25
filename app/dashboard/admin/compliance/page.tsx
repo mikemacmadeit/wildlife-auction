@@ -46,7 +46,7 @@ import {
   MapPin,
   User,
 } from 'lucide-react';
-import { collection, query, where, getDocs, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Listing, Order, ComplianceStatus, DocumentType } from '@/lib/types';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -56,6 +56,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
 import { ComplianceDocument } from '@/lib/types';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
+import { subscribeToUnreadCountByType, markNotificationsAsReadByType } from '@/lib/firebase/notifications';
 
 type TabType = 'listings' | 'orders' | 'breeder_permits' | 'payout_holds';
 
@@ -156,6 +157,9 @@ export default function AdminCompliancePage() {
   const [selectedPermit, setSelectedPermit] = useState<SellerPermit | null>(null);
   const [permitDialogOpen, setPermitDialogOpen] = useState(false);
   const [permitRejectionReason, setPermitRejectionReason] = useState('');
+  const [approvedPermits, setApprovedPermits] = useState<SellerPermit[]>([]);
+  const [breederPermitNotificationCount, setBreederPermitNotificationCount] = useState(0);
+  const [showApprovedPermits, setShowApprovedPermits] = useState(false);
 
   // Allow deep-linking: /dashboard/admin/compliance?tab=payout_holds
   useEffect(() => {
@@ -195,6 +199,22 @@ export default function AdminCompliancePage() {
       loadData();
     }
   }, [activeTab, adminLoading, isAdmin, loadData]);
+
+  // Mark breeder permit notifications as read when viewing the tab
+  useEffect(() => {
+    if (!user?.uid || !isAdmin || activeTab !== 'breeder_permits') return;
+    
+    // Mark all unread breeder permit notifications as read when viewing the tab
+    const markAsRead = async () => {
+      try {
+        await markNotificationsAsReadByType(user.uid, 'admin_breeder_permit_submitted' as any);
+      } catch (error) {
+        console.error('Error marking notifications as read:', error);
+      }
+    };
+    
+    markAsRead();
+  }, [user?.uid, isAdmin, activeTab]);
 
   const loadPendingListings = async () => {
     const listingsRef = collection(db, 'listings');
@@ -297,6 +317,37 @@ export default function AdminCompliancePage() {
     }
     setBreederPermits(Array.isArray(jsonRes?.permits) ? jsonRes.permits : []);
   };
+
+  const loadApprovedPermits = async () => {
+    if (!user?.uid) return;
+    const token = await user.getIdToken();
+    const res = await fetch('/api/admin/breeder-permits?status=verified&limit=100', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const jsonRes = await res.json().catch(() => null);
+    if (!res.ok) {
+      console.error('Failed to load approved permits:', jsonRes);
+      return;
+    }
+    setApprovedPermits(Array.isArray(jsonRes?.permits) ? jsonRes.permits : []);
+  };
+
+  // Subscribe to unread notifications for breeder permits
+  useEffect(() => {
+    if (!user?.uid || !isAdmin) return;
+    
+    try {
+      return subscribeToUnreadCountByType(
+        user.uid,
+        'admin_breeder_permit_submitted' as any,
+        (count) => setBreederPermitNotificationCount(count || 0)
+      );
+    } catch (error) {
+      console.error('Error subscribing to breeder permit notifications:', error);
+      setBreederPermitNotificationCount(0);
+      return;
+    }
+  }, [user?.uid, isAdmin]);
 
   const loadComplianceHolds = async () => {
     const ordersRef = collection(db, 'orders');
@@ -587,8 +638,13 @@ export default function AdminCompliancePage() {
           <TabsTrigger value="orders">
             Orders ({orders.length})
           </TabsTrigger>
-          <TabsTrigger value="breeder_permits">
+          <TabsTrigger value="breeder_permits" className="relative">
             Breeder Permits ({breederPermits.length})
+            {breederPermitNotificationCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold flex items-center justify-center">
+                {breederPermitNotificationCount > 99 ? '99+' : breederPermitNotificationCount}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="payout_holds">
             Payout Holds ({holdRows.length})
@@ -928,14 +984,33 @@ export default function AdminCompliancePage() {
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" />
                     <div className="font-semibold">TPWD Breeder Permits</div>
+                    {breederPermitNotificationCount > 0 && (
+                      <Badge variant="destructive" className="ml-2">
+                        {breederPermitNotificationCount} new
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Seller-submitted TPWD breeder permits. Approving applies a public trust badge (marketplace workflow).
                   </div>
                 </div>
-                <Button onClick={loadBreederPermits} variant="outline" disabled={loading || !user}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    onClick={() => {
+                      setShowApprovedPermits(!showApprovedPermits);
+                      if (!showApprovedPermits) {
+                        loadApprovedPermits();
+                      }
+                    }} 
+                    variant="outline" 
+                    disabled={loading || !user}
+                  >
+                    {showApprovedPermits ? 'Hide Approved' : 'View Approved'}
+                  </Button>
+                  <Button onClick={loadBreederPermits} variant="outline" disabled={loading || !user}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1115,6 +1190,85 @@ export default function AdminCompliancePage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Approved Permits Section */}
+          {showApprovedPermits && (
+            <Card className="border-2 border-primary/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-primary" />
+                  Approved Breeder Permits ({approvedPermits.length})
+                </CardTitle>
+                <CardDescription>
+                  All verified TPWD breeder permits. These sellers have the "TPWD breeder permit" trust badge.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {approvedPermits.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No approved permits yet.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {approvedPermits.map((p) => (
+                      <Card key={p.sellerId} className="border border-primary/20 bg-primary/5">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="font-semibold">Seller</div>
+                                <Link href={`/dashboard/admin/users/${p.sellerId}`} className="font-mono text-xs text-primary hover:underline">
+                                  {p.sellerId}
+                                </Link>
+                                <Badge variant="default" className="bg-primary">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              </div>
+                              {p.permitNumber && (
+                                <div className="text-sm text-muted-foreground">
+                                  Permit #: <span className="font-mono">{p.permitNumber}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                {p.uploadedAt && (
+                                  <span>Submitted: {format(new Date(p.uploadedAt), 'MMM d, yyyy')}</span>
+                                )}
+                                {p.reviewedAt && (
+                                  <span>Approved: {format(new Date(p.reviewedAt), 'MMM d, yyyy')}</span>
+                                )}
+                                {p.reviewedBy && (
+                                  <span>By: {p.reviewedBy}</span>
+                                )}
+                              </div>
+                              {p.expiresAt && (
+                                <div className="text-xs text-muted-foreground">
+                                  Expires: {format(new Date(p.expiresAt), 'MMM d, yyyy')}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {p.documentUrl && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(p.documentUrl || '', '_blank')}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Document
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="payout_holds" className="space-y-4">

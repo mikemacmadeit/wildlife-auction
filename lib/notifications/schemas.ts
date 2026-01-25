@@ -66,6 +66,16 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     bidAmount: z.number().finite().nonnegative(),
   }),
   z.object({
+    type: z.literal('Bid.Placed'),
+    listingId: baseString,
+    listingTitle: baseString,
+    listingUrl: urlSchema,
+    bidAmount: z.number().finite().nonnegative(),
+    currentBidAmount: z.number().finite().nonnegative(),
+    isHighBidder: z.boolean(),
+    endsAt: z.string().optional(),
+  }),
+  z.object({
     type: z.literal('Listing.Approved'),
     listingId: baseString,
     listingTitle: baseString,
@@ -213,6 +223,15 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     storagePath: baseString,
     documentUrl: urlSchema.optional().nullable(),
     adminComplianceUrl: urlSchema,
+  }),
+  z.object({
+    type: z.literal('Offer.Submitted'),
+    offerId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    offerUrl: urlSchema,
+    amount: z.number(),
+    expiresAt: z.string().optional(),
   }),
   z.object({
     type: z.literal('Offer.Received'),

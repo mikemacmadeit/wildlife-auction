@@ -18,6 +18,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Auction.Won',
   'Auction.Lost',
   'Auction.BidReceived',
+  'Bid.Placed',
 
   // LISTINGS (seller-facing moderation outcomes)
   'Listing.Approved',
@@ -46,6 +47,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Message.Received',
 
   // OFFERS (Best Offer)
+  'Offer.Submitted',
   'Offer.Received',
   'Offer.Countered',
   'Offer.Accepted',
@@ -141,6 +143,16 @@ export type NotificationEventPayload =
       listingTitle: string;
       listingUrl: string;
       bidAmount: number;
+    }
+  | {
+      type: 'Bid.Placed';
+      listingId: string;
+      listingTitle: string;
+      listingUrl: string;
+      bidAmount: number;
+      currentBidAmount: number;
+      isHighBidder: boolean;
+      endsAt?: string;
     }
   | {
       type: 'Listing.Approved';
@@ -263,6 +275,15 @@ export type NotificationEventPayload =
       threadUrl: string;
       senderRole: 'buyer' | 'seller';
       preview?: string;
+    }
+  | {
+      type: 'Offer.Submitted';
+      offerId: string;
+      listingId: string;
+      listingTitle: string;
+      offerUrl: string;
+      amount: number;
+      expiresAt?: string;
     }
   | {
       type: 'Offer.Received';
