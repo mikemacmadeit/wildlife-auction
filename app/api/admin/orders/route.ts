@@ -99,6 +99,8 @@ export async function GET(request: Request) {
           'paid_held',
           'awaiting_bank_transfer',
           'awaiting_wire',
+          'in_transit',
+          'delivered',
           'buyer_confirmed',
           'accepted',
           'ready_to_release',
@@ -162,6 +164,7 @@ export async function GET(request: Request) {
 
     if (filter === 'escrow') {
       // Orders held for payout release: paid funds awaiting release OR high-ticket awaiting payment confirmation
+      // Includes orders in transit/delivered that haven't been released yet
       orders = orders.filter((order: any) => {
         const status = order.status as OrderStatus;
         const hasTransfer = !!order.stripeTransferId;
@@ -171,6 +174,8 @@ export async function GET(request: Request) {
           status === 'paid_held' ||
           status === 'awaiting_bank_transfer' ||
           status === 'awaiting_wire' ||
+          status === 'in_transit' ||
+          status === 'delivered' ||
           status === 'buyer_confirmed' ||
           status === 'accepted' ||
           status === 'ready_to_release'
