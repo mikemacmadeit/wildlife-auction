@@ -127,6 +127,7 @@ export default function SellerLayout({
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
+  const [unreadSalesCount, setUnreadSalesCount] = useState<number>(0);
   const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
   const [adminEverTrue, setAdminEverTrue] = useState(false);
