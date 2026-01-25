@@ -366,7 +366,7 @@ export default function BuyerOrderDetailPage() {
                     try {
                       setProcessing('confirm');
                       await confirmReceipt(order.id);
-                      toast({ title: 'Receipt confirmed', description: 'Funds remain held until admin release.' });
+                      toast({ title: 'Receipt confirmed', description: 'Transaction complete. Seller was paid immediately upon successful payment.' });
                       const refreshed = await getOrderById(order.id);
                       if (refreshed) setOrder(refreshed);
                     } catch (e: any) {

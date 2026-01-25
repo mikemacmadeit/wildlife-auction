@@ -129,11 +129,11 @@ export function TransactionTimeline(props: {
       completed: 'Transaction complete. Seller was paid immediately upon successful payment.',
     };
     const sellerCopy = {
-      paymentReceived: 'Payment received and held securely. Prepare delivery.',
+      paymentReceived: 'Payment received. Seller was paid immediately. Prepare delivery.',
       prepare: 'Prepare delivery and update the delivery status.',
       inTransit: 'Delivery is in transit. Mark delivered once complete.',
       delivered: 'Delivery is marked. Buyer can confirm receipt or report an issue.',
-      protection: 'Protection window active. Payout is held until the window ends or buyer confirms.',
+      protection: 'Protection window active. Buyer can report issues within the window.',
       ready: 'Order fulfilled. Transaction complete.',
       completed: 'Transaction complete. Seller was paid immediately upon successful payment.',
     };
@@ -238,11 +238,11 @@ export function TransactionTimeline(props: {
       },
       {
         key: 'payout',
-        title: order.status === 'refunded' ? 'Refunded' : 'Payment released',
+        title: order.status === 'refunded' ? 'Refunded' : 'Payment complete',
         description:
           order.status === 'refunded'
             ? 'Payment was refunded.'
-            : 'Payment released to the seller. Transaction complete.',
+            : 'Seller was paid immediately upon successful payment. Transaction complete.',
         icon: order.status === 'refunded' ? <Undo2 className="h-4 w-4" /> : <DollarSign className="h-4 w-4" />,
         rank: 7,
         // Always show the final step so buyers understand the end-state.

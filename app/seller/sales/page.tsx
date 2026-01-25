@@ -44,13 +44,13 @@ function statusBadge(status: string) {
   switch (status) {
     case 'paid_held':
     case 'paid':
-      return { variant: 'default' as const, label: 'Paid (held)' };
+      return { variant: 'default' as const, label: 'Paid' }; // Seller already paid - no "held" needed
     case 'in_transit':
       return { variant: 'secondary' as const, label: 'In transit' };
     case 'delivered':
       return { variant: 'secondary' as const, label: 'Delivered' };
     case 'ready_to_release':
-      return { variant: 'default' as const, label: 'Ready to release' };
+      return { variant: 'default' as const, label: 'Fulfillment complete' }; // Changed from "Ready to release"
     case 'completed':
       return { variant: 'secondary' as const, label: 'Completed' };
     case 'disputed':
@@ -483,12 +483,12 @@ export default function SellerSalesPage() {
                                         <div className="font-semibold">{formatDate(o.paidAt || null)}</div>
                                       </div>
                                       <div className="rounded-md border bg-background p-3">
-                                        <div className="text-xs text-muted-foreground">Eligible for release</div>
-                                        <div className="font-semibold">{formatDate((o as any).releaseEligibleAt || null)}</div>
+                                        <div className="text-xs text-muted-foreground">Payment status</div>
+                                        <div className="font-semibold">Paid immediately</div>
                                       </div>
                                       <div className="rounded-md border bg-background p-3">
-                                        <div className="text-xs text-muted-foreground">Released</div>
-                                        <div className="font-semibold">{formatDate(o.releasedAt || null)}</div>
+                                        <div className="text-xs text-muted-foreground">Payment method</div>
+                                        <div className="font-semibold">{(o as any).paymentMethod || 'Card'}</div>
                                       </div>
                                     </div>
 

@@ -3,10 +3,12 @@
  * 
  * Tabs:
  * - All Purchases - All orders across statuses (pending/paid/awaiting/wire/refunded/cancelled/etc.)
- * - Payout holds - Funds received / awaiting payment confirmation and not yet released (legacy key: "escrow")
+ * - Fulfillment Issues - Orders requiring fulfillment attention (legacy key: "escrow" for backward compatibility)
  * - Protected Transactions - Orders with protected transaction enabled
  * - Open Disputes - Orders with open disputes
- * - Ready to Release - Orders eligible for payout release
+ * - Fulfillment Pending - Orders awaiting fulfillment completion
+ * 
+ * NOTE: Sellers are paid immediately via Stripe Connect destination charges - no payout release needed.
  */
 
 'use client';
@@ -494,7 +496,7 @@ export default function AdminOpsPage() {
     if (eligibleOrders.length === 0) {
       toast({
         title: 'No Eligible Orders',
-        description: 'None of the selected orders are eligible for release.',
+        description: 'Sellers are paid immediately - no release needed. Admin can help enforce fulfillment timelines.',
         variant: 'destructive',
       });
       setBulkActionDialogOpen(null);
@@ -632,7 +634,7 @@ export default function AdminOpsPage() {
     setSelectedOrderIds(new Set());
   }, [activeTab]);
 
-  // Status badge helpers
+  // Status badge helpers - Updated to reflect immediate payment (no payout holds)
   const getStatusBadge = (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => {
     if (disputeStatus && disputeStatus !== 'none' && disputeStatus !== 'cancelled' && !disputeStatus.startsWith('resolved')) {
       return <Badge variant="destructive">Dispute: {disputeStatus}</Badge>;
@@ -640,9 +642,9 @@ export default function AdminOpsPage() {
     
     switch (status) {
       case 'paid':
-        return <Badge variant="default" className="bg-orange-500 text-white">Paid</Badge>;
+        return <Badge variant="default" className="bg-green-600 text-white">Paid</Badge>; // Seller already paid
       case 'paid_held':
-        return <Badge variant="default" className="bg-orange-500 text-white">Paid (Held)</Badge>;
+        return <Badge variant="default" className="bg-green-600 text-white">Paid</Badge>; // Changed from "Paid (Held)" - seller already paid
       case 'awaiting_bank_transfer':
         return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Bank Transfer</Badge>;
       case 'awaiting_wire':
@@ -656,7 +658,7 @@ export default function AdminOpsPage() {
       case 'buyer_confirmed':
         return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
       case 'ready_to_release':
-        return <Badge variant="default" className="bg-emerald-700 text-white">Ready to Release</Badge>;
+        return <Badge variant="default" className="bg-emerald-700 text-white">Fulfillment Complete</Badge>; // Changed from "Ready to Release"
       case 'completed':
         return <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">Completed</Badge>;
       case 'refunded':
@@ -790,29 +792,18 @@ export default function AdminOpsPage() {
                 className="pl-10"
               />
             </div>
-            {(activeTab === 'escrow' || activeTab === 'ready_to_release') && selectedOrderIds.size > 0 && (
+            {selectedOrderIds.size > 0 && (
               <div className="flex items-center gap-2 pt-2 border-t">
                 <span className="text-sm text-muted-foreground">
                   {selectedOrderIds.size} order{selectedOrderIds.size !== 1 ? 's' : ''} selected
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const totalAmount = filteredOrders
-                      .filter(o => selectedOrderIds.has(o.id))
-                      .reduce((sum, o) => sum + o.sellerAmount, 0);
-                    setBulkActionDialogOpen('release');
-                  }}
-                >
-                  Bulk Release ({formatCurrency(filteredOrders.filter(o => selectedOrderIds.has(o.id)).reduce((sum, o) => sum + o.sellerAmount, 0))})
-                </Button>
+                {/* DEPRECATED: Bulk release removed - sellers paid immediately */}
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setBulkActionDialogOpen('hold')}
                 >
-                  Bulk Hold
+                  Bulk Hold (Fulfillment)
                 </Button>
                 <Button
                   size="sm"
@@ -843,7 +834,7 @@ export default function AdminOpsPage() {
           </TabsTrigger>
           <TabsTrigger value="escrow">
             <DollarSign className="h-4 w-4 mr-2" />
-            Payout holds
+            Fulfillment Issues
           </TabsTrigger>
           <TabsTrigger value="protected">
             <Shield className="h-4 w-4 mr-2" />
@@ -855,7 +846,7 @@ export default function AdminOpsPage() {
           </TabsTrigger>
           <TabsTrigger value="ready_to_release">
             <CheckCircle className="h-4 w-4 mr-2" />
-            Ready to Release
+            Fulfillment Pending
           </TabsTrigger>
         </TabsList>
 
@@ -1016,8 +1007,8 @@ export default function AdminOpsPage() {
               <CardContent className="pt-6">
                 <div className="text-center py-12">
                   <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Orders Ready to Release</h3>
-                  <p className="text-muted-foreground">No orders are currently eligible for payout release.</p>
+                  <h3 className="text-lg font-semibold mb-2">No Orders Pending Fulfillment</h3>
+                  <p className="text-muted-foreground">All orders are either in progress or completed. Sellers are paid immediately upon successful payment.</p>
                 </div>
               </CardContent>
             </Card>
@@ -1041,7 +1032,7 @@ export default function AdminOpsPage() {
                   <div className="flex-1">
                     <ReadyToReleaseCard
                       order={order}
-                      onRelease={() => setReleaseDialogOpen(order.id)}
+                      onRelease={() => {}} // DEPRECATED: No release needed - seller already paid
                       onView={() => handleViewOrder(order)}
                       getStatusBadge={getStatusBadge}
                     />
@@ -1283,26 +1274,18 @@ export default function AdminOpsPage() {
       </Dialog>
 
       {/* Bulk Action Dialogs */}
+      {/* DEPRECATED: Bulk release dialog - sellers already paid immediately */}
       <Dialog open={bulkActionDialogOpen === 'release'} onOpenChange={(open) => !open && setBulkActionDialogOpen(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Bulk Release Payouts</DialogTitle>
+            <DialogTitle>Seller Already Paid</DialogTitle>
             <DialogDescription>
-              Release payouts for {selectedOrderIds.size} selected order{selectedOrderIds.size !== 1 ? 's' : ''}?
-              Total amount: {formatCurrency(filteredOrders.filter(o => selectedOrderIds.has(o.id)).reduce((sum, o) => sum + o.sellerAmount, 0))}
+              Sellers receive funds immediately upon successful payment via Stripe Connect destination charges. No payout release needed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkActionDialogOpen(null)}>Cancel</Button>
-            <Button onClick={handleBulkRelease} disabled={processingOrderId === 'bulk'}>
-              {processingOrderId === 'bulk' ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Release All'
-              )}
+            <Button onClick={() => setBulkActionDialogOpen(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1692,14 +1675,12 @@ function OrderCard({
   getHoldReasonText: (reason: PayoutHoldReason) => string;
 }) {
   const isAwaitingBankRails = order.status === 'awaiting_bank_transfer' || order.status === 'awaiting_wire';
-  const isReleaseCandidate = order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted';
-  const fundsAvailableOn =
-    order.stripeFundsAvailableOn instanceof Date && Number.isFinite(order.stripeFundsAvailableOn.getTime())
-      ? order.stripeFundsAvailableOn
-      : null;
-  const btStatus = typeof (order as any).stripeBalanceTransactionStatus === 'string' ? String((order as any).stripeBalanceTransactionStatus) : null;
-  const minsUntilAvailable =
-    fundsAvailableOn && btStatus !== 'available' ? Math.max(0, Math.ceil((fundsAvailableOn.getTime() - Date.now()) / 60000)) : null;
+  // DEPRECATED: isReleaseCandidate - sellers paid immediately, no release needed
+  const isReleaseCandidate = false; // Always false - seller already paid
+  // DEPRECATED: Stripe settlement info - seller already paid via destination charge
+  const fundsAvailableOn = null;
+  const btStatus = null;
+  const minsUntilAvailable = null;
 
   return (
     <Card>
@@ -1716,16 +1697,10 @@ function OrderCard({
               <p>Seller: {order.sellerName} ({order.sellerEmail})</p>
               <p>Amount: {formatCurrency(order.amount)} | Seller receives: {formatCurrency(order.sellerAmount)}</p>
               <p>Created: {formatDate(order.createdAt)}</p>
-              {fundsAvailableOn ? (
-                <p>
-                  Stripe settlement:{' '}
-                  {btStatus === 'available'
-                    ? 'Available now'
-                    : `Expected ${fundsAvailableOn.toLocaleString()}${minsUntilAvailable ? ` (~${minsUntilAvailable} min)` : ''}`}
-                </p>
-              ) : null}
+              <p className="text-green-600 text-xs">✓ Seller paid immediately via destination charge</p>
+              {/* DEPRECATED: payoutHoldReason no longer used (seller paid immediately) */}
               {order.payoutHoldReason && order.payoutHoldReason !== 'none' && (
-                <p className="text-orange-600">Hold: {getHoldReasonText(order.payoutHoldReason)}</p>
+                <p className="text-muted-foreground text-xs">Note: Seller was paid immediately via destination charge</p>
               )}
             </div>
           </div>
@@ -1740,14 +1715,16 @@ function OrderCard({
                 Mark Paid (Stripe)
               </Button>
             ) : (
+              // DEPRECATED: No payout release needed - seller already paid immediately
               <Button
                 size="sm"
                 onClick={onRelease}
-                disabled={!isReleaseCandidate}
-                className="bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                disabled={true}
+                className="bg-gray-400 hover:bg-gray-400 disabled:opacity-50 cursor-not-allowed"
+                title="Seller already paid immediately - no release needed"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Release
+                Already Paid
               </Button>
             )}
             <Button variant="destructive" size="sm" onClick={onRefund}>
@@ -1830,11 +1807,12 @@ function ProtectedTransactionCard({
                 )}
               </Button>
             )}
+            {/* DEPRECATED: No payout release needed - seller already paid immediately */}
             {order.deliveryConfirmedAt && (!order.protectionEndsAt || order.protectionEndsAt.getTime() <= Date.now()) && (
-              <Button size="sm" onClick={onRelease} className="bg-green-600 hover:bg-green-700">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Release
-              </Button>
+              <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Seller Paid
+              </Badge>
             )}
           </div>
         </div>
@@ -1895,7 +1873,7 @@ function DisputeCard({
   );
 }
 
-// Ready to Release Card
+// Fulfillment Complete Card (formerly "Ready to Release" - seller already paid)
 function ReadyToReleaseCard({
   order,
   onRelease,
@@ -1907,12 +1885,12 @@ function ReadyToReleaseCard({
   onView: () => void;
   getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
 }) {
-  const eligibleReason =
-    order.status === 'ready_to_release'
-      ? 'Ready to release'
+  const fulfillmentStatus =
+    order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted'
+      ? 'Fulfillment complete'
       : order.buyerConfirmedAt || order.buyerAcceptedAt || order.acceptedAt
         ? 'Buyer confirmed receipt'
-        : 'Eligible';
+        : 'Fulfillment in progress';
   
   return (
     <Card>
@@ -1926,7 +1904,8 @@ function ReadyToReleaseCard({
             <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Seller: {order.sellerName} | Amount: {formatCurrency(order.sellerAmount)}</p>
-              <p className="text-green-600 font-medium">Eligible: {eligibleReason}</p>
+              <p className="text-green-600 font-medium">Status: {fulfillmentStatus}</p>
+              <p className="text-xs text-muted-foreground">✓ Seller paid immediately via destination charge</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -1934,10 +1913,7 @@ function ReadyToReleaseCard({
               <Eye className="h-4 w-4 mr-2" />
               View
             </Button>
-            <Button size="sm" onClick={onRelease} className="bg-green-600 hover:bg-green-700">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Release Payout
-            </Button>
+            {/* DEPRECATED: No payout release needed - seller already paid */}
           </div>
         </div>
       </CardContent>

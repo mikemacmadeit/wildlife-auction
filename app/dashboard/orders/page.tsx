@@ -747,7 +747,7 @@ export default function OrdersPage() {
 
   const statusChipDefs: Array<{ key: PurchasesStatusKey | 'all'; label: string }> = [
     { key: 'all', label: 'All' },
-    { key: 'held', label: 'Held' },
+    { key: 'held', label: 'Fulfillment in progress' }, // Changed from "Held" - seller already paid
     { key: 'awaiting_permit', label: 'Awaiting permit' },
     { key: 'in_transit', label: 'In transit' },
     { key: 'delivered', label: 'Delivered' },
@@ -758,7 +758,7 @@ export default function OrdersPage() {
   const getUIStatusBadge = (statusKey: PurchasesStatusKey) => {
     switch (statusKey) {
       case 'held':
-        return <Badge className="bg-orange-500 text-white">Held (payout)</Badge>;
+        return <Badge className="bg-blue-500 text-white">Fulfillment in progress</Badge>; // Changed from "Held (payout)" - seller already paid
       case 'awaiting_permit':
         return <Badge className="bg-purple-600 text-white">Awaiting permit</Badge>;
       case 'in_transit':
@@ -788,8 +788,7 @@ export default function OrdersPage() {
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
-            Funds are held for payout release and are released only after delivery and any required marketplace compliance steps
-            are complete (and no dispute is open).
+            Seller was paid immediately upon successful payment. Waiting on fulfillment (delivery/pickup) to complete.
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

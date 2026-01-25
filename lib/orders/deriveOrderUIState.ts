@@ -77,11 +77,12 @@ export function deriveOrderUIState(order: Order): {
     };
   }
 
+  // NEW: Fulfillment-based workflow (seller already paid immediately via destination charge)
   if (order.status === 'buyer_confirmed' || order.status === 'ready_to_release') {
     return {
-      statusKey: 'held',
+      statusKey: 'completed',
       currentStepLabel: 'Buyer confirmed',
-      waitingOn: 'Waiting on admin release',
+      waitingOn: undefined, // Seller already paid - no admin release needed
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },
     };
@@ -90,18 +91,30 @@ export function deriveOrderUIState(order: Order): {
   if (order.status === 'completed') {
     return {
       statusKey: 'completed',
-      currentStepLabel: order.stripeTransferId ? 'Payment released' : 'Completed',
+      currentStepLabel: 'Transaction complete',
+      waitingOn: undefined,
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },
     };
   }
 
+  // Payment received - seller already paid immediately, now in fulfillment phase
   if (order.status === 'paid_held' || order.status === 'paid') {
     const preparing = !!(order as any).sellerPreparingAt;
+    const transportOption = (order as any).transportOption || 'SELLER_TRANSPORT';
+    
+    // Determine what we're waiting on based on transport option
+    let waitingOnText: string;
+    if (transportOption === 'BUYER_TRANSPORT') {
+      waitingOnText = preparing ? 'Waiting on seller to schedule pickup' : 'Waiting on seller to prepare for pickup';
+    } else {
+      waitingOnText = preparing ? 'Waiting on seller to mark in transit' : 'Waiting on seller to begin preparing delivery';
+    }
+    
     return {
-      statusKey: 'held',
-      currentStepLabel: preparing ? 'Seller preparing delivery' : 'Payment received',
-      waitingOn: preparing ? 'Waiting on seller to mark in transit' : 'Waiting on seller to begin preparing',
+      statusKey: 'in_transit', // Changed from 'held' - this is fulfillment phase, not payout hold
+      currentStepLabel: preparing ? 'Seller preparing' : 'Payment received',
+      waitingOn: waitingOnText,
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },
     };
