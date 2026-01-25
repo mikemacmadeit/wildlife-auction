@@ -946,12 +946,18 @@ export async function POST(request: Request) {
     }
 
     /**
-     * Payments model (evidence-based):
-     * - This code path uses "platform charge + later transfer" (separate charges & transfers).
-     * - We intentionally do NOT set `payment_intent_data.transfer_data` here.
-     *   Funds settle to the platform first, then are released later via an admin-triggered Stripe Transfer.
-     * - This is a settlement/payout-hold workflow and does NOT imply custody of animals/goods or any intermediary role.
+     * STRIPE-COMPLIANT PAYMENT MODEL:
+     * - Uses Stripe Connect destination charges with immediate payment to seller.
+     * - Platform fee (5%) is deducted automatically via application_fee_amount.
+     * - Seller receives funds immediately upon successful payment (no escrow, no payout holds).
+     * - This is a marketplace facilitation model; platform does not take custody of funds or goods.
      */
+    
+    // Determine transport option from listing (default to SELLER_TRANSPORT if not set for backward compatibility)
+    const transportOption = (listingData as any)?.transportOption || 
+                           ((listingData as any)?.trust?.sellerOffersDelivery ? 'SELLER_TRANSPORT' : 'BUYER_TRANSPORT') ||
+                           'SELLER_TRANSPORT';
+    
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],
       line_items: [
@@ -973,8 +979,22 @@ export async function POST(request: Request) {
       mode: 'payment',
       success_url: `${baseUrl}/dashboard/orders?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: offerId ? `${baseUrl}/listing/${listingId}?offer=${offerId}` : `${baseUrl}/listing/${listingId}`,
-      // IMPORTANT: Do not set `payment_intent_data.transfer_data` here.
-      // We hold funds at the platform until payout release conditions are satisfied, then pay sellers via Stripe Transfer.
+      // STRIPE CONNECT DESTINATION CHARGE: Seller receives funds immediately, platform fee deducted automatically
+      payment_intent_data: {
+        application_fee_amount: platformFee, // 5% platform fee (in cents)
+        transfer_data: {
+          destination: sellerStripeAccountId, // Seller's Stripe Connect account ID
+        },
+        // Automatic capture (default) - seller is paid immediately upon successful payment
+        metadata: {
+          transactionId: orderId,
+          listingId: listingId,
+          buyerId: buyerId,
+          sellerId: listingData.sellerId,
+          transportOption: String(transportOption),
+          paymentType: 'full',
+        },
+      },
       metadata: {
         orderId,
         listingId: listingId,
@@ -982,7 +1002,7 @@ export async function POST(request: Request) {
         sellerId: listingData.sellerId,
         sellerStripeAccountId: sellerStripeAccountId,
         listingTitle: listingData.title,
-        sellerAmount: sellerAmount.toString(), // Store seller amount in metadata for transfer
+        sellerAmount: sellerAmount.toString(), // For reference only (seller already paid via destination charge)
         platformFee: platformFee.toString(),
         quantity: String(quantityRequested),
         unitPrice: String(purchaseAmount),
@@ -990,6 +1010,7 @@ export async function POST(request: Request) {
         sellerTierWeight: String(sellerTierWeight),
         platformFeePercent: feePercent.toString(), // Immutable snapshot at checkout time (flat)
         paymentMethod,
+        transportOption: String(transportOption),
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmount) } : {}),
       },
       customer_email: decodedToken.email || undefined,

@@ -125,8 +125,8 @@ export function TransactionTimeline(props: {
       inTransit: 'Your order is on the way.',
       delivered: 'Delivery is marked. Confirm receipt or report an issue if needed.',
       protection: 'Protection window active. You can report an issue within the window.',
-      ready: 'Ready for payout release. Admin will release funds to the seller.',
-      completed: 'Payout released. Transaction complete.',
+      ready: 'Order fulfilled. Transaction complete.',
+      completed: 'Transaction complete. Seller was paid immediately upon successful payment.',
     };
     const sellerCopy = {
       paymentReceived: 'Payment received and held securely. Prepare delivery.',
@@ -134,8 +134,8 @@ export function TransactionTimeline(props: {
       inTransit: 'Delivery is in transit. Mark delivered once complete.',
       delivered: 'Delivery is marked. Buyer can confirm receipt or report an issue.',
       protection: 'Protection window active. Payout is held until the window ends or buyer confirms.',
-      ready: 'Ready for payout release. Admin will release funds after checks.',
-      completed: 'Payout released. Transaction complete.',
+      ready: 'Order fulfilled. Transaction complete.',
+      completed: 'Transaction complete. Seller was paid immediately upon successful payment.',
     };
     const copy = role === 'seller' ? sellerCopy : buyerCopy;
 

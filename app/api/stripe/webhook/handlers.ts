@@ -384,24 +384,23 @@ export async function handleCheckoutSessionCompleted(
       }
     }
     
-    // Snapshot protected transaction fields from listing
+    // Snapshot protected transaction fields from listing (for dispute windows only - no payout holds)
     const protectedTransactionEnabled = listingData.protectedTransactionEnabled || false;
     const protectedTransactionDays = listingData.protectedTransactionDays || null;
     const protectedTermsVersion = listingData.protectedTermsVersion || 'v1';
     
-    // Determine payout hold reason
-    let payoutHoldReason = 'none';
-    if (protectedTransactionEnabled && protectedTransactionDays) {
-      payoutHoldReason = 'protection_window';
-    }
+    // Get transport option from listing (required for fulfillment workflow)
+    const transportOption = (listingData as any)?.transportOption || 
+                           ((listingData as any)?.trust?.sellerOffersDelivery ? 'SELLER_TRANSPORT' : 'BUYER_TRANSPORT') ||
+                           'SELLER_TRANSPORT';
 
     // Check if transfer permit is required (whitetail_breeder)
     const transferPermitRequired = listingCategory === 'whitetail_breeder';
 
     // Create or update order in Firestore (idempotent).
     const now = new Date();
-    // Legacy env var name retained for backward compatibility. This governs the protected-transaction dispute window duration (hours).
-    const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
+    // Dispute window duration (hours) - for internal enforcement only, does not affect Stripe payout timing
+    const disputeWindowHours = parseInt(process.env.DISPUTE_WINDOW_HOURS || '72', 10);
     const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
     
     let orderRef = orderIdFromMeta ? db.collection('orders').doc(String(orderIdFromMeta)) : db.collection('orders').doc();
@@ -432,11 +431,24 @@ export async function handleCheckoutSessionCompleted(
       return;
     }
 
+    // NEW STATUS MODEL: Seller is paid immediately via destination charge - status only tracks fulfillment
     const orderStatus: string = paymentConfirmed
-      ? 'paid_held'
+      ? 'paid' // Legacy status for backward compatibility
       : isBankRails
         ? (effectivePaymentMethod === 'wire' ? 'awaiting_wire' : 'awaiting_bank_transfer')
         : 'pending';
+    
+    // NEW: Transaction status for fulfillment workflow (seller already paid)
+    const transactionStatus: string = paymentConfirmed
+      ? 'PAID' // Payment successful - seller already received funds via destination charge
+      : isBankRails
+        ? 'PENDING_PAYMENT'
+        : 'PENDING_PAYMENT';
+    
+    // Determine initial fulfillment status based on transport option
+    const fulfillmentStatus: string = paymentConfirmed && transactionStatus === 'PAID'
+      ? (transportOption === 'SELLER_TRANSPORT' ? 'FULFILLMENT_REQUIRED' : 'FULFILLMENT_REQUIRED')
+      : transactionStatus;
 
     // Public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
     const photos = Array.isArray((listingData as any)?.photos) ? ((listingData as any).photos as any[]) : [];
@@ -488,14 +500,17 @@ export async function handleCheckoutSessionCompleted(
       sellerAmount: sellerAmount / 100,
       quantity: quantityFromMeta,
       ...(typeof unitPriceFromMeta === 'number' && Number.isFinite(unitPriceFromMeta) ? { unitPrice: unitPriceFromMeta } : {}),
-      status: orderStatus,
+      status: orderStatus, // Legacy status for backward compatibility
+      transactionStatus: fulfillmentStatus, // NEW: Fulfillment-based status (seller already paid)
+      transportOption: String(transportOption), // NEW: Transport option for fulfillment workflow
       paymentMethod: effectivePaymentMethod,
       stripeCheckoutSessionId: checkoutSessionId,
       stripePaymentIntentId: paymentIntentId,
       sellerStripeAccountId: sellerStripeAccountId,
       ...(stripeSettlement ? stripeSettlement : {}),
-      // For async bank rails, payment is not confirmed yet; paidAt/dispute window are set on async success.
+      // Seller is paid immediately via destination charge - paidAt tracks when payment succeeded
       paidAt: isAsync ? null : now,
+      // Dispute deadline for internal enforcement only (does not affect Stripe payout - seller already paid)
       disputeDeadlineAt: isAsync ? null : disputeDeadline,
       adminHold: false,
       createdAt: existingOrderData?.createdAt || now,
@@ -503,7 +518,9 @@ export async function handleCheckoutSessionCompleted(
       lastUpdatedByRole: 'admin',
       protectedTransactionDaysSnapshot: protectedTransactionDays,
       protectedTermsVersionSnapshot: protectedTermsVersion,
-      payoutHoldReason: payoutHoldReason,
+      // DEPRECATED: payoutHoldReason no longer used (seller paid immediately via destination charge)
+      // Kept for backward compatibility with existing orders
+      payoutHoldReason: 'none',
       protectedDisputeStatus: 'none',
       // Compliance fields
       transferPermitRequired: transferPermitRequired,
@@ -555,16 +572,17 @@ export async function handleCheckoutSessionCompleted(
             meta: { paymentIntentId },
           },
         });
+        // Seller paid immediately via destination charge - no funds held
         await appendOrderTimelineEvent({
           db: db as any,
           orderId: orderRef.id,
           event: {
-            id: `FUNDS_HELD:${paymentIntentId}`,
-            type: 'FUNDS_HELD',
-            label: 'Funds held (payout hold)',
+            id: `PAYMENT_COMPLETE:${paymentIntentId}`,
+            type: 'PAYMENT_AUTHORIZED',
+            label: 'Payment complete - seller paid',
             actor: 'system',
             visibility: 'buyer',
-            meta: { payoutHold: true },
+            meta: { paymentIntentId, sellerPaid: true },
           },
         });
       }

@@ -2478,6 +2478,8 @@ function NewListingPageContent() {
           transportReady: formData.transportType !== null,
           sellerOffersDelivery: formData.transportType === 'seller',
         },
+        // NEW: Transport option (required for fulfillment workflow)
+        transportOption: formData.transportType === 'seller' ? 'SELLER_TRANSPORT' : formData.transportType === 'buyer' ? 'BUYER_TRANSPORT' : undefined,
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
         ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),

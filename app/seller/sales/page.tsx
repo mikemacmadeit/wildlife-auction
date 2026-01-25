@@ -471,7 +471,7 @@ export default function SellerSalesPage() {
                                         <div className="text-sm text-muted-foreground">Net proceeds</div>
                                       </div>
                                       <div className="text-sm text-muted-foreground max-w-[420px]">
-                                        This order uses a delayed settlement model. Payments are processed through the platform and released when the order becomes eligible and operations releases payout.
+                                        Seller receives funds immediately upon successful payment via Stripe Connect destination charges. No payout release needed.
                                       </div>
                                     </div>
 

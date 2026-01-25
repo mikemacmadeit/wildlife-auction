@@ -365,6 +365,12 @@ export async function POST(request: Request) {
       stripeCustomerId,
     });
 
+    // Determine transport option from listing (default to SELLER_TRANSPORT if not set)
+    const transportOption = (listingData as any)?.transportOption || 
+                           ((listingData as any)?.trust?.sellerOffersDelivery ? 'SELLER_TRANSPORT' : 'BUYER_TRANSPORT') ||
+                           'SELLER_TRANSPORT';
+    
+    // STRIPE CONNECT DESTINATION CHARGE: Seller receives funds immediately, platform fee deducted automatically
     const pi = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: 'usd',
@@ -377,9 +383,15 @@ export async function POST(request: Request) {
           bank_transfer: { type: 'us_bank_transfer' },
         },
       } as any,
+      // Automatic capture (default) - seller is paid immediately upon successful payment
+      application_fee_amount: platformFeeCents, // 5% platform fee (in cents)
+      transfer_data: {
+        destination: String(sellerStripeAccountId || ''), // Seller's Stripe Connect account ID
+      },
       confirm: true,
       description: `Wire transfer for listing ${listingId}`,
       metadata: {
+        transactionId: orderId,
         orderId,
         listingId,
         buyerId,
@@ -390,6 +402,8 @@ export async function POST(request: Request) {
         paymentMethod: 'wire',
         quantity: String(quantityRequested),
         unitPrice: String(purchaseAmountUsd),
+        transportOption: String(transportOption),
+        paymentType: 'full',
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmountUsd) } : {}),
       },
     });

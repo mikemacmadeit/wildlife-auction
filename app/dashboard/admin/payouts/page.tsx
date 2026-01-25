@@ -168,21 +168,20 @@ export default function AdminPayoutsPage() {
     try {
       setProcessingId(orderId);
       
-      // Release payment via Stripe transfer API
-      const result = await releasePayment(orderId);
-      
+      // DEPRECATED: Sellers are paid immediately via destination charges - no release needed
+      // This function is kept for UI compatibility but sellers already received funds
       toast({
-        title: '✅ Payment Released',
-        description: `Transfer ${result.transferId} created. ${formatCurrency(result.amount)} has been sent to the seller.`,
+        title: '✅ Seller Already Paid',
+        description: 'Seller received funds immediately upon successful payment. No payout release needed.',
       });
       
       await loadOrders();
     } catch (error: any) {
-      console.error('Error releasing payment:', error);
+      console.error('Error:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to release payment. Please try again.',
-        variant: 'destructive',
+        title: 'Info',
+        description: 'Sellers are paid immediately via Stripe Connect destination charges. No payout release action needed.',
+        variant: 'default',
       });
     } finally {
       setProcessingId(null);

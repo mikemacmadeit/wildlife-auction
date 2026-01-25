@@ -395,9 +395,18 @@ export interface Listing {
     /**
      * Optional: seller indicates they may offer delivery themselves.
      * Buyer and seller still coordinate directly; the platform does not arrange transport.
+     * @deprecated Use transportOption instead
      */
     sellerOffersDelivery?: boolean;
   };
+  
+  /**
+   * Transport option: Who handles transportation
+   * - SELLER_TRANSPORT: Seller will deliver (seller handles transport)
+   * - BUYER_TRANSPORT: Buyer must handle pickup/transport
+   * Required for all listings (enforced at creation)
+   */
+  transportOption?: 'SELLER_TRANSPORT' | 'BUYER_TRANSPORT';
   
   // Category-specific attributes (replaces old metadata)
   subcategory?: string; // Optional subcategory within the 3 top categories
@@ -541,21 +550,39 @@ export interface Bid {
  * - New canonical: paid_held → in_transit → delivered → buyer_confirmed → ready_to_release → completed
  * - Legacy/back-compat: `paid` ~= `paid_held`, `accepted` ~= `buyer_confirmed`
  */
+// NEW: Fulfillment-based transaction status (replaces escrow statuses)
+export type TransactionStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'FULFILLMENT_REQUIRED'
+  | 'READY_FOR_PICKUP'        // BUYER_TRANSPORT
+  | 'PICKUP_SCHEDULED'        // BUYER_TRANSPORT (optional)
+  | 'PICKED_UP'               // BUYER_TRANSPORT
+  | 'DELIVERY_SCHEDULED'      // SELLER_TRANSPORT
+  | 'OUT_FOR_DELIVERY'        // SELLER_TRANSPORT (optional)
+  | 'DELIVERED_PENDING_CONFIRMATION' // SELLER_TRANSPORT
+  | 'COMPLETED'
+  | 'DISPUTE_OPENED'
+  | 'SELLER_NONCOMPLIANT'
+  | 'REFUNDED'
+  | 'CANCELLED';
+
+// LEGACY: Keep old OrderStatus for backward compatibility during migration
 export type OrderStatus =
   | 'pending'
   // High-ticket rails (async / offline-like)
   | 'awaiting_bank_transfer'
   | 'awaiting_wire'
-  // Canonical paid+held (funds in platform, not released)
+  // Canonical paid+held (funds in platform, not released) - DEPRECATED: Use TransactionStatus instead
   | 'paid_held'
-  // Legacy paid (still present in older docs)
+  // Legacy paid (still present in older docs) - DEPRECATED: Use TransactionStatus.PAID instead
   | 'paid'
   | 'in_transit'
   | 'delivered'
   | 'buyer_confirmed'
-  // Legacy accepted (still present in older docs)
+  // Legacy accepted (still present in older docs) - DEPRECATED
   | 'accepted'
-  | 'ready_to_release'
+  | 'ready_to_release' // DEPRECATED: No longer used - seller paid immediately
   | 'disputed'
   | 'completed'
   | 'refunded'
@@ -651,7 +678,19 @@ export interface Order {
    */
   quantity?: number;
   unitPrice?: number;
-  status: OrderStatus;
+  status: OrderStatus; // Legacy status (for backward compatibility)
+  /**
+   * NEW: Fulfillment-based transaction status (replaces escrow statuses).
+   * Seller is paid immediately upon successful payment; status only tracks fulfillment progress.
+   */
+  transactionStatus?: TransactionStatus;
+  /**
+   * Transport option: Who handles transportation
+   * - SELLER_TRANSPORT: Seller will deliver (seller handles transport)
+   * - BUYER_TRANSPORT: Buyer must handle pickup/transport
+   * Inherited from listing at checkout time
+   */
+  transportOption?: 'SELLER_TRANSPORT' | 'BUYER_TRANSPORT';
   stripeCheckoutSessionId?: string;
   stripePaymentIntentId?: string;
   /**
@@ -683,16 +722,15 @@ export interface Order {
   sellerSnapshot?: OrderSellerSnapshot;
   timeline?: OrderTimelineEvent[];
   
-  // Payout-hold workflow fields
+  // Payment tracking (seller paid immediately via destination charge - no payout holds)
   paymentMethod?: OrderPaymentMethod; // How buyer paid (card vs bank rails)
-  paidAt?: Date; // When payment was confirmed/settled into platform (card: immediate; bank/wire: async)
-  disputeDeadlineAt?: Date; // Deadline for buyer to dispute
+  paidAt?: Date; // When payment was confirmed (seller already paid immediately via destination charge)
+  disputeDeadlineAt?: Date; // Deadline for buyer to dispute (for internal enforcement only, does not affect Stripe payout)
   /**
-   * Seller-progress markers for fulfillment (explicit UX timeline).
-   * These do NOT change payout logic; they exist to make "who needs to do what next" obvious.
+   * Fulfillment progress markers (seller paid immediately - these only track fulfillment, not payout timing).
    */
   sellerPreparingAt?: Date; // Seller marked "preparing for delivery"
-  inTransitAt?: Date; // Seller marked "in transit" (timestamp even if status was already in_transit)
+  inTransitAt?: Date; // Seller marked "in transit"
   deliveredAt?: Date; // When seller marked as delivered
   /**
    * @deprecated Prefer buyerConfirmedAt/buyerAcceptedAt.
@@ -700,7 +738,40 @@ export interface Order {
    */
   acceptedAt?: Date; // When buyer accepted/received (legacy)
   buyerConfirmedAt?: Date; // When buyer confirms receipt (canonical)
-  releaseEligibleAt?: Date; // When order becomes eligible for admin release (computed server-side)
+  
+  // FULFILLMENT WORKFLOW FIELDS (replaces escrow/payout release logic)
+  /**
+   * Pickup workflow (BUYER_TRANSPORT)
+   */
+  pickup?: {
+    location?: string;
+    windows?: Array<{ start: Date; end: Date }>;
+    selectedWindow?: { start: Date; end: Date };
+    pickupCode?: string;
+    confirmedAt?: Date;
+    proofPhotos?: string[];
+  };
+  
+  /**
+   * Delivery workflow (SELLER_TRANSPORT)
+   */
+  delivery?: {
+    eta?: Date;
+    transporter?: { name?: string; phone?: string; plate?: string };
+    proofUploads?: Array<{ type: string; url: string; uploadedAt: Date }>;
+    deliveredAt?: Date;
+    buyerConfirmedAt?: Date;
+  };
+  
+  /**
+   * Dispute/issue tracking
+   */
+  issues?: {
+    openedAt?: Date;
+    reason?: string;
+    notes?: string;
+    photos?: string[];
+  };
   disputedAt?: Date; // When buyer opened dispute
   disputeReason?: string; // Reason for dispute (legacy, string-based)
   disputeNotes?: string; // Additional dispute details (used for both regular and protected disputes)

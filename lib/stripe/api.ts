@@ -379,12 +379,21 @@ export async function createWireIntent(
  * Release held funds to seller (Admin only)
  * Creates a Stripe transfer to the seller's connected account
  */
+/**
+ * @deprecated Sellers are paid immediately via Stripe Connect destination charges.
+ * This function is kept for backward compatibility but will return an error.
+ * No payout release is needed - seller already received funds at payment time.
+ */
 export async function releasePayment(orderId: string): Promise<{
   success: boolean;
   transferId: string;
   amount: number;
   message: string;
 }> {
+  // DEPRECATED: Sellers are paid immediately via destination charges
+  throw new Error('Payout release is no longer needed - sellers are paid immediately upon successful payment via Stripe Connect destination charges.');
+  
+  // Legacy code below (never reached):
   const user = auth.currentUser;
   if (!user) {
     throw new Error('User must be authenticated');
@@ -396,7 +405,7 @@ export async function releasePayment(orderId: string): Promise<{
     throw new Error('Failed to get authentication token');
   }
 
-  // Canonical admin release endpoint (order-scoped)
+  // Canonical admin release endpoint (order-scoped) - DEPRECATED
   const response = await fetch(`/api/admin/orders/${orderId}/release`, {
     method: 'POST',
     headers: {

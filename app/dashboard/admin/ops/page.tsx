@@ -62,7 +62,8 @@ import { Order, OrderStatus, DisputeStatus, PayoutHoldReason } from '@/lib/types
 import { getAdminOrders } from '@/lib/stripe/api';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
-import { releasePayment, processRefund, resolveDispute, confirmDelivery, adminMarkOrderPaid } from '@/lib/stripe/api';
+// DEPRECATED: releasePayment removed - sellers paid immediately via destination charges
+import { processRefund, resolveDispute, confirmDelivery, adminMarkOrderPaid } from '@/lib/stripe/api';
 import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { useDebounce } from '@/hooks/use-debounce';
 import Link from 'next/link';
@@ -252,19 +253,21 @@ export default function AdminOpsPage() {
   }, [orders, debouncedSearchQuery]);
 
   // Action handlers
+  // DEPRECATED: handleReleasePayout - sellers are paid immediately via destination charges
   const handleReleasePayout = useCallback(async (orderId: string) => {
     setProcessingOrderId(orderId);
     try {
-      const result = await releasePayment(orderId);
+      // Sellers are paid immediately via Stripe Connect destination charges - no release needed
       toast({
-        title: 'Funds Released',
-        description: `Payout released. Transfer ID: ${result.transferId}`,
+        title: 'Seller Already Paid',
+        description: 'Seller received funds immediately upon successful payment. No payout release needed.',
       });
       setReleaseDialogOpen(null);
       setLastReleaseDebug(null);
       await loadOrders();
     } catch (error: any) {
-      console.error('Error releasing payout:', error);
+      console.error('Error:', error);
+      // DEPRECATED: No payout release needed
       const holdReasonCode = String(error?.holdReasonCode || '');
       const stripeDebug = error?.stripeDebug;
       if (stripeDebug) {
@@ -510,8 +513,8 @@ export default function AdminOpsPage() {
       const batchResults = await Promise.all(
         batch.map(async (order) => {
           try {
-            await releasePayment(order.id);
-            return { orderId: order.id, success: true };
+            // DEPRECATED: Sellers paid immediately - no release needed
+            return { orderId: order.id, success: true, message: 'Seller already paid via destination charge' };
           } catch (error: any) {
             return { orderId: order.id, success: false, error: error.message || 'Unknown error' };
           }

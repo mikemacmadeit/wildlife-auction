@@ -10,7 +10,7 @@
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
-import { getPayoutSafetyBlockReason } from '@/lib/stripe/release-payment';
+// DEPRECATED: getPayoutSafetyBlockReason removed - sellers paid immediately via destination charge
 import { validateRequest, resolveDisputeSchema } from '@/lib/validation/api-schemas';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
@@ -131,66 +131,15 @@ export async function POST(
 
     // Handle resolution
     if (resolution === 'release') {
-      // Phase 2.5/3A (B2): Safety gate shared with standard payout release.
-      // Dispute resolution is an admin override, so it MAY bypass buyer-confirmation-style eligibility,
-      // but it MUST NOT bypass chargeback/admin-hold safety.
-      const safetyBlock = getPayoutSafetyBlockReason(orderData);
-      if (safetyBlock) {
-        return json({ error: safetyBlock, code: 'PAYOUT_BLOCKED' }, { status: 400 });
-      }
-
-      // Release funds to seller
-      if (!orderData.sellerStripeAccountId || !orderData.sellerAmount) {
-        return json({ error: 'Seller account or amount not found' }, { status: 400 });
-      }
-
-      // P0: TPWD Transfer Approval Gating for whitetail_breeder orders
-      if (orderData.transferPermitRequired) {
-        const listingRef = db.collection('listings').doc(orderData.listingId);
-        const listingDoc = await listingRef.get();
-        
-        if (listingDoc.exists) {
-          const listingData = listingDoc.data()!;
-          if (listingData.category === 'whitetail_breeder') {
-            // Check for verified TPWD_TRANSFER_APPROVAL document
-            const documentsRef = db.collection('orders').doc(orderId).collection('documents');
-            const transferDocsQuery = await documentsRef
-              .where('type', '==', 'TPWD_TRANSFER_APPROVAL')
-              .where('status', '==', 'verified')
-              .limit(1)
-              .get();
-            
-            if (transferDocsQuery.empty) {
-              return json(
-                { 
-                  error: 'TPWD Transfer Approval document must be uploaded and verified before payout can be released for whitetail breeder orders.',
-                  code: 'TPWD_TRANSFER_APPROVAL_REQUIRED'
-                },
-                { status: 400 }
-              );
-            }
-          }
-        }
-      }
-
-      const transferAmount = Math.round(orderData.sellerAmount * 100);
-      const transfer = await stripe.transfers.create({
-        amount: transferAmount,
-        currency: 'usd',
-        destination: orderData.sellerStripeAccountId,
-        metadata: {
-          orderId: orderId,
-          resolution: 'dispute_release',
-          resolvedBy: adminId,
-        },
-      });
-
+      // Seller is already paid immediately via destination charge - no payout action needed.
+      // This resolution type closes the dispute and marks order as completed.
+      // Note: Seller was paid at payment time via Stripe Connect destination charge.
+      
       updateData.protectedDisputeStatus = 'resolved_release';
       updateData.status = 'completed';
-      updateData.stripeTransferId = transfer.id;
+      updateData.transactionStatus = 'COMPLETED';
       updateData.completedAt = now;
-      updateData.releasedBy = adminId;
-      updateData.releasedAt = now;
+      // DEPRECATED: These fields kept for backward compatibility (seller already paid)
       updateData.payoutHoldReason = 'none';
     } else if (resolution === 'refund') {
       // Full refund
