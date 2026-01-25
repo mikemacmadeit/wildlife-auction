@@ -190,9 +190,12 @@ export default function SellerLayout({
       if (item.href === '/dashboard/bids-offers') {
         return { ...item, badge: unreadOffersCount > 0 ? unreadOffersCount : undefined };
       }
+      if (item.href === '/seller/sales') {
+        return { ...item, badge: unreadSalesCount > 0 ? unreadSalesCount : undefined };
+      }
       return item;
     });
-  }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
+  }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount, unreadSalesCount]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
@@ -220,6 +223,7 @@ export default function SellerLayout({
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
+      setUnreadSalesCount(0);
       setUnreadAdminNotificationsCount(0);
       return;
     }
@@ -259,12 +263,23 @@ export default function SellerLayout({
           setUnreadOffersCount(count || 0);
         })
       );
+
+      // Subscribe to sales notifications (Order.Received maps to order_created)
+      const salesTypes: NotificationType[] = ['order_created', 'order_paid'];
+      unsubs.push(
+        subscribeToUnreadCountByTypes(user.uid, salesTypes, (count) => {
+          console.log('[Seller Layout] Unread sales notifications:', count);
+          setUnreadSalesCount(count || 0);
+        })
+      );
+
       return () => unsubs.forEach((fn) => fn());
     } catch (e) {
       console.error('Failed to subscribe to unread message count:', e);
       setUnreadMessagesCount(0);
       setUnreadNotificationsCount(0);
       setUnreadOffersCount(0);
+      setUnreadSalesCount(0);
       return;
     }
   }, [user?.uid, showAdminNav, isSuperAdmin]);

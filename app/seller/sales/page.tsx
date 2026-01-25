@@ -30,6 +30,9 @@ import { getOrdersForUser } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocument } from '@/lib/firebase/firestore';
 import { useDebounce } from '@/hooks/use-debounce';
+import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
+import type { NotificationType } from '@/lib/types';
+import { usePathname } from 'next/navigation';
 
 interface OrderWithListing extends Order {
   listing?: Listing | null;
@@ -109,6 +112,7 @@ function initials(name: string) {
 export default function SellerSalesPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const pathname = usePathname();
 
   const [tab, setTab] = useState<TabKey>('needs_action');
   const [tabFading, setTabFading] = useState(false);
@@ -119,6 +123,7 @@ export default function SellerSalesPage() {
   const [buyerProfiles, setBuyerProfiles] = useState<Record<string, PublicProfileLite | null>>({});
   const [paymentOpen, setPaymentOpen] = useState<Record<string, boolean>>({});
   const [detailsOpen, setDetailsOpen] = useState<Record<string, boolean>>({});
+  const [unreadSalesCount, setUnreadSalesCount] = useState(0);
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
@@ -158,6 +163,44 @@ export default function SellerSalesPage() {
   useEffect(() => {
     if (!authLoading) void load();
   }, [authLoading, load]);
+
+  // Subscribe to sales notifications (Order.Received maps to order_created in NotificationType)
+  useEffect(() => {
+    if (!user?.uid) {
+      setUnreadSalesCount(0);
+      return;
+    }
+
+    try {
+      // Order.Received notification maps to 'order_created' type in inApp.ts
+      const salesNotificationTypes: NotificationType[] = ['order_created', 'order_paid'];
+      return subscribeToUnreadCountByTypes(user.uid, salesNotificationTypes, (count) => {
+        console.log('[Seller Sales] Unread sales notifications:', count);
+        setUnreadSalesCount(count || 0);
+      });
+    } catch (error) {
+      console.error('[Seller Sales] Error subscribing to notifications:', error);
+      setUnreadSalesCount(0);
+      return;
+    }
+  }, [user?.uid]);
+
+  // Mark sales notifications as read when viewing the sales page
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!pathname?.startsWith('/seller/sales')) return;
+    
+    const markAsRead = async () => {
+      try {
+        await markNotificationsAsReadByTypes(user.uid, ['order_created', 'order_paid']);
+        setUnreadSalesCount(0);
+      } catch (error) {
+        console.error('[Seller Sales] Error marking notifications as read:', error);
+      }
+    };
+    
+    void markAsRead();
+  }, [pathname, user?.uid]);
 
   // Smooth visual transition when switching in-page tabs (avoid "flash" from unmount/remount).
   useEffect(() => {
