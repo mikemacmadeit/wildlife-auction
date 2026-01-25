@@ -26,9 +26,6 @@ interface ListItemProps {
 
 const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
   ({ listing, variant = 'default' }, ref) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListItem.tsx:28',message:'ListItem render',data:{listingId:listing.id,variant},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   const router = useRouter();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
@@ -519,3 +516,4 @@ export const ListItem = React.memo(ListItemComponent, (prevProps, nextProps) => 
          prevProps.variant === nextProps.variant;
 });
 ListItem.displayName = 'ListItem';
+

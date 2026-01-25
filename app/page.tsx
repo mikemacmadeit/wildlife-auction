@@ -48,9 +48,6 @@ export default function HomePage() {
   // when favoriteIds changes, leading to the glitching issue.
   // Instead, we'll handle the watchlist in a separate component that can subscribe to state.
   // The homepage itself doesn't need to know about favoriteIds - it just displays listings.
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:48',message:'HomePage render',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-  // #endregion
   
   const router = useRouter();
   // Use global toast function instead of useToast() hook to prevent re-renders when toast state changes
@@ -445,9 +442,6 @@ export default function HomePage() {
   };
 
   const ListingRail = React.memo((props: { listings: Listing[]; emptyText: string }) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:445',message:'ListingRail render',data:{listingsCount:props.listings.length,listingIds:props.listings.map(l=>l.id).join(','),listingRefs:props.listings.map(l=>l===listingsMapRef.current.get(l.id)?'same':'new').join(',')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
-    // #endregion
     // Memoize sorted listings to prevent re-renders when favoriteIds changes
     // Create a stable key based on listing IDs to detect real changes
     const listingsKey = useMemo(() => props.listings.map(l => l.id).sort().join(','), [props.listings.map(l => l.id).sort().join(',')]);
@@ -760,11 +754,6 @@ export default function HomePage() {
         return !nextListing || prevListing !== nextListing;
       });
     
-    // #region agent log
-    if (idsChanged || emptyTextChanged || refsChanged) {
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:746',message:'ListingRail memo: props changed',data:{idsChanged,emptyTextChanged,refsChanged,prevIds,nextIds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
-    }
-    // #endregion
     
     // Return true if props are the same (skip render), false if they changed (re-render)
     return !idsChanged && !emptyTextChanged && !refsChanged;

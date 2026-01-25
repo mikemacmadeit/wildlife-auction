@@ -194,9 +194,6 @@ export default function DashboardLayout({
       }
       if (item.href === '/dashboard/admin/support') {
         const badge = isAdmin && unreadSupportTicketsCount > 0 ? unreadSupportTicketsCount : undefined;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:195',message:'Admin support badge calculation',data:{isAdmin,unreadSupportTicketsCount,badge,itemHref:item.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         return {
           ...item,
           badge,
@@ -486,17 +483,11 @@ export default function DashboardLayout({
                         prefetch={true}
                         onClick={(e) => {
                           const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:464',message:'Admin Sidebar Link onClick',data:{href:item.href,pathnameBefore,defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                          // #endregion
                           // Track navigation result after a short delay
                           setTimeout(() => {
                             const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
                             const navigationOccurred = pathnameBefore !== pathnameAfter;
-                            // #region agent log
-                            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:464',message:'Admin Sidebar Link navigation result',data:{href:item.href,pathnameBefore,pathnameAfter,navigationOccurred,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                            // #endregion
-                          }, 100);
+                            }, 100);
                         }}
                         className={cn(
                           'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
@@ -558,17 +549,11 @@ export default function DashboardLayout({
                         prefetch={true}
                         onClick={(e) => {
                           const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:522',message:'Admin Sidebar Link onClick (collapsed)',data:{href:item.href,pathnameBefore,defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                          // #endregion
                           // Track navigation result after a short delay
                           setTimeout(() => {
                             const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
                             const navigationOccurred = pathnameBefore !== pathnameAfter;
-                            // #region agent log
-                            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:522',message:'Admin Sidebar Link navigation result (collapsed)',data:{href:item.href,pathnameBefore,pathnameAfter,navigationOccurred,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                            // #endregion
-                          }, 100);
+                            }, 100);
                         }}
                         className={cn(
                           'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
@@ -680,17 +665,11 @@ export default function DashboardLayout({
                             onClick={(e) => {
                               setMobileMenuOpen(false);
                               const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
-                              // #region agent log
-                              fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:629',message:'Admin Mobile Sidebar Link onClick',data:{href:item.href,pathnameBefore,defaultPrevented:e.defaultPrevented,isTrusted:e.isTrusted,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                              // #endregion
                               // Track navigation result after a short delay
                               setTimeout(() => {
                                 const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
                                 const navigationOccurred = pathnameBefore !== pathnameAfter;
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:629',message:'Admin Mobile Sidebar Link navigation result',data:{href:item.href,pathnameBefore,pathnameAfter,navigationOccurred,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                                // #endregion
-                              }, 100);
+                                }, 100);
                             }}
                             className={cn(
                               'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
@@ -810,3 +789,4 @@ export default function DashboardLayout({
     </RequireAuth>
   );
 }
+

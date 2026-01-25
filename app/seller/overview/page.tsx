@@ -162,15 +162,9 @@ interface SellerActivity {
 }
 
 export default function SellerOverviewPage() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'seller/overview/page.tsx:164',message:'SellerOverviewPage render',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const uid = user?.uid || null;
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'seller/overview/page.tsx:168',message:'Auth state',data:{uid,authLoading,userExists:!!user,userUid:user?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -226,15 +220,9 @@ export default function SellerOverviewPage() {
 
   // Fetch listings and orders
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'seller/overview/page.tsx:222',message:'useEffect listings/orders triggered',data:{uid,authLoading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     let cancelled = false;
 
     const fetchData = async (sellerId: string) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'seller/overview/page.tsx:225',message:'fetchData called',data:{sellerId,cancelled},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       try {
         setLoading(true);
         setError(null);
@@ -288,14 +276,8 @@ export default function SellerOverviewPage() {
 
   // Seller command-center aggregation (server-side; read-only). This complements the client reads above.
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'seller/overview/page.tsx:278',message:'useEffect dashboard triggered',data:{authLoading,userExists:!!user,userUid:user?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     let cancelled = false;
     async function loadDashboard() {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'seller/overview/page.tsx:280',message:'loadDashboard called',data:{userExists:!!user,authLoading,cancelled},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       if (!user || authLoading) return;
       setDashboardLoading(true);
       try {
@@ -1240,3 +1222,4 @@ export default function SellerOverviewPage() {
     </div>
   );
 }
+

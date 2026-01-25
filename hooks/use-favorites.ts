@@ -155,16 +155,9 @@ export function useFavorites() {
         
         // Only call setState if something actually changed
         if (hasChanged) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:125',message:'Set changed - updating state',data:{prevSize:currentIds.size,newSize:ids.size,idsArray:Array.from(ids).join(',')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          // #endregion
           favoriteIdsRef.current = ids; // Update ref immediately
           // Don't call setFavoriteIds - it causes re-renders in all components using the hook
           // Components will read from favoriteIdsRef.current via isFavorite callback
-        } else {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:119',message:'No change detected - skipping setState',data:{size:currentIds.size},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
         }
 
         // Update pendingIds ref immediately (doesn't cause re-renders)
@@ -220,9 +213,6 @@ export function useFavorites() {
 
   const toggleFavorite = useCallback(
     async (listingId: string): Promise<'added' | 'removed'> => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:168',message:'toggleFavorite called',data:{listingId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
-      // #endregion
       const currentUser = userRef.current;
       if (!currentUser) {
         const err: any = new Error('Authentication required');
@@ -244,9 +234,6 @@ export function useFavorites() {
       // Don't call setPendingIds - it causes re-renders in all components using the hook
 
       // Optimistic update
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:182',message:'Optimistic update - toggleFavorite',data:{listingId,action,isCurrentlyFavorite,currentFavoriteIdsCount:favoriteIdsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       const next = new Set(favoriteIdsRef.current);
       if (isCurrentlyFavorite) {
         next.delete(listingId);
@@ -254,9 +241,6 @@ export function useFavorites() {
         next.add(listingId);
       }
       favoriteIdsRef.current = next; // Update ref immediately
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:189',message:'Optimistic update applied',data:{listingId,prevSize:favoriteIdsRef.current.size,nextSize:next.size,wasFavorite:isCurrentlyFavorite},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Don't call setFavoriteIds - it causes re-renders in all components using the hook
       // Components will read from favoriteIdsRef.current via isFavorite callback
 
@@ -309,9 +293,6 @@ export function useFavorites() {
   const isFavorite = useCallback(
     (listingId: string) => {
       const result = favoriteIdsRef.current.has(listingId);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:242',message:'isFavorite called',data:{listingId,result,favoriteIdsSize:favoriteIdsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       return result;
     },
     [] // Empty deps - use ref instead to keep callback stable
@@ -339,9 +320,6 @@ export function useFavorites() {
       const next = new Set(favoriteIdsRef.current);
       next.add(listingId);
       favoriteIdsRef.current = next;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:210',message:'Optimistic update - adding',data:{listingId,prevSize:favoriteIdsRef.current.size,newSize:next.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
       try {
@@ -379,9 +357,6 @@ export function useFavorites() {
       const next = new Set(favoriteIdsRef.current);
       next.delete(listingId);
       favoriteIdsRef.current = next;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-favorites.ts:330',message:'Optimistic update - removing',data:{listingId,prevSize:favoriteIdsRef.current.size,newSize:next.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       // Don't call setFavoriteIds - it causes re-renders in all components using the hook
 
       try {
@@ -435,3 +410,4 @@ export function useFavorites() {
     favoriteIdsRef,
   };
 }
+

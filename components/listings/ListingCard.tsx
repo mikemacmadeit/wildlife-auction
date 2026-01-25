@@ -24,9 +24,6 @@ interface ListingCardProps {
 
 const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
   ({ listing, className }, ref) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListingCard.tsx:27',message:'ListingCard render',data:{listingId:listing.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-  // #endregion
   const router = useRouter();
   // CRITICAL: Don't call useFavorites() here - it subscribes to state and causes re-renders
   // Access the ref directly from the module-level export to avoid subscribing to state
@@ -449,14 +446,7 @@ export const ListingCard = React.memo(ListingCardComponent, (prevProps, nextProp
   const listingIdSame = prevProps.listing.id === nextProps.listing.id;
   const classNameSame = prevProps.className === nextProps.className;
   
-  // #region agent log
-  if (!listingIdSame || !classNameSame) {
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListingCard.tsx:442',message:'ListingCard memo: props changed',data:{listingId:nextProps.listing.id,listingIdSame,classNameSame},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  } else {
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ListingCard.tsx:445',message:'ListingCard memo: props same, skipping render',data:{listingId:nextProps.listing.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  }
-  // #endregion
-  
   return listingIdSame && classNameSame;
 });
 ListingCard.displayName = 'ListingCard';
+

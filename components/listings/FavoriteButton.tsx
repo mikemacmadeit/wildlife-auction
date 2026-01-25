@@ -22,9 +22,6 @@ function FavoriteButtonComponent({
   size = 'md',
   className 
 }: FavoriteButtonProps) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FavoriteButton.tsx:25',message:'FavoriteButton render',data:{listingId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
-  // #endregion
   const { user } = useAuth();
   // CRITICAL: Don't call useFavorites() here - it subscribes to state and causes ALL FavoriteButton components to re-render
   // Access the ref directly from the module-level export to avoid subscribing to state
@@ -65,10 +62,6 @@ function FavoriteButtonComponent({
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FavoriteButton.tsx:34',message:'Heart icon clicked',data:{listingId,isFavorited,pending},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-
     if (!user) {
       setAuthPromptOpen(true);
       return;
@@ -84,9 +77,6 @@ function FavoriteButtonComponent({
     
     try {
       const action = await toggleFavoriteFn(listingId);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FavoriteButton.tsx:44',message:'Toggle favorite completed',data:{listingId,action},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Update local state to match the ref (which was updated optimistically in toggleFavorite)
       setLocalIsFavorited(isFavoriteRef.current(listingId));
       setLocalPending(isPendingRef.current(listingId));
@@ -171,3 +161,4 @@ export const FavoriteButton = React.memo(FavoriteButtonComponent, (prevProps, ne
          prevProps.className === nextProps.className;
 });
 FavoriteButton.displayName = 'FavoriteButton';
+
