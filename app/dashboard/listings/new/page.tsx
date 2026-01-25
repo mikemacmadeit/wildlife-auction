@@ -1306,9 +1306,7 @@ function NewListingPageContent() {
                 if (!attrs.breed?.trim()) errs.push('Breed');
                 if (!attrs.sex) errs.push('Sex');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                if (!attrs.identificationDisclosure) errs.push('Identification Disclosure');
-                if (!attrs.healthDisclosure) errs.push('Health Disclosure');
-                if (!attrs.transportDisclosure) errs.push('Transport Disclosure');
+                // Disclosures are now handled in the final seller acknowledgment step, not validated here
                 return errs;
               }
               if (formData.category === 'ranch_equipment' || formData.category === 'ranch_vehicles' || formData.category === 'hunting_outfitter_assets') {
@@ -1481,9 +1479,7 @@ function NewListingPageContent() {
           if (!String(attrs.breed || '').trim()) errors.push('Breed');
           if (!attrs.sex) errors.push('Sex');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
-          if (!attrs.identificationDisclosure) errors.push('Identification Disclosure');
-          if (!attrs.healthDisclosure) errors.push('Health Disclosure');
-          if (!attrs.transportDisclosure) errors.push('Transport Disclosure');
+          // Disclosures are now handled in the final seller acknowledgment step, not validated here
           if (errors.length) {
             toast({
               title: 'Missing Required Fields',
@@ -2912,8 +2908,22 @@ function NewListingPageContent() {
                   onCheckedChange={(checked) => setSellerAnimalAckModalChecked(Boolean(checked))}
                 />
                 <Label htmlFor="seller-animal-ack-modal" className="cursor-pointer leading-relaxed">
-                  I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                  Wildlife Exchange does not take custody of animals.
+                  <div className="space-y-2">
+                    <div>
+                      I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
+                      Wildlife Exchange does not take custody of animals.
+                    </div>
+                    {formData.category === 'sporting_working_dogs' && (
+                      <div className="mt-3 pt-3 border-t border-border/40">
+                        <div className="font-medium mb-1">Required disclosures:</div>
+                        <div className="text-sm space-y-1">
+                          <div>• I have accurately disclosed identification details (if applicable).</div>
+                          <div>• I have disclosed any known health issues and represented the dog honestly.</div>
+                          <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </Label>
               </div>
             </div>
@@ -2938,6 +2948,36 @@ function NewListingPageContent() {
                 // Set ref first to prevent onOpenChange from resetting checkbox
                 sellerAnimalAckForceRef.current = true;
                 setSellerAnimalAttestationAccepted(true);
+                
+                // For dog listings, set the disclosure fields when acknowledgment is accepted
+                // Update formData and also update the pending payload directly to ensure disclosures are included
+                if (formData.category === 'sporting_working_dogs') {
+                  const updatedAttributes = {
+                    ...formData.attributes,
+                    identificationDisclosure: true,
+                    healthDisclosure: true,
+                    transportDisclosure: true,
+                  } as any;
+                  
+                  setFormData({
+                    ...formData,
+                    attributes: updatedAttributes,
+                  });
+                  
+                  // Also update the pending payload to include disclosures
+                  if (pendingPublishPayloadRef.current) {
+                    const payload = pendingPublishPayloadRef.current as any;
+                    if (payload.attributes) {
+                      payload.attributes = {
+                        ...payload.attributes,
+                        identificationDisclosure: true,
+                        healthDisclosure: true,
+                        transportDisclosure: true,
+                      };
+                    }
+                  }
+                }
+                
                 const payload = pendingPublishPayloadRef.current;
                 // Close modal - onOpenChange won't reset checkbox because ref is true
                 setSellerAnimalAckModalOpen(false);
