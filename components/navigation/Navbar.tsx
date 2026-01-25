@@ -118,9 +118,24 @@ export function Navbar() {
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-primary/10 blur-xl rounded-full group-hover:bg-primary/20 transition-colors" />
               <div className="relative h-9 w-9 md:h-10 md:w-10 lg:h-11 lg:w-11 group-hover:scale-110 transition-transform">
-                {/* Light mode: Olivewood color using mask */}
+                {/* Light mode: Light green (primary/sage) on mobile, olivewood on desktop */}
                 <div 
-                  className="h-full w-full dark:hidden"
+                  className="h-full w-full dark:hidden md:hidden"
+                  style={{
+                    backgroundColor: 'hsl(var(--primary))',
+                    maskImage: 'url(/images/Kudu.png)',
+                    maskSize: 'contain',
+                    maskRepeat: 'no-repeat',
+                    maskPosition: 'center',
+                    WebkitMaskImage: 'url(/images/Kudu.png)',
+                    WebkitMaskSize: 'contain',
+                    WebkitMaskRepeat: 'no-repeat',
+                    WebkitMaskPosition: 'center',
+                  }}
+                />
+                {/* Light mode desktop: Olivewood color using mask */}
+                <div 
+                  className="hidden md:block dark:hidden h-full w-full"
                   style={{
                     backgroundColor: 'hsl(75 8% 13%)',
                     maskImage: 'url(/images/Kudu.png)',
