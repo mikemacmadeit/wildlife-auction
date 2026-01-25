@@ -187,7 +187,7 @@ export function buildInAppNotification(params: {
         title: 'New sale!',
         body: `The buyer confirmed receipt for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'View sale',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },
       };
     }
@@ -199,7 +199,7 @@ export function buildInAppNotification(params: {
         title: 'Seller is preparing delivery',
         body: `The seller is preparing your order for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'View sale',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -211,7 +211,7 @@ export function buildInAppNotification(params: {
         title: 'In transit',
         body: `Your order for “${p.listingTitle}” is in transit.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'View sale',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -223,7 +223,7 @@ export function buildInAppNotification(params: {
         title: 'Delivery confirmed',
         body: `Delivery confirmed for “${p.listingTitle}”.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'View sale',
         metadata: { listingId: p.listingId, orderId: p.orderId, deliveryDate: p.deliveryDate },
       };
     }
