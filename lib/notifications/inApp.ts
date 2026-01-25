@@ -499,12 +499,15 @@ export function buildInAppNotification(params: {
     case 'Bid.Placed': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Bid.Placed' }>;
       return {
+        ...base,
+        type: 'bid_placed',
         title: p.isHighBidder ? 'Bid placed — you\'re winning!' : 'Bid placed',
         body: p.isHighBidder
           ? `Your bid of $${p.bidAmount.toLocaleString()} on ${p.listingTitle} is currently the high bid.`
           : `Your bid of $${p.bidAmount.toLocaleString()} on ${p.listingTitle} has been placed.`,
-        actionUrl: p.listingUrl,
-        actionLabel: 'View listing',
+        deepLinkUrl: p.listingUrl,
+        linkLabel: 'View listing',
+        metadata: { listingId: p.listingId, bidAmount: p.bidAmount, isHighBidder: p.isHighBidder },
       };
     }
     case 'Auction.BidReceived': {
