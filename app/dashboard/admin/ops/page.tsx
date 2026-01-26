@@ -1,12 +1,11 @@
 /**
- * Admin Ops Dashboard - Unified view for managing transaction lifecycle
+ * Admin Ops Dashboard - Fulfillment-first console for managing order fulfillment
  * 
- * Tabs:
- * - All Purchases - All orders across statuses (pending/paid/awaiting/wire/refunded/cancelled/etc.)
- * - Fulfillment Issues - Orders requiring fulfillment attention (legacy key: "escrow" for backward compatibility)
- * - Protected Transactions - Orders with protected transaction enabled
- * - Open Disputes - Orders with open disputes
- * - Fulfillment Pending - Orders awaiting fulfillment completion
+ * Lanes (organized by transactionStatus):
+ * - Overdue: Orders past SLA deadline, not completed
+ * - Needs Action: Active fulfillment statuses requiring action
+ * - Disputes: Orders with open disputes
+ * - Completed: Completed orders
  * 
  * NOTE: Sellers are paid immediately via Stripe Connect destination charges - no payout release needed.
  */
@@ -23,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -58,9 +56,10 @@ import {
   ArrowRight,
   TrendingUp,
   Truck,
+  XCircle,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDistanceToNow } from '@/lib/utils';
-import { Order, OrderStatus, DisputeStatus, PayoutHoldReason } from '@/lib/types';
+import { Order } from '@/lib/types';
 import { getAdminOrders } from '@/lib/stripe/api';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
@@ -71,12 +70,13 @@ import { useDebounce } from '@/hooks/use-debounce';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
-import { getHoldInfo, generatePayoutExplanation } from '@/lib/orders/hold-reasons';
+// DEPRECATED: hold-reasons.ts - sellers paid immediately, no payout holds
 import { Copy, Check } from 'lucide-react';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getNextRequiredAction, getUXBadge } from '@/lib/orders/progress';
 import { isStripeTestModeClient } from '@/lib/stripe/mode';
-import { TestModePayoutHelperModal } from '@/components/admin/TestModePayoutHelperModal';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 import { AIDisputeSummary } from '@/components/admin/AIDisputeSummary';
 
@@ -89,48 +89,47 @@ interface OrderWithDetails extends Order {
   buyerEmail?: string;
   sellerName?: string;
   sellerEmail?: string;
+  fulfillmentSlaDeadlineAt?: Date;
+  fulfillmentSlaStartedAt?: Date;
 }
 
-// NOTE: Tab value `'escrow'` is a legacy internal filter key meaning "payout holds".
-// It is NOT shown to end users, and is retained to preserve existing API/query wiring.
-type TabType = 'escrow' | 'protected' | 'disputes' | 'ready_to_release';
-// Add an explicit "all" view so admins always have a source-of-truth list of purchases.
-type AdminOpsTabType = TabType | 'all';
+// Fulfillment-first lanes (no legacy tabs)
+type FulfillmentLane = 'overdue' | 'needs_action' | 'disputes' | 'completed';
 
 export default function AdminOpsPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<AdminOpsTabType>('escrow');
+  const [activeLane, setActiveLane] = useState<FulfillmentLane>('needs_action');
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [sortBySla, setSortBySla] = useState(true);
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [lastReleaseDebug, setLastReleaseDebug] = useState<{
-    orderId: string;
-    holdReasonCode?: string;
-    stripeDebug?: any;
-    message?: string;
-    at: number;
-  } | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
-  const [bulkActionDialogOpen, setBulkActionDialogOpen] = useState<'release' | 'hold' | 'unhold' | null>(null);
+  const [bulkActionDialogOpen, setBulkActionDialogOpen] = useState<'hold' | 'unhold' | null>(null);
   const [bulkHoldReason, setBulkHoldReason] = useState('');
   const [bulkHoldNotes, setBulkHoldNotes] = useState('');
   
   // Dialog states
-  const [releaseDialogOpen, setReleaseDialogOpen] = useState<string | null>(null);
-  const [testModePayoutHelpOpen, setTestModePayoutHelpOpen] = useState(false);
-  const [testModePayoutHelpOrderId, setTestModePayoutHelpOrderId] = useState<string | null>(null);
   const [refundDialogOpen, setRefundDialogOpen] = useState<string | null>(null);
   const [resolveDialogOpen, setResolveDialogOpen] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
-  const [resolutionType, setResolutionType] = useState<'release' | 'refund' | 'partial_refund'>('release');
+  const [resolutionType, setResolutionType] = useState<'refund' | 'partial_refund'>('refund');
   const [adminNotes, setAdminNotes] = useState('');
   const [copiedExplanation, setCopiedExplanation] = useState(false);
+  const [freezeDialogOpen, setFreezeDialogOpen] = useState<string | null>(null);
+  const [freezeReason, setFreezeReason] = useState('');
+  const [reminderDialogOpen, setReminderDialogOpen] = useState<string | null>(null);
+  const [reminderRole, setReminderRole] = useState<'buyer' | 'seller' | null>(null);
+  const [reminderMessage, setReminderMessage] = useState('');
+  const [bulkReminderDialogOpen, setBulkReminderDialogOpen] = useState(false);
+  const [bulkReminderRole, setBulkReminderRole] = useState<'buyer' | 'seller'>('seller');
+  const [bulkReminderMessage, setBulkReminderMessage] = useState('');
 
   const handleViewOrder = useCallback((order: OrderWithDetails) => {
     setSelectedOrder(order);
@@ -142,17 +141,8 @@ export default function AdminOpsPage() {
     
     setLoading(true);
     try {
-      const result = await getAdminOrders(
-        activeTab === 'all'
-          ? 'all'
-          : activeTab === 'escrow'
-            ? 'escrow'
-            : activeTab === 'protected'
-              ? 'protected'
-              : activeTab === 'disputes'
-                ? 'disputes'
-                : 'ready_to_release'
-      );
+      // Load all orders - we'll filter by txStatus client-side
+      const result = await getAdminOrders('all');
       
       // Enrich orders with listing and user details
       const enrichedOrders = await Promise.all(
@@ -167,7 +157,7 @@ export default function AdminOpsPage() {
               'createdAt', 'updatedAt', 'paidAt', 'disputeDeadlineAt', 'deliveredAt',
               'acceptedAt', 'disputedAt', 'deliveryConfirmedAt', 'protectionStartAt',
               'protectionEndsAt', 'buyerAcceptedAt', 'disputeOpenedAt', 'releasedAt',
-              'refundedAt', 'completedAt',
+              'refundedAt', 'completedAt', 'fulfillmentSlaDeadlineAt', 'fulfillmentSlaStartedAt',
               // Stripe settlement visibility (server-authored via webhooks)
               'stripeFundsAvailableOn'
             ];
@@ -219,7 +209,7 @@ export default function AdminOpsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, user?.uid, isAdmin, toast]);
+  }, [user?.uid, isAdmin, toast]);
 
   // Load orders when tab changes
   useEffect(() => {
@@ -231,14 +221,9 @@ export default function AdminOpsPage() {
   // Debounce search query
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const testModeHelpListingId = useMemo(() => {
-    if (!testModePayoutHelpOrderId) return null;
-    const order = orders.find((o) => o.id === testModePayoutHelpOrderId);
-    return order?.listingId || null;
-  }, [orders, testModePayoutHelpOrderId]);
 
   // Filter orders by search query (enhanced with paymentIntentId)
-  const filteredOrders = useMemo(() => {
+  const searchFilteredOrders = useMemo(() => {
     if (!debouncedSearchQuery) return orders;
     
     const query = debouncedSearchQuery.toLowerCase();
@@ -254,88 +239,91 @@ export default function AdminOpsPage() {
     );
   }, [orders, debouncedSearchQuery]);
 
-  // Action handlers
-  // DEPRECATED: handleReleasePayout - sellers are paid immediately via destination charges
-  const handleReleasePayout = useCallback(async (orderId: string) => {
-    setProcessingOrderId(orderId);
-    try {
-      // Sellers are paid immediately via Stripe Connect destination charges - no release needed
-      toast({
-        title: 'Seller Already Paid',
-        description: 'Seller received funds immediately upon successful payment. No payout release needed.',
+  // Organize orders into fulfillment lanes based on txStatus
+  const laneOrders = useMemo(() => {
+    const now = Date.now();
+    const overdue: OrderWithDetails[] = [];
+    const needsAction: OrderWithDetails[] = [];
+    const atRisk: OrderWithDetails[] = []; // SLA < 24h or stalled > 48h
+    const disputes: OrderWithDetails[] = [];
+    const completed: OrderWithDetails[] = [];
+
+    searchFilteredOrders.forEach(order => {
+      const txStatus = getEffectiveTransactionStatus(order);
+      
+      // Overdue: SLA deadline passed and not completed
+      if (order.fulfillmentSlaDeadlineAt && 
+          order.fulfillmentSlaDeadlineAt.getTime() < now && 
+          txStatus !== 'COMPLETED') {
+        overdue.push(order);
+        return;
+      }
+
+      // Disputes
+      if (txStatus === 'DISPUTE_OPENED') {
+        disputes.push(order);
+        return;
+      }
+
+      // Completed
+      if (txStatus === 'COMPLETED') {
+        completed.push(order);
+        return;
+      }
+
+      // Needs Action: all other active fulfillment statuses (including compliance gate)
+      if (['AWAITING_TRANSFER_COMPLIANCE', 'FULFILLMENT_REQUIRED', 'PAID', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 
+           'READY_FOR_PICKUP', 'PICKUP_SCHEDULED', 'DELIVERED_PENDING_CONFIRMATION'].includes(txStatus)) {
+        needsAction.push(order);
+        
+        // Check if "At Risk" (SLA < 24h or stalled > 48h)
+        const slaDeadline = order.fulfillmentSlaDeadlineAt?.getTime();
+        const hoursUntilSla = slaDeadline ? (slaDeadline - now) / (1000 * 60 * 60) : null;
+        const lastStatusChange = order.lastStatusChangedAt?.getTime() || order.updatedAt?.getTime() || order.createdAt?.getTime() || 0;
+        const hoursSinceStatusChange = (now - lastStatusChange) / (1000 * 60 * 60);
+        
+        if ((hoursUntilSla !== null && hoursUntilSla < 24 && hoursUntilSla > 0) || hoursSinceStatusChange > 48) {
+          atRisk.push(order);
+        }
+        return;
+      }
+    });
+
+    // Sort Needs Action by SLA deadline (soonest first) if enabled
+    if (sortBySla) {
+      needsAction.sort((a, b) => {
+        const aDeadline = a.fulfillmentSlaDeadlineAt?.getTime() || Infinity;
+        const bDeadline = b.fulfillmentSlaDeadlineAt?.getTime() || Infinity;
+        return aDeadline - bDeadline;
       });
-      setReleaseDialogOpen(null);
-      setLastReleaseDebug(null);
-      await loadOrders();
-    } catch (error: any) {
-      console.error('Error:', error);
-      // DEPRECATED: No payout release needed
-      const holdReasonCode = String(error?.holdReasonCode || '');
-      const stripeDebug = error?.stripeDebug;
-      if (stripeDebug) {
-        setLastReleaseDebug({ orderId, holdReasonCode, stripeDebug, message: error?.message, at: Date.now() });
-      }
-
-      // Test-mode helper modal: only show in Stripe test mode, only for settlement/balance holds.
-      if (
-        isStripeTestModeClient() &&
-        (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT' || holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE')
-      ) {
-        // Avoid stacking dialogs: close the confirmation dialog and open the helper.
-        setReleaseDialogOpen(null);
-        setTestModePayoutHelpOrderId(orderId);
-        // Defer opening to avoid focus/aria-hidden warnings while the other dialog is closing.
-        setTimeout(() => setTestModePayoutHelpOpen(true), 0);
-      }
-
-      if (holdReasonCode === 'STRIPE_FUNDS_PENDING_SETTLEMENT') {
-        const when = typeof stripeDebug?.availableOnIso === 'string' ? stripeDebug.availableOnIso : null;
-        const mins = typeof stripeDebug?.minutesUntilAvailable === 'number' ? stripeDebug.minutesUntilAvailable : null;
-        toast({
-          title: 'Stripe settlement pending',
-          description: when
-            ? `Funds become available at ${new Date(when).toLocaleString()}.${mins ? ` Try again in ~${mins} minutes.` : ' Retry after that.'}`
-            : 'Funds are not yet available to transfer. Retry shortly.',
-          variant: 'destructive',
-        });
-      } else if (holdReasonCode === 'STRIPE_INSUFFICIENT_AVAILABLE_BALANCE' && stripeDebug) {
-        const attempted =
-          typeof stripeDebug?.attemptedTransferUsdCents === 'number'
-            ? `$${(stripeDebug.attemptedTransferUsdCents / 100).toFixed(2)}`
-            : null;
-        const available =
-          typeof stripeDebug?.availableUsdCents === 'number'
-            ? `$${(stripeDebug.availableUsdCents / 100).toFixed(2)}`
-            : null;
-        const pending =
-          typeof stripeDebug?.pendingUsdCents === 'number'
-            ? `$${(stripeDebug.pendingUsdCents / 100).toFixed(2)}`
-            : null;
-        const reserved =
-          typeof stripeDebug?.connectReservedUsdCents === 'number'
-            ? `$${(stripeDebug.connectReservedUsdCents / 100).toFixed(2)}`
-            : null;
-        const cardAvailCents = typeof stripeDebug?.availableUsdSourceTypes?.card === 'number' ? stripeDebug.availableUsdSourceTypes.card : null;
-        const cardAvail = typeof cardAvailCents === 'number' ? `$${(cardAvailCents / 100).toFixed(2)}` : null;
-        toast({
-          title: 'Stripe balance not sufficient for transfer',
-          description:
-            attempted && available
-              ? `Attempted transfer ${attempted}, but Stripe blocked the transfer. USD available=${available}${cardAvail ? ` (available.card ${cardAvail})` : ''}${pending ? ` (pending ${pending})` : ''}${reserved ? ` (connect reserved ${reserved})` : ''}.`
-              : (error.message || 'Failed to release payout'),
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to release payout',
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setProcessingOrderId(null);
+      atRisk.sort((a, b) => {
+        const aDeadline = a.fulfillmentSlaDeadlineAt?.getTime() || Infinity;
+        const bDeadline = b.fulfillmentSlaDeadlineAt?.getTime() || Infinity;
+        return aDeadline - bDeadline;
+      });
     }
-  }, [loadOrders, toast]);
+
+    return { overdue, needsAction, atRisk, disputes, completed };
+  }, [searchFilteredOrders, sortBySla]);
+
+  // Get orders for active lane
+  const filteredOrders = useMemo(() => {
+    if (activeLane === 'overdue') {
+      return laneOrders.overdue;
+    }
+    if (activeLane === 'needs_action') {
+      // If "Overdue only" toggle is on, show overdue items in needs_action lane
+      // If "At Risk" grouping is enabled, show at-risk items first
+      if (showOverdueOnly) {
+        return laneOrders.overdue;
+      }
+      // Show at-risk items first, then regular needs action
+      return [...laneOrders.atRisk, ...laneOrders.needsAction.filter(o => !laneOrders.atRisk.includes(o))];
+    }
+    return laneOrders[activeLane] || [];
+  }, [activeLane, laneOrders, showOverdueOnly]);
+
+  // Action handlers
 
   const handleMarkPaid = useCallback(async (orderId: string) => {
     setProcessingOrderId(orderId);
@@ -343,7 +331,7 @@ export default function AdminOpsPage() {
       await adminMarkOrderPaid(orderId);
       toast({
         title: 'Payment confirmed',
-        description: 'Order marked as paid (held). Funds remain held until manual release.',
+        description: 'Order marked as paid. Seller was paid immediately via destination charge.',
       });
       await loadOrders();
     } catch (error: any) {
@@ -422,7 +410,7 @@ export default function AdminOpsPage() {
         description: `Dispute resolved as ${resolutionType}.`,
       });
       setResolveDialogOpen(null);
-      setResolutionType('release');
+      setResolutionType('refund');
       setRefundAmount('');
       setRefundReason('');
       setAdminNotes('');
@@ -439,19 +427,28 @@ export default function AdminOpsPage() {
     }
   }, [resolveDialogOpen, resolutionType, refundAmount, refundReason, adminNotes, loadOrders, toast]);
 
-  // Calculate stats
+  // Calculate stats based on txStatus
   const stats = useMemo(() => {
     const total = orders.length;
-    const paid = orders.filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId).length;
-    const completed = orders.filter(o => o.status === 'completed').length;
+    const now = Date.now();
+    const overdue = orders.filter(o => {
+      const txStatus = getEffectiveTransactionStatus(o);
+      return o.fulfillmentSlaDeadlineAt && 
+             o.fulfillmentSlaDeadlineAt.getTime() < now && 
+             txStatus !== 'COMPLETED';
+    }).length;
+    const needsAction = orders.filter(o => {
+      const txStatus = getEffectiveTransactionStatus(o);
+      return ['FULFILLMENT_REQUIRED', 'PAID', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 
+              'READY_FOR_PICKUP', 'PICKUP_SCHEDULED', 'DELIVERED_PENDING_CONFIRMATION'].includes(txStatus);
+    }).length;
+    const disputes = orders.filter(o => getEffectiveTransactionStatus(o) === 'DISPUTE_OPENED').length;
+    const completed = orders.filter(o => getEffectiveTransactionStatus(o) === 'COMPLETED').length;
     const totalValue = orders.reduce((sum, o) => sum + o.amount, 0);
-    const totalFees = orders.reduce((sum, o) => sum + o.platformFee, 0);
+    const totalFees = orders.reduce((sum, o) => sum + (o.platformFee || 0), 0);
     const totalPayouts = orders.reduce((sum, o) => sum + o.sellerAmount, 0);
-    const pendingPayouts = orders
-      .filter(o => (o.status === 'paid' || o.status === 'paid_held') && !o.stripeTransferId)
-      .reduce((sum, o) => sum + o.sellerAmount, 0);
 
-    return { total, paid, completed, totalValue, totalFees, totalPayouts, pendingPayouts };
+    return { total, overdue, needsAction, disputes, completed, totalValue, totalFees, totalPayouts };
   }, [orders]);
 
   const handleConfirmDelivery = useCallback(async (orderId: string) => {
@@ -475,69 +472,7 @@ export default function AdminOpsPage() {
     }
   }, [loadOrders, toast]);
 
-  // Bulk action handlers
-  const handleBulkRelease = useCallback(async () => {
-    const ordersToRelease = filteredOrders.filter(o => selectedOrderIds.has(o.id));
-    if (ordersToRelease.length === 0) return;
-
-    // Filter to only eligible orders (same logic as "Ready to Release" tab)
-    const eligibleOrders = ordersToRelease.filter(order => {
-      if (order.stripeTransferId || order.status === 'completed') return false;
-      if (order.adminHold) return false;
-      if (order.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(order.disputeStatus)) return false;
-
-      const hasBuyerConfirm = !!(order.buyerConfirmedAt || order.buyerAcceptedAt || order.acceptedAt);
-      const hasDelivery = !!(order.deliveredAt || order.deliveryConfirmedAt);
-      if (!hasBuyerConfirm || !hasDelivery) return false;
-
-      return order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted';
-    });
-
-    if (eligibleOrders.length === 0) {
-      toast({
-        title: 'No Eligible Orders',
-        description: 'Sellers are paid immediately - no release needed. Admin can help enforce fulfillment timelines.',
-        variant: 'destructive',
-      });
-      setBulkActionDialogOpen(null);
-      return;
-    }
-
-    setBulkActionDialogOpen(null);
-    setProcessingOrderId('bulk');
-
-    const results: { orderId: string; success: boolean; error?: string }[] = [];
-    const BATCH_SIZE = 3;
-
-    // Process in batches
-    for (let i = 0; i < eligibleOrders.length; i += BATCH_SIZE) {
-      const batch = eligibleOrders.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async (order) => {
-          try {
-            // DEPRECATED: Sellers paid immediately - no release needed
-            return { orderId: order.id, success: true, message: 'Seller already paid via destination charge' };
-          } catch (error: any) {
-            return { orderId: order.id, success: false, error: error.message || 'Unknown error' };
-          }
-        })
-      );
-      results.push(...batchResults);
-    }
-
-    const successCount = results.filter(r => r.success).length;
-    const failCount = results.filter(r => !r.success).length;
-
-    toast({
-      title: 'Bulk Release Complete',
-      description: `${successCount} released, ${failCount} failed`,
-      variant: failCount > 0 ? 'destructive' : 'default',
-    });
-
-    setSelectedOrderIds(new Set());
-    setProcessingOrderId(null);
-    await loadOrders();
-  }, [filteredOrders, selectedOrderIds, loadOrders, toast]);
+  // Bulk release removed - sellers paid immediately
 
   const handleBulkHold = useCallback(async () => {
     if (!bulkHoldReason.trim()) {
@@ -629,61 +564,13 @@ export default function AdminOpsPage() {
     await loadOrders();
   }, [filteredOrders, selectedOrderIds, bulkHoldReason, bulkHoldNotes, loadOrders, toast]);
 
-  // Reset selection when tab changes
+  // Reset selection when lane changes
   useEffect(() => {
     setSelectedOrderIds(new Set());
-  }, [activeTab]);
+  }, [activeLane]);
 
   // Status badge helpers - Updated to reflect immediate payment (no payout holds)
-  const getStatusBadge = (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => {
-    if (disputeStatus && disputeStatus !== 'none' && disputeStatus !== 'cancelled' && !disputeStatus.startsWith('resolved')) {
-      return <Badge variant="destructive">Dispute: {disputeStatus}</Badge>;
-    }
-    
-    switch (status) {
-      case 'paid':
-        return <Badge variant="default" className="bg-green-600 text-white">Paid</Badge>; // Seller already paid
-      case 'paid_held':
-        return <Badge variant="default" className="bg-green-600 text-white">Paid</Badge>; // Changed from "Paid (Held)" - seller already paid
-      case 'awaiting_bank_transfer':
-        return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Bank Transfer</Badge>;
-      case 'awaiting_wire':
-        return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Wire</Badge>;
-      case 'in_transit':
-        return <Badge variant="default" className="bg-blue-500 text-white">In Transit</Badge>;
-      case 'delivered':
-        return <Badge variant="default" className="bg-blue-600 text-white">Delivered</Badge>;
-      case 'accepted':
-        return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
-      case 'buyer_confirmed':
-        return <Badge variant="default" className="bg-green-600 text-white">Buyer Confirmed</Badge>;
-      case 'ready_to_release':
-        return <Badge variant="default" className="bg-emerald-700 text-white">Fulfillment Complete</Badge>; // Changed from "Ready to Release"
-      case 'completed':
-        return <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">Completed</Badge>;
-      case 'refunded':
-        return <Badge variant="destructive">Refunded</Badge>;
-      case 'disputed':
-        return <Badge variant="destructive">Disputed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const getHoldReasonText = (reason: PayoutHoldReason) => {
-    switch (reason) {
-      case 'protection_window':
-        return 'Protection Window';
-      case 'dispute_open':
-        return 'Dispute Open';
-      case 'admin_hold':
-        return 'Admin Hold';
-      case 'none':
-        return 'None';
-      default:
-        return reason;
-    }
-  };
+  // Removed getStatusBadge and getHoldReasonText - all badges now use txStatus from getEffectiveTransactionStatus
 
   if (adminLoading) {
     return (
@@ -715,7 +602,7 @@ export default function AdminOpsPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Admin Operations Dashboard</h1>
         <p className="text-muted-foreground">
-          Manage payout holds, protected transactions, disputes, and payouts
+          Monitor fulfillment progress, disputes, and enforce seller compliance. Sellers are paid immediately upon successful payment.
         </p>
       </div>
 
@@ -725,10 +612,10 @@ export default function AdminOpsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Payouts</p>
-                <p className="text-2xl font-bold">{stats.paid}</p>
+                <p className="text-sm font-medium text-muted-foreground">Needs Action</p>
+                <p className="text-2xl font-bold">{stats.needsAction}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(stats.pendingPayouts)}
+                  {stats.overdue > 0 && `${stats.overdue} overdue`}
                 </p>
               </div>
               <Clock className="h-8 w-8 text-orange-600" />
@@ -739,10 +626,24 @@ export default function AdminOpsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm font-medium text-muted-foreground">Disputes</p>
+                <p className="text-2xl font-bold">{stats.disputes}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Open disputes
+                </p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
                 <p className="text-2xl font-bold">{stats.completed}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(stats.totalPayouts)}
+                  {stats.total} total orders
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -753,24 +654,10 @@ export default function AdminOpsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats.total} orders
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
                 <p className="text-sm font-medium text-muted-foreground">Platform Fees</p>
                 <p className="text-2xl font-bold">{formatCurrency(stats.totalFees)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Platform fee (varies by seller plan)
+                  {formatCurrency(stats.totalValue)} total revenue
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-purple-600" />
@@ -793,7 +680,7 @@ export default function AdminOpsPage() {
               />
             </div>
             {selectedOrderIds.size > 0 && (
-              <div className="flex items-center gap-2 pt-2 border-t">
+              <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
                 <span className="text-sm text-muted-foreground">
                   {selectedOrderIds.size} order{selectedOrderIds.size !== 1 ? 's' : ''} selected
                 </span>
@@ -814,6 +701,28 @@ export default function AdminOpsPage() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="default"
+                  onClick={() => {
+                    setBulkReminderDialogOpen(true);
+                    setBulkReminderRole('seller');
+                  }}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Remind Sellers
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => {
+                    setBulkReminderDialogOpen(true);
+                    setBulkReminderRole('buyer');
+                  }}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Remind Buyers
+                </Button>
+                <Button
+                  size="sm"
                   variant="ghost"
                   onClick={() => setSelectedOrderIds(new Set())}
                 >
@@ -825,294 +734,205 @@ export default function AdminOpsPage() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AdminOpsTabType)}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all">
-            <Package className="h-4 w-4 mr-2" />
-            All Purchases
-          </TabsTrigger>
-          <TabsTrigger value="escrow">
-            <DollarSign className="h-4 w-4 mr-2" />
-            Fulfillment Issues
-          </TabsTrigger>
-          <TabsTrigger value="protected">
-            <Shield className="h-4 w-4 mr-2" />
-            Protected
-          </TabsTrigger>
-          <TabsTrigger value="disputes">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Open Disputes
-          </TabsTrigger>
-          <TabsTrigger value="ready_to_release">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Fulfillment Pending
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tab Content */}
-        <TabsContent value="all" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      {/* Lane Controls */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={activeLane === 'overdue' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveLane('overdue')}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Overdue ({laneOrders.overdue.length})
+              </Button>
+              <Button
+                variant={activeLane === 'needs_action' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveLane('needs_action')}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Needs Action ({laneOrders.needsAction.length})
+                {laneOrders.atRisk.length > 0 && (
+                  <Badge variant="destructive" className="ml-2 text-xs">
+                    {laneOrders.atRisk.length} at risk
+                  </Badge>
+                )}
+              </Button>
+              <Button
+                variant={activeLane === 'disputes' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveLane('disputes')}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Disputes ({laneOrders.disputes.length})
+              </Button>
+              <Button
+                variant={activeLane === 'completed' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveLane('completed')}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Completed ({laneOrders.completed.length})
+              </Button>
             </div>
-          ) : filteredOrders.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No purchases found</h3>
-                  <p className="text-muted-foreground">Try searching by Order ID, listing title, or buyer/seller email.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onRelease={() => setReleaseDialogOpen(order.id)}
-                  onRefund={() => setRefundDialogOpen(order.id)}
-                  onMarkPaid={() => handleMarkPaid(order.id)}
-                  onView={() => handleViewOrder(order)}
-                  getStatusBadge={getStatusBadge}
-                  getHoldReasonText={getHoldReasonText}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="escrow" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No payout holds</h3>
-                  <p className="text-muted-foreground">All paid orders have been released or are being processed.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <div key={order.id} className="flex items-start gap-2">
-                  {(activeTab === 'escrow' || activeTab === 'ready_to_release') && (
+            <div className="flex items-center gap-3">
+              {activeLane === 'needs_action' && (
+                <>
+                  <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedOrderIds.has(order.id)}
-                      onCheckedChange={(checked) => {
-                        const newSet = new Set(selectedOrderIds);
-                        if (checked) {
-                          newSet.add(order.id);
-                        } else {
-                          newSet.delete(order.id);
-                        }
-                        setSelectedOrderIds(newSet);
-                      }}
-                      className="mt-6"
+                      id="overdue-only"
+                      checked={showOverdueOnly}
+                      onCheckedChange={(checked) => setShowOverdueOnly(checked === true)}
                     />
+                    <Label htmlFor="overdue-only" className="text-sm cursor-pointer">
+                      Overdue only
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="sort-sla"
+                      checked={sortBySla}
+                      onCheckedChange={(checked) => setSortBySla(checked === true)}
+                    />
+                    <Label htmlFor="sort-sla" className="text-sm cursor-pointer">
+                      Sort by SLA
+                    </Label>
+                  </div>
+                  {laneOrders.atRisk.length > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {laneOrders.atRisk.length} at risk
+                    </Badge>
                   )}
-                  <div className="flex-1">
+                </>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lane Content */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                {activeLane === 'overdue' && <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-4" />}
+                {activeLane === 'needs_action' && <Clock className="h-12 w-12 text-orange-600 mx-auto mb-4" />}
+                {activeLane === 'disputes' && <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-4" />}
+                {activeLane === 'completed' && <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />}
+                <h3 className="text-lg font-semibold mb-2">
+                  {activeLane === 'overdue' && 'No Overdue Orders'}
+                  {activeLane === 'needs_action' && 'No Orders Needing Action'}
+                  {activeLane === 'disputes' && 'No Open Disputes'}
+                  {activeLane === 'completed' && 'No Completed Orders'}
+                </h3>
+                <p className="text-muted-foreground">
+                  {activeLane === 'overdue' && 'All orders are within SLA or completed.'}
+                  {activeLane === 'needs_action' && 'All fulfillment actions are complete.'}
+                  {activeLane === 'disputes' && 'All disputes have been resolved.'}
+                  {activeLane === 'completed' && 'No completed orders found.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {/* At Risk section (only shown in needs_action lane) */}
+            {activeLane === 'needs_action' && laneOrders.atRisk.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <div className="text-sm font-semibold text-destructive">At Risk ({laneOrders.atRisk.length})</div>
+                  <div className="text-xs text-muted-foreground">SLA approaching or stalled {'>'} 48h</div>
+                </div>
+                {laneOrders.atRisk.map((order) => {
+                  const txStatus = getEffectiveTransactionStatus(order);
+                  if (txStatus === 'DISPUTE_OPENED') {
+                    return (
+                      <DisputeCard
+                        key={order.id}
+                        order={order}
+                        onResolve={() => setResolveDialogOpen(order.id)}
+                        onView={() => handleViewOrder(order)}
+                      />
+                    );
+                  }
+                  return (
                     <OrderCard
+                      key={order.id}
                       order={order}
-                      onRelease={() => setReleaseDialogOpen(order.id)}
                       onRefund={() => setRefundDialogOpen(order.id)}
                       onMarkPaid={() => handleMarkPaid(order.id)}
                       onView={() => handleViewOrder(order)}
-                      getStatusBadge={getStatusBadge}
-                      getHoldReasonText={getHoldReasonText}
+                      selected={selectedOrderIds.has(order.id)}
+                      onSelect={(orderId, checked) => {
+                        setSelectedOrderIds((prev) => {
+                          const next = new Set(prev);
+                          if (checked) {
+                            next.add(orderId);
+                          } else {
+                            next.delete(orderId);
+                          }
+                          return next;
+                        });
+                      }}
                     />
+                  );
+                })}
+                {laneOrders.needsAction.filter(o => !laneOrders.atRisk.includes(o)).length > 0 && (
+                  <div className="pt-4 border-t">
+                    <div className="text-sm font-semibold text-muted-foreground px-2 mb-2">Other Orders Needing Action</div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="protected" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Protected Transactions</h3>
-                  <p className="text-muted-foreground">No orders with protected transactions found.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <ProtectedTransactionCard
-                  key={order.id}
-                  order={order}
-                  onRelease={() => setReleaseDialogOpen(order.id)}
-                  onConfirmDelivery={() => handleConfirmDelivery(order.id)}
-                  onView={() => handleViewOrder(order)}
-                  getStatusBadge={getStatusBadge}
-                  isProcessing={processingOrderId === order.id}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="disputes" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Open Disputes</h3>
-                  <p className="text-muted-foreground">All disputes have been resolved.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <DisputeCard
-                  key={order.id}
-                  order={order}
-                  onResolve={() => setResolveDialogOpen(order.id)}
-                  onView={() => handleViewOrder(order)}
-                  getStatusBadge={getStatusBadge}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="ready_to_release" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Orders Pending Fulfillment</h3>
-                  <p className="text-muted-foreground">All orders are either in progress or completed. Sellers are paid immediately upon successful payment.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <div key={order.id} className="flex items-start gap-2">
-                  <Checkbox
-                    checked={selectedOrderIds.has(order.id)}
-                    onCheckedChange={(checked) => {
-                      const newSet = new Set(selectedOrderIds);
-                      if (checked) {
-                        newSet.add(order.id);
-                      } else {
-                        newSet.delete(order.id);
-                      }
-                      setSelectedOrderIds(newSet);
-                    }}
-                    className="mt-6"
+                )}
+              </div>
+            )}
+            {filteredOrders
+              .filter(order => activeLane !== 'needs_action' || !laneOrders.atRisk.includes(order))
+              .map((order) => {
+              const txStatus = getEffectiveTransactionStatus(order);
+              // Use DisputeCard for disputes, OrderCard for everything else
+              if (txStatus === 'DISPUTE_OPENED') {
+                return (
+                  <DisputeCard
+                    key={order.id}
+                    order={order}
+                    onResolve={() => setResolveDialogOpen(order.id)}
+                    onView={() => handleViewOrder(order)}
                   />
-                  <div className="flex-1">
-                    <ReadyToReleaseCard
-                      order={order}
-                      onRelease={() => {}} // DEPRECATED: No release needed - seller already paid
-                      onView={() => handleViewOrder(order)}
-                      getStatusBadge={getStatusBadge}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+                );
+              }
+              return (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onRefund={() => setRefundDialogOpen(order.id)}
+                  onMarkPaid={() => handleMarkPaid(order.id)}
+                  onView={() => handleViewOrder(order)}
+                  selected={selectedOrderIds.has(order.id)}
+                  onSelect={(orderId, checked) => {
+                    setSelectedOrderIds((prev) => {
+                      const next = new Set(prev);
+                      if (checked) {
+                        next.add(orderId);
+                      } else {
+                        next.delete(orderId);
+                      }
+                      return next;
+                    });
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Release Dialog */}
-      <Dialog open={!!releaseDialogOpen} onOpenChange={(open) => !open && setReleaseDialogOpen(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Release Payout</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to release the payout for this order? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReleaseDialogOpen(null)}>Cancel</Button>
-            {isStripeTestModeClient() && releaseDialogOpen ? (
-              <Button
-                type="button"
-                variant="link"
-                className="text-xs text-muted-foreground"
-                onClick={() => {
-                  // Close first, then open helper to avoid focus/aria-hidden warnings.
-                  const id = releaseDialogOpen;
-                  setReleaseDialogOpen(null);
-                  setTestModePayoutHelpOrderId(id);
-                  setTimeout(() => setTestModePayoutHelpOpen(true), 0);
-                }}
-              >
-                Test Mode Help
-              </Button>
-            ) : null}
-            <Button
-              onClick={() => releaseDialogOpen && handleReleasePayout(releaseDialogOpen)}
-              disabled={processingOrderId === releaseDialogOpen}
-            >
-              {processingOrderId === releaseDialogOpen ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Release Payout'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Test Mode payout helper (Stripe TEST mode only).
-          Manual test checklist:
-          - Run checkout with a normal test card -> Release may show this modal (pending settlement).
-          - Run checkout with 4000 0000 0000 0077 -> Release should succeed immediately.
-      */}
-      {testModePayoutHelpOrderId ? (
-        <TestModePayoutHelperModal
-          open={testModePayoutHelpOpen && isStripeTestModeClient()}
-          onOpenChange={setTestModePayoutHelpOpen}
-          orderId={testModePayoutHelpOrderId}
-          listingId={testModeHelpListingId}
-          settlementInfo={
-            lastReleaseDebug?.orderId === testModePayoutHelpOrderId
-              ? {
-                  availableOnIso: lastReleaseDebug?.stripeDebug?.availableOnIso,
-                  minutesUntilAvailable: lastReleaseDebug?.stripeDebug?.minutesUntilAvailable,
-                }
-              : null
-          }
-          onTryReleaseAgain={async () => {
-            if (!testModePayoutHelpOrderId) return;
-            await handleReleasePayout(testModePayoutHelpOrderId);
-          }}
-        />
-      ) : null}
 
       {/* Refund Dialog */}
       <Dialog open={!!refundDialogOpen} onOpenChange={(open) => !open && setRefundDialogOpen(null)}>
@@ -1171,6 +991,277 @@ export default function AdminOpsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Freeze Seller Dialog */}
+      <Dialog open={!!freezeDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setFreezeDialogOpen(null);
+          setFreezeReason('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Freeze Seller Account</DialogTitle>
+            <DialogDescription>
+              Freeze this seller's account. They will not be able to create new listings or receive payments.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Reason *</Label>
+              <Textarea
+                placeholder="Enter reason for freezing seller account"
+                value={freezeReason}
+                onChange={(e) => setFreezeReason(e.target.value)}
+                required
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setFreezeDialogOpen(null);
+              setFreezeReason('');
+            }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!freezeReason.trim() || processingOrderId !== null}
+              onClick={async () => {
+                if (!freezeDialogOpen || !freezeReason.trim()) return;
+                try {
+                  setProcessingOrderId(freezeDialogOpen);
+                  const token = await user?.getIdToken();
+                  const res = await fetch(`/api/admin/sellers/${freezeDialogOpen}/freeze`, {
+                    method: 'POST',
+                    headers: {
+                      'content-type': 'application/json',
+                      authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ reason: freezeReason.trim() }),
+                  });
+                  if (!res.ok) {
+                    const json = await res.json().catch(() => ({}));
+                    throw new Error(json?.message || json?.error || 'Failed to freeze seller');
+                  }
+                  toast({ title: 'Success', description: 'Seller account frozen.' });
+                  setFreezeDialogOpen(null);
+                  setFreezeReason('');
+                  await loadOrders();
+                } catch (e: any) {
+                  toast({ title: 'Error', description: e?.message || 'Failed to freeze seller', variant: 'destructive' });
+                } finally {
+                  setProcessingOrderId(null);
+                }
+              }}
+            >
+              {processingOrderId === freezeDialogOpen ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Freeze Seller
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Reminder Dialog */}
+      <Dialog open={!!reminderDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setReminderDialogOpen(null);
+          setReminderRole(null);
+          setReminderMessage('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Reminder</DialogTitle>
+            <DialogDescription>
+              Send a reminder email to the {reminderRole || 'user'} about this order.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Custom Message (Optional)</Label>
+              <Textarea
+                placeholder="Add a custom message to include in the reminder email..."
+                value={reminderMessage}
+                onChange={(e) => setReminderMessage(e.target.value)}
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                If left empty, a standard reminder will be sent based on the order status.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setReminderDialogOpen(null);
+              setReminderRole(null);
+              setReminderMessage('');
+            }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!reminderRole || processingOrderId !== null}
+              onClick={async () => {
+                if (!reminderDialogOpen || !reminderRole) return;
+                try {
+                  setProcessingOrderId(reminderDialogOpen);
+                  const token = await user?.getIdToken();
+                  const res = await fetch(`/api/admin/orders/${reminderDialogOpen}/send-reminder`, {
+                    method: 'POST',
+                    headers: {
+                      'content-type': 'application/json',
+                      authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      role: reminderRole,
+                      message: reminderMessage.trim() || undefined,
+                    }),
+                  });
+                  if (!res.ok) {
+                    const json = await res.json().catch(() => ({}));
+                    throw new Error(json?.message || json?.error || 'Failed to send reminder');
+                  }
+                  toast({ title: 'Success', description: `Reminder sent to ${reminderRole}.` });
+                  setReminderDialogOpen(null);
+                  setReminderRole(null);
+                  setReminderMessage('');
+                } catch (e: any) {
+                  toast({ title: 'Error', description: e?.message || 'Failed to send reminder', variant: 'destructive' });
+                } finally {
+                  setProcessingOrderId(null);
+                }
+              }}
+            >
+              {processingOrderId === reminderDialogOpen ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+              Send Reminder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Send Reminder Dialog */}
+      <Dialog open={bulkReminderDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setBulkReminderDialogOpen(false);
+          setBulkReminderMessage('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Bulk Reminders</DialogTitle>
+            <DialogDescription>
+              Send reminder emails to {bulkReminderRole === 'buyer' ? 'buyers' : 'sellers'} for {selectedOrderIds.size} selected order{selectedOrderIds.size !== 1 ? 's' : ''}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Target Role</Label>
+              <Select value={bulkReminderRole} onValueChange={(v) => setBulkReminderRole(v as 'buyer' | 'seller')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="seller">Sellers</SelectItem>
+                  <SelectItem value="buyer">Buyers</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Custom Message (Optional)</Label>
+              <Textarea
+                placeholder="Add a custom message to include in all reminder emails..."
+                value={bulkReminderMessage}
+                onChange={(e) => setBulkReminderMessage(e.target.value)}
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                If left empty, standard reminders will be sent based on each order's status.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setBulkReminderDialogOpen(false);
+              setBulkReminderMessage('');
+            }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={processingOrderId === 'bulk-reminder'}
+              onClick={async () => {
+                if (selectedOrderIds.size === 0) return;
+                try {
+                  setProcessingOrderId('bulk-reminder');
+                  const token = await user?.getIdToken();
+                  const orderIds = Array.from(selectedOrderIds);
+                  const results: { orderId: string; success: boolean; error?: string }[] = [];
+                  
+                  // Process in batches to avoid rate limits
+                  const BATCH_SIZE = 5;
+                  for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+                    const batch = orderIds.slice(i, i + BATCH_SIZE);
+                    const batchResults = await Promise.all(
+                      batch.map(async (orderId) => {
+                        try {
+                          const res = await fetch(`/api/admin/orders/${orderId}/send-reminder`, {
+                            method: 'POST',
+                            headers: {
+                              'content-type': 'application/json',
+                              authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({
+                              role: bulkReminderRole,
+                              message: bulkReminderMessage.trim() || undefined,
+                            }),
+                          });
+                          if (!res.ok) {
+                            const json = await res.json().catch(() => ({}));
+                            throw new Error(json?.message || json?.error || 'Failed to send reminder');
+                          }
+                          return { orderId, success: true };
+                        } catch (error: any) {
+                          return { orderId, success: false, error: error.message || 'Unknown error' };
+                        }
+                      })
+                    );
+                    results.push(...batchResults);
+                  }
+
+                  const successCount = results.filter(r => r.success).length;
+                  const failCount = results.filter(r => !r.success).length;
+
+                  toast({
+                    title: 'Bulk Reminders Sent',
+                    description: `${successCount} sent successfully, ${failCount} failed`,
+                    variant: failCount > 0 ? 'destructive' : 'default',
+                  });
+
+                  setBulkReminderDialogOpen(false);
+                  setBulkReminderMessage('');
+                  setSelectedOrderIds(new Set());
+                } catch (e: any) {
+                  toast({ title: 'Error', description: e?.message || 'Failed to send bulk reminders', variant: 'destructive' });
+                } finally {
+                  setProcessingOrderId(null);
+                }
+              }}
+            >
+              {processingOrderId === 'bulk-reminder' ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Send to {selectedOrderIds.size} {bulkReminderRole === 'buyer' ? 'Buyer' : 'Seller'}{selectedOrderIds.size !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Resolve Dispute Dialog */}
       <Dialog open={!!resolveDialogOpen} onOpenChange={(open) => !open && setResolveDialogOpen(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1216,7 +1307,6 @@ export default function AdminOpsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="release">Release Funds to Seller</SelectItem>
                   <SelectItem value="refund">Full Refund to Buyer</SelectItem>
                   <SelectItem value="partial_refund">Partial Refund</SelectItem>
                 </SelectContent>
@@ -1274,22 +1364,6 @@ export default function AdminOpsPage() {
       </Dialog>
 
       {/* Bulk Action Dialogs */}
-      {/* DEPRECATED: Bulk release dialog - sellers already paid immediately */}
-      <Dialog open={bulkActionDialogOpen === 'release'} onOpenChange={(open) => !open && setBulkActionDialogOpen(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Seller Already Paid</DialogTitle>
-            <DialogDescription>
-              Sellers receive funds immediately upon successful payment via Stripe Connect destination charges. No payout release needed.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setBulkActionDialogOpen(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={bulkActionDialogOpen === 'hold' || bulkActionDialogOpen === 'unhold'} onOpenChange={(open) => !open && setBulkActionDialogOpen(null)}>
         <DialogContent>
@@ -1338,17 +1412,17 @@ export default function AdminOpsPage() {
 
       {/* Order Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Order Details</DialogTitle>
             <DialogDescription>
               Complete order information and timeline
             </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
-            <div className="space-y-6">
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4">
               {/* Phase 2G: Admin Order Health Summary (derived; no DB writes) */}
-              <div className="space-y-3 p-4 rounded-lg border border-border/50 bg-muted/20">
+              <div className="p-3 rounded-lg border border-border/50 bg-muted/20">
                 {(() => {
                   const trust = getOrderTrustState(selectedOrder);
                   const issue = getOrderIssueState(selectedOrder);
@@ -1359,39 +1433,8 @@ export default function AdminOpsPage() {
                       ? formatDistanceToNow(protectionEndsAt, { addSuffix: true })
                       : null;
 
-                  const hasDeliveryMarked = !!selectedOrder.deliveredAt || !!selectedOrder.deliveryConfirmedAt;
-                  const hasBuyerConfirmation =
-                    !!selectedOrder.buyerConfirmedAt ||
-                    !!selectedOrder.buyerAcceptedAt ||
-                    !!selectedOrder.acceptedAt ||
-                    selectedOrder.status === 'ready_to_release' ||
-                    selectedOrder.status === 'buyer_confirmed' ||
-                    selectedOrder.status === 'accepted';
-
-                  const hasOpenProtectedDispute =
-                    !!selectedOrder.disputeStatus && ['open', 'needs_evidence', 'under_review'].includes(selectedOrder.disputeStatus);
-                  const hasChargeback =
-                    !!selectedOrder.chargebackStatus &&
-                    ['open', 'active', 'funds_withdrawn', 'needs_response', 'warning_needs_response'].includes(selectedOrder.chargebackStatus as any);
-                  const inProtectionWindow =
-                    selectedOrder.payoutHoldReason === 'protection_window' &&
-                    protectionEndsAt &&
-                    protectionEndsAt.getTime() > now.getTime();
-
-                  const payoutEligible =
-                    !selectedOrder.stripeTransferId &&
-                    !selectedOrder.adminHold &&
-                    !hasOpenProtectedDispute &&
-                    !hasChargeback &&
-                    !inProtectionWindow &&
-                    hasDeliveryMarked &&
-                    hasBuyerConfirmation &&
-                    (selectedOrder.status === 'ready_to_release' ||
-                      selectedOrder.status === 'buyer_confirmed' ||
-                      selectedOrder.status === 'accepted');
-
                   return (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                       <div>
                         <Label className="text-xs text-muted-foreground">Trust state</Label>
                         <div className="mt-1">
@@ -1409,10 +1452,10 @@ export default function AdminOpsPage() {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs text-muted-foreground">Payout eligible</Label>
+                        <Label className="text-xs text-muted-foreground">Payment Status</Label>
                         <div className="mt-1">
-                          <Badge variant={payoutEligible ? 'default' : 'secondary'} className="font-semibold text-xs">
-                            {payoutEligible ? 'Yes' : 'No'}
+                          <Badge variant="default" className="font-semibold text-xs bg-green-600">
+                            Seller Paid Immediately
                           </Badge>
                         </div>
                       </div>
@@ -1428,9 +1471,9 @@ export default function AdminOpsPage() {
                           )}
                         </div>
                       </div>
-                      <div className="col-span-2 md:col-span-4">
+                      <div className="col-span-2 md:col-span-1">
                         <Label className="text-xs text-muted-foreground">Compliance</Label>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
                           <Badge variant="outline" className="font-semibold text-xs">
                             {(selectedOrder.listingCategory as any) || 'unknown_category'}
                           </Badge>
@@ -1439,7 +1482,7 @@ export default function AdminOpsPage() {
                           </Badge>
                           {selectedOrder.transferPermitRequired !== false && (
                             <Badge variant="outline" className="font-semibold text-xs">
-                              Transfer permit: {selectedOrder.transferPermitStatus || 'none'}
+                              Permit: {selectedOrder.transferPermitStatus || 'none'}
                             </Badge>
                           )}
                         </div>
@@ -1449,21 +1492,23 @@ export default function AdminOpsPage() {
                 })()}
               </div>
 
-              {/* AI Summary */}
+              {/* AI Summary - Collapsible */}
               {selectedOrder.id && (
-                <AIAdminSummary
-                  entityType="order"
-                  entityId={selectedOrder.id}
-                  existingSummary={(selectedOrder as any).aiAdminSummary || null}
-                  existingSummaryAt={(selectedOrder as any).aiAdminSummaryAt || null}
-                  existingSummaryModel={(selectedOrder as any).aiAdminSummaryModel || null}
-                  onSummaryUpdated={(summary, model, generatedAt) => {
-                    // Update local state
-                    (selectedOrder as any).aiAdminSummary = summary;
-                    (selectedOrder as any).aiAdminSummaryAt = generatedAt;
-                    (selectedOrder as any).aiAdminSummaryModel = model;
-                  }}
-                />
+                <div className="border border-border/50 rounded-lg overflow-hidden">
+                  <AIAdminSummary
+                    entityType="order"
+                    entityId={selectedOrder.id}
+                    existingSummary={(selectedOrder as any).aiAdminSummary || null}
+                    existingSummaryAt={(selectedOrder as any).aiAdminSummaryAt || null}
+                    existingSummaryModel={(selectedOrder as any).aiAdminSummaryModel || null}
+                    onSummaryUpdated={(summary, model, generatedAt) => {
+                      // Update local state
+                      (selectedOrder as any).aiAdminSummary = summary;
+                      (selectedOrder as any).aiAdminSummaryAt = generatedAt;
+                      (selectedOrder as any).aiAdminSummaryModel = model;
+                    }}
+                  />
+                </div>
               )}
 
               {/* AI Dispute Summary - Only show if order has an active dispute */}
@@ -1487,165 +1532,344 @@ export default function AdminOpsPage() {
                 />
               )}
 
-              {/* Order Info */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Order Info - Compact Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">Order ID</Label>
-                  <p className="font-mono text-sm">{selectedOrder.id}</p>
+                  <p className="font-mono text-xs mt-0.5 break-all">{selectedOrder.id}</p>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Status</Label>
-                  <div className="mt-1">
-                    {getStatusBadge(selectedOrder.status, selectedOrder.disputeStatus, selectedOrder.payoutHoldReason)}
+                  <div className="mt-0.5">
+                    {(() => {
+                      const txStatus = getEffectiveTransactionStatus(selectedOrder);
+                      return (
+                        <Badge variant={txStatus === 'COMPLETED' ? 'default' : txStatus === 'DISPUTE_OPENED' ? 'destructive' : 'secondary'} className="text-xs">
+                          {txStatus.replaceAll('_', ' ')}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Amount</Label>
-                  <p className="text-sm font-semibold">{formatCurrency(selectedOrder.amount)}</p>
+                  <p className="text-sm font-semibold mt-0.5">{formatCurrency(selectedOrder.amount)}</p>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Seller Receives</Label>
-                  <p className="text-sm font-semibold">{formatCurrency(selectedOrder.sellerAmount)}</p>
+                  <p className="text-sm font-semibold mt-0.5">{formatCurrency(selectedOrder.sellerAmount)}</p>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <Label className="text-xs text-muted-foreground">Buyer</Label>
-                  <p className="text-sm">{selectedOrder.buyerName}</p>
-                  <p className="text-xs text-muted-foreground">{selectedOrder.buyerEmail}</p>
+                  <p className="text-sm mt-0.5">{selectedOrder.buyerName || 'N/A'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{selectedOrder.buyerEmail}</p>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <Label className="text-xs text-muted-foreground">Seller</Label>
-                  <p className="text-sm">{selectedOrder.sellerName}</p>
-                  <p className="text-xs text-muted-foreground">{selectedOrder.sellerEmail}</p>
+                  <p className="text-sm mt-0.5">{selectedOrder.sellerName || 'N/A'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{selectedOrder.sellerEmail || 'N/A'}</p>
                 </div>
                 {selectedOrder.stripePaymentIntentId && (
-                  <div>
+                  <div className="col-span-2">
                     <Label className="text-xs text-muted-foreground">Payment Intent ID</Label>
-                    <p className="font-mono text-xs">{selectedOrder.stripePaymentIntentId}</p>
+                    <p className="font-mono text-xs mt-0.5 break-all">{selectedOrder.stripePaymentIntentId}</p>
                   </div>
                 )}
                 {selectedOrder.stripeTransferId && (
-                  <div>
+                  <div className="col-span-2">
                     <Label className="text-xs text-muted-foreground">Transfer ID</Label>
-                    <p className="font-mono text-xs">{selectedOrder.stripeTransferId}</p>
+                    <p className="font-mono text-xs mt-0.5 break-all">{selectedOrder.stripeTransferId}</p>
                   </div>
                 )}
               </div>
 
-              {/* Listing Info */}
-              <div>
-                <Label className="text-xs text-muted-foreground">Listing</Label>
-                <div className="mt-2 flex items-center gap-3">
-                  {selectedOrder.listingImage && (
-                    <img
-                      src={selectedOrder.listingImage}
-                      alt={selectedOrder.listingTitle || 'Listing'}
-                      className="w-16 h-16 object-cover rounded"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-semibold">
-                      {selectedOrder.listingTitle || (selectedOrder as any).listingSnapshot?.title || selectedOrder.listingId || 'Unknown Listing'}
-                    </p>
-                    <a
-                      href={`/listings/${selectedOrder.listingId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      View Listing →
-                    </a>
-                  </div>
+              {/* Listing Info - Compact */}
+              <div className="flex items-start gap-3">
+                {selectedOrder.listingImage && (
+                  <img
+                    src={selectedOrder.listingImage}
+                    alt={selectedOrder.listingTitle || 'Listing'}
+                    className="w-14 h-14 object-cover rounded shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <Label className="text-xs text-muted-foreground">Listing</Label>
+                  <p className="font-semibold text-sm mt-0.5 truncate">
+                    {selectedOrder.listingTitle || (selectedOrder as any).listingSnapshot?.title || selectedOrder.listingId || 'Unknown Listing'}
+                  </p>
+                  <a
+                    href={`/listing/${selectedOrder.listingId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline inline-block mt-0.5"
+                  >
+                    View Listing →
+                  </a>
                 </div>
               </div>
 
-              {/* Hold Reason and Next Action */}
-              {selectedOrder && (() => {
-                const holdInfo = getHoldInfo(selectedOrder);
-                return (
-                  <div className="space-y-4 p-4 rounded-lg border border-border/50 bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold">Payout Hold Information</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          const explanation = generatePayoutExplanation(selectedOrder);
-                          await navigator.clipboard.writeText(explanation);
-                          setCopiedExplanation(true);
-                          setTimeout(() => setCopiedExplanation(false), 2000);
-                          toast({
-                            title: 'Copied',
-                            description: 'Payout explanation copied to clipboard',
-                          });
-                        }}
-                      >
-                        {copiedExplanation ? (
-                          <>
-                            <Check className="mr-2 h-4 w-4" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Copy Explanation
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Hold Reason</Label>
-                        <p className="text-sm font-medium mt-1">{holdInfo.reason}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Next Action</Label>
-                        <p className="text-sm mt-1">{holdInfo.nextAction}</p>
-                      </div>
-                      {holdInfo.earliestReleaseDate && (
-                        <div className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">Earliest Release Date</Label>
-                          <p className="text-sm mt-1">{holdInfo.earliestReleaseDate.toLocaleString()}</p>
+              {/* Compliance Transfer Status (for regulated whitetail deals) */}
+              {(() => {
+                const txStatus = getEffectiveTransactionStatus(selectedOrder);
+                const { isRegulatedWhitetailDeal, hasComplianceConfirmations } = require('@/lib/compliance/whitetail');
+                if (isRegulatedWhitetailDeal(selectedOrder) || txStatus === 'AWAITING_TRANSFER_COMPLIANCE') {
+                  const confirmations = hasComplianceConfirmations(selectedOrder);
+                  const paidAt = selectedOrder.paidAt;
+                  const daysSincePayment = paidAt ? Math.floor((Date.now() - (paidAt instanceof Date ? paidAt.getTime() : new Date(paidAt).getTime())) / (1000 * 60 * 60 * 24)) : null;
+                  const isOverdue = daysSincePayment !== null && daysSincePayment > 7;
+                  
+                  return (
+                    <div className="p-3 rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/20">
+                      <Label className="text-xs font-semibold mb-2 block text-purple-900 dark:text-purple-100">Transfer Compliance</Label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Buyer</div>
+                          <div className="flex items-center gap-1.5">
+                            {confirmations.buyerConfirmed ? (
+                              <>
+                                <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                <span className="text-xs font-semibold text-green-600">Confirmed</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3.5 w-3.5 text-red-600" />
+                                <span className="text-xs font-semibold text-red-600">Pending</span>
+                              </>
+                            )}
+                          </div>
+                          {selectedOrder.complianceTransfer?.buyerConfirmedAt && (
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              {formatDate(selectedOrder.complianceTransfer.buyerConfirmedAt)}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="col-span-2">
-                        <Label className="text-xs text-muted-foreground">Can Release</Label>
-                        <Badge variant={holdInfo.canRelease ? 'default' : 'secondary'} className="mt-1">
-                          {holdInfo.canRelease ? 'Yes' : 'No'}
-                        </Badge>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Seller</div>
+                          <div className="flex items-center gap-1.5">
+                            {confirmations.sellerConfirmed ? (
+                              <>
+                                <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                <span className="text-xs font-semibold text-green-600">Confirmed</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3.5 w-3.5 text-red-600" />
+                                <span className="text-xs font-semibold text-red-600">Pending</span>
+                              </>
+                            )}
+                          </div>
+                          {selectedOrder.complianceTransfer?.sellerConfirmedAt && (
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              {formatDate(selectedOrder.complianceTransfer.sellerConfirmedAt)}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Document</div>
+                          <div className="flex items-center gap-1.5">
+                            {(selectedOrder.complianceTransfer?.buyerUploadUrl || selectedOrder.complianceTransfer?.sellerUploadUrl) ? (
+                              <>
+                                <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                <span className="text-xs font-semibold text-green-600">Uploaded</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">None</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {paidAt && (
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Days Since Payment</div>
+                            <div className={`text-xs font-semibold ${isOverdue ? 'text-red-600' : ''}`}>
+                              {daysSincePayment !== null ? `${daysSincePayment}d` : 'N/A'}
+                              {isOverdue && <Badge variant="destructive" className="ml-1 text-[10px]">Overdue</Badge>}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                );
+                  );
+                }
+                return null;
               })()}
 
-              {/* Stripe Debug (admin-only): shows Stripe settlement/balance context from last release attempt */}
-              {selectedOrder && lastReleaseDebug?.orderId === selectedOrder.id && lastReleaseDebug?.stripeDebug ? (
-                <div className="rounded-lg border border-border/50 bg-muted/10 p-4">
-                  <div className="text-sm font-semibold">Stripe Debug</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Returned from the payout release endpoint. IDs + timestamps only (no secrets).
+              {/* Fulfillment Status & Timeline - Side by Side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fulfillment Status */}
+                {selectedOrder && (
+                  <div className="p-3 rounded-lg border border-border/50 bg-muted/30">
+                    <Label className="text-sm font-semibold mb-2 block">Fulfillment Status</Label>
+                    <FulfillmentStatusBlock order={selectedOrder} />
                   </div>
-                  <div className="mt-3">
-                    <details>
-                      <summary className="cursor-pointer text-sm font-semibold text-blue-600 hover:underline">
-                        View debug payload
-                      </summary>
-                      <pre className="mt-3 text-xs overflow-auto rounded-md bg-black/90 text-white p-3">
-{JSON.stringify(lastReleaseDebug.stripeDebug, null, 2)}
-                      </pre>
-                    </details>
+                )}
+
+                {/* Timeline */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Transaction Timeline</Label>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    <TransactionTimeline order={selectedOrder} role="admin" dense />
                   </div>
                 </div>
-              ) : null}
-
-              {/* Timeline */}
-              <div>
-                <Label className="text-xs text-muted-foreground mb-2 block">Transaction Timeline (Unified)</Label>
-                <TransactionTimeline order={selectedOrder} role="admin" />
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 flex flex-col sm:flex-row gap-2 pt-4 border-t">
+            <div className="flex gap-2 flex-1 flex-wrap">
+              {selectedOrder && (
+                <>
+                  {/* Compliance-specific reminder buttons if in compliance gate */}
+                  {(() => {
+                    const txStatus = getEffectiveTransactionStatus(selectedOrder);
+                    const { isRegulatedWhitetailDeal } = require('@/lib/compliance/whitetail');
+                    if (txStatus === 'AWAITING_TRANSFER_COMPLIANCE' && isRegulatedWhitetailDeal(selectedOrder)) {
+                      return (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              if (!selectedOrder) return;
+                              try {
+                                setProcessingOrderId(selectedOrder.id);
+                                const token = await user?.getIdToken();
+                                const res = await fetch(`/api/admin/orders/${selectedOrder.id}/compliance-transfer/remind`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'content-type': 'application/json',
+                                    authorization: `Bearer ${token}`,
+                                  },
+                                  body: JSON.stringify({ target: 'buyer' }),
+                                });
+                                if (!res.ok) {
+                                  const json = await res.json().catch(() => ({}));
+                                  throw new Error(json?.error || 'Failed to send reminder');
+                                }
+                                toast({ title: 'Success', description: 'Compliance reminder sent to buyer.' });
+                              } catch (e: any) {
+                                toast({ title: 'Error', description: e?.message || 'Failed to send reminder', variant: 'destructive' });
+                              } finally {
+                                setProcessingOrderId(null);
+                              }
+                            }}
+                            disabled={processingOrderId !== null}
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Remind Buyer (Compliance)
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              if (!selectedOrder) return;
+                              try {
+                                setProcessingOrderId(selectedOrder.id);
+                                const token = await user?.getIdToken();
+                                const res = await fetch(`/api/admin/orders/${selectedOrder.id}/compliance-transfer/remind`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'content-type': 'application/json',
+                                    authorization: `Bearer ${token}`,
+                                  },
+                                  body: JSON.stringify({ target: 'seller' }),
+                                });
+                                if (!res.ok) {
+                                  const json = await res.json().catch(() => ({}));
+                                  throw new Error(json?.error || 'Failed to send reminder');
+                                }
+                                toast({ title: 'Success', description: 'Compliance reminder sent to seller.' });
+                              } catch (e: any) {
+                                toast({ title: 'Error', description: e?.message || 'Failed to send reminder', variant: 'destructive' });
+                              } finally {
+                                setProcessingOrderId(null);
+                              }
+                            }}
+                            disabled={processingOrderId !== null}
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Remind Seller (Compliance)
+                          </Button>
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setReminderDialogOpen(selectedOrder.id);
+                            setReminderRole('seller');
+                            setReminderMessage('');
+                          }}
+                          disabled={processingOrderId !== null}
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Remind Seller
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setReminderDialogOpen(selectedOrder.id);
+                            setReminderRole('buyer');
+                            setReminderMessage('');
+                          }}
+                          disabled={processingOrderId !== null}
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Remind Buyer
+                        </Button>
+                      </>
+                    );
+                  })()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFreezeDialogOpen(selectedOrder.sellerId)}
+                    disabled={processingOrderId !== null}
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Freeze Seller
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!selectedOrder) return;
+                      try {
+                        setProcessingOrderId(selectedOrder.id);
+                        const token = await user?.getIdToken();
+                        const res = await fetch(`/api/orders/${selectedOrder.id}/dispute-packet`, {
+                          headers: { authorization: `Bearer ${token}` },
+                        });
+                        if (!res.ok) throw new Error('Failed to export dispute packet');
+                        const blob = await res.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `dispute-packet-${selectedOrder.id}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        toast({ title: 'Success', description: 'Dispute packet downloaded.' });
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: e?.message || 'Failed to export dispute packet', variant: 'destructive' });
+                      } finally {
+                        setProcessingOrderId(null);
+                      }
+                    }}
+                    disabled={processingOrderId !== null}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export Dispute Packet
+                  </Button>
+                </>
+              )}
+            </div>
             <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
               Close
             </Button>
@@ -1656,53 +1880,144 @@ export default function AdminOpsPage() {
   );
 }
 
+// Fulfillment Status Component (reusable)
+function FulfillmentStatusBlock({ order }: { order: OrderWithDetails }) {
+  const txStatus = getEffectiveTransactionStatus(order);
+  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
+  const slaDeadline = order.fulfillmentSlaDeadlineAt;
+  const now = Date.now();
+  const slaTimeRemaining = slaDeadline ? Math.max(0, slaDeadline.getTime() - now) : null;
+  const slaHoursRemaining = slaTimeRemaining ? Math.floor(slaTimeRemaining / (1000 * 60 * 60)) : null;
+  const slaMinutesRemaining = slaTimeRemaining ? Math.floor((slaTimeRemaining % (1000 * 60 * 60)) / (1000 * 60)) : null;
+
+  // Progress checklist based on transport
+  const progressItems: Array<{ label: string; completed: boolean }> = [];
+  if (transportOption === 'SELLER_TRANSPORT') {
+    const scheduled = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
+    const out = ['OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
+    const deliveredPending = ['DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
+    const completed = txStatus === 'COMPLETED';
+    progressItems.push(
+      { label: 'Delivery scheduled', completed: scheduled },
+      { label: 'Out for delivery', completed: out },
+      { label: 'Delivered (pending confirmation)', completed: deliveredPending },
+      { label: 'Completed', completed: completed }
+    );
+  } else {
+    const pickupInfo = ['READY_FOR_PICKUP', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
+    const windowSelected = ['PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
+    const pickupConfirmed = ['PICKED_UP', 'COMPLETED'].includes(txStatus);
+    const completed = txStatus === 'COMPLETED';
+    progressItems.push(
+      { label: 'Pickup info set', completed: pickupInfo },
+      { label: 'Pickup window selected', completed: windowSelected },
+      { label: 'Pickup confirmed', completed: pickupConfirmed },
+      { label: 'Completed', completed: completed }
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant={txStatus === 'COMPLETED' ? 'default' : txStatus === 'DISPUTE_OPENED' ? 'destructive' : 'secondary'} className="text-xs">
+          {txStatus.replaceAll('_', ' ')}
+        </Badge>
+        <Badge variant="outline" className="text-xs">
+          {transportOption === 'SELLER_TRANSPORT' ? 'Seller Transport' : 'Buyer Transport'}
+        </Badge>
+        {slaDeadline ? (
+          <Badge variant={slaTimeRemaining && slaTimeRemaining > 0 ? (slaHoursRemaining && slaHoursRemaining < 24 ? 'destructive' : 'secondary') : 'destructive'} className="text-xs">
+            {slaTimeRemaining && slaTimeRemaining > 0
+              ? `${slaHoursRemaining !== null && slaMinutesRemaining !== null ? `${slaHoursRemaining}h ${slaMinutesRemaining}m` : 'Calculating...'}`
+              : 'SLA Passed'}
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-xs">No SLA</Badge>
+        )}
+      </div>
+      <div className="space-y-1">
+        {progressItems.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-2 text-xs">
+            {item.completed ? (
+              <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />
+            ) : (
+              <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+            )}
+            <span className={item.completed ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
+              {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Order Card Component
 function OrderCard({
   order,
-  onRelease,
   onRefund,
   onMarkPaid,
   onView,
-  getStatusBadge,
-  getHoldReasonText,
+  selected,
+  onSelect,
 }: {
   order: OrderWithDetails;
-  onRelease: () => void;
   onRefund: () => void;
   onMarkPaid: () => void;
   onView: () => void;
-  getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
-  getHoldReasonText: (reason: PayoutHoldReason) => string;
+  selected?: boolean;
+  onSelect?: (orderId: string, checked: boolean) => void;
 }) {
+  const txStatus = getEffectiveTransactionStatus(order);
   const isAwaitingBankRails = order.status === 'awaiting_bank_transfer' || order.status === 'awaiting_wire';
-  // DEPRECATED: isReleaseCandidate - sellers paid immediately, no release needed
-  const isReleaseCandidate = false; // Always false - seller already paid
-  // DEPRECATED: Stripe settlement info - seller already paid via destination charge
-  const fundsAvailableOn = null;
-  const btStatus = null;
-  const minsUntilAvailable = null;
 
   return (
     <Card>
       <CardContent className="pt-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {onSelect && (
+            <div className="flex items-center shrink-0">
+              <Checkbox
+                checked={selected || false}
+                onCheckedChange={(checked) => onSelect(order.id, checked === true)}
+              />
+            </div>
+          )}
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
-              {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
+              {(() => {
+                const badge = getUXBadge(order, 'admin');
+                return <Badge variant={badge.variant}>{badge.label}</Badge>;
+              })()}
             </div>
             <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
+            {(() => {
+              const nextAction = getNextRequiredAction(order, 'admin');
+              if (nextAction) {
+                return (
+                  <div className="text-sm bg-muted/50 border border-border/50 rounded-lg p-3 mt-2">
+                    <div className="font-semibold text-foreground">{nextAction.title}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{nextAction.description}</div>
+                    {nextAction.dueAt && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Due: {formatDate(nextAction.dueAt)}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div className="text-sm text-muted-foreground space-y-1">
               <p>Buyer: {order.buyerName} ({order.buyerEmail})</p>
               <p>Seller: {order.sellerName} ({order.sellerEmail})</p>
               <p>Amount: {formatCurrency(order.amount)} | Seller receives: {formatCurrency(order.sellerAmount)}</p>
               <p>Created: {formatDate(order.createdAt)}</p>
               <p className="text-green-600 text-xs">✓ Seller paid immediately via destination charge</p>
-              {/* DEPRECATED: payoutHoldReason no longer used (seller paid immediately) */}
-              {order.payoutHoldReason && order.payoutHoldReason !== 'none' && (
-                <p className="text-muted-foreground text-xs">Note: Seller was paid immediately via destination charge</p>
-              )}
             </div>
+            <FulfillmentStatusBlock order={order} />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onView}>
@@ -1714,19 +2029,7 @@ function OrderCard({
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Mark Paid (Stripe)
               </Button>
-            ) : (
-              // DEPRECATED: No payout release needed - seller already paid immediately
-              <Button
-                size="sm"
-                onClick={onRelease}
-                disabled={true}
-                className="bg-gray-400 hover:bg-gray-400 disabled:opacity-50 cursor-not-allowed"
-                title="Seller already paid immediately - no release needed"
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Already Paid
-              </Button>
-            )}
+            ) : null}
             <Button variant="destructive" size="sm" onClick={onRefund}>
               Refund
             </Button>
@@ -1737,102 +2040,18 @@ function OrderCard({
   );
 }
 
-// Protected Transaction Card
-function ProtectedTransactionCard({
-  order,
-  onRelease,
-  onConfirmDelivery,
-  onView,
-  getStatusBadge,
-  isProcessing,
-}: {
-  order: OrderWithDetails;
-  onRelease: () => void;
-  onConfirmDelivery: () => void;
-  onView: () => void;
-  getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
-  isProcessing: boolean;
-}) {
-  const timeRemaining = order.protectionEndsAt 
-    ? formatDistanceToNow(order.protectionEndsAt, { addSuffix: true })
-    : 'N/A';
-  
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
-              {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
-              <Badge variant="outline" className="bg-blue-50">
-                <Shield className="h-3 w-3 mr-1" />
-                {order.protectedTransactionDaysSnapshot} Days
-              </Badge>
-            </div>
-            <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>Seller: {order.sellerName} | Buyer: {order.buyerName}</p>
-              <p>Amount: {formatCurrency(order.amount)}</p>
-              {order.protectionEndsAt && (
-                <p>Protection ends: {timeRemaining}</p>
-              )}
-              {order.disputeStatus && order.disputeStatus !== 'none' && (
-                <p className="text-orange-600">Dispute: {order.disputeStatus}</p>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onView}>
-              <Eye className="h-4 w-4 mr-2" />
-              View
-            </Button>
-            {!order.deliveryConfirmedAt && order.protectedTransactionDaysSnapshot && (
-              <Button 
-                size="sm" 
-                onClick={onConfirmDelivery} 
-                disabled={isProcessing}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Truck className="h-4 w-4 mr-2" />
-                    Confirm Delivery
-                  </>
-                )}
-              </Button>
-            )}
-            {/* DEPRECATED: No payout release needed - seller already paid immediately */}
-            {order.deliveryConfirmedAt && (!order.protectionEndsAt || order.protectionEndsAt.getTime() <= Date.now()) && (
-              <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Seller Paid
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 // Dispute Card
 function DisputeCard({
   order,
   onResolve,
   onView,
-  getStatusBadge,
 }: {
   order: OrderWithDetails;
   onResolve: () => void;
   onView: () => void;
-  getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
 }) {
+  const txStatus = getEffectiveTransactionStatus(order);
   return (
     <Card>
       <CardContent className="pt-6">
@@ -1840,7 +2059,9 @@ function DisputeCard({
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
-              {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
+              <Badge variant={txStatus === 'COMPLETED' ? 'default' : txStatus === 'DISPUTE_OPENED' ? 'destructive' : 'secondary'}>
+                {txStatus.replaceAll('_', ' ')}
+              </Badge>
             </div>
             <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
             <div className="text-sm text-muted-foreground space-y-1">
@@ -1873,50 +2094,3 @@ function DisputeCard({
   );
 }
 
-// Fulfillment Complete Card (formerly "Ready to Release" - seller already paid)
-function ReadyToReleaseCard({
-  order,
-  onRelease,
-  onView,
-  getStatusBadge,
-}: {
-  order: OrderWithDetails;
-  onRelease: () => void;
-  onView: () => void;
-  getStatusBadge: (status: OrderStatus, disputeStatus?: DisputeStatus, payoutHoldReason?: PayoutHoldReason) => JSX.Element;
-}) {
-  const fulfillmentStatus =
-    order.status === 'ready_to_release' || order.status === 'buyer_confirmed' || order.status === 'accepted'
-      ? 'Fulfillment complete'
-      : order.buyerConfirmedAt || order.buyerAcceptedAt || order.acceptedAt
-        ? 'Buyer confirmed receipt'
-        : 'Fulfillment in progress';
-  
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-muted-foreground">#{order.id.slice(-8)}</span>
-              {getStatusBadge(order.status, order.disputeStatus, order.payoutHoldReason)}
-            </div>
-            <h3 className="font-semibold">{order.listingTitle || (order as any).listingSnapshot?.title || order.listingId || 'Unknown Listing'}</h3>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>Seller: {order.sellerName} | Amount: {formatCurrency(order.sellerAmount)}</p>
-              <p className="text-green-600 font-medium">Status: {fulfillmentStatus}</p>
-              <p className="text-xs text-muted-foreground">✓ Seller paid immediately via destination charge</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onView}>
-              <Eye className="h-4 w-4 mr-2" />
-              View
-            </Button>
-            {/* DEPRECATED: No payout release needed - seller already paid */}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

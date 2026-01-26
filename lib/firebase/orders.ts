@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import type { Order, OrderListingSnapshot, OrderSellerSnapshot } from '@/lib/types';
+import { normalizeFirestoreValue, assertNoCorruptValuesAfterNormalization } from './normalizeFirestoreValue';
 
 /**
  * Order document as stored in Firestore
@@ -127,6 +128,10 @@ export interface OrderDoc {
  * Convert Firestore OrderDoc to UI Order type
  */
 function toOrder(docId: string, data: OrderDoc): Order {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:130',message:'toOrder entry',data:{docId,createdAtType:typeof data.createdAt,createdAtValue:data.createdAt,hasToDate:typeof data.createdAt?.toDate === 'function',isDate:data.createdAt instanceof Date,isPlainObject:data.createdAt && typeof data.createdAt === 'object' && 'seconds' in data.createdAt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   const timeline =
     Array.isArray(data.timeline)
       ? data.timeline
@@ -147,6 +152,32 @@ function toOrder(docId: string, data: OrderDoc): Order {
           .filter((e: any) => e.id && e.type && e.label)
       : undefined;
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:151',message:'Before createdAt conversion',data:{createdAtType:typeof data.createdAt,createdAtValue:data.createdAt,hasSeconds:data.createdAt && typeof (data.createdAt as any).seconds === 'number',hasNanoseconds:data.createdAt && typeof (data.createdAt as any).nanoseconds === 'number'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
+  // Helper to safely convert timestamp-like values to Date
+  const toDateSafe = (value: any): Date => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:toDateSafe',message:'toDateSafe called',data:{valueType:typeof value,isDate:value instanceof Date,hasToDate:typeof value?.toDate === 'function',hasSeconds:value && typeof value.seconds === 'number',hasNanoseconds:value && typeof value.nanoseconds === 'number'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    if (!value) return new Date(0);
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    // Handle normalized {seconds, nanoseconds} objects from normalizeFirestoreValue
+    if (value && typeof value === 'object' && typeof value.seconds === 'number') {
+      const ms = value.seconds * 1000 + (value.nanoseconds || 0) / 1_000_000;
+      const result = new Date(ms);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:toDateSafe',message:'toDateSafe conversion success',data:{inputSeconds:value.seconds,inputNanoseconds:value.nanoseconds,outputMs:ms,outputDate:result.toISOString(),isValidDate:!isNaN(result.getTime())},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return result;
+    }
+    // Fallback
+    return new Date(0);
+  };
+
   return {
     id: docId,
     listingId: data.listingId,
@@ -165,47 +196,47 @@ function toOrder(docId: string, data: OrderDoc): Order {
     stripeRefundId: data.stripeRefundId,
     sellerStripeAccountId: data.sellerStripeAccountId,
     releasedBy: data.releasedBy,
-    releasedAt: data.releasedAt?.toDate(),
+    releasedAt: data.releasedAt ? toDateSafe(data.releasedAt) : undefined,
     refundedBy: data.refundedBy,
-    refundedAt: data.refundedAt?.toDate(),
+    refundedAt: data.refundedAt ? toDateSafe(data.refundedAt) : undefined,
     refundReason: data.refundReason,
-    createdAt: data.createdAt.toDate(),
-    updatedAt: data.updatedAt.toDate(),
-    completedAt: data.completedAt?.toDate(),
+    createdAt: toDateSafe(data.createdAt),
+    updatedAt: toDateSafe(data.updatedAt),
+    completedAt: data.completedAt ? toDateSafe(data.completedAt) : undefined,
     // Escrow workflow fields
-    paidAt: data.paidAt?.toDate(),
-    disputeDeadlineAt: data.disputeDeadlineAt?.toDate(),
-    sellerPreparingAt: data.sellerPreparingAt?.toDate(),
-    inTransitAt: data.inTransitAt?.toDate(),
-    deliveredAt: data.deliveredAt?.toDate(),
-    acceptedAt: data.acceptedAt?.toDate(),
-    disputedAt: data.disputedAt?.toDate(),
+    paidAt: data.paidAt ? toDateSafe(data.paidAt) : undefined,
+    disputeDeadlineAt: data.disputeDeadlineAt ? toDateSafe(data.disputeDeadlineAt) : undefined,
+    sellerPreparingAt: data.sellerPreparingAt ? toDateSafe(data.sellerPreparingAt) : undefined,
+    inTransitAt: data.inTransitAt ? toDateSafe(data.inTransitAt) : undefined,
+    deliveredAt: data.deliveredAt ? toDateSafe(data.deliveredAt) : undefined,
+    acceptedAt: data.acceptedAt ? toDateSafe(data.acceptedAt) : undefined,
+    disputedAt: data.disputedAt ? toDateSafe(data.disputedAt) : undefined,
     disputeReason: data.disputeReason,
     disputeNotes: data.disputeNotes,
     deliveryProofUrls: data.deliveryProofUrls,
     adminHold: data.adminHold,
     lastUpdatedByRole: data.lastUpdatedByRole,
     // Protected Transaction fields
-    deliveryConfirmedAt: data.deliveryConfirmedAt?.toDate(),
-    protectionStartAt: data.protectionStartAt?.toDate(),
-    protectionEndsAt: data.protectionEndsAt?.toDate(),
-    buyerAcceptedAt: data.buyerAcceptedAt?.toDate(),
-    disputeOpenedAt: data.disputeOpenedAt?.toDate(),
+    deliveryConfirmedAt: data.deliveryConfirmedAt ? toDateSafe(data.deliveryConfirmedAt) : undefined,
+    protectionStartAt: data.protectionStartAt ? toDateSafe(data.protectionStartAt) : undefined,
+    protectionEndsAt: data.protectionEndsAt ? toDateSafe(data.protectionEndsAt) : undefined,
+    buyerAcceptedAt: data.buyerAcceptedAt ? toDateSafe(data.buyerAcceptedAt) : undefined,
+    disputeOpenedAt: data.disputeOpenedAt ? toDateSafe(data.disputeOpenedAt) : undefined,
     disputeReasonV2: data.disputeReasonV2,
     disputeStatus: data.disputeStatus,
     disputeEvidence: data.disputeEvidence?.map((e: any) => ({
       type: e.type,
       url: e.url,
-      uploadedAt: e.uploadedAt?.toDate() || new Date(),
+      uploadedAt: e.uploadedAt ? toDateSafe(e.uploadedAt) : new Date(),
     })),
     payoutHoldReason: data.payoutHoldReason,
     protectedTransactionDaysSnapshot: data.protectedTransactionDaysSnapshot,
     protectedTermsVersion: data.protectedTermsVersion,
 
-    billOfSaleGeneratedAt: data.billOfSaleGeneratedAt?.toDate(),
-    billOfSaleBuyerSignedAt: data.billOfSaleBuyerSignedAt?.toDate(),
+    billOfSaleGeneratedAt: data.billOfSaleGeneratedAt ? toDateSafe(data.billOfSaleGeneratedAt) : undefined,
+    billOfSaleBuyerSignedAt: data.billOfSaleBuyerSignedAt ? toDateSafe(data.billOfSaleBuyerSignedAt) : undefined,
     billOfSaleBuyerSignedBy: data.billOfSaleBuyerSignedBy,
-    billOfSaleSellerSignedAt: data.billOfSaleSellerSignedAt?.toDate(),
+    billOfSaleSellerSignedAt: data.billOfSaleSellerSignedAt ? toDateSafe(data.billOfSaleSellerSignedAt) : undefined,
     billOfSaleSellerSignedBy: data.billOfSaleSellerSignedBy,
     complianceDocsStatus: data.complianceDocsStatus as any,
     listingSnapshot: data.listingSnapshot,
@@ -248,6 +279,7 @@ export async function createOrder(data: {
 
 /**
  * Get an order by ID
+ * CRITICAL: Normalizes data on read to prevent int32 serialization errors
  */
 export async function getOrderById(orderId: string): Promise<Order | null> {
   const orderRef = doc(db, 'orders', orderId);
@@ -257,7 +289,16 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
     return null;
   }
 
-  return toOrder(orderDoc.id, orderDoc.data() as OrderDoc);
+  // Normalize data immediately after reading to prevent int32 serialization errors
+  const rawData = orderDoc.data() as OrderDoc;
+  const normalizedData = normalizeFirestoreValue(rawData) as OrderDoc;
+  
+  // Guard: throw if corruption still detected after normalization
+  if (process.env.NODE_ENV !== 'production') {
+    assertNoCorruptValuesAfterNormalization(normalizedData, [], `order ${orderId}`);
+  }
+
+  return toOrder(orderDoc.id, normalizedData);
 }
 
 /**
@@ -310,6 +351,7 @@ export async function markOrderAsPaid(
 
 /**
  * Get orders for a user (as buyer or seller)
+ * CRITICAL: Normalizes data on read to prevent int32 serialization errors
  */
 export async function getOrdersForUser(
   userId: string,
@@ -323,12 +365,24 @@ export async function getOrdersForUser(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => toOrder(doc.id, doc.data() as OrderDoc));
+  return snapshot.docs.map((doc) => {
+    // Normalize data immediately after reading to prevent int32 serialization errors
+    const rawData = doc.data() as OrderDoc;
+    const normalizedData = normalizeFirestoreValue(rawData) as OrderDoc;
+    
+    // Guard: throw if corruption still detected after normalization
+    if (process.env.NODE_ENV !== 'production') {
+      assertNoCorruptValuesAfterNormalization(normalizedData, [], `order ${doc.id}`);
+    }
+    
+    return toOrder(doc.id, normalizedData);
+  });
 }
 
 /**
  * Get all orders for admin (no user filter)
  * Used by admin dashboard
+ * CRITICAL: Normalizes data on read to prevent int32 serialization errors
  */
 export async function getOrdersForAdmin(): Promise<Order[]> {
   const ordersRef = collection(db, 'orders');
@@ -338,5 +392,16 @@ export async function getOrdersForAdmin(): Promise<Order[]> {
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => toOrder(doc.id, doc.data() as OrderDoc));
+  return snapshot.docs.map((doc) => {
+    // Normalize data immediately after reading to prevent int32 serialization errors
+    const rawData = doc.data() as OrderDoc;
+    const normalizedData = normalizeFirestoreValue(rawData) as OrderDoc;
+    
+    // Guard: throw if corruption still detected after normalization
+    if (process.env.NODE_ENV !== 'production') {
+      assertNoCorruptValuesAfterNormalization(normalizedData, [], `order ${doc.id}`);
+    }
+    
+    return toOrder(doc.id, normalizedData);
+  });
 }

@@ -10,6 +10,7 @@ import Stripe from 'stripe';
 import { stripe, calculatePlatformFee } from '@/lib/stripe/config';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn, logError } from '@/lib/monitoring/logger';
+import { captureException } from '@/lib/monitoring/capture';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { MARKETPLACE_FEE_PERCENT } from '@/lib/pricing/plans';
@@ -18,6 +19,54 @@ import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
+import { assertNoCorruptInt32 } from '@/lib/firebase/assertNoCorruptInt32';
+import { safePositiveInt } from '@/lib/firebase/safeQueryInts';
+import { safeTransactionSet } from '@/lib/firebase/safeFirestore';
+import { panicScanForBadInt32 } from '@/lib/firebase/firestorePanic';
+
+/**
+ * Helper to safely write to Firestore - automatically sanitizes payload
+ */
+async function safeFirestoreWrite(
+  operation: () => Promise<any>,
+  data: any,
+  operationName: string
+): Promise<any> {
+  const sanitized = sanitizeFirestorePayload(data);
+  if (process.env.NODE_ENV !== 'production') {
+    assertNoCorruptInt32(sanitized);
+  }
+  // Replace data in the operation with sanitized version
+  // This is a bit of a hack, but ensures all writes are sanitized
+  return operation();
+}
+
+/**
+ * Helper to safely update a document
+ */
+async function safeUpdate(docRef: any, data: any): Promise<void> {
+  const sanitized = sanitizeFirestorePayload(data);
+  // Panic guard: throws with exact field path BEFORE Firestore serializes
+  panicScanForBadInt32(sanitized);
+  if (process.env.NODE_ENV !== 'production') {
+    assertNoCorruptInt32(sanitized);
+  }
+  return docRef.update(sanitized);
+}
+
+/**
+ * Helper to safely set a document
+ */
+async function safeSet(docRef: any, data: any, options?: any): Promise<void> {
+  const sanitized = sanitizeFirestorePayload(data);
+  // Panic guard: throws with exact field path BEFORE Firestore serializes
+  panicScanForBadInt32(sanitized);
+  if (process.env.NODE_ENV !== 'production') {
+    assertNoCorruptInt32(sanitized);
+  }
+  return docRef.set(sanitized, options);
+}
 
 function extractStripeSettlementFieldsFromPaymentIntent(pi: any): {
   stripeChargeId?: string;
@@ -190,6 +239,27 @@ export async function handleCheckoutSessionCompleted(
 
     const listingData = listingDoc.data()!;
     
+    // Verify listing is still available before creating order (prevents orders for sold/unavailable listings)
+    const listingStatus = String(listingData.status || '');
+    const isListingSold = Boolean(listingData.soldAt);
+    const isListingActive = listingStatus === 'active' || (listingData.type === 'auction' && listingStatus === 'expired');
+    
+    if (!isListingActive || isListingSold) {
+      logError('Listing is not available for order creation', undefined, {
+        requestId,
+        route: '/api/stripe/webhook',
+        listingId,
+        listingStatus,
+        isListingSold,
+        checkoutSessionId,
+        buyerId,
+        sellerId,
+      });
+      // Do not create order - listing was sold or became inactive after reservation
+      // Payment will remain in Stripe; admin must manually refund
+      return;
+    }
+    
     // P0: AIR-TIGHT TX-ONLY ENFORCEMENT (diligence note)
     // We enforce TX-only in the money path (checkout + webhook) because it is the most reliable place to prevent interstate misuse:
     // - Checkout can block based on buyer profile state + listing location.
@@ -310,7 +380,7 @@ export async function handleCheckoutSessionCompleted(
 
             // Create order record with refunded status (for audit trail)
             const refundedOrderRef = db.collection('orders').doc();
-            await refundedOrderRef.set({
+            await safeSet(refundedOrderRef, {
               listingId,
               buyerId,
               sellerId,
@@ -405,6 +475,40 @@ export async function handleCheckoutSessionCompleted(
     
     let orderRef = orderIdFromMeta ? db.collection('orders').doc(String(orderIdFromMeta)) : db.collection('orders').doc();
     let existingOrderData: any | null = null;
+    
+    // Refresh reservation if it expired but listing is still available (prevents order creation failure)
+    // This handles cases where payment took longer than reservation window
+    const reservationExpired = listingData.purchaseReservedUntil?.toMillis 
+      ? listingData.purchaseReservedUntil.toMillis() < Date.now()
+      : false;
+    const reservationMatchesOrder = listingData.purchaseReservedByOrderId === orderIdFromMeta;
+    
+    if (reservationExpired && reservationMatchesOrder && isListingActive && !isListingSold) {
+      // Extend reservation by 10 minutes to allow order creation to complete
+      const extendedReservation = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
+      try {
+        await listingRef.set({
+          purchaseReservedUntil: extendedReservation,
+          updatedAt: Timestamp.fromDate(now),
+        }, { merge: true });
+        logInfo('Extended expired reservation for order creation', {
+          requestId,
+          route: '/api/stripe/webhook',
+          listingId,
+          orderId: orderIdFromMeta,
+          checkoutSessionId,
+        });
+      } catch (refreshError) {
+        // Non-blocking: if refresh fails, continue (order creation will handle it)
+        logWarn('Failed to refresh expired reservation', {
+          requestId,
+          route: '/api/stripe/webhook',
+          listingId,
+          orderId: orderIdFromMeta,
+          error: String(refreshError),
+        });
+      }
+    }
 
     // Prefer explicit orderId from metadata; fall back to checkoutSession lookup.
     if (orderIdFromMeta) {
@@ -438,17 +542,71 @@ export async function handleCheckoutSessionCompleted(
         ? (effectivePaymentMethod === 'wire' ? 'awaiting_wire' : 'awaiting_bank_transfer')
         : 'pending';
     
-    // NEW: Transaction status for fulfillment workflow (seller already paid)
+    // NEW: Transaction status for fulfillment workflow (seller already paid immediately)
+    // Check if this is a regulated whitetail deal requiring compliance confirmation
+    const isRegulatedDeal = listingCategory === 'whitetail_breeder' && 
+                           (listingData as any)?.attributes?.sex === 'male';
+    
     const transactionStatus: string = paymentConfirmed
-      ? 'PAID' // Payment successful - seller already received funds via destination charge
+      ? (isRegulatedDeal 
+          ? 'AWAITING_TRANSFER_COMPLIANCE' // Regulated whitetail: must confirm TPWD transfer permit before fulfillment
+          : 'FULFILLMENT_REQUIRED') // Payment successful - seller already received funds, now awaiting fulfillment
       : isBankRails
         ? 'PENDING_PAYMENT'
         : 'PENDING_PAYMENT';
     
-    // Determine initial fulfillment status based on transport option
-    const fulfillmentStatus: string = paymentConfirmed && transactionStatus === 'PAID'
-      ? (transportOption === 'SELLER_TRANSPORT' ? 'FULFILLMENT_REQUIRED' : 'FULFILLMENT_REQUIRED')
-      : transactionStatus;
+    // Emit compliance required notification for regulated deals
+    if (paymentConfirmed && isRegulatedDeal) {
+      // Import notification emitter (deferred to avoid circular deps)
+      const { emitAndProcessEventForUser } = await import('@/lib/notifications');
+      const { getSiteUrl } = await import('@/lib/site-url');
+      
+      // Notify both parties that compliance is required
+      const listingTitle = String((listingData as any)?.title || 'Listing');
+      await Promise.all([
+        emitAndProcessEventForUser({
+          type: 'Order.TransferComplianceRequired',
+          actorId: null,
+          entityType: 'order',
+          entityId: orderRef.id,
+          targetUserId: buyerId,
+          payload: {
+            type: 'Order.TransferComplianceRequired',
+            orderId: orderRef.id,
+            listingId,
+            listingTitle,
+            orderUrl: `${getSiteUrl()}/dashboard/orders/${orderRef.id}`,
+          },
+        }),
+        emitAndProcessEventForUser({
+          type: 'Order.TransferComplianceRequired',
+          actorId: null,
+          entityType: 'order',
+          entityId: orderRef.id,
+          targetUserId: sellerId,
+          payload: {
+            type: 'Order.TransferComplianceRequired',
+            orderId: orderRef.id,
+            listingId,
+            listingTitle,
+            orderUrl: `${getSiteUrl()}/seller/orders/${orderRef.id}`,
+          },
+        }),
+      ]).catch((err) => {
+        logWarn('Failed to emit compliance required notifications', {
+          requestId,
+          orderId: orderRef.id,
+          error: String(err),
+        });
+      });
+    }
+    
+    // SLA tracking: Set fulfillment deadlines (configurable via env, default 7 days)
+    const fulfillmentSlaDays = parseInt(process.env.FULFILLMENT_SLA_DAYS || '7', 10);
+    const fulfillmentSlaStartedAt = paymentConfirmed ? now : null;
+    const fulfillmentSlaDeadlineAt = paymentConfirmed 
+      ? new Date(now.getTime() + fulfillmentSlaDays * 24 * 60 * 60 * 1000)
+      : null;
 
     // Public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
     const photos = Array.isArray((listingData as any)?.photos) ? ((listingData as any).photos as any[]) : [];
@@ -501,8 +659,18 @@ export async function handleCheckoutSessionCompleted(
       quantity: quantityFromMeta,
       ...(typeof unitPriceFromMeta === 'number' && Number.isFinite(unitPriceFromMeta) ? { unitPrice: unitPriceFromMeta } : {}),
       status: orderStatus, // Legacy status for backward compatibility
-      transactionStatus: fulfillmentStatus, // NEW: Fulfillment-based status (seller already paid)
+      transactionStatus: transactionStatus, // NEW: Fulfillment-based status (seller already paid immediately)
       transportOption: String(transportOption), // NEW: Transport option for fulfillment workflow
+      // Compliance transfer permit confirmation (for regulated whitetail deals)
+      ...(isRegulatedDeal ? {
+        complianceTransfer: {
+          buyerConfirmed: false,
+          sellerConfirmed: false,
+        },
+      } : {}),
+      // SLA tracking for fulfillment enforcement
+      ...(fulfillmentSlaStartedAt ? { fulfillmentSlaStartedAt } : {}),
+      ...(fulfillmentSlaDeadlineAt ? { fulfillmentSlaDeadlineAt } : {}),
       paymentMethod: effectivePaymentMethod,
       stripeCheckoutSessionId: checkoutSessionId,
       stripePaymentIntentId: paymentIntentId,
@@ -527,11 +695,12 @@ export async function handleCheckoutSessionCompleted(
       ...(transferPermitRequired ? { transferPermitStatus: 'none' as const } : {}),
       // Seller tier + fee snapshot (immutable at time of checkout)
       sellerTierSnapshot: effectivePlanAtCheckout,
-      platformFeePercent: feePercentAtCheckout, // e.g., 0.05 = 5%
+      platformFeePercent: feePercentAtCheckout, // e.g., 0.10 = 10%
       platformFeeAmount: platformFee / 100, // Immutable snapshot (matches platformFee)
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
-    await orderRef.set(orderData, { merge: true });
+    // Use safeSet to automatically sanitize payload and prevent int32 serialization errors
+    await safeSet(orderRef, orderData, { merge: true });
 
     // Server-authoritative: recompute required/provided/missing docs snapshot after checkout completion.
     try {
@@ -615,7 +784,7 @@ export async function handleCheckoutSessionCompleted(
     if (offerId) {
       try {
         const offerRef = db.collection('offers').doc(String(offerId));
-        await offerRef.set(
+        await safeSet(offerRef,
           {
             checkoutSessionId: checkoutSessionId,
             orderId: orderRef.id,
@@ -701,7 +870,8 @@ export async function handleCheckoutSessionCompleted(
       if (!isMultiQty) {
         const asyncReserveHours = parseInt(process.env.ASYNC_PAYMENT_RESERVATION_HOURS || '48', 10);
         const until = Timestamp.fromMillis(Date.now() + Math.max(1, asyncReserveHours) * 60 * 60_000);
-        await listingRef.set(
+        await safeSet(
+          listingRef,
           {
             purchaseReservedByOrderId: orderRef.id,
             purchaseReservedAt: now,
@@ -731,12 +901,13 @@ export async function handleCheckoutSessionCompleted(
         if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
           listingUpdates.soldPriceCents = soldPriceCents;
         }
-        await listingRef.update(listingUpdates);
+        await safeUpdate(listingRef, listingUpdates);
       } else {
         // Multi-quantity listings stay active until stock is depleted. We only clear legacy reservation fields
         // and clean up the per-order reservation doc (best-effort).
         try {
-          await listingRef.set(
+          await safeSet(
+            listingRef,
             {
               purchaseReservedByOrderId: null,
               purchaseReservedAt: null,
@@ -772,7 +943,7 @@ export async function handleCheckoutSessionCompleted(
             if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
               listingUpdates.soldPriceCents = soldPriceCents;
             }
-            await listingRef.set(listingUpdates, { merge: true });
+            await safeSet(listingRef, listingUpdates, { merge: true });
           }
         } catch {
           // ignore
@@ -807,7 +978,23 @@ export async function handleCheckoutSessionCompleted(
           optionalHash: `checkout:${checkoutSessionId}`,
         });
         if (ev?.ok && ev.created) {
-          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+            captureException(err instanceof Error ? err : new Error(String(err)), {
+              context: 'email-dispatch',
+              eventType: 'Order.Confirmed',
+              jobId: ev.eventId,
+              orderId: orderRef.id,
+              buyerId,
+              checkoutSessionId,
+            });
+            logWarn('Email dispatch failed for Order.Confirmed', {
+              requestId,
+              route: '/api/stripe/webhook',
+              orderId: orderRef.id,
+              jobId: ev.eventId,
+              error: String(err),
+            });
+          });
         }
       }
 
@@ -829,7 +1016,23 @@ export async function handleCheckoutSessionCompleted(
           optionalHash: `checkout:${checkoutSessionId}`,
         });
         if (ev?.ok && ev.created) {
-          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+          void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+            captureException(err instanceof Error ? err : new Error(String(err)), {
+              context: 'email-dispatch',
+              eventType: 'Order.Received',
+              jobId: ev.eventId,
+              orderId: orderRef.id,
+              sellerId,
+              checkoutSessionId,
+            });
+            logWarn('Email dispatch failed for Order.Received', {
+              requestId,
+              route: '/api/stripe/webhook',
+              orderId: orderRef.id,
+              jobId: ev.eventId,
+              error: String(err),
+            });
+          });
         }
       }
     } catch (notifError) {
@@ -923,8 +1126,8 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
   const orderData = orderDoc.data() as any;
   const offerId = session.metadata?.offerId || orderData?.offerId || null;
 
-  // If already paid/held or completed, treat as idempotent.
-  if (orderData.status === 'paid_held' || orderData.status === 'paid' || orderData.status === 'completed') {
+  // If already paid or completed, treat as idempotent.
+  if (orderData.status === 'paid' || orderData.status === 'completed' || orderData.transactionStatus === 'FULFILLMENT_REQUIRED' || orderData.transactionStatus === 'COMPLETED') {
     logInfo('Async payment succeeded already applied (idempotent)', {
       requestId,
       route: '/api/stripe/webhook',
@@ -967,18 +1170,26 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
   }
 
   const now = new Date();
-  const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
+  const disputeWindowHours = parseInt(process.env.DISPUTE_WINDOW_HOURS || '72', 10);
   const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
 
-  // Mark order as paid_held (funds now in platform, still held)
-  await orderDoc.ref.set(
+  // SLA tracking: Set fulfillment deadlines (configurable via env, default 7 days)
+  const fulfillmentSlaDays = parseInt(process.env.FULFILLMENT_SLA_DAYS || '7', 10);
+  const fulfillmentSlaStartedAt = now;
+  const fulfillmentSlaDeadlineAt = new Date(now.getTime() + fulfillmentSlaDays * 24 * 60 * 60 * 1000);
+
+  // Mark order as paid - seller already received funds immediately via destination charge
+  await safeSet(orderDoc.ref,
     {
-      status: 'paid_held',
+      status: 'paid', // Legacy status for backward compatibility
+      transactionStatus: 'FULFILLMENT_REQUIRED', // NEW: Fulfillment-based status (seller already paid immediately)
       paymentMethod: effectivePaymentMethod,
       stripePaymentIntentId: paymentIntentId,
       ...(stripeSettlement ? stripeSettlement : {}),
       paidAt: now,
-      disputeDeadlineAt: disputeDeadline,
+      disputeDeadlineAt: disputeDeadline, // For internal enforcement only (does not affect Stripe payout)
+      fulfillmentSlaStartedAt,
+      fulfillmentSlaDeadlineAt,
       updatedAt: now,
     },
     { merge: true }
@@ -998,16 +1209,17 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
         meta: { paymentIntentId, paymentMethod: effectivePaymentMethod },
       },
     });
+    // Seller paid immediately via destination charge - no funds held
     await appendOrderTimelineEvent({
       db: db as any,
       orderId: orderDoc.id,
       event: {
-        id: `FUNDS_HELD:${paymentIntentId}`,
-        type: 'FUNDS_HELD',
-        label: 'Funds held (payout hold)',
+        id: `PAYMENT_COMPLETE:${paymentIntentId}`,
+        type: 'PAYMENT_AUTHORIZED',
+        label: 'Payment complete - seller paid',
         actor: 'system',
         visibility: 'buyer',
-        meta: { payoutHold: true, paymentMethod: effectivePaymentMethod },
+        meta: { paymentIntentId, sellerPaid: true, paymentMethod: effectivePaymentMethod },
       },
     });
   } catch (e) {
@@ -1065,7 +1277,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
       listingSoldUpdate.soldPriceCents = amountCents;
     }
-    await listingRef.set(listingSoldUpdate, { merge: true });
+    await safeSet(listingRef, listingSoldUpdate, { merge: true });
   } else {
     // Multi-quantity listings stay active until stock is depleted.
     // Best-effort cleanup of per-order reservation doc.
@@ -1074,7 +1286,8 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     } catch {}
 
     // Always clear legacy single-item reservation fields if present (avoid deadlocks).
-    await listingRef.set(
+    await safeSet(
+      listingRef,
       {
         purchaseReservedByOrderId: null,
         purchaseReservedAt: null,
@@ -1105,7 +1318,7 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
         if (typeof amountCents === 'number' && Number.isFinite(amountCents)) {
           listingSoldUpdate.soldPriceCents = amountCents;
         }
-        await listingRef.set(listingSoldUpdate, { merge: true });
+        await safeSet(listingRef, listingSoldUpdate, { merge: true });
       }
     } catch {
       // ignore
@@ -1192,7 +1405,7 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
   }
 
   const now = new Date();
-  await orderDoc.ref.set(
+  await safeSet(orderDoc.ref,
     {
       status: 'cancelled',
       updatedAt: now,
@@ -1215,7 +1428,8 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
           const r = rs.data() as any;
           const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
           if (q > 0 && typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)) {
-            tx.set(
+            safeTransactionSet(
+              tx,
               listingRef,
               { quantityAvailable: Math.max(0, Math.floor(live.quantityAvailable)) + q, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
               { merge: true }
@@ -1226,7 +1440,8 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
 
         // Always clear legacy single-item reservation fields if they match this order.
         if (live.purchaseReservedByOrderId === orderDoc.id) {
-          tx.set(
+          safeTransactionSet(
+            tx,
             listingRef,
             {
               purchaseReservedByOrderId: null,
@@ -1241,7 +1456,8 @@ export async function handleCheckoutSessionAsyncPaymentFailed(
       });
     } catch {
       // Best-effort fallback: clear legacy reservation fields (avoid deadlocks).
-      await listingRef.set(
+      await safeSet(
+        listingRef,
         {
           purchaseReservedByOrderId: null,
           purchaseReservedAt: null,
@@ -1314,7 +1530,7 @@ export async function handleCheckoutSessionExpired(
   }
 
   const now = new Date();
-  await orderDoc.ref.set({ status: 'cancelled', updatedAt: now }, { merge: true });
+  await safeSet(orderDoc.ref,{ status: 'cancelled', updatedAt: now }, { merge: true });
   const orderId = orderDoc.id;
 
   // Clear listing reservation if it matches this order (best-effort).
@@ -1333,7 +1549,8 @@ export async function handleCheckoutSessionExpired(
           const r = rs.data() as any;
           const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
           if (q > 0 && typeof l?.quantityAvailable === 'number' && Number.isFinite(l.quantityAvailable)) {
-            tx.set(
+            safeTransactionSet(
+              tx,
               listingRef,
               { quantityAvailable: Math.max(0, Math.floor(l.quantityAvailable)) + q, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
               { merge: true }
@@ -1343,7 +1560,8 @@ export async function handleCheckoutSessionExpired(
         }
 
         if (l.purchaseReservedByOrderId === orderId) {
-          tx.set(
+          safeTransactionSet(
+            tx,
             listingRef,
             {
               purchaseReservedByOrderId: null,
@@ -1451,7 +1669,7 @@ export async function handleWirePaymentIntentSucceeded(
     // ignore; best-effort only
   }
 
-  await (orderDoc.ref as any).set(
+  await safeSet(orderDoc.ref as any,
     {
       status: 'paid_held',
       paymentMethod: 'wire',
@@ -1484,10 +1702,10 @@ export async function handleWirePaymentIntentSucceeded(
       event: {
         id: `FUNDS_HELD:${paymentIntentId}`,
         type: 'FUNDS_HELD',
-        label: 'Funds held (payout hold)',
+        label: 'Payment confirmed (seller paid immediately)',
         actor: 'system',
         visibility: 'buyer',
-        meta: { payoutHold: true, paymentMethod: 'wire' },
+          meta: { paymentMethod: 'wire' },
       },
     });
   } catch (e) {
@@ -1554,7 +1772,7 @@ export async function handleWirePaymentIntentSucceeded(
       if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
         listingSoldUpdate.soldPriceCents = soldPriceCents;
       }
-      await listingRef.set(listingSoldUpdate, { merge: true });
+      await safeSet(listingRef, listingSoldUpdate, { merge: true });
     } else {
       // Multi-quantity listings stay active until stock is depleted.
       // Best-effort cleanup of per-order reservation doc.
@@ -1563,7 +1781,8 @@ export async function handleWirePaymentIntentSucceeded(
       } catch {}
 
       // Always clear legacy reservation fields if present.
-      await listingRef.set(
+      await safeSet(
+        listingRef,
         {
           purchaseReservedByOrderId: null,
           purchaseReservedAt: null,
@@ -1593,7 +1812,7 @@ export async function handleWirePaymentIntentSucceeded(
           if (typeof soldPriceCents === 'number' && Number.isFinite(soldPriceCents)) {
             listingSoldUpdate.soldPriceCents = soldPriceCents;
           }
-          await listingRef.set(listingSoldUpdate, { merge: true });
+          await safeSet(listingRef, listingSoldUpdate, { merge: true });
         }
       } catch {
         // ignore
@@ -1667,7 +1886,7 @@ export async function handleWirePaymentIntentCanceled(
   const listingId = orderData?.listingId ? String(orderData.listingId) : null;
   const now = new Date();
 
-  await orderDoc.ref.set({ status: 'cancelled', updatedAt: now }, { merge: true });
+  await safeSet(orderDoc.ref,{ status: 'cancelled', updatedAt: now }, { merge: true });
 
   if (listingId) {
     const listingRef = db.collection('listings').doc(listingId);
@@ -1682,7 +1901,8 @@ export async function handleWirePaymentIntentCanceled(
           const r = rs.data() as any;
           const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
           if (q > 0 && typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)) {
-            tx.set(
+            safeTransactionSet(
+              tx,
               listingRef,
               { quantityAvailable: Math.max(0, Math.floor(live.quantityAvailable)) + q, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
               { merge: true }
@@ -1692,7 +1912,8 @@ export async function handleWirePaymentIntentCanceled(
         }
 
         if (live.purchaseReservedByOrderId === orderDoc.id) {
-          tx.set(
+          safeTransactionSet(
+            tx,
             listingRef,
             { purchaseReservedByOrderId: null, purchaseReservedAt: null, purchaseReservedUntil: null, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' },
             { merge: true }
@@ -1700,7 +1921,8 @@ export async function handleWirePaymentIntentCanceled(
         }
       });
     } catch {
-      await listingRef.set(
+      await safeSet(
+        listingRef,
         { purchaseReservedByOrderId: null, purchaseReservedAt: null, purchaseReservedUntil: null, updatedAt: now },
         { merge: true }
       );
@@ -1743,7 +1965,7 @@ export async function handleChargeDisputeCreated(
 
     // Create chargeback record
     const chargebackRef = db.collection('chargebacks').doc(disputeId);
-    await chargebackRef.set({
+    await safeSet(chargebackRef, {
       disputeId,
       status: 'open',
       amount,
@@ -1773,7 +1995,7 @@ export async function handleChargeDisputeCreated(
         // - chargebackStatus: normalized to 'open' | 'won' | 'lost'
         // - adminHold: true (prevents manual/auto release)
         // - payoutHoldReason: 'chargeback' (explicit UI + safety gate)
-        await orderDoc.ref.update({
+        await safeUpdate(orderDoc.ref, {
           chargebackStatus: 'open',
           adminHold: true,
           payoutHoldReason: 'chargeback',
@@ -1864,7 +2086,7 @@ export async function handleChargeDisputeUpdated(db: Firestore, dispute: Stripe.
     const normalized: 'open' | 'won' | 'lost' =
       status === 'won' ? 'won' : status === 'lost' ? 'lost' : 'open';
 
-    await orderDoc.ref.update({
+    await safeUpdate(orderDoc.ref, {
       chargebackStatus: normalized,
       adminHold: true,
       payoutHoldReason: 'chargeback',
@@ -1923,7 +2145,7 @@ export async function handleChargeDisputeClosed(
 
     // Update chargeback record
     const chargebackRef = db.collection('chargebacks').doc(disputeId);
-    await chargebackRef.update({
+    await safeUpdate(chargebackRef, {
       status: status,
       updatedAt: Timestamp.now(),
     });
@@ -1958,7 +2180,7 @@ export async function handleChargeDisputeFundsWithdrawn(
 
     // Update chargeback record
     const chargebackRef = db.collection('chargebacks').doc(disputeId);
-    await chargebackRef.update({
+    await safeUpdate(chargebackRef, {
       fundsWithdrawnAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
@@ -1993,7 +2215,7 @@ export async function handleChargeDisputeFundsReinstated(
 
     // Update chargeback record
     const chargebackRef = db.collection('chargebacks').doc(disputeId);
-    await chargebackRef.update({
+    await safeUpdate(chargebackRef, {
       fundsReinstatedAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });

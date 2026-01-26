@@ -99,6 +99,50 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.Received' }>;
       return `Buyer confirmed receipt for "${p.listingTitle}". View: ${p.orderUrl}`;
     }
+    case 'Order.DeliveryScheduled': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryScheduled' }>;
+      return `Delivery scheduled for "${p.listingTitle}". ETA: ${new Date(p.eta).toLocaleString()}. ${p.orderUrl}`;
+    }
+    case 'Order.PickupReady': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupReady' }>;
+      return `Pickup ready for "${p.listingTitle}" at ${p.location}. Select a time window: ${p.orderUrl}`;
+    }
+    case 'Order.PickupWindowSelected': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupWindowSelected' }>;
+      return `Buyer selected pickup window for "${p.listingTitle}". Window: ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
+    }
+    case 'Order.PickupConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupConfirmed' }>;
+      return `Buyer confirmed pickup for "${p.listingTitle}". Transaction complete. ${p.orderUrl}`;
+    }
+    case 'Order.ReceiptConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ReceiptConfirmed' }>;
+      return `Buyer confirmed receipt for "${p.listingTitle}". Transaction complete. ${p.orderUrl}`;
+    }
+    case 'Order.SlaApproaching': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.SlaApproaching' }>;
+      return `Action required: "${p.listingTitle}" deadline approaching (${p.hoursRemaining}h remaining). ${p.orderUrl}`;
+    }
+    case 'Order.SlaOverdue': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.SlaOverdue' }>;
+      return `URGENT: "${p.listingTitle}" is overdue (${p.hoursOverdue}h past deadline). ${p.orderUrl}`;
+    }
+    case 'Order.TransferComplianceRequired': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.TransferComplianceRequired' }>;
+      return `TPWD transfer permit compliance required for "${p.listingTitle}". Confirm compliance: ${p.orderUrl}`;
+    }
+    case 'Order.ComplianceBuyerConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ComplianceBuyerConfirmed' }>;
+      return `Buyer confirmed TPWD transfer compliance for "${p.listingTitle}". View: ${p.orderUrl}`;
+    }
+    case 'Order.ComplianceSellerConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ComplianceSellerConfirmed' }>;
+      return `Seller confirmed TPWD transfer compliance for "${p.listingTitle}". View: ${p.orderUrl}`;
+    }
+    case 'Order.ComplianceUnlocked': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ComplianceUnlocked' }>;
+      return `Compliance confirmed! Fulfillment unlocked for "${p.listingTitle}". View: ${p.orderUrl}`;
+    }
     default:
       return null;
   }
@@ -270,13 +314,161 @@ function buildEmailJobPayload(params: {
     }
     case 'Order.DeliveryCheckIn': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryCheckIn' }>;
+      // Clamp to prevent negative values from causing int32 serialization errors
+      const safeDaysSinceDelivery = clampInt32(p.daysSinceDelivery);
       return {
         template: 'order_delivery_checkin',
         templatePayload: {
           buyerName: recipientName,
           orderId: p.orderId,
           listingTitle: p.listingTitle,
-          daysSinceDelivery: p.daysSinceDelivery,
+          daysSinceDelivery: safeDaysSinceDelivery,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryScheduled': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryScheduled' }>;
+      // Use order_in_transit template for now (can be enhanced later)
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.PickupReady': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupReady' }>;
+      // Use order_in_transit template for now (can be enhanced later)
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.PickupWindowSelected': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupWindowSelected' }>;
+      // Use order_received template for now (can be enhanced later)
+      return {
+        template: 'order_received',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.PickupConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupConfirmed' }>;
+      // Use order_received template
+      return {
+        template: 'order_received',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.ReceiptConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ReceiptConfirmed' }>;
+      // Use order_received template
+      return {
+        template: 'order_received',
+        templatePayload: {
+          sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.SlaApproaching': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.SlaApproaching' }>;
+      // Use order_delivery_checkin template for now (can be enhanced later)
+      // Clamp hoursRemaining to prevent negative values from causing int32 serialization errors
+      const safeHoursRemaining = clampInt32(p.hoursRemaining);
+      return {
+        template: 'order_delivery_checkin',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+          daysSinceDelivery: 0,
+        },
+      };
+    }
+    case 'Order.SlaOverdue': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.SlaOverdue' }>;
+      // Use order_delivery_checkin template for now (can be enhanced later)
+      // Clamp hoursOverdue to prevent negative values from causing int32 serialization errors
+      const safeHoursOverdue = clampInt32(p.hoursOverdue);
+      const safeDaysSinceDelivery = clampInt32(safeHoursOverdue / 24);
+      return {
+        template: 'order_delivery_checkin',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+          daysSinceDelivery: safeDaysSinceDelivery,
+        },
+      };
+    }
+    case 'Order.TransferComplianceRequired': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.TransferComplianceRequired' }>;
+      return {
+        template: 'order_transfer_compliance_required',
+        templatePayload: {
+          recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.ComplianceBuyerConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ComplianceBuyerConfirmed' }>;
+      return {
+        template: 'order_compliance_buyer_confirmed',
+        templatePayload: {
+          recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.ComplianceSellerConfirmed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ComplianceSellerConfirmed' }>;
+      return {
+        template: 'order_compliance_seller_confirmed',
+        templatePayload: {
+          recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.ComplianceUnlocked': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.ComplianceUnlocked' }>;
+      return {
+        template: 'order_compliance_unlocked',
+        templatePayload: {
+          recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,
         },
       };

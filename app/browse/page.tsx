@@ -339,6 +339,12 @@ export default function BrowsePage() {
   const getBrowseFilters = (): BrowseFilters => {
     const browseFilters: BrowseFilters = { lifecycle: listingStatus };
     
+    // When searching in active feed, include ended listings so they can be found
+    // They will be filtered client-side to only show if they match the search
+    if (listingStatus === 'active' && debouncedSearchQuery?.trim()) {
+      browseFilters.statuses = ['active', 'ended', 'expired'];
+    }
+    
     if (selectedType !== 'all') {
       browseFilters.type = selectedType;
     }
@@ -492,6 +498,24 @@ export default function BrowsePage() {
   // (Full-text search, city-level location, metadata fields, etc.)
   const filteredListings = useMemo(() => {
     let result = [...listings];
+
+    // Filter out ended listings from default active feed (unless searching)
+    // Ended listings should only appear when explicitly searching or viewing completed listings
+    if (listingStatus === 'active' && !debouncedSearchQuery?.trim()) {
+      result = result.filter((listing) => {
+        // Exclude ended/expired listings from default active feed
+        if (listing.status === 'ended' || listing.status === 'expired') return false;
+        // Also exclude listings that have ended (endsAt in the past) but status hasn't been updated yet
+        const endMs =
+          listing.endAt?.getTime?.() && Number.isFinite(listing.endAt.getTime())
+            ? listing.endAt.getTime()
+            : listing.endsAt?.getTime?.() && Number.isFinite(listing.endsAt.getTime())
+              ? listing.endsAt.getTime()
+              : null;
+        if (endMs && endMs <= Date.now() && !listing.soldAt) return false;
+        return true;
+      });
+    }
 
     // Full-text search (client-side only - Firestore doesn't support full-text search)
     if (debouncedSearchQuery) {

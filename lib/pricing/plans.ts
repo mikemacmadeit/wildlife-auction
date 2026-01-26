@@ -2,7 +2,7 @@
  * Seller Tiers (Subscription Model)
  *
  * IMPORTANT:
- * - Marketplace fee is flat at 5% for all sellers and categories (not tier-based).
+ * - Marketplace fee is flat at 10% for all sellers and categories (not tier-based).
  * - Subscriptions are optional and only affect exposure/priority UX and styling.
  * - We keep backward compatibility for legacy ids 'free'|'pro'|'elite'.
  */
@@ -14,7 +14,7 @@ import { mapLegacyPlanToTier, getTierWeight } from '@/lib/pricing/subscriptions'
 export type LegacyPlanId = 'free' | 'pro' | 'elite';
 export type PlanId = SubscriptionTier | LegacyPlanId;
 
-export const MARKETPLACE_FEE_PERCENT = 0.05;
+export const MARKETPLACE_FEE_PERCENT = 0.10;
 
 export interface PlanConfig {
   /** Canonical tier id */
@@ -23,7 +23,7 @@ export interface PlanConfig {
   monthlyPrice: number;
   tierWeight: number; // standard=0 priority=10 premier=20
 
-  /** Kept for compatibility with older UI; always 5% */
+  /** Kept for compatibility with older UI; always 10% */
   takeRate: number;
   /** Kept for compatibility with older UI; always unlimited */
   listingLimit: null;

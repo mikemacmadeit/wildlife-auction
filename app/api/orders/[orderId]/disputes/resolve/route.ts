@@ -158,6 +158,30 @@ export async function POST(
 
       updateData.protectedDisputeStatus = 'resolved_refund';
       updateData.status = 'refunded';
+      updateData.transactionStatus = 'REFUNDED';
+      updateData.stripeRefundId = refund.id;
+      updateData.refundedBy = adminId;
+      updateData.refundedAt = now;
+      updateData.refundReason = 'Dispute resolved - full refund';
+      updateData.payoutHoldReason = 'none';
+    } else if (resolution === 'partial_refund') {
+      // Full refund
+      if (!orderData.stripePaymentIntentId) {
+        return json({ error: 'Payment intent not found' }, { status: 400 });
+      }
+
+      const refund = await stripe.refunds.create({
+        payment_intent: orderData.stripePaymentIntentId,
+        metadata: {
+          orderId: orderId,
+          resolution: 'dispute_refund',
+          resolvedBy: adminId,
+        },
+      });
+
+      updateData.protectedDisputeStatus = 'resolved_refund';
+      updateData.status = 'refunded';
+      updateData.transactionStatus = 'REFUNDED';
       updateData.stripeRefundId = refund.id;
       updateData.refundedBy = adminId;
       updateData.refundedAt = now;
@@ -189,62 +213,13 @@ export async function POST(
       updateData.refundReason = `Dispute resolved - partial refund of $${refundAmountValue}`;
       updateData.refundAmount = refundAmountValue;
       updateData.isFullRefund = false;
+      updateData.transactionStatus = 'COMPLETED'; // Partial refund resolved - order complete
       
-      // Release remaining amount to seller
-      const remainingAmount = orderData.sellerAmount - refundAmountValue;
-      if (remainingAmount > 0 && orderData.sellerStripeAccountId) {
-        const safetyBlock = getPayoutSafetyBlockReason(orderData);
-        if (safetyBlock) {
-          return json({ error: safetyBlock, code: 'PAYOUT_BLOCKED' }, { status: 400 });
-        }
-
-        // P0: TPWD Transfer Approval Gating for whitetail_breeder orders (partial release)
-        if (orderData.transferPermitRequired) {
-          const listingRef = db.collection('listings').doc(orderData.listingId);
-          const listingDoc = await listingRef.get();
-          
-          if (listingDoc.exists) {
-            const listingData = listingDoc.data()!;
-            if (listingData.category === 'whitetail_breeder') {
-              // Check for verified TPWD_TRANSFER_APPROVAL document
-              const documentsRef = db.collection('orders').doc(orderId).collection('documents');
-              const transferDocsQuery = await documentsRef
-                .where('type', '==', 'TPWD_TRANSFER_APPROVAL')
-                .where('status', '==', 'verified')
-                .limit(1)
-                .get();
-              
-              if (transferDocsQuery.empty) {
-                return json(
-                  { 
-                    error: 'TPWD Transfer Approval document must be uploaded and verified before payout can be released for whitetail breeder orders.',
-                    code: 'TPWD_TRANSFER_APPROVAL_REQUIRED'
-                  },
-                  { status: 400 }
-                );
-              }
-            }
-          }
-        }
-        
-        const transferAmount = Math.round(remainingAmount * 100);
-        const transfer = await stripe.transfers.create({
-          amount: transferAmount,
-          currency: 'usd',
-          destination: orderData.sellerStripeAccountId,
-          metadata: {
-            orderId: orderId,
-            resolution: 'dispute_partial_release',
-            resolvedBy: adminId,
-          },
-        });
-        updateData.stripeTransferId = transfer.id;
-        updateData.completedAt = now;
-        updateData.releasedBy = adminId;
-        updateData.releasedAt = now;
-      }
+      // NOTE: Seller already received full payment immediately via destination charge.
+      // For partial refunds, we only create the refund - no transfer needed.
+      // The seller keeps (sellerAmount - refundAmount) automatically.
       
-      updateData.payoutHoldReason = 'none';
+      updateData.payoutHoldReason = 'none'; // Deprecated field - kept for backward compatibility
     }
 
     // Store admin action notes

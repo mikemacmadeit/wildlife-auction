@@ -9,6 +9,7 @@
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { assertInt32 } from '@/lib/debug/int32Tripwire';
 
 /**
  * Firestore Admin SDK rejects `undefined` anywhere in a document (including nested objects).
@@ -108,6 +109,9 @@ export type AuditActionType =
   | 'admin_listing_document_rejected'
   | 'admin_order_document_verified'
   | 'admin_order_document_rejected'
+  // Admin: order notes and review
+  | 'admin_note_added'
+  | 'order_reviewed'
   // Seller: breeder permit submission + admin review (seller-level compliance)
   | 'seller_breeder_permit_submitted'
   | 'admin_seller_breeder_permit_verified'
@@ -190,10 +194,14 @@ export async function getAuditLogsForOrder(
   orderId: string,
   limit: number = 50
 ): Promise<AuditLog[]> {
+  // Clamp limit to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 50;
+  // Tripwire: catch invalid limit before Firestore query
+  assertInt32(safeLimit, 'Firestore.limit');
   const logsSnapshot = await db.collection('auditLogs')
     .where('orderId', '==', orderId)
     .orderBy('createdAt', 'desc')
-    .limit(limit)
+    .limit(safeLimit)
     .get();
 
   return logsSnapshot.docs.map(doc => doc.data() as AuditLog);
@@ -207,10 +215,14 @@ export async function getAuditLogsForListing(
   listingId: string,
   limit: number = 50
 ): Promise<AuditLog[]> {
+  // Clamp limit to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 50;
+  // Tripwire: catch invalid limit before Firestore query
+  assertInt32(safeLimit, 'Firestore.limit');
   const logsSnapshot = await db.collection('auditLogs')
     .where('listingId', '==', listingId)
     .orderBy('createdAt', 'desc')
-    .limit(limit)
+    .limit(safeLimit)
     .get();
 
   return logsSnapshot.docs.map(doc => doc.data() as AuditLog);
@@ -224,10 +236,14 @@ export async function getAuditLogsByActor(
   actorUid: string,
   limit: number = 100
 ): Promise<AuditLog[]> {
+  // Clamp limit to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 100;
+  // Tripwire: catch invalid limit before Firestore query
+  assertInt32(safeLimit, 'Firestore.limit');
   const logsSnapshot = await db.collection('auditLogs')
     .where('actorUid', '==', actorUid)
     .orderBy('createdAt', 'desc')
-    .limit(limit)
+    .limit(safeLimit)
     .get();
 
   return logsSnapshot.docs.map(doc => doc.data() as AuditLog);

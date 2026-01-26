@@ -18,6 +18,7 @@ import { validateRequest, createCheckoutSessionSchema } from '@/lib/validation/a
 import { checkRateLimitByKey, rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { logInfo, logWarn } from '@/lib/monitoring/logger';
+import { captureException } from '@/lib/monitoring/capture';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { containsProhibitedKeywords } from '@/lib/compliance/validation';
 import { ACH_DEBIT_MIN_TOTAL_USD } from '@/lib/payments/constants';
@@ -51,6 +52,9 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
 const NextResponse = { json };
 
 export async function POST(request: Request) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Handler entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   try {
     // Lazily initialize Admin SDK inside the handler so we can return a structured error instead of crashing at import-time.
     // (Netlify functions frequently fail if Admin creds are missing/malformed at module load.)
@@ -59,7 +63,13 @@ export async function POST(request: Request) {
     try {
       auth = getAdminAuth();
       db = getAdminDb();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Admin SDK initialized',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
     } catch (e: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Admin SDK init failed',data:{errorCode:e?.code,errorMessage:e?.message,missing:e?.missing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       logWarn('Firebase Admin init failed in /api/stripe/checkout/create-session', {
         code: e?.code,
         message: e?.message,
@@ -171,6 +181,65 @@ export async function POST(request: Request) {
         { error: rl.error || 'Too many requests. Please try again later.', retryAfter: rl.retryAfter },
         { status: rl.status ?? 429, headers: { 'Retry-After': String(rl.retryAfter) } }
       );
+    }
+
+    // IDEMPOTENCY: Check for existing checkout session within 1-minute window
+    // Prevents duplicate sessions from double-clicks/refreshes
+    const idempotencyWindow = Math.floor(Date.now() / 60000); // 1-minute window
+    const idempotencyKey = `checkout_session:${listingId}:${buyerId}:${idempotencyWindow}`;
+    const idempotencyRef = db.collection('checkoutSessions').doc(idempotencyKey);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Before idempotency check',data:{idempotencyKey,listingId,buyerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    let existingSessionDoc;
+    try {
+      existingSessionDoc = await idempotencyRef.get();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Idempotency check completed',data:{exists:existingSessionDoc.exists},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+    } catch (idempError: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Idempotency check failed',data:{errorMessage:idempError?.message,errorCode:idempError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      // Non-blocking: if idempotency check fails, continue (will use Stripe idempotency key)
+      existingSessionDoc = { exists: false } as any;
+    }
+    
+    if (existingSessionDoc.exists) {
+      const existingData = existingSessionDoc.data() as any;
+      const existingSessionId = existingData.stripeSessionId;
+      const createdAt = existingData.createdAt?.toMillis ? existingData.createdAt.toMillis() : 0;
+      const windowAge = Date.now() - createdAt;
+      
+      // Only reuse if within 1-minute window (60 seconds)
+      if (existingSessionId && windowAge < 60000) {
+        try {
+          const existingSession = await stripe.checkout.sessions.retrieve(existingSessionId);
+          if (existingSession && existingSession.status !== 'expired') {
+            logInfo('Returning existing checkout session (idempotent)', {
+              route: '/api/stripe/checkout/create-session',
+              listingId,
+              buyerId,
+              sessionId: existingSessionId,
+              windowAge,
+            });
+            return NextResponse.json({
+              sessionId: existingSession.id,
+              url: existingSession.url,
+              message: 'Checkout session already exists',
+            });
+          }
+        } catch (stripeError: any) {
+          // If session doesn't exist in Stripe, continue to create new one
+          logWarn('Existing session ID not found in Stripe, creating new session', {
+            route: '/api/stripe/checkout/create-session',
+            listingId,
+            buyerId,
+            existingSessionId,
+            error: stripeError?.message,
+          });
+        }
+      }
     }
 
     // Get listing from Firestore using Admin SDK
@@ -637,7 +706,8 @@ export async function POST(request: Request) {
     const orderRef = db.collection('orders').doc();
     const orderId = orderRef.id;
     const nowTs = Timestamp.now();
-    const reserveMinutes = parseInt(process.env.CHECKOUT_RESERVATION_MINUTES || '20', 10);
+    // Extend reservation window to 30 minutes to reduce expiry risk during payment
+    const reserveMinutes = parseInt(process.env.CHECKOUT_RESERVATION_MINUTES || '30', 10);
     const reserveUntilTs = Timestamp.fromMillis(Date.now() + Math.max(5, reserveMinutes) * 60_000);
     const reservationCol = listingRef.collection('purchaseReservations');
     const reservationRef = reservationCol.doc(orderId);
@@ -948,7 +1018,7 @@ export async function POST(request: Request) {
     /**
      * STRIPE-COMPLIANT PAYMENT MODEL:
      * - Uses Stripe Connect destination charges with immediate payment to seller.
-     * - Platform fee (5%) is deducted automatically via application_fee_amount.
+     * - Platform fee (10%) is deducted automatically via application_fee_amount.
      * - Seller receives funds immediately upon successful payment (no escrow, no payout holds).
      * - This is a marketplace facilitation model; platform does not take custody of funds or goods.
      */
@@ -981,7 +1051,7 @@ export async function POST(request: Request) {
       cancel_url: offerId ? `${baseUrl}/listing/${listingId}?offer=${offerId}` : `${baseUrl}/listing/${listingId}`,
       // STRIPE CONNECT DESTINATION CHARGE: Seller receives funds immediately, platform fee deducted automatically
       payment_intent_data: {
-        application_fee_amount: platformFee, // 5% platform fee (in cents)
+        application_fee_amount: platformFee, // 10% platform fee (in cents)
         transfer_data: {
           destination: sellerStripeAccountId, // Seller's Stripe Connect account ID
         },
@@ -1027,8 +1097,21 @@ export async function POST(request: Request) {
     
     let session: Stripe.Checkout.Session;
     try {
-      session = await stripe.checkout.sessions.create(sessionConfig);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Before Stripe session create',data:{listingId,buyerId,orderId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      // Use Stripe idempotency key to prevent duplicate sessions at Stripe level
+      const stripeIdempotencyKey = `checkout:${listingId}:${buyerId}:${idempotencyWindow}`;
+      session = await stripe.checkout.sessions.create(sessionConfig, {
+        idempotencyKey: stripeIdempotencyKey,
+      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Stripe session created',data:{sessionId:session.id,status:session.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
     } catch (stripeError: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Stripe session create failed',data:{errorType:stripeError?.type,errorCode:stripeError?.code,errorMessage:stripeError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       // Roll back reservation + cancel the order skeleton (best-effort).
       await rollbackReservationBestEffort();
       const msg = String(stripeError?.message || '');
@@ -1046,6 +1129,26 @@ export async function POST(request: Request) {
         );
       }
       throw stripeError;
+    }
+
+    // Persist idempotency record (expires after 2 minutes to allow cleanup)
+    try {
+      await idempotencyRef.set({
+        stripeSessionId: session.id,
+        listingId,
+        buyerId,
+        orderId,
+        createdAt: nowTs,
+        expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000), // 2 minutes
+      });
+    } catch (idempError) {
+      // Non-blocking: idempotency record failure shouldn't block checkout
+      logWarn('Failed to persist idempotency record', {
+        route: '/api/stripe/checkout/create-session',
+        listingId,
+        buyerId,
+        error: String(idempError),
+      });
     }
 
     // Persist session ID onto the pre-created order (webhook idempotency + buyer/seller visibility).
@@ -1077,7 +1180,10 @@ export async function POST(request: Request) {
       message: 'Checkout session created successfully',
     });
   } catch (error: any) {
-    console.error('Error creating checkout session:', error);
+    captureException(error instanceof Error ? error : new Error(String(error)), {
+      endpoint: '/api/stripe/checkout/create-session',
+      errorMessage: error.message,
+    });
     return NextResponse.json(
       {
         error: 'Failed to create checkout session',

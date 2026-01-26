@@ -35,6 +35,17 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.DeliveryConfirmed',
   'Order.Accepted',
   'Order.DeliveryCheckIn',
+  'Order.DeliveryScheduled', // NEW: Seller scheduled delivery (SELLER_TRANSPORT)
+  'Order.PickupReady', // NEW: Seller set pickup info (BUYER_TRANSPORT)
+  'Order.PickupWindowSelected', // NEW: Buyer selected pickup window
+  'Order.PickupConfirmed', // NEW: Buyer confirmed pickup
+  'Order.ReceiptConfirmed', // NEW: Buyer confirmed receipt (SELLER_TRANSPORT)
+  'Order.SlaApproaching', // NEW: SLA deadline approaching reminder
+  'Order.SlaOverdue', // NEW: SLA deadline passed
+  'Order.TransferComplianceRequired', // NEW: Regulated whitetail - compliance gate activated
+  'Order.ComplianceBuyerConfirmed', // NEW: Buyer confirmed TPWD transfer compliance
+  'Order.ComplianceSellerConfirmed', // NEW: Seller confirmed TPWD transfer compliance
+  'Order.ComplianceUnlocked', // NEW: Both parties confirmed - fulfillment unlocked
   'Payout.Released',
 
   // ONBOARDING / TRUST
@@ -244,6 +255,91 @@ export type NotificationEventPayload =
       listingTitle: string;
       orderUrl: string;
       daysSinceDelivery: number;
+    }
+  | {
+      type: 'Order.DeliveryScheduled';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      eta: string; // ISO 8601 datetime
+    }
+  | {
+      type: 'Order.PickupReady';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      location: string;
+    }
+  | {
+      type: 'Order.PickupWindowSelected';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      windowStart: string; // ISO 8601 datetime
+      windowEnd: string; // ISO 8601 datetime
+    }
+  | {
+      type: 'Order.PickupConfirmed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
+      type: 'Order.ReceiptConfirmed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
+      type: 'Order.SlaApproaching';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      hoursRemaining: number;
+      deadline: string; // ISO 8601 datetime
+    }
+  | {
+      type: 'Order.SlaOverdue';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      hoursOverdue: number;
+      deadline: string; // ISO 8601 datetime
+    }
+  | {
+      type: 'Order.TransferComplianceRequired';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
+      type: 'Order.ComplianceBuyerConfirmed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
+      type: 'Order.ComplianceSellerConfirmed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
+      type: 'Order.ComplianceUnlocked';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
     }
   | {
       type: 'Payout.Released';

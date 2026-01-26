@@ -288,23 +288,51 @@ export async function createCheckoutSession(
     throw new Error('Failed to get authentication token');
   }
 
-  const response = await fetch(`${API_BASE}/checkout/create-session`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      listingId,
-      ...(offerId ? { offerId } : {}),
-      ...(paymentMethod ? { paymentMethod } : {}),
-      ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
-      ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
-    }),
-  });
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Fetch entry',data:{listingId,offerId,paymentMethod,quantity,hasToken:!!token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/checkout/create-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        listingId,
+        ...(offerId ? { offerId } : {}),
+        ...(paymentMethod ? { paymentMethod } : {}),
+        ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
+        ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
+      }),
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Fetch completed',data:{status:response.status,statusText:response.statusText,ok:response.ok,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+  } catch (fetchError: any) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Fetch failed',data:{errorName:fetchError?.name,errorMessage:fetchError?.message,errorType:typeof fetchError,isNetworkError:fetchError?.message?.includes('fetch') || fetchError?.message?.includes('network') || fetchError?.name === 'TypeError'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    throw fetchError;
+  }
 
   if (!response.ok) {
-    const error = await response.json();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Response not ok',data:{status:response.status,statusText:response.statusText,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    let error: any;
+    try {
+      error = await response.json();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Error JSON parsed',data:{errorCode:error?.code,errorMessage:error?.message,errorError:error?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+    } catch (parseError: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Error JSON parse failed',data:{parseError:parseError?.message,responseText:await response.text().catch(()=>'[could not read]')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      error = {};
+    }
     const errorMessage =
       error.message ||
       (error.code ? `${error.code}: ${error.error || 'Checkout failed'}` : undefined) ||
@@ -316,9 +344,15 @@ export async function createCheckoutSession(
     if (!isConfigError) {
       console.error('Failed to create checkout session:', errorMessage);
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Throwing error',data:{errorMessage,isConfigError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     throw new Error(errorMessage);
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/stripe/api.ts:createCheckoutSession',message:'Success parsing JSON',data:{hasUrl:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   return response.json();
 }
 

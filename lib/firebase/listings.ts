@@ -1210,6 +1210,9 @@ export const queryListingsForBrowse = async (
     if (showingActive) {
       const nowMs = Date.now();
       filteredItems = filteredItems.filter((l) => {
+        // Explicitly exclude ended/expired listings from active feed
+        // These should only appear when explicitly searching or viewing completed listings
+        if (l.status === 'ended' || l.status === 'expired') return false;
         // Read-time guard may have normalized status -> ended; hide those from Active browse.
         if (l.status !== 'active') return false;
         // Hide purchase-reserved listings from Active browse (prevents "it can be bought twice" UX).

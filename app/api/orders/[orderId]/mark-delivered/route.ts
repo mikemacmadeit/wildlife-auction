@@ -10,13 +10,14 @@
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { OrderStatus } from '@/lib/types';
+import { OrderStatus, TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 const markDeliveredSchema = z.object({
   deliveryProofUrls: z.array(z.string().url()).optional(),
@@ -99,34 +100,69 @@ export async function POST(
       return json({ error: 'Unauthorized - You can only mark your own orders as delivered' }, { status: 403 });
     }
 
-    // Validate status transition
-    const currentStatus = orderData.status as OrderStatus;
-    const allowedStatuses: OrderStatus[] = ['paid', 'paid_held', 'in_transit'];
+    // Validate transport option - this endpoint is for SELLER_TRANSPORT only
+    const transportOption = orderData.transportOption || 'SELLER_TRANSPORT';
+    if (transportOption !== 'SELLER_TRANSPORT') {
+      return json(
+        { 
+          error: 'Invalid transport option',
+          details: 'This endpoint is for SELLER_TRANSPORT orders only. Use pickup endpoints for BUYER_TRANSPORT orders.'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate status transition - check transactionStatus if available, else legacy status
+    const currentTxStatus = orderData.transactionStatus as TransactionStatus | undefined;
+    const currentLegacyStatus = orderData.status as OrderStatus;
     
-    if (!allowedStatuses.includes(currentStatus)) {
+    // Allowed states: FULFILLMENT_REQUIRED, DELIVERY_SCHEDULED, OUT_FOR_DELIVERY
+    const allowedTxStatuses: TransactionStatus[] = ['FULFILLMENT_REQUIRED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'];
+    const allowedLegacyStatuses: OrderStatus[] = ['paid', 'paid_held', 'in_transit'];
+    
+    const isValidTransition = currentTxStatus 
+      ? allowedTxStatuses.includes(currentTxStatus)
+      : allowedLegacyStatuses.includes(currentLegacyStatus);
+    
+    if (!isValidTransition) {
       return json(
         { 
           error: 'Invalid status transition',
-          details: `Cannot mark delivered for order with status '${currentStatus}'. Order must be in one of: ${allowedStatuses.join(', ')}`
+          details: `Cannot mark delivered. Current status: ${currentTxStatus || currentLegacyStatus}`
         },
         { status: 400 }
       );
     }
 
     // Check if already delivered or beyond
-    if (['delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'completed', 'disputed'].includes(currentStatus)) {
-      return json({ error: `Order is already ${currentStatus}` }, { status: 400 });
+    if (currentTxStatus === 'DELIVERED_PENDING_CONFIRMATION' || currentTxStatus === 'COMPLETED' || 
+        ['delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'completed', 'disputed'].includes(currentLegacyStatus)) {
+      return json({ error: `Order is already ${currentTxStatus || currentLegacyStatus}` }, { status: 400 });
     }
 
     // Update order to delivered
     const now = new Date();
     const updateData: any = {
-      status: 'delivered' as OrderStatus,
+      status: 'delivered' as OrderStatus, // Legacy status for backward compatibility
+      transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' as TransactionStatus, // NEW: Primary status
       deliveredAt: now,
       updatedAt: now,
       lastUpdatedByRole: 'seller',
     };
 
+    // Populate delivery object
+    updateData.delivery = {
+      ...(orderData.delivery || {}),
+      deliveredAt: now,
+      ...(deliveryProofUrls && deliveryProofUrls.length > 0 ? { 
+        proofUploads: [
+          ...(orderData.delivery?.proofUploads || []),
+          ...deliveryProofUrls.map(url => ({ type: 'delivery_proof', url, uploadedAt: now }))
+        ]
+      } : {}),
+    };
+
+    // Legacy field for backward compatibility
     if (deliveryProofUrls && deliveryProofUrls.length > 0) {
       updateData.deliveryProofUrls = deliveryProofUrls;
     }
@@ -175,7 +211,11 @@ export async function POST(
         void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
       }
     } catch (e) {
-      console.error('Error emitting Order.Delivered notification event:', e);
+      captureException(e instanceof Error ? e : new Error(String(e)), {
+        endpoint: '/api/orders/[orderId]/mark-delivered',
+        orderId: params.orderId,
+        context: 'Order.Delivered notification event',
+      });
     }
 
     return json({
@@ -186,7 +226,11 @@ export async function POST(
       message: 'Order marked as delivered. Buyer can now accept or dispute.',
     });
   } catch (error: any) {
-    console.error('Error marking order as delivered:', error);
+    captureException(error instanceof Error ? error : new Error(String(error)), {
+      endpoint: '/api/orders/[orderId]/mark-delivered',
+      orderId: params.orderId,
+      errorMessage: error.message,
+    });
     return json({ error: 'Failed to mark order as delivered', message: error.message }, { status: 500 });
   }
 }

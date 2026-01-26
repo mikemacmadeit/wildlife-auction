@@ -4,6 +4,7 @@
  */
 
 import { Redis } from '@upstash/redis';
+import { captureException } from '@/lib/monitoring/capture';
 
 // Redis client (initialized lazily)
 let redisClient: Redis | null = null;
@@ -43,12 +44,28 @@ function initializeRedis(): Redis | null {
       console.log('[rate-limit] Redis initialized successfully');
       return redisClient;
     } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      captureException(err, {
+        context: 'rate-limit-redis-init',
+        redisUrl: redisUrl ? '[SET]' : '[MISSING]',
+        redisToken: redisToken ? '[SET]' : '[MISSING]',
+      });
       console.error('[rate-limit] Failed to initialize Redis:', error);
       console.warn('[rate-limit] Falling back to in-memory rate limiting');
       redisAvailable = false;
       return null;
     }
   } else {
+    const isNetlifyRuntime = String(process.env.NETLIFY || '').toLowerCase() === 'true' || !!process.env.NETLIFY;
+    if (isNetlifyRuntime) {
+      // In production serverless, missing Redis is a critical issue
+      captureException(new Error('Upstash Redis not configured in Netlify runtime'), {
+        context: 'rate-limit-missing-config',
+        environment: 'netlify',
+        redisUrl: redisUrl ? '[SET]' : '[MISSING]',
+        redisToken: redisToken ? '[SET]' : '[MISSING]',
+      });
+    }
     console.warn('[rate-limit] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not set, using in-memory rate limiting');
     redisAvailable = false;
     return null;
@@ -135,6 +152,15 @@ export async function checkRateLimitByKey(
 
       return { allowed: true };
     } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      captureException(err, {
+        context: 'rate-limit-redis-operation',
+        key: redisKey,
+        config: {
+          windowMs: config.windowMs,
+          maxRequests: config.maxRequests,
+        },
+      });
       console.error('[rate-limit] Redis error, falling back to in-memory:', error);
       // Fall through to in-memory
     }

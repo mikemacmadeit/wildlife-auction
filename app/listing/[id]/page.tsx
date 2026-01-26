@@ -748,13 +748,22 @@ export default function ListingDetailPage() {
         setWireData(out);
         setWireDialogOpen(true);
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/listing/[id]/page.tsx:handleBuyNow',message:'Before createCheckoutSession',data:{listingId:listing.id,method,qty,isAnimalListing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const { createCheckoutSession } = await import('@/lib/stripe/api');
         const { url } = await createCheckoutSession(listing.id, undefined, method, qty, {
           buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/listing/[id]/page.tsx:handleBuyNow',message:'Checkout session created',data:{hasUrl:!!url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         window.location.href = url;
       }
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/listing/[id]/page.tsx:handleBuyNow',message:'Checkout error caught',data:{errorName:error?.name,errorMessage:error?.message,errorType:typeof error,isNetworkError:error?.message?.includes('fetch') || error?.message?.includes('network') || error?.name === 'TypeError'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.error('Error creating checkout session:', error);
       setCheckoutError({
         attemptedMethod: method,

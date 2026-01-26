@@ -297,7 +297,7 @@ export function QuickSetupTour({ open, onClose, onComplete }: QuickSetupTourProp
     }
   }, [open, checkStatus]);
 
-  const renderStepContent = () => {
+  const renderStepContent = useCallback(() => {
     switch (currentStep) {
       case 'profile':
         return (
@@ -607,7 +607,7 @@ export function QuickSetupTour({ open, onClose, onComplete }: QuickSetupTourProp
       default:
         return null;
     }
-  };
+  }, [currentStep, formData, profileErrors, loading, checkingStatus, status, userProfile]);
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>

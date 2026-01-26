@@ -554,6 +554,7 @@ export interface Bid {
 export type TransactionStatus =
   | 'PENDING_PAYMENT'
   | 'PAID'
+  | 'AWAITING_TRANSFER_COMPLIANCE'  // Regulated whitetail: awaiting TPWD transfer permit confirmation
   | 'FULFILLMENT_REQUIRED'
   | 'READY_FOR_PICKUP'        // BUYER_TRANSPORT
   | 'PICKUP_SCHEDULED'        // BUYER_TRANSPORT (optional)
@@ -815,6 +816,20 @@ export interface Order {
   // Compliance fields for orders
   transferPermitStatus?: 'none' | 'requested' | 'uploaded' | 'approved' | 'rejected'; // TPWD transfer approval status
   transferPermitRequired?: boolean; // Whether transfer permit is required for this order
+  
+  /**
+   * TPWD Transfer Permit Compliance Confirmation (for regulated whitetail breeder buck transactions)
+   * Both buyer and seller must confirm compliance before fulfillment can proceed.
+   */
+  complianceTransfer?: {
+    buyerConfirmed: boolean;
+    buyerConfirmedAt?: Date;
+    buyerUploadUrl?: string; // Optional: buyer-uploaded permit document
+    sellerConfirmed: boolean;
+    sellerConfirmedAt?: Date;
+    sellerUploadUrl?: string; // Optional: seller-uploaded permit document
+    unlockedAt?: Date; // When both confirmations were received and fulfillment was unlocked
+  };
 
   // Bill of Sale / Written Transfer (attestation timestamps; server-authored)
   billOfSaleGeneratedAt?: Date;
@@ -853,6 +868,15 @@ export interface Order {
   aiDisputeFacts?: string[] | null; // Key facts / timeline bullets extracted from dispute
   aiDisputeReviewedAt?: Date | null; // When dispute summary was generated
   aiDisputeModel?: string | null; // OpenAI model used (e.g., "gpt-4o-mini")
+  
+  // Reminder tracking (optional, for automated reminder engine)
+  lastStatusChangedAt?: Date; // Track when transactionStatus last changed (for stalled order detection)
+  reminders?: {
+    buyerLastAt?: Date; // Last reminder sent to buyer
+    sellerLastAt?: Date; // Last reminder sent to seller
+    buyerCount?: number; // Total reminders sent to buyer
+    sellerCount?: number; // Total reminders sent to seller
+  };
 }
 
 export interface FilterState {

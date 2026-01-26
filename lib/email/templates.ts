@@ -231,6 +231,35 @@ export interface AdminDisputeOpenedEmailData {
   adminOpsUrl: string;
 }
 
+// Compliance Transfer Email Data
+export interface OrderTransferComplianceRequiredEmailData {
+  recipientName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
+export interface OrderComplianceBuyerConfirmedEmailData {
+  recipientName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
+export interface OrderComplianceSellerConfirmedEmailData {
+  recipientName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
+export interface OrderComplianceUnlockedEmailData {
+  recipientName: string;
+  orderId: string;
+  listingTitle: string;
+  orderUrl: string;
+}
+
 export interface AdminBreederPermitSubmittedEmailData {
   adminName: string;
   sellerId: string;
@@ -1787,6 +1816,145 @@ export function getListingRejectedEmail(data: ListingRejectedEmailData): { subje
     </div>
   `;
   return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+// Compliance Transfer Email Templates
+export function getOrderTransferComplianceRequiredEmail(
+  data: OrderTransferComplianceRequiredEmailData
+): { subject: string; html: string } {
+  const subject = `TPWD Transfer Compliance Required — ${data.listingTitle}`;
+  const preheader = `TPWD transfer permit compliance confirmation required before fulfillment can proceed.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const contactUrl = `${origin || 'https://wildlife.exchange'}/contact`;
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      TPWD Transfer Compliance Required
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.recipientName)} — this transaction requires TPWD transfer permit compliance confirmation before fulfillment can proceed.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#FFF4E6; border:1px solid rgba(245,158,11,0.3); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#92400E; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Legal Notice
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#92400E;">
+            Wildlife Exchange facilitates transactions between permitted parties. Buyer and seller are solely responsible for complying with all Texas Parks & Wildlife transfer and possession requirements prior to delivery or pickup.
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 16px 0 0 0; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A;">
+      <strong>What you need to do:</strong>
+      <ul style="margin: 8px 0 0 18px; padding: 0; color:#5B564A;">
+        <li>Confirm that the TPWD transfer permit has been completed in compliance with Texas law.</li>
+        <li>Optionally upload your TPWD transfer permit document for record-keeping.</li>
+        <li>Both buyer and seller must confirm before fulfillment can proceed.</li>
+      </ul>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
+      <tr>
+        <td align="center">
+          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+            Confirm Compliance
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+  return renderEmail({ subject, preheader, contentHtml: content, origin });
+}
+
+export function getOrderComplianceBuyerConfirmedEmail(
+  data: OrderComplianceBuyerConfirmedEmailData
+): { subject: string; html: string } {
+  const subject = `Buyer Confirmed Compliance — ${data.listingTitle}`;
+  const preheader = `The buyer has confirmed TPWD transfer permit compliance.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Buyer Confirmed Compliance
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.recipientName)} — the buyer has confirmed TPWD transfer permit compliance for "${escapeHtml(data.listingTitle)}".
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A; margin: 0 0 16px 0;">
+      Once you also confirm compliance, fulfillment will be unlocked and you can proceed with delivery or pickup scheduling.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
+      <tr>
+        <td align="center">
+          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+            View Order
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+  return renderEmail({ subject, preheader, contentHtml: content, origin });
+}
+
+export function getOrderComplianceSellerConfirmedEmail(
+  data: OrderComplianceSellerConfirmedEmailData
+): { subject: string; html: string } {
+  const subject = `Seller Confirmed Compliance — ${data.listingTitle}`;
+  const preheader = `The seller has confirmed TPWD transfer permit compliance.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Seller Confirmed Compliance
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.recipientName)} — the seller has confirmed TPWD transfer permit compliance for "${escapeHtml(data.listingTitle)}".
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A; margin: 0 0 16px 0;">
+      Once you also confirm compliance, fulfillment will be unlocked and the seller can proceed with delivery or pickup scheduling.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
+      <tr>
+        <td align="center">
+          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+            View Order
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+  return renderEmail({ subject, preheader, contentHtml: content, origin });
+}
+
+export function getOrderComplianceUnlockedEmail(
+  data: OrderComplianceUnlockedEmailData
+): { subject: string; html: string } {
+  const subject = `Fulfillment Unlocked — ${data.listingTitle}`;
+  const preheader = `Both parties confirmed compliance. Fulfillment is now unlocked.`;
+  const origin = tryGetOrigin(data.orderUrl);
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Fulfillment Unlocked
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
+      Hi ${escapeHtml(data.recipientName)} — both buyer and seller have confirmed TPWD transfer permit compliance for "${escapeHtml(data.listingTitle)}".
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color:#5B564A; margin: 0 0 16px 0;">
+      Fulfillment is now unlocked. The seller can proceed with scheduling delivery or setting pickup information.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px;">
+      <tr>
+        <td align="center">
+          <a href="${data.orderUrl}" style="display: inline-block; padding: 12px 24px; background: #22251F; color: #F5F5F0; text-decoration: none; border-radius: 8px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; font-weight: 700;">
+            View Order
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+  return renderEmail({ subject, preheader, contentHtml: content, origin });
 }
 
 export function getAdminDisputeOpenedEmail(data: AdminDisputeOpenedEmailData): { subject: string; html: string } {

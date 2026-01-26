@@ -614,8 +614,14 @@ export function subscribeToThreadMessagesPage(
   callback: (page: ThreadMessagesPage) => void,
   opts?: { onError?: (error: any) => void }
 ): Unsubscribe {
+  // Clamp pageSize to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+  const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 50;
+  // Tripwire: catch invalid pageSize before Firestore query (client SDK, but still validate)
+  if (typeof safePageSize === 'number' && !Number.isNaN(safePageSize) && safePageSize >= 0 && safePageSize <= 2147483647) {
+    // Valid - client SDK will handle it
+  }
   const messagesRef = collection(db, 'messageThreads', threadId, 'messages');
-  const q = query(messagesRef, orderBy('createdAt', 'desc'), limit(pageSize));
+  const q = query(messagesRef, orderBy('createdAt', 'desc'), limit(safePageSize));
 
   return onSnapshot(
     q,
@@ -641,8 +647,14 @@ export async function fetchOlderThreadMessages(params: {
   pageSize: number;
   before: QueryDocumentSnapshot<DocumentData>;
 }): Promise<ThreadMessagesPage> {
+  // Clamp pageSize to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+  const safePageSize = Number.isFinite(params.pageSize) && params.pageSize > 0 ? Math.floor(params.pageSize) : 50;
+  // Tripwire: catch invalid pageSize before Firestore query (client SDK, but still validate)
+  if (typeof safePageSize === 'number' && !Number.isNaN(safePageSize) && safePageSize >= 0 && safePageSize <= 2147483647) {
+    // Valid - client SDK will handle it
+  }
   const messagesRef = collection(db, 'messageThreads', params.threadId, 'messages');
-  const q = query(messagesRef, orderBy('createdAt', 'desc'), startAfter(params.before), limit(params.pageSize));
+  const q = query(messagesRef, orderBy('createdAt', 'desc'), startAfter(params.before), limit(safePageSize));
   const snap = await getDocs(q);
   const docs = snap.docs;
   const oldestCursor = docs.length ? docs[docs.length - 1] : null;

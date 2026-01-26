@@ -44,6 +44,10 @@ import {
   getAdminListingRejectedEmail,
   getAdminDisputeOpenedEmail,
   getAdminBreederPermitSubmittedEmail,
+  getOrderTransferComplianceRequiredEmail,
+  getOrderComplianceBuyerConfirmedEmail,
+  getOrderComplianceSellerConfirmedEmail,
+  getOrderComplianceUnlockedEmail,
   type OrderConfirmationEmailData,
   type DeliveryConfirmationEmailData,
   type OrderInTransitEmailData,
@@ -80,6 +84,10 @@ import {
   type AdminListingRejectedEmailData,
   type AdminDisputeOpenedEmailData,
   type AdminBreederPermitSubmittedEmailData,
+  type OrderTransferComplianceRequiredEmailData,
+  type OrderComplianceBuyerConfirmedEmailData,
+  type OrderComplianceSellerConfirmedEmailData,
+  type OrderComplianceUnlockedEmailData,
 } from './templates';
 
 function coerceDate(v: unknown): Date | undefined {
@@ -1016,6 +1024,90 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: AdminBreederPermitSubmittedEmailData) => {
       const { subject, html } = getAdminBreederPermitSubmittedEmail(data);
       return { subject, preheader: `Breeder permit submitted`, html };
+    },
+  },
+  {
+    type: 'order_transfer_compliance_required',
+    displayName: 'Order: Transfer Compliance Required',
+    description: 'Sent to buyer and seller when a regulated whitetail deal requires TPWD transfer permit compliance confirmation.',
+    schema: z.object({
+      recipientName: z.string().min(1),
+      orderId: z.string().min(1),
+      listingTitle: z.string().min(1),
+      orderUrl: urlSchema,
+    }),
+    samplePayload: {
+      recipientName: 'Alex Johnson',
+      orderId: 'ORD_123456',
+      listingTitle: 'Whitetail Breeder Buck - 180+ Class',
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: OrderTransferComplianceRequiredEmailData) => {
+      const { subject, html } = getOrderTransferComplianceRequiredEmail(data);
+      return { subject, preheader: `TPWD transfer compliance required`, html };
+    },
+  },
+  {
+    type: 'order_compliance_buyer_confirmed',
+    displayName: 'Order: Compliance Buyer Confirmed',
+    description: 'Sent to seller when buyer confirms TPWD transfer permit compliance.',
+    schema: z.object({
+      recipientName: z.string().min(1),
+      orderId: z.string().min(1),
+      listingTitle: z.string().min(1),
+      orderUrl: urlSchema,
+    }),
+    samplePayload: {
+      recipientName: 'Jordan Smith',
+      orderId: 'ORD_123456',
+      listingTitle: 'Whitetail Breeder Buck - 180+ Class',
+      orderUrl: 'https://wildlife.exchange/seller/orders/ORD_123456',
+    },
+    render: (data: OrderComplianceBuyerConfirmedEmailData) => {
+      const { subject, html } = getOrderComplianceBuyerConfirmedEmail(data);
+      return { subject, preheader: `Buyer confirmed compliance`, html };
+    },
+  },
+  {
+    type: 'order_compliance_seller_confirmed',
+    displayName: 'Order: Compliance Seller Confirmed',
+    description: 'Sent to buyer when seller confirms TPWD transfer permit compliance.',
+    schema: z.object({
+      recipientName: z.string().min(1),
+      orderId: z.string().min(1),
+      listingTitle: z.string().min(1),
+      orderUrl: urlSchema,
+    }),
+    samplePayload: {
+      recipientName: 'Alex Johnson',
+      orderId: 'ORD_123456',
+      listingTitle: 'Whitetail Breeder Buck - 180+ Class',
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: OrderComplianceSellerConfirmedEmailData) => {
+      const { subject, html } = getOrderComplianceSellerConfirmedEmail(data);
+      return { subject, preheader: `Seller confirmed compliance`, html };
+    },
+  },
+  {
+    type: 'order_compliance_unlocked',
+    displayName: 'Order: Compliance Unlocked',
+    description: 'Sent to both buyer and seller when both parties confirm compliance and fulfillment is unlocked.',
+    schema: z.object({
+      recipientName: z.string().min(1),
+      orderId: z.string().min(1),
+      listingTitle: z.string().min(1),
+      orderUrl: urlSchema,
+    }),
+    samplePayload: {
+      recipientName: 'Alex Johnson',
+      orderId: 'ORD_123456',
+      listingTitle: 'Whitetail Breeder Buck - 180+ Class',
+      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+    },
+    render: (data: OrderComplianceUnlockedEmailData) => {
+      const { subject, html } = getOrderComplianceUnlockedEmail(data);
+      return { subject, preheader: `Fulfillment unlocked`, html };
     },
   },
 ] as const;

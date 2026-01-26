@@ -1,0 +1,91 @@
+name: Firestore Daily Backup
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to backup'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: 'prod'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev", "staging", "prod"]') }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ matrix.env == 'prod' && secrets.GCP_PROJECT_ID_PROD || matrix.env == 'staging' && secrets.GCP_PROJECT_ID_STAGING || secrets.GCP_PROJECT_ID_DEV }}
+      
+      - name: Run Firestore Backup
+        id: backup
+        env:
+          ENV: ${{ matrix.env }}
+          BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          PROJECT_ID: ${{ matrix.env == 'prod' && secrets.GCP_PROJECT_ID_PROD || matrix.env == 'staging' && secrets.GCP_PROJECT_ID_STAGING || secrets.GCP_PROJECT_ID_DEV }}
+        run: |
+          chmod +x scripts/backup-firestore.sh
+          bash scripts/backup-firestore.sh "${ENV}" "${BUCKET_NAME}" "${PROJECT_ID}"
+      
+      - name: Verify Backup
+        id: verify
+        env:
+          ENV: ${{ matrix.env }}
+          BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+        run: |
+          chmod +x scripts/verify-firestore-backup.sh
+          bash scripts/verify-firestore-backup.sh "${ENV}" "${BUCKET_NAME}"
+      
+      - name: Notify on Failure (Slack)
+        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "❌ Firestore Backup Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Firestore Backup Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ matrix.env }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

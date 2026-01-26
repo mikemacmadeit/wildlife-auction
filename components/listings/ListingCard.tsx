@@ -23,7 +23,7 @@ interface ListingCardProps {
 }
 
 const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
-  ({ listing, className }, ref) => {
+  function ListingCardComponent({ listing, className }, ref) {
   const router = useRouter();
   // CRITICAL: Don't call useFavorites() here - it subscribes to state and causes re-renders
   // Access the ref directly from the module-level export to avoid subscribing to state

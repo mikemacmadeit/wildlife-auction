@@ -25,7 +25,7 @@ interface ListItemProps {
 }
 
 const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
-  ({ listing, variant = 'default' }, ref) => {
+  function ListItemComponent({ listing, variant = 'default' }, ref) {
   const router = useRouter();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;

@@ -12,10 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { User, Phone, MapPin, Building2, Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { updateUserProfile } from '@/lib/firebase/users';
+import { updateUserProfile, getUserProfile } from '@/lib/firebase/users';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { useAuth } from '@/hooks/use-auth';
 import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
@@ -48,6 +49,7 @@ export function ProfileCompletionModal({
     fullName: userDisplayName || '',
     phone: '',
     businessName: '',
+    displayNamePreference: 'personal' as 'personal' | 'business',
     location: {
       city: '',
       state: 'TX',
@@ -56,6 +58,36 @@ export function ProfileCompletionModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Load existing profile data if available (for users with partial profiles)
+  useEffect(() => {
+    if (!open || !userId) return;
+    
+    const loadExistingProfile = async () => {
+      try {
+        const profile = await getUserProfile(userId);
+        if (profile) {
+          setFormData(prev => ({
+            ...prev,
+            fullName: profile.profile?.fullName || prev.fullName || userDisplayName || '',
+            phone: profile.phoneNumber || prev.phone,
+            businessName: profile.profile?.businessName || prev.businessName,
+            displayNamePreference: profile.profile?.preferences?.displayNamePreference || 'personal',
+            location: {
+              city: profile.profile?.location?.city || prev.location.city,
+              state: profile.profile?.location?.state || prev.location.state || 'TX',
+              zip: profile.profile?.location?.zip || prev.location.zip,
+            },
+          }));
+        }
+      } catch (error) {
+        // Silently fail - user can still complete profile
+        console.error('Failed to load existing profile:', error);
+      }
+    };
+
+    loadExistingProfile();
+  }, [open, userId, userDisplayName]);
 
   // Update form data when userDisplayName changes
   useEffect(() => {
@@ -113,6 +145,11 @@ export function ProfileCompletionModal({
         profile: {
           fullName: formData.fullName,
           location: formData.location,
+          preferences: {
+            verification: true, // Default preference
+            transport: true, // Default preference
+            displayNamePreference: formData.displayNamePreference,
+          },
         },
       };
 
@@ -320,11 +357,45 @@ export function ProfileCompletionModal({
                 id="businessName"
                 type="text"
                 value={formData.businessName}
-                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                onChange={(e) => {
+                  const newBusinessName = e.target.value;
+                  setFormData({ 
+                    ...formData, 
+                    businessName: newBusinessName,
+                    // Reset preference to personal if business name is cleared
+                    displayNamePreference: newBusinessName.trim() ? formData.displayNamePreference : 'personal',
+                  });
+                }}
                 className="min-h-[48px] text-base bg-background"
                 placeholder="Hill Country Exotics"
               />
             </div>
+
+            {/* Display Name Preference Toggle */}
+            {formData.businessName.trim() && (
+              <div className="mt-4 p-4 rounded-lg border border-border/50 bg-muted/20">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="font-semibold text-foreground flex items-center gap-2 mb-1">
+                      Show Business / Ranch Name on Listings & Profile
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      When enabled, &quot;{formData.businessName}&quot; will appear instead of &quot;{formData.fullName || 'your name'}&quot; on listing cards and your seller profile.
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.displayNamePreference === 'business'}
+                    onCheckedChange={(checked) => {
+                      setFormData({
+                        ...formData,
+                        displayNamePreference: checked ? 'business' : 'personal',
+                      });
+                    }}
+                    disabled={!formData.businessName.trim() || isLoading}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <Separator />

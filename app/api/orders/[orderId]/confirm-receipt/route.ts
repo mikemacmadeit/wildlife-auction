@@ -8,13 +8,14 @@
 // Route handlers work fine with Web `Request` / `Response`.
 import { getFirestore } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { OrderStatus } from '@/lib/types';
+import { OrderStatus, TransactionStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { Timestamp } from 'firebase-admin/firestore';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -147,18 +148,17 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     try {
       const listingTitle = String(orderData?.listingSnapshot?.title || '').trim() || 'Your listing';
       const ev = await emitAndProcessEventForUser({
-        type: 'Order.Received',
+        type: 'Order.ReceiptConfirmed',
         actorId: buyerId,
         entityType: 'order',
         entityId: orderId,
         targetUserId: orderData.sellerId,
         payload: {
-          type: 'Order.Received',
+          type: 'Order.ReceiptConfirmed',
           orderId,
           listingId: orderData.listingId,
           listingTitle,
           orderUrl: `${getSiteUrl()}/seller/orders/${orderId}`,
-          amount: typeof orderData.amount === 'number' ? orderData.amount : 0,
         },
         optionalHash: `buyer_confirmed:${now.toISOString()}`,
       });
@@ -174,13 +174,14 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       orderId,
       status: updateData.status,
       buyerConfirmedAt: now,
-      message:
-        updateData.status === 'ready_to_release'
-          ? 'Receipt confirmed. Order is ready for admin review and release.'
-          : 'Receipt confirmed. Order will be reviewed for release.',
+      message: 'Receipt confirmed. Transaction complete. Seller was paid immediately upon successful payment.',
     });
   } catch (error: any) {
-    console.error('Error confirming receipt:', error);
+    captureException(error instanceof Error ? error : new Error(String(error)), {
+      endpoint: '/api/orders/[orderId]/confirm-receipt',
+      orderId: params.orderId,
+      errorMessage: error.message,
+    });
     return json({ error: 'Failed to confirm receipt', message: error.message }, { status: 500 });
   }
 }

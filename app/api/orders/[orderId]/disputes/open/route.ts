@@ -10,7 +10,7 @@
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { DisputeReason, DisputeEvidence } from '@/lib/types';
+import { DisputeReason, DisputeEvidence, TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
@@ -178,6 +178,15 @@ export async function POST(
       protectedDisputeNotes: notes || null,
       protectedDisputeEvidence: evidenceWithTimestamps,
       disputeOpenedAt: now,
+      transactionStatus: 'DISPUTE_OPENED' as TransactionStatus, // NEW: Primary status
+      // Populate issues object
+      issues: {
+        openedAt: now,
+        reason: reason,
+        notes: notes || undefined,
+        photos: evidence.filter(e => e.type === 'photo' || e.type === 'video').map(e => e.url),
+      },
+      // DEPRECATED: payoutHoldReason kept for backward compatibility (seller already paid immediately)
       payoutHoldReason: 'dispute_open',
       updatedAt: now,
       lastUpdatedByRole: 'buyer',

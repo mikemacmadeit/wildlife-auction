@@ -441,7 +441,7 @@ export default function HomePage() {
       .map((x) => x.l);
   };
 
-  const ListingRail = React.memo((props: { listings: Listing[]; emptyText: string }) => {
+  const ListingRail = React.memo(function ListingRail(props: { listings: Listing[]; emptyText: string }) {
     // Memoize sorted listings to prevent re-renders when favoriteIds changes
     // Create a stable key based on listing IDs to detect real changes
     const listingsKey = useMemo(() => props.listings.map(l => l.id).sort().join(','), [props.listings.map(l => l.id).sort().join(',')]);

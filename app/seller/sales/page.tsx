@@ -31,8 +31,10 @@ import { getListingById } from '@/lib/firebase/listings';
 import { getDocument } from '@/lib/firebase/firestore';
 import { useDebounce } from '@/hooks/use-debounce';
 import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
-import type { NotificationType } from '@/lib/types';
+import type { NotificationType, TransactionStatus } from '@/lib/types';
 import { usePathname } from 'next/navigation';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getNextRequiredAction, getUXBadge } from '@/lib/orders/progress';
 
 interface OrderWithListing extends Order {
   listing?: Listing | null;
@@ -40,17 +42,27 @@ interface OrderWithListing extends Order {
 
 type TabKey = 'needs_action' | 'in_progress' | 'completed' | 'cancelled' | 'all';
 
+// DEPRECATED: Use getUXBadge() from lib/orders/progress.ts instead
+// Keeping for backward compatibility during migration
+function statusBadgeFromTransactionStatus(txStatus: TransactionStatus) {
+  // Use new shared model
+  const mockOrder = { transactionStatus: txStatus } as Order;
+  return getUXBadge(mockOrder, 'seller');
+}
+
+// Legacy function for backward compatibility (derives from order.status if transactionStatus missing)
 function statusBadge(status: string) {
+  // This is a fallback - prefer using statusBadgeFromTransactionStatus
   switch (status) {
     case 'paid_held':
     case 'paid':
-      return { variant: 'default' as const, label: 'Paid' }; // Seller already paid - no "held" needed
+      return { variant: 'default' as const, label: 'Paid' };
     case 'in_transit':
       return { variant: 'secondary' as const, label: 'In transit' };
     case 'delivered':
       return { variant: 'secondary' as const, label: 'Delivered' };
     case 'ready_to_release':
-      return { variant: 'default' as const, label: 'Fulfillment complete' }; // Changed from "Ready to release"
+      return { variant: 'default' as const, label: 'Fulfillment complete' };
     case 'completed':
       return { variant: 'secondary' as const, label: 'Completed' };
     case 'disputed':
@@ -222,19 +234,44 @@ export default function SellerSalesPage() {
           );
         });
 
-    const isNeedsAction = (s: string) =>
-      ['paid_held', 'paid', 'ready_to_release', 'delivered', 'disputed'].includes(s);
-    const isInProgress = (s: string) => ['pending', 'awaiting_bank_transfer', 'awaiting_wire', 'in_transit'].includes(s);
+    // Use transactionStatus for filtering
+    const isNeedsAction = (order: Order) => {
+      const txStatus = getEffectiveTransactionStatus(order);
+      return [
+        'FULFILLMENT_REQUIRED',
+        'READY_FOR_PICKUP',
+        'DELIVERY_SCHEDULED',
+        'DELIVERED_PENDING_CONFIRMATION',
+        'DISPUTE_OPENED',
+        'SELLER_NONCOMPLIANT',
+      ].includes(txStatus);
+    };
+    
+    const isInProgress = (order: Order) => {
+      const txStatus = getEffectiveTransactionStatus(order);
+      return [
+        'PENDING_PAYMENT',
+        'FULFILLMENT_REQUIRED',
+        'READY_FOR_PICKUP',
+        'PICKUP_SCHEDULED',
+        'DELIVERY_SCHEDULED',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED_PENDING_CONFIRMATION',
+      ].includes(txStatus);
+    };
 
     switch (tab) {
       case 'needs_action':
-        return base.filter((o) => isNeedsAction(String(o.status || '')));
+        return base.filter((o) => isNeedsAction(o));
       case 'in_progress':
-        return base.filter((o) => isInProgress(String(o.status || '')));
+        return base.filter((o) => isInProgress(o));
       case 'completed':
-        return base.filter((o) => String(o.status || '') === 'completed');
+        return base.filter((o) => getEffectiveTransactionStatus(o) === 'COMPLETED');
       case 'cancelled':
-        return base.filter((o) => ['cancelled', 'refunded'].includes(String(o.status || '')));
+        return base.filter((o) => {
+          const txStatus = getEffectiveTransactionStatus(o);
+          return txStatus === 'REFUNDED' || txStatus === 'CANCELLED';
+        });
       case 'all':
       default:
         return base;
@@ -360,7 +397,9 @@ export default function SellerSalesPage() {
           ) : (
             <div className="grid gap-4">
               {filtered.map((o) => {
-                const badge = statusBadge(String(o.status || ''));
+                const txStatus = getEffectiveTransactionStatus(o);
+                const badge = statusBadgeFromTransactionStatus(txStatus);
+                const transportOption = o.transportOption || 'SELLER_TRANSPORT';
                 const title = o.listingSnapshot?.title || o.listing?.title || 'Listing';
                 const cover = o.listingSnapshot?.coverPhotoUrl || (Array.isArray((o.listing as any)?.images) ? (o.listing as any).images?.[0] : null) || null;
                 const orderTotal = typeof o.amount === 'number' ? o.amount : null;
@@ -374,6 +413,14 @@ export default function SellerSalesPage() {
                 const soldAt = o.paidAt || o.createdAt || null;
                 const viewPaymentOpen = paymentOpen[o.id] === true;
                 const viewDetailsOpen = detailsOpen[o.id] === true;
+
+                // Use shared progress model for next action
+                const nextActionData = getNextRequiredAction(o, 'seller');
+                const nextAction = nextActionData ? {
+                  label: nextActionData.ctaLabel,
+                  href: nextActionData.ctaAction.startsWith('/') ? nextActionData.ctaAction : `/seller/orders/${o.id}`,
+                  variant: nextActionData.severity === 'danger' ? 'destructive' as const : nextActionData.severity === 'warning' ? 'default' as const : 'secondary' as const,
+                } : null;
 
                 return (
                   <Card key={o.id} className="border-border/60 overflow-hidden">
@@ -401,9 +448,31 @@ export default function SellerSalesPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant={badge.variant}>{badge.label}</Badge>
-                                {o.payoutHoldReason && o.payoutHoldReason !== 'none' ? (
-                                  <Badge variant="secondary" className="font-semibold">
-                                    Hold: {String(o.payoutHoldReason).replaceAll('_', ' ').toLowerCase()}
+                                {/* SLA countdown chip */}
+                                {o.fulfillmentSlaDeadlineAt && (() => {
+                                  const now = Date.now();
+                                  const deadline = o.fulfillmentSlaDeadlineAt.getTime();
+                                  const hoursRemaining = Math.floor((deadline - now) / (1000 * 60 * 60));
+                                  if (hoursRemaining < 0) {
+                                    return <Badge variant="destructive" className="text-xs">SLA Overdue</Badge>;
+                                  }
+                                  if (hoursRemaining < 24) {
+                                    return <Badge variant="destructive" className="text-xs">{hoursRemaining}h remaining</Badge>;
+                                  }
+                                  return <Badge variant="outline" className="text-xs">{hoursRemaining}h remaining</Badge>;
+                                })()}
+                                {transportOption === 'BUYER_TRANSPORT' ? (
+                                  <Badge variant="outline" className="font-semibold text-xs">
+                                    Buyer Transport
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="font-semibold text-xs">
+                                    Seller Transport
+                                  </Badge>
+                                )}
+                                {txStatus === 'SELLER_NONCOMPLIANT' ? (
+                                  <Badge variant="destructive" className="font-semibold">
+                                    Non-compliant
                                   </Badge>
                                 ) : null}
                               </div>
@@ -429,10 +498,21 @@ export default function SellerSalesPage() {
                                 <div className="text-sm text-muted-foreground">Net proceeds</div>
                                 <div className="text-lg font-extrabold tracking-tight">{formatMoney(net)}</div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Button asChild size="sm" className="font-semibold">
+                              <div className="flex items-center gap-2 flex-wrap justify-end">
+                                {nextAction && !nextActionData?.blockedReason && (
+                                  <Button
+                                    size="sm"
+                                    variant={nextAction.variant}
+                                    asChild
+                                  >
+                                    <Link href={nextAction.href}>
+                                      {nextAction.label}
+                                    </Link>
+                                  </Button>
+                                )}
+                                <Button asChild size="sm" variant="outline" className="font-semibold">
                                   <Link href={`/seller/orders/${o.id}`}>
-                                    View order details
+                                    View details
                                     <ArrowRight className="h-4 w-4 ml-2" />
                                   </Link>
                                 </Button>
@@ -529,7 +609,7 @@ export default function SellerSalesPage() {
                                             <span className="font-semibold">{formatMoney(orderTotal)}</span>
                                           </div>
                                           <div className="flex items-center justify-between">
-                                            <span className="text-muted-foreground">Fees</span>
+                                            <span className="text-muted-foreground">Platform fee (10%)</span>
                                             <span className="font-semibold">{platformFee !== null ? formatMoney(-Math.abs(platformFee)) : '—'}</span>
                                           </div>
                                           <div className="flex items-center justify-between">

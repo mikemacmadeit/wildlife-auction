@@ -7,15 +7,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search } from 'lucide-react';
+import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOrderByCheckoutSessionId, getOrdersForUser } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
-import { Order, OrderStatus } from '@/lib/types';
+import { Order, OrderStatus, TransactionStatus } from '@/lib/types';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { deriveOrderUIState, type PurchasesStatusKey } from '@/lib/orders/deriveOrderUIState';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getNextRequiredAction, getUXBadge } from '@/lib/orders/progress';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -519,14 +521,14 @@ export default function OrdersPage() {
       await confirmReceipt(orderId);
       toast({
         title: 'Receipt confirmed',
-        description: 'Confirm only after you have received the animal/equipment. Funds remain held until admin release.',
+        description: 'Transaction complete. Seller was paid immediately upon successful payment.',
       });
       // Refresh orders (fast path: uses snapshots; avoids N+1 listing reads)
       await loadOrders({ silent: true });
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to accept order',
+        description: error.message || 'Failed to confirm receipt',
         variant: 'destructive',
       });
     } finally {
@@ -567,8 +569,17 @@ export default function OrdersPage() {
   };
 
   const canAcceptOrDispute = (order: Order): boolean => {
-    const status = order.status as OrderStatus;
-    return ['paid', 'paid_held', 'in_transit', 'delivered'].includes(status) && !order.stripeTransferId;
+    // Use transactionStatus - seller already paid immediately, no transfer ID check needed
+    const txStatus = getEffectiveTransactionStatus(order);
+    const transportOption = order.transportOption || 'SELLER_TRANSPORT';
+    
+    if (transportOption === 'SELLER_TRANSPORT') {
+      // Can confirm receipt when delivered
+      return txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY';
+    } else {
+      // BUYER_TRANSPORT - can confirm pickup when scheduled
+      return txStatus === 'PICKUP_SCHEDULED';
+    }
   };
 
   const isDisputeDeadlinePassed = (order: Order): boolean => {
@@ -579,7 +590,76 @@ export default function OrdersPage() {
     return typeof ms === 'number' ? ms < Date.now() : false;
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIconFromTransactionStatus = (txStatus: TransactionStatus) => {
+    switch (txStatus) {
+      case 'COMPLETED':
+        return <CheckCircle className="h-5 w-5 text-accent" />;
+      case 'DELIVERED_PENDING_CONFIRMATION':
+        return <Package className="h-5 w-5 text-blue-600" />;
+      case 'OUT_FOR_DELIVERY':
+      case 'DELIVERY_SCHEDULED':
+        return <Truck className="h-5 w-5 text-blue-500" />;
+      case 'PICKUP_SCHEDULED':
+      case 'READY_FOR_PICKUP':
+        return <Clock className="h-5 w-5 text-blue-500" />;
+      case 'PICKED_UP':
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'FULFILLMENT_REQUIRED':
+        return <Clock className="h-5 w-5 text-orange-500" />;
+      case 'PENDING_PAYMENT':
+        return <Clock className="h-5 w-5 text-orange-500" />;
+      case 'DISPUTE_OPENED':
+        return <XCircle className="h-5 w-5 text-destructive" />;
+      case 'SELLER_NONCOMPLIANT':
+        return <AlertTriangle className="h-5 w-5 text-destructive" />;
+      case 'REFUNDED':
+      case 'CANCELLED':
+        return <XCircle className="h-5 w-5 text-destructive" />;
+      default:
+        return <Package className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadgeFromTransactionStatus = (txStatus: TransactionStatus) => {
+    switch (txStatus) {
+      case 'COMPLETED':
+        return <Badge variant="default" className="bg-accent text-accent-foreground">Completed</Badge>;
+      case 'DELIVERED_PENDING_CONFIRMATION':
+        return <Badge variant="default" className="bg-blue-600 text-white">Delivered</Badge>;
+      case 'OUT_FOR_DELIVERY':
+        return <Badge variant="default" className="bg-blue-500 text-white">Out for Delivery</Badge>;
+      case 'DELIVERY_SCHEDULED':
+        return <Badge variant="default" className="bg-blue-500 text-white">Delivery Scheduled</Badge>;
+      case 'PICKUP_SCHEDULED':
+        return <Badge variant="default" className="bg-blue-500 text-white">Pickup Scheduled</Badge>;
+      case 'READY_FOR_PICKUP':
+        return <Badge variant="default" className="bg-blue-500 text-white">Ready for Pickup</Badge>;
+      case 'PICKED_UP':
+        return <Badge variant="default" className="bg-green-600 text-white">Picked Up</Badge>;
+      case 'FULFILLMENT_REQUIRED':
+        return <Badge variant="default" className="bg-orange-500 text-white">Fulfillment Required</Badge>;
+      case 'PENDING_PAYMENT':
+        return <Badge variant="default" className="bg-orange-500 text-white">Pending Payment</Badge>;
+      case 'DISPUTE_OPENED':
+        return <Badge variant="destructive">Disputed</Badge>;
+      case 'SELLER_NONCOMPLIANT':
+        return <Badge variant="destructive">Non-Compliant</Badge>;
+      case 'REFUNDED':
+        return <Badge variant="destructive">Refunded</Badge>;
+      case 'CANCELLED':
+        return <Badge variant="destructive">Cancelled</Badge>;
+      default:
+        return <Badge variant="outline">{txStatus}</Badge>;
+    }
+  };
+
+  // Legacy functions for backward compatibility (use transactionStatus when available)
+  const getStatusIcon = (status: string, order?: Order) => {
+    if (order) {
+      const txStatus = getEffectiveTransactionStatus(order);
+      return getStatusIconFromTransactionStatus(txStatus);
+    }
+    // Fallback to legacy status
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-5 w-5 text-accent" />;
@@ -608,7 +688,12 @@ export default function OrdersPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, order?: Order) => {
+    if (order) {
+      const txStatus = getEffectiveTransactionStatus(order);
+      return getStatusBadgeFromTransactionStatus(txStatus);
+    }
+    // Fallback to legacy status
     switch (status) {
       case 'completed':
         return <Badge variant="default" className="bg-accent text-accent-foreground">Completed</Badge>;
@@ -621,7 +706,7 @@ export default function OrdersPage() {
         return <Badge variant="default" className="bg-blue-500 text-white">In Transit</Badge>;
       case 'paid':
       case 'paid_held':
-        return <Badge variant="default" className="bg-orange-500 text-white">Paid (Held)</Badge>;
+        return <Badge variant="default" className="bg-orange-500 text-white">Fulfillment in progress</Badge>;
       case 'awaiting_bank_transfer':
         return <Badge variant="default" className="bg-orange-500 text-white">Awaiting Bank Transfer</Badge>;
       case 'awaiting_wire':
@@ -758,7 +843,7 @@ export default function OrdersPage() {
   const getUIStatusBadge = (statusKey: PurchasesStatusKey) => {
     switch (statusKey) {
       case 'held':
-        return <Badge className="bg-blue-500 text-white">Fulfillment in progress</Badge>; // Changed from "Held (payout)" - seller already paid
+        return <Badge className="bg-blue-500 text-white">Fulfillment in progress</Badge>;
       case 'awaiting_permit':
         return <Badge className="bg-purple-600 text-white">Awaiting permit</Badge>;
       case 'in_transit':
@@ -775,7 +860,31 @@ export default function OrdersPage() {
     }
   };
 
-  const StatusBadgeWithTooltip = ({ statusKey }: { statusKey: PurchasesStatusKey }) => {
+  const StatusBadgeWithTooltip = ({ statusKey, order }: { statusKey: PurchasesStatusKey; order?: Order }) => {
+    // Use new shared model if order provided
+    if (order) {
+      const badge = getUXBadge(order, 'buyer');
+      const badgeEl = <Badge variant={badge.variant}>{badge.label}</Badge>;
+      // Show tooltip for "Action needed" or "Waiting on seller"
+      if (badge.variant === 'warning' || badge.label.includes('Waiting')) {
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex" data-no-drawer="1">
+                  {badgeEl}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs">
+                {badge.label === 'Action needed' ? 'Action required from you' : 'Seller paid immediately. Waiting for seller action.'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      }
+      return <span className="inline-flex" data-no-drawer="1">{badgeEl}</span>;
+    }
+    // Fallback for legacy usage
     const badge = getUIStatusBadge(statusKey);
     if (statusKey !== 'held') return badge;
 
@@ -802,7 +911,7 @@ export default function OrdersPage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">My Purchases</h1>
             <p className="text-muted-foreground mt-1">
-              Track payout holds, compliance milestones, and delivery—exactly who we’re waiting on.
+              Track fulfillment progress, compliance milestones, and delivery—exactly who we’re waiting on.
             </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/60 backdrop-blur px-4 py-3">
@@ -961,6 +1070,11 @@ export default function OrdersPage() {
                 handleOpenDispute(order.id);
                 return;
               }
+              if (ui.primaryAction.kind === 'select_pickup_window' || ui.primaryAction.kind === 'confirm_pickup') {
+                // Route to order detail page where the pickup forms are
+                window.location.href = `/dashboard/orders/${order.id}`;
+                return;
+              }
               // complete_transfer / view_details -> open drawer
               setDrawerOrderId(order.id);
             };
@@ -1016,10 +1130,27 @@ export default function OrdersPage() {
                       </div>
 
                       <div className="mt-1 text-sm font-semibold">
-                        {ui.currentStepLabel}
-                        {ui.waitingOn ? (
-                          <span className="text-muted-foreground font-normal"> · {ui.waitingOn}</span>
-                        ) : null}
+                        {(() => {
+                          const nextAction = getNextRequiredAction(order, 'buyer');
+                          if (nextAction) {
+                            return (
+                              <>
+                                {nextAction.title}
+                                {nextAction.description && (
+                                  <span className="text-muted-foreground font-normal"> · {nextAction.description}</span>
+                                )}
+                              </>
+                            );
+                          }
+                          return (
+                            <>
+                              {ui.currentStepLabel}
+                              {ui.waitingOn ? (
+                                <span className="text-muted-foreground font-normal"> · {ui.waitingOn}</span>
+                              ) : null}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -1053,10 +1184,10 @@ export default function OrdersPage() {
 
                   <div className="shrink-0 flex items-center gap-2">
                     <div className="h-10 w-10 rounded-full border border-border/60 bg-background/60 flex items-center justify-center">
-                      {getStatusIcon(order.status)}
+                      {getStatusIcon(order.status, order)}
                     </div>
                     <div className="hidden sm:block">
-                      <StatusBadgeWithTooltip statusKey={ui.statusKey} />
+                      <StatusBadgeWithTooltip statusKey={ui.statusKey} order={order} />
                     </div>
                   </div>
                 </div>
@@ -1095,17 +1226,57 @@ export default function OrdersPage() {
 
                 <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
                   <div className="flex items-center gap-2">
+                    {(() => {
+                      const nextAction = getNextRequiredAction(order, 'buyer');
+                      if (!nextAction) return null;
+                      
+                      // Check if this is a simple action that can be done directly
+                      const txStatus = getEffectiveTransactionStatus(order);
+                      const canHandleDirectly = 
+                        txStatus === 'DELIVERED_PENDING_CONFIRMATION' && 
+                        nextAction.ctaLabel.toLowerCase().includes('confirm');
+                      
+                      return (
+                        <Button
+                          size="sm"
+                          className="font-semibold"
+                          variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
+                          disabled={processingOrderId === order.id || (nextAction.ctaLabel.toLowerCase().includes('confirm') && !canAct)}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            
+                            // Handle simple actions directly
+                            if (canHandleDirectly && txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+                              await handleConfirmReceipt(order.id);
+                              return;
+                            }
+                            
+                            // Navigate to detail page for actions that need forms/dialogs
+                            if (nextAction.ctaAction.startsWith('/')) {
+                              window.location.href = nextAction.ctaAction;
+                            } else {
+                              // Fallback to detail page
+                              window.location.href = `/dashboard/orders/${order.id}`;
+                            }
+                          }}
+                        >
+                          {processingOrderId === order.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          {nextAction.ctaLabel}
+                        </Button>
+                      );
+                    })()}
+
                     <Button
+                      asChild
                       size="sm"
+                      variant="outline"
                       className="font-semibold"
-                      disabled={processingOrderId === order.id || (ui.primaryAction.kind === 'confirm_receipt' && !canAct)}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void onPrimary();
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {processingOrderId === order.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                      {ui.primaryAction.label}
+                      <Link href={`/dashboard/orders/${order.id}`}>
+                        View details
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
                     </Button>
 
                     <DropdownMenu>
@@ -1202,10 +1373,25 @@ export default function OrdersPage() {
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <div className="font-extrabold">{ui.currentStepLabel}</div>
-                            {getUIStatusBadge(ui.statusKey)}
+                            {(() => {
+                              const nextAction = getNextRequiredAction(selectedOrder, 'buyer');
+                              const badge = getUXBadge(selectedOrder, 'buyer');
+                              return (
+                                <>
+                                  <div className="font-extrabold">{nextAction?.title || ui.currentStepLabel}</div>
+                                  <Badge variant={badge.variant}>{badge.label}</Badge>
+                                </>
+                              );
+                            })()}
                           </div>
-                          {ui.waitingOn ? <div className="text-sm text-muted-foreground mt-1">{ui.waitingOn}</div> : null}
+                          {(() => {
+                            const nextAction = getNextRequiredAction(selectedOrder, 'buyer');
+                            return nextAction ? (
+                              <div className="text-sm text-muted-foreground mt-1">{nextAction.description}</div>
+                            ) : ui.waitingOn ? (
+                              <div className="text-sm text-muted-foreground mt-1">{ui.waitingOn}</div>
+                            ) : null;
+                          })()}
                         </div>
                         <div className="text-right">
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</div>
@@ -1260,7 +1446,12 @@ export default function OrdersPage() {
                   </div>
                   <div className="rounded-xl border border-border/60 p-3 bg-background/40">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</div>
-                    <div className="text-sm font-semibold mt-1">{String(selectedOrder.status).replaceAll('_', ' ')}</div>
+                    <div className="text-sm font-semibold mt-1">
+                      {(() => {
+                        const badge = getUXBadge(selectedOrder, 'buyer');
+                        return <Badge variant={badge.variant}>{badge.label}</Badge>;
+                      })()}
+                    </div>
                   </div>
                 </div>
 

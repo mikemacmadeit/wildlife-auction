@@ -18,6 +18,8 @@ import { requireAdmin, requireRateLimit, json } from '@/app/api/admin/_util';
 import { processEventDoc } from '@/lib/notifications/processEvent';
 import { renderEmail, validatePayload } from '@/lib/email';
 import { sendEmailHtml } from '@/lib/email/sender';
+import { assertInt32 } from '@/lib/debug/int32Tripwire';
+import { safeTransactionSet, safeSet } from '@/lib/firebase/safeFirestore';
 
 const bodySchema = z.object({
   kind: z.enum(['events', 'email', 'all']).default('all'),
@@ -56,7 +58,12 @@ export async function POST(request: Request) {
 
   // 1) Process pending events → enqueue jobs
   if (kind === 'events' || kind === 'all') {
-    const snap = await db.collection('events').where('status', '==', 'pending').orderBy('createdAt', 'asc').limit(limit).get();
+    // Clamp limit to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+    const { safePositiveInt } = await import('@/lib/firebase/safeQueryInts');
+    const safeLimit = safePositiveInt(limit, 50);
+    // Tripwire: catch invalid limit before Firestore query
+    assertInt32(safeLimit, 'Firestore.limit');
+    const snap = await db.collection('events').where('status', '==', 'pending').orderBy('createdAt', 'asc').limit(safeLimit).get();
     out.events.scanned = snap.size;
 
     for (const docSnap of snap.docs) {
@@ -72,13 +79,14 @@ export async function POST(request: Request) {
           if (cur.status !== 'pending') return;
           const attempts = Number(cur.processing?.attempts || 0);
           if (attempts >= MAX_ATTEMPTS) {
-            tx.set(ref, { status: 'failed', processing: { ...(cur.processing || {}), error: 'Max attempts reached' } }, { merge: true });
+            safeTransactionSet(tx, ref, { status: 'failed', processing: { ...(cur.processing || {}), error: 'Max attempts reached' } }, { merge: true });
             return;
           }
           const lastAttemptAt = cur.processing?.lastAttemptAt?.toDate?.() as Date | undefined;
           if (lastAttemptAt && Date.now() - lastAttemptAt.getTime() < EVENT_LOCK_MS) return;
 
-          tx.set(
+          safeTransactionSet(
+            tx,
             ref,
             { processing: { attempts: attempts + 1, lastAttemptAt: Timestamp.now(), error: cur.processing?.error || null } },
             { merge: true }
@@ -107,7 +115,11 @@ export async function POST(request: Request) {
 
   // 2) Dispatch queued emailJobs → send via configured provider (SendGrid)
   if (kind === 'email' || kind === 'all') {
-    const snap = await db.collection('emailJobs').where('status', '==', 'queued').orderBy('createdAt', 'asc').limit(limit).get();
+    // Clamp limit to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+    const { safePositiveInt: safePositiveIntEmail } = await import('@/lib/firebase/safeQueryInts');
+    const emailLimit = safePositiveIntEmail(limit, 50);
+    assertInt32(emailLimit, 'Firestore.emailJobs.limit');
+    const snap = await db.collection('emailJobs').where('status', '==', 'queued').orderBy('createdAt', 'asc').limit(emailLimit).get();
     out.email.scanned = snap.size;
 
     for (const jobSnap of snap.docs) {
@@ -123,7 +135,7 @@ export async function POST(request: Request) {
           if (cur.status !== 'queued') return;
           const attempts = Number(cur.attempts || 0);
           if (attempts >= MAX_ATTEMPTS) {
-            tx.set(ref, { status: 'failed', error: 'Max attempts reached' }, { merge: true });
+            safeTransactionSet(tx, ref, { status: 'failed', error: 'Max attempts reached' }, { merge: true });
             return;
           }
           const deliverAfterAt = cur.deliverAfterAt?.toDate?.() as Date | undefined;
@@ -131,7 +143,8 @@ export async function POST(request: Request) {
           const lastAttemptAt = cur.lastAttemptAt?.toDate?.() as Date | undefined;
           if (lastAttemptAt && Date.now() - lastAttemptAt.getTime() < backoffMs(attempts)) return;
 
-          tx.set(
+          safeTransactionSet(
+            tx,
             ref,
             { status: 'processing', attempts: attempts + 1, lastAttemptAt: Timestamp.now() },
             { merge: true }
@@ -153,14 +166,14 @@ export async function POST(request: Request) {
         const payload = claimed.templatePayload;
         const toEmail = String(claimed.toEmail || '');
         if (!toEmail || !toEmail.includes('@')) {
-          await ref.set({ status: 'failed', error: 'Missing/invalid toEmail' }, { merge: true });
+          await safeSet(ref, { status: 'failed', error: 'Missing/invalid toEmail' }, { merge: true });
           out.email.failed++;
           continue;
         }
 
         const validated = validatePayload(template as any, payload);
         if (!validated.ok) {
-          await ref.set({ status: 'failed', error: 'Invalid template payload' }, { merge: true });
+          await safeSet(ref, { status: 'failed', error: 'Invalid template payload' }, { merge: true });
           out.email.failed++;
           continue;
         }
@@ -168,16 +181,16 @@ export async function POST(request: Request) {
         const rendered = renderEmail(template as any, validated.data);
         const result = await sendEmailHtml(toEmail, rendered.subject, rendered.html);
         if (!result.success) {
-          await ref.set({ status: 'queued', error: result.error || 'Send failed' }, { merge: true });
+          await safeSet(ref, { status: 'queued', error: result.error || 'Send failed' }, { merge: true });
           out.email.requeued++;
           continue;
         }
 
-        await ref.set({ status: 'sent', messageId: result.messageId || null, error: FieldValue.delete() }, { merge: true });
+        await safeSet(ref, { status: 'sent', messageId: result.messageId || null, error: FieldValue.delete() }, { merge: true });
         out.email.sent++;
       } catch (e: any) {
         try {
-          await ref.set({ status: 'queued', error: String(e?.message || e) }, { merge: true });
+          await safeSet(ref, { status: 'queued', error: String(e?.message || e) }, { merge: true });
         } catch {}
         out.email.requeued++;
       }

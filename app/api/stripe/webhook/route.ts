@@ -409,6 +409,7 @@ export async function POST(request: Request) {
  * Updates user's Stripe Connect status based on account capabilities
  */
 async function handleAccountUpdated(db: ReturnType<typeof getFirestore>, account: Stripe.Account) {
+  let userId: string | undefined;
   try {
     // Find user by stripeAccountId
     const usersRef = db.collection('users');
@@ -420,6 +421,7 @@ async function handleAccountUpdated(db: ReturnType<typeof getFirestore>, account
     }
 
     const userDoc = snapshot.docs[0];
+    userId = userDoc.id;
     const updateData: any = {
       chargesEnabled: account.capabilities?.card_payments === 'active',
       payoutsEnabled: account.capabilities?.transfers === 'active',
@@ -437,9 +439,13 @@ async function handleAccountUpdated(db: ReturnType<typeof getFirestore>, account
     }
 
     await userDoc.ref.update(updateData);
-    console.log(`Updated Stripe account status for user: ${userDoc.id}`);
+    console.log(`Updated Stripe account status for user: ${userId}`);
   } catch (error) {
-    console.error('Error handling account.updated:', error);
+    captureException(error instanceof Error ? error : new Error(String(error)), {
+      event: 'account.updated',
+      userId: userId || 'unknown',
+      stripeAccountId: account.id,
+    });
     throw error;
   }
 }

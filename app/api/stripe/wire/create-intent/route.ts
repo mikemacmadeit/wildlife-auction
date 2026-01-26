@@ -384,7 +384,7 @@ export async function POST(request: Request) {
         },
       } as any,
       // Automatic capture (default) - seller is paid immediately upon successful payment
-      application_fee_amount: platformFeeCents, // 5% platform fee (in cents)
+      application_fee_amount: platformFeeCents, // 10% platform fee (in cents)
       transfer_data: {
         destination: String(sellerStripeAccountId || ''), // Seller's Stripe Connect account ID
       },

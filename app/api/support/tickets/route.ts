@@ -17,6 +17,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { json, getRequestMeta } from '@/app/api/admin/_util';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { safePositiveInt } from '@/lib/firebase/safeQueryInts';
 
 const CreateSchema = z.object({
   subject: z.string().trim().min(1).max(160),
@@ -80,7 +81,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const status = String(url.searchParams.get('status') || 'all').trim(); // open|resolved|all
-  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') || 50) || 50));
+  const rawLimit = Number(url.searchParams.get('limit') || 50) || 50;
+  const limit = safePositiveInt(rawLimit, 50);
 
   let q: FirebaseFirestore.Query = db.collection('supportTickets').where('userId', '==', uid).orderBy('createdAt', 'desc').limit(limit);
   if (status === 'open' || status === 'resolved') {
@@ -98,7 +100,8 @@ export async function GET(request: Request) {
       code === 'failed-precondition' || msg.toLowerCase().includes('requires an index') || msg.toLowerCase().includes('failed-precondition');
     if (!isMissingIndex) throw e;
     usedFallback = true;
-    const fq = db.collection('supportTickets').where('userId', '==', uid).limit(Math.max(limit, 200));
+    const fallbackLimit = safePositiveInt(Math.max(limit, 200), 200);
+    const fq = db.collection('supportTickets').where('userId', '==', uid).limit(fallbackLimit);
     const fsnap = await fq.get();
     const mapped = fsnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
     const sorted = mapped.sort((a: any, b: any) => {

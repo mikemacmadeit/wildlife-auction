@@ -1,5 +1,6 @@
 import type { Order } from '@/lib/types';
 import { getOrderIssueState } from './getOrderIssueState';
+import { getEffectiveTransactionStatus } from './status';
 
 export type OrderTrustState =
   | 'awaiting_payment'
@@ -18,71 +19,80 @@ export type OrderTrustState =
  *
  * NON-NEGOTIABLE:
  * - Purely derived (NO DB writes)
- * - Uses existing order fields only (no new states stored)
+ * - Uses transactionStatus as primary source (with legacy status fallback)
  *
- * Mapping inputs (per Phase 2A spec):
- * - status
- * - deliveredAt
- * - deliveryConfirmedAt
- * - buyerConfirmedAt
+ * Mapping inputs:
+ * - transactionStatus (primary)
+ * - status (legacy fallback)
+ * - deliveredAt, deliveryConfirmedAt, buyerConfirmedAt
  * - protectedDisputeStatus / disputeStatus
  * - adminHold
- * - payoutHoldReason
+ * - transportOption
  */
 export function getOrderTrustState(order: Order): OrderTrustState {
-  const status = order.status;
+  // Use effective transaction status as source of truth
+  const txStatus = getEffectiveTransactionStatus(order);
 
   // Terminal states first
-  if (status === 'refunded') return 'refunded';
-  if (status === 'completed') return 'completed';
+  if (txStatus === 'REFUNDED') return 'refunded';
+  if (txStatus === 'COMPLETED') return 'completed';
+  if (txStatus === 'CANCELLED') return 'completed'; // Treat cancelled as completed
 
   // Issue/hold states override normal progress (but not terminal).
   const issue = getOrderIssueState(order);
   if (issue !== 'none') return 'issue_open';
   if (order.adminHold === true) return 'issue_open';
+  if (txStatus === 'DISPUTE_OPENED') return 'issue_open';
+  if (txStatus === 'SELLER_NONCOMPLIANT') return 'issue_open';
 
-  // Awaiting payment rails
-  if (status === 'pending' || status === 'awaiting_bank_transfer' || status === 'awaiting_wire') {
+  // Awaiting payment
+  if (txStatus === 'PENDING_PAYMENT') {
     return 'awaiting_payment';
   }
 
-  // Delivery progression (check BEFORE payment_received to catch in_transit status)
-  // Note: `in_transit` status is set via seller action when they mark "in transit"
-  if (status === 'in_transit' || (order as any).inTransitAt) return 'in_transit';
+  // Transport-aware fulfillment states
+  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
+  
+  if (transportOption === 'BUYER_TRANSPORT') {
+    // BUYER_TRANSPORT flow
+    if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_SCHEDULED') {
+      return 'in_transit';
+    }
+    
+    if (txStatus === 'PICKED_UP') {
+      return 'completed';
+    }
+  } else {
+    // SELLER_TRANSPORT flow
+    if (txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') {
+      return 'in_transit';
+    }
+    
+    if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+      // Check protection window (legacy field for backward compatibility)
+      if (order.payoutHoldReason === 'protection_window' && order.protectionEndsAt) {
+        const protectionEnds = new Date(order.protectionEndsAt);
+        if (protectionEnds.getTime() > Date.now()) {
+          return 'protection_window';
+        }
+      }
+      return 'delivered';
+    }
+  }
 
-  // Payment received (funds held)
-  if (status === 'paid' || status === 'paid_held') {
-    // If the seller explicitly marked they are preparing, reflect that.
+  // FULFILLMENT_REQUIRED - payment received, awaiting fulfillment start
+  if (txStatus === 'FULFILLMENT_REQUIRED') {
+    // If seller marked preparing, show that
     if ((order as any).sellerPreparingAt) return 'preparing_delivery';
     return 'payment_received';
   }
 
-  // Treat buyer confirmation as a delivery marker as well (prevents "stuck" states if seller doesn't mark delivered).
-  const hasDeliveredMarker =
-    !!order.deliveredAt ||
-    !!order.deliveryConfirmedAt ||
-    !!order.buyerConfirmedAt ||
-    status === 'delivered' ||
-    status === 'buyer_confirmed' ||
-    status === 'accepted' ||
-    status === 'ready_to_release';
-  if (!hasDeliveredMarker) {
-    // Payment is received (or legacy accepted/buyer_confirmed) but seller hasn't marked delivery yet.
-    return 'preparing_delivery';
+  // Legacy status fallback (for orders without transactionStatus)
+  const legacyStatus = order.status;
+  if (legacyStatus === 'paid' || legacyStatus === 'paid_held') {
+    if ((order as any).sellerPreparingAt) return 'preparing_delivery';
+    return 'payment_received';
   }
-
-  // Delivered, but protection window may be active (we intentionally use payoutHoldReason as the gate here).
-  if (order.payoutHoldReason === 'protection_window') return 'protection_window';
-
-  // Buyer confirmed + delivery marked -> ready for payout review/release (manual release still required).
-  const buyerConfirmed = !!order.buyerConfirmedAt || status === 'buyer_confirmed' || status === 'accepted' || status === 'ready_to_release';
-  const delivered = !!order.deliveredAt || !!order.deliveryConfirmedAt || !!order.buyerConfirmedAt || status === 'delivered';
-  if ((status === 'ready_to_release' || status === 'buyer_confirmed' || status === 'accepted') && buyerConfirmed && delivered) {
-    return 'ready_for_payout';
-  }
-
-  // Default delivered (no active protection hold)
-  if (hasDeliveredMarker) return 'delivered';
 
   // Fallback
   return 'payment_received';

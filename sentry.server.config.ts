@@ -11,6 +11,11 @@ const SENTRY_ENVIRONMENT = process.env.SENTRY_ENVIRONMENT || process.env.NODE_EN
 const SENTRY_TRACES_SAMPLE_RATE = parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1');
 const SENTRY_RELEASE = process.env.SENTRY_RELEASE;
 
+// Warn if Sentry is not configured in production (but don't block)
+if (!SENTRY_DSN && process.env.NODE_ENV === 'production') {
+  console.warn('[Sentry] SENTRY_DSN not configured. Error monitoring is disabled.');
+}
+
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,

@@ -3,7 +3,8 @@
  * 
  * Admin-only endpoint to fetch orders with server-side filtering
  * Query params:
- * - filter: 'escrow' | 'protected' | 'disputes' | 'ready_to_release' | 'all'  (legacy key name: "escrow" = payout-hold orders)
+ * - filter: 'fulfillment_issues' | 'protected' | 'disputes' | 'fulfillment_pending' | 'all'
+   *   (legacy filter keys still supported for backward compatibility)
  * - limit: number (default 100)
  * - cursor: string (order ID for pagination)
  */
@@ -20,6 +21,8 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { OrderStatus, DisputeStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { normalizeFirestoreValue, assertNoCorruptValuesAfterNormalization } from '@/lib/firebase/normalizeFirestoreValue';
+import { safePositiveInt } from '@/lib/firebase/safeQueryInts';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -71,8 +74,14 @@ export async function GET(request: Request) {
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') || 'all';
-    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    // Clamp limit to >= 1 to prevent -1/NaN/undefined from causing int32 serialization errors
+    const rawLimit = parseInt(searchParams.get('limit') || '100', 10);
+    const limit = safePositiveInt(rawLimit, 100);
     const cursor = searchParams.get('cursor');
+    
+    // Tripwire: catch invalid limit before Firestore query
+    const { assertInt32 } = await import('@/lib/debug/int32Tripwire');
+    assertInt32(limit, 'Firestore.limit');
 
     // Build Firestore query.
     //
@@ -90,20 +99,15 @@ export async function GET(request: Request) {
     };
 
     let ordersQuery: any;
-    if (filter === 'escrow') {
+    if (filter === 'fulfillment_issues') {
+      // Fulfillment Issues: Orders needing admin attention
+      // Filter by transactionStatus instead of legacy status
       ordersQuery = ordersCol
-        // Payout-hold queue: includes paid/paid_held as well as post-delivery/buyer-confirm states
-        // that are still awaiting admin payout release.
-        .where('status', 'in', [
-          'paid',
-          'paid_held',
-          'awaiting_bank_transfer',
-          'awaiting_wire',
-          'in_transit',
-          'delivered',
-          'buyer_confirmed',
-          'accepted',
-          'ready_to_release',
+        .where('transactionStatus', 'in', [
+          'SELLER_NONCOMPLIANT',
+          'DISPUTE_OPENED',
+          'FULFILLMENT_REQUIRED',
+          'DELIVERED_PENDING_CONFIRMATION',
         ])
         .orderBy('createdAt', 'desc')
         .limit(limit);
@@ -112,9 +116,19 @@ export async function GET(request: Request) {
         .where('disputeStatus', 'in', ['open', 'needs_evidence', 'under_review'])
         .orderBy('createdAt', 'desc')
         .limit(limit);
-    } else if (filter === 'ready_to_release') {
-      // Candidate statuses for manual release queue. Final eligibility still checked below.
-      ordersQuery = ordersCol.where('status', 'in', ['ready_to_release', 'buyer_confirmed', 'accepted']).orderBy('createdAt', 'desc').limit(limit);
+    } else if (filter === 'ready_to_release' || filter === 'fulfillment_pending') {
+      // Fulfillment Pending: Orders in fulfillment but not completed
+      ordersQuery = ordersCol
+        .where('transactionStatus', 'in', [
+          'FULFILLMENT_REQUIRED',
+          'READY_FOR_PICKUP',
+          'PICKUP_SCHEDULED',
+          'DELIVERY_SCHEDULED',
+          'OUT_FOR_DELIVERY',
+          'DELIVERED_PENDING_CONFIRMATION',
+        ])
+        .orderBy('createdAt', 'desc')
+        .limit(limit);
     } else {
       // 'protected' and 'all' start with the broadest query; protected requires further in-memory checks.
       ordersQuery = ordersCol.orderBy('createdAt', 'desc').limit(limit);
@@ -146,10 +160,21 @@ export async function GET(request: Request) {
       }
     }
 
-    let orders = snapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    // CRITICAL: Normalize data immediately after reading to prevent int32 serialization errors
+    let orders = snapshot.docs.map((doc: any) => {
+      const rawData = doc.data();
+      const normalizedData = normalizeFirestoreValue(rawData);
+      
+      // Guard: throw if corruption still detected after normalization
+      if (process.env.NODE_ENV !== 'production') {
+        assertNoCorruptValuesAfterNormalization(normalizedData, [], `order ${doc.id}`);
+      }
+      
+      return {
+        id: doc.id,
+        ...normalizedData,
+      };
+    });
 
     // Airtight display fields: some admin tooling uses `listingTitle` for rendering.
     // Canonical snapshot is `listingSnapshot.title`, but older orders (or some flows) may not have `listingTitle`.
@@ -162,24 +187,55 @@ export async function GET(request: Request) {
       };
     });
 
-    if (filter === 'escrow') {
-      // Orders held for payout release: paid funds awaiting release OR high-ticket awaiting payment confirmation
-      // Includes orders in transit/delivered that haven't been released yet
+    if (filter === 'fulfillment_issues') {
+      // Fulfillment Issues: Filter by transactionStatus and SLA deadlines
       orders = orders.filter((order: any) => {
-        const status = order.status as OrderStatus;
-        const hasTransfer = !!order.stripeTransferId;
-        if (hasTransfer) return false;
-        return (
-          status === 'paid' ||
-          status === 'paid_held' ||
-          status === 'awaiting_bank_transfer' ||
-          status === 'awaiting_wire' ||
-          status === 'in_transit' ||
-          status === 'delivered' ||
-          status === 'buyer_confirmed' ||
-          status === 'accepted' ||
-          status === 'ready_to_release'
-        );
+        const txStatus = order.transactionStatus as string | undefined;
+        const now = Date.now();
+        
+        // SELLER_NONCOMPLIANT - always show
+        if (txStatus === 'SELLER_NONCOMPLIANT') return true;
+        
+        // DISPUTE_OPENED - always show
+        if (txStatus === 'DISPUTE_OPENED') return true;
+        
+        // FULFILLMENT_REQUIRED + SLA deadline passed
+        if (txStatus === 'FULFILLMENT_REQUIRED') {
+          let deadline: number | null = null;
+          if (order.fulfillmentSlaDeadlineAt) {
+            if (order.fulfillmentSlaDeadlineAt.toDate && typeof order.fulfillmentSlaDeadlineAt.toDate === 'function') {
+              deadline = order.fulfillmentSlaDeadlineAt.toDate().getTime();
+            } else if (order.fulfillmentSlaDeadlineAt instanceof Date) {
+              deadline = order.fulfillmentSlaDeadlineAt.getTime();
+            } else if (order.fulfillmentSlaDeadlineAt && typeof order.fulfillmentSlaDeadlineAt === 'object' && typeof order.fulfillmentSlaDeadlineAt.seconds === 'number') {
+              deadline = order.fulfillmentSlaDeadlineAt.seconds * 1000 + (order.fulfillmentSlaDeadlineAt.nanoseconds || 0) / 1_000_000;
+            }
+          }
+          if (deadline && now > deadline) return true;
+        }
+        
+        // DELIVERED_PENDING_CONFIRMATION older than 7 days
+        if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+          let deliveredAt: number | null = null;
+          if (order.deliveredAt) {
+            if (order.deliveredAt.toDate && typeof order.deliveredAt.toDate === 'function') {
+              deliveredAt = order.deliveredAt.toDate().getTime();
+            } else if (order.deliveredAt instanceof Date) {
+              deliveredAt = order.deliveredAt.getTime();
+            } else if (order.deliveredAt && typeof order.deliveredAt === 'object' && typeof order.deliveredAt.seconds === 'number') {
+              deliveredAt = order.deliveredAt.seconds * 1000 + (order.deliveredAt.nanoseconds || 0) / 1_000_000;
+            }
+          }
+          if (!deliveredAt && order.delivery?.deliveredAt) {
+            deliveredAt = new Date(order.delivery.deliveredAt).getTime();
+          }
+          if (deliveredAt) {
+            const daysSinceDelivery = (now - deliveredAt) / (1000 * 60 * 60 * 24);
+            if (daysSinceDelivery > 7) return true;
+          }
+        }
+        
+        return false;
       });
     } else if (filter === 'protected') {
       // Protected transactions: has protectedTransactionDaysSnapshot AND deliveryConfirmedAt exists
@@ -190,39 +246,23 @@ export async function GET(request: Request) {
                order.deliveryConfirmedAt !== undefined;
       });
     } else if (filter === 'disputes') {
-      // Open disputes: disputeStatus in ['open', 'needs_evidence', 'under_review']
+      // Open disputes: transactionStatus === DISPUTE_OPENED
       orders = orders.filter((order: any) => {
-        const disputeStatus = order.disputeStatus as DisputeStatus;
-        return disputeStatus === 'open' || 
-               disputeStatus === 'needs_evidence' || 
-               disputeStatus === 'under_review';
+        const txStatus = order.transactionStatus as string | undefined;
+        return txStatus === 'DISPUTE_OPENED';
       });
-    } else if (filter === 'ready_to_release') {
-      // Ready to release: eligible for payout
+    } else if (filter === 'ready_to_release' || filter === 'fulfillment_pending') {
+      // Fulfillment Pending: Orders in fulfillment but not completed
       orders = orders.filter((order: any) => {
-        const status = order.status as OrderStatus;
-        const disputeStatus = order.disputeStatus as DisputeStatus;
-        const adminHold = order.adminHold === true;
-        const hasTransfer = !!order.stripeTransferId;
-
-        // Already released
-        if (hasTransfer || status === 'completed') return false;
-
-        // Blocked by dispute or admin hold
-        if (adminHold) return false;
-        if (disputeStatus === 'open' || disputeStatus === 'needs_evidence' || disputeStatus === 'under_review') {
-          return false;
-        }
-
-        // Manual release queue: buyer confirmed + delivery marked
-        const hasBuyerConfirm = !!order.buyerConfirmedAt || !!order.buyerAcceptedAt || !!order.acceptedAt;
-        const hasDelivery = !!order.deliveredAt || !!order.deliveryConfirmedAt;
-
-        if ((status === 'ready_to_release' || status === 'buyer_confirmed' || status === 'accepted') && hasBuyerConfirm && hasDelivery) {
-          return true;
-        }
-
-        return false;
+        const txStatus = order.transactionStatus as string | undefined;
+        return [
+          'FULFILLMENT_REQUIRED',
+          'READY_FOR_PICKUP',
+          'PICKUP_SCHEDULED',
+          'DELIVERY_SCHEDULED',
+          'OUT_FOR_DELIVERY',
+          'DELIVERED_PENDING_CONFIRMATION',
+        ].includes(txStatus || '');
       });
     }
     // 'all' filter returns all orders (already fetched)
@@ -243,20 +283,48 @@ export async function GET(request: Request) {
 
       timestampFields.forEach((field) => {
         if (serialized[field]) {
-          if (serialized[field].toDate) {
+          // Handle Firestore Timestamp objects (with .toDate method)
+          if (serialized[field].toDate && typeof serialized[field].toDate === 'function') {
             serialized[field] = serialized[field].toDate().toISOString();
-          } else if (serialized[field] instanceof Date) {
+          } 
+          // Handle Date objects
+          else if (serialized[field] instanceof Date) {
             serialized[field] = serialized[field].toISOString();
+          }
+          // Handle normalized {seconds, nanoseconds} objects from normalizeFirestoreValue
+          else if (serialized[field] && typeof serialized[field] === 'object' && typeof serialized[field].seconds === 'number') {
+            const ms = serialized[field].seconds * 1000 + (serialized[field].nanoseconds || 0) / 1_000_000;
+            serialized[field] = new Date(ms).toISOString();
+          }
+          // If it's already an ISO string, leave it as-is
+          else if (typeof serialized[field] === 'string') {
+            // Already an ISO string, no conversion needed
           }
         }
       });
 
       // Convert disputeEvidence timestamps
       if (serialized.disputeEvidence && Array.isArray(serialized.disputeEvidence)) {
-        serialized.disputeEvidence = serialized.disputeEvidence.map((evidence: any) => ({
-          ...evidence,
-          uploadedAt: evidence.uploadedAt?.toDate ? evidence.uploadedAt.toDate().toISOString() : evidence.uploadedAt,
-        }));
+        serialized.disputeEvidence = serialized.disputeEvidence.map((evidence: any) => {
+          let uploadedAt = evidence.uploadedAt;
+          // Handle Firestore Timestamp
+          if (uploadedAt?.toDate && typeof uploadedAt.toDate === 'function') {
+            uploadedAt = uploadedAt.toDate().toISOString();
+          }
+          // Handle Date
+          else if (uploadedAt instanceof Date) {
+            uploadedAt = uploadedAt.toISOString();
+          }
+          // Handle normalized {seconds, nanoseconds}
+          else if (uploadedAt && typeof uploadedAt === 'object' && typeof uploadedAt.seconds === 'number') {
+            const ms = uploadedAt.seconds * 1000 + (uploadedAt.nanoseconds || 0) / 1_000_000;
+            uploadedAt = new Date(ms).toISOString();
+          }
+          return {
+            ...evidence,
+            uploadedAt: uploadedAt || new Date().toISOString(),
+          };
+        });
       }
 
       return serialized;
