@@ -12,6 +12,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 export async function POST(request: Request, ctx: { params: { offerId: string } }) {
   const rate = await requireRateLimit(request);
@@ -193,10 +194,28 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
       });
 
       if (evBuyer?.ok && typeof evBuyer?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: evBuyer.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: evBuyer.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Offer.Accepted',
+            jobId: evBuyer.eventId,
+            offerId,
+            role: 'buyer',
+            endpoint: '/api/offers/[offerId]/accept',
+          });
+        });
       }
       if (evSeller?.ok && typeof evSeller?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: evSeller.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: evSeller.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Offer.Accepted',
+            jobId: evSeller.eventId,
+            offerId,
+            role: 'seller',
+            endpoint: '/api/offers/[offerId]/accept',
+          });
+        });
       }
     } catch {
       // best-effort

@@ -15,6 +15,7 @@ import { computeReminderPlan, shouldSendReminder, getReminderTemplate } from '@/
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { createAuditLog } from '@/lib/audit/logger';
+import { captureException } from '@/lib/monitoring/capture';
 import { getSiteUrl } from '@/lib/site-url';
 import { safeUpdate } from '@/lib/firebase/safeFirestore';
 
@@ -141,7 +142,16 @@ export async function POST(request: Request) {
                 });
 
                 if (event?.ok && event.created) {
-                  void tryDispatchEmailJobNow({ db: db as any, jobId: event.eventId, waitForJob: true }).catch(() => {});
+                  void tryDispatchEmailJobNow({ db: db as any, jobId: event.eventId, waitForJob: true }).catch((err) => {
+                    captureException(err instanceof Error ? err : new Error(String(err)), {
+                      context: 'email-dispatch',
+                      eventType: 'Order.Reminder',
+                      jobId: event.eventId,
+                      orderId,
+                      role: 'buyer',
+                      endpoint: '/api/admin/reminders/run',
+                    });
+                  });
                 }
 
                 // Update reminder metadata
@@ -200,7 +210,16 @@ export async function POST(request: Request) {
                 });
 
                 if (event?.ok && event.created) {
-                  void tryDispatchEmailJobNow({ db: db as any, jobId: event.eventId, waitForJob: true }).catch(() => {});
+                  void tryDispatchEmailJobNow({ db: db as any, jobId: event.eventId, waitForJob: true }).catch((err) => {
+                    captureException(err instanceof Error ? err : new Error(String(err)), {
+                      context: 'email-dispatch',
+                      eventType: 'Order.Reminder',
+                      jobId: event.eventId,
+                      orderId,
+                      role: 'buyer',
+                      endpoint: '/api/admin/reminders/run',
+                    });
+                  });
                 }
 
                 // Update reminder metadata

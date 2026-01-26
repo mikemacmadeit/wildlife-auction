@@ -12,6 +12,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { json, requireAuth, requireRateLimit } from '../../_util';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 const declineSchema = z.object({
   note: z.string().max(500).optional(),
@@ -143,7 +144,15 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         optionalHash: `offer:${offerId}:declined`,
       });
       if (ev?.ok && typeof ev?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Offer.Declined',
+            jobId: ev.eventId,
+            offerId,
+            endpoint: '/api/offers/[offerId]/decline',
+          });
+        });
       }
     } catch {
       // best-effort

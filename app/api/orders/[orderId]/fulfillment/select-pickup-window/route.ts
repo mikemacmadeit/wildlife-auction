@@ -14,6 +14,7 @@ import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 const selectPickupWindowSchema = z.object({
   selectedWindowIndex: z.number().int().min(0),
@@ -204,7 +205,15 @@ export async function POST(
         optionalHash: `pickup_window_selected:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.PickupWindowSelected',
+            jobId: ev.eventId,
+            orderId: params.orderId,
+            endpoint: '/api/orders/[orderId]/fulfillment/select-pickup-window',
+          });
+        });
       }
     } catch (e) {
       console.error('Error emitting Order.PickupWindowSelected notification event:', e);

@@ -16,6 +16,7 @@ import { getSiteUrl } from '@/lib/site-url';
 import { getPrimaryListingImageUrl, offerAmountSchema, json, requireAuth, requireRateLimit } from '../_util';
 import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -338,7 +339,17 @@ export async function POST(request: Request) {
           });
           // Best-effort: send the queued email job immediately (avoids relying on schedulers for time-sensitive offers).
           if (buyerEv?.ok && typeof buyerEv?.eventId === 'string') {
-            void tryDispatchEmailJobNow({ db: db as any, jobId: buyerEv.eventId, waitForJob: true }).catch(() => {});
+            void tryDispatchEmailJobNow({ db: db as any, jobId: buyerEv.eventId, waitForJob: true }).catch((err) => {
+              captureException(err instanceof Error ? err : new Error(String(err)), {
+                context: 'email-dispatch',
+                eventType: 'Offer.Submitted',
+                jobId: buyerEv.eventId,
+                offerId: result.offerId,
+                listingId,
+                role: 'buyer',
+                endpoint: '/api/offers/create',
+              });
+            });
           }
         }
         if (sellerId) {
@@ -361,7 +372,17 @@ export async function POST(request: Request) {
           });
           // Best-effort: send the queued email job immediately (avoids relying on schedulers for time-sensitive offers).
           if (sellerEv?.ok && typeof sellerEv?.eventId === 'string') {
-            void tryDispatchEmailJobNow({ db: db as any, jobId: sellerEv.eventId, waitForJob: true }).catch(() => {});
+            void tryDispatchEmailJobNow({ db: db as any, jobId: sellerEv.eventId, waitForJob: true }).catch((err) => {
+              captureException(err instanceof Error ? err : new Error(String(err)), {
+                context: 'email-dispatch',
+                eventType: 'Offer.Received',
+                jobId: sellerEv.eventId,
+                offerId: result.offerId,
+                listingId,
+                role: 'seller',
+                endpoint: '/api/offers/create',
+              });
+            });
           }
         }
       }

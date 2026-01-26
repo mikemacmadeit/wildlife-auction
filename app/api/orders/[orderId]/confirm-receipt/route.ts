@@ -163,7 +163,15 @@ export async function POST(request: Request, { params }: { params: { orderId: st
         optionalHash: `buyer_confirmed:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.ReceiptConfirmed',
+            jobId: ev.eventId,
+            orderId,
+            endpoint: '/api/orders/[orderId]/confirm-receipt',
+          });
+        });
       }
     } catch (e) {
       console.warn('[confirm-receipt] Failed to emit Order.Received (best-effort)', { orderId, error: String(e) });

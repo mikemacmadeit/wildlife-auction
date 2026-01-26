@@ -15,6 +15,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -159,7 +160,15 @@ export async function POST(
         optionalHash: `accepted:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.Accepted',
+            jobId: ev.eventId,
+            orderId,
+            endpoint: '/api/orders/[orderId]/accept',
+          });
+        });
       }
     } catch (e) {
       console.error('Error emitting Order.Accepted notification event:', e);

@@ -15,6 +15,7 @@ import { getSiteUrl } from '@/lib/site-url';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -195,11 +196,23 @@ export async function POST(
         optionalHash: `delivery:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.DeliveryConfirmed',
+            jobId: ev.eventId,
+            orderId: params.orderId,
+            endpoint: '/api/orders/[orderId]/confirm-delivery',
+          });
+        });
       }
     } catch (emailError) {
       // Don't fail the confirmation if email fails
-      console.error('Error emitting delivery_confirmed notification event:', emailError);
+      captureException(emailError instanceof Error ? emailError : new Error(String(emailError)), {
+        context: 'notification-event',
+        endpoint: '/api/orders/[orderId]/confirm-delivery',
+        orderId: params.orderId,
+      });
     }
 
     return json({

@@ -13,6 +13,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { createAuditLog } from '@/lib/audit/logger';
+import { captureException } from '@/lib/monitoring/capture';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { getUserProfile } from '@/lib/firebase/users';
 import { assertInt32 } from '@/lib/debug/int32Tripwire';
@@ -220,7 +221,16 @@ export async function POST(
     });
 
     if (ev?.ok && ev.created) {
-      void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+      void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+        captureException(err instanceof Error ? err : new Error(String(err)), {
+          context: 'email-dispatch',
+          eventType: 'Order.Reminder',
+          jobId: ev.eventId,
+          orderId: params.orderId,
+          role: validation.data.role,
+          endpoint: '/api/admin/orders/[orderId]/send-reminder',
+        });
+      });
     }
 
     // Log audit

@@ -208,7 +208,15 @@ export async function POST(
         optionalHash: `delivered:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.Delivered',
+            jobId: ev.eventId,
+            orderId: params.orderId,
+            endpoint: '/api/orders/[orderId]/mark-delivered',
+          });
+        });
       }
     } catch (e) {
       captureException(e instanceof Error ? e : new Error(String(e)), {

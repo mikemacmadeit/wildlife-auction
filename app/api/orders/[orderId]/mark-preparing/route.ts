@@ -14,6 +14,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import type { OrderStatus } from '@/lib/types';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -128,7 +129,15 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       });
       if (ev?.ok && ev.created) {
         // Best-effort: don't rely on schedulers for order timeline emails.
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.Preparing',
+            jobId: ev.eventId,
+            orderId: params.orderId,
+            endpoint: '/api/orders/[orderId]/mark-preparing',
+          });
+        });
       }
     } catch (e) {
       console.error('Error emitting Order.Preparing notification event:', e);

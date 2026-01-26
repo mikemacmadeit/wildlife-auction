@@ -1,7 +1,7 @@
 // Auto-generated at build time. Do not edit manually.
 export const BUILD_INFO = {
-  sha: "3ca18d88ef0c079ce481e16b679f2d06fec929ec",
-  shortSha: "3ca18d8",
+  sha: "12c7d3748085b203a7ac6fa0b42b8130725f2a45",
+  shortSha: "12c7d37",
   branch: "main",
-  builtAtIso: "2026-01-26T18:55:24.025Z",
+  builtAtIso: "2026-01-26T19:24:06.752Z",
 } as const;

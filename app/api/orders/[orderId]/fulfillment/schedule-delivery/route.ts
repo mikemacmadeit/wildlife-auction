@@ -15,6 +15,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
+import { captureException } from '@/lib/monitoring/capture';
 import { assertNoCorruptInt32 } from '@/lib/firebase/assertNoCorruptInt32';
 
 const scheduleDeliverySchema = z.object({
@@ -198,7 +199,15 @@ export async function POST(
         optionalHash: `delivery_scheduled:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.DeliveryScheduled',
+            jobId: ev.eventId,
+            orderId: params.orderId,
+            endpoint: '/api/orders/[orderId]/fulfillment/schedule-delivery',
+          });
+        });
       }
     } catch (e) {
       console.error('Error emitting Order.DeliveryScheduled notification event:', e);

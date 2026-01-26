@@ -13,6 +13,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { offerAmountSchema, json, requireAuth, requireRateLimit } from '../../_util';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 const counterSchema = z.object({
   amount: offerAmountSchema,
@@ -180,7 +181,15 @@ export async function POST(request: Request, ctx: { params: { offerId: string } 
         optionalHash: `offer:${offerId}:counter:${result.expiresAtIso}`,
       });
       if (ev?.ok && typeof ev?.eventId === 'string') {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Offer.Countered',
+            jobId: ev.eventId,
+            offerId,
+            endpoint: '/api/offers/[offerId]/counter',
+          });
+        });
       }
     } catch {
       // best-effort

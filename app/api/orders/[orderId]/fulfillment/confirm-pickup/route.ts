@@ -14,6 +14,7 @@ import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
+import { captureException } from '@/lib/monitoring/capture';
 
 const confirmPickupSchema = z.object({
   pickupCode: z.string().length(6, 'Pickup code must be 6 digits'),
@@ -194,7 +195,15 @@ export async function POST(
         optionalHash: `pickup_confirmed:${now.toISOString()}`,
       });
       if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch(() => {});
+        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
+            context: 'email-dispatch',
+            eventType: 'Order.Received',
+            jobId: ev.eventId,
+            orderId: params.orderId,
+            endpoint: '/api/orders/[orderId]/fulfillment/confirm-pickup',
+          });
+        });
       }
     } catch (e) {
       console.error('Error emitting Order.Received notification event:', e);
