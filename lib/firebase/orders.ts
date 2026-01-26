@@ -128,9 +128,46 @@ export interface OrderDoc {
  * Convert Firestore OrderDoc to UI Order type
  */
 function toOrder(docId: string, data: OrderDoc): Order {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:130',message:'toOrder entry',data:{docId,createdAtType:typeof data.createdAt,createdAtValue:data.createdAt,hasToDate:typeof data.createdAt?.toDate === 'function',isDate:data.createdAt instanceof Date,isPlainObject:data.createdAt && typeof data.createdAt === 'object' && 'seconds' in data.createdAt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
+  // Helper to safely convert timestamp-like values to Date
+  const toDateSafe = (value: any): Date => {
+    if (!value) return new Date(0);
+    if (value instanceof Date) {
+      // Verify it's a valid Date
+      if (Number.isFinite(value.getTime())) {
+        return value;
+      }
+      return new Date(0);
+    }
+    // Try toDate() method (Firestore Timestamp) with error handling
+    if (typeof value?.toDate === 'function') {
+      try {
+        const result = value.toDate();
+        if (result instanceof Date && Number.isFinite(result.getTime())) {
+          return result;
+        }
+      } catch (err) {
+        // If toDate() fails, fall through to other checks
+        // This can happen if value is a serialized object that looks like it has toDate but doesn't work
+      }
+    }
+    // Handle normalized {seconds, nanoseconds} objects from normalizeFirestoreValue
+    if (value && typeof value === 'object' && typeof value.seconds === 'number') {
+      const ms = value.seconds * 1000 + (value.nanoseconds || 0) / 1_000_000;
+      const result = new Date(ms);
+      if (Number.isFinite(result.getTime())) {
+        return result;
+      }
+    }
+    // Handle string/number timestamps (from JSON serialization)
+    if (typeof value === 'string' || typeof value === 'number') {
+      const result = new Date(value);
+      if (Number.isFinite(result.getTime())) {
+        return result;
+      }
+    }
+    // Fallback
+    return new Date(0);
+  };
   
   const timeline =
     Array.isArray(data.timeline)
@@ -139,44 +176,13 @@ function toOrder(docId: string, data: OrderDoc): Order {
             id: String(e?.id || ''),
             type: String(e?.type || ''),
             label: String(e?.label || ''),
-            timestamp:
-              typeof e?.timestamp?.toDate === 'function'
-                ? e.timestamp.toDate()
-                : e?.timestamp instanceof Date
-                  ? e.timestamp
-                  : new Date(0),
+            timestamp: toDateSafe(e?.timestamp),
             actor: String(e?.actor || 'system'),
             visibility: e?.visibility ? String(e.visibility) : undefined,
             meta: e?.meta && typeof e.meta === 'object' ? e.meta : undefined,
           }))
           .filter((e: any) => e.id && e.type && e.label)
       : undefined;
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:151',message:'Before createdAt conversion',data:{createdAtType:typeof data.createdAt,createdAtValue:data.createdAt,hasSeconds:data.createdAt && typeof (data.createdAt as any).seconds === 'number',hasNanoseconds:data.createdAt && typeof (data.createdAt as any).nanoseconds === 'number'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
-  // Helper to safely convert timestamp-like values to Date
-  const toDateSafe = (value: any): Date => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:toDateSafe',message:'toDateSafe called',data:{valueType:typeof value,isDate:value instanceof Date,hasToDate:typeof value?.toDate === 'function',hasSeconds:value && typeof value.seconds === 'number',hasNanoseconds:value && typeof value.nanoseconds === 'number'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
-    if (!value) return new Date(0);
-    if (value instanceof Date) return value;
-    if (typeof value?.toDate === 'function') return value.toDate();
-    // Handle normalized {seconds, nanoseconds} objects from normalizeFirestoreValue
-    if (value && typeof value === 'object' && typeof value.seconds === 'number') {
-      const ms = value.seconds * 1000 + (value.nanoseconds || 0) / 1_000_000;
-      const result = new Date(ms);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'orders.ts:toDateSafe',message:'toDateSafe conversion success',data:{inputSeconds:value.seconds,inputNanoseconds:value.nanoseconds,outputMs:ms,outputDate:result.toISOString(),isValidDate:!isNaN(result.getTime())},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      return result;
-    }
-    // Fallback
-    return new Date(0);
-  };
 
   return {
     id: docId,
@@ -242,6 +248,8 @@ function toOrder(docId: string, data: OrderDoc): Order {
     listingSnapshot: data.listingSnapshot,
     sellerSnapshot: data.sellerSnapshot,
     timeline: timeline as any,
+    fulfillmentSlaDeadlineAt: (data as any).fulfillmentSlaDeadlineAt ? toDateSafe((data as any).fulfillmentSlaDeadlineAt) : undefined,
+    fulfillmentSlaStartedAt: (data as any).fulfillmentSlaStartedAt ? toDateSafe((data as any).fulfillmentSlaStartedAt) : undefined,
   };
 }
 

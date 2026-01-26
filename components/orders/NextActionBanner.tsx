@@ -140,13 +140,13 @@ export function NextActionBanner({
   const { title, description, urgency, ctaLabel, icon } = actionDetails;
 
   // Urgency styling
-  const urgencyStyles = {
+  const urgencyStyles: Record<'overdue' | 'urgent' | 'normal', string> = {
     overdue: 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100',
     urgent: 'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 text-orange-900 dark:text-orange-100',
     normal: 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100',
   };
 
-  const urgencyStyle = urgencyStyles[urgency] || urgencyStyles.normal;
+  const urgencyStyle = urgencyStyles[urgency as 'overdue' | 'urgent' | 'normal'] || urgencyStyles.normal;
 
   if (variant === 'inline') {
     // Compact version for list rows

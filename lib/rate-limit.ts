@@ -155,7 +155,7 @@ export async function checkRateLimitByKey(
       const err = error instanceof Error ? error : new Error(String(error));
       captureException(err, {
         context: 'rate-limit-redis-operation',
-        key: redisKey,
+        key: key,
         config: {
           windowMs: config.windowMs,
           maxRequests: config.maxRequests,

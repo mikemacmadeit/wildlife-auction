@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -75,7 +75,7 @@ export default function BuyerOrderDetailPage() {
   const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'select_window' | 'confirm_pickup' | null>(null);
   const [pickupCodeInput, setPickupCodeInput] = useState('');
 
-  const loadOrder = async (cancelledRef?: { current: boolean }) => {
+  const loadOrder = useCallback(async (cancelledRef?: { current: boolean }) => {
     // Allow calling without cancelledRef for manual reloads
     if (!user?.uid || !orderId) return;
     setLoading(true);
@@ -97,7 +97,7 @@ export default function BuyerOrderDetailPage() {
     } finally {
       if (!cancelledRef?.current) setLoading(false);
     }
-  };
+  }, [user?.uid, orderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +108,7 @@ export default function BuyerOrderDetailPage() {
     return () => {
       cancelledRef.current = true;
     };
-  }, [authLoading, orderId, user?.uid]);
+  }, [authLoading, loadOrder]);
 
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
@@ -543,8 +543,12 @@ export default function BuyerOrderDetailPage() {
                         <div className="font-semibold text-sm">Select Pickup Window</div>
                         <div className="space-y-2">
                           {order.pickup.windows.map((window: any, idx: number) => {
-                            const start = window.start?.toDate ? window.start.toDate() : new Date(window.start);
-                            const end = window.end?.toDate ? window.end.toDate() : new Date(window.end);
+                            const start = (window.start && typeof window.start === 'object' && typeof window.start.toDate === 'function') 
+                              ? window.start.toDate() 
+                              : new Date(window.start || 0);
+                            const end = (window.end && typeof window.end === 'object' && typeof window.end.toDate === 'function')
+                              ? window.end.toDate()
+                              : new Date(window.end || 0);
                             return (
                               <Button
                                 key={idx}
@@ -576,7 +580,7 @@ export default function BuyerOrderDetailPage() {
                       <Separator />
                     </>
                   )}
-                  {txStatus === 'PICKUP_SCHEDULED' && order.pickup?.selectedWindow && txStatus !== 'AWAITING_TRANSFER_COMPLIANCE' && (
+                  {txStatus === 'PICKUP_SCHEDULED' && order.pickup?.selectedWindow && (
                     <>
                       <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
                         <div><strong>Scheduled Window:</strong></div>

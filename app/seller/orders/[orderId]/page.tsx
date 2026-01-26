@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
@@ -69,33 +69,29 @@ export default function SellerOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadOrder() {
-      if (!user?.uid || !orderId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const o = await getOrderById(orderId);
-        if (!o) throw new Error('Order not found');
-        if (o.sellerId !== user.uid) throw new Error('You can only view your own sales.');
-        const l = await getListingById(o.listingId);
-        const bos = await getDocuments('order', o.id, 'BILL_OF_SALE').catch(() => []);
-        if (cancelled) return;
-        setOrder(o);
-        setListing(l || null);
-        setBillOfSaleDocs(bos);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load order');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const loadOrder = useCallback(async () => {
+    if (!user?.uid || !orderId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const o = await getOrderById(orderId);
+      if (!o) throw new Error('Order not found');
+      if (o.sellerId !== user.uid) throw new Error('You can only view your own sales.');
+      const l = await getListingById(o.listingId);
+      const bos = await getDocuments('order', o.id, 'BILL_OF_SALE').catch(() => []);
+      setOrder(o);
+      setListing(l || null);
+      setBillOfSaleDocs(bos);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load order');
+    } finally {
+      setLoading(false);
     }
+  }, [user?.uid, orderId]);
+
+  useEffect(() => {
     if (!authLoading) void loadOrder();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, orderId, user?.uid]);
+  }, [authLoading, loadOrder]);
 
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);

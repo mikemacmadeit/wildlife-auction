@@ -22,7 +22,7 @@ export function isRegulatedWhitetailDeal(listingOrOrder: Listing | Order): boole
   if ('listingSnapshot' in listingOrOrder && listingOrOrder.listingSnapshot) {
     const snapshot = listingOrOrder.listingSnapshot;
     if (snapshot.category === 'whitetail_breeder') {
-      const attrs = snapshot.attributes as WhitetailBreederAttributes | undefined;
+      const attrs = (snapshot as any).attributes as WhitetailBreederAttributes | undefined;
       if (attrs && attrs.sex === 'male') {
         return true;
       }

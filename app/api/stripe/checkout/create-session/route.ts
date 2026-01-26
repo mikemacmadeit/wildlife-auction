@@ -52,9 +52,6 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
 const NextResponse = { json };
 
 export async function POST(request: Request) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Handler entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   try {
     // Lazily initialize Admin SDK inside the handler so we can return a structured error instead of crashing at import-time.
     // (Netlify functions frequently fail if Admin creds are missing/malformed at module load.)
@@ -63,13 +60,7 @@ export async function POST(request: Request) {
     try {
       auth = getAdminAuth();
       db = getAdminDb();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Admin SDK initialized',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
     } catch (e: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Admin SDK init failed',data:{errorCode:e?.code,errorMessage:e?.message,missing:e?.missing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       logWarn('Firebase Admin init failed in /api/stripe/checkout/create-session', {
         code: e?.code,
         message: e?.message,
@@ -188,19 +179,10 @@ export async function POST(request: Request) {
     const idempotencyWindow = Math.floor(Date.now() / 60000); // 1-minute window
     const idempotencyKey = `checkout_session:${listingId}:${buyerId}:${idempotencyWindow}`;
     const idempotencyRef = db.collection('checkoutSessions').doc(idempotencyKey);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Before idempotency check',data:{idempotencyKey,listingId,buyerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     let existingSessionDoc;
     try {
       existingSessionDoc = await idempotencyRef.get();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Idempotency check completed',data:{exists:existingSessionDoc.exists},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
     } catch (idempError: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Idempotency check failed',data:{errorMessage:idempError?.message,errorCode:idempError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       // Non-blocking: if idempotency check fails, continue (will use Stripe idempotency key)
       existingSessionDoc = { exists: false } as any;
     }
@@ -1097,21 +1079,12 @@ export async function POST(request: Request) {
     
     let session: Stripe.Checkout.Session;
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Before Stripe session create',data:{listingId,buyerId,orderId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Use Stripe idempotency key to prevent duplicate sessions at Stripe level
       const stripeIdempotencyKey = `checkout:${listingId}:${buyerId}:${idempotencyWindow}`;
       session = await stripe.checkout.sessions.create(sessionConfig, {
         idempotencyKey: stripeIdempotencyKey,
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Stripe session created',data:{sessionId:session.id,status:session.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
     } catch (stripeError: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/stripe/checkout/create-session/route.ts:POST',message:'Stripe session create failed',data:{errorType:stripeError?.type,errorCode:stripeError?.code,errorMessage:stripeError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Roll back reservation + cancel the order skeleton (best-effort).
       await rollbackReservationBestEffort();
       const msg = String(stripeError?.message || '');

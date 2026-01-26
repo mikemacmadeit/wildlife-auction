@@ -18,6 +18,11 @@ function safeString(v: any): string {
   return typeof v === 'string' ? v : String(v ?? '');
 }
 
+function clampInt32(n: number): number {
+  // Clamp to int32 safe range: -2147483648 to 2147483647
+  return Math.max(-2147483648, Math.min(2147483647, Math.round(n)));
+}
+
 async function loadUserContact(
   db: FirebaseFirestore.Firestore,
   userId: string

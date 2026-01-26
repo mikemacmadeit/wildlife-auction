@@ -135,10 +135,10 @@ export function requiresSellerAction(order: Order): boolean {
   }
 
   if (transportOption === 'SELLER_TRANSPORT') {
-    return status === 'FULFILLMENT_REQUIRED' || status === 'DELIVERY_SCHEDULED';
+    return status === 'DELIVERY_SCHEDULED';
   } else {
     // BUYER_TRANSPORT
-    return status === 'FULFILLMENT_REQUIRED' || status === 'READY_FOR_PICKUP';
+    return status === 'READY_FOR_PICKUP';
   }
 }
 

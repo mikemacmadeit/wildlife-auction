@@ -86,7 +86,7 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
           ? 'buyer'
           : 'buyer', // Default to buyer if neither confirmed
       helpText: 'Both buyer and seller must confirm TPWD transfer permit compliance before fulfillment can begin.',
-      completedAt: confirmations.bothConfirmedAt,
+      completedAt: order.complianceTransfer?.unlockedAt,
     });
   }
 
@@ -490,7 +490,7 @@ export function getUXBadge(order: Order, role: 'buyer' | 'seller' | 'admin'): UX
     if (nextAction && nextAction.ownerRole === 'buyer') {
       return {
         label: ORDER_COPY.fulfillment.actionNeeded,
-        variant: 'warning',
+        variant: 'secondary',
       };
     }
     if (nextAction && nextAction.ownerRole === 'seller') {
@@ -505,7 +505,7 @@ export function getUXBadge(order: Order, role: 'buyer' | 'seller' | 'admin'): UX
     if (nextAction && nextAction.ownerRole === 'seller') {
       return {
         label: ORDER_COPY.fulfillment.actionNeeded,
-        variant: 'warning',
+        variant: 'secondary',
       };
     }
     if (nextAction && nextAction.ownerRole === 'buyer') {

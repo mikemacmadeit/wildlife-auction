@@ -1867,7 +1867,7 @@ export function getOrderTransferComplianceRequiredEmail(
       </tr>
     </table>
   `;
-  return renderEmail({ subject, preheader, contentHtml: content, origin });
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getOrderComplianceBuyerConfirmedEmail(
@@ -1896,7 +1896,7 @@ export function getOrderComplianceBuyerConfirmedEmail(
       </tr>
     </table>
   `;
-  return renderEmail({ subject, preheader, contentHtml: content, origin });
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getOrderComplianceSellerConfirmedEmail(
@@ -1925,7 +1925,7 @@ export function getOrderComplianceSellerConfirmedEmail(
       </tr>
     </table>
   `;
-  return renderEmail({ subject, preheader, contentHtml: content, origin });
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getOrderComplianceUnlockedEmail(
@@ -1954,7 +1954,7 @@ export function getOrderComplianceUnlockedEmail(
       </tr>
     </table>
   `;
-  return renderEmail({ subject, preheader, contentHtml: content, origin });
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
 }
 
 export function getAdminDisputeOpenedEmail(data: AdminDisputeOpenedEmailData): { subject: string; html: string } {

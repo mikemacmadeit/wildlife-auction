@@ -877,6 +877,10 @@ export interface Order {
     buyerCount?: number; // Total reminders sent to buyer
     sellerCount?: number; // Total reminders sent to seller
   };
+  
+  // Fulfillment SLA tracking (optional, server-authored)
+  fulfillmentSlaDeadlineAt?: Date; // Deadline for fulfillment completion
+  fulfillmentSlaStartedAt?: Date; // When fulfillment SLA period started
 }
 
 export interface FilterState {

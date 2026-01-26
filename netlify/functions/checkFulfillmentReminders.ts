@@ -8,6 +8,7 @@
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import type { Order } from '@/lib/types';
 import { getReminderSchedule, shouldAutoComplete, shouldEscalateToAdmin, SLA_WARNING_HOURS, COMPLIANCE_REMINDER_HOURS, COMPLIANCE_ESCALATION_DAYS } from '@/lib/orders/completion-policies';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
@@ -36,8 +37,10 @@ async function getReminderRecord(
   if (reminderDoc.exists) {
     const data = reminderDoc.data()!;
     // Safely convert Timestamps to Dates, ensuring no invalid nanoseconds
-    const lastReminderAt = data.lastReminderAt?.toDate ? data.lastReminderAt.toDate() : (data.lastReminderAt instanceof Date ? data.lastReminderAt : undefined);
-    const nextReminderAt = data.nextReminderAt?.toDate ? data.nextReminderAt.toDate() : (data.nextReminderAt instanceof Date ? data.nextReminderAt : undefined);
+    const lastReminderAtRaw: any = data.lastReminderAt;
+    const lastReminderAt = lastReminderAtRaw instanceof Date ? lastReminderAtRaw : (lastReminderAtRaw && typeof lastReminderAtRaw === 'object' && typeof lastReminderAtRaw.toDate === 'function' ? lastReminderAtRaw.toDate() : undefined);
+    const nextReminderAtRaw: any = data.nextReminderAt;
+    const nextReminderAt = nextReminderAtRaw instanceof Date ? nextReminderAtRaw : (nextReminderAtRaw && typeof nextReminderAtRaw === 'object' && typeof nextReminderAtRaw.toDate === 'function' ? nextReminderAtRaw.toDate() : undefined);
     // Tripwire: catch invalid reminderCount before returning
     if (data.reminderCount !== undefined) {
       assertInt32(data.reminderCount, 'reminderRecord.reminderCount');
@@ -103,7 +106,7 @@ async function sendReminder(
     orderUrl = `${getSiteUrl()}/seller/orders/${order.id}`;
     
     if (reminderType === 'sla_approaching') {
-      const slaDeadline = order.fulfillmentSlaDeadlineAt?.toDate ? order.fulfillmentSlaDeadlineAt.toDate() : new Date(order.fulfillmentSlaDeadlineAt);
+      const slaDeadline = order.fulfillmentSlaDeadlineAt instanceof Date ? order.fulfillmentSlaDeadlineAt : (order.fulfillmentSlaDeadlineAt && typeof order.fulfillmentSlaDeadlineAt === 'object' && typeof order.fulfillmentSlaDeadlineAt.toDate === 'function' ? order.fulfillmentSlaDeadlineAt.toDate() : new Date(order.fulfillmentSlaDeadlineAt || 0));
       // Clamp to >= 0 to prevent negative values from causing int32 serialization errors
       const hoursRemaining = Math.max(0, Math.floor((slaDeadline.getTime() - now) / (1000 * 60 * 60)));
       // Tripwire: catch invalid int32 before serialization
@@ -119,7 +122,7 @@ async function sendReminder(
         deadline: slaDeadline.toISOString(),
       };
     } else if (reminderType === 'sla_overdue') {
-      const slaDeadline = order.fulfillmentSlaDeadlineAt?.toDate ? order.fulfillmentSlaDeadlineAt.toDate() : new Date(order.fulfillmentSlaDeadlineAt);
+      const slaDeadline = order.fulfillmentSlaDeadlineAt instanceof Date ? order.fulfillmentSlaDeadlineAt : (order.fulfillmentSlaDeadlineAt && typeof order.fulfillmentSlaDeadlineAt === 'object' && typeof order.fulfillmentSlaDeadlineAt.toDate === 'function' ? order.fulfillmentSlaDeadlineAt.toDate() : new Date(order.fulfillmentSlaDeadlineAt || 0));
       // Clamp to >= 0 (hoursOverdue should always be positive when overdue, but ensure it)
       const hoursOverdue = Math.max(0, Math.floor((now - slaDeadline.getTime()) / (1000 * 60 * 60)));
       // Tripwire: catch invalid int32 before serialization
@@ -137,7 +140,7 @@ async function sendReminder(
     } else {
       // Regular fulfillment reminder
       eventType = 'Order.SlaApproaching'; // Reuse SLA approaching for now
-      const slaDeadline = order.fulfillmentSlaDeadlineAt?.toDate ? order.fulfillmentSlaDeadlineAt.toDate() : null;
+      const slaDeadline = order.fulfillmentSlaDeadlineAt instanceof Date ? order.fulfillmentSlaDeadlineAt : (order.fulfillmentSlaDeadlineAt && typeof order.fulfillmentSlaDeadlineAt === 'object' && typeof order.fulfillmentSlaDeadlineAt.toDate === 'function' ? order.fulfillmentSlaDeadlineAt.toDate() : null);
       // Clamp to >= 0 to prevent negative values
       const hoursRemaining = slaDeadline ? Math.max(0, Math.floor((slaDeadline.getTime() - now) / (1000 * 60 * 60))) : null;
       // Tripwire: catch invalid int32 before serialization
@@ -165,7 +168,9 @@ async function sendReminder(
       orderUrl,
       // Clamp to >= 0 to prevent negative values
       daysSinceDelivery: (() => {
-        const days = order.deliveredAt ? Math.max(0, Math.floor((now - (order.deliveredAt.toDate ? order.deliveredAt.toDate().getTime() : new Date(order.deliveredAt).getTime())) / (1000 * 60 * 60 * 24))) : 0;
+        const deliveredAt = order.deliveredAt;
+        const deliveredAtTime = deliveredAt instanceof Date ? deliveredAt.getTime() : (deliveredAt && typeof deliveredAt === 'object' && typeof deliveredAt.toDate === 'function' ? deliveredAt.toDate().getTime() : new Date(deliveredAt || 0).getTime());
+        const days = Math.max(0, Math.floor((now - deliveredAtTime) / (1000 * 60 * 60 * 24)));
         assertInt32(days, 'Order.DeliveryCheckIn.daysSinceDelivery');
         return days;
       })(),
@@ -194,7 +199,7 @@ async function sendReminder(
       entityType: 'order',
       entityId: order.id,
       targetUserId,
-      payload: eventPayload,
+      payload: eventPayload as any,
       optionalHash: `reminder:${reminderType}:${now}`,
     });
     
@@ -243,8 +248,9 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
       ...doc.data(),
     }));
     
-    for (const order of orders) {
+    for (const orderDoc of orders) {
       try {
+        const order: any = orderDoc;
         const txStatus = getEffectiveTransactionStatus(order);
         
         // Skip if status changed (no longer in stall state)
@@ -266,18 +272,18 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
           });
           
           // Log audit
-          await createAuditLog({
-            db: db as any,
-            action: 'order_auto_completed',
-            actorId: 'system',
-            entityType: 'order',
-            entityId: order.id,
+          await createAuditLog(db, {
+            actorUid: 'system',
+            actorRole: 'system',
+            actionType: 'order_status_changed',
+            orderId: order.id,
+            source: 'cron',
             metadata: {
               reason: 'delivered_pending_confirmation_timeout',
               daysSinceDelivery: (() => {
-                const days = order.deliveredAt 
-                  ? Math.max(0, Math.floor((now - (order.deliveredAt.toDate ? order.deliveredAt.toDate().getTime() : new Date(order.deliveredAt).getTime())) / (1000 * 60 * 60 * 24)))
-                  : null;
+                const deliveredAt: any = order.deliveredAt;
+                const deliveredAtTime = deliveredAt instanceof Date ? deliveredAt.getTime() : (deliveredAt && typeof deliveredAt === 'object' && typeof deliveredAt.toDate === 'function' ? deliveredAt.toDate().getTime() : new Date(deliveredAt || 0).getTime());
+                const days = Math.max(0, Math.floor((now - deliveredAtTime) / (1000 * 60 * 60 * 24)));
                 if (days !== null) assertInt32(days, 'audit.daysSinceDelivery');
                 return days;
               })(),
@@ -298,18 +304,19 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
           });
           
           // Log audit
-          await createAuditLog({
-            db: db as any,
-            action: 'order_escalated',
-            actorId: 'system',
-            entityType: 'order',
-            entityId: order.id,
+          await createAuditLog(db, {
+            actorUid: 'system',
+            actorRole: 'system',
+            actionType: 'order_status_changed',
+            orderId: order.id,
+            source: 'cron',
             metadata: {
               reason: 'unresponsive_timeout',
               daysSincePayment: (() => {
-                const days = order.paidAt
-                  ? Math.max(0, Math.floor((now - (order.paidAt.toDate ? order.paidAt.toDate().getTime() : new Date(order.paidAt).getTime())) / (1000 * 60 * 60 * 24)))
-                  : null;
+                const paidAt: any = order.paidAt;
+                if (!paidAt) return null;
+                const paidAtTime = paidAt instanceof Date ? paidAt.getTime() : (paidAt && typeof paidAt === 'object' && typeof paidAt.toDate === 'function' ? paidAt.toDate().getTime() : new Date(paidAt || 0).getTime());
+                const days = Math.max(0, Math.floor((now - paidAtTime) / (1000 * 60 * 60 * 24)));
                 if (days !== null) assertInt32(days, 'audit.daysSincePayment');
                 return days;
               })(),
@@ -323,10 +330,10 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
         // Check if this is a compliance-gated order needing compliance reminders
         if (txStatus === 'AWAITING_TRANSFER_COMPLIANCE' && isRegulatedWhitetailDeal(order)) {
           const confirmations = hasComplianceConfirmations(order);
-          const paidAt = order.paidAt;
+          const paidAt: any = order.paidAt;
           
           if (paidAt) {
-            const paidAtMs = paidAt.toDate ? paidAt.toDate().getTime() : new Date(paidAt).getTime();
+            const paidAtMs = paidAt instanceof Date ? paidAt.getTime() : (paidAt && typeof paidAt === 'object' && typeof paidAt.toDate === 'function' ? paidAt.toDate().getTime() : new Date(paidAt || 0).getTime());
             const hoursSincePayment = Math.max(0, Math.floor((now - paidAtMs) / (1000 * 60 * 60)));
             const daysSincePayment = Math.max(0, Math.floor(hoursSincePayment / 24));
             
@@ -347,6 +354,7 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
             
             // Check last compliance reminder
             const reminderRecord = await getReminderRecord(db, order.id);
+            if (!reminderRecord) continue;
             const lastComplianceReminder = reminderRecord.lastReminderAt?.getTime() || 0;
             const hoursSinceLastReminder = lastComplianceReminder > 0 ? Math.max(0, Math.floor((now - lastComplianceReminder) / (1000 * 60 * 60))) : Infinity;
             
@@ -355,9 +363,12 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
               // Determine which party needs reminder
               if (!confirmations.buyerConfirmed) {
                 await emitAndProcessEventForUser({
-                  db: db as any,
-                  userId: order.buyerId,
-                  event: {
+                  type: 'Order.TransferComplianceRequired',
+                  entityType: 'order',
+                  entityId: order.id,
+                  targetUserId: order.buyerId,
+                  actorId: 'system',
+                  payload: {
                     type: 'Order.TransferComplianceRequired',
                     orderId: order.id,
                     listingId: order.listingId,
@@ -369,9 +380,12 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
               
               if (!confirmations.sellerConfirmed) {
                 await emitAndProcessEventForUser({
-                  db: db as any,
-                  userId: order.sellerId,
-                  event: {
+                  type: 'Order.TransferComplianceRequired',
+                  entityType: 'order',
+                  entityId: order.id,
+                  targetUserId: order.sellerId,
+                  actorId: 'system',
+                  payload: {
                     type: 'Order.TransferComplianceRequired',
                     orderId: order.id,
                     listingId: order.listingId,
@@ -401,13 +415,14 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
                 });
                 
                 // Log audit
-                await createAuditLog({
-                  db: db as any,
-                  action: 'compliance_stalled',
-                  actorId: 'system',
-                  entityType: 'order',
-                  entityId: order.id,
+                await createAuditLog(db, {
+                  actorUid: 'system',
+                  actorRole: 'system',
+                  actionType: 'order_status_changed',
+                  orderId: order.id,
+                  source: 'cron',
                   metadata: {
+                    reason: 'compliance_stalled',
                     daysSincePayment: daysSincePayment, // Already clamped and validated above
                     buyerConfirmed: confirmations.buyerConfirmed,
                     sellerConfirmed: confirmations.sellerConfirmed,
@@ -423,6 +438,7 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
         
         // Check reminder schedule (for non-compliance reminders)
         const reminderRecord = await getReminderRecord(db, order.id);
+        if (!reminderRecord) continue;
         const schedule = getReminderSchedule(order);
         
         if (schedule.length === 0) {
@@ -451,9 +467,8 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
           } else if (currentStatus === 'READY_FOR_PICKUP' || currentStatus === 'PICKUP_SCHEDULED') {
             reminderType = 'pickup';
           } else if (order.fulfillmentSlaDeadlineAt) {
-            const slaDeadline = order.fulfillmentSlaDeadlineAt.toDate 
-              ? order.fulfillmentSlaDeadlineAt.toDate().getTime()
-              : new Date(order.fulfillmentSlaDeadlineAt).getTime();
+            const slaDeadlineAt: any = order.fulfillmentSlaDeadlineAt;
+            const slaDeadline = slaDeadlineAt instanceof Date ? slaDeadlineAt.getTime() : (slaDeadlineAt && typeof slaDeadlineAt === 'object' && typeof slaDeadlineAt.toDate === 'function' ? slaDeadlineAt.toDate().getTime() : new Date(slaDeadlineAt || 0).getTime());
             if (now > slaDeadline) {
               reminderType = 'sla_overdue';
             } else if ((slaDeadline - now) <= SLA_WARNING_HOURS * 60 * 60 * 1000) {
@@ -480,7 +495,7 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
           processed++;
         }
       } catch (error: any) {
-        console.error(`Error processing reminder for order ${order.id}:`, error);
+        console.error(`Error processing reminder for order ${orderDoc.id}:`, error);
         errors++;
       }
     }

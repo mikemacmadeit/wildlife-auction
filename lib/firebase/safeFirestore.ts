@@ -8,7 +8,7 @@
  * IMPORTANT: Always use these functions instead of direct .update(), .set(), .add()
  */
 
-import { Firestore, DocumentReference, CollectionReference, WriteBatch, Transaction } from 'firebase-admin/firestore';
+import { Firestore, DocumentReference, CollectionReference, WriteBatch, Transaction, SetOptions } from 'firebase-admin/firestore';
 import { sanitizeFirestorePayload } from './sanitizeFirestore';
 import { assertNoCorruptInt32 } from './assertNoCorruptInt32';
 import { panicScanForBadInt32 } from './firestorePanic';
@@ -27,7 +27,7 @@ export async function safeUpdate(
   if (process.env.NODE_ENV !== 'production') {
     assertNoCorruptInt32(sanitized);
   }
-  return docRef.update(sanitized);
+  await docRef.update(sanitized);
 }
 
 /**
@@ -36,7 +36,7 @@ export async function safeUpdate(
 export async function safeSet(
   docRef: DocumentReference,
   data: any,
-  options?: { merge?: boolean }
+  options?: SetOptions
 ): Promise<void> {
   const sanitized = sanitizeFirestorePayload(data);
   // Panic guard: throws with exact field path BEFORE Firestore serializes
@@ -44,7 +44,11 @@ export async function safeSet(
   if (process.env.NODE_ENV !== 'production') {
     assertNoCorruptInt32(sanitized);
   }
-  return docRef.set(sanitized, options);
+  if (options) {
+    await docRef.set(sanitized, options);
+  } else {
+    await docRef.set(sanitized);
+  }
 }
 
 /**
@@ -60,7 +64,7 @@ export async function safeCreate(
   if (process.env.NODE_ENV !== 'production') {
     assertNoCorruptInt32(sanitized);
   }
-  return docRef.create(sanitized);
+  await docRef.create(sanitized);
 }
 
 /**
@@ -101,13 +105,17 @@ export function safeBatchSet(
   batch: WriteBatch,
   docRef: DocumentReference,
   data: any,
-  options?: { merge?: boolean }
+  options?: SetOptions
 ): WriteBatch {
   const sanitized = sanitizeFirestorePayload(data);
   if (process.env.NODE_ENV !== 'production') {
     assertNoCorruptInt32(sanitized);
   }
-  return batch.set(docRef, sanitized, options);
+  if (options) {
+    return batch.set(docRef, sanitized, options);
+  } else {
+    return batch.set(docRef, sanitized);
+  }
 }
 
 /**
@@ -147,7 +155,7 @@ export function safeTransactionSet(
   transaction: Transaction,
   docRef: DocumentReference,
   data: any,
-  options?: { merge?: boolean }
+  options?: SetOptions
 ): Transaction {
   const sanitized = sanitizeFirestorePayload(data);
   // Panic guard: throws with exact field path BEFORE Firestore serializes
@@ -155,7 +163,11 @@ export function safeTransactionSet(
   if (process.env.NODE_ENV !== 'production') {
     assertNoCorruptInt32(sanitized);
   }
-  return transaction.set(docRef, sanitized, options);
+  if (options) {
+    return transaction.set(docRef, sanitized, options);
+  } else {
+    return transaction.set(docRef, sanitized);
+  }
 }
 
 /**

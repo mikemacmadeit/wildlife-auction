@@ -38,6 +38,8 @@ import { getNextRequiredAction, getUXBadge } from '@/lib/orders/progress';
 
 interface OrderWithListing extends Order {
   listing?: Listing | null;
+  fulfillmentSlaDeadlineAt?: Date;
+  fulfillmentSlaStartedAt?: Date;
 }
 
 type TabKey = 'needs_action' | 'in_progress' | 'completed' | 'cancelled' | 'all';

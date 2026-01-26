@@ -156,7 +156,7 @@ export function OrderMilestoneTimeline({
                       {/* Blocked reason */}
                       {isBlocked && milestone.isBlocked && (
                         <div className="text-xs text-destructive mt-1 bg-destructive/10 border border-destructive/20 rounded p-2">
-                          {milestone.blockedReason || 'This step is currently blocked'}
+                          {(milestone as any).blockedReason || 'This step is currently blocked'}
                         </div>
                       )}
                     </div>

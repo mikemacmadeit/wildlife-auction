@@ -64,8 +64,8 @@ export function computeReminderPlan(order: Order): ReminderPlan {
   const buyerAction = getNextRequiredAction(order, 'buyer');
   const sellerAction = getNextRequiredAction(order, 'seller');
 
-  const buyerNeedsAction = buyerAction && buyerAction.ownerRole === 'buyer';
-  const sellerNeedsAction = sellerAction && sellerAction.ownerRole === 'seller';
+  const buyerNeedsAction = !!(buyerAction && buyerAction.ownerRole === 'buyer');
+  const sellerNeedsAction = !!(sellerAction && sellerAction.ownerRole === 'seller');
 
   // Compute reminder windows
   const computeReminder = (

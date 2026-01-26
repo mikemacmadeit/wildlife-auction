@@ -866,7 +866,7 @@ export default function OrdersPage() {
       const badge = getUXBadge(order, 'buyer');
       const badgeEl = <Badge variant={badge.variant}>{badge.label}</Badge>;
       // Show tooltip for "Action needed" or "Waiting on seller"
-      if (badge.variant === 'warning' || badge.label.includes('Waiting')) {
+      if (badge.label.includes('Action needed') || badge.label.includes('Waiting')) {
         return (
           <TooltipProvider>
             <Tooltip>
@@ -1176,7 +1176,7 @@ export default function OrdersPage() {
                           </>
                         ) : null}
                         <span className="text-muted-foreground/60">•</span>
-                        <span>{order.createdAt.toLocaleDateString()}</span>
+                        <span>{(order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt || 0)).toLocaleDateString()}</span>
                         </div>
                       </div>
                     </div>
@@ -1460,6 +1460,23 @@ export default function OrdersPage() {
                   {Array.isArray(selectedOrder.timeline) && selectedOrder.timeline.length ? (
                     <div className="max-h-[40vh] overflow-auto pr-1">
                       {[...selectedOrder.timeline]
+                        .map((ev: any) => {
+                          // Safely convert timestamp to Date if needed
+                          let timestamp: Date;
+                          const ts = ev.timestamp;
+                          if (ts instanceof Date) {
+                            timestamp = ts;
+                          } else if (ts && typeof ts === 'object' && typeof ts.toDate === 'function') {
+                            timestamp = ts.toDate();
+                          } else if (ts && typeof ts === 'object' && typeof ts.seconds === 'number') {
+                            timestamp = new Date(ts.seconds * 1000 + (ts.nanoseconds || 0) / 1_000_000);
+                          } else if (typeof ts === 'string' || typeof ts === 'number') {
+                            timestamp = new Date(ts);
+                          } else {
+                            timestamp = new Date(0);
+                          }
+                          return { ...ev, timestamp };
+                        })
                         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
                         .map((ev) => (
                           <div key={ev.id} className="relative pl-6 py-2">
