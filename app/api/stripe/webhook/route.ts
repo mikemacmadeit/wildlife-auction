@@ -9,6 +9,8 @@
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
+// Ensure Sentry server config is loaded
+import '../../../sentry.server.config';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import Stripe from 'stripe';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';

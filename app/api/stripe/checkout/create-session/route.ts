@@ -1106,14 +1106,15 @@ export async function POST(request: Request) {
 
     // Persist idempotency record (expires after 2 minutes to allow cleanup)
     try {
-      await idempotencyRef.set({
+      const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
+      await idempotencyRef.set(sanitizeFirestorePayload({
         stripeSessionId: session.id,
         listingId,
         buyerId,
         orderId,
         createdAt: nowTs,
         expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000), // 2 minutes
-      });
+      }));
     } catch (idempError) {
       // Non-blocking: idempotency record failure shouldn't block checkout
       logWarn('Failed to persist idempotency record', {
@@ -1126,14 +1127,16 @@ export async function POST(request: Request) {
 
     // Persist session ID onto the pre-created order (webhook idempotency + buyer/seller visibility).
     try {
-      await orderRef.set({ stripeCheckoutSessionId: session.id, updatedAt: Timestamp.now() }, { merge: true });
+      const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
+      await orderRef.set(sanitizeFirestorePayload({ stripeCheckoutSessionId: session.id, updatedAt: Timestamp.now() }), { merge: true });
     } catch {
       // ignore; webhook can still reconcile by metadata.orderId
     }
 
     if (offerId && offerRef) {
       try {
-        await offerRef.set({ checkoutSessionId: session.id, orderId, updatedAt: Timestamp.now() }, { merge: true });
+        const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
+        await offerRef.set(sanitizeFirestorePayload({ checkoutSessionId: session.id, orderId, updatedAt: Timestamp.now() }), { merge: true });
         await createAuditLog(db, {
           actorUid: buyerId,
           actorRole: 'buyer',

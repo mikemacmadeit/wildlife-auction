@@ -12,6 +12,8 @@
  * This endpoint should only exist for testing purposes.
  */
 
+// Ensure Sentry server config is loaded
+import '../../../sentry.server.config';
 import { captureException } from '@/lib/monitoring/capture';
 
 export async function GET() {

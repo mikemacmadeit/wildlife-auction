@@ -48,6 +48,17 @@ function normalizeTimestampLike(v: any): Timestamp | any {
   return v;
 }
 
+// Clamp numbers to valid int32 range
+function clampToInt32(n: number): number | null {
+  const MAX_INT32 = 2147483647; // 2^31 - 1
+  const MIN_INT32 = -2147483648; // -2^31
+  if (n > MAX_INT32 || n < MIN_INT32) {
+    console.warn(`⚠️  Clamping out-of-range int32 value ${n} to null`);
+    return null;
+  }
+  return Math.trunc(n);
+}
+
 export function sanitizeFirestorePayload(input: any): any {
   // primitives
   if (input === null || input === undefined) return input;
@@ -56,6 +67,14 @@ export function sanitizeFirestorePayload(input: any): any {
   if (input === -1 || input === 4294967295) {
     console.warn('⚠️  Sanitizing corrupt int32 sentinel value, converting to null');
     return null;
+  }
+
+  // Clamp numbers that are out of int32 range
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    const clamped = clampToInt32(input);
+    if (clamped !== input) {
+      return clamped;
+    }
   }
 
   // Timestamp-like object
