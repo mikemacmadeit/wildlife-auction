@@ -888,7 +888,7 @@ export default function ListingDetailPage() {
                     <Badge
                       variant="success"
                       className="font-medium gap-1"
-                      title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Evidence required for disputes."
+                      title="Protected Transaction: Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. Optional dispute window after delivery; evidence required for disputes."
                     >
                       <Shield className="h-3 w-3" />
                       Protected {listing!.protectedTransactionDays} Days
@@ -1992,7 +1992,7 @@ export default function ListingDetailPage() {
                         <Badge
                           variant="success"
                           className="text-xs font-medium gap-1"
-                          title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules."
+                          title="Protected Transaction: Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. Optional dispute window after delivery; evidence required for disputes."
                         >
                           <Shield className="h-3 w-3" />
                           Protected {listing!.protectedTransactionDays} Days

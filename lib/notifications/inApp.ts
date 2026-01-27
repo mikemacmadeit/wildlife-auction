@@ -233,7 +233,7 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'order_accepted',
         title: 'Order accepted',
-        body: `The buyer accepted your order for "${p.listingTitle}". Funds will be released soon.`,
+        body: `The buyer accepted your order for "${p.listingTitle}". You receive funds via Stripe when the buyer pays.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View sale',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },

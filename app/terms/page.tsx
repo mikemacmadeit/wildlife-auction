@@ -183,7 +183,7 @@ export default function TermsPage() {
             <p className="font-semibold text-foreground">Whitetail breeder listings</p>
             <ul className="list-disc ml-5 space-y-1">
               <li>Whitetail deer may only be listed in the Whitetail Breeder category.</li>
-              <li>Platform workflows may require permits/records to be uploaded and reviewed before a listing is published or funds are released.</li>
+              <li>Platform workflows may require permits/records to be uploaded and reviewed to publish listings or complete order compliance. Payments are processed by Stripe; Agchange does not hold or release funds.</li>
             </ul>
             <p className="text-xs text-muted-foreground">
               “Verified” indicates an admin reviewed an uploaded document for marketplace workflow completeness; it does not represent TPWD approval or
@@ -213,8 +213,7 @@ export default function TermsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>Payments are processed by Stripe. Agchange may collect marketplace fees.</p>
             <p>
-              Agchange processes payments through the platform and releases funds according to marketplace workflow rules (for example, dispute windows or required document uploads).
-              This relates to payment settlement only and does not mean Agchange takes custody of any animal or good.
+              Agchange does not hold funds, provide escrow, or condition payouts on delivery. Sellers receive funds via Stripe when the buyer pays. Document and listing reviews are for marketplace workflow and compliance only and do not mean Agchange takes custody of any animal or good.
             </p>
           </CardContent>
         </Card>

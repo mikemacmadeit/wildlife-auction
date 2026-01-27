@@ -47,10 +47,10 @@ Agchange is a trusted online marketplace for buying and selling animals, livesto
 1. **Browse listings** - Search and filter to find what you want
 2. **Contact sellers** - Ask questions before buying
 3. **Make purchase** - Buy now, bid in auction, or make an offer
-4. **Secure payment** - Payments are processed through the platform and released according to marketplace confirmation and dispute rules
+4. **Secure payment** - Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
 5. **Receive item** - Pickup, delivery, or professional transport
 6. **Confirm delivery** - Inspect and confirm receipt
-7. **Funds released** - Seller gets paid after confirmation
+7. **Order complete** - Sellers receive funds via Stripe when you pay; we do not hold or release payouts
 
 ### For Sellers
 
@@ -61,14 +61,14 @@ Agchange is a trusted online marketplace for buying and selling animals, livesto
 5. **Publish listing** - Admin reviews, then goes live
 6. **Sell your item** - Receive bids, offers, or direct purchases
 7. **Arrange delivery** - Coordinate with buyer
-8. **Get paid** - Receive payout after delivery confirmed
+8. **Get paid** - Receive payment via Stripe when the buyer pays
 
 ## Key Features
 
 ### Security & Protection
 
 **Buyer Protection:**
-- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
+- Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
 - Inspection period to verify item
 - Dispute process if issues arise
 - Refund available if problems can't be resolved
@@ -77,7 +77,7 @@ Agchange is a trusted online marketplace for buying and selling animals, livesto
 - Verified buyers
 - Secure payment processing
 - Dispute resolution process
-- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
+- Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
 
 ### Verification & Trust
 
@@ -121,9 +121,8 @@ Agchange is a trusted online marketplace for buying and selling animals, livesto
 
 **All payments are:**
 - Encrypted and secure
-- Processed through trusted processors
+- Processed by Stripe (we do not hold funds or condition payouts on delivery)
 - Protected by fraud detection
-- Processed through the platform and released according to marketplace confirmation and dispute rules
 
 ## Why Use Agchange?
 

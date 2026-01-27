@@ -233,7 +233,7 @@ Complete guide to buying animals, livestock, equipment, and more on Agchange.
 **After purchase:**
 - Stay in communication - Keep seller updated
 - Inspect item carefully - Before confirming delivery
-- Confirm delivery promptly - So seller can get paid
+- Confirm delivery promptly - Completes the order (sellers receive funds via Stripe when you pay)
 - Leave feedback - Help other buyers
 
 ## Troubleshooting

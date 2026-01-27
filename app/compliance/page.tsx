@@ -103,10 +103,10 @@ export default function CompliancePage() {
               </div>
 
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h3 className="font-semibold text-yellow-800 mb-2">Transfer Approval Required Before Payout:</h3>
+                <h3 className="font-semibold text-yellow-800 mb-2">Transfer Approval (Whitetail Compliance):</h3>
                 <p className="text-sm text-yellow-700">
                   For whitetail breeder sales, sellers must upload a verified TPWD Transfer Approval document 
-                  before funds can be released. This ensures compliance with TPWD transfer regulations.
+                  to satisfy TPWD transfer regulations. Sellers are paid via Stripe when the buyer pays; Agchange does not hold or release funds.
                 </p>
               </div>
 
@@ -117,9 +117,9 @@ export default function CompliancePage() {
                   <li>Seller uploads TPWD Breeder Permit document</li>
                   <li>Admin reviews and verifies permit document</li>
                   <li>Listing goes live after admin approval</li>
-                  <li>After sale, seller uploads TPWD Transfer Approval</li>
+                  <li>After sale, seller uploads TPWD Transfer Approval for compliance</li>
                   <li>Admin verifies transfer approval</li>
-                  <li>Payout is released to seller</li>
+                  <li>Order compliance is complete (sellers receive funds via Stripe when the buyer pays; we do not hold or release payouts)</li>
                 </ol>
               </div>
             </div>
@@ -274,15 +274,15 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
 
-        {/* Payout Holds & Release */}
+        {/* How payments work */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-primary" />
-              <CardTitle>Payout Holds & Release</CardTitle>
+              <CardTitle>How Payments Work</CardTitle>
             </div>
             <CardDescription>
-              How Payment Works
+              Stripe processes payments; we do not hold or release funds
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

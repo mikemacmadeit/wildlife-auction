@@ -476,8 +476,8 @@ export const EMAIL_EVENT_REGISTRY = [
   },
   {
     type: 'payout_released',
-    displayName: 'Payout Released',
-    description: 'Sent to seller when payout is released.',
+    displayName: 'Payment Received',
+    description: 'Sent to seller when payment was processed (seller receives funds via Stripe when buyer pays).',
     schema: payoutNotificationSchema,
     samplePayload: {
       sellerName: 'Jordan Smith',
@@ -489,7 +489,7 @@ export const EMAIL_EVENT_REGISTRY = [
     },
     render: (data: PayoutNotificationEmailData) => {
       const { subject, html } = getPayoutNotificationEmail(data);
-      return { subject, preheader: `Payout released for ${data.listingTitle}`, html };
+      return { subject, preheader: `You received payment for ${data.listingTitle}`, html };
     },
   },
   {

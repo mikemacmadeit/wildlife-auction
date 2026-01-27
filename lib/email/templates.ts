@@ -766,14 +766,14 @@ export function getOrderPreparingEmail(data: OrderPreparingEmailData): { subject
 }
 
 export function getPayoutNotificationEmail(data: PayoutNotificationEmailData): { subject: string; html: string } {
-  const subject = `Payout Released - ${data.listingTitle}`;
-  const preheader = `Payout released for ${data.listingTitle}. Arrival time depends on your bank.`;
+  const subject = `Payment received - ${data.listingTitle}`;
+  const preheader = `You received payment for ${data.listingTitle}. Arrival time depends on your bank.`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
-      Payout released
+      Payment received
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
-      Hi ${escapeHtml(data.sellerName)} — your payout was released. Depending on your bank, it may take a few business days to appear.
+      Hi ${escapeHtml(data.sellerName)} — you received payment via Stripe when the buyer paid. Depending on your bank, it may take a few business days to appear.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -2102,14 +2102,14 @@ export function getOrderDeliveredEmail(data: OrderDeliveredEmailData): { subject
 
 export function getOrderAcceptedEmail(data: OrderAcceptedEmailData): { subject: string; html: string } {
   const subject = `Order accepted — ${data.listingTitle}`;
-  const preheader = `The buyer accepted your order. Funds will be released soon.`;
+  const preheader = `The buyer accepted your order. You receive funds via Stripe when the buyer pays.`;
   const origin = tryGetOrigin(data.orderUrl);
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Order accepted
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
-      Hi ${escapeHtml(data.sellerName)} — the buyer accepted your order. Funds will be released soon.
+      Hi ${escapeHtml(data.sellerName)} — the buyer accepted your order. You receive funds via Stripe when the buyer pays.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"

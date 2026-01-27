@@ -333,7 +333,7 @@ export default function AdminPayoutsPage() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Manage Payouts</h1>
           <p className="text-muted-foreground">
-            Confirm deliveries and release payments to sellers
+            Confirm deliveries and manage order status. Sellers receive funds via Stripe when the buyer pays.
           </p>
         </div>
         <Button onClick={loadOrders} variant="outline" disabled={loading}>
@@ -450,7 +450,7 @@ export default function AdminPayoutsPage() {
               <p className="text-muted-foreground">
                 {searchQuery || filterStatus !== 'all'
                   ? 'Try adjusting your filters or search query.'
-                  : 'All deliveries have been confirmed and payments released.'}
+                  : 'All deliveries have been confirmed. Sellers are paid via Stripe when the buyer pays.'}
               </p>
             </div>
           </CardContent>
@@ -813,7 +813,7 @@ function OrderCard({
               )}
               {order.status === 'completed' && order.stripeRefundId && (
                 <div className="text-xs text-center text-muted-foreground p-2 bg-green-50 rounded-md">
-                  Payment released
+                  Order complete (seller paid via Stripe)
                 </div>
               )}
             </div>

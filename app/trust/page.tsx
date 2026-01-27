@@ -133,13 +133,13 @@ export default function TrustPage() {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  For whitetail breeder sales, sellers must upload TPWD Transfer Approval before payout release. 
-                  Admin verifies the document before funds are released.
+                  For whitetail breeder sales, sellers must upload TPWD Transfer Approval for compliance. 
+                  Admin verifies the document. Sellers receive funds via Stripe when the buyer pays; Agchange does not hold or release payouts.
                 </p>
                 <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
                   <li>TPWD transfer approval uploaded</li>
                   <li>Admin verified</li>
-                  <li>Required before payout</li>
+                  <li>Required for whitetail compliance workflow</li>
                 </ul>
               </div>
 

@@ -180,8 +180,8 @@ export async function POST(
       status: updateData.status,
       buyerConfirmedAt: now,
       message: updateData.status === 'ready_to_release' 
-        ? 'Order accepted. Funds will be released to seller.'
-        : 'Order accepted successfully. Funds will be released to seller.',
+        ? 'Order accepted successfully. Sellers receive funds via Stripe when the buyer pays.'
+        : 'Order accepted successfully. Sellers receive funds via Stripe when the buyer pays.',
     });
   } catch (error: any) {
     console.error('Error accepting order:', error);

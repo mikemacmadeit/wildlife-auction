@@ -36,7 +36,7 @@ export function WireInstructionsDialog(props: {
         <DialogHeader>
           <DialogTitle>Wire transfer instructions</DialogTitle>
           <DialogDescription>
-            Send a bank/wire transfer using the details below. Payments are processed through the platform and released according to marketplace confirmation and dispute rules.
+            Send a bank/wire transfer using the details below. Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
           </DialogDescription>
         </DialogHeader>
 

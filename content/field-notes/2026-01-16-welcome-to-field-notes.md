@@ -21,7 +21,7 @@ Field Notes is our “high-signal” library for **real transactions**—what to
 ## Who this is for
 
 - **First-time buyers** who want to avoid mistakes and checkout friction
-- **Sellers** who want listings approved quickly and payouts released cleanly
+- **Sellers** who want listings approved quickly and payments processed smoothly (via Stripe when the buyer pays)
 - **High-ticket buyers/sellers** (\$10k–\$50k+) who need predictable payment rails
 - **Anyone** who wants to understand badges, compliance workflow, and transaction timelines
 

@@ -225,7 +225,7 @@ Understanding how Agchange protects your payments and purchases.
 
 ### How long is protection active?
 
-Protection is active from payment until you confirm delivery. Once you confirm, funds are released and protection ends.
+Protection is active from payment until you confirm delivery. Once you confirm, the order is complete; we do not hold or release payouts. Protection ends.
 
 ### Can I get refund after confirming?
 

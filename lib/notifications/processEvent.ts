@@ -94,7 +94,7 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
     }
     case 'Order.Accepted': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.Accepted' }>;
-      return `Buyer accepted order for "${p.listingTitle}". Funds will be released soon: ${p.orderUrl}`;
+      return `Buyer accepted order for "${p.listingTitle}". Payment was processed when the buyer paid: ${p.orderUrl}`;
     }
     case 'Order.DeliveryCheckIn': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryCheckIn' }>;

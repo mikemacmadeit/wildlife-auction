@@ -269,7 +269,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 <Badge 
                   variant="success" 
                   className="font-semibold text-xs shadow-warm"
-                  title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Evidence required for disputes."
+                  title="Protected Transaction: Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. Optional dispute window after delivery; evidence required for disputes."
                 >
                   Protected {listing.protectedTransactionDays} Days
                 </Badge>

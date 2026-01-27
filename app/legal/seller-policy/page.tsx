@@ -93,8 +93,7 @@ export default function SellerPolicyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              The platform may require certain disclosures and documents (by category) to publish listings or release payouts. These are marketplace
-              workflow requirements and do not create any warranty by Agchange.
+              The platform may require certain disclosures and documents (by category) to publish listings or complete order compliance (e.g. required document uploads). Payments are processed by Stripe; Agchange does not hold or release payouts. These are marketplace workflow requirements and do not create any warranty by Agchange.
             </p>
             <p>
               Any “verified” label means a document was reviewed for workflow completeness; it does <strong>not</strong> mean a regulator approved a transfer.

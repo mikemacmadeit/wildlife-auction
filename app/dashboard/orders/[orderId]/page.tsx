@@ -312,7 +312,7 @@ export default function BuyerOrderDetailPage() {
             <DialogHeader>
               <DialogTitle>Delivery check-in</DialogTitle>
               <DialogDescription>
-                If delivery arrived, mark it delivered (confirm receipt). If something isn’t right, report an issue so we can review before payout is released.
+                If delivery arrived, mark it delivered (confirm receipt). If something isn’t right, report an issue so we can review. Payments are processed by Stripe; we do not hold or release payouts.
               </DialogDescription>
             </DialogHeader>
             <div className="flex items-start gap-3">
