@@ -55,6 +55,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [showUploadNewPermit, setShowUploadNewPermit] = useState(false);
 
   const canSubmit = useMemo(() => !!user?.uid && !!file && !uploading && !submitting, [file, submitting, uploading, user?.uid]);
 
@@ -217,6 +218,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
       setProgress(100);
       setFile(null);
       setJustSubmitted(true);
+      setShowUploadNewPermit(false);
       toast({
         title: 'Submitted for review',
         description: 'Your breeder permit has been uploaded and is awaiting approval. We’ll update this card when our team has reviewed it.',
@@ -297,23 +299,31 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
         ) : null}
 
         {permit?.status === 'verified' ? (
-          <div className="rounded-lg border bg-muted/20 p-4 flex items-start justify-between gap-3">
-            <div>
-              <div className="font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                Permit verified
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/20 p-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  Permit verified
+                </div>
+                <div className="mt-2">
+                  <SellerTrustBadges badgeIds={['tpwd_breeder_permit_verified']} />
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {permit.expiresAt ? `Expires: ${new Date(permit.expiresAt).toLocaleDateString()}` : 'No expiration on file.'}
+                </div>
               </div>
-              <div className="mt-2">
-                <SellerTrustBadges badgeIds={['tpwd_breeder_permit_verified']} />
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {permit.expiresAt ? `Expires: ${new Date(permit.expiresAt).toLocaleDateString()}` : 'No expiration on file.'}
-              </div>
+              {permit.documentUrl ? (
+                <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View
+                </Button>
+              ) : null}
             </div>
-            {permit.documentUrl ? (
-              <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
-                <Eye className="h-4 w-4 mr-2" />
-                View
+            {!showUploadNewPermit && !compactVerified ? (
+              <Button variant="outline" size="sm" onClick={() => setShowUploadNewPermit(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload new permit
               </Button>
             ) : null}
           </div>
@@ -352,8 +362,11 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
           </div>
         ) : null}
 
-        {/* Overview UX: once verified, keep this card “read-only” and hide the upload form. */}
-        {compactVerified && permit?.status === 'verified' ? null : waitingOnApproval ? null : (
+        {(permit?.status !== 'verified' || showUploadNewPermit) && !waitingOnApproval ? (
+        <>
+          {permit?.status === 'verified' && showUploadNewPermit ? (
+            <p className="text-sm text-muted-foreground">Upload a new document when your current permit is expiring or has expired.</p>
+          ) : null}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="tpwd-permit-number">Permit number</Label>
@@ -376,9 +389,6 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             />
           </div>
         </div>
-        )}
-
-        {compactVerified && permit?.status === 'verified' ? null : waitingOnApproval ? null : (
         <div className="space-y-2">
           <Label htmlFor="tpwd-permit-file">Upload permit (PDF or image)</Label>
           <Input
@@ -392,17 +402,13 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             Allowed: PDF/JPG/PNG/WEBP. Max 10MB.
           </div>
         </div>
-        )}
-
         {(uploading || submitting) ? (
           <div className="space-y-2">
             <Progress value={progress} />
             <div className="text-xs text-muted-foreground">{submitting ? 'Submitting…' : 'Uploading…'}</div>
           </div>
         ) : null}
-
-        {compactVerified && permit?.status === 'verified' ? null : waitingOnApproval ? null : (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
@@ -411,14 +417,20 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             {(uploading || submitting) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
             Submit for review
           </Button>
-          {permit?.documentUrl ? (
+          {permit?.status === 'verified' && showUploadNewPermit ? (
+            <Button variant="outline" onClick={() => { setShowUploadNewPermit(false); setFile(null); setError(null); }}>
+              Cancel
+            </Button>
+          ) : null}
+          {permit?.documentUrl && permit?.status !== 'verified' ? (
             <Button variant="outline" onClick={() => setShowPreview(true)} disabled={uploading || submitting}>
               <Eye className="h-4 w-4 mr-2" />
               View current
             </Button>
           ) : null}
         </div>
-        )}
+        </>
+        ) : null}
 
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
           <DialogContent className="max-w-3xl">

@@ -221,6 +221,27 @@ export default function SellerSalesPage() {
     return () => clearTimeout(t);
   }, [tab]);
 
+  // Shared with tab logic and counts: "Needs action" = seller has the next required action (matches admin reminders)
+  const isSellerNeedsAction = useCallback((order: Order) => {
+    const a = getNextRequiredAction(order, 'seller');
+    return !!(a && a.ownerRole === 'seller');
+  }, []);
+
+  const tabCounts = useMemo(() => {
+    const tx = (o: Order) => getEffectiveTransactionStatus(o);
+    return {
+      needs_action: orders.filter((o) => isSellerNeedsAction(o)).length,
+      in_progress: orders.filter((o) => {
+        if (isSellerNeedsAction(o)) return false;
+        const s = tx(o);
+        return ['PENDING_PAYMENT', 'FULFILLMENT_REQUIRED', 'DELIVERY_PROPOSED', 'READY_FOR_PICKUP', 'PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'AWAITING_TRANSFER_COMPLIANCE'].includes(s);
+      }).length,
+      completed: orders.filter((o) => tx(o) === 'COMPLETED').length,
+      cancelled: orders.filter((o) => ['REFUNDED', 'CANCELLED'].includes(tx(o))).length,
+      all: orders.length,
+    };
+  }, [orders, isSellerNeedsAction]);
+
   const filtered = useMemo(() => {
     const q = debounced.trim().toLowerCase();
     const base = !q
@@ -229,54 +250,31 @@ export default function SellerSalesPage() {
           return (
             o.id.toLowerCase().includes(q) ||
             o.listingId?.toLowerCase().includes(q) ||
-            (o.listing?.title || '').toLowerCase().includes(q) ||
-            String(o.status || '').toLowerCase().includes(q)
+            (o.listing?.title || o.listingSnapshot?.title || '').toString().toLowerCase().includes(q) ||
+            String(o.status || '').toLowerCase().includes(q) ||
+            String(getEffectiveTransactionStatus(o)).toLowerCase().includes(q)
           );
         });
 
-    // Use transactionStatus for filtering
-    const isNeedsAction = (order: Order) => {
-      const txStatus = getEffectiveTransactionStatus(order);
-      return [
-        'FULFILLMENT_REQUIRED',
-        'READY_FOR_PICKUP',
-        'DELIVERY_SCHEDULED',
-        'DELIVERED_PENDING_CONFIRMATION',
-        'DISPUTE_OPENED',
-        'SELLER_NONCOMPLIANT',
-      ].includes(txStatus);
-    };
-    
-    const isInProgress = (order: Order) => {
-      const txStatus = getEffectiveTransactionStatus(order);
-      return [
-        'PENDING_PAYMENT',
-        'FULFILLMENT_REQUIRED',
-        'READY_FOR_PICKUP',
-        'PICKUP_SCHEDULED',
-        'DELIVERY_SCHEDULED',
-        'OUT_FOR_DELIVERY',
-        'DELIVERED_PENDING_CONFIRMATION',
-      ].includes(txStatus);
-    };
-
+    const tx = (o: Order) => getEffectiveTransactionStatus(o);
     switch (tab) {
       case 'needs_action':
-        return base.filter((o) => isNeedsAction(o));
+        return base.filter((o) => isSellerNeedsAction(o));
       case 'in_progress':
-        return base.filter((o) => isInProgress(o));
-      case 'completed':
-        return base.filter((o) => getEffectiveTransactionStatus(o) === 'COMPLETED');
-      case 'cancelled':
         return base.filter((o) => {
-          const txStatus = getEffectiveTransactionStatus(o);
-          return txStatus === 'REFUNDED' || txStatus === 'CANCELLED';
+          if (isSellerNeedsAction(o)) return false;
+          const s = tx(o);
+          return ['PENDING_PAYMENT', 'FULFILLMENT_REQUIRED', 'DELIVERY_PROPOSED', 'READY_FOR_PICKUP', 'PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'AWAITING_TRANSFER_COMPLIANCE'].includes(s);
         });
+      case 'completed':
+        return base.filter((o) => tx(o) === 'COMPLETED');
+      case 'cancelled':
+        return base.filter((o) => ['REFUNDED', 'CANCELLED'].includes(tx(o)));
       case 'all':
       default:
         return base;
     }
-  }, [debounced, orders, tab]);
+  }, [debounced, orders, tab, isSellerNeedsAction]);
 
   // Fetch buyer public profiles for currently visible rows (best-effort, public-safe only).
   useEffect(() => {
@@ -367,21 +365,52 @@ export default function SellerSalesPage() {
           </CardContent>
         </Card>
 
+        {tab === 'needs_action' && tabCounts.needs_action > 0 ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 flex items-center gap-3 flex-wrap">
+            <Clock className="h-5 w-5 text-primary shrink-0" />
+            <p className="text-sm font-medium text-foreground">
+              {tabCounts.needs_action} order{tabCounts.needs_action !== 1 ? 's' : ''} need your action. Complete the step on each card to keep things moving — admins can send reminders to buyers if they’re holding things up.
+            </p>
+          </div>
+        ) : null}
+
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="needs_action">
               <Clock className="h-4 w-4 mr-2" />
               Needs action
+              {tabCounts.needs_action > 0 && (
+                <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+                  {tabCounts.needs_action}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="in_progress">
               <Truck className="h-4 w-4 mr-2" />
               In progress
+              {tabCounts.in_progress > 0 && (
+                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {tabCounts.in_progress}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="completed">
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Completed
+              {tabCounts.completed > 0 && (
+                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {tabCounts.completed}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+            <TabsTrigger value="cancelled">
+              Cancelled
+              {tabCounts.cancelled > 0 && (
+                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {tabCounts.cancelled}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="all">All</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -389,9 +418,26 @@ export default function SellerSalesPage() {
         <div className={`mt-4 transition-opacity duration-150 ${tabFading ? 'opacity-70' : 'opacity-100'}`}>
           {filtered.length === 0 ? (
             <Card className="border-border/60">
-              <CardContent className="pt-6 text-center text-sm text-muted-foreground">
-                <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                No sales found.
+              <CardContent className="pt-6 pb-6 text-center text-sm text-muted-foreground">
+                {tab === 'needs_action' ? (
+                  <>
+                    <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-primary/70" />
+                    <p className="font-semibold text-foreground">All caught up</p>
+                    <p className="mt-1">No orders need your action right now.</p>
+                    <p className="mt-2 text-xs">Check <button type="button" onClick={() => setTab('in_progress')} className="text-primary underline underline-offset-2 font-medium">In progress</button> for orders waiting on the buyer, or <button type="button" onClick={() => setTab('all')} className="text-primary underline underline-offset-2 font-medium">All</button> to see everything.</p>
+                  </>
+                ) : tab === 'in_progress' ? (
+                  <>
+                    <Truck className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                    <p className="font-semibold text-foreground">No orders in progress</p>
+                    <p className="mt-1">Orders awaiting your action appear under <button type="button" onClick={() => setTab('needs_action')} className="text-primary underline underline-offset-2 font-medium">Needs action</button>.</p>
+                  </>
+                ) : (
+                  <>
+                    <Package className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                    No sales found.
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -421,9 +467,39 @@ export default function SellerSalesPage() {
                   variant: nextActionData.severity === 'danger' ? 'destructive' as const : nextActionData.severity === 'warning' ? 'default' as const : 'secondary' as const,
                 } : null;
 
+                const sellerHasAction = nextActionData && nextActionData.ownerRole === 'seller';
+
                 return (
-                  <Card key={o.id} className="border-border/60 overflow-hidden">
+                  <Card key={o.id} className={`border-border/60 overflow-hidden ${sellerHasAction ? 'ring-1 ring-primary/30' : ''}`}>
                     <CardContent className="p-0">
+                      {sellerHasAction && (
+                        <div className="bg-primary/10 border-b border-primary/20 px-4 py-3">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-primary shrink-0" />
+                                <span className="font-semibold text-sm text-primary">Action needed</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {nextActionData.title} — {nextActionData.description}
+                              </p>
+                              {nextActionData.dueAt && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Due {formatDate(nextActionData.dueAt)}
+                                </p>
+                              )}
+                            </div>
+                            {!nextActionData.blockedReason && nextAction && (
+                              <Button size="default" variant="default" className="shrink-0 font-semibold shadow-warm ring-2 ring-primary/25" asChild>
+                                <Link href={nextAction.href}>
+                                  {nextAction.label}
+                                  <ArrowRight className="h-4 w-4 ml-2" />
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex gap-4 p-4">
                         <div className="relative h-24 w-24 shrink-0 rounded-lg overflow-hidden bg-muted border">
                           {cover ? (
