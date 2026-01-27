@@ -288,21 +288,13 @@ export default function CompliancePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Agchange uses a payout-hold workflow to protect both buyers and sellers:
+                Agchange is a software marketplace. We verify sellers and review required documentation and listings before they go live. Payments are processed by Stripe. Agchange does not hold funds, provide escrow, or condition payouts on delivery.
               </p>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-4">
-                <li>Buyer pays platform via Stripe Checkout at purchase</li>
-                <li>Funds are held for payout release by the platform</li>
-                <li>For whitetail breeder orders: Seller must upload TPWD Transfer Approval</li>
-                <li>Admin verifies transfer approval document</li>
-                <li>Admin releases payout to seller via Stripe Transfer</li>
-              </ol>
             </div>
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                <strong>Protection:</strong> This payout-hold workflow helps ensure required marketplace documents are verified
-                before funds are released, protecting both buyers and sellers.
+                For whitetail breeder orders, sellers must upload TPWD Transfer Approval after sale. Admin verifies the document. This is a documentation requirement; payouts are not held or conditioned on it.
               </AlertDescription>
             </Alert>
           </CardContent>

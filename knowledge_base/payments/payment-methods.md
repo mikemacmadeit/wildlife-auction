@@ -52,7 +52,7 @@ Agchange accepts multiple payment methods for your convenience.
 ## Payment Security
 
 - **All payments are secure** and encrypted
-- **Funds are held** until delivery is confirmed
+- **Payments are processed by Stripe** — we do not hold funds or condition payouts on delivery
 - **Buyer protection** applies to all payment methods
 - **No payment info stored** on our servers
 

@@ -16,7 +16,7 @@ Trust is the product—but “trust” needs to be **specific**. This guide tell
 - **Badges help reduce uncertainty**, but they are not a guarantee.
 - **Marketplace Review Complete** means **workflow review**, not regulator approval.
 - For regulated categories (like whitetail breeder), we verify that required documents were uploaded and reviewed—but **buyer/seller remain responsible** for compliance.
-- **Protected transaction** means funds can be held until delivery/acceptance steps are completed (depending on the listing/order).
+- **Protected transaction / Verified listing window** means an optional dispute window after delivery; Agchange does not hold funds or condition payouts on delivery.
 
 ## What we verify vs what we do not
 
@@ -61,7 +61,7 @@ Trust is the product—but “trust” needs to be **specific**. This guide tell
 
 ### “Protected X Days”
 
-- **Means**: The order has a protection window after delivery/receipt milestones. Funds may be held until requirements are met and/or the protection period ends.
+- **Means**: The order has an optional dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
 - **Why it matters**: It creates a clear window for disputes with evidence.
 
 ### Seller trust badges (profile/listing)

@@ -14,7 +14,7 @@ Your payments are protected and secure on Agchange.
 
 ## How Protection Works
 
-- **Funds are held securely** until delivery is confirmed
+- **Payments are processed by Stripe** — Agchange does not hold funds or condition payouts on delivery
 - **You have a protection window** to inspect your purchase
 - **Dispute resolution** available if issues arise
 - **Refund process** for eligible cases

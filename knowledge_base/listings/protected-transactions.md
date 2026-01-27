@@ -14,9 +14,8 @@ Protected transactions provide additional buyer protection and seller benefits.
 
 ## What is Protection?
 
-- **Extended protection window** - More time for buyer to inspect
-- **Held funds** - Payment held until protection window ends
-- **Dispute support** - Enhanced dispute resolution
+- **Verified listing window** - Optional dispute window (e.g. 7 or 14 days) after delivery
+- **Dispute support** - Enhanced dispute resolution; Agchange does not hold funds or condition payouts on delivery
 - **Peace of mind** - For both buyers and sellers
 
 ## For Buyers
@@ -24,7 +23,7 @@ Protected transactions provide additional buyer protection and seller benefits.
 ### Benefits
 
 - **Longer inspection period** - 7 or 14 days (seller chooses)
-- **Secure payment** - Funds held until you're satisfied
+- **Secure payment** - Processed by Stripe; we do not hold funds or condition payouts on delivery
 - **Better dispute process** - Enhanced support if issues arise
 - **Confidence** - Know you're protected
 
@@ -35,7 +34,7 @@ Protected transactions provide additional buyer protection and seller benefits.
 3. **Confirm delivery** - Protection window starts
 4. **Inspect thoroughly** - Use full protection period
 5. **Report issues** if any during protection window
-6. **Funds released** to seller after protection period (if no issues)
+6. Sellers receive funds via Stripe when you pay; we do not hold or release payouts
 
 ## For Sellers
 
@@ -58,7 +57,7 @@ Protected transactions provide additional buyer protection and seller benefits.
 - **Starts** when buyer confirms delivery
 - **Duration** - 7 or 14 days (seller's choice)
 - **Buyer can report issues** during this time
-- **Funds held** until window expires or dispute resolved
+- **Dispute window** applies; Agchange does not hold funds or condition payouts on delivery
 
 ## Important Notes
 

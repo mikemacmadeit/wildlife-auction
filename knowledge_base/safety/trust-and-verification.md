@@ -27,7 +27,7 @@ Agchange uses verification and trust features to keep the platform safe.
 
 ## Buyer Protection
 
-- **Secure payments** - Funds held until delivery
+- **Secure payments** - Processed by Stripe; Agchange does not hold funds or condition payouts on delivery
 - **Dispute resolution** - Platform helps resolve issues
 - **Protection window** - Time to inspect purchases
 - **Refund process** - For eligible cases

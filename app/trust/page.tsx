@@ -207,15 +207,15 @@ export default function TrustPage() {
           </CardContent>
         </Card>
 
-        {/* Escrow & Payout Process */}
+        {/* How payments work — no escrow, no payout holds */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
-              <CardTitle>Payout Holds & Release</CardTitle>
+              <CardTitle>How payments work</CardTitle>
             </div>
             <CardDescription>
-              How payment works and when sellers receive funds
+              Seller verification and listing review before listings go live
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -225,9 +225,9 @@ export default function TrustPage() {
                   <span className="text-sm font-bold text-primary">1</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">Buyer Pays Platform</h4>
+                  <h4 className="font-semibold mb-1">How payments work</h4>
                   <p className="text-sm text-muted-foreground">
-                    Buyer pays via Stripe Checkout. Funds are held for payout release (not immediately transferred to seller).
+                    Agchange is a software marketplace. We verify sellers and review required documentation and listings before they go live. Payments are processed by Stripe. Agchange does not hold funds, provide escrow, or condition payouts on delivery.
                   </p>
                 </div>
               </div>
@@ -250,10 +250,9 @@ export default function TrustPage() {
                   <span className="text-sm font-bold text-primary">3</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">Admin Releases Payout</h4>
+                  <h4 className="font-semibold mb-1">Seller receives funds</h4>
                   <p className="text-sm text-muted-foreground">
-                    Once compliance documents are verified (if required), admin releases payout to seller via Stripe Transfer. 
-                    Seller receives funds minus platform fees.
+                    Sellers receive funds via Stripe when the buyer pays. Agchange does not hold or delay payouts.
                   </p>
                 </div>
               </div>
@@ -262,8 +261,7 @@ export default function TrustPage() {
             <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertDescription className="text-green-800 dark:text-green-200">
-                <strong>Protection:</strong> This payout-hold workflow helps ensure required marketplace documents are verified before funds are released,
-                protecting both buyers and sellers. “Verified” is for marketplace workflow completeness—not regulator approval.
+                <strong>How it works:</strong> We verify sellers and review required documentation and listings before they go live. Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. “Verified” is for marketplace workflow completeness—not regulator approval.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -317,7 +315,7 @@ export default function TrustPage() {
                   <li>Admin approves → Listing becomes <Badge variant="outline">Active</Badge></li>
                   <li>After sale: Seller uploads TPWD Transfer Approval</li>
                   <li>Admin verifies transfer approval</li>
-                  <li>Payout is released to seller</li>
+                  <li>Seller receives funds via Stripe when the buyer pays (we do not hold or release payouts)</li>
                 </ol>
               </div>
 
@@ -377,10 +375,9 @@ export default function TrustPage() {
                 Agchange offers optional transaction protection for buyers:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
-                <li><strong>7-day protection window:</strong> Buyer can dispute within 7 days of delivery</li>
-                <li><strong>14-day protection window:</strong> Extended protection for higher-value transactions</li>
-                <li><strong>Dispute resolution:</strong> Admin reviews disputes and resolves (release funds or refund)</li>
-                <li><strong>Payout hold:</strong> Funds are held during protection window</li>
+                <li><strong>Verified listing window (7 days):</strong> Buyer can dispute within 7 days of delivery</li>
+                <li><strong>Verified listing window (14 days):</strong> Extended dispute window for higher-value transactions</li>
+                <li><strong>Dispute resolution:</strong> Admin reviews disputes and resolves (refund when appropriate). Agchange does not hold funds.</li>
               </ul>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -432,8 +429,7 @@ export default function TrustPage() {
               <div>
                 <h4 className="font-semibold mb-1">When will I receive my payout?</h4>
                 <p className="text-sm text-muted-foreground">
-                  For whitetail breeder orders: After TPWD Transfer Approval is uploaded and verified by admin. 
-                  For other orders: After dispute window passes (or protection window if applicable) and no disputes are filed.
+                  Sellers receive funds via Stripe when the buyer pays. Agchange does not hold or delay payouts. TPWD Transfer Approval (for whitetail breeder sales) is a documentation requirement; it does not gate or delay payout.
                 </p>
               </div>
             </div>

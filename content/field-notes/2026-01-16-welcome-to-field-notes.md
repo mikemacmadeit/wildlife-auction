@@ -38,7 +38,7 @@ Field Notes is our “high-signal” library for **real transactions**—what to
 
 - “Why does checkout fail for large amounts?”
 - “What does **Marketplace Review Complete** mean?”
-- “What does it mean when funds are held until delivery confirmation?”
+- “How do dispute windows work (we do not hold funds; payments are processed by Stripe)?”
 - “What should I do before I accept an offer?”
 
 ## Quick links (inside the app)

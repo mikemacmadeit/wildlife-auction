@@ -67,7 +67,7 @@ How to stay safe when buying on Agchange.
 ### Payment Protection
 
 **How you're protected:**
-- Funds held until delivery confirmed
+- Payments processed by Stripe; Agchange does not hold funds or condition payouts on delivery
 - Inspection period to verify item
 - Dispute process if issues arise
 - Refund available if problems
@@ -162,7 +162,7 @@ How to stay safe when buying on Agchange.
 ### If Item Doesn't Match
 
 **What to do:**
-1. **Don't confirm delivery** - Keep funds held
+1. **Don't confirm delivery** - Open a dispute if the item is not as described
 2. **Contact seller immediately** - Explain the issue
 3. **Take photos** - Document the problem
 4. **Request resolution** - Refund or replacement

@@ -2032,7 +2032,7 @@ function NewListingPageContent() {
                 <Label htmlFor="protected" className="cursor-pointer flex-1">
                   <div className="font-medium mb-1">Protected Transaction</div>
                   <div className="text-sm text-muted-foreground">
-                    Offer buyer protection (dispute window after delivery). Funds release after confirmation or dispute resolution.
+                    Verified listing window: optional dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
                   </div>
                 </Label>
               </div>
@@ -2110,7 +2110,7 @@ function NewListingPageContent() {
       description: 'Review your listing before publishing',
       content: (
         <div className="space-y-6">
-          {/* Payout gating is already surfaced earlier in the flow; keep review step clean. */}
+          {/* Seller verification and listing review are surfaced earlier in the flow; keep review step clean. */}
 
           <Alert className="bg-muted/40 border-border/60">
             <AlertCircle className="h-4 w-4" />

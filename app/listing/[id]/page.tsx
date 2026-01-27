@@ -1469,7 +1469,7 @@ export default function ListingDetailPage() {
                             />
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                            Checkout supports card and bank transfer. Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
                           </div>
                         </div>
                       </div>
@@ -1490,7 +1490,7 @@ export default function ListingDetailPage() {
                           <div className="min-w-0">
                             <div className="font-semibold">Protected Transaction</div>
                             <div className="text-xs text-muted-foreground">
-                              Enabled ({listing!.protectedTransactionDays} days). Funds release after delivery/acceptance requirements are met.
+                              Verified listing window ({listing!.protectedTransactionDays} days). Dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
                             </div>
                           </div>
                         </div>
@@ -1824,7 +1824,7 @@ export default function ListingDetailPage() {
                               />
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Checkout supports card payments; for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                              Checkout supports card and bank transfer. Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
                             </div>
                           </div>
                         </div>
@@ -1845,7 +1845,7 @@ export default function ListingDetailPage() {
                             <div className="min-w-0">
                               <div className="font-semibold">Protected Transaction</div>
                               <div className="text-xs text-muted-foreground">
-                                Enabled ({listing!.protectedTransactionDays} days). Funds release after delivery/acceptance requirements are met.
+                                Verified listing window ({listing!.protectedTransactionDays} days). Dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
                               </div>
                             </div>
                           </div>
@@ -2091,7 +2091,7 @@ export default function ListingDetailPage() {
                       <AccordionTrigger className="text-sm">Payment Methods</AccordionTrigger>
                       <AccordionContent className="text-sm">
                         <p className="text-muted-foreground">
-                          Checkout supports card payments, and for high-ticket purchases we recommend bank transfer. Funds are held until delivery confirmation.
+                          Agchange is a software marketplace. We verify sellers and review required documentation and listings before they go live. Payments are processed by Stripe. Agchange does not hold funds, provide escrow, or condition payouts on delivery.
                         </p>
                       </AccordionContent>
                     </AccordionItem>

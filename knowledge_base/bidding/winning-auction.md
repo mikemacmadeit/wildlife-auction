@@ -23,7 +23,7 @@ Congratulations! Here's what to expect after winning an auction.
 
 1. **Review order details** - Verify item, price, and seller
 2. **Select payment method** - Card, ACH, or wire transfer
-3. **Complete payment** - Funds are held securely
+3. **Complete payment** - Processed by Stripe; we do not hold funds or condition payouts on delivery
 4. **Order confirmed** - You'll receive confirmation
 
 ## Time Limits
@@ -34,7 +34,7 @@ Congratulations! Here's what to expect after winning an auction.
 
 ## After Payment
 
-- **Funds are held securely** until delivery
+- **Payments** - Processed by Stripe; we do not hold funds or condition payouts on delivery
 - **Seller arranges delivery** or pickup
 - **You can message seller** through the order page
 - **Track order status** in "My Orders"

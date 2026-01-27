@@ -676,7 +676,7 @@ export async function POST(request: Request) {
     // NOTE: We intentionally do NOT enforce a hard minimum for ACH here.
     // Stripe + risk controls remain server-side authoritative, but UX should always allow ACH selection.
 
-    // Create Stripe Checkout Session with funds held in platform balance until payout release.
+    // Create Stripe Checkout Session. Sellers receive funds via Stripe when buyer pays (no escrow, no payout holds).
     // (We avoid regulated-service wording here; this is a settlement/payout-hold workflow.)
     const baseUrl = getAppUrl();
     

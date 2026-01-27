@@ -181,7 +181,7 @@ Complete guide to buying animals, livestock, equipment, and more on Agchange.
 
 **Payment security:**
 - All payments are encrypted and secure
-- Funds held until delivery confirmed
+- Payments processed by Stripe; we do not hold funds or condition payouts on delivery
 - Protected transaction process
 - Refund available if issues arise
 
@@ -206,12 +206,12 @@ Complete guide to buying animals, livestock, equipment, and more on Agchange.
 - **Receive the item** - Pickup, delivery, or transport
 - **Inspect the item** - Make sure it's as described
 - **Confirm delivery** - Click "Confirm Delivery" in order
-- **Funds released** - Seller receives payment after confirmation
+- **Payment** - Sellers receive funds via Stripe when you pay; we do not hold or release payouts
 
 ## Your Protection
 
 **Buyer protection includes:**
-- **Funds held securely** - Not released until delivery confirmed
+- **Secure payments** - Processed by Stripe; we do not hold funds or condition payouts on delivery
 - **Inspection period** - Time to verify item is as described
 - **Dispute process** - If item not as described or issues arise
 - **Refund available** - If problems can't be resolved

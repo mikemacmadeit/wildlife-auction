@@ -25,7 +25,7 @@ Agchange accepts multiple secure payment methods for your convenience.
 **How it works:**
 - Enter card details during checkout
 - Payment is processed immediately
-- Funds are held securely until delivery is confirmed
+- Payments are processed by Stripe; Agchange does not hold funds or condition payouts on delivery
 - Works for all listing types (auction, fixed price, best offer)
 
 **Requirements:**
@@ -134,18 +134,16 @@ Agchange accepts multiple secure payment methods for your convenience.
 ## Payment Processing
 
 **How payments are handled:**
-1. **Payment is processed** when you complete checkout
-2. **Funds are held securely** by Agchange
-3. **Seller is notified** of your purchase
-4. **Delivery is arranged** between you and seller
-5. **Funds are released** to seller when you confirm delivery
-6. **You have protection** during the delivery window
+1. **Payment is processed** when you complete checkout (via Stripe)
+2. **Seller is notified** of your purchase
+3. **Delivery is arranged** between you and seller
+4. **Dispute window** applies; Agchange does not hold funds or condition payouts on delivery
+5. **Refunds** available for eligible disputes
 
 **Payment protection:**
-- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
+- Payments are processed by Stripe. Agchange does not hold funds, provide escrow, or condition payouts on delivery.
 - Dispute process available if issues arise
 - Refund available if item not as described
-- Secure delayed settlement protection
 
 ## Troubleshooting
 

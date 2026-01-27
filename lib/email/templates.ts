@@ -576,7 +576,7 @@ function getEmailTemplate(params: {
 
 export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { subject: string; html: string } {
   const subject = `Order Confirmation - ${data.listingTitle}`;
-  const preheader = `Order confirmed for ${data.listingTitle}. Funds held for payout release until delivery.`;
+  const preheader = `Order confirmed for ${data.listingTitle}. Payment received.`;
   const origin = tryGetOrigin(data.orderUrl);
   const contactUrl = `${origin || 'https://agchange.com'}/contact`;
   const content = `
@@ -584,7 +584,7 @@ export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { s
       Order confirmed
     </div>
     <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 16px 0;">
-      Hi ${escapeHtml(data.buyerName)} — your payment was received. Your funds are held securely while the seller coordinates delivery.
+      Hi ${escapeHtml(data.buyerName)} — your payment was received. Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"

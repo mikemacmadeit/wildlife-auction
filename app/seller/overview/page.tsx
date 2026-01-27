@@ -788,13 +788,13 @@ export default function SellerOverviewPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payouts held (gross)</div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Revenue (gross)</div>
                       <div className="text-2xl font-extrabold mt-1">
                         {typeof dashboardData?.totals?.revenue?.held === 'number'
                           ? `$${dashboardData.totals.revenue.held.toLocaleString()}`
                           : '—'}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">Held until timeline + compliance checks complete</div>
+                      <div className="text-xs text-muted-foreground mt-1">From sales via Stripe</div>
                     </div>
                     <Shield className="h-5 w-5 text-primary" />
                   </div>

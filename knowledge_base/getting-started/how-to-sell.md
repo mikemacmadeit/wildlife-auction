@@ -239,18 +239,16 @@ Complete guide to becoming a successful seller on Agchange.
 
 **How it works:**
 1. Buyer makes purchase
-2. Payment is processed and held securely
+2. Payment is processed by Stripe (sellers receive funds when buyer pays; we do not hold or release payouts)
 3. You arrange delivery with buyer
 4. Buyer receives and inspects item
-5. Buyer confirms delivery
-6. Funds are released to you
-7. Payout processed to your payment account
+5. Buyer confirms delivery (if applicable)
+6. Dispute window applies; Agchange does not condition payouts on delivery
 
 **Timeline:**
-- Payment held until delivery confirmed
-- Payout released after confirmation
-- Processing: 1-3 business days typically
-- Total: Usually 5-10 business days from sale
+- Sellers receive funds via Stripe when the buyer pays
+- Processing: 1-3 business days typically for bank transfers
+- Agchange does not hold funds or delay payouts
 
 ### Understanding Fees
 

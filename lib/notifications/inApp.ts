@@ -173,7 +173,7 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'order_created',
         title: 'Order confirmed',
-        body: `Payment received for “${p.listingTitle}”. Funds are held securely until delivery and issue windows are complete.`,
+        body: `Payment received for “${p.listingTitle}”. Payments are processed by Stripe; Agchange does not hold funds or condition payouts on delivery.`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View timeline',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount, paymentMethod: p.paymentMethod },

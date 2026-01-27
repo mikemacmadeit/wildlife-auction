@@ -3,7 +3,7 @@ title: "How Payment Protection Works"
 slug: "payment-protection-explained"
 category: "payments"
 audience: ["buyer", "all"]
-tags: ["payments", "protection", "security", "buyer protection", "safe", "secure", "delayed settlement"]
+tags: ["payments", "protection", "security", "buyer protection", "safe", "secure"]
 enabled: true
 version: 1
 ---
@@ -14,12 +14,11 @@ Understanding how Agchange protects your payments and purchases.
 
 ## What Is Payment Protection?
 
-**Payment protection means:**
-- Payments are processed through the platform and released according to marketplace confirmation and dispute rules
-- You can inspect item before funds are released
-- Dispute process available if issues arise
-- Refund available if problems can't be resolved
-- Secure, encrypted payment processing
+**How payments work on Agchange:**
+- Agchange is a software marketplace. We verify sellers and review required documentation and listings before they go live.
+- Payments are processed by Stripe. Agchange does not hold funds, provide escrow, or condition payouts on delivery.
+- Dispute process available if issues arise. Refund available for eligible cases.
+- Secure, encrypted payment processing.
 
 **Why it matters:**
 - Protects you from fraud
@@ -34,30 +33,15 @@ Understanding how Agchange protects your payments and purchases.
 
 **When you complete checkout:**
 - Payment is processed immediately (cards) or pending (ACH/wire)
-- Payments are processed through the platform
-- Not released to seller until marketplace rules are met
+- Payments are processed by Stripe
+- Agchange does not hold funds or condition payouts on delivery
 - Secure and encrypted
 
 **What happens:**
 - Payment method is charged
-- Funds held in secure account
 - Order is created
 - Seller is notified
-
-### Step 2: Funds Are Held
-
-**During this time:**
-- Payments are secure and protected
-- Seller can't access funds until marketplace rules are met
-- You can inspect item
-- Dispute available if needed
-- Protection window active
-
-**Protection window:**
-- Starts when payment processes
-- Continues until delivery confirmed
-- Allows time to inspect item
-- Can open dispute if issues
+- You can open a dispute if issues arise (dispute window applies)
 
 ### Step 3: Delivery and Inspection
 
@@ -78,10 +62,9 @@ Understanding how Agchange protects your payments and purchases.
 ### Step 4: Confirm or Dispute
 
 **If item is good:**
-- Click "Confirm Delivery" in order
-- Funds released to seller
+- Click "Confirm Delivery" in order (if offered)
 - Order completed
-- Protection window ends
+- Sellers receive funds via Stripe when you pay; we do not hold or release payouts
 
 **If item has issues:**
 - Don't confirm delivery
@@ -101,14 +84,14 @@ Understanding how Agchange protects your payments and purchases.
 - Never stored on Agchange servers
 - Industry-standard security
 
-### Funds Held Securely
+### Secure Payments
 
 **Your payments are:**
-- Processed through secure platform
-- Not released until marketplace rules are met
-- Protected from fraud
-- Available for refund if needed
-- Managed professionally
+- Processed by Stripe
+- Agchange does not hold funds or condition payouts on delivery
+- Protected by fraud detection
+- Refunds available for eligible disputes
+- Managed via Stripe
 
 ### Inspection Period
 
@@ -166,7 +149,7 @@ Understanding how Agchange protects your payments and purchases.
 2. Wait for delivery
 3. Inspect item thoroughly
 4. Confirm if good, dispute if issues
-5. Funds held until you're satisfied
+5. Dispute if needed during the dispute window; we do not hold funds
 
 **Best practices:**
 - Inspect immediately upon delivery
@@ -197,11 +180,11 @@ Understanding how Agchange protects your payments and purchases.
 ### Typical Timeline
 
 **Standard process:**
-1. **Purchase** - Payment processed, funds held
+1. **Purchase** - Payment processed by Stripe (we do not hold funds)
 2. **Delivery** - Item delivered (1-14 days)
 3. **Inspection** - You inspect item
-4. **Confirmation** - Confirm delivery or dispute
-5. **Resolution** - Funds released or refunded
+4. **Confirmation** - Confirm delivery or dispute if needed
+5. **Resolution** - Refund if dispute valid; we do not release payouts (sellers are paid via Stripe when you pay)
 
 **Total time:**
 - Usually 1-3 weeks from purchase
@@ -254,7 +237,7 @@ Never pay outside the platform. This removes all protection. Report seller to su
 
 ### How do I know protection is active?
 
-Your order status will show payment processed and funds held. Protection is active until you confirm delivery.
+Your order status will show payment processed. Dispute window applies; Agchange does not hold funds or condition payouts on delivery.
 
 ## Related Articles
 

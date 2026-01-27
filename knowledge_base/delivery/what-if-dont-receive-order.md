@@ -173,8 +173,8 @@ If your order hasn't arrived or you're having delivery issues, here's what to do
 ## Protection and Refunds
 
 **Your payment is protected:**
-- Funds are held until you confirm delivery
-- You can open a dispute if issues arise
+- Payments are processed by Stripe; Agchange does not hold funds or condition payouts on delivery
+- You can open a dispute if issues arise (e.g. item not received)
 - Refund available if item not as described or never arrives
 - Protection window allows time to inspect item
 

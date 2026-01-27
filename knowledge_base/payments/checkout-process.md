@@ -60,13 +60,13 @@ Understanding the checkout process for purchases.
 
 - **Time limits** - Complete checkout within deadline (for auctions)
 - **Payment security** - All payments are encrypted and secure
-- **Funds held** - Payment held until delivery confirmed
+- **Payments** - Processed by Stripe; we do not hold funds or condition payouts on delivery
 - **Order confirmation** - Save confirmation for your records
 
 ## After Checkout
 
 - **Order created** - Appears in "My Orders"
-- **Payment processed** - Funds held securely
+- **Payment processed** - Via Stripe; we do not hold funds
 - **Seller notified** - Seller knows about purchase
 - **Delivery arranged** - Seller will contact you
 

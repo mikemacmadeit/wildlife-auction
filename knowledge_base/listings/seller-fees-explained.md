@@ -119,10 +119,9 @@ Understanding the fees associated with selling on Agchange.
 - Equals your payout
 
 **Payout timeline:**
-- Funds held until buyer confirms delivery
-- Released to you after delivery confirmation
-- Processed to your payment account
-- Typically 2-5 business days after release
+- Sellers receive funds via Stripe when the buyer pays
+- Agchange does not hold funds or condition payouts on delivery
+- Typically 2-5 business days for bank transfers
 
 ## Fee Questions
 
