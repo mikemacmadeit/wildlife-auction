@@ -14,7 +14,7 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { collection, getCountFromServer, onSnapshot, orderBy, query, where, limit as fsLimit, getDocs } from 'firebase/firestore';
-import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, getListingsByIds, filterOutEndedAuctions, toListing } from '@/lib/firebase/listings';
+import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, getListingsByIds, filterOutEndedAuctions, filterListingsForDiscovery, toListing } from '@/lib/firebase/listings';
 import { db } from '@/lib/firebase/config';
 import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,9 @@ function toDateSafe(v: any): Date | null {
   }
   return null;
 }
+
+// Homepage hero brand — always "Agchange" (never "Wildlife Exchange")
+const HOMEPAGE_HERO_BRAND = 'Agchange';
 
 /** Inline filter: hide dog-related listings from UI for Stripe review (no backend change). */
 function isDogListing(l: Listing): boolean {
@@ -241,7 +244,7 @@ export default function HomePage() {
         const fetched = await getListingsByIds(recentIds);
         if (cancelled) return;
         const valid = fetched.filter((x) => x !== null) as Listing[];
-        setRecentlyViewedListings(filterOutEndedAuctions(valid));
+        setRecentlyViewedListings(filterListingsForDiscovery(valid));
       } catch {
         if (!cancelled) setRecentlyViewedListings([]);
       }
@@ -928,7 +931,7 @@ export default function HomePage() {
                 <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
-                Agchange
+                {HOMEPAGE_HERO_BRAND}
               </h1>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">

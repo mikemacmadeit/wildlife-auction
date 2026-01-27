@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, PackageCheck, Calendar, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
-import { getOrderById } from '@/lib/firebase/orders';
+import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
@@ -92,6 +92,29 @@ export default function SellerOrderDetailPage() {
   useEffect(() => {
     if (!authLoading) void loadOrder();
   }, [authLoading, loadOrder]);
+
+  const handleMarkDelivered = useCallback(async () => {
+    if (!order) return;
+    try {
+      setProcessing('delivered');
+      await postAuthJson(`/api/orders/${order.id}/mark-delivered`, {});
+      toast({ title: 'Updated', description: 'Marked delivered.' });
+      const refreshed = await getOrderById(order.id);
+      if (refreshed) setOrder(refreshed);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
+    } finally {
+      setProcessing(null);
+    }
+  }, [order, toast]);
+
+  useEffect(() => {
+    if (!orderId || !user?.uid) return;
+    const unsub = subscribeToOrder(orderId, (next) => {
+      if (next && next.sellerId === user.uid) setOrder(next);
+    });
+    return () => unsub();
+  }, [orderId, user?.uid]);
 
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
@@ -180,7 +203,7 @@ export default function SellerOrderDetailPage() {
                     <div className="font-semibold text-sm">Propose delivery</div>
                     <div className="text-xs text-muted-foreground">Propose delivery windows (hauling). Buyer will agree to one.</div>
                   </div>
-                  <Button variant="default" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
+                  <Button variant="default" size="lg" className="shadow-warm ring-2 ring-primary/25 font-semibold" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
                     <Calendar className="h-4 w-4 mr-2" />
                     Propose delivery
                   </Button>
@@ -205,6 +228,8 @@ export default function SellerOrderDetailPage() {
                   </div>
                   <Button
                     variant="default"
+                    size="lg"
+                    className="shadow-warm ring-2 ring-primary/25 font-semibold"
                     disabled={processing !== null}
                     onClick={() => setMarkOutForDeliveryOpen(true)}
                   >
@@ -225,20 +250,10 @@ export default function SellerOrderDetailPage() {
                   </div>
                   <Button
                     variant="default"
+                    size="lg"
+                    className="shadow-warm ring-2 ring-primary/25 font-semibold"
                     disabled={processing !== null}
-                    onClick={async () => {
-                      try {
-                        setProcessing('delivered');
-                        await postAuthJson(`/api/orders/${order.id}/mark-delivered`, {});
-                        toast({ title: 'Updated', description: 'Marked delivered.' });
-                        const refreshed = await getOrderById(order.id);
-                        if (refreshed) setOrder(refreshed);
-                      } catch (e: any) {
-                        toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
-                      } finally {
-                        setProcessing(null);
-                      }
-                    }}
+                    onClick={handleMarkDelivered}
                   >
                     {processing === 'delivered' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PackageCheck className="h-4 w-4 mr-2" />}
                     Mark Delivered
@@ -320,6 +335,8 @@ export default function SellerOrderDetailPage() {
                   </div>
                   <Button
                     variant="default"
+                    size="lg"
+                    className="shadow-warm ring-2 ring-primary/25 font-semibold"
                     disabled={processing !== null}
                     onClick={() => setSetPickupInfoOpen(true)}
                   >
@@ -348,7 +365,7 @@ export default function SellerOrderDetailPage() {
                     <div className="font-semibold text-sm">Agree to pickup window</div>
                     <div className="text-xs text-muted-foreground">Confirm this time works for you.</div>
                   </div>
-                  <Button variant="default" disabled={processing !== null} onClick={() => setAgreePickupOpen(true)}>
+                  <Button variant="default" size="lg" className="shadow-warm ring-2 ring-primary/25 font-semibold" disabled={processing !== null} onClick={() => setAgreePickupOpen(true)}>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Agree to window
                   </Button>
@@ -488,9 +505,11 @@ export default function SellerOrderDetailPage() {
                     )}
                   </div>
                   <Button
+                    size="lg"
+                    className={nextAction.severity !== 'danger' ? 'shadow-warm ring-2 ring-primary/25 font-semibold' : 'font-semibold'}
                     variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
-                    disabled={!!nextAction.blockedReason}
-                    onClick={() => {
+                    disabled={!!nextAction.blockedReason || (nextAction.ctaAction.includes('mark-delivered') && processing === 'delivered')}
+                    onClick={async () => {
                       if (nextAction.ctaAction.includes('schedule-delivery')) {
                         setScheduleDeliveryOpen(true);
                       } else if (nextAction.ctaAction.includes('set-pickup')) {
@@ -500,12 +519,15 @@ export default function SellerOrderDetailPage() {
                       } else if (nextAction.ctaAction.includes('mark-out')) {
                         setMarkOutForDeliveryOpen(true);
                       } else if (nextAction.ctaAction.includes('mark-delivered')) {
-                        window.location.href = `/seller/orders/${order.id}#mark-delivered`;
+                        await handleMarkDelivered();
                       } else if (nextAction.ctaAction.startsWith('/')) {
                         window.location.href = nextAction.ctaAction;
                       }
                     }}
                   >
+                    {nextAction.ctaAction.includes('mark-delivered') && processing === 'delivered' ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : null}
                     {nextAction.ctaLabel}
                   </Button>
                 </div>

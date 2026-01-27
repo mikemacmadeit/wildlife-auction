@@ -96,7 +96,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const gateEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
+  // Set to true to re-enable the site password gate (e.g. after Stripe review).
+  const SITE_GATE_TEMPORARILY_HIDDEN = true;
+  const gateEnabled =
+    !SITE_GATE_TEMPORARILY_HIDDEN &&
+    ['1', 'true', 'yes', 'on'].includes(String(process.env.SITE_GATE_ENABLED || '').toLowerCase());
 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>

@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2, MapPin, Package, User } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
-import { getOrderById } from '@/lib/firebase/orders';
+import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
@@ -109,6 +109,14 @@ export default function BuyerOrderDetailPage() {
       cancelledRef.current = true;
     };
   }, [authLoading, loadOrder]);
+
+  useEffect(() => {
+    if (!orderId || !user?.uid) return;
+    const unsub = subscribeToOrder(orderId, (next) => {
+      if (next && next.buyerId === user.uid) setOrder(next);
+    });
+    return () => unsub();
+  }, [orderId, user?.uid]);
 
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);

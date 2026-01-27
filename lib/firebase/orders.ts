@@ -6,14 +6,15 @@ import {
   collection,
   doc,
   getDoc,
-  setDoc,
-  updateDoc,
-  query,
-  where,
   getDocs,
+  onSnapshot,
   orderBy,
+  query,
+  setDoc,
   serverTimestamp,
   Timestamp,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from './config';
 import type { Order, OrderListingSnapshot, OrderSellerSnapshot } from '@/lib/types';
@@ -339,6 +340,38 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   }
 
   return toOrder(orderDoc.id, normalizedData);
+}
+
+/**
+ * Subscribe to order doc for real-time updates (e.g. seller marks delivered, buyer confirms).
+ * Returns an unsubscribe function.
+ */
+export function subscribeToOrder(
+  orderId: string,
+  callback: (order: Order | null) => void
+): () => void {
+  const orderRef = doc(db, 'orders', orderId);
+  return onSnapshot(
+    orderRef,
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+      const rawData = snapshot.data() as OrderDoc;
+      const normalizedData = normalizeFirestoreValue(rawData) as OrderDoc;
+      try {
+        callback(toOrder(snapshot.id, normalizedData));
+      } catch (e) {
+        console.warn('[subscribeToOrder] toOrder failed', orderId, e);
+        callback(null);
+      }
+    },
+    (err) => {
+      console.warn('[subscribeToOrder]', orderId, err);
+      callback(null);
+    }
+  );
 }
 
 /**

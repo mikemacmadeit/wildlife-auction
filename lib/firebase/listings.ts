@@ -1398,6 +1398,15 @@ export function filterOutEndedAuctions(listings: Listing[]): Listing[] {
 }
 
 /**
+ * For discovery surfaces (recently viewed, etc.), only show listings that are currently
+ * active and visible to buyers. Excludes paused (draft), pending, removed, ended, expired.
+ */
+export function filterListingsForDiscovery(listings: Listing[]): Listing[] {
+  const activeOnly = listings.filter((l) => l.status === 'active');
+  return filterOutEndedAuctions(activeOnly);
+}
+
+/**
  * List active listings with optional filters (legacy - kept for backward compatibility)
  * Returns UI Listing[] (Date fields)
  * 

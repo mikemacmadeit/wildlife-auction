@@ -166,11 +166,9 @@ export function Navbar() {
               </div>
             </div>
             <span className="sr-only">Agchange</span>
-            {user && (
-              <span className="hidden md:inline text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none">
-                Agchange
-              </span>
-            )}
+            <span className="hidden md:inline text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none">
+              Agchange
+            </span>
           </Link>
 
           {/* Desktop Navigation - Centered (only on large screens) */}

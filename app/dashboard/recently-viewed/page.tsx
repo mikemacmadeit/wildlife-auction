@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
-import { getListingsByIds, filterOutEndedAuctions } from '@/lib/firebase/listings';
+import { getListingsByIds, filterListingsForDiscovery } from '@/lib/firebase/listings';
 import type { Listing } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,7 +54,7 @@ export default function RecentlyViewedPage() {
         const fetched = await getListingsByIds(recentIds);
         if (cancelled) return;
         const valid = fetched.filter((x) => x !== null) as Listing[];
-        setListings(filterOutEndedAuctions(valid));
+        setListings(filterListingsForDiscovery(valid));
       } finally {
         if (!cancelled) setLoading(false);
       }

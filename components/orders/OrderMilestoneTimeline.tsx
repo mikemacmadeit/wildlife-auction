@@ -93,7 +93,7 @@ export function OrderMilestoneTimeline({
                 </div>
 
                 {/* Milestone content */}
-                <div className="flex-1 min-w-0 pb-4">
+                <div className={cn('flex-1 min-w-0 pb-4 rounded-lg -mx-1 px-2 py-1', isCurrent && !isBlocked && 'bg-primary/10 ring-1 ring-primary/20')}>
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -136,17 +136,24 @@ export function OrderMilestoneTimeline({
                         )}
                       </div>
 
-                      {/* Help text */}
+                      {/* Help text — use prominent button when this is the current step */}
                       {showHelpText && milestone.helpText && (
                         <Collapsible>
                           <CollapsibleTrigger asChild>
-                            <button className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1">
-                              <ChevronDown className="h-3 w-3" />
+                            <button
+                              className={cn(
+                                'mt-2 inline-flex items-center gap-1.5 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                isCurrent && !isBlocked
+                                  ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-warm ring-1 ring-primary/30 hover:bg-primary/90'
+                                  : 'text-xs text-muted-foreground hover:text-foreground'
+                              )}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
                               Learn more
                             </button>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
-                            <div className="text-xs text-muted-foreground mt-1 pl-4 border-l-2 border-border">
+                            <div className="text-xs text-muted-foreground mt-2 pl-4 border-l-2 border-border">
                               {milestone.helpText}
                             </div>
                           </CollapsibleContent>
