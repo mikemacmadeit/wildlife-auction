@@ -18,6 +18,7 @@ import { DocumentType } from '@/lib/types';
 import { z } from 'zod';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { deleteStoragePathsBestEffort, getStoragePathFromUrl } from '@/lib/firebase/storage-cleanup';
 
 const bodySchema = z.object({
   documentUrl: z.string().url(),
@@ -105,12 +106,19 @@ export async function POST(
     if (expiresAt) docData.expiresAt = Timestamp.fromDate(new Date(expiresAt));
     if (metadata !== undefined) docData.metadata = metadata;
 
-    const docRef = await documentsRef.add(docData);
-
-    return json({
-      success: true,
-      documentId: docRef.id,
-    });
+    try {
+      const docRef = await documentsRef.add(docData);
+      return json({
+        success: true,
+        documentId: docRef.id,
+      });
+    } catch (e) {
+      const path = getStoragePathFromUrl(documentUrl);
+      if (path && path.startsWith(`listings/${listingId}/documents/`)) {
+        await deleteStoragePathsBestEffort([path]);
+      }
+      throw e;
+    }
   } catch (error: any) {
     console.error('Error uploading document:', error);
     return json({ error: error.message || 'Failed to upload document' }, { status: 500 });

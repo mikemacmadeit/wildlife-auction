@@ -194,15 +194,18 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
           </div>
 
           {/* Content with Premium Styling */}
-          <div className="p-3 sm:p-5 flex-1 flex flex-col gap-2 sm:gap-4">
+          <div className="p-3 sm:p-5 flex-1 flex flex-col gap-2 sm:gap-4 min-w-0">
             {sold.isSold && (
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
                 <div className="font-semibold">{sold.soldPriceLabel}</div>
                 {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
               </div>
             )}
-            {/* Title with gradient text effect */}
-            <h3 className="font-bold text-base sm:text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors duration-300 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+            {/* Title – line-clamp-4, flex-shrink-0 so longer titles aren’t cut off in gallery mode */}
+            <h3
+              className="font-bold text-base sm:text-lg leading-tight line-clamp-4 group-hover:text-primary transition-colors duration-300 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text min-w-0 break-words flex-shrink-0"
+              title={listing.title}
+            >
               {listing.title}
             </h3>
 
@@ -236,10 +239,10 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             </div>
 
             {/* Price and Seller Info - Enhanced */}
-            <div className="mt-auto pt-3 sm:pt-4 border-t border-border/50">
-              <div className="flex items-center justify-between gap-3 min-w-0">
-                <div className="space-y-1 flex-shrink-0 min-w-0 max-w-[60%] sm:max-w-[65%]">
-                  <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent break-words truncate">
+            <div className="mt-auto pt-3 sm:pt-4 border-t border-border/50 overflow-hidden">
+              <div className="flex items-center justify-between gap-3 min-w-0 overflow-hidden">
+                <div className="space-y-1 flex-shrink-0 min-w-0 overflow-hidden sm:max-w-[65%]">
+                  <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent truncate">
                     {priceDisplay}
                   </div>
                   {quantity && quantity > 1 ? (
@@ -253,8 +256,8 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                     </div>
                   ) : null}
                 </div>
-                <div className="flex flex-col items-end gap-1.5 flex-shrink-0 min-w-0 max-w-[40%] sm:max-w-[35%]">
-                  <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end max-w-full">
+                <div className="flex flex-col items-end gap-1.5 min-w-0 flex-shrink overflow-hidden sm:max-w-[35%]">
+                  <div className="hidden sm:flex items-center gap-2 flex-wrap justify-end max-w-full overflow-hidden">
                     {listing.sellerSnapshot?.verified && (
                       <Badge variant="secondary" className="text-[10px] font-semibold flex-shrink-0">
                         <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -272,24 +275,26 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                       </Badge>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-end gap-2 text-xs text-muted-foreground font-medium truncate text-right hover:underline overflow-hidden max-w-full"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const sellerId = listing.sellerId;
-                      if (!sellerId) return;
-                      router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
-                    }}
-                    aria-label="View seller profile"
-                  >
-                    <Avatar className="h-6 w-6 border border-border/50 flex-shrink-0">
-                      <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
-                      <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
-                    </Avatar>
-                    <span className="truncate block min-w-0">{sellerName}</span>
-                  </button>
+                  <div className="w-full min-w-0 max-w-full overflow-hidden flex justify-end">
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-end gap-2 text-xs text-muted-foreground font-medium text-right hover:underline overflow-hidden min-w-0 max-w-full"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const sellerId = listing.sellerId;
+                        if (!sellerId) return;
+                        router.push(`/sellers/${sellerId}?from=${encodeURIComponent(`/listing/${listing.id}`)}`);
+                      }}
+                      aria-label="View seller profile"
+                    >
+                      <Avatar className="h-6 w-6 border border-border/50 flex-shrink-0">
+                        <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
+                        <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
+                      </Avatar>
+                      <span className="truncate min-w-0">{sellerName}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

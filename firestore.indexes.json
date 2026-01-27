@@ -684,6 +684,16 @@
       ]
     },
     {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "deliveryConfirmedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "chargebacks",
       "queryScope": "COLLECTION",
       "fields": [
@@ -791,6 +801,29 @@
           "fieldPath": "__name__",
           "order": "DESCENDING"
         }
+      ]
+    },
+    {
+      "collectionGroup": "listings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sellerId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "listings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "watchlist",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "listingId", "order": "ASCENDING" }
       ]
     }
   ],

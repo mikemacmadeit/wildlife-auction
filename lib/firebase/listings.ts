@@ -1149,10 +1149,29 @@ export const queryListingsForBrowse = async (
       } else {
         // Serializable cursor - fetch the document to use as cursor
         const docRef = doc(db, 'listings', cursor.docId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          constraints.push(startAfter(docSnap));
+        let docSnap;
+        try {
+          docSnap = await getDoc(docRef);
+        } catch (error) {
+          // FIX-006: Cursor doc fetch failed - fallback to timestamp-based pagination
+          console.warn('[queryListingsForBrowse] Cursor doc fetch failed, using timestamp fallback', error);
+          docSnap = null;
         }
+        
+        if (docSnap?.exists()) {
+          constraints.push(startAfter(docSnap));
+        } else if (typeof cursor === 'object' && 'createdAt' in cursor && cursor.createdAt) {
+          // FIX-006: Fallback to timestamp-based pagination when cursor doc is missing
+          // Use createdAt from cursor metadata to continue pagination
+          const fallbackField = soldOnly ? 'soldAt' : 'createdAt';
+          const fallbackValue = cursor.createdAt;
+          if (sort === 'newest' || sort === 'oldest') {
+            constraints.push(where(fallbackField, sort === 'newest' ? '<' : '>', fallbackValue));
+          }
+          // Note: For price sorts, we can't easily fallback without the price value, so we skip pagination
+          // This will return results from the beginning, which is acceptable for deleted cursor docs
+        }
+        // If no fallback available, continue without cursor (returns from beginning)
       }
     }
     
@@ -1354,6 +1373,26 @@ export const queryListingsForBrowse = async (
 };
 
 /**
+ * Filter out ended auctions from a listing list.
+ * Ended auctions should only appear when explicitly filtering for "Completed" on the browse page.
+ * Use for discovery feeds (homepage Trending, Explore, Recently viewed, etc.).
+ */
+export function filterOutEndedAuctions(listings: Listing[]): Listing[] {
+  const now = Date.now();
+  return listings.filter((l) => {
+    if (l.status === 'ended' || l.status === 'expired') return false;
+    const endMs =
+      (l as any).endAt?.getTime?.() && Number.isFinite((l as any).endAt.getTime())
+        ? (l as any).endAt.getTime()
+        : l.endsAt?.getTime?.() && Number.isFinite(l.endsAt.getTime())
+          ? l.endsAt.getTime()
+          : null;
+    if (endMs != null && endMs <= now && !l.soldAt) return false;
+    return true;
+  });
+}
+
+/**
  * List active listings with optional filters (legacy - kept for backward compatibility)
  * Returns UI Listing[] (Date fields)
  * 
@@ -1376,7 +1415,7 @@ export const listActiveListings = async (
       },
       sort: 'newest',
     });
-    return result.items;
+    return filterOutEndedAuctions(result.items);
   } catch (error) {
     console.error('Error fetching active listings:', error);
     throw error;
@@ -1395,12 +1434,13 @@ export const listMostWatchedAuctions = async (params?: { limitCount?: number }):
       limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((docSnap) =>
+    const items = snap.docs.map((docSnap) =>
       toListing({
         id: docSnap.id,
         ...(docSnap.data() as ListingDoc),
       })
     );
+    return filterOutEndedAuctions(items);
   } catch (error) {
     // Production safety: if the composite index for metrics.favorites isn't available yet,
     // fall back to a query that should already be indexed (status + type + createdAt),
@@ -1443,9 +1483,10 @@ export const listMostWatchedAuctions = async (params?: { limitCount?: number }):
           ...(docSnap.data() as ListingDoc),
         })
       );
-      return items
+      const sorted = items
         .sort((a: any, b: any) => Number(b?.metrics?.favorites || 0) - Number(a?.metrics?.favorites || 0))
         .slice(0, limitCount);
+      return filterOutEndedAuctions(sorted);
     }
 
     console.error('Error fetching most watched auctions:', error);
@@ -1476,12 +1517,13 @@ export const listMostWatchedListings = async (params?: { limitCount?: number }):
       limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((docSnap) =>
+    const items = snap.docs.map((docSnap) =>
       toListing({
         id: docSnap.id,
         ...(docSnap.data() as ListingDoc),
       })
     );
+    return filterOutEndedAuctions(items);
   } catch (error) {
     // Same production-safe fallback strategy as listMostWatchedAuctions.
     const msg = String((error as any)?.message || '');
@@ -1517,9 +1559,10 @@ export const listMostWatchedListings = async (params?: { limitCount?: number }):
           ...(docSnap.data() as ListingDoc),
         })
       );
-      return items
+      const sorted = items
         .sort((a: any, b: any) => Number(b?.metrics?.favorites || 0) - Number(a?.metrics?.favorites || 0))
         .slice(0, limitCount);
+      return filterOutEndedAuctions(sorted);
     }
 
     console.error('Error fetching most watched listings:', error);

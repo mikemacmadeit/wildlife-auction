@@ -86,7 +86,7 @@ export default function LoginPage() {
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = 'Please check your email address';
     }
 
     if (!formData.password) {
@@ -256,7 +256,7 @@ export default function LoginPage() {
       >
         <Card className="border border-border/50 shadow-warm">
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl md:text-3xl font-bold">Sign In</CardTitle>
+            <CardTitle className="we-h2">Sign In</CardTitle>
             <CardDescription>
               Sign in to your account to continue
             </CardDescription>
@@ -351,6 +351,10 @@ export default function LoginPage() {
                   </>
                 )}
               </Button>
+              <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5" aria-hidden />
+                Your session is encrypted.
+              </p>
             </form>
 
             <div className="mt-6 space-y-4">

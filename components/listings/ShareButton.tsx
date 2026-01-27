@@ -80,7 +80,6 @@ export function ShareButton({
       size="icon"
       onClick={handleShare}
       className={cn(
-        'h-10 w-10',
         'hover:bg-primary/10',
         className
       )}

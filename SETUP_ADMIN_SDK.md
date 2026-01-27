@@ -15,11 +15,7 @@ Once you set this up, I'll be able to perform Firestore operations for you autom
 
 ## Step 2: Verify Setup
 
-Run this to test:
-```bash
-cd project
-node -e "const admin = require('./lib/firebase/admin-helper.ts'); console.log('✅ Admin SDK ready!')"
-```
+Run your app or a script that uses `getAdminDb` / `getAdminAuth` from `lib/firebase/admin` to verify. The Admin SDK is initialized from that module (service account key or env vars).
 
 Or I can test it for you by running a simple Firestore operation.
 

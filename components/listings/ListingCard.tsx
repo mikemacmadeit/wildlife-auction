@@ -257,8 +257,8 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               {/* Protected Transaction Badge */}
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
                 <Badge 
-                  variant="default" 
-                  className="bg-green-600 text-white font-semibold text-xs shadow-warm"
+                  variant="success" 
+                  className="font-semibold text-xs shadow-warm"
                   title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Evidence required for disputes."
                 >
                   Protected {listing.protectedTransactionDays} Days
@@ -270,8 +270,8 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
             {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
               <div className="sm:hidden absolute bottom-2 right-2 z-20">
                 <Badge
-                  variant="default"
-                  className="bg-green-600 text-white font-semibold text-xs shadow-warm"
+                  variant="success"
+                  className="font-semibold text-xs shadow-warm"
                   title="Protected Transaction"
                 >
                   Protected {listing.protectedTransactionDays} Days
@@ -304,16 +304,19 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
             </div>
           </div>
 
-          {/* Content */}
-          <div className="p-2.5 sm:p-4 flex-1 flex flex-col gap-1.5 sm:gap-3">
+          {/* Content – no overflow-hidden so flex won’t shrink and clip the title */}
+          <div className="p-2.5 sm:p-4 flex-1 flex flex-col gap-1.5 sm:gap-3 min-w-0">
             {sold.isSold && (
               <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
                 <div className="font-semibold">{sold.soldPriceLabel}</div>
                 {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
               </div>
             )}
-            {/* Title */}
-            <h3 className="font-bold text-sm sm:text-base line-clamp-2 leading-snug sm:leading-snug group-hover:text-primary transition-colors duration-300">
+            {/* Title – line-clamp-4, flex-shrink-0 so it’s never clipped in gallery mode */}
+            <h3
+              className="font-bold text-sm sm:text-base line-clamp-4 leading-snug sm:leading-snug group-hover:text-primary transition-colors duration-300 min-w-0 break-words flex-shrink-0"
+              title={listing.title}
+            >
               {listing.title}
             </h3>
 
@@ -346,8 +349,8 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
           {!sold.isSold && (listing as any)?.offerReservedByOfferId ? (
             <div className="hidden sm:flex items-center gap-2 flex-wrap -mt-1">
               <Badge
-                variant="secondary"
-                className="bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30 text-xs"
+                variant="warning"
+                className="text-xs"
                 title="Reserved by an accepted offer"
               >
                 Reserved (offer accepted)
@@ -366,11 +369,11 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
           </div>
 
             {/* Price and Seller Info */}
-            <div className="mt-auto pt-2 sm:pt-3 border-t border-border/50">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 min-w-0">
+            <div className="mt-auto pt-2 sm:pt-3 border-t border-border/50 overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
                 {/* Price Section */}
-                <div className="flex-shrink-0 min-w-0 max-w-[60%] sm:max-w-[65%]">
-                  <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent break-words truncate">
+                <div className="flex-shrink-0 min-w-0 overflow-hidden sm:max-w-[65%]">
+                  <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent truncate">
                     {priceDisplay}
                   </div>
                   {listing.type === 'auction' && listing.reservePrice && (
@@ -379,12 +382,12 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     </div>
                   )}
                 </div>
-                {/* Seller Section */}
-                <div className="flex flex-col items-start sm:items-end gap-1.5 sm:gap-1.5 min-w-0 flex-shrink-0 max-w-[40%] sm:max-w-[35%]">
-                  <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
+                {/* Seller Section – must not overlap price; truncate name */}
+                <div className="flex flex-col items-start sm:items-end gap-1.5 sm:gap-1.5 min-w-0 flex-shrink overflow-hidden sm:max-w-[35%]">
+                  <div className="flex items-center gap-1.5 sm:gap-2 w-full min-w-0 max-w-full overflow-hidden">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold text-muted-foreground min-w-0 hover:underline overflow-hidden max-w-full"
+                      className="inline-flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold text-muted-foreground min-w-0 hover:underline overflow-hidden flex-1 max-w-full text-left sm:text-right"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -398,7 +401,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                         <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
                         <AvatarFallback className="text-[9px] sm:text-[10px] font-bold">{sellerInitial}</AvatarFallback>
                       </Avatar>
-                      <span className="truncate block min-w-0">{sellerName}</span>
+                      <span className="truncate min-w-0">{sellerName}</span>
                     </button>
                     {/* Seller Tier badge (Seller Tiers) */}
                     <div className="hidden sm:block flex-shrink-0">
@@ -420,11 +423,6 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                     {sellerBadges.includes('Identity verified') && (
                       <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
                         ID verified
-                      </Badge>
-                    )}
-                    {sellerBadges.includes('TPWD breeder permit') && (
-                      <Badge variant="outline" className="text-[10px] font-semibold flex-shrink-0">
-                        TPWD permit
                       </Badge>
                     )}
                   </div>

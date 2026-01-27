@@ -219,14 +219,23 @@ export async function POST(request: Request) {
         });
         return NextResponse.json({ received: true, idempotent: true }, { headers: responseHeaders });
       }
-      // If transaction failed for other reasons, log and continue (but this is risky)
-      logError('Webhook transaction error', transactionError, {
+      // Event was NOT recorded. Do not process — return 500 so Stripe retries. Prevents duplicate order / double mark-sold.
+      logError('Webhook idempotency transaction failed; event not recorded', transactionError, {
         requestId,
         route: '/api/stripe/webhook',
         eventId,
         eventType: event.type,
       });
-      // Continue processing - transaction failure shouldn't block webhook
+      captureException(transactionError instanceof Error ? transactionError : new Error(String(transactionError)), {
+        requestId,
+        route: '/api/stripe/webhook',
+        eventId,
+        eventType: event.type,
+      });
+      return NextResponse.json(
+        { error: 'Webhook processing temporarily unavailable; will retry.' },
+        { status: 500, headers: responseHeaders }
+      );
     }
 
     // If event was already processed, return early
@@ -418,7 +427,7 @@ async function handleAccountUpdated(db: ReturnType<typeof getFirestore>, account
     const snapshot = await usersRef.where('stripeAccountId', '==', account.id).get();
 
     if (snapshot.empty) {
-      console.warn(`No user found with stripeAccountId: ${account.id}`);
+      logWarn('No user found with stripeAccountId', { route: '/api/stripe/webhook', stripeAccountId: account.id });
       return;
     }
 
@@ -441,7 +450,7 @@ async function handleAccountUpdated(db: ReturnType<typeof getFirestore>, account
     }
 
     await userDoc.ref.update(updateData);
-    console.log(`Updated Stripe account status for user: ${userId}`);
+    logInfo('Updated Stripe account status', { route: '/api/stripe/webhook', userId, stripeAccountId: account.id });
   } catch (error) {
     captureException(error instanceof Error ? error : new Error(String(error)), {
       event: 'account.updated',

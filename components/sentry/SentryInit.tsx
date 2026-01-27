@@ -1,17 +1,15 @@
 /**
  * Sentry Client Initialization Component
- * 
- * This component ensures Sentry is initialized on the client side.
- * Must be a client component to run in the browser.
+ *
+ * Sentry auto-instruments Next.js and loads sentry.client.config.ts at build time.
+ * Do NOT manually import sentry.client.config here — that pulls server-only
+ * deps (require-in-the-middle, etc.) into the client bundle and can cause
+ * "Cannot read properties of undefined (reading 'call')" or chunk errors.
+ * This component is a no-op placeholder; remove from layout if not needed.
  */
 
 'use client';
 
-// Import Sentry client config to ensure it's initialized
-import '../../sentry.client.config';
-
 export function SentryInit() {
-  // This component just ensures the config file is imported
-  // The actual initialization happens in sentry.client.config.ts
   return null;
 }

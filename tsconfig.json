@@ -38,7 +38,6 @@
   "exclude": [
     "node_modules",
     "scripts/**/*",
-    "lib/firebase/admin-helper.ts",
     "**/*.test.ts",
     "**/*.test.tsx"
   ]

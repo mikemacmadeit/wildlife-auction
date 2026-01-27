@@ -7,7 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOrderByCheckoutSessionId, getOrdersForUser } from '@/lib/firebase/orders';
@@ -1318,35 +1319,30 @@ export default function OrdersPage() {
         </div>
 
         {orders.length === 0 ? (
-          <Card>
-            <CardContent className="pt-12 pb-12 text-center">
-              <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No purchases yet</h3>
-              <p className="text-sm text-muted-foreground">Start browsing to find your next listing.</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Package}
+            title="No orders yet"
+            description="Start browsing to find your first purchase."
+            action={{ label: 'Browse listings', href: '/browse' }}
+            className="py-12"
+          />
         ) : filteredOrders.length === 0 ? (
-          <Card>
-            <CardContent className="pt-12 pb-12 text-center space-y-3">
-              <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <h3 className="text-lg font-semibold">No matches</h3>
-              <p className="text-sm text-muted-foreground">Try adjusting your filters.</p>
-              <Button
-                type="button"
-                variant="outline"
-                className="font-semibold"
-                onClick={() => {
-                  setSearchText('');
-                  setStatusFilter('all');
-                  setCategoryFilter('all');
-                  setDateRange('90');
-                  setNeedsActionOnly(false);
-                }}
-              >
-                Clear filters
-              </Button>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Filter}
+            title="No matches"
+            description="Try adjusting your filters."
+            action={{
+              label: 'Clear filters',
+              onClick: () => {
+                setSearchText('');
+                setStatusFilter('all');
+                setCategoryFilter('all');
+                setDateRange('90');
+                setNeedsActionOnly(false);
+              },
+            }}
+            className="py-12"
+          />
         ) : null}
 
         {/* Order detail drawer */}

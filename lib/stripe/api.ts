@@ -282,13 +282,14 @@ export async function createCheckoutSession(
     throw new Error('User must be authenticated');
   }
 
-  // Force token refresh to ensure it's valid
-  const token = await getIdToken(user, true);
+  // FIX-002: Force token refresh before critical operations to prevent stale token errors
+  // This ensures the token is fresh and valid, reducing 401 errors during checkout
+  let token = await getIdToken(user, true);
   if (!token) {
     throw new Error('Failed to get authentication token');
   }
 
-  const response = await fetch(`${API_BASE}/checkout/create-session`, {
+  let response = await fetch(`${API_BASE}/checkout/create-session`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -302,6 +303,27 @@ export async function createCheckoutSession(
       ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
     }),
   });
+
+  // FIX-002: Retry-on-401: if token expired, refresh and retry once
+  if (response.status === 401) {
+    token = await getIdToken(user, true);
+    if (token) {
+      response = await fetch(`${API_BASE}/checkout/create-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          listingId,
+          ...(offerId ? { offerId } : {}),
+          ...(paymentMethod ? { paymentMethod } : {}),
+          ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
+          ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
+        }),
+      });
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json();

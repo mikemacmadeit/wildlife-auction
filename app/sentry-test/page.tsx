@@ -16,8 +16,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// Import Sentry client config to ensure it's initialized
-import '../../sentry.client.config';
 import { captureException } from '@/lib/monitoring/capture';
 
 export default function SentryTestPage() {

@@ -30,8 +30,12 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
-          // Performance: Enable compression and caching
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          {
+            key: 'Cache-Control',
+            value: process.env.NODE_ENV === 'development'
+              ? 'no-store, must-revalidate'
+              : 'public, max-age=31536000, immutable',
+          },
         ],
       },
       // Static assets: aggressive caching
@@ -44,7 +48,12 @@ const nextConfig = {
       {
         source: '/_next/static/:path*',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          {
+            key: 'Cache-Control',
+            value: process.env.NODE_ENV === 'development'
+              ? 'no-store, must-revalidate'
+              : 'public, max-age=31536000, immutable',
+          },
         ],
       },
     ];

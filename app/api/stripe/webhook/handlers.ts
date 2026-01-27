@@ -916,10 +916,26 @@ export async function handleCheckoutSessionCompleted(
             },
             { merge: true }
           );
-        } catch {}
+        } catch (e) {
+          captureException(e instanceof Error ? e : new Error(String(e)), {
+            context: 'stripe webhook handler',
+            operation: 'reservation cleanup',
+            listingId: listingIdStr,
+            orderId: orderIdStr,
+          });
+          throw e;
+        }
         try {
           await db.collection('listings').doc(listingIdStr).collection('purchaseReservations').doc(orderIdStr).delete();
-        } catch {}
+        } catch (e) {
+          captureException(e instanceof Error ? e : new Error(String(e)), {
+            context: 'stripe webhook handler',
+            operation: 'reservation cleanup',
+            listingId: listingIdStr,
+            orderId: orderIdStr,
+          });
+          throw e;
+        }
 
         // If quantityAvailable is now 0, mark sold-out.
         try {
@@ -945,8 +961,14 @@ export async function handleCheckoutSessionCompleted(
             }
             await safeSet(listingRef, listingUpdates, { merge: true });
           }
-        } catch {
-          // ignore
+        } catch (e) {
+          captureException(e instanceof Error ? e : new Error(String(e)), {
+            context: 'stripe webhook handler',
+            operation: 'sold-out check',
+            listingId: listingIdStr,
+            orderId: orderIdStr,
+          });
+          throw e;
         }
       }
     }
@@ -1283,7 +1305,15 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
     // Best-effort cleanup of per-order reservation doc.
     try {
       await listingRef.collection('purchaseReservations').doc(orderDoc.id).delete();
-    } catch {}
+    } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), {
+        context: 'stripe webhook handler',
+        operation: 'reservation cleanup',
+        listingId,
+        orderId: orderDoc.id,
+      });
+      throw e;
+    }
 
     // Always clear legacy single-item reservation fields if present (avoid deadlocks).
     await safeSet(
@@ -1320,8 +1350,14 @@ export async function handleCheckoutSessionAsyncPaymentSucceeded(
         }
         await safeSet(listingRef, listingSoldUpdate, { merge: true });
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      captureException(e instanceof Error ? e : new Error(String(e)), {
+        context: 'stripe webhook handler',
+        operation: 'sold-out check',
+        listingId,
+        orderId: orderDoc.id,
+      });
+      throw e;
     }
   }
 
@@ -1778,7 +1814,15 @@ export async function handleWirePaymentIntentSucceeded(
       // Best-effort cleanup of per-order reservation doc.
       try {
         await listingRef.collection('purchaseReservations').doc(orderDoc.id).delete();
-      } catch {}
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), {
+          context: 'stripe webhook handler',
+          operation: 'reservation cleanup',
+          listingId,
+          orderId: orderDoc.id,
+        });
+        throw e;
+      }
 
       // Always clear legacy reservation fields if present.
       await safeSet(
@@ -1814,8 +1858,14 @@ export async function handleWirePaymentIntentSucceeded(
           }
           await safeSet(listingRef, listingSoldUpdate, { merge: true });
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        captureException(e instanceof Error ? e : new Error(String(e)), {
+          context: 'stripe webhook handler',
+          operation: 'sold-out check',
+          listingId,
+          orderId: orderDoc.id,
+        });
+        throw e;
       }
     }
   }

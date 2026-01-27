@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ArrowLeft, Archive, Inbox, MoreVertical, Search, CheckCheck } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { MessageThreadComponent } from '@/components/messaging/MessageThread';
 import { getOrCreateThread, markThreadAsRead, setThreadArchived, subscribeToAllUserThreads } from '@/lib/firebase/messages';
 import { getListingById } from '@/lib/firebase/listings';
@@ -601,7 +602,13 @@ export default function MessagesPage() {
               </CardHeader>
               <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
                 {inboxItems.length === 0 ? (
-                  <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
+                  <EmptyState
+                    icon={MessageSquare}
+                    title="No messages yet"
+                    description="Start a conversation with a seller from a listing."
+                    action={{ label: 'Browse listings', href: '/browse' }}
+                    className="m-4 py-8"
+                  />
                 ) : (
                   <ScrollArea className="h-full" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                     <div className="divide-y divide-border/50 px-3">
@@ -837,7 +844,13 @@ export default function MessagesPage() {
             </CardHeader>
             <CardContent className="p-0 flex-1 min-h-0">
               {inboxItems.length === 0 ? (
-                <div className="p-6 text-sm text-muted-foreground">No conversations yet.</div>
+                <EmptyState
+                  icon={MessageSquare}
+                  title="No messages yet"
+                  description="Start a conversation with a seller from a listing."
+                  action={{ label: 'Browse listings', href: '/browse' }}
+                  className="m-4 py-8"
+                />
               ) : (
                 <ScrollArea className="h-full">
                   {/* Keep a small right padding so the scrollbar never overlays content. */}

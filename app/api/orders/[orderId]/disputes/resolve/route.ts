@@ -147,37 +147,17 @@ export async function POST(
         return json({ error: 'Payment intent not found' }, { status: 400 });
       }
 
-      const refund = await stripe.refunds.create({
-        payment_intent: orderData.stripePaymentIntentId,
-        metadata: {
-          orderId: orderId,
-          resolution: 'dispute_refund',
-          resolvedBy: adminId,
+      const refund = await stripe.refunds.create(
+        {
+          payment_intent: orderData.stripePaymentIntentId,
+          metadata: {
+            orderId: orderId,
+            resolution: 'dispute_refund',
+            resolvedBy: adminId,
+          },
         },
-      });
-
-      updateData.protectedDisputeStatus = 'resolved_refund';
-      updateData.status = 'refunded';
-      updateData.transactionStatus = 'REFUNDED';
-      updateData.stripeRefundId = refund.id;
-      updateData.refundedBy = adminId;
-      updateData.refundedAt = now;
-      updateData.refundReason = 'Dispute resolved - full refund';
-      updateData.payoutHoldReason = 'none';
-    } else if (resolution === 'partial_refund') {
-      // Full refund
-      if (!orderData.stripePaymentIntentId) {
-        return json({ error: 'Payment intent not found' }, { status: 400 });
-      }
-
-      const refund = await stripe.refunds.create({
-        payment_intent: orderData.stripePaymentIntentId,
-        metadata: {
-          orderId: orderId,
-          resolution: 'dispute_refund',
-          resolvedBy: adminId,
-        },
-      });
+        { idempotencyKey: `dispute-resolve:refund:${orderId}` }
+      );
 
       updateData.protectedDisputeStatus = 'resolved_refund';
       updateData.status = 'refunded';
@@ -195,15 +175,18 @@ export async function POST(
 
       const refundAmountValue = refundAmount ?? 0;
       const refundAmountCents = Math.round(refundAmountValue * 100);
-      const refund = await stripe.refunds.create({
-        payment_intent: orderData.stripePaymentIntentId,
-        amount: refundAmountCents,
-        metadata: {
-          orderId: orderId,
-          resolution: 'dispute_partial_refund',
-          resolvedBy: adminId,
+      const refund = await stripe.refunds.create(
+        {
+          payment_intent: orderData.stripePaymentIntentId,
+          amount: refundAmountCents,
+          metadata: {
+            orderId: orderId,
+            resolution: 'dispute_partial_refund',
+            resolvedBy: adminId,
+          },
         },
-      });
+        { idempotencyKey: `dispute-resolve:partial:${orderId}:${refundAmountCents}` }
+      );
 
       updateData.protectedDisputeStatus = 'resolved_partial_refund';
       updateData.status = 'completed';

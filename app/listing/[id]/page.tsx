@@ -137,6 +137,7 @@ export default function ListingDetailPage() {
   const [showBidDialog, setShowBidDialog] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [bidInFlight, setBidInFlight] = useState(false);
+  const [checkoutInFlight, setCheckoutInFlight] = useState(false);
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -721,12 +722,19 @@ export default function ListingDetailPage() {
 
   const handleSelectPaymentMethod = async (method: PaymentMethodChoice) => {
     if (!listing) return;
+    // FIX-001: Prevent double-submit on checkout
+    if (checkoutInFlight) {
+      return;
+    }
+    
     try {
+      setCheckoutInFlight(true);
       setPaymentDialogOpen(false);
 
       // Animal listings require explicit acknowledgment (server-enforced).
       // If we got here without it (e.g. retry buttons), route back through the ack dialog.
       if (isAnimalListing && !animalRiskAcked) {
+        setCheckoutInFlight(false); // Reset before early return
         setAnimalAckOpen(true);
         return;
       }
@@ -765,6 +773,7 @@ export default function ListingDetailPage() {
     } finally {
       setIsPlacingBid(false);
       setPendingCheckout(null);
+      setCheckoutInFlight(false);
     }
   };
 
@@ -877,8 +886,8 @@ export default function ListingDetailPage() {
                   ) : null}
                   {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
                     <Badge
-                      variant="default"
-                      className="bg-green-600 text-white font-medium gap-1"
+                      variant="success"
+                      className="font-medium gap-1"
                       title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Evidence required for disputes."
                     >
                       <Shield className="h-3 w-3" />
@@ -917,8 +926,8 @@ export default function ListingDetailPage() {
                   variant="outline"
                   size="icon"
                   onClick={handleShare}
-                  className="h-10 w-10"
                   title="Share listing"
+                  aria-label="Share listing"
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
@@ -926,8 +935,9 @@ export default function ListingDetailPage() {
                   variant="outline"
                   size="icon"
                   onClick={handleAddToWatchlist}
-                  className={cn('h-10 w-10', isFavorite(listing!.id) && 'text-destructive border-destructive')}
+                  className={cn(isFavorite(listing!.id) && 'text-destructive border-destructive')}
                   title={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
+                  aria-label={isFavorite(listing!.id) ? 'Remove from watchlist' : 'Add to watchlist'}
                 >
                   <Heart className={cn('h-4 w-4 transition-colors duration-200', isFavorite(listing!.id) && 'fill-current')} />
                 </Button>
@@ -1094,6 +1104,7 @@ export default function ListingDetailPage() {
                         onClick={handleBuyNow}
                         disabled={
                           isPlacingBid ||
+                          checkoutInFlight ||
                           listing!.status !== 'active' ||
                           !!(listing as any).offerReservedByOfferId ||
                           buyNowAvailability.available <= 0
@@ -1516,7 +1527,7 @@ export default function ListingDetailPage() {
                           <Button 
                             size="lg" 
                             onClick={handleCompleteAuctionPurchase}
-                            disabled={isPlacingBid}
+                            disabled={isPlacingBid || checkoutInFlight}
                             className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
                           >
                             {isPlacingBid ? (
@@ -1705,6 +1716,7 @@ export default function ListingDetailPage() {
                           onClick={handleBuyNow}
                           disabled={
                             isPlacingBid ||
+                            checkoutInFlight ||
                             listing!.status !== 'active' ||
                             !!(listing as any).offerReservedByOfferId ||
                             buyNowAvailability.available <= 0
@@ -1950,22 +1962,32 @@ export default function ListingDetailPage() {
                     </div>
                   </div>
 
-                  {/* Trust */}
+                  {/* Trust strip: verified, transport, protected */}
                   <div className="rounded-lg border bg-muted/20 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trust &amp; safety</div>
                       <Link href="/trust" className="text-xs font-semibold underline underline-offset-4">
                         Trust &amp; Compliance
                       </Link>
                     </div>
-                    <div className="mt-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <TrustBadges
                         verified={listing!.trust?.verified || false}
                         transport={listing!.trust?.transportReady || false}
-                        size="md"
+                        size="sm"
                         showTooltips={true}
-                        showIcons={false}
+                        showIcons={true}
                       />
+                      {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
+                        <Badge
+                          variant="success"
+                          className="text-xs font-medium gap-1"
+                          title="Protected Transaction: Payments are processed through the platform and released according to marketplace confirmation and dispute rules."
+                        >
+                          <Shield className="h-3 w-3" />
+                          Protected {listing!.protectedTransactionDays} Days
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
 

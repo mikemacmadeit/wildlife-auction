@@ -23,9 +23,9 @@ export async function placeBidServer(params: {
     return { ok: false, error: 'You must be signed in to place a bid.' };
   }
 
-  // Do NOT force-refresh the token on every bid; bidding is high-frequency.
-  // Firebase will refresh automatically when needed.
-  const token = await getIdToken(user, false);
+  // FIX-002: Force token refresh before critical operations to prevent stale token errors
+  // This ensures the token is fresh and valid, reducing 401 errors during bid placement
+  const token = await getIdToken(user, true);
   const res = await fetch('/api/bids/place', {
     method: 'POST',
     headers: {

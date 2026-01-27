@@ -174,9 +174,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // IDEMPOTENCY: Check for existing checkout session within 1-minute window
+    // IDEMPOTENCY: Check for existing checkout session within 5-second window
     // Prevents duplicate sessions from double-clicks/refreshes
-    const idempotencyWindow = Math.floor(Date.now() / 60000); // 1-minute window
+    // FIX-001: Reduced from 60s to 5s to catch rapid clicks while still preventing true duplicates
+    const idempotencyWindow = Math.floor(Date.now() / 5000); // 5-second window
     const idempotencyKey = `checkout_session:${listingId}:${buyerId}:${idempotencyWindow}`;
     const idempotencyRef = db.collection('checkoutSessions').doc(idempotencyKey);
     let existingSessionDoc;
@@ -193,8 +194,8 @@ export async function POST(request: Request) {
       const createdAt = existingData.createdAt?.toMillis ? existingData.createdAt.toMillis() : 0;
       const windowAge = Date.now() - createdAt;
       
-      // Only reuse if within 1-minute window (60 seconds)
-      if (existingSessionId && windowAge < 60000) {
+      // Only reuse if within 5-second window
+      if (existingSessionId && windowAge < 5000) {
         try {
           const existingSession = await stripe.checkout.sessions.retrieve(existingSessionId);
           if (existingSession && existingSession.status !== 'expired') {

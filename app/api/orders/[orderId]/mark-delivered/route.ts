@@ -18,6 +18,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { captureException } from '@/lib/monitoring/capture';
+import { logWarn } from '@/lib/monitoring/logger';
 
 const markDeliveredSchema = z.object({
   deliveryProofUrls: z.array(z.string().url()).optional(),
@@ -140,34 +141,62 @@ export async function POST(
       return json({ error: `Order is already ${currentTxStatus || currentLegacyStatus}` }, { status: 400 });
     }
 
-    // Update order to delivered
+    // FIX-003: Transaction guard to prevent delivery vs dispute race condition
     const now = new Date();
-    const updateData: any = {
-      status: 'delivered' as OrderStatus, // Legacy status for backward compatibility
-      transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' as TransactionStatus, // NEW: Primary status
-      deliveredAt: now,
-      updatedAt: now,
-      lastUpdatedByRole: 'seller',
-    };
+    try {
+      await db.runTransaction(async (tx) => {
+        const orderSnap = await tx.get(orderRef);
+        if (!orderSnap.exists) {
+          throw new Error('Order not found');
+        }
+        const txOrderData = orderSnap.data()!;
+        
+        // Check if dispute is open (race condition guard)
+        const hasDispute = txOrderData.disputeOpenedAt || 
+                          txOrderData.protectedDisputeStatus && txOrderData.protectedDisputeStatus !== 'none' ||
+                          txOrderData.transactionStatus === 'DISPUTE_OPENED';
+        
+        if (hasDispute) {
+          throw new Error('CONFLICT_DISPUTE_OPEN');
+        }
+        
+        // Update order to delivered
+        const updateData: any = {
+          status: 'delivered' as OrderStatus, // Legacy status for backward compatibility
+          transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' as TransactionStatus, // NEW: Primary status
+          deliveredAt: now,
+          updatedAt: now,
+          lastUpdatedByRole: 'seller',
+        };
 
-    // Populate delivery object
-    updateData.delivery = {
-      ...(orderData.delivery || {}),
-      deliveredAt: now,
-      ...(deliveryProofUrls && deliveryProofUrls.length > 0 ? { 
-        proofUploads: [
-          ...(orderData.delivery?.proofUploads || []),
-          ...deliveryProofUrls.map(url => ({ type: 'delivery_proof', url, uploadedAt: now }))
-        ]
-      } : {}),
-    };
+        // Populate delivery object
+        updateData.delivery = {
+          ...(txOrderData.delivery || {}),
+          deliveredAt: now,
+          ...(deliveryProofUrls && deliveryProofUrls.length > 0 ? { 
+            proofUploads: [
+              ...(txOrderData.delivery?.proofUploads || []),
+              ...deliveryProofUrls.map(url => ({ type: 'delivery_proof', url, uploadedAt: now }))
+            ]
+          } : {}),
+        };
 
-    // Legacy field for backward compatibility
-    if (deliveryProofUrls && deliveryProofUrls.length > 0) {
-      updateData.deliveryProofUrls = deliveryProofUrls;
+        // Legacy field for backward compatibility
+        if (deliveryProofUrls && deliveryProofUrls.length > 0) {
+          updateData.deliveryProofUrls = deliveryProofUrls;
+        }
+
+        tx.update(orderRef, updateData);
+      });
+    } catch (error: any) {
+      if (error.message === 'CONFLICT_DISPUTE_OPEN') {
+        return json({ 
+          error: 'Cannot mark delivered - dispute is open',
+          code: 'CONFLICT_DISPUTE_OPEN'
+        }, { status: 409 });
+      }
+      throw error;
     }
-
-    await orderRef.update(updateData);
 
     // Timeline (server-authored, idempotent).
     try {
@@ -184,8 +213,12 @@ export async function POST(
           ...(deliveryProofUrls?.length ? { meta: { deliveryProofUrlsCount: deliveryProofUrls.length } } : {}),
         },
       });
-    } catch {
-      // best-effort
+    } catch (e) {
+      logWarn('Failed to append mark-delivered timeline event (best-effort)', {
+        endpoint: '/api/orders/[orderId]/mark-delivered',
+        orderId: params.orderId,
+        error: String(e),
+      });
     }
 
     // Emit notification to buyer

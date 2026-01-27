@@ -134,7 +134,7 @@ project/
 │   │   └── templates.ts         # Email templates
 │   ├── firebase/                # Firebase helpers
 │   │   ├── config.ts            # Client SDK init
-│   │   ├── admin-helper.ts     # Admin SDK helpers (scripts)
+│   │   ├── admin.ts             # Admin SDK (use this only; admin-helper removed FC-10)
 │   │   ├── auth.ts              # Auth helpers
 │   │   ├── bids.ts              # Bid management
 │   │   ├── listings.ts         # Listing CRUD

@@ -17,7 +17,6 @@ import { requireAdmin } from '@/app/api/admin/_util';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { logInfo, logError, logWarn } from '@/lib/monitoring/logger';
 import { captureException } from '@/lib/monitoring/capture';
-
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -27,6 +26,27 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
     },
   });
 }
+
+/** Platform fee in dollars. Prefer platformFeeAmount; legacy orders may have only platformFee (also dollars). */
+function platformFeeFromOrder(orderData: any): number {
+  const amt = orderData?.platformFeeAmount;
+  if (typeof amt === 'number' && Number.isFinite(amt)) return amt;
+  const fee = orderData?.platformFee;
+  if (typeof fee === 'number' && Number.isFinite(fee) && fee >= 0) return fee;
+  return 0;
+}
+
+/** Map sellerTierSnapshot (standard|priority|premier) or sellerPlanSnapshot (free|pro|elite) to feesByPlan key. */
+function planKeyForFees(orderData: any): 'free' | 'pro' | 'elite' | 'unknown' {
+  const tier = orderData?.sellerTierSnapshot || orderData?.sellerPlanSnapshot;
+  if (!tier || typeof tier !== 'string') return 'unknown';
+  const t = tier.toLowerCase();
+  if (t === 'standard' || t === 'free') return 'free';
+  if (t === 'priority' || t === 'pro') return 'pro';
+  if (t === 'premier' || t === 'elite') return 'elite';
+  return 'unknown';
+}
+
 
 export async function GET(request: Request) {
   try {
@@ -145,14 +165,14 @@ export async function GET(request: Request) {
         const paidAt = orderData.paidAt?.toDate();
         if (!paidAt) return;
 
-        const platformFee = orderData.platformFeeAmount || orderData.platformFee || 0;
-        const planSnapshot = orderData.sellerPlanSnapshot || 'unknown';
+        const platformFee = platformFeeFromOrder(orderData);
+        const planKey = planKeyForFees(orderData);
 
         // Last 30 days (for plan breakdown)
         if (paidAt >= last30Days) {
           totalFees30d += platformFee;
           ordersCount30d++;
-          feesByPlan[planSnapshot] = (feesByPlan[planSnapshot] || 0) + platformFee;
+          feesByPlan[planKey] = (feesByPlan[planKey] || 0) + platformFee;
         }
 
         // Last 7 days
@@ -161,11 +181,14 @@ export async function GET(request: Request) {
           ordersCount7d++;
         }
 
-        // Refunds
-        if (orderData.refundedAt && orderData.refundAmount) {
+        // Refunds: include full refunds (use order.amount when refundAmount missing)
+        if (orderData.refundedAt) {
           const refundedAt = orderData.refundedAt.toDate();
           if (refundedAt >= startDate && refundedAt <= endDate) {
-            totalRefunds += orderData.refundAmount;
+            const refundDollars = typeof orderData.refundAmount === 'number' && Number.isFinite(orderData.refundAmount)
+              ? orderData.refundAmount
+              : (typeof orderData.amount === 'number' && Number.isFinite(orderData.amount) ? orderData.amount : 0);
+            totalRefunds += refundDollars;
           }
         }
       });
@@ -202,8 +225,7 @@ export async function GET(request: Request) {
         const allTimeSnapshot = await allTimeOrdersQuery.limit(10000).get();
         allTimeSnapshot.forEach((doc) => {
           const orderData = doc.data();
-          const platformFee = orderData.platformFeeAmount || orderData.platformFee || 0;
-          totalFeesAllTime += platformFee;
+          totalFeesAllTime += platformFeeFromOrder(orderData);
         });
       } catch (error) {
         // If query fails (e.g., no index or timeout), log warning

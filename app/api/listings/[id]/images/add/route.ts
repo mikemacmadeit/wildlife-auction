@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { deleteStoragePathsBestEffort, getStoragePathFromUrl } from '@/lib/firebase/storage-cleanup';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,11 +44,20 @@ export async function POST(request: Request, ctx: { params: { id: string } }) {
   const data = snap.data() as any;
   if (data?.sellerId !== uid) return json({ ok: false, error: 'Forbidden' }, { status: 403 });
 
-  await ref.update({
-    images: FieldValue.arrayUnion(parsed.data.url),
-    updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: uid,
-  });
+  const url = parsed.data.url;
+  try {
+    await ref.update({
+      images: FieldValue.arrayUnion(url),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: uid,
+    });
+  } catch (e) {
+    const path = getStoragePathFromUrl(url);
+    if (path && path.startsWith(`listings/${listingId}/images/`)) {
+      await deleteStoragePathsBestEffort([path]);
+    }
+    throw e;
+  }
 
   return json({ ok: true });
 }

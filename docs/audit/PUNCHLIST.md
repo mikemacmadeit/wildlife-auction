@@ -73,7 +73,7 @@ Date: 2026-01-15
    - **Evidence**: present in `project/package.json`; no usage found via grep.
 
 17) **Consolidate duplicated Firebase Admin helper modules**
-   - **Evidence**: `project/lib/firebase/admin-helper.ts` exists alongside `project/lib/firebase/admin.ts` (needs review to delete/merge).
+   - **Evidence**: `project/lib/firebase/admin-helper.ts` existed alongside `project/lib/firebase/admin.ts`. **Done (FC-10):** `admin-helper.ts` removed; use `lib/firebase/admin.ts` only.
 
 18) **Reduce build/runtime log noise**
    - **Evidence**: Several routes log verbose objects in production paths (e.g. `connect/check-status`).

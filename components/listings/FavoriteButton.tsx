@@ -132,7 +132,6 @@ function FavoriteButtonComponent({
         onClick={handleClick}
         disabled={pending}
         className={cn(
-          'h-10 w-10',
           'hover:bg-primary/10',
           isFavorited && 'text-primary',
           className

@@ -98,16 +98,37 @@ export async function GET(
     // Get timeline events
     const timelineEvents = orderData.timeline || [];
 
-    // Get messages (if available)
-    const messagesRef = db.collection('messages')
-      .where('orderId', '==', orderId)
-      .orderBy('createdAt', 'asc');
-    const messagesSnapshot = await messagesRef.get().catch(() => ({ docs: [] }));
-    const messages = messagesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : doc.data().createdAt,
-    }));
+    // Get messages from the order's message thread (listing + buyer + seller)
+    const listingId = orderData.listingId as string;
+    const buyerId = orderData.buyerId as string;
+    const sellerId = orderData.sellerId as string;
+    let messages: { id: string; [k: string]: any }[] = [];
+    if (listingId && buyerId && sellerId) {
+      const threadSnap = await db
+        .collection('messageThreads')
+        .where('listingId', '==', listingId)
+        .where('buyerId', '==', buyerId)
+        .where('sellerId', '==', sellerId)
+        .limit(1)
+        .get();
+      if (!threadSnap.empty) {
+        const threadId = threadSnap.docs[0].id;
+        const messagesSnap = await db
+          .collection('messageThreads')
+          .doc(threadId)
+          .collection('messages')
+          .orderBy('createdAt', 'asc')
+          .get();
+        messages = messagesSnap.docs.map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            ...d,
+            createdAt: (d.createdAt as any)?.toDate ? (d.createdAt as any).toDate().toISOString() : d.createdAt,
+          };
+        });
+      }
+    }
 
     // Get compliance documents
     const documentsRef = db.collection('orders').doc(orderId).collection('documents');

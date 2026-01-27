@@ -72,6 +72,7 @@ import type { WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAt
 import { ListItem } from '@/components/listings/ListItem';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
+import { EmptyState } from '@/components/ui/empty-state';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -684,20 +685,13 @@ export default function WatchlistPage() {
           </TabsContent>
         </Tabs>
       ) : (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h2 className="text-xl font-semibold mb-2">Your watchlist is empty</h2>
-              <p className="text-muted-foreground mb-6">
-                Start saving listings you're interested in by clicking the heart icon on any listing.
-              </p>
-              <Button asChild>
-                <Link href="/browse">Browse Listings</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Heart}
+          title="Your watchlist is empty"
+          description="Save listings you're interested in."
+          action={{ label: 'Browse listings', href: '/browse' }}
+          className="py-12"
+        />
       )}
 
         </TabsContent>

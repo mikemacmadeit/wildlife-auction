@@ -5,11 +5,16 @@
  * listings/{listingId}/documents/{docId}/{filename}
  * orders/{orderId}/documents/{docId}/{filename}
  * seller-permits/{sellerId}/{docId}/{filename}
+ *
+ * Size limit: MAX_DOCUMENT_SIZE_BYTES (default 10 MB). Change here to adjust.
  */
 
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './config';
 import { nanoid } from 'nanoid';
+
+/** Max file size for compliance documents (10 MB). Change this constant to adjust the limit. */
+export const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
 
 export interface DocumentUploadProgress {
   progress: number; // 0-100
@@ -38,6 +43,11 @@ export async function uploadComplianceDocument(
   onProgress?: (progress: DocumentUploadProgress) => void
 ): Promise<DocumentUploadResult> {
   try {
+    if (typeof file.size === 'number' && file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      const err: any = new Error(`File too large; max ${MAX_DOCUMENT_SIZE_BYTES / (1024 * 1024)} MB`);
+      err.code = 'FILE_TOO_LARGE';
+      throw err;
+    }
     // Generate unique document ID
     const documentId = nanoid();
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
@@ -120,6 +130,11 @@ export async function uploadSellerPermitDocument(
   onProgress?: (progress: DocumentUploadProgress) => void
 ): Promise<DocumentUploadResult> {
   try {
+    if (typeof file.size === 'number' && file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      const err: any = new Error(`File too large; max ${MAX_DOCUMENT_SIZE_BYTES / (1024 * 1024)} MB`);
+      err.code = 'FILE_TOO_LARGE';
+      throw err;
+    }
     const documentId = nanoid();
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
     const fileName = `${documentId}.${fileExtension}`;

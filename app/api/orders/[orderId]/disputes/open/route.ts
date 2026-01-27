@@ -115,12 +115,7 @@ export async function POST(
       }
     }
 
-    // Check if dispute already exists
-    if (orderData.protectedDisputeStatus && orderData.protectedDisputeStatus !== 'none') {
-      return json({ error: 'Dispute already exists for this order' }, { status: 400 });
-    }
-
-    // Check buyer protection eligibility
+    // Check buyer protection eligibility (before transaction)
     const buyerRef = db.collection('users').doc(buyerId);
     const buyerDoc = await buyerRef.get();
     const buyerData = buyerDoc.exists ? buyerDoc.data() : {};
@@ -129,7 +124,7 @@ export async function POST(
       return json({ error: 'You are not eligible for protected transactions due to previous fraudulent claims' }, { status: 403 });
     }
 
-    // Validate time windows based on reason
+    // Validate time windows based on reason (before transaction)
     const deliveryConfirmedAt = orderData.deliveryConfirmedAt.toDate();
     const hoursSinceDelivery = (Date.now() - deliveryConfirmedAt.getTime()) / (1000 * 60 * 60);
     
@@ -145,7 +140,7 @@ export async function POST(
       return json({ error: `${reason === 'injury' ? 'Injury' : 'Escape'} claims must be filed within 72 hours of delivery` }, { status: 400 });
     }
 
-    // Check evidence requirements
+    // Check evidence requirements (before transaction)
     const hasPhotoOrVideo = evidence.some(e => e.type === 'photo' || e.type === 'video');
     if (!hasPhotoOrVideo) {
       return json({ error: 'At least one photo or video is required' }, { status: 400 });
@@ -170,33 +165,72 @@ export async function POST(
       payoutHoldReason: orderData.payoutHoldReason,
     };
 
-    // Update order
+    // FIX-003: Transaction guard to prevent dispute vs delivery race condition
     const now = new Date();
-    await orderRef.update({
-      protectedDisputeStatus: disputeStatus,
-      protectedDisputeReason: reason,
-      protectedDisputeNotes: notes || null,
-      protectedDisputeEvidence: evidenceWithTimestamps,
-      disputeOpenedAt: now,
-      transactionStatus: 'DISPUTE_OPENED' as TransactionStatus, // NEW: Primary status
-      // Populate issues object
-      issues: {
-        openedAt: now,
-        reason: reason,
-        notes: notes || undefined,
-        photos: evidence.filter(e => e.type === 'photo' || e.type === 'video').map(e => e.url),
-      },
-      // DEPRECATED: payoutHoldReason kept for backward compatibility (seller already paid immediately)
-      payoutHoldReason: 'dispute_open',
-      updatedAt: now,
-      lastUpdatedByRole: 'buyer',
-    });
+    try {
+      await db.runTransaction(async (tx) => {
+        const orderSnap = await tx.get(orderRef);
+        if (!orderSnap.exists) {
+          throw new Error('Order not found');
+        }
+        const txOrderData = orderSnap.data()!;
+        
+        // Check if dispute already exists
+        if (txOrderData.protectedDisputeStatus && txOrderData.protectedDisputeStatus !== 'none') {
+          throw new Error('Dispute already exists');
+        }
+        
+        // Check if already delivered (race condition guard)
+        const isDelivered = txOrderData.deliveredAt || 
+                           txOrderData.transactionStatus === 'DELIVERED_PENDING_CONFIRMATION' ||
+                           txOrderData.transactionStatus === 'COMPLETED' ||
+                           ['delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'completed'].includes(txOrderData.status);
+        
+        if (isDelivered) {
+          throw new Error('CONFLICT_ALREADY_DELIVERED');
+        }
+        
+        // Update order
+        tx.update(orderRef, {
+          protectedDisputeStatus: disputeStatus,
+          protectedDisputeReason: reason,
+          protectedDisputeNotes: notes || null,
+          protectedDisputeEvidence: evidenceWithTimestamps,
+          disputeOpenedAt: now,
+          transactionStatus: 'DISPUTE_OPENED' as TransactionStatus, // NEW: Primary status
+          // Populate issues object
+          issues: {
+            openedAt: now,
+            reason: reason,
+            notes: notes || undefined,
+            photos: evidence.filter(e => e.type === 'photo' || e.type === 'video').map(e => e.url),
+          },
+          // DEPRECATED: payoutHoldReason kept for backward compatibility (seller already paid immediately)
+          payoutHoldReason: 'dispute_open',
+          updatedAt: now,
+          lastUpdatedByRole: 'buyer',
+        });
+      });
+    } catch (error: any) {
+      if (error.message === 'CONFLICT_ALREADY_DELIVERED') {
+        return json({ 
+          error: 'Cannot open dispute - order is already delivered',
+          code: 'CONFLICT_ALREADY_DELIVERED'
+        }, { status: 409 });
+      }
+      if (error.message === 'Dispute already exists') {
+        return json({ error: 'Dispute already exists for this order' }, { status: 400 });
+      }
+      throw error;
+    }
 
-    // Increment buyer claims count
+    // Increment buyer claims count (outside transaction, best-effort)
     const currentClaimsCount = buyerData?.buyerClaimsCount || 0;
     await buyerRef.update({
       buyerClaimsCount: currentClaimsCount + 1,
       updatedAt: Timestamp.now(),
+    }).catch(() => {
+      // Non-blocking: claims count update failure shouldn't block dispute creation
     });
 
     // Create audit log

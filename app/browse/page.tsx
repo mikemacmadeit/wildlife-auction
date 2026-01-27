@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2, ArrowLeft, Heart } from 'lucide-react';
+import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2, ArrowLeft, Heart, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -21,6 +21,7 @@ import { ListingCard } from '@/components/listings/ListingCard';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
 import { FilterBottomSheet } from '@/components/navigation/FilterBottomSheet';
 import { MobileBrowseFilterSheet } from '@/components/navigation/MobileBrowseFilterSheet';
@@ -30,6 +31,7 @@ import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from 
 import { FilterState, ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { useToast } from '@/hooks/use-toast';
+import { useMinLoading } from '@/hooks/use-min-loading';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { getSavedSearch } from '@/lib/firebase/savedSearches';
@@ -104,6 +106,7 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const showSkeleton = useMinLoading(!loading, 300);
   const [nextCursor, setNextCursor] = useState<BrowseCursor | null>(null);
   const [hasMore, setHasMore] = useState(false);
   
@@ -339,12 +342,8 @@ export default function BrowsePage() {
   const getBrowseFilters = (): BrowseFilters => {
     const browseFilters: BrowseFilters = { lifecycle: listingStatus };
     
-    // When searching in active feed, include ended listings so they can be found
-    // They will be filtered client-side to only show if they match the search
-    if (listingStatus === 'active' && debouncedSearchQuery?.trim()) {
-      browseFilters.statuses = ['active', 'ended', 'expired'];
-    }
-    
+    // Active feed: always query only status=active. Ended auctions appear only when
+    // user explicitly filters for "Completed" (or similar).
     if (selectedType !== 'all') {
       browseFilters.type = selectedType;
     }
@@ -499,13 +498,10 @@ export default function BrowsePage() {
   const filteredListings = useMemo(() => {
     let result = [...listings];
 
-    // Filter out ended listings from default active feed (unless searching)
-    // Ended listings should only appear when explicitly searching or viewing completed listings
-    if (listingStatus === 'active' && !debouncedSearchQuery?.trim()) {
+    // Exclude ended auctions from active feed; they appear only when user filters for "Completed"
+    if (listingStatus === 'active') {
       result = result.filter((listing) => {
-        // Exclude ended/expired listings from default active feed
         if (listing.status === 'ended' || listing.status === 'expired') return false;
-        // Also exclude listings that have ended (endsAt in the past) but status hasn't been updated yet
         const endMs =
           listing.endAt?.getTime?.() && Number.isFinite(listing.endAt.getTime())
             ? listing.endAt.getTime()
@@ -1263,7 +1259,7 @@ export default function BrowsePage() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-3 md:mb-6 gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold mb-1 break-words">
-              {loading
+              {showSkeleton
                 ? 'Loading...'
                 : searchQuery.trim()
                   ? `${sortedListings.length.toLocaleString()}+ results for ${searchQuery.trim()}`
@@ -1401,8 +1397,8 @@ export default function BrowsePage() {
             </div>
 
             {/* Loading State */}
-            {loading && (
-              <div className="py-12">
+            {(loading || showSkeleton) && !error && (
+              <div className="py-12 animate-in fade-in-0 duration-200">
                 <SkeletonListingGrid count={12} />
               </div>
             )}
@@ -1416,27 +1412,26 @@ export default function BrowsePage() {
             )}
 
             {/* Empty State */}
-            {!loading && !error && sortedListings.length === 0 && (
-              <Card className="p-12 text-center">
-                <CardContent>
-                  <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-xl font-semibold mb-2">No listings found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {activeFilterCount > 0
-                      ? 'Try adjusting your filters or search query.'
-                      : 'Check back soon for new listings.'}
-                  </p>
-                  {activeFilterCount > 0 && (
-                    <Button variant="outline" onClick={clearFilters}>
-                      Clear Filters
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
+            {!loading && !showSkeleton && !error && sortedListings.length === 0 && (
+              <EmptyState
+                icon={activeFilterCount > 0 ? Filter : Sparkles}
+                title={activeFilterCount > 0 ? 'No results match your filters' : 'No listings yet'}
+                description={
+                  activeFilterCount > 0
+                    ? 'Clear filters or broaden your search.'
+                    : 'Check back soon or browse all categories.'
+                }
+                action={
+                  activeFilterCount > 0
+                    ? { label: 'Clear filters', onClick: clearFilters }
+                    : { label: 'Browse all categories', href: '/browse' }
+                }
+                className="py-12"
+              />
             )}
 
             {/* Listings Grid/List */}
-            {!loading && !error && sortedListings.length > 0 && (
+            {!loading && !showSkeleton && !error && sortedListings.length > 0 && (
               <>
                 {/* Mobile: always list view (eBay-style) */}
                 <div className="md:hidden space-y-3">

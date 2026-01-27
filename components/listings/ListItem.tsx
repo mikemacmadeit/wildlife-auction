@@ -437,10 +437,10 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
               </div>
 
               {/* Right: less important info (seller, etc.) */}
-              <div className="md:border-l md:pl-5 md:border-border/40 flex flex-col gap-3">
-                <div className="mt-auto rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
+              <div className="md:border-l md:pl-5 md:border-border/40 flex flex-col gap-3 min-w-0 overflow-hidden">
+                <div className="mt-auto rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2 min-w-0 overflow-hidden">
                   <div className="text-xs text-muted-foreground font-semibold">Sold by</div>
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                     <div className="h-8 w-8 rounded-full border bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
                       {typeof sellerPhotoUrl === 'string' && sellerPhotoUrl.trim() ? (
                         <Image
@@ -463,7 +463,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     </div>
                     <button
                       type="button"
-                      className="text-sm font-bold truncate text-left hover:underline"
+                      className="text-sm font-bold truncate text-left hover:underline min-w-0 overflow-hidden flex-1 max-w-full"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -491,11 +491,6 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     {sellerBadges.includes('Identity verified') ? (
                       <Badge variant="outline" className="text-[10px] font-semibold">
                         ID verified
-                      </Badge>
-                    ) : null}
-                    {sellerBadges.includes('TPWD breeder permit') ? (
-                      <Badge variant="outline" className="text-[10px] font-semibold">
-                        TPWD permit
                       </Badge>
                     ) : null}
                   </div>

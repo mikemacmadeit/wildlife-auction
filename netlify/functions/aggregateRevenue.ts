@@ -18,10 +18,24 @@ import { captureException } from '../../lib/monitoring/capture';
 
 type FeesByPlan = Record<string, number>;
 
+/** Platform fee in dollars. Prefer platformFeeAmount; legacy may have only platformFee (also dollars). */
 function feeFromOrder(orderData: any): number {
-  const v = orderData?.platformFeeAmount ?? orderData?.platformFee ?? 0;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
+  const amt = orderData?.platformFeeAmount;
+  if (typeof amt === 'number' && Number.isFinite(amt)) return amt;
+  const fee = orderData?.platformFee;
+  if (typeof fee === 'number' && Number.isFinite(fee) && fee >= 0) return fee;
+  return 0;
+}
+
+/** Map sellerTierSnapshot | sellerPlanSnapshot to feesByPlan key (free|pro|elite|unknown). */
+function planKeyForFees(orderData: any): 'free' | 'pro' | 'elite' | 'unknown' {
+  const tier = orderData?.sellerTierSnapshot || orderData?.sellerPlanSnapshot;
+  if (!tier || typeof tier !== 'string') return 'unknown';
+  const t = tier.toLowerCase();
+  if (t === 'standard' || t === 'free') return 'free';
+  if (t === 'priority' || t === 'pro') return 'pro';
+  if (t === 'premier' || t === 'elite') return 'elite';
+  return 'unknown';
 }
 
 function clampInt(v: string | undefined, fallback: number, min: number, max: number): number {
@@ -105,11 +119,11 @@ const baseHandler: Handler = async () => {
       const paidAt = d?.paidAt?.toDate?.();
       if (!(paidAt instanceof Date)) return;
       const fee = feeFromOrder(d);
-      const planSnapshot = d?.sellerPlanSnapshot || 'unknown';
+      const planKey = planKeyForFees(d);
 
       totalFees30d += fee;
       ordersCount30d += 1;
-      feesByPlan30d[planSnapshot] = (feesByPlan30d[planSnapshot] || 0) + fee;
+      feesByPlan30d[planKey] = (feesByPlan30d[planKey] || 0) + fee;
 
       if (paidAt >= last7Days) {
         totalFees7d += fee;
@@ -117,16 +131,17 @@ const baseHandler: Handler = async () => {
       }
     });
 
-    // Windowed refunds (matches current endpoint logic: refundedAt + refundAmount)
+    // Windowed refunds: include full refunds (use order.amount when refundAmount missing)
     let totalRefunds30d = 0;
     windowOrdersSnap.forEach((doc) => {
       const d = doc.data();
       const refundedAt = d?.refundedAt?.toDate?.();
       if (!(refundedAt instanceof Date)) return;
       if (refundedAt < last30Days || refundedAt > now) return;
-      const refundAmount = d?.refundAmount;
-      const n = typeof refundAmount === 'number' ? refundAmount : Number(refundAmount);
-      if (Number.isFinite(n)) totalRefunds30d += n;
+      const refundDollars = typeof d?.refundAmount === 'number' && Number.isFinite(d.refundAmount)
+        ? d.refundAmount
+        : (typeof d?.amount === 'number' && Number.isFinite(d.amount) ? d.amount : 0);
+      totalRefunds30d += refundDollars;
     });
 
     // Chargebacks in last30d (matches current endpoint: chargebacks.amount in cents -> dollars)

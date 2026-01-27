@@ -8,12 +8,13 @@
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 import { validateRequest, processRefundSchema } from '@/lib/validation/api-schemas';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAuditLog } from '@/lib/audit/logger';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { logInfo, logError } from '@/lib/monitoring/logger';
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error: any) {
-      console.error('Token verification error:', error?.code || error?.message || error);
+      logError('Token verification error', error, { route: '/api/stripe/refunds/process', code: error?.code });
       return json(
         {
           error: 'Unauthorized - Invalid token',
@@ -158,23 +159,54 @@ export async function POST(request: Request) {
       return json({ error: 'Refund amount must be greater than zero' }, { status: 400 });
     }
 
-    // Create Stripe refund
-    const refund = await stripe.refunds.create(
-      {
-        payment_intent: paymentIntentId,
-        amount: refundAmountCents,
-        reason: 'requested_by_customer', // or 'duplicate', 'fraudulent'
-        metadata: {
-          orderId: orderId,
-          listingId: orderData.listingId,
-          buyerId: orderData.buyerId,
-          sellerId: orderData.sellerId,
-          refundedBy: adminId,
-          refundReason: reason || 'Admin refund',
+    // Transaction guard: prevent concurrent refunds (P3)
+    const now = new Date();
+    const guardWindowMs = 5 * 60 * 1000; // 5 minutes
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(orderRef);
+        if (!snap.exists) throw new Error('Order not found');
+        const data = snap.data() as any;
+        if (data.status === 'refunded') throw new Error('ORDER_ALREADY_REFUNDED');
+        const at = data.refundInProgressAt?.toMillis?.() ?? data.refundInProgressAt;
+        if (typeof at === 'number' && Date.now() - at < guardWindowMs) throw new Error('REFUND_IN_PROGRESS');
+        tx.update(orderRef, { refundInProgressAt: now, updatedAt: now });
+      });
+    } catch (e: any) {
+      if (e?.message === 'ORDER_ALREADY_REFUNDED') {
+        return json({ error: 'Order already refunded' }, { status: 400 });
+      }
+      if (e?.message === 'REFUND_IN_PROGRESS') {
+        return json(
+          { error: 'Refund already in progress for this order', code: 'REFUND_IN_PROGRESS' },
+          { status: 409 }
+        );
+      }
+      throw e;
+    }
+
+    let refund: { id: string };
+    try {
+      refund = await stripe.refunds.create(
+        {
+          payment_intent: paymentIntentId,
+          amount: refundAmountCents,
+          reason: 'requested_by_customer',
+          metadata: {
+            orderId: orderId,
+            listingId: orderData.listingId,
+            buyerId: orderData.buyerId,
+            sellerId: orderData.sellerId,
+            refundedBy: adminId,
+            refundReason: reason || 'Admin refund',
+          },
         },
-      },
-      { idempotencyKey: `refund:${orderId}:${refundAmountCents}` }
-    );
+        { idempotencyKey: `refund:${orderId}:${refundAmountCents}` }
+      );
+    } catch (stripeErr: any) {
+      await orderRef.update({ refundInProgressAt: FieldValue.delete(), updatedAt: new Date() }).catch(() => {});
+      throw stripeErr;
+    }
 
     // Capture before state for audit
     const beforeState = {
@@ -183,22 +215,21 @@ export async function POST(request: Request) {
       refundedBy: orderData.refundedBy,
     };
 
-    // Update order in Firestore
+    // Update order in Firestore; clear refund-in-progress lock
     const updateData: any = {
-      status: refundAmountCents === totalAmount ? 'refunded' : 'completed', // Full refund = refunded, partial = still completed
+      status: refundAmountCents === totalAmount ? 'refunded' : 'completed',
       stripeRefundId: refund.id,
       refundedBy: adminId,
-      refundedAt: new Date(),
+      refundedAt: now,
       refundReason: reason || 'Admin refund',
-      updatedAt: new Date(),
+      updatedAt: now,
+      refundInProgressAt: FieldValue.delete(),
     };
 
-    // If partial refund, store refund amount
     if (refundAmountCents < totalAmount) {
       updateData.refundAmount = refundAmountCents / 100;
     }
 
-    // Store admin action notes
     const existingNotes = orderData.adminActionNotes || [];
     updateData.adminActionNotes = [
       ...existingNotes,
@@ -211,9 +242,13 @@ export async function POST(request: Request) {
       },
     ];
 
-    await orderRef.update(updateData);
+    try {
+      await orderRef.update(updateData);
+    } catch (updateErr: any) {
+      await orderRef.update({ refundInProgressAt: FieldValue.delete(), updatedAt: new Date() }).catch(() => {});
+      throw updateErr;
+    }
 
-    // Create audit log
     await createAuditLog(db, {
       actorUid: adminId,
       actorRole: 'admin',
@@ -237,7 +272,13 @@ export async function POST(request: Request) {
       source: 'admin_ui',
     });
 
-    console.log(`Refund processed for order ${orderId}: Refund ${refund.id} of $${refundAmountCents / 100} (${refundAmountCents === totalAmount ? 'full' : 'partial'})`);
+    logInfo('Refund processed', {
+      route: '/api/stripe/refunds/process',
+      orderId,
+      refundId: refund.id,
+      amountUsd: refundAmountCents / 100,
+      isFullRefund: refundAmountCents === totalAmount,
+    });
 
     return json({
       success: true,
@@ -249,7 +290,7 @@ export async function POST(request: Request) {
         : 'Partial refund processed successfully',
     });
   } catch (error: any) {
-    console.error('Error processing refund:', error);
+    logError('Error processing refund', error, { route: '/api/stripe/refunds/process' });
     return json(
       {
         error: 'Failed to process refund',

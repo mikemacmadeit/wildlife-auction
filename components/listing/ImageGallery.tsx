@@ -143,11 +143,43 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
           </>
         )}
 
-        {/* Image Counter */}
+        {/* Image counter and indicator dots */}
         {images.length > 1 && (
-          <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-card/90 backdrop-blur-sm border border-border/50 text-sm font-semibold shadow-warm">
-            {selectedIndex + 1} / {images.length}
-          </div>
+          <>
+            <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-card/90 backdrop-blur-sm border border-border/50 text-sm font-semibold shadow-warm tabular-nums">
+              {selectedIndex + 1} of {images.length}
+            </div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 sm:gap-1.5" role="group" aria-label="Image gallery navigation">
+              {images.slice(0, 10).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedIndex(i);
+                  }}
+                  className={cn(
+                    'min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-transparent',
+                    selectedIndex === i
+                      ? 'bg-primary'
+                      : 'bg-card/80 hover:bg-card border border-border/50'
+                  )}
+                  aria-label={`Go to image ${i + 1}`}
+                  aria-current={selectedIndex === i ? 'true' : undefined}
+                >
+                  <span
+                    className={cn(
+                      'rounded-full',
+                      selectedIndex === i ? 'h-2.5 w-2.5 bg-primary-foreground' : 'h-2 w-2 bg-foreground/50'
+                    )}
+                  />
+                </button>
+              ))}
+              {images.length > 10 && (
+                <span className="text-xs text-muted-foreground ml-1">+{images.length - 10}</span>
+              )}
+            </div>
+          </>
         )}
 
         {/* Click to Expand Hint */}
@@ -158,7 +190,7 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
 
       {/* Thumbnail Gallery */}
       {images.length > 1 && (
-        <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mt-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2 mt-3">
           {images.slice(0, 6).map((image, index) => (
             <motion.button
               key={index}
@@ -269,10 +301,10 @@ export function ImageGallery({ images, title, className, focalPointsByUrl }: Ima
               </>
             )}
 
-            {/* Image Counter in Fullscreen */}
+            {/* Image counter in fullscreen */}
             {images.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-card/90 backdrop-blur-sm border border-border/50 text-sm font-semibold shadow-warm">
-                {selectedIndex + 1} / {images.length}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-card/90 backdrop-blur-sm border border-border/50 text-sm font-semibold shadow-warm tabular-nums">
+                {selectedIndex + 1} of {images.length}
               </div>
             )}
           </div>

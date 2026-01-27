@@ -14,7 +14,7 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { collection, getCountFromServer, onSnapshot, orderBy, query, where, limit as fsLimit, getDocs } from 'firebase/firestore';
-import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, getListingsByIds, toListing } from '@/lib/firebase/listings';
+import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, getListingsByIds, filterOutEndedAuctions, toListing } from '@/lib/firebase/listings';
 import { db } from '@/lib/firebase/config';
 import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,7 @@ export default function HomePage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [mostWatched, setMostWatched] = useState<Listing[]>([]);
   const [endingSoon, setEndingSoon] = useState<Listing[]>([]);
-  
+
   // Memoize listings arrays AND individual listing objects to prevent recreation
   // Create a stable map of listings by ID to reuse object references
   const listingsMapRef = useRef<Map<string, Listing>>(new Map());
@@ -225,7 +225,7 @@ export default function HomePage() {
         const fetched = await getListingsByIds(recentIds);
         if (cancelled) return;
         const valid = fetched.filter((x) => x !== null) as Listing[];
-        setRecentlyViewedListings(valid);
+        setRecentlyViewedListings(filterOutEndedAuctions(valid));
       } catch {
         if (!cancelled) setRecentlyViewedListings([]);
       }

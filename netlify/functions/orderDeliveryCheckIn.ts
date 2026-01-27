@@ -29,6 +29,7 @@ const baseHandler: Handler = async () => {
     const snap = await db
       .collection('orders')
       .where('deliveryConfirmedAt', '<=', cutoffTs)
+      .orderBy('deliveryConfirmedAt', 'asc')
       .limit(MAX_ORDERS_PER_RUN)
       .get();
 
