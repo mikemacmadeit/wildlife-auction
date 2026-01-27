@@ -167,7 +167,7 @@ export async function POST(
 
     // Notify admins (email + in-app). Non-blocking.
     try {
-      const origin = 'https://wildlife.exchange';
+      const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://agchange.com';
       const adminUids = await listAdminRecipientUids(db as any);
       if (adminUids.length > 0) {
         await emitEventToUsers({

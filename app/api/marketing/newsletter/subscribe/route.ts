@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       updateEnabled: true,
       attributes: {
         SOURCE: source,
-        SITE: 'wildlife.exchange',
+        SITE: 'agchange.com',
       },
     };
 

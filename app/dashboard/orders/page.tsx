@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter } from 'lucide-react';
+import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter, PartyPopper } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOrderByCheckoutSessionId, getOrdersForUser } from '@/lib/firebase/orders';
@@ -82,6 +82,7 @@ export default function OrdersPage() {
   const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
   const [pendingCheckoutListingTitle, setPendingCheckoutListingTitle] = useState<string | null>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+  const [showCongratsModal, setShowCongratsModal] = useState(false);
   const reconcileAttemptedRef = useRef<Record<string, boolean>>({});
 
   // eBay-style controls (client-side filtering; avoids extra Firestore reads)
@@ -305,6 +306,8 @@ export default function OrdersPage() {
                 title: 'Payment confirmed',
                 body: 'Payment confirmed. Your order will appear below shortly.',
               };
+
+          if (!isProcessing) setShowCongratsModal(true);
 
           // Track this session so we can poll for the corresponding Firestore order.
           const listingIdFromMeta =
@@ -907,6 +910,47 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
+      {/* Post-purchase congratulations modal */}
+      <Dialog open={showCongratsModal} onOpenChange={setShowCongratsModal}>
+        <DialogContent className="sm:max-w-md border-2 border-primary/20 bg-card shadow-xl" aria-describedby="congrats-desc">
+          <DialogHeader>
+            <div className="flex items-center justify-center gap-2 text-primary mb-2">
+              <PartyPopper className="h-10 w-10" aria-hidden />
+            </div>
+            <DialogTitle className="text-center text-2xl font-bold">
+              Congratulations!
+            </DialogTitle>
+            <DialogDescription id="congrats-desc" asChild>
+              <div className="text-center space-y-4 pt-2">
+                <p className="text-base text-foreground font-medium">
+                  You’ve purchased <span className="font-semibold text-primary">{pendingCheckoutListingTitle || 'your item'}</span>.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Your payment is confirmed and your purchase appears in <strong>My Purchases</strong> below. The seller will contact you about next steps—delivery, pickup, or transfer paperwork.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  You can track progress and message the seller from your order at any time.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              onClick={() => {
+                setShowCongratsModal(false);
+                requestAnimationFrame(() => {
+                  document.getElementById('orders-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+              }}
+              className="w-full font-semibold"
+              size="lg"
+            >
+              View my purchase
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -1057,7 +1101,7 @@ export default function OrdersPage() {
         ) : null}
 
         {/* Orders list */}
-        <div className="flex flex-col gap-4" data-tour="orders-list">
+        <div id="orders-list" className="flex flex-col gap-4" data-tour="orders-list">
           {filteredOrders.map((order) => {
             const ui = deriveOrderUIState(order);
             const canAct = canAcceptOrDispute(order);
@@ -1288,7 +1332,6 @@ export default function OrdersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-[200px]">
-                        <DropdownMenuItem onClick={() => setDrawerOrderId(order.id)}>View details</DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link href={`/listing/${order.listingId}`}>View listing</Link>
                         </DropdownMenuItem>

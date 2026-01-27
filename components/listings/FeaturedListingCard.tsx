@@ -15,6 +15,7 @@ import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/hooks/use-auth';
 
 interface FeaturedListingCardProps {
   listing: Listing;
@@ -25,12 +26,14 @@ interface FeaturedListingCardProps {
 export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCardProps>(
   ({ listing, className, index = 0 }, ref) => {
   const router = useRouter();
+  const { user } = useAuth();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
   const sellerName = listing.sellerSnapshot?.displayName || 'Seller';
   const sellerInitial = String(sellerName || 'S').trim().slice(0, 1).toUpperCase();
-  const sellerPhotoUrl = listing.sellerSnapshot?.photoURL || '';
+  const rawSellerPhoto = listing.sellerSnapshot?.photoURL ?? '';
+  const sellerPhotoUrl = typeof rawSellerPhoto === 'string' && rawSellerPhoto.trim().startsWith('http') ? rawSellerPhoto.trim() : '';
 
   const priceDisplay = listing.type === 'auction'
     ? listing.currentBid
@@ -39,6 +42,16 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     : listing.type === 'fixed'
     ? `$${listing.price?.toLocaleString() || '0'}`
     : `$${listing.price?.toLocaleString() || 'Contact'}`;
+
+  const endsAtMs = listing.endsAt instanceof Date ? listing.endsAt.getTime() : null;
+  const auctionEnded = typeof endsAtMs === 'number' && endsAtMs <= Date.now();
+  const isCurrentHighBidder = Boolean(
+    user?.uid &&
+    listing.type === 'auction' &&
+    !sold.isSold &&
+    !auctionEnded &&
+    listing.currentBidderId === user.uid
+  );
 
   const hasCountdown = !sold.isSold && listing.type === 'auction' && !!listing.endsAt;
   const cover = listing.photos?.[0];
@@ -270,8 +283,16 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             <div className="mt-auto pt-3 sm:pt-4 border-t border-border/50 overflow-hidden">
               <div className="flex items-center justify-between gap-3 min-w-0 overflow-hidden">
                 <div className="space-y-1 flex-shrink-0 min-w-0 overflow-hidden sm:max-w-[65%]">
-                  <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent truncate">
-                    {priceDisplay}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent truncate">
+                      {priceDisplay}
+                    </span>
+                    {isCurrentHighBidder && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        You're winning
+                      </span>
+                    )}
                   </div>
                   {quantity && quantity > 1 ? (
                     <div className="text-xs text-muted-foreground font-medium truncate">
@@ -317,7 +338,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                       aria-label="View seller profile"
                     >
                       <Avatar className="h-6 w-6 border border-border/50 flex-shrink-0">
-                        <AvatarImage src={sellerPhotoUrl} alt={sellerName} />
+                        {sellerPhotoUrl ? <AvatarImage src={sellerPhotoUrl} alt={sellerName} referrerPolicy="no-referrer" /> : null}
                         <AvatarFallback className="text-[10px] font-bold">{sellerInitial}</AvatarFallback>
                       </Avatar>
                       <span className="truncate min-w-0">{sellerName}</span>

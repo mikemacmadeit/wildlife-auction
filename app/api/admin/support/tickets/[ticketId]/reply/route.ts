@@ -59,7 +59,7 @@ export async function POST(request: Request, ctx: { params: { ticketId: string }
     { merge: true }
   );
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://wildlife.exchange';
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://agchange.com';
   const { subject, html } = getSupportTicketReplyEmail({
     ticketId,
     userName: String(before?.name || 'there'),

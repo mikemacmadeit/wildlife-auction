@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shield, Lock, Mail } from 'lucide-react';
+import { SUPPORT_EMAIL } from '@/lib/brand';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Agchange',
@@ -232,7 +233,7 @@ export default function PrivacyPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2 text-foreground">
               <Mail className="h-4 w-4 text-primary" />
-              <span className="font-semibold">support@wildlife.exchange</span>
+              <span className="font-semibold">{SUPPORT_EMAIL}</span>
             </div>
             <p>
               Prefer a form? Visit our{' '}

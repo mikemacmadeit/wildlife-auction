@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -58,10 +58,14 @@ async function postAuthJson(path: string, body?: any): Promise<any> {
 
 export default function SellerOrderDetailPage() {
   const params = useParams<{ orderId: string }>();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const orderId = params?.orderId;
+  const fromSales = searchParams?.get('from') === 'sales';
+  const backHref = fromSales ? '/seller/sales' : '/seller/overview';
+  const backLabel = fromSales ? 'Back to sold' : 'Back to seller dashboard';
   const [order, setOrder] = useState<Order | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
@@ -203,7 +207,7 @@ export default function SellerOrderDetailPage() {
                     <div className="font-semibold text-sm">Propose delivery</div>
                     <div className="text-xs text-muted-foreground">Propose delivery windows (hauling). Buyer will agree to one.</div>
                   </div>
-                  <Button variant="default" size="lg" className="shadow-warm ring-2 ring-primary/25 font-semibold" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
+                  <Button variant="default" size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
                     <Calendar className="h-4 w-4 mr-2" />
                     Propose delivery
                   </Button>
@@ -229,7 +233,7 @@ export default function SellerOrderDetailPage() {
                   <Button
                     variant="default"
                     size="lg"
-                    className="shadow-warm ring-2 ring-primary/25 font-semibold"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
                     disabled={processing !== null}
                     onClick={() => setMarkOutForDeliveryOpen(true)}
                   >
@@ -251,7 +255,7 @@ export default function SellerOrderDetailPage() {
                   <Button
                     variant="default"
                     size="lg"
-                    className="shadow-warm ring-2 ring-primary/25 font-semibold"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
                     disabled={processing !== null}
                     onClick={handleMarkDelivered}
                   >
@@ -336,7 +340,7 @@ export default function SellerOrderDetailPage() {
                   <Button
                     variant="default"
                     size="lg"
-                    className="shadow-warm ring-2 ring-primary/25 font-semibold"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
                     disabled={processing !== null}
                     onClick={() => setSetPickupInfoOpen(true)}
                   >
@@ -365,7 +369,7 @@ export default function SellerOrderDetailPage() {
                     <div className="font-semibold text-sm">Agree to pickup window</div>
                     <div className="text-xs text-muted-foreground">Confirm this time works for you.</div>
                   </div>
-                  <Button variant="default" size="lg" className="shadow-warm ring-2 ring-primary/25 font-semibold" disabled={processing !== null} onClick={() => setAgreePickupOpen(true)}>
+                  <Button variant="default" size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30" disabled={processing !== null} onClick={() => setAgreePickupOpen(true)}>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Agree to window
                   </Button>
@@ -422,9 +426,9 @@ export default function SellerOrderDetailPage() {
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-8 max-w-4xl space-y-4">
           <Button asChild variant="outline" size="sm">
-            <Link href="/seller/overview">
+            <Link href={backHref}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to seller dashboard
+              {backLabel}
             </Link>
           </Button>
           <Card>
@@ -446,9 +450,9 @@ export default function SellerOrderDetailPage() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="space-y-2 min-w-[260px]">
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/seller/overview">
+                  <Link href={backHref}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to seller dashboard
+                    {backLabel}
                   </Link>
                 </Button>
                 <div>
@@ -506,8 +510,30 @@ export default function SellerOrderDetailPage() {
                   </div>
                   <Button
                     size="lg"
-                    className={nextAction.severity !== 'danger' ? 'shadow-warm ring-2 ring-primary/25 font-semibold' : 'font-semibold'}
-                    variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
+                    className={
+                      nextAction.severity === 'danger'
+                        ? 'font-semibold'
+                        : nextAction.ctaAction.includes('schedule-delivery') ||
+                            nextAction.ctaAction.includes('set-pickup') ||
+                            nextAction.ctaAction.includes('agree-pickup') ||
+                            nextAction.ctaAction.includes('mark-out') ||
+                            nextAction.ctaAction.includes('mark-delivered')
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30'
+                          : 'shadow-warm ring-2 ring-primary/25 font-semibold'
+                    }
+                    variant={
+                      nextAction.severity === 'danger'
+                        ? 'destructive'
+                        : nextAction.ctaAction.includes('schedule-delivery') ||
+                            nextAction.ctaAction.includes('set-pickup') ||
+                            nextAction.ctaAction.includes('agree-pickup') ||
+                            nextAction.ctaAction.includes('mark-out') ||
+                            nextAction.ctaAction.includes('mark-delivered')
+                          ? 'default'
+                          : nextAction.severity === 'warning'
+                            ? 'default'
+                            : 'outline'
+                    }
                     disabled={!!nextAction.blockedReason || (nextAction.ctaAction.includes('mark-delivered') && processing === 'delivered')}
                     onClick={async () => {
                       if (nextAction.ctaAction.includes('schedule-delivery')) {
@@ -662,7 +688,8 @@ export default function SellerOrderDetailPage() {
                   </div>
                 </div>
                 <Button
-                  variant="outline"
+                  variant="default"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
                   disabled={Boolean(order.billOfSaleSellerSignedAt)}
                   onClick={async () => {
                     try {

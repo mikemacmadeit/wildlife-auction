@@ -58,6 +58,7 @@ import { getUserProfile } from '@/lib/firebase/users';
 import type { UserProfile } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
@@ -386,9 +387,7 @@ export default function SellerLayout({
             </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col overflow-hidden">
-                <span className="text-lg font-extrabold text-foreground leading-tight whitespace-nowrap">
-                  Agchange
-                </span>
+                <BrandLogoText className="text-lg font-extrabold tracking-tight font-barletta-inline text-foreground leading-tight whitespace-nowrap" />
                 <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                   Dashboard
                 </span>
@@ -632,7 +631,7 @@ export default function SellerLayout({
               className="h-full w-full object-contain"
             />
           </div>
-          <span className="text-lg font-bold">Agchange</span>
+          <BrandLogoText className="text-lg font-bold tracking-tight font-barletta-inline text-foreground" />
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />

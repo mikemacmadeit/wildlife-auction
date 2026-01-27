@@ -18,6 +18,7 @@ import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, ge
 import { db } from '@/lib/firebase/config';
 import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { User } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
 // Removed useFavorites import - homepage doesn't need it
@@ -40,8 +41,7 @@ function toDateSafe(v: any): Date | null {
   return null;
 }
 
-// Homepage hero brand — always "Agchange" (never "Wildlife Exchange")
-const HOMEPAGE_HERO_BRAND = 'Agchange';
+// Hero uses BrandLogoText; same two-tone (Ag = primary, change = beige) and font as navbar.
 
 /** Inline filter: hide dog-related listings from UI for Stripe review (no backend change). */
 function isDogListing(l: Listing): boolean {
@@ -57,6 +57,31 @@ function isDogListing(l: Listing): boolean {
   const title = (l?.title ?? '').toString().toLowerCase();
   if (/dog/i.test(title)) return true;
   return false;
+}
+
+/** Inline filter: hide horse/equestrian listings from UI until category is re-enabled (no backend change). */
+function isHorseListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  if (/horse|equestrian/i.test(cat)) return true;
+  const species = (l as any)?.species ?? (l as any)?.attributes?.speciesId ?? '';
+  if (String(species).toLowerCase() === 'horse') return true;
+  return false;
+}
+
+/** Inline filter: hide ranch_equipment / ranch_vehicles until re-enabled (no backend change). */
+function isRanchEquipmentOrVehiclesListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  return cat === 'ranch_equipment' || cat === 'ranch_vehicles';
+}
+
+/** Inline filter: hide hunting_outfitter_assets until re-enabled (no backend change). */
+function isHuntingOutfitterListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  return cat === 'hunting_outfitter_assets';
+}
+
+function isHiddenCategoryListing(l: Listing): boolean {
+  return isDogListing(l) || isHorseListing(l) || isRanchEquipmentOrVehiclesListing(l) || isHuntingOutfitterListing(l);
 }
 
 export default function HomePage() {
@@ -407,13 +432,13 @@ export default function HomePage() {
     };
   }, [savedSellers, user?.uid]);
 
-  // Memoize derived listings to prevent recreation on each render. Dog-related listings filtered for Stripe review.
-  const featuredListings = useMemo(() => stableListings.filter((l) => l.featured && !isDogListing(l)), [stableListings]);
-  const recentListings = useMemo(() => stableListings.filter((l) => !isDogListing(l)).slice(0, 6), [stableListings]);
+  // Memoize derived listings to prevent recreation on each render. Dog and horse listings filtered until re-enabled.
+  const featuredListings = useMemo(() => stableListings.filter((l) => l.featured && !isHiddenCategoryListing(l)), [stableListings]);
+  const recentListings = useMemo(() => stableListings.filter((l) => !isHiddenCategoryListing(l)).slice(0, 6), [stableListings]);
 
   const signedInDiscoveryListings = useMemo(() => {
     if (!user?.uid) return [];
-    if (mostWatched?.length) return mostWatched.filter((l) => !isDogListing(l)).slice(0, 12);
+    if (mostWatched?.length) return mostWatched.filter((l) => !isHiddenCategoryListing(l)).slice(0, 12);
     return recentListings.slice(0, 12);
   }, [mostWatched, recentListings, user?.uid]);
 
@@ -930,9 +955,12 @@ export default function HomePage() {
               <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
                 <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
-                {HOMEPAGE_HERO_BRAND}
-              </h1>
+              {/* Lighter green (primary) for "Ag", beige for "change"; dark wrapper matches navbar palette on dark bg. */}
+              <div className="dark">
+                <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight font-barletta-inline text-[hsl(37,27%,70%)] whitespace-nowrap">
+                  <BrandLogoText className="text-inherit" />
+                </h1>
+              </div>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
               Texas-only marketplace for registered livestock, horses &amp; ranch assets
@@ -1041,7 +1069,7 @@ export default function HomePage() {
                   subtitle="Your latest clicks — fast way back in."
                   href="/dashboard/recently-viewed"
                 />
-                <ListingRail listings={recentlyViewedListings.filter((l) => !isDogListing(l))} emptyText="No recently viewed listings yet." />
+                <ListingRail listings={recentlyViewedListings.filter((l) => !isHiddenCategoryListing(l))} emptyText="No recently viewed listings yet." />
               </div>
             ) : null}
 
@@ -1055,7 +1083,7 @@ export default function HomePage() {
                     <span className="text-xs text-muted-foreground">{watchlistListings.length} watched</span>
                   }
                 />
-                <ListingRail listings={watchlistListings.filter((l) => !isDogListing(l))} emptyText="No watched items yet. Tap the heart on any listing." />
+                <ListingRail listings={watchlistListings.filter((l) => !isHiddenCategoryListing(l))} emptyText="No watched items yet. Tap the heart on any listing." />
               </div>
             ) : null}
 
@@ -1220,7 +1248,7 @@ export default function HomePage() {
                   href="/dashboard/watchlist"
                   actionLabel="See sellers"
                 />
-                <ListingRail listings={newFromSavedSellers.filter((l) => !isDogListing(l))} emptyText="No active listings from your saved sellers yet." />
+                <ListingRail listings={newFromSavedSellers.filter((l) => !isHiddenCategoryListing(l))} emptyText="No active listings from your saved sellers yet." />
               </div>
             ) : null}
             </div>
@@ -1244,8 +1272,9 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          {/* Mobile-only: compact 2-column grid (icons + title only). Dog-related category hidden for Stripe review. */}
-          <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto md:hidden">
+          {/* Mobile-only: 3 animal categories. Dog/horse/ranch/hunting hidden. */}
+          <div className="flex justify-center md:hidden">
+            <div className="grid grid-cols-3 gap-2 max-w-2xl w-full">
             {[
               { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-9 h-9 icon-primary-color mask-icon-whitetail-breeder" /> },
               { href: '/browse?category=wildlife_exotics', label: 'Registered & Specialty Livestock', icon: <div className="w-9 h-9 icon-primary-color mask-icon-fallow" /> },
@@ -1274,7 +1303,7 @@ export default function HomePage() {
               { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-9 h-9 icon-primary-color mask-icon-hunting-blind" /> },
               { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-9 h-9 icon-primary-color mask-icon-tractor" /> },
               { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-9 h-9 icon-primary-color mask-icon-top-drive" /> },
-            ].filter((c) => !/dog/i.test((c.label || '') + (c.href || ''))).map((c) => (
+            ].filter((c) => !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.href || ''))).map((c) => (
               <Link key={c.href} href={c.href} className="group">
                 <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors">
                   <CardContent className="p-3">
@@ -1288,10 +1317,12 @@ export default function HomePage() {
                 </Card>
               </Link>
             ))}
+            </div>
           </div>
 
-          {/* Desktop/tablet: keep existing layout exactly */}
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          {/* Desktop/tablet: 3 animal categories on one line */}
+          <div className="hidden md:flex md:justify-center">
+            <div className="grid grid-cols-3 gap-6 max-w-4xl w-full">
             {/* Whitetail Breeder - First priority */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -1361,7 +1392,8 @@ export default function HomePage() {
               </Link>
             </motion.div>
 
-            {/* Ranch Equipment & Attachments */}
+            {/* Ranch Equipment & Attachments — hidden until re-enabled (category not deleted, filter at render) */}
+            {!['ranch_equipment'].some((x) => /ranch_equipment/i.test(x)) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1383,8 +1415,10 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
 
-            {/* Ranch Vehicles & Trailers */}
+            {/* Ranch Vehicles & Trailers — hidden until re-enabled (category not deleted, filter at render) */}
+            {!['ranch_vehicles'].some((x) => /ranch_vehicles/i.test(x)) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1406,8 +1440,10 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
 
-            {/* Horse & Equestrian */}
+            {/* Horse & Equestrian — hidden until re-enabled (category not deleted, filter at render) */}
+            {!['horse_equestrian', 'horse'].some((x) => /horse|equestrian/i.test(x)) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1442,6 +1478,7 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
 
             {/* Sporting & Working Dogs — hidden for Stripe review (category not deleted, filter at render) */}
             {!['sporting_working_dogs', 'dog'].some((x) => /dog/i.test(x)) && (
@@ -1468,7 +1505,8 @@ export default function HomePage() {
             </motion.div>
             )}
 
-            {/* Hunting & Outfitter Assets */}
+            {/* Hunting & Outfitter Assets — hidden until re-enabled (only 3 animal categories for now) */}
+            {!['hunting_outfitter_assets'].some((x) => /hunting_outfitter/i.test(x)) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1490,6 +1528,8 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
+            </div>
           </div>
         </div>
       </section>
@@ -1519,7 +1559,7 @@ export default function HomePage() {
       )}
 
       {/* Most Watched */}
-      {!loading && mostWatched.filter((l) => !isDogListing(l)).length > 0 && (
+      {!loading && mostWatched.filter((l) => !isHiddenCategoryListing(l)).length > 0 && (
         <section className="py-12 md:py-16 bg-background border-t border-border/50">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -1533,13 +1573,13 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            <ListingRail listings={mostWatched.filter((l) => !isDogListing(l))} emptyText="No watched listings yet." />
+            <ListingRail listings={mostWatched.filter((l) => !isHiddenCategoryListing(l))} emptyText="No watched listings yet." />
           </div>
         </section>
       )}
 
       {/* Ending Soon */}
-      {!loading && endingSoon.filter((l) => !isDogListing(l)).length > 0 && (
+      {!loading && endingSoon.filter((l) => !isHiddenCategoryListing(l)).length > 0 && (
         <section className="py-12 md:py-16 bg-background border-t border-border/50">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -1553,7 +1593,7 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-                <ListingRail listings={stableEndingSoon.filter((l) => !isDogListing(l))} emptyText="No auctions ending soon." />
+                <ListingRail listings={stableEndingSoon.filter((l) => !isHiddenCategoryListing(l))} emptyText="No auctions ending soon." />
           </div>
         </section>
       )}

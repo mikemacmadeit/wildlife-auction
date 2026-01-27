@@ -12,10 +12,25 @@ export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'ranch_vehicles', label: 'Ranch Vehicles & Trailers' },
 ];
 
-/** Categories to show in Browse by Category / filters (hides dog-related for Stripe review). */
+/** Categories to show in Browse by Category / filters (only whitetail, wildlife/exotics, cattle for now). */
 export const BROWSE_CATEGORIES_FOR_DISPLAY = BROWSE_CATEGORIES.filter(
-  (c) => !/dog/i.test((c.label || '') + (c.value || ''))
+  (c) => !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.value || ''))
 );
+
+/** When true, Sporting & Working Dogs is hidden from new/edit listing category choosers (can be re-enabled later). */
+export const HIDE_SPORTING_WORKING_DOGS_AS_OPTION = true;
+
+/** When true, Horse & Equestrian is hidden from new/edit listing category choosers (can be re-enabled later). */
+export const HIDE_HORSE_AS_OPTION = true;
+
+/** When true, Hunting & Outfitter Assets is hidden from new/edit listing category choosers (can be re-enabled later). */
+export const HIDE_HUNTING_OUTFITTER_AS_OPTION = true;
+
+/** When true, Ranch Equipment & Attachments is hidden from new/edit listing category choosers (can be re-enabled later). */
+export const HIDE_RANCH_EQUIPMENT_AS_OPTION = true;
+
+/** When true, Ranch Vehicles & Trailers is hidden from new/edit listing category choosers (can be re-enabled later). */
+export const HIDE_RANCH_VEHICLES_AS_OPTION = true;
 
 export const BROWSE_TYPES: { value: ListingType; label: string }[] = [
   { value: 'auction', label: 'Auction' },

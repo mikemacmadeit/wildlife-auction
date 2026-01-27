@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut, BookOpen } from 'lucide-react';
+import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -38,6 +38,8 @@ import { useToast } from '@/hooks/use-toast';
 import { NotificationsBell } from '@/components/navigation/NotificationsBell';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { BRAND_DISPLAY_NAME } from '@/lib/brand';
+import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -95,13 +97,13 @@ export function Navbar() {
     { href: '/', label: 'Home' },
     { href: '/browse', label: 'Browse' },
     { href: '/how-it-works', label: 'How It Works' },
-    { href: '/field-notes', label: 'Field Notes' },
   ];
 
   const howItWorksItems = [
     { href: '/how-it-works', label: 'Overview' },
     { href: '/how-it-works/plans', label: 'Seller Tiers' },
     { href: '/how-it-works/trust', label: 'Trust & Compliance' },
+    { href: '/field-notes', label: 'Field Notes' },
   ];
 
   return (
@@ -114,7 +116,7 @@ export function Navbar() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] h-20 items-center gap-4">
           {/* Logo Section - Left side */}
-          <Link href="/" className="flex items-center gap-2 md:gap-3 group flex-shrink-0 min-w-0 z-10" aria-label="Agchange">
+          <Link href="/" className="flex items-center gap-2 md:gap-3 group flex-shrink-0 min-w-0 z-10" aria-label={BRAND_DISPLAY_NAME}>
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-primary/10 blur-xl rounded-full group-hover:bg-primary/20 transition-colors" />
               <div className="relative h-9 w-9 md:h-10 md:w-10 lg:h-11 lg:w-11 group-hover:scale-110 transition-transform">
@@ -165,10 +167,8 @@ export function Navbar() {
                 />
               </div>
             </div>
-            <span className="sr-only">Agchange</span>
-            <span className="hidden md:inline text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none">
-              Agchange
-            </span>
+            <span className="sr-only">{BRAND_DISPLAY_NAME}</span>
+            <BrandLogoText className="hidden md:inline text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none" />
           </Link>
 
           {/* Desktop Navigation - Centered (only on large screens) */}
@@ -178,7 +178,7 @@ export function Navbar() {
                 const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href + '/'));
 
                 if (link.href === '/how-it-works') {
-                  const isHowActive = pathname === '/how-it-works' || pathname?.startsWith('/how-it-works/');
+                  const isHowActive = pathname === '/how-it-works' || pathname?.startsWith('/how-it-works/') || pathname === '/field-notes' || pathname?.startsWith('/field-notes/');
                   return (
                     <DropdownMenu key={link.href}>
                       <DropdownMenuTrigger asChild>
@@ -214,7 +214,6 @@ export function Navbar() {
                   );
                 }
 
-                const isFieldNotes = link.href === '/field-notes';
                 return (
                   <Link
                     key={link.href}
@@ -222,11 +221,9 @@ export function Navbar() {
                     className={cn(
                       'px-2 xl:px-3 py-2.5 rounded-lg text-sm xl:text-base font-semibold transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
                       'hover:bg-muted/50 hover:text-foreground',
-                      isActive && 'text-primary dark:text-[hsl(37,27%,70%)]',
-                      isFieldNotes && 'inline-flex items-center gap-2'
+                      isActive && 'text-primary dark:text-[hsl(37,27%,70%)]'
                     )}
                   >
-                    {isFieldNotes ? <BookOpen className="h-4 w-4 opacity-70" /> : null}
                     <span className="relative z-10">{link.label}</span>
                     {isActive && (
                       <motion.div
@@ -396,7 +393,7 @@ export function Navbar() {
                         WebkitMaskPosition: 'center',
                       }}
                     />
-                    <span className="sr-only">Agchange</span>
+                    <span className="sr-only">{BRAND_DISPLAY_NAME}</span>
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col gap-2 mt-6 pb-4">
@@ -404,7 +401,7 @@ export function Navbar() {
                     const isActive = pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href + '/'));
 
                     if (link.href === '/how-it-works') {
-                      const isHowActive = pathname === '/how-it-works' || pathname?.startsWith('/how-it-works/');
+                      const isHowActive = pathname === '/how-it-works' || pathname?.startsWith('/how-it-works/') || pathname === '/field-notes' || pathname?.startsWith('/field-notes/');
                       return (
                         <div key={link.href} className="space-y-1">
                           <SheetClose asChild>

@@ -15,10 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Loader2, MessageCircle, Search, Star, Store, Trash2 } from 'lucide-react';
+import { Grid3x3, List as ListIcon, Loader2, MessageCircle, Search, Star, Store, Trash2 } from 'lucide-react';
 import { unfollowSeller } from '@/lib/firebase/following';
 
 type SortKey = 'recent' | 'highest_rated' | 'most_sales';
+type ViewMode = 'grid' | 'list';
 
 function toDateSafe(v: any): Date | null {
   if (!v) return null;
@@ -34,6 +35,145 @@ function toDateSafe(v: any): Date | null {
   return null;
 }
 
+interface SellerCardProps {
+  s: SavedSellerDoc;
+  activeCount: number | null | undefined;
+  removing: boolean;
+  messaging: boolean;
+  onRemove: (sellerId: string) => void;
+  onMessage: (sellerId: string) => void;
+}
+
+function SellerListCard({ s, activeCount, removing, messaging, onRemove, onMessage }: SellerCardProps) {
+  const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
+  const hasRating = s.ratingCount > 0;
+  const ratingLabel = hasRating ? s.ratingAverage.toFixed(1) : '—';
+  const positiveLabel = s.itemsSold > 0 && s.positivePercent > 0 ? `${Math.round(s.positivePercent)}%` : '—';
+  const shopHref = `/sellers/${s.sellerId}`;
+
+  return (
+    <Card className="border-2">
+      <CardContent className="p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="relative h-12 w-12 rounded-full overflow-hidden bg-muted shrink-0 border">
+              {s.sellerPhotoURL ? (
+                <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="48px" unoptimized />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
+                  {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="font-extrabold truncate">{s.sellerDisplayName}</div>
+              <div className="text-xs text-muted-foreground truncate">{usernameLabel}</div>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-xs inline-flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5" />
+                  {ratingLabel}
+                  <span className="text-muted-foreground">({s.ratingCount || 0})</span>
+                </Badge>
+                <Badge variant="outline" className="text-xs">Positive {positiveLabel}</Badge>
+                <Badge variant="outline" className="text-xs">Sold {s.itemsSold || 0}</Badge>
+                <Badge variant="outline" className="text-xs">Active {activeCount === null ? '…' : activeCount ?? 0}</Badge>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:justify-end sm:flex-wrap">
+            <Button asChild variant="outline" className="min-h-[40px] w-full sm:w-auto">
+              <Link href={shopHref}><Store className="h-4 w-4 mr-2" />View store</Link>
+            </Button>
+            <Button
+              className="min-h-[40px] w-full sm:w-auto"
+              disabled={messaging || (typeof activeCount === 'number' && activeCount <= 0)}
+              onClick={() => onMessage(s.sellerId)}
+            >
+              {messaging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
+              Message
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-8 w-8 col-span-2 justify-center sm:h-auto sm:w-auto sm:min-h-[40px] sm:px-3 sm:col-auto",
+                "text-muted-foreground hover:text-destructive hover:bg-destructive/10 sm:!bg-destructive sm:!text-destructive-foreground sm:hover:!bg-destructive/90"
+              )}
+              disabled={removing}
+              onClick={() => onRemove(s.sellerId)}
+              aria-label="Remove seller"
+            >
+              {removing ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin sm:mr-2" /> : <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />}
+              <span className="hidden sm:inline">Remove</span>
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SellerGridCard({ s, activeCount, removing, messaging, onRemove, onMessage }: SellerCardProps) {
+  const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
+  const hasRating = s.ratingCount > 0;
+  const ratingLabel = hasRating ? s.ratingAverage.toFixed(1) : '—';
+  const shopHref = `/sellers/${s.sellerId}`;
+
+  return (
+    <Card className="border-2 h-full flex flex-col overflow-hidden">
+      <CardContent className="p-4 flex flex-col flex-1">
+        <div className="flex flex-col items-center text-center mb-3">
+          <div className="relative h-16 w-16 rounded-full overflow-hidden bg-muted shrink-0 border mb-2">
+            {s.sellerPhotoURL ? (
+              <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="64px" unoptimized />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-xl font-extrabold text-muted-foreground">
+                {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="font-extrabold truncate w-full">{s.sellerDisplayName}</div>
+          <div className="text-xs text-muted-foreground truncate w-full">{usernameLabel}</div>
+          <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap">
+            <Badge variant="outline" className="text-xs inline-flex items-center gap-0.5">
+              <Star className="h-3 w-3" />
+              {ratingLabel}
+            </Badge>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground">Sold {s.itemsSold || 0}</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground">Active {activeCount === null ? '…' : activeCount ?? 0}</span>
+          </div>
+        </div>
+        <div className="mt-auto flex flex-col gap-2">
+          <Button asChild variant="outline" size="sm" className="w-full">
+            <Link href={shopHref}><Store className="h-3.5 w-3.5 mr-1.5" />View store</Link>
+          </Button>
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={messaging || (typeof activeCount === 'number' && activeCount <= 0)}
+            onClick={() => onMessage(s.sellerId)}
+          >
+            {messaging ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5 mr-1.5" />}
+            Message
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            disabled={removing}
+            onClick={() => onRemove(s.sellerId)}
+          >
+            {removing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+            Remove
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SavedSellersList(props: { className?: string }) {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -43,6 +183,7 @@ export function SavedSellersList(props: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [queryText, setQueryText] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('recent');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [removing, setRemoving] = useState<string | null>(null);
   const [activeCountBySellerId, setActiveCountBySellerId] = useState<Record<string, number | null>>({});
   const [messagingSellerId, setMessagingSellerId] = useState<string | null>(null);
@@ -152,7 +293,6 @@ export function SavedSellersList(props: { className?: string }) {
   const onRemove = async (sellerId: string) => {
     if (!user?.uid) return;
     setRemoving(sellerId);
-    // optimistic
     const prev = rows;
     setRows((r) => r.filter((x) => x.sellerId !== sellerId));
     try {
@@ -163,6 +303,26 @@ export function SavedSellersList(props: { className?: string }) {
       toast({ title: 'Remove failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setRemoving(null);
+    }
+  };
+
+  const handleMessage = async (sellerId: string) => {
+    if (!user?.uid) return;
+    try {
+      setMessagingSellerId(sellerId);
+      const listingsRef = collection(db, 'listings');
+      const q = query(listingsRef, where('sellerId', '==', sellerId), where('status', '==', 'active'), limit(1));
+      const snap = await getDocs(q);
+      const listingId = snap.docs[0]?.id;
+      if (!listingId) {
+        toast({ title: 'No active listings', description: 'This seller has no active listings to message about yet.' });
+        return;
+      }
+      router.push(`/dashboard/messages?listingId=${listingId}&sellerId=${sellerId}`);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to start a message', variant: 'destructive' });
+    } finally {
+      setMessagingSellerId(null);
     }
   };
 
@@ -217,6 +377,26 @@ export function SavedSellersList(props: { className?: string }) {
                   <SelectItem value="most_sales">Sort: Most sales</SelectItem>
                 </SelectContent>
               </Select>
+              {rows.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    aria-label="Gallery view"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    aria-label="List view"
+                  >
+                    <ListIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -235,122 +415,33 @@ export function SavedSellersList(props: { className?: string }) {
             </div>
           </CardContent>
         </Card>
-      ) : (
+      ) : viewMode === 'list' ? (
         <div className="space-y-3">
-          {filtered.map((s) => {
-            const usernameLabel = s.sellerUsername ? `${s.sellerUsername}` : `${s.sellerId.slice(0, 8)}`;
-            const hasRating = s.ratingCount > 0;
-            const ratingLabel = hasRating ? s.ratingAverage.toFixed(1) : '—';
-            const positiveLabel = s.itemsSold > 0 && s.positivePercent > 0 ? `${Math.round(s.positivePercent)}%` : '—';
-            const shopHref = `/sellers/${s.sellerId}`;
-            const activeCount = activeCountBySellerId[s.sellerId];
-
-            return (
-              <Card key={s.sellerId} className="border-2">
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="relative h-12 w-12 rounded-full overflow-hidden bg-muted shrink-0 border">
-                        {s.sellerPhotoURL ? (
-                          <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="48px" unoptimized />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
-                            {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="font-extrabold truncate">{s.sellerDisplayName}</div>
-                        <div className="text-xs text-muted-foreground truncate">{usernameLabel}</div>
-
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs inline-flex items-center gap-1">
-                            <Star className="h-3.5 w-3.5" />
-                            {ratingLabel}
-                            <span className="text-muted-foreground">({s.ratingCount || 0})</span>
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Positive {positiveLabel}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Sold {s.itemsSold || 0}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Active {activeCount === null ? '…' : activeCount ?? 0}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:justify-end sm:flex-wrap">
-                      <Button asChild variant="outline" className="min-h-[40px] w-full sm:w-auto">
-                        <Link href={shopHref}>
-                          <Store className="h-4 w-4 mr-2" />
-                          View store
-                        </Link>
-                      </Button>
-                      <Button
-                        className="min-h-[40px] w-full sm:w-auto"
-                        disabled={messagingSellerId === s.sellerId || (typeof activeCount === 'number' && activeCount <= 0)}
-                        onClick={async () => {
-                          if (!user?.uid) return;
-                          try {
-                            setMessagingSellerId(s.sellerId);
-                            const listingsRef = collection(db, 'listings');
-                            const q = query(listingsRef, where('sellerId', '==', s.sellerId), where('status', '==', 'active'), limit(1));
-                            const snap = await getDocs(q);
-                            const listingId = snap.docs[0]?.id;
-                            if (!listingId) {
-                              toast({ title: 'No active listings', description: 'This seller has no active listings to message about yet.' });
-                              return;
-                            }
-                            router.push(`/dashboard/messages?listingId=${listingId}&sellerId=${s.sellerId}`);
-                          } catch (e: any) {
-                            toast({ title: 'Error', description: e?.message || 'Failed to start a message', variant: 'destructive' });
-                          } finally {
-                            setMessagingSellerId(null);
-                          }
-                        }}
-                      >
-                        {messagingSellerId === s.sellerId ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <MessageCircle className="h-4 w-4 mr-2" />
-                        )}
-                        Message
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "h-8 w-8 col-span-2 justify-center",
-                          "sm:h-auto sm:w-auto sm:min-h-[40px] sm:px-3 sm:col-auto",
-                          "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
-                          "sm:!bg-destructive sm:!text-destructive-foreground sm:hover:!bg-destructive/90"
-                        )}
-                        disabled={removing === s.sellerId}
-                        onClick={() => onRemove(s.sellerId)}
-                        aria-label="Remove seller"
-                      >
-                        {removing === s.sellerId ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin sm:mr-2" />
-                            <span className="hidden sm:inline">Remove</span>
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Remove</span>
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {filtered.map((s) => (
+            <SellerListCard
+              key={s.sellerId}
+              s={s}
+              activeCount={activeCountBySellerId[s.sellerId]}
+              removing={removing === s.sellerId}
+              messaging={messagingSellerId === s.sellerId}
+              onRemove={onRemove}
+              onMessage={handleMessage}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filtered.map((s) => (
+            <SellerGridCard
+              key={s.sellerId}
+              s={s}
+              activeCount={activeCountBySellerId[s.sellerId]}
+              removing={removing === s.sellerId}
+              messaging={messagingSellerId === s.sellerId}
+              onRemove={onRemove}
+              onMessage={handleMessage}
+            />
+          ))}
         </div>
       )}
     </div>

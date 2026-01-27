@@ -457,7 +457,8 @@ export async function POST(request: Request) {
         if (outbidRes?.created) void trySendEmailJob(outbidRes.eventId);
       }
 
-      // Bidder: always send Bid.Placed confirmation, then conditionally send HighBidder/Outbid
+      // Bidder: one clear notification. Bid.Placed already says "you're winning" when isHighBidder;
+      // do not also send Auction.HighBidder to avoid duplicate "You're winning" / "Bid placed — you're winning!".
       const isHighBidder = newBidderId === bidderId;
       const bidPlacedRes = await emitAndProcessEventForUser({
         type: 'Bid.Placed',
@@ -479,7 +480,7 @@ export async function POST(request: Request) {
       });
       if (bidPlacedRes?.created) void trySendEmailJob(bidPlacedRes.eventId);
 
-      // Bidder: winning vs immediately surpassed (additional notification).
+      // If someone else is now high bidder (proxy/auto-bid outbid you in same round), notify bidder once.
       if (newBidderId !== bidderId) {
         const immediateOutbidRes = await emitAndProcessEventForUser({
           type: 'Auction.Outbid',
@@ -499,27 +500,6 @@ export async function POST(request: Request) {
           optionalHash: `bid:${result.bidId}:immediate`,
         });
         if (immediateOutbidRes?.created) void trySendEmailJob(immediateOutbidRes.eventId);
-      } else {
-        const highBidderRes = await emitAndProcessEventForUser({
-          type: 'Auction.HighBidder',
-          actorId: bidderId,
-          entityType: 'listing',
-          entityId: listingId,
-          targetUserId: bidderId,
-          payload: {
-            type: 'Auction.HighBidder',
-            listingId,
-            listingTitle,
-            listingUrl,
-            yourBidAmount: result.newCurrentBid,
-            currentBidAmount: result.newCurrentBid,
-            yourMaxBidAmount: result.yourMaxBid,
-            priceMoved: result.priceMoved,
-            ...(endsAtIso ? { endsAt: endsAtIso } : {}),
-          },
-          optionalHash: `bid:${result.bidId}`,
-        });
-        if (highBidderRes?.created) void trySendEmailJob(highBidderRes.eventId);
       }
     }
 

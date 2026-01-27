@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -34,8 +35,11 @@ export function Footer() {
       marketplace: [
         { href: '/browse', label: 'Browse' },
         { href: '/dashboard/listings/new', label: 'Create listing' },
-        { href: '/how-it-works', label: 'How It Works' },
+      ],
+      howItWorks: [
+        { href: '/how-it-works', label: 'Overview' },
         { href: '/how-it-works/plans', label: 'Seller Tiers' },
+        { href: '/how-it-works/trust', label: 'Trust & Compliance' },
         { href: '/field-notes', label: 'Field Notes' },
       ],
       trust: [
@@ -118,9 +122,7 @@ export function Footer() {
                 />
               </div>
               <div className="leading-tight">
-                <div className="text-lg font-extrabold tracking-tight text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">
-                  Agchange
-                </div>
+                <BrandLogoText className="text-lg font-extrabold tracking-tight text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]" />
                 <div className="text-xs text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]">
                   Texas marketplace • built for trust
                 </div>
@@ -172,6 +174,23 @@ export function Footer() {
                   </li>
                 )
               )}
+            </ul>
+          </div>
+
+          {/* How It Works */}
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">How It Works</div>
+            <ul className="space-y-2 text-sm">
+              {links.howItWorks.map((l) => (
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className="text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)] hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)] transition-colors underline-offset-4 hover:underline"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 

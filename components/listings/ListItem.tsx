@@ -15,6 +15,8 @@ import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { BROWSE_SPECIES } from '@/components/browse/filters/constants';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
+
 interface ListItemProps {
   listing: Listing;
   /**
@@ -27,6 +29,7 @@ interface ListItemProps {
 const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
   function ListItemComponent({ listing, variant = 'default' }, ref) {
   const router = useRouter();
+  const { user } = useAuth();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
@@ -64,11 +67,15 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     return null;
   }, [(listing as any)?.endsAt]);
 
-  const sellerPhotoUrl: string | null =
+  const rawSellerPhoto: string | null =
     (listing as any)?.sellerSnapshot?.photoURL ||
     (listing as any)?.sellerPhotoURL ||
     (listing as any)?.seller?.photoURL ||
     null;
+  const sellerPhotoUrl: string | null =
+    typeof rawSellerPhoto === 'string' && rawSellerPhoto.trim().startsWith('http')
+      ? rawSellerPhoto.trim()
+      : null;
 
   const cover = listing.photos?.[0];
   const coverUrl = cover?.url || listing.images?.[0] || '';
@@ -200,6 +207,15 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     return 0;
   }, [isAuction, isFixed, isClassified, listing.currentBid, listing.startingBid, listing.price]);
 
+  const auctionEnded = endsAtDate ? endsAtDate.getTime() <= Date.now() : false;
+  const isCurrentHighBidder = Boolean(
+    user?.uid &&
+    isAuction &&
+    !sold.isSold &&
+    !auctionEnded &&
+    listing.currentBidderId === user.uid
+  );
+
   if (variant === 'browseMobile') {
     return (
       <motion.div ref={ref} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="w-full">
@@ -252,8 +268,16 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
 
                 <div className="mt-2 flex items-end justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-lg font-extrabold text-primary leading-none">
-                      ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-lg font-extrabold text-primary leading-none">
+                        ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
+                      </span>
+                      {isCurrentHighBidder && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          You're winning
+                        </span>
+                      )}
                     </div>
                     {bestOfferEnabled ? (
                       <div className="mt-1 text-[11px] font-semibold text-muted-foreground">Best Offer</div>
@@ -361,8 +385,16 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                       ) : null}
                     </>
                   ) : (
-                    <div className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
-                      ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
+                        ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
+                      </span>
+                      {isCurrentHighBidder && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          You're winning
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -452,7 +484,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                   <div className="text-xs text-muted-foreground font-semibold">Sold by</div>
                   <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                     <div className="h-8 w-8 rounded-full border bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
-                      {typeof sellerPhotoUrl === 'string' && sellerPhotoUrl.trim() ? (
+                      {sellerPhotoUrl ? (
                         <Image
                           src={sellerPhotoUrl}
                           alt="Seller profile"
@@ -461,6 +493,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                           className="h-8 w-8 object-cover"
                           quality={75}
                           unoptimized
+                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <span className="text-xs font-bold text-muted-foreground">

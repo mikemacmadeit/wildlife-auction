@@ -1089,6 +1089,11 @@ export type NotificationType =
   | 'message_received'
   | 'bid_received'
   | 'bid_outbid'
+  | 'bid_placed'
+  | 'auction_high_bidder'
+  | 'auction_ending_soon'
+  | 'auction_won'
+  | 'auction_lost'
   // Best Offer (eBay-style)
   | 'offer_received'
   | 'offer_countered'

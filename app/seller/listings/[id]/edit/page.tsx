@@ -39,6 +39,7 @@ import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
+import { HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION } from '@/components/browse/filters/constants';
 
 function EditListingPageContent() {
   const router = useRouter();
@@ -424,6 +425,7 @@ function EditListingPageContent() {
                 </CardContent>
               </Card>
 
+              {!HIDE_HORSE_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'horse_equestrian'
@@ -464,7 +466,9 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
+              {!HIDE_SPORTING_WORKING_DOGS_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'sporting_working_dogs'
@@ -494,6 +498,7 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               <Card
                 className={`cursor-pointer transition-all border-2 ${
@@ -538,6 +543,7 @@ function EditListingPageContent() {
                 </CardContent>
               </Card>
 
+              {!HIDE_HUNTING_OUTFITTER_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'hunting_outfitter_assets'
@@ -567,7 +573,9 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
+              {!HIDE_RANCH_EQUIPMENT_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'ranch_equipment'
@@ -610,7 +618,9 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
+              {!HIDE_RANCH_VEHICLES_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'ranch_vehicles'
@@ -640,6 +650,7 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
             </div>
           </div>
 

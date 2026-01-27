@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Mail, Shield, ArrowRight } from 'lucide-react';
 import { ContactForm } from '@/components/support/ContactForm';
+import { BRAND_DISPLAY_NAME, SUPPORT_EMAIL } from '@/lib/brand';
 
 export const metadata: Metadata = {
   title: 'Contact | Agchange',
@@ -33,10 +34,10 @@ export default function ContactPage() {
           <CardContent className="space-y-4">
             <div className="rounded-lg border bg-muted/30 p-4">
               <div className="text-sm text-muted-foreground">Support email</div>
-              <div className="text-lg font-semibold">support@wildlife.exchange</div>
+              <div className="text-lg font-semibold">{SUPPORT_EMAIL}</div>
             </div>
             <Button asChild className="w-full min-h-[48px]">
-              <a href="mailto:support@wildlife.exchange?subject=Wildlife%20Exchange%20Support">
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(BRAND_DISPLAY_NAME + ' Support')}`}>
                 Email support <ArrowRight className="h-4 w-4 ml-2" />
               </a>
             </Button>

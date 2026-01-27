@@ -107,7 +107,7 @@ interface ListingWithStatus extends Listing {
 
 export default function WatchlistPage() {
   const { user, loading: authLoading } = useAuth();
-  const { favoriteIdsRef, isLoading: favoritesLoading, removeFavorite, toggleFavorite } = useFavorites();
+  const { favoriteIdsRef, removeFavorite, toggleFavorite } = useFavorites();
   // Use ref instead of state to avoid re-renders - poll for changes
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   
@@ -202,10 +202,12 @@ export default function WatchlistPage() {
     };
   }, []);
 
-  // Fetch listings when favorite IDs change
+  // Fetch listings when favorite IDs change. Do not gate on favoritesLoading — in
+  // use-favorites it is never set false to avoid re-renders, so we run when user
+  // and favoriteIds (from the 200ms poll) are ready.
   useEffect(() => {
     const fetchListings = async () => {
-      if (authLoading || favoritesLoading) {
+      if (authLoading) {
         return;
       }
 
@@ -264,7 +266,7 @@ export default function WatchlistPage() {
       subs.forEach((unsubscribe) => unsubscribe());
       subs.clear();
     };
-  }, [favoriteIds, user, authLoading, favoritesLoading, enrichListing]);
+  }, [favoriteIds, user, authLoading, enrichListing]);
 
   // Categorize listings by tab
   const categorizedListings = useMemo(() => {
@@ -386,7 +388,7 @@ export default function WatchlistPage() {
     }
   };
 
-  if (authLoading || favoritesLoading || loading) {
+  if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -448,9 +450,9 @@ export default function WatchlistPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container pl-4 pr-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
+      <div className="container mx-auto px-4 sm:px-6 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
       <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
-        <div className="mb-6 flex items-center justify-start">
+        <div className="mb-6 flex items-center justify-center">
           <TabsList className="grid grid-cols-3 w-full max-w-xl">
             <TabsTrigger value="watchlist" className="font-semibold">
               Saved listings
@@ -587,26 +589,26 @@ export default function WatchlistPage() {
       {totalCount > 0 ? (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="active" className="relative">
-              Active
+            <TabsTrigger value="active" className="flex items-center justify-center gap-1.5 min-w-0 px-2 sm:px-3">
+              <span className="truncate">Active</span>
               {activeCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
+                <Badge variant="secondary" className="h-5 min-w-[20px] shrink-0 px-1.5 text-xs tabular-nums">
                   {activeCount}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="ended" className="relative">
-              Ended
+            <TabsTrigger value="ended" className="flex items-center justify-center gap-1.5 min-w-0 px-2 sm:px-3">
+              <span className="truncate">Ended</span>
               {endedCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
+                <Badge variant="secondary" className="h-5 min-w-[20px] shrink-0 px-1.5 text-xs tabular-nums">
                   {endedCount}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="sold" className="relative">
-              Sold
+            <TabsTrigger value="sold" className="flex items-center justify-center gap-1.5 min-w-0 px-2 sm:px-3">
+              <span className="truncate">Sold</span>
               {soldCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5 text-xs">
+                <Badge variant="secondary" className="h-5 min-w-[20px] shrink-0 px-1.5 text-xs tabular-nums">
                   {soldCount}
                 </Badge>
               )}

@@ -25,6 +25,7 @@ import {
 import type { Order } from '@/lib/types';
 import { getOrderTrustState, type OrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 
 export type TimelineRole = 'buyer' | 'seller' | 'admin';
 
@@ -89,6 +90,7 @@ export function TransactionTimeline(props: {
 
   const trust = getOrderTrustState(order);
   const issue = getOrderIssueState(order);
+  const txStatus = getEffectiveTransactionStatus(order);
 
   const toMillisSafe = (value: any): number | null => {
     if (!value) return null;
@@ -251,19 +253,16 @@ export function TransactionTimeline(props: {
       },
     ];
 
-    // Ensure currentRank reflects the actual order status, not just trust state
-    // If order status is 'in_transit' but trust state hasn't caught up, use status directly
+    // Use transaction status as source of truth so progress always matches actual status
     let currentRank = trust === 'awaiting_payment' ? 0 : rank;
-    
-    // Override: If order status is explicitly 'in_transit', ensure rank is 3
-    if (order.status === 'in_transit' && currentRank < 3) {
-      currentRank = 3;
-    }
-    
-    // Override: If order status is 'delivered', ensure rank is at least 4
-    if (order.status === 'delivered' && currentRank < 4) {
-      currentRank = 4;
-    }
+    const inTransitStatuses = ['READY_FOR_PICKUP', 'PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'DELIVERY_PROPOSED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'];
+    const deliveredStatuses = ['DELIVERED_PENDING_CONFIRMATION', 'PICKED_UP', 'COMPLETED'];
+    if (inTransitStatuses.includes(txStatus) && currentRank < 3) currentRank = 3;
+    if (deliveredStatuses.includes(txStatus) && currentRank < 4) currentRank = 4;
+    if (txStatus === 'COMPLETED' && currentRank < 7) currentRank = 7;
+    // Legacy fallback if txStatus not set
+    if (order.status === 'in_transit' && currentRank < 3) currentRank = 3;
+    if (order.status === 'delivered' && currentRank < 4) currentRank = 4;
 
     return baseSteps
       .filter((s) => s.show !== false)
@@ -293,7 +292,7 @@ export function TransactionTimeline(props: {
           status: stepStatusFor(effectiveRank, currentRank, blocked && s.key !== 'payout'),
         } as TimelineStep;
       });
-  }, [order, role, trust, rank, blocked, protectionRemaining]);
+  }, [order, role, trust, rank, blocked, protectionRemaining, txStatus]);
 
   const StepDot = (s: TimelineStep) => (
     <div

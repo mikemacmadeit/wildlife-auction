@@ -125,7 +125,7 @@ export function PayoutReadinessCard({ userProfile, onRefresh }: PayoutReadinessC
           ? 'Stripe account rejected'
           : 'Error',
         description: isPlatformNotActivated
-          ? 'Wildlife.Exchange must activate its Stripe account before we can create seller payout accounts. Open Stripe onboarding, complete activation, then retry.'
+          ? 'Agchange must activate its Stripe account before we can create seller payout accounts. Open Stripe onboarding, complete activation, then retry.'
           : isPlatformProfileIncomplete
           ? 'Stripe requires the platform to complete a Connect questionnaire/profile before we can create seller payout accounts. Open Connect setup in Stripe Dashboard, complete it, then retry.'
           : isPlatformRejected

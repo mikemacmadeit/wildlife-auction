@@ -19,13 +19,16 @@ export function ThemeToggle({ className }: { className?: string }) {
     setTheme(current === 'light' ? 'dark' : 'light');
   };
 
+  // Use explicit dimensions so server and client always match (avoids hydration className mismatch).
+  const iconButtonClass = 'h-11 w-11 min-w-[44px] min-h-[44px]';
+
   if (!mounted) {
-    // Return a placeholder to avoid hydration mismatch
+    // Placeholder matches mounted button structure so hydration is consistent.
     return (
       <Button
         variant="ghost"
         size="icon"
-        className={cn('min-w-[44px] min-h-[44px]', className)}
+        className={cn(iconButtonClass, className)}
         aria-label="Toggle theme"
       >
         <Sun className="h-5 w-5" />
@@ -38,7 +41,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
-      className={cn('min-w-[44px] min-h-[44px]', className)}
+      className={cn(iconButtonClass, className)}
       aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
     >
       {(theme === 'light' || (theme === 'system' && !document.documentElement.classList.contains('dark'))) ? (

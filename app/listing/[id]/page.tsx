@@ -168,6 +168,14 @@ export default function ListingDetailPage() {
   const endsAtMs = useMemo(() => (endsAtDate ? endsAtDate.getTime() : null), [endsAtDate]);
   const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
 
+  // Per-user: show "You're the highest bidder" only when the signed-in viewer is the current high bidder on an active auction.
+  const isCurrentHighBidder = useMemo(() => {
+    if (!user?.uid || !listing || listing.type !== 'auction' || isSold) return false;
+    const ended = typeof endsAtMs === 'number' ? endsAtMs <= Date.now() : false;
+    if (ended) return false;
+    return (listing as any)?.currentBidderId === user.uid;
+  }, [user?.uid, listing?.id, listing?.type, (listing as any)?.currentBidderId, isSold, endsAtMs]);
+
   // Use photo focal points (selected during upload) to match object-cover crop on the listing page gallery.
   const focalPointsByUrl = useMemo(() => {
     const m: Record<string, { x: number; y: number }> = {};
@@ -995,6 +1003,19 @@ export default function ListingDetailPage() {
                         <span className="text-base text-muted-foreground">(Current Bid)</span>
                       )}
                     </div>
+                    {isCurrentHighBidder && (
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 rounded-lg px-3 py-2 font-semibold text-sm',
+                          'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary border border-primary/30'
+                        )}
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <CheckCircle2 className="h-5 w-5 flex-shrink-0" aria-hidden />
+                        <span>You&apos;re the highest bidder</span>
+                      </div>
+                    )}
                     {listing!.type === 'auction' && listing!.startingBid && (
                       <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                         <span>
@@ -1048,6 +1069,19 @@ export default function ListingDetailPage() {
                     <CardTitle className="text-lg font-bold">Place Your Bid</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-5">
+                    {isCurrentHighBidder && (
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 rounded-lg px-3 py-2.5 font-semibold text-sm',
+                          'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary border border-primary/30'
+                        )}
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <CheckCircle2 className="h-5 w-5 flex-shrink-0" aria-hidden />
+                        <span>You&apos;re the highest bidder</span>
+                      </div>
+                    )}
                     {/* Countdown Timer - Prominent */}
                     <div className="space-y-2">
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -1391,6 +1425,19 @@ export default function ListingDetailPage() {
                         <span className="text-sm text-muted-foreground">or Best Offer</span>
                       ) : null}
                     </div>
+                    {isCurrentHighBidder && (
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 rounded-lg px-3 py-2 mt-2 font-semibold text-sm',
+                          'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary border border-primary/30'
+                        )}
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <CheckCircle2 className="h-5 w-5 flex-shrink-0" aria-hidden />
+                        <span>You&apos;re the highest bidder</span>
+                      </div>
+                    )}
                     {listing!.type === 'auction' && listing!.startingBid ? (
                       <div className="text-xs text-muted-foreground">
                         Starting bid: ${listing!.startingBid.toLocaleString()}
@@ -1505,6 +1552,21 @@ export default function ListingDetailPage() {
                         <div className="space-y-3">
                           <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Time remaining</div>
                           <CountdownTimer endDate={endsAtDate} variant="default" />
+                        </div>
+                      )}
+
+                      {/* You're the highest bidder - prominent strip directly above Place a Bid */}
+                      {isCurrentHighBidder && (
+                        <div
+                          className={cn(
+                            'flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-sm',
+                            'bg-primary/20 text-primary dark:bg-primary/25 dark:text-primary border-2 border-primary/40'
+                          )}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <CheckCircle2 className="h-5 w-5 flex-shrink-0" aria-hidden />
+                          <span>You&apos;re the highest bidder</span>
                         </div>
                       )}
 

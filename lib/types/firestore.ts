@@ -22,6 +22,7 @@ export interface ListingDoc {
   // Pricing (type-specific)
   price?: number; // For fixed price listings
   currentBid?: number; // For auction listings (denormalized from bids)
+  currentBidderId?: string; // For auction listings (denormalized: current highest bidder UID)
   reservePrice?: number; // For auction listings
   startingBid?: number; // For auction listings
 

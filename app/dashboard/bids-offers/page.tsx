@@ -26,12 +26,15 @@ import {
   Handshake,
   MoreHorizontal,
   ArrowUpRight,
+  ArrowRight,
+  ArrowDownLeft,
   RefreshCw,
   Search,
   TrendingUp,
   Clock,
   CheckCircle2,
   XCircle,
+  X,
 } from 'lucide-react';
 import { getMyBids, placeBidServer, type MyBidRow } from '@/lib/api/bids';
 import { getMyOffers, getSellerOffers } from '@/lib/offers/api';
@@ -48,9 +51,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { getMinIncrementCents } from '@/lib/auctions/proxyBidding';
 import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
+import { getListingById } from '@/lib/firebase/listings';
 import type { NotificationType } from '@/lib/types';
 
 type OfferRow = {
@@ -59,6 +64,7 @@ type OfferRow = {
   listingSnapshot?: { title?: string; images?: string[]; type?: string; sellerSnapshot?: { displayName?: string } };
   listingImageUrl?: string;
   sellerId?: string;
+  buyerId?: string;
   status: string;
   currentAmount: number;
   acceptedAmount?: number;
@@ -79,6 +85,7 @@ type UnifiedRow =
       type: 'offer';
       id: string;
       status: 'SENT' | 'COUNTERED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
+      direction: 'in' | 'out'; // 'out' = you sent (you're buyer), 'in' = you received (you're seller)
       listingId: string;
       listingTitle: string;
       listingImage?: string;
@@ -179,6 +186,24 @@ export default function BidsOffersPage() {
   const [loading, setLoading] = useState(false);
   const [bids, setBids] = useState<MyBidRow[]>([]);
   const [offers, setOffers] = useState<OfferRow[]>([]);
+  // When API returns "Unknown listing" / "Listing unavailable", try client fetch to recover title/seller (e.g. listing exists but API missed it).
+  const [listingOverrides, setListingOverrides] = useState<Record<string, { title: string; sellerName?: string }>>({});
+
+  const [dismissedRemovedListingIds, setDismissedRemovedListingIds] = useState<Set<string>>(new Set());
+  const [hideRemovedListings, setHideRemovedListingsState] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('bids_offers_hide_removed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const setHideRemovedListings = useCallback((v: boolean) => {
+    setHideRemovedListingsState(v);
+    try {
+      localStorage.setItem('bids_offers_hide_removed', v ? 'true' : 'false');
+    } catch {}
+  }, []);
 
   // Raise max bid dialog
   const [raiseDialogOpen, setRaiseDialogOpen] = useState(false);
@@ -251,11 +276,69 @@ export default function BidsOffersPage() {
     load();
   }, [authLoading, load, user]);
 
-  // Clear bids/offers on logout so we never show another user's data (e.g. shared device).
+  // When API returns "Listing removed or deleted" for a bid, try client-side fetch so we still show title/seller if the listing exists.
+  useEffect(() => {
+    const unavailable = bids.filter(
+      (b) =>
+        (b.listingTitle === 'Unknown listing' ||
+          b.listingTitle === 'Listing unavailable' ||
+          b.listingTitle === 'Listing removed or deleted') &&
+        b.listingId
+    );
+    if (unavailable.length === 0) return;
+    let cancelled = false;
+    const run = async () => {
+      for (const b of unavailable) {
+        if (cancelled) break;
+        try {
+          const listing = await getListingById(b.listingId);
+          if (cancelled) break;
+          if (listing)
+            setListingOverrides((prev) => ({
+              ...prev,
+              [b.listingId]: {
+                title: listing.title,
+                sellerName: listing.sellerSnapshot?.displayName,
+              },
+            }));
+        } catch {
+          // listing may be deleted or inaccessible; leave as unavailable
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [bids]);
+
+  // Refetch when page gains focus so WINNING/OUTBID stays correct after placing a bid on the listing page.
+  useEffect(() => {
+    if (!user) return;
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [user, load]);
+
+  // Load persisted dismissed-removed listing ids when user is available.
+  useEffect(() => {
+    if (!user?.uid || typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(`bids_offers_dismissed_${user.uid}`);
+      const arr = raw ? JSON.parse(raw) : [];
+      setDismissedRemovedListingIds(new Set(Array.isArray(arr) ? arr : []));
+    } catch {}
+  }, [user?.uid]);
+
+  // Clear bids/offers, listing overrides, and dismissed IDs on logout so we never show another user's data (e.g. shared device).
   useEffect(() => {
     if (!authLoading && !user) {
       setBids([]);
       setOffers([]);
+      setListingOverrides({});
+      setDismissedRemovedListingIds(new Set());
     }
   }, [authLoading, user]);
 
@@ -269,7 +352,7 @@ export default function BidsOffersPage() {
       return;
     }
 
-    const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received'];
+    const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received', 'bid_placed', 'auction_high_bidder'];
     const offerTypes: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
     const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
     const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
@@ -289,7 +372,7 @@ export default function BidsOffersPage() {
   const clearTabNotifs = useCallback(
     async (nextTab: 'needs_action' | 'bids' | 'offers' | 'history') => {
       if (!user?.uid) return;
-      const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received'];
+      const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received', 'bid_placed', 'auction_high_bidder'];
       const offerTypes: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
       const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
       const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
@@ -325,7 +408,7 @@ export default function BidsOffersPage() {
       const status = offerStatusFromRow(o) as any;
       const expiresAtMs = typeof o.expiresAt === 'number' ? o.expiresAt : null;
       const timeLeftMs = expiresAtMs ? expiresAtMs - now : null;
-      const title = o.listingSnapshot?.title || 'Unknown listing';
+      const title = o.listingSnapshot?.title || 'Listing removed or deleted';
       const image =
         o.listingImageUrl ||
         (Array.isArray(o.listingSnapshot?.images) ? o.listingSnapshot!.images!.find((u) => typeof u === 'string' && u) : undefined);
@@ -333,10 +416,12 @@ export default function BidsOffersPage() {
       const yourAmount = Number(o.acceptedAmount ?? o.currentAmount ?? 0);
       const listingType = o.listingSnapshot?.type;
       const updatedAt = typeof o.updatedAt === 'number' ? o.updatedAt : 0;
+      const direction = o.sellerId === user?.uid ? 'in' : 'out'; // in = you're seller (received), out = you're buyer (sent)
       return {
         type: 'offer',
         id: o.offerId,
         status,
+        direction,
         listingId: o.listingId,
         listingTitle: title,
         listingImage: image,
@@ -350,7 +435,41 @@ export default function BidsOffersPage() {
     });
 
     return [...bidRows, ...offerRows];
-  }, [bids, offers]);
+  }, [bids, offers, user?.uid]);
+
+  const getDisplayTitle = useCallback(
+    (r: UnifiedRow) =>
+      r.type === 'bid' && 'listingId' in r && r.listingId && listingOverrides[r.listingId]
+        ? listingOverrides[r.listingId].title
+        : (r as { listingTitle?: string }).listingTitle ?? 'Listing removed or deleted',
+    [listingOverrides]
+  );
+  const getDisplaySeller = useCallback(
+    (r: UnifiedRow) =>
+      r.type === 'bid' && 'listingId' in r && r.listingId && listingOverrides[r.listingId]?.sellerName != null
+        ? listingOverrides[r.listingId].sellerName
+        : (r as { sellerName?: string }).sellerName,
+    [listingOverrides]
+  );
+
+  const isListingRemoved = useCallback(
+    (r: UnifiedRow) => getDisplayTitle(r) === 'Listing removed or deleted',
+    [getDisplayTitle]
+  );
+
+  const dismissRemovedListing = useCallback(
+    (listingId: string) => {
+      setDismissedRemovedListingIds((prev) => {
+        const next = new Set(prev);
+        next.add(listingId);
+        try {
+          if (user?.uid) localStorage.setItem(`bids_offers_dismissed_${user.uid}`, JSON.stringify([...next]));
+        } catch {}
+        return next;
+      });
+    },
+    [user?.uid]
+  );
 
   const stats = useMemo(() => {
     const bidWinning = bids.filter((b) => b.status === 'WINNING').length;
@@ -366,39 +485,57 @@ export default function BidsOffersPage() {
 
   const needsAction = useMemo(() => {
     if (!user?.uid) return [];
-    const list = rows.filter((r) => {
+    let list = rows.filter((r) => {
       if (r.type === 'bid') return r.status === 'OUTBID';
-      // For offers: determine if user is seller or buyer, then filter accordingly
+      // For offers: use buyerId/sellerId to determine role; buyer needs action when countered or accepted
       if (r.type === 'offer') {
         const offerRow = r.raw as OfferRow;
         const rawStatus = String(offerRow.status || '').toLowerCase();
-        const isSellerOffer = offerRow.sellerId === user.uid;
-        
-        if (isSellerOffer) {
+        const isBuyer = offerRow.buyerId === user.uid;
+        const isSeller = offerRow.sellerId === user.uid;
+
+        if (isBuyer) {
+          // Buyer needs action: seller countered (COUNTERED) or accepted (ACCEPTED) — must respond or checkout
+          return r.status === 'COUNTERED' || r.status === 'ACCEPTED';
+        }
+        if (isSeller) {
           // Seller needs action: new offers (status 'open') or buyer countered seller's counter
-          // offerStatusFromRow maps both to 'SENT', but we also check raw status for accuracy
           return (
             r.status === 'SENT' &&
             (rawStatus === 'open' || (rawStatus === 'countered' && offerRow.lastActorRole === 'buyer'))
           );
-        } else {
-          // Buyer needs action: seller countered (COUNTERED) or accepted (ACCEPTED)
-          return r.status === 'COUNTERED' || r.status === 'ACCEPTED';
         }
+        // Fallback: if role ambiguous, treat ACCEPTED/COUNTERED as needs-action (likely buyer view)
+        return r.status === 'COUNTERED' || r.status === 'ACCEPTED';
       }
       return false;
     });
-    // Prioritize urgent ending soon items first
+    list = list.filter((r) => {
+      if (r.type === 'bid' && 'listingId' in r) {
+        if (dismissedRemovedListingIds.has(r.listingId)) return false;
+        if (hideRemovedListings && isListingRemoved(r)) return false;
+      }
+      return true;
+    });
+    // Prioritize checkout-ready (ACCEPTED offers) first, then ending soon
     return list.sort((a, b) => {
+      const aCheckout = a.type === 'offer' && a.status === 'ACCEPTED' ? 1 : 0;
+      const bCheckout = b.type === 'offer' && b.status === 'ACCEPTED' ? 1 : 0;
+      if (bCheckout !== aCheckout) return bCheckout - aCheckout; // ACCEPTED first
       const aLeft = a.timeLeftMs === null ? Number.POSITIVE_INFINITY : a.timeLeftMs;
       const bLeft = b.timeLeftMs === null ? Number.POSITIVE_INFINITY : b.timeLeftMs;
       return aLeft - bLeft;
     });
-  }, [rows, user?.uid]);
+  }, [rows, user?.uid, dismissedRemovedListingIds, hideRemovedListings, isListingRemoved]);
 
   const bidRows = useMemo(() => {
     const now = Date.now();
     let list = rows.filter((r) => r.type === 'bid') as Extract<UnifiedRow, { type: 'bid' }>[];
+
+    list = list.filter((b) => !dismissedRemovedListingIds.has(b.listingId));
+    if (hideRemovedListings) {
+      list = list.filter((b) => getDisplayTitle(b) !== 'Listing removed or deleted');
+    }
 
     if (normalizedQuery) {
       list = list.filter((b) => (b.listingTitle || '').toLowerCase().includes(normalizedQuery));
@@ -444,7 +581,7 @@ export default function BidsOffersPage() {
       const timeLeftMs = endsAt ? endsAt - now : null;
       return { ...b, timeLeftMs };
     });
-  }, [normalizedQuery, rows, sortKey, statusFilter]);
+  }, [normalizedQuery, rows, sortKey, statusFilter, dismissedRemovedListingIds, hideRemovedListings, getDisplayTitle]);
 
   const offerRows = useMemo(() => {
     let list = rows.filter((r) => r.type === 'offer') as Extract<UnifiedRow, { type: 'offer' }>[];
@@ -467,6 +604,9 @@ export default function BidsOffersPage() {
     }
     return list;
   }, [normalizedQuery, rows, sortKey]);
+
+  const offerRowsSent = useMemo(() => offerRows.filter((r) => r.direction === 'out'), [offerRows]);
+  const offerRowsReceived = useMemo(() => offerRows.filter((r) => r.direction === 'in'), [offerRows]);
 
   const filtered = useMemo(() => {
     // Legacy list kept for "history" tab grouping only.
@@ -684,18 +824,30 @@ export default function BidsOffersPage() {
                     </SelectContent>
                   </Select>
                   {tab === 'bids' ? (
-                    <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                      <SelectTrigger className="min-w-[180px]">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Status: All</SelectItem>
-                        <SelectItem value="winning">Winning</SelectItem>
-                        <SelectItem value="outbid">Outbid</SelectItem>
-                        <SelectItem value="accepted">Won</SelectItem>
-                        <SelectItem value="expired">Lost</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <>
+                      <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                        <SelectTrigger className="min-w-[180px]">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Status: All</SelectItem>
+                          <SelectItem value="winning">Winning</SelectItem>
+                          <SelectItem value="outbid">Outbid</SelectItem>
+                          <SelectItem value="accepted">Won</SelectItem>
+                          <SelectItem value="expired">Lost</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Switch
+                          id="hide-removed"
+                          checked={hideRemovedListings}
+                          onCheckedChange={setHideRemovedListings}
+                        />
+                        <Label htmlFor="hide-removed" className="text-sm font-medium cursor-pointer">
+                          Hide removed
+                        </Label>
+                      </div>
+                    </>
                   ) : null}
                 </div>
               </div>
@@ -710,9 +862,19 @@ export default function BidsOffersPage() {
                   {needsAction.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">You’re all caught up.</div>
                   ) : (
-                    <div className="space-y-3">
-                      {needsAction.map((r) => (
-                        <div key={r.id} className="rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors">
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Complete these steps to keep your deals on track—checkout or respond soon to move orders forward.
+                      </p>
+                      <div className="space-y-3">
+                        {needsAction.map((r) => (
+                          <div
+                            key={r.id}
+                            className={cn(
+                              'rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors',
+                              r.type === 'offer' && r.status === 'ACCEPTED' && 'border-emerald-500/50 dark:border-emerald-500/30 border-2'
+                            )}
+                          >
                           <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
                             <div className="flex items-start gap-3 min-w-0">
                               <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
@@ -732,56 +894,93 @@ export default function BidsOffersPage() {
                                     </Badge>
                                   ) : null}
                                 </div>
-                                <div className="font-semibold leading-snug truncate mt-1">{(r as any).listingTitle}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {(r as any).sellerName || '—'}</div>
+                                <div className="font-semibold leading-snug truncate mt-1">{getDisplayTitle(r)}</div>
+                                {getDisplayTitle(r) === 'Listing removed or deleted' && (
+                                  <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {getDisplaySeller(r) || '—'}</div>
+                                {r.type === 'offer' && r.status === 'ACCEPTED' && (
+                                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1.5 font-medium">
+                                    Complete checkout to secure your purchase—pay now to lock in this price.
+                                  </p>
+                                )}
+                                {r.type === 'offer' && r.status === 'COUNTERED' && (
+                                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 font-medium">
+                                    Review and respond before the counter expires.
+                                  </p>
+                                )}
+                                  {r.type === 'bid' && r.status === 'OUTBID' && (
+                                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-1.5 font-medium">
+                                    Raise your max bid to stay in the running.
+                                  </p>
+                                )}
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 justify-end flex-wrap">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end flex-wrap">
                               {r.type === 'bid' ? (
-                                <>
-                                  <Button
-                                    onClick={() => {
-                                      const b = r as any;
-                                      setRaiseTarget({
-                                        listingId: b.listingId,
-                                        listingTitle: b.listingTitle,
-                                        currentHighestBid: Number(b.currentHighestBid || 0) || 0,
-                                        myMaxBid: Number(b.myMaxBid || 0) || 0,
-                                      });
-                                      setRaiseInput(
-                                        String(
-                                          suggestNextMaxUsd({
-                                            currentHighestBid: Number(b.currentHighestBid || 0) || 0,
-                                            myMaxBid: Number(b.myMaxBid || 0) || 0,
-                                          })
-                                        )
-                                      );
-                                      setRaiseDialogOpen(true);
-                                    }}
-                                  >
-                                    Raise max
-                                  </Button>
-                                  <Button variant="outline" asChild>
-                                    <Link href={`/listing/${(r as any).listingId}`}>View</Link>
-                                  </Button>
-                                </>
+                                isListingRemoved(r) ? (
+                                  <>
+                                    <Button variant="outline" size="sm" asChild>
+                                      <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-muted-foreground hover:text-foreground"
+                                      onClick={() => dismissRemovedListing((r as any).listingId)}
+                                    >
+                                      <X className="h-4 w-4 mr-1.5" />
+                                      Remove from list
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="default"
+                                      onClick={() => {
+                                        const b = r as any;
+                                        setRaiseTarget({
+                                          listingId: b.listingId,
+                                          listingTitle: getDisplayTitle(r),
+                                          currentHighestBid: Number(b.currentHighestBid || 0) || 0,
+                                          myMaxBid: Number(b.myMaxBid || 0) || 0,
+                                        });
+                                        setRaiseInput(
+                                          String(
+                                            suggestNextMaxUsd({
+                                              currentHighestBid: Number(b.currentHighestBid || 0) || 0,
+                                              myMaxBid: Number(b.myMaxBid || 0) || 0,
+                                            })
+                                          )
+                                        );
+                                        setRaiseDialogOpen(true);
+                                      }}
+                                    >
+                                      Raise max bid
+                                    </Button>
+                                    <Button variant="outline" asChild>
+                                      <Link href={`/listing/${(r as any).listingId}`}>View</Link>
+                                    </Button>
+                                  </>
+                                )
                               ) : (
                                 <>
                                   {r.status === 'ACCEPTED' ? (
                                     <Button
                                       onClick={() => openOfferCheckout((r as any).raw)}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
                                     >
-                                      Checkout
+                                      Checkout now
+                                      <ArrowRight className="ml-2 h-4 w-4" />
                                     </Button>
                                   ) : (
                                     <Button
                                       asChild
                                       className={
                                         r.status === 'COUNTERED'
-                                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                          : 'border-primary/40 text-primary hover:bg-primary/10'
+                                          ? 'bg-amber-600 hover:bg-amber-700 text-white font-semibold shrink-0'
+                                          : 'border-primary/40 text-primary hover:bg-primary/10 shrink-0'
                                       }
                                       variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
                                     >
@@ -799,6 +998,7 @@ export default function BidsOffersPage() {
                           </div>
                         </div>
                       ))}
+                      </div>
                     </div>
                   )}
                   </TabsContent>
@@ -829,15 +1029,18 @@ export default function BidsOffersPage() {
                                     </span>
                                   ) : null}
                                 </div>
-                                <div className="font-semibold leading-snug truncate mt-1">{r.listingTitle}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {r.sellerName || '—'}</div>
+                                <div className="font-semibold leading-snug truncate mt-1">{getDisplayTitle(r)}</div>
+                                {getDisplayTitle(r) === 'Listing removed or deleted' && (
+                                  <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {getDisplaySeller(r) || '—'}</div>
                               </div>
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
                               <div>
                                 <div className="text-xs text-muted-foreground">Current</div>
-                                <div className="font-semibold">{formatMoney(r.currentHighestBid)}</div>
+                                <div className="font-semibold">{isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)}</div>
                               </div>
                               <div>
                                 <div className="text-xs text-muted-foreground">Your max</div>
@@ -849,59 +1052,77 @@ export default function BidsOffersPage() {
                               </div>
                               <div className="hidden sm:block">
                                 <div className="text-xs text-muted-foreground">Ends</div>
-                                <div className="font-semibold">{r.endsAt ? new Date(r.endsAt).toLocaleString() : '—'}</div>
+                                <div className="font-semibold">{isListingRemoved(r) ? '—' : (r.endsAt ? new Date(r.endsAt).toLocaleString() : '—')}</div>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-2 justify-end">
-                              {r.status === 'OUTBID' ? (
-                                <Button
-                                  onClick={() => {
-                                    setRaiseTarget({
-                                      listingId: r.listingId,
-                                      listingTitle: r.listingTitle,
-                                      currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                      myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                    });
-                                    setRaiseInput(
-                                      String(
-                                        suggestNextMaxUsd({
-                                          currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                          myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                        })
-                                      )
-                                    );
-                                    setRaiseDialogOpen(true);
-                                  }}
-                                >
-                                  Raise max
-                                </Button>
+                              {isListingRemoved(r) ? (
+                                <>
+                                  <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/listing/${r.listingId}`}>View listing</Link>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-foreground"
+                                    onClick={() => dismissRemovedListing(r.listingId)}
+                                  >
+                                    <X className="h-4 w-4 mr-1.5" />
+                                    Remove from list
+                                  </Button>
+                                </>
                               ) : (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    setRaiseTarget({
-                                      listingId: r.listingId,
-                                      listingTitle: r.listingTitle,
-                                      currentHighestBid: Number(r.currentHighestBid || 0) || 0,
-                                      myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                    });
-                                    setRaiseInput(
-                                      String(
-                                        suggestNextMaxUsd({
+                                <>
+                                  {r.status === 'OUTBID' ? (
+                                    <Button
+                                      variant="default"
+                                      onClick={() => {
+                                        setRaiseTarget({
+                                          listingId: r.listingId,
+                                          listingTitle: getDisplayTitle(r),
                                           currentHighestBid: Number(r.currentHighestBid || 0) || 0,
                                           myMaxBid: Number(r.myMaxBid || 0) || 0,
-                                        })
-                                      )
-                                    );
-                                    setRaiseDialogOpen(true);
-                                  }}
-                                >
-                                  Increase max
-                                </Button>
-                              )}
+                                        });
+                                        setRaiseInput(
+                                          String(
+                                            suggestNextMaxUsd({
+                                              currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                              myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                            })
+                                          )
+                                        );
+                                        setRaiseDialogOpen(true);
+                                      }}
+                                    >
+                                      Raise max
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="default"
+                                      onClick={() => {
+                                        setRaiseTarget({
+                                          listingId: r.listingId,
+                                          listingTitle: getDisplayTitle(r),
+                                          currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                          myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                        });
+                                        setRaiseInput(
+                                          String(
+                                            suggestNextMaxUsd({
+                                              currentHighestBid: Number(r.currentHighestBid || 0) || 0,
+                                              myMaxBid: Number(r.myMaxBid || 0) || 0,
+                                            })
+                                          )
+                                        );
+                                        setRaiseDialogOpen(true);
+                                      }}
+                                    >
+                                      Increase max
+                                    </Button>
+                                  )}
 
-                              <DropdownMenu>
+                                  <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="outline" size="icon" className="h-10 w-10">
                                     <MoreHorizontal className="h-4 w-4" />
@@ -918,6 +1139,8 @@ export default function BidsOffersPage() {
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -930,96 +1153,134 @@ export default function BidsOffersPage() {
                   {offerRows.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No offers match your search.</div>
                   ) : (
-                    <div className="space-y-3">
-                      {offerRows.map((r) => (
-                        <div key={r.id} className="rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors">
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-                            <div className="flex items-start gap-3 min-w-0">
-                              <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                {r.listingImage ? <Image src={r.listingImage} alt="" fill className="object-cover" /> : null}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline" className="text-xs">
-                                    Offer
-                                  </Badge>
-                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-xs">
-                                    {r.status}
-                                  </Badge>
-                                  {r.timeLeftMs !== null ? (
-                                    <span className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
-                                      Expires in {formatTimeLeftFromMs(r.timeLeftMs)}
-                                    </span>
-                                  ) : null}
+                    <div className="space-y-6">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Sent</span> = offers you made on others’ listings. <span className="font-medium text-foreground">Received</span> = offers others made on your listings.
+                      </p>
+
+                      {[
+                        { title: 'Offers you sent', icon: ArrowRight, rows: offerRowsSent, emptyNote: 'You haven’t sent any offers.' },
+                        { title: 'Offers you received', icon: ArrowDownLeft, rows: offerRowsReceived, emptyNote: 'No one has made offers on your listings.' },
+                      ].map(({ title, icon: Icon, rows, emptyNote }) => (
+                        <section key={title} className="space-y-3">
+                          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            {title}
+                            <span className="text-muted-foreground font-normal">({rows.length})</span>
+                          </h3>
+                          {rows.length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-4 pl-6">{emptyNote}</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {rows.map((r) => (
+                                <div
+                                  key={r.id}
+                                  className={cn(
+                                    'rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors',
+                                    r.status === 'ACCEPTED' && 'border-emerald-500/50 dark:border-emerald-500/30 border-2'
+                                  )}
+                                >
+                                  <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 w-full">
+                                    {/* Thumb + title/seller — grows to use full card width */}
+                                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                                      <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                        {r.listingImage ? <Image src={r.listingImage} alt="" fill className="object-cover" /> : null}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-xs">
+                                            {r.status}
+                                          </Badge>
+                                          {r.timeLeftMs !== null ? (
+                                            <span className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
+                                              Expires {formatTimeLeftFromMs(r.timeLeftMs)}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                        <p className="font-semibold leading-snug mt-1 truncate" title={r.listingTitle}>
+                                          {r.listingTitle}
+                                        </p>
+                                        {r.listingTitle === 'Listing removed or deleted' && (
+                                          <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog</div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">Seller: {r.sellerName || '—'}</p>
+                                        {r.status === 'ACCEPTED' && r.direction === 'out' && (
+                                          <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1.5 font-medium">
+                                            Complete checkout to secure your purchase.
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Amounts — fixed column widths so values align across all cards */}
+                                    <div className="grid grid-cols-[5.5rem_6.5rem_4.5rem] sm:grid-cols-[5.5rem_8rem_5rem] gap-x-4 gap-y-0 shrink-0 lg:order-2">
+                                      <div className="min-w-[5.5rem]">
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Amount</div>
+                                        <div className="font-semibold tabular-nums">{formatMoney(r.yourAmount)}</div>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Offer</div>
+                                        <div className="font-mono text-sm truncate" title={r.id}>{r.id.slice(0, 8)}…</div>
+                                      </div>
+                                      <div className="min-w-[4.5rem] sm:min-w-[5rem]">
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Listing</div>
+                                        <div className="font-medium capitalize truncate">{r.listingType || '—'}</div>
+                                      </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3">
+                                      {r.status === 'ACCEPTED' && r.direction === 'out' ? (
+                                        <Button
+                                          onClick={() => openOfferCheckout(r.raw)}
+                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
+                                        >
+                                          Checkout now
+                                          <ArrowRight className="ml-2 h-4 w-4" />
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          asChild
+                                          className={
+                                            r.status === 'COUNTERED'
+                                              ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                              : 'border-primary/40 text-primary hover:bg-primary/10'
+                                          }
+                                          variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
+                                        >
+                                          <Link href={`/dashboard/offers/${r.id}`}>{r.status === 'COUNTERED' ? 'Review counter' : 'View offer'}</Link>
+                                        </Button>
+                                      )}
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="outline" size="icon" className="h-10 w-10">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem asChild>
+                                            <Link href={`/listing/${r.listingId}`}>
+                                              <ArrowUpRight className="h-4 w-4 mr-2" />
+                                              View listing
+                                            </Link>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem asChild>
+                                            <Link href={`/dashboard/offers/${r.id}`}>
+                                              <Handshake className="h-4 w-4 mr-2" />
+                                              Offer details
+                                            </Link>
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="font-semibold leading-snug truncate mt-1">{r.listingTitle}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {r.sellerName || '—'}</div>
-                              </div>
+                              ))}
                             </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto">
-                              <div>
-                                <div className="text-xs text-muted-foreground">Your amount</div>
-                                <div className="font-semibold">{formatMoney(r.yourAmount)}</div>
-                              </div>
-                              <div className="hidden sm:block">
-                                <div className="text-xs text-muted-foreground">Offer</div>
-                                <div className="font-semibold font-mono">{r.id}</div>
-                              </div>
-                              <div className="hidden sm:block">
-                                <div className="text-xs text-muted-foreground">Listing</div>
-                                <div className="font-semibold capitalize">{r.listingType || '—'}</div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 justify-end">
-                              {r.status === 'ACCEPTED' ? (
-                                <Button
-                                  onClick={() => openOfferCheckout(r.raw)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                                >
-                                  Checkout
-                                </Button>
-                              ) : (
-                                <Button
-                                  asChild
-                                  className={
-                                    r.status === 'COUNTERED'
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                      : 'border-primary/40 text-primary hover:bg-primary/10'
-                                  }
-                                  variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
-                                >
-                                  <Link href={`/dashboard/offers/${r.id}`}>{r.status === 'COUNTERED' ? 'Review counter' : 'View offer'}</Link>
-                                </Button>
-                              )}
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="icon" className="h-10 w-10">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/listing/${r.listingId}`}>
-                                      <ArrowUpRight className="h-4 w-4 mr-2" />
-                                      View listing
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/offers/${r.id}`}>
-                                      <Handshake className="h-4 w-4 mr-2" />
-                                      Offer details
-                                    </Link>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        </div>
+                          )}
+                        </section>
                       ))}
                     </div>
                   )}
@@ -1034,7 +1295,10 @@ export default function BidsOffersPage() {
                         <div key={r.id} className="rounded-xl border bg-card p-4">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="min-w-0">
-                              <div className="font-semibold truncate">{(r as any).listingTitle}</div>
+                              <div className="font-semibold truncate">{getDisplayTitle(r)}</div>
+                              {getDisplayTitle(r) === 'Listing removed or deleted' && (
+                                <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
+                              )}
                               <div className="text-xs text-muted-foreground mt-0.5">{r.type === 'bid' ? 'Auction' : 'Offer'} · {r.status}</div>
                             </div>
                             <Button variant="outline" asChild>
@@ -1068,7 +1332,7 @@ export default function BidsOffersPage() {
             <DialogHeader>
               <DialogTitle>Raise your max bid</DialogTitle>
               <DialogDescription>
-                Proxy bidding: this sets your <span className="font-semibold">maximum</span>. The visible current bid may not change immediately.
+                Proxy bidding: this sets your <span className="font-semibold">maximum</span>. The visible current bid may not change until someone bids against you. After you update, we’ll refresh so you see whether you’re winning or outbid.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">

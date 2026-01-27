@@ -179,7 +179,14 @@ export async function GET(request: Request) {
 
     const listingIds = Array.from(grouped.keys()).slice(0, limitN);
     const listingRefs = listingIds.map((id) => db.collection('listings').doc(id));
-    const listingSnaps = listingRefs.length ? await db.getAll(...listingRefs) : [];
+    // Firestore getAll accepts at most 100 refs per call; batch to avoid errors
+    const BATCH = 100;
+    const listingSnaps: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
+    for (let i = 0; i < listingRefs.length; i += BATCH) {
+      const chunk = listingRefs.slice(i, i + BATCH);
+      const snaps = await db.getAll(...chunk);
+      listingSnaps.push(...snaps);
+    }
 
     const sellerIds = new Set<string>();
     const listingById = new Map<string, any>();
@@ -191,7 +198,13 @@ export async function GET(request: Request) {
     }
 
     const sellerRefs = Array.from(sellerIds).map((id) => db.collection('users').doc(id));
-    const sellerSnaps = sellerRefs.length ? await db.getAll(...sellerRefs) : [];
+    const sellerSnapsBatch: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
+    for (let i = 0; i < sellerRefs.length; i += BATCH) {
+      const chunk = sellerRefs.slice(i, i + BATCH);
+      const snaps = await db.getAll(...chunk);
+      sellerSnapsBatch.push(...snaps);
+    }
+    const sellerSnaps = sellerSnapsBatch;
     const sellerNameById = new Map<string, string>();
     for (const s of sellerSnaps) {
       if (!s.exists) continue;
@@ -206,7 +219,7 @@ export async function GET(request: Request) {
       const listing = listingById.get(listingId) || null;
 
       const type = listing?.type || 'unknown';
-      const title = listing?.title || 'Unknown listing';
+      const title = listing?.title || 'Listing removed or deleted';
       const image = Array.isArray(listing?.images) ? listing.images[0] : undefined;
       const sellerId = listing?.sellerId || undefined;
       const sellerName = sellerId ? sellerNameById.get(String(sellerId)) : undefined;

@@ -92,6 +92,28 @@ function isDogListing(l: Listing): boolean {
   return false;
 }
 
+function isHorseListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  if (/horse|equestrian/i.test(cat)) return true;
+  const species = (l as any)?.species ?? (l as any)?.attributes?.speciesId ?? '';
+  if (String(species).toLowerCase() === 'horse') return true;
+  return false;
+}
+
+function isRanchEquipmentOrVehiclesListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  return cat === 'ranch_equipment' || cat === 'ranch_vehicles';
+}
+
+function isHuntingOutfitterListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  return cat === 'hunting_outfitter_assets';
+}
+
+function isHiddenCategoryListing(l: Listing): boolean {
+  return isDogListing(l) || isHorseListing(l) || isRanchEquipmentOrVehiclesListing(l) || isHuntingOutfitterListing(l);
+}
+
 export default function BrowsePage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -529,8 +551,8 @@ export default function BrowsePage() {
   const filteredListings = useMemo(() => {
     let result = [...listings];
 
-    // Hide dog-related listings for Stripe review (inline filter, no backend change)
-    result = result.filter((l) => !isDogListing(l));
+    // Hide dog and horse/equestrian listings until those categories are re-enabled (inline filter, no backend change)
+    result = result.filter((l) => !isHiddenCategoryListing(l));
 
     // Exclude ended auctions from active feed; they appear only when user filters for "Completed"
     if (listingStatus === 'active') {

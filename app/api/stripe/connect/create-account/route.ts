@@ -181,7 +181,7 @@ export async function POST(request: Request) {
             error: 'Stripe account activation required',
             code: 'STRIPE_PLATFORM_NOT_ACTIVATED',
             message:
-              'Your platform Stripe account must be activated before Wildlife.Exchange can create seller payout accounts. ' +
+              'Your platform Stripe account must be activated before Agchange can create seller payout accounts. ' +
               'Open Stripe Dashboard → Activate your account, then retry.',
             actionUrl: 'https://dashboard.stripe.com/account/onboarding',
             stripe: {

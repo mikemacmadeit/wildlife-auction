@@ -345,19 +345,19 @@ export default function SellerSalesPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl space-y-6">
-        <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/25">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-2xl md:text-3xl font-extrabold tracking-tight">Sold</CardTitle>
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl space-y-6 min-w-0 overflow-x-hidden">
+        <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/25 overflow-hidden">
+          <CardHeader className="pb-4 px-4 pt-4 sm:px-6 sm:pt-6">
+            <CardTitle className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight">Sold</CardTitle>
             <CardDescription>Track payment → delivery → completion for every order.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-[240px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by order, listing, status..." className="pl-9" />
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6 pt-0">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative w-full min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search orders…" className="pl-9 min-h-11 w-full" aria-label="Search orders" />
               </div>
-              <Button variant="outline" onClick={() => load()} disabled={loading}>
+              <Button variant="outline" onClick={() => load()} disabled={loading} className="w-full sm:w-auto min-h-11 shrink-0">
                 {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Refresh
               </Button>
@@ -366,52 +366,52 @@ export default function SellerSalesPage() {
         </Card>
 
         {tab === 'needs_action' && tabCounts.needs_action > 0 ? (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 flex items-center gap-3 flex-wrap">
-            <Clock className="h-5 w-5 text-primary shrink-0" />
-            <p className="text-sm font-medium text-foreground">
+          <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
+            <Clock className="h-5 w-5 text-primary shrink-0" aria-hidden />
+            <p className="text-sm font-medium text-foreground min-w-0 break-words">
               {tabCounts.needs_action} order{tabCounts.needs_action !== 1 ? 's' : ''} need your action. Complete the step on each card to keep things moving — admins can send reminders to buyers if they’re holding things up.
             </p>
           </div>
         ) : null}
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="needs_action">
-              <Clock className="h-4 w-4 mr-2" />
-              Needs action
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full min-w-0">
+          <TabsList className="flex-wrap h-auto gap-1 p-1.5 w-full min-w-0">
+            <TabsTrigger value="needs_action" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
+              <Clock className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
+              <span className="truncate">Needs action</span>
               {tabCounts.needs_action > 0 && (
                 <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
                   {tabCounts.needs_action}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="in_progress">
-              <Truck className="h-4 w-4 mr-2" />
-              In progress
+            <TabsTrigger value="in_progress" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
+              <Truck className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
+              <span className="truncate">In progress</span>
               {tabCounts.in_progress > 0 && (
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                   {tabCounts.in_progress}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="completed">
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Completed
+            <TabsTrigger value="completed" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
+              <CheckCircle2 className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
+              <span className="truncate">Completed</span>
               {tabCounts.completed > 0 && (
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                   {tabCounts.completed}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="cancelled">
-              Cancelled
+            <TabsTrigger value="cancelled" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
+              <span className="truncate">Cancelled</span>
               {tabCounts.cancelled > 0 && (
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                   {tabCounts.cancelled}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="all" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">All</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -441,7 +441,7 @@ export default function SellerSalesPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-4 min-w-0">
               {filtered.map((o) => {
                 const txStatus = getEffectiveTransactionStatus(o);
                 const badge = statusBadgeFromTransactionStatus(txStatus);
@@ -461,21 +461,22 @@ export default function SellerSalesPage() {
 
                 // Use shared progress model for next action
                 const nextActionData = getNextRequiredAction(o, 'seller');
+                const nextActionHrefBase = nextActionData.ctaAction.startsWith('/') ? nextActionData.ctaAction : `/seller/orders/${o.id}`;
                 const nextAction = nextActionData ? {
                   label: nextActionData.ctaLabel,
-                  href: nextActionData.ctaAction.startsWith('/') ? nextActionData.ctaAction : `/seller/orders/${o.id}`,
+                  href: nextActionHrefBase.includes('/seller/orders/') ? (nextActionHrefBase.includes('?') ? `${nextActionHrefBase}&from=sales` : `${nextActionHrefBase}?from=sales`) : nextActionHrefBase,
                   variant: nextActionData.severity === 'danger' ? 'destructive' as const : nextActionData.severity === 'warning' ? 'default' as const : 'secondary' as const,
                 } : null;
 
                 const sellerHasAction = nextActionData && nextActionData.ownerRole === 'seller';
 
                 return (
-                  <Card key={o.id} className={`border-border/60 overflow-hidden ${sellerHasAction ? 'ring-1 ring-primary/30' : ''}`}>
-                    <CardContent className="p-0">
+                  <Card key={o.id} className={`border-border/60 overflow-hidden min-w-0 ${sellerHasAction ? 'ring-1 ring-primary/30' : ''}`}>
+                    <CardContent className="p-0 overflow-hidden">
                       {sellerHasAction && (
                         <div className="bg-primary/10 border-b border-primary/20 px-4 py-3">
-                          <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <Clock className="h-4 w-4 text-primary shrink-0" />
                                 <span className="font-semibold text-sm text-primary">Action needed</span>
@@ -490,18 +491,18 @@ export default function SellerSalesPage() {
                               )}
                             </div>
                             {!nextActionData.blockedReason && nextAction && (
-                              <Button size="default" variant="default" className="shrink-0 font-semibold shadow-warm ring-2 ring-primary/25" asChild>
-                                <Link href={nextAction.href}>
+                              <Button size="default" variant="default" className="w-full sm:w-auto min-h-11 shrink-0 font-semibold shadow-warm ring-2 ring-primary/25" asChild>
+                                <Link href={nextAction.href} className="min-h-11">
                                   {nextAction.label}
-                                  <ArrowRight className="h-4 w-4 ml-2" />
+                                  <ArrowRight className="h-4 w-4 ml-2 shrink-0" aria-hidden />
                                 </Link>
                               </Button>
                             )}
                           </div>
                         </div>
                       )}
-                      <div className="flex gap-4 p-4">
-                        <div className="relative h-24 w-24 shrink-0 rounded-lg overflow-hidden bg-muted border">
+                      <div className="flex flex-col sm:flex-row gap-4 p-4 min-w-0">
+                        <div className="relative h-24 w-24 shrink-0 rounded-lg overflow-hidden bg-muted border self-start">
                           {cover ? (
                             <Image
                               src={String(cover)}
@@ -518,11 +519,11 @@ export default function SellerSalesPage() {
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
+                        <div className="min-w-0 flex-1 flex flex-col gap-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant={badge.variant}>{badge.label}</Badge>
+                                <Badge variant={badge.variant} className="shrink-0">{badge.label}</Badge>
                                 {/* SLA countdown chip */}
                                 {o.fulfillmentSlaDeadlineAt && (() => {
                                   const now = Date.now();
@@ -552,204 +553,192 @@ export default function SellerSalesPage() {
                                 ) : null}
                               </div>
                               <div className="mt-2 font-semibold text-foreground leading-snug line-clamp-2">{title}</div>
-                              <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-mono">Item ID: {o.listingId}</span>
-                                  <span className="text-muted-foreground/70">•</span>
-                                  <span className="font-mono">Order: {o.id}</span>
+                              <div className="mt-1 text-xs text-muted-foreground space-y-0.5 min-w-0">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                  <span className="font-mono truncate max-w-[120px] sm:max-w-none" title={o.listingId}>Item ID: {o.listingId}</span>
+                                  <span className="text-muted-foreground/70 shrink-0">•</span>
+                                  <span className="font-mono truncate max-w-[100px] sm:max-w-none" title={o.id}>Order: {o.id}</span>
                                 </div>
-                                <div className="flex items-center gap-2 flex-wrap">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                   <span>Sold: {formatShortDate(soldAt)}</span>
-                                  <span className="text-muted-foreground/70">•</span>
+                                  <span className="text-muted-foreground/70 shrink-0">•</span>
                                   <span>Buyer paid: {formatShortDate(buyerPaidAt)}</span>
-                                  <span className="text-muted-foreground/70">•</span>
-                                  <span className="truncate">Buyer: {buyerLabel}</span>
+                                  <span className="text-muted-foreground/70 shrink-0">•</span>
+                                  <span className="truncate min-w-0" title={buyerLabel}>Buyer: {buyerLabel}</span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="shrink-0 flex flex-col items-end gap-2">
-                              <div className="text-right">
+                            <div className="shrink-0 flex flex-col sm:items-end gap-2 w-full sm:w-auto">
+                              <div className="text-left sm:text-right">
                                 <div className="text-sm text-muted-foreground">Net proceeds</div>
                                 <div className="text-lg font-extrabold tracking-tight">{formatMoney(net)}</div>
                               </div>
-                              <div className="flex items-center gap-2 flex-wrap justify-end">
-                                {nextAction && !nextActionData?.blockedReason && (
-                                  <Button
-                                    size="default"
-                                    variant={nextAction.variant}
-                                    className={nextAction.variant === 'destructive' ? 'font-semibold shadow-warm' : 'font-semibold shadow-warm ring-2 ring-primary/25'}
-                                    asChild
-                                  >
-                                    <Link href={nextAction.href}>
-                                      {nextAction.label}
-                                    </Link>
-                                  </Button>
-                                )}
-                                <Button asChild size="default" variant="outline" className="font-semibold shadow-warm">
-                                  <Link href={`/seller/orders/${o.id}`}>
-                                    View details
-                                    <ArrowRight className="h-4 w-4 ml-2" />
-                                  </Link>
-                                </Button>
-                              </div>
+                              <Button asChild size="default" variant="outline" className="font-semibold shadow-warm w-full sm:w-auto min-h-11">
+                                <Link href={`/seller/orders/${o.id}?from=sales`} className="inline-flex items-center justify-center min-h-11">
+                                  View details
+                                  <ArrowRight className="h-4 w-4 ml-2 shrink-0" aria-hidden />
+                                </Link>
+                              </Button>
                             </div>
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-                            <div className="text-sm text-muted-foreground">
-                              <span className="font-semibold text-foreground">{formatMoney(orderTotal)}</span> order total
-                              {platformFee !== null ? (
-                                <>
-                                  {' '}
-                                  <span className="text-muted-foreground/70">•</span> Fees: <span className="font-semibold text-foreground">{formatMoney(platformFee)}</span>
-                                </>
-                              ) : null}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Collapsible
-                                open={viewDetailsOpen}
-                                onOpenChange={(open) => setDetailsOpen((prev) => ({ ...prev, [o.id]: open }))}
-                              >
+                          <div className="mt-3 w-full min-w-0">
+                            <Collapsible
+                              open={viewDetailsOpen}
+                              onOpenChange={(open) => setDetailsOpen((prev) => ({ ...prev, [o.id]: open }))}
+                              className="w-full min-w-0"
+                            >
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                                <div className="text-sm text-muted-foreground min-w-0 break-words">
+                                  <span className="font-semibold text-foreground">{formatMoney(orderTotal)}</span> order total
+                                  {platformFee !== null ? (
+                                    <>
+                                      {' '}
+                                      <span className="text-muted-foreground/70">•</span> Fees: <span className="font-semibold text-foreground">{formatMoney(platformFee)}</span>
+                                    </>
+                                  ) : null}
+                                </div>
                                 <CollapsibleTrigger asChild>
-                                  <Button variant="outline" size="sm" className="font-semibold">
-                                    <Receipt className="h-4 w-4 mr-2" />
-                                    Payment & order details
-                                    <ChevronDown className={viewDetailsOpen ? 'h-4 w-4 ml-2 rotate-180 transition-transform' : 'h-4 w-4 ml-2 transition-transform'} />
+                                  <Button variant="outline" size="sm" className="font-semibold w-full sm:w-auto min-h-11 justify-between sm:justify-start">
+                                    <span className="inline-flex items-center gap-2">
+                                      <Receipt className="h-4 w-4 shrink-0" aria-hidden />
+                                      Payment & order details
+                                    </span>
+                                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${viewDetailsOpen ? 'rotate-180' : ''}`} aria-hidden />
                                   </Button>
                                 </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                  <div className="mt-3 rounded-lg border bg-muted/10 p-4 space-y-6">
-                                    {/* Payment section */}
-                                    <div>
-                                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Payment</div>
-                                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                              </div>
+                              <CollapsibleContent className="w-full min-w-0">
+                                  <div className="mt-3 w-full min-w-0 rounded-xl border bg-muted/10 p-4 sm:p-5 md:p-6 space-y-6 md:space-y-8 overflow-hidden">
+                                    {/* Payment section — full width, two-column layout on md+ */}
+                                    <div className="space-y-5">
+                                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                                         <div>
-                                          <div className="text-2xl font-extrabold tracking-tight">{formatMoney(net)}</div>
-                                          <div className="text-sm text-muted-foreground">Net proceeds</div>
+                                          <div className="text-2xl md:text-3xl font-extrabold tracking-tight">{formatMoney(net)}</div>
+                                          <div className="text-sm text-muted-foreground mt-1">Net proceeds</div>
                                         </div>
-                                        <div className="text-sm text-muted-foreground max-w-[420px]">
+                                        <div className="text-sm text-muted-foreground md:pt-1">
                                           Seller receives funds immediately upon successful payment via Stripe Connect destination charges. No payout release needed.
                                         </div>
                                       </div>
-                                      <div className="grid gap-3 md:grid-cols-3 mt-4">
-                                        <div className="rounded-md border bg-background p-3">
-                                          <div className="text-xs text-muted-foreground">Buyer paid</div>
-                                          <div className="font-semibold">{formatDate(o.paidAt || null)}</div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="rounded-lg border bg-background p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Buyer paid</div>
+                                          <div className="font-semibold mt-1">{formatDate(o.paidAt || null)}</div>
                                         </div>
-                                        <div className="rounded-md border bg-background p-3">
-                                          <div className="text-xs text-muted-foreground">Payment status</div>
-                                          <div className="font-semibold">Paid immediately</div>
+                                        <div className="rounded-lg border bg-background p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Payment status</div>
+                                          <div className="font-semibold mt-1">Paid immediately</div>
                                         </div>
-                                        <div className="rounded-md border bg-background p-3">
-                                          <div className="text-xs text-muted-foreground">Payment method</div>
-                                          <div className="font-semibold">{(o as any).paymentMethod || 'Card'}</div>
+                                        <div className="rounded-lg border bg-background p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Payment method</div>
+                                          <div className="font-semibold mt-1">{(o as any).paymentMethod || 'Card'}</div>
                                         </div>
                                       </div>
-                                      <div className="grid gap-3 md:grid-cols-2 mt-4">
-                                        <div className="space-y-2">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                                        <div className="rounded-lg border bg-background p-4 space-y-3">
                                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Transaction info</div>
-                                          <div className="text-sm">
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Type</span>
-                                              <span className="font-semibold">Order</span>
+                                          <dl className="text-sm space-y-2.5">
+                                            <div className="flex justify-between gap-4">
+                                              <dt className="text-muted-foreground shrink-0">Type</dt>
+                                              <dd className="font-semibold text-right truncate">Order</dd>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Order date</span>
-                                              <span className="font-semibold">{formatDate(o.createdAt || null)}</span>
+                                            <div className="flex justify-between gap-4">
+                                              <dt className="text-muted-foreground shrink-0">Order date</dt>
+                                              <dd className="font-semibold text-right truncate">{formatDate(o.createdAt || null)}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Buyer</span>
-                                              <span className="font-semibold truncate max-w-[220px]">{buyerLabel}</span>
+                                            <div className="flex justify-between gap-4">
+                                              <dt className="text-muted-foreground shrink-0">Buyer</dt>
+                                              <dd className="font-semibold text-right truncate min-w-0" title={buyerLabel}>{buyerLabel}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Payment intent</span>
-                                              <span className="font-mono text-xs truncate max-w-[220px]">{o.stripePaymentIntentId || '—'}</span>
+                                            <div className="flex justify-between gap-2 min-w-0">
+                                              <dt className="text-muted-foreground shrink-0">Payment intent</dt>
+                                              <dd className="font-mono text-xs text-right truncate min-w-0 max-w-[50%]" title={o.stripePaymentIntentId || ''}>{o.stripePaymentIntentId || '—'}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Transfer</span>
-                                              <span className="font-mono text-xs truncate max-w-[220px]">{o.stripeTransferId || '—'}</span>
+                                            <div className="flex justify-between gap-2 min-w-0">
+                                              <dt className="text-muted-foreground shrink-0">Transfer</dt>
+                                              <dd className="font-mono text-xs text-right truncate min-w-0 max-w-[50%]" title={o.stripeTransferId || ''}>{o.stripeTransferId || '—'}</dd>
                                             </div>
-                                          </div>
+                                          </dl>
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="rounded-lg border bg-background p-4 space-y-3">
                                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Transaction breakdown</div>
-                                          <div className="text-sm">
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Amount</span>
-                                              <span className="font-semibold">{formatMoney(orderTotal)}</span>
+                                          <dl className="text-sm space-y-2.5">
+                                            <div className="flex justify-between gap-4">
+                                              <dt className="text-muted-foreground shrink-0">Amount</dt>
+                                              <dd className="font-semibold text-right">{formatMoney(orderTotal)}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Platform fee (10%)</span>
-                                              <span className="font-semibold">{platformFee !== null ? formatMoney(-Math.abs(platformFee)) : '—'}</span>
+                                            <div className="flex justify-between gap-4">
+                                              <dt className="text-muted-foreground shrink-0">Platform fee (10%)</dt>
+                                              <dd className="font-semibold text-right">{platformFee !== null ? formatMoney(-Math.abs(platformFee)) : '—'}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-muted-foreground">Net proceeds</span>
-                                              <span className="font-extrabold">{formatMoney(net)}</span>
+                                            <div className="flex justify-between gap-4 border-t border-border pt-2.5 mt-2.5">
+                                              <dt className="text-muted-foreground shrink-0">Net proceeds</dt>
+                                              <dd className="font-extrabold text-right">{formatMoney(net)}</dd>
                                             </div>
-                                          </div>
-                                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                            <Info className="h-3.5 w-3.5" />
+                                          </dl>
+                                          <div className="text-xs text-muted-foreground flex items-start gap-2 pt-1">
+                                            <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                                             <span>
                                               Learn how you get paid in{' '}
-                                              <Link href="/how-it-works" className="underline underline-offset-2">
-                                                How it works
-                                              </Link>
-                                              .
+                                              <Link href="/how-it-works" className="underline underline-offset-2">How it works</Link>.
                                             </span>
                                           </div>
                                         </div>
                                       </div>
                                     </div>
-                                    <Separator />
-                                    {/* Order section */}
-                                    <div>
-                                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Order</div>
-                                      <div className="flex items-start justify-between gap-4 flex-wrap">
-                                        <div>
-                                          <div className="font-semibold">{title}</div>
-                                          <div className="mt-1 text-sm text-muted-foreground">
+
+                                    <Separator className="my-2" />
+
+                                    {/* Order section — full width, spaced layout */}
+                                    <div className="space-y-5">
+                                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order</div>
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-semibold break-words">{title}</div>
+                                          <div className="mt-1 text-sm text-muted-foreground truncate" title={o.listingId}>
                                             Item ID: <span className="font-mono">{o.listingId}</span>
                                           </div>
                                         </div>
-                                        <Button asChild size="sm" className="font-semibold">
-                                          <Link href={`/seller/orders/${o.id}`}>Open full timeline</Link>
+                                        <Button asChild size="sm" className="font-semibold shrink-0 w-full sm:w-auto min-h-11">
+                                          <Link href={`/seller/orders/${o.id}?from=sales`} className="inline-flex items-center justify-center min-h-11">Open full timeline</Link>
                                         </Button>
                                       </div>
-                                      <div className="grid gap-3 md:grid-cols-4 mt-4">
-                                        <div className="rounded-md border bg-muted/10 p-3">
-                                          <div className="text-xs text-muted-foreground">Buyer paid</div>
-                                          <div className="font-semibold">{formatDate(o.paidAt || null)}</div>
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+                                        <div className="rounded-lg border bg-muted/20 p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Buyer paid</div>
+                                          <div className="font-semibold mt-1">{formatDate(o.paidAt || null)}</div>
                                         </div>
-                                        <div className="rounded-md border bg-muted/10 p-3">
-                                          <div className="text-xs text-muted-foreground">Marked delivered</div>
-                                          <div className="font-semibold">{formatDate(o.deliveredAt || null)}</div>
+                                        <div className="rounded-lg border bg-muted/20 p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Marked delivered</div>
+                                          <div className="font-semibold mt-1">{formatDate(o.deliveredAt || null)}</div>
                                         </div>
-                                        <div className="rounded-md border bg-muted/10 p-3">
-                                          <div className="text-xs text-muted-foreground">Buyer confirmed</div>
-                                          <div className="font-semibold">{formatDate(o.buyerConfirmedAt || o.acceptedAt || null)}</div>
+                                        <div className="rounded-lg border bg-muted/20 p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Buyer confirmed</div>
+                                          <div className="font-semibold mt-1">{formatDate(o.buyerConfirmedAt || o.acceptedAt || null)}</div>
                                         </div>
-                                        <div className="rounded-md border bg-muted/10 p-3">
-                                          <div className="text-xs text-muted-foreground">Dispute</div>
-                                          <div className="font-semibold">{o.disputedAt ? formatDate(o.disputedAt) : '—'}</div>
+                                        <div className="rounded-lg border bg-muted/20 p-4">
+                                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Dispute</div>
+                                          <div className="font-semibold mt-1">{o.disputedAt ? formatDate(o.disputedAt) : '—'}</div>
                                         </div>
                                       </div>
                                       {(o.complianceDocsStatus?.missing?.length || 0) > 0 ? (
-                                        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-900 dark:text-amber-100 min-w-0 break-words">
                                           <div className="font-semibold">Compliance documents required</div>
-                                          <div className="mt-1">
-                                            Missing: <span className="font-mono">{o.complianceDocsStatus?.missing?.join(', ')}</span>
+                                          <div className="mt-1 break-words">
+                                            Missing: <span className="font-mono break-all">{o.complianceDocsStatus?.missing?.join(', ')}</span>
                                           </div>
-                                          <div className="mt-2">
+                                          <div className="mt-2 text-amber-800 dark:text-amber-200">
                                             Manage required docs from the order timeline to unblock payout.
                                           </div>
                                         </div>
                                       ) : null}
                                     </div>
                                   </div>
-                                </CollapsibleContent>
-                              </Collapsible>
-                            </div>
+                              </CollapsibleContent>
+                            </Collapsible>
                           </div>
                         </div>
                       </div>

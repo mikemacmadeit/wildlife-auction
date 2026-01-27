@@ -312,6 +312,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     status: doc.status,
     price: doc.price,
     currentBid: doc.currentBid,
+    currentBidderId: doc.currentBidderId,
     reservePrice: doc.reservePrice,
     startingBid: doc.startingBid,
     images: derivedImages,
