@@ -26,6 +26,8 @@ const nextConfig = {
           { key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' },
         ],
       },
+      // HTML and app routes: do NOT cache long. Long-lived cache on HTML causes stale chunk
+      // URLs after deploy → ChunkLoadError (404 on old chunks). Only _next/static gets immutable.
       {
         source: '/:path*',
         headers: [
@@ -34,7 +36,7 @@ const nextConfig = {
             key: 'Cache-Control',
             value: process.env.NODE_ENV === 'development'
               ? 'no-store, must-revalidate'
-              : 'public, max-age=31536000, immutable',
+              : 'public, max-age=0, must-revalidate',
           },
         ],
       },

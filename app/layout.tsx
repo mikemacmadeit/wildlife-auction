@@ -16,6 +16,7 @@ import { cookies } from 'next/headers';
 import { SiteGateClient } from '@/components/site/SiteGateClient';
 import { VisibilityDiagnostics } from '@/lib/dev/visibility-diagnostics';
 import { SentryInit } from '@/components/sentry/SentryInit';
+import { ChunkLoadRecovery } from '@/components/ChunkLoadRecovery';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -101,6 +102,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.className} ${foundersGrotesk.variable}`}>
         <SentryInit />
+        <ChunkLoadRecovery />
         <Providers>
           <FavoritesInitializer />
           {gateEnabled ? (
