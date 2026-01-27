@@ -35,11 +35,13 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.DeliveryConfirmed',
   'Order.Accepted',
   'Order.DeliveryCheckIn',
-  'Order.DeliveryScheduled', // NEW: Seller scheduled delivery (SELLER_TRANSPORT)
-  'Order.PickupReady', // NEW: Seller set pickup info (BUYER_TRANSPORT)
-  'Order.PickupWindowSelected', // NEW: Buyer selected pickup window
-  'Order.PickupConfirmed', // NEW: Buyer confirmed pickup
-  'Order.ReceiptConfirmed', // NEW: Buyer confirmed receipt (SELLER_TRANSPORT)
+  'Order.DeliveryScheduled', // Seller proposed/scheduled delivery (SELLER_TRANSPORT)
+  'Order.DeliveryAgreed', // Buyer agreed to delivery window (SELLER_TRANSPORT)
+  'Order.PickupReady', // Seller set pickup info (BUYER_TRANSPORT)
+  'Order.PickupWindowSelected', // Buyer selected pickup window (BUYER_TRANSPORT)
+  'Order.PickupWindowAgreed', // Seller agreed to pickup window (BUYER_TRANSPORT)
+  'Order.PickupConfirmed', // Buyer confirmed pickup
+  'Order.ReceiptConfirmed', // Buyer confirmed receipt (SELLER_TRANSPORT)
   'Order.SlaApproaching', // NEW: SLA deadline approaching reminder
   'Order.SlaOverdue', // NEW: SLA deadline passed
   'Order.TransferComplianceRequired', // NEW: Regulated whitetail - compliance gate activated
@@ -262,7 +264,18 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       orderUrl: string;
-      eta: string; // ISO 8601 datetime
+      eta?: string; // ISO 8601 (legacy)
+      proposedWindows?: Array<{ start: Date; end: Date }>;
+      message?: string;
+    }
+  | {
+      type: 'Order.DeliveryAgreed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      windowStart: string;
+      windowEnd: string;
     }
   | {
       type: 'Order.PickupReady';
@@ -280,6 +293,15 @@ export type NotificationEventPayload =
       orderUrl: string;
       windowStart: string; // ISO 8601 datetime
       windowEnd: string; // ISO 8601 datetime
+    }
+  | {
+      type: 'Order.PickupWindowAgreed';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      windowStart: string;
+      windowEnd: string;
     }
   | {
       type: 'Order.PickupConfirmed';

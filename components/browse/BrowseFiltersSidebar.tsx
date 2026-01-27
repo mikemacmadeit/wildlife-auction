@@ -219,7 +219,7 @@ export function BrowseFiltersSidebar(props: {
                 placeholder="Search species…"
                 className="min-h-[40px]"
               />
-              <div className="max-h-[220px] overflow-auto pr-1 space-y-2">
+              <div className="max-h-[220px] overflow-y-auto overflow-x-hidden overscroll-contain pr-1 space-y-2">
                 {speciesOptions.map((s) => {
                   const checked = (value.species || []).includes(s.value);
                   return (

@@ -10,7 +10,7 @@ version: 1
 
 # How to Sign Up for an Account
 
-Creating an account on Wildlife Exchange is free and takes just a few minutes.
+Creating an account on Agchange is free and takes just a few minutes.
 
 ## Steps to Sign Up
 

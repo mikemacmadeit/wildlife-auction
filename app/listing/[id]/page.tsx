@@ -1674,7 +1674,7 @@ export default function ListingDetailPage() {
                                   </Accordion>
 
                                   <div className="text-[11px] text-muted-foreground">
-                                    By clicking <span className="font-semibold">Bid</span>, you authorize Wildlife Exchange to bid up to your max bid and,
+                                    By clicking <span className="font-semibold">Bid</span>, you authorize Agchange to bid up to your max bid and,
                                     if you win, charge your payment method. You agree to our{' '}
                                     <Link href="/terms" className="underline underline-offset-4">Terms</Link> and acknowledge our{' '}
                                     <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>.
@@ -1876,7 +1876,7 @@ export default function ListingDetailPage() {
                     <ul className="space-y-2 text-sm">
                       <li>
                         <span className="font-semibold">Seller-listed animal:</span>{' '}
-                        This is a live, captive-bred whitetail breeder animal offered by the seller (not Wildlife Exchange).
+                        This is a live, captive-bred whitetail breeder animal offered by the seller (not Agchange).
                       </li>
                       <li>
                         <span className="font-semibold">Payment ≠ legal transfer:</span>{' '}
@@ -1924,7 +1924,7 @@ export default function ListingDetailPage() {
 
                     <div className="text-xs text-muted-foreground border-t pt-3">
                       <span className="font-semibold">Marketplace disclaimer:</span>{' '}
-                      Wildlife Exchange is a marketplace platform. Wildlife Exchange does not own, sell, transport, or transfer animals.
+                      Agchange is a marketplace platform. Agchange does not own, sell, transport, or transfer animals.
                       Listings are created by independent sellers who are responsible for complying with Texas law.
                     </div>
                   </CardContent>
@@ -1978,6 +1978,16 @@ export default function ListingDetailPage() {
                         showTooltips={true}
                         showIcons={true}
                       />
+                      {listing!.transportOption === 'SELLER_TRANSPORT' && (
+                        <Badge variant="outline" className="text-xs font-medium" title="Seller delivers">
+                          Seller Transport
+                        </Badge>
+                      )}
+                      {listing!.transportOption === 'BUYER_TRANSPORT' && (
+                        <Badge variant="outline" className="text-xs font-medium" title="Buyer arranges pickup">
+                          Buyer Transport
+                        </Badge>
+                      )}
                       {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
                         <Badge
                           variant="success"
@@ -2017,7 +2027,7 @@ export default function ListingDetailPage() {
                         Animal listing disclaimer
                       </div>
                       <ul className="mt-2 list-disc ml-5 text-sm text-muted-foreground space-y-1">
-                        <li>Wildlife Exchange does not take custody, possession, or control of animals.</li>
+                        <li>Agchange does not take custody, possession, or control of animals.</li>
                         <li>Health and legality representations are made solely by the seller.</li>
                         <li>Risk transfers upon delivery or pickup; buyer and seller handle logistics.</li>
                       </ul>
@@ -2039,7 +2049,7 @@ export default function ListingDetailPage() {
                         Equipment / vehicles disclaimer
                       </div>
                       <ul className="mt-2 list-disc ml-5 text-sm text-muted-foreground space-y-1">
-                        <li>Listings are “AS-IS, WHERE-IS.” Wildlife Exchange provides no warranties.</li>
+                        <li>Listings are “AS-IS, WHERE-IS.” Agchange provides no warranties.</li>
                         <li>Buyer and seller handle inspection, title/VIN verification, liens, and transfer paperwork.</li>
                       </ul>
                       <div className="mt-2 text-xs text-muted-foreground">

@@ -1,5 +1,5 @@
 ---
-title: "How to Buy on Wildlife Exchange"
+title: "How to Buy on Agchange"
 slug: "how-to-buy"
 category: "getting-started"
 audience: ["buyer", "all"]
@@ -8,9 +8,9 @@ enabled: true
 version: 1
 ---
 
-# How to Buy on Wildlife Exchange
+# How to Buy on Agchange
 
-Complete guide to buying animals, livestock, equipment, and more on Wildlife Exchange.
+Complete guide to buying animals, livestock, equipment, and more on Agchange.
 
 ## Getting Started
 

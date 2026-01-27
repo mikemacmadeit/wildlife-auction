@@ -177,17 +177,27 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </Badge>
               </div>
             ) : null}
-            {(listing as any)?.protectedTransactionEnabled && (listing as any)?.protectedTransactionDays ? (
-              <div className="sm:hidden absolute bottom-2 right-2 z-20">
+            <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
+              {listing.transportOption === 'SELLER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
+                  Seller Transport
+                </Badge>
+              )}
+              {listing.transportOption === 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
+                  Buyer Transport
+                </Badge>
+              )}
+              {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
                 <Badge
                   variant="default"
                   className="bg-green-600 text-white font-semibold text-xs shadow-warm"
                   title="Protected Transaction"
                 >
-                  Protected {(listing as any).protectedTransactionDays} Days
+                  Protected {listing.protectedTransactionDays} Days
                 </Badge>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
 
             {/* Subtle shimmer effect - warm tones */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-parchment/8 to-transparent z-5" />
@@ -236,6 +246,24 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 size="sm"
                 className="flex-wrap gap-2"
               />
+            </div>
+            {/* Transport + Protected badges (desktop content) */}
+            <div className="hidden sm:flex items-center gap-2 flex-wrap">
+              {listing.transportOption === 'SELLER_TRANSPORT' && (
+                <Badge variant="outline" className="text-[11px] font-semibold" title="Seller delivers">
+                  Seller Transport
+                </Badge>
+              )}
+              {listing.transportOption === 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="text-[11px] font-semibold" title="Buyer arranges pickup">
+                  Buyer Transport
+                </Badge>
+              )}
+              {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
+                <Badge variant="default" className="bg-green-600 text-white text-[11px] font-semibold" title="Protected Transaction">
+                  Protected {listing.protectedTransactionDays} Days
+                </Badge>
+              ) : null}
             </div>
 
             {/* Price and Seller Info - Enhanced */}

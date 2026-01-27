@@ -109,8 +109,10 @@ export function isFulfillmentStatus(status: TransactionStatus): boolean {
   return [
     'FULFILLMENT_REQUIRED',
     'READY_FOR_PICKUP',
+    'PICKUP_PROPOSED',
     'PICKUP_SCHEDULED',
     'PICKED_UP',
+    'DELIVERY_PROPOSED',
     'DELIVERY_SCHEDULED',
     'OUT_FOR_DELIVERY',
     'DELIVERED_PENDING_CONFIRMATION',
@@ -135,10 +137,9 @@ export function requiresSellerAction(order: Order): boolean {
   }
 
   if (transportOption === 'SELLER_TRANSPORT') {
-    return status === 'DELIVERY_SCHEDULED';
+    return status === 'DELIVERY_SCHEDULED' || status === 'OUT_FOR_DELIVERY';
   } else {
-    // BUYER_TRANSPORT
-    return status === 'READY_FOR_PICKUP';
+    return status === 'PICKUP_PROPOSED';
   }
 }
 
@@ -158,7 +159,6 @@ export function requiresBuyerAction(order: Order): boolean {
   if (transportOption === 'BUYER_TRANSPORT') {
     return status === 'READY_FOR_PICKUP' || status === 'PICKUP_SCHEDULED';
   } else {
-    // SELLER_TRANSPORT
-    return status === 'DELIVERED_PENDING_CONFIRMATION';
+    return status === 'DELIVERY_PROPOSED' || status === 'DELIVERED_PENDING_CONFIRMATION';
   }
 }

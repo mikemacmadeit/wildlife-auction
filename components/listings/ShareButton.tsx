@@ -32,7 +32,7 @@ export function ShareButton({
       if (navigator.share) {
         await navigator.share({
           title: listingTitle,
-          text: `Check out this listing on Wildlife Exchange: ${listingTitle}`,
+          text: `Check out this listing on Agchange: ${listingTitle}`,
           url,
         });
         toast({

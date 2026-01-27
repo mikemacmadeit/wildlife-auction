@@ -1691,6 +1691,8 @@ export async function handleWirePaymentIntentSucceeded(
   const now = new Date();
   const disputeWindowHours = parseInt(process.env.ESCROW_DISPUTE_WINDOW_HOURS || '72', 10);
   const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
+  const fulfillmentSlaDays = parseInt(process.env.FULFILLMENT_SLA_DAYS || '7', 10);
+  const fulfillmentSlaDeadlineAt = new Date(now.getTime() + fulfillmentSlaDays * 24 * 60 * 60 * 1000);
 
   // Settlement visibility for Admin Ops (best-effort). Events often do not include expanded charge/balance_transaction.
   let stripeSettlement: ReturnType<typeof extractStripeSettlementFieldsFromPaymentIntent> | null = null;
@@ -1713,6 +1715,7 @@ export async function handleWirePaymentIntentSucceeded(
       ...(stripeSettlement ? stripeSettlement : {}),
       paidAt: now,
       disputeDeadlineAt: disputeDeadline,
+      fulfillmentSlaDeadlineAt,
       updatedAt: now,
     },
     { merge: true }

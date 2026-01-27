@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { isValidNonEpochDate } from '@/lib/utils';
 import type { Order } from '@/lib/types';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { requiresSellerAction, requiresBuyerAction } from '@/lib/orders/status';
@@ -40,11 +41,11 @@ export function NextActionBanner({
   const needsSellerAction = requiresSellerAction(order);
   const needsBuyerAction = requiresBuyerAction(order);
 
-  // Calculate SLA urgency
-  const slaDeadline = order.fulfillmentSlaDeadlineAt;
+  // Calculate SLA urgency (ignore epoch – treat as "no deadline")
+  const slaDeadline = isValidNonEpochDate(order.fulfillmentSlaDeadlineAt) ? order.fulfillmentSlaDeadlineAt : null;
   const now = Date.now();
   const slaTimeRemaining = slaDeadline ? Math.max(0, slaDeadline.getTime() - now) : null;
-  const slaHoursRemaining = slaTimeRemaining ? Math.floor(slaTimeRemaining / (1000 * 60 * 60)) : null;
+  const slaHoursRemaining = slaTimeRemaining !== null ? Math.floor(slaTimeRemaining / (1000 * 60 * 60)) : null;
   const isSlaUrgent = slaHoursRemaining !== null && slaHoursRemaining < 24;
   const isSlaOverdue = slaTimeRemaining !== null && slaTimeRemaining <= 0;
 
@@ -57,10 +58,10 @@ export function NextActionBanner({
       if (txStatus === 'FULFILLMENT_REQUIRED') {
         if (transportOption === 'SELLER_TRANSPORT') {
           return {
-            title: 'Action required: Schedule delivery',
-            description: 'Set delivery ETA and transporter information to proceed.',
+            title: 'Action required: Propose delivery',
+            description: 'Propose delivery windows (hauling). Buyer will agree to one.',
             urgency: isSlaOverdue ? 'overdue' : isSlaUrgent ? 'urgent' : 'normal',
-            ctaLabel: 'Schedule Delivery',
+            ctaLabel: 'Propose Delivery',
             icon: <Truck className="h-5 w-5" />,
           };
         } else {
@@ -72,6 +73,15 @@ export function NextActionBanner({
             icon: <MapPin className="h-5 w-5" />,
           };
         }
+      }
+      if (txStatus === 'PICKUP_PROPOSED') {
+        return {
+          title: 'Action required: Agree to pickup window',
+          description: 'Buyer proposed a pickup window. Agree to confirm the time.',
+          urgency: 'normal',
+          ctaLabel: 'Agree to Window',
+          icon: <CheckCircle2 className="h-5 w-5" />,
+        };
       }
       if (txStatus === 'DELIVERY_SCHEDULED') {
         return {
@@ -85,12 +95,21 @@ export function NextActionBanner({
     }
 
     if (role === 'buyer') {
+      if (txStatus === 'DELIVERY_PROPOSED') {
+        return {
+          title: 'Action required: Agree to delivery window',
+          description: 'Seller proposed delivery windows. Agree to one that works for you.',
+          urgency: 'normal',
+          ctaLabel: 'Agree to Window',
+          icon: <CheckCircle2 className="h-5 w-5" />,
+        };
+      }
       if (txStatus === 'READY_FOR_PICKUP') {
         return {
-          title: 'Action required: Select pickup window',
-          description: 'Choose a time window that works for you to pick up your order.',
+          title: 'Action required: Propose pickup window',
+          description: 'Choose a time window. Seller must agree before you confirm pickup.',
           urgency: 'normal',
-          ctaLabel: 'Select Pickup Window',
+          ctaLabel: 'Propose Pickup Window',
           icon: <Clock className="h-5 w-5" />,
         };
       }
@@ -200,7 +219,7 @@ export function NextActionBanner({
                 Past deadline
               </Badge>
             )}
-            {slaDeadline && (
+            {slaDeadline && isValidNonEpochDate(slaDeadline) && (
               <div className="text-xs opacity-75">
                 Deadline: {formatDistanceToNowStrict(slaDeadline, { addSuffix: true })}
               </div>

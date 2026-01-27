@@ -119,7 +119,7 @@ export function Footer() {
               </div>
               <div className="leading-tight">
                 <div className="text-lg font-extrabold tracking-tight text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)]">
-                  Wildlife Exchange
+                  Agchange
                 </div>
                 <div className="text-xs text-[hsl(37_27%_35%)] dark:text-[hsl(37_27%_78%)]">
                   Texas marketplace • built for trust
@@ -278,7 +278,7 @@ export function Footer() {
                 </div>
                 {error && <p className="text-xs text-red-600 dark:text-red-200">{error}</p>}
                 <p className="text-[11px] leading-relaxed text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
-                  By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
+                  By subscribing, you agree to receive emails from Agchange. Unsubscribe anytime.{' '}
                   <Link href="/privacy" className="underline underline-offset-2 hover:text-[hsl(37_27%_15%)] dark:hover:text-[hsl(37_27%_92%)]">
                     Privacy
                   </Link>
@@ -291,7 +291,7 @@ export function Footer() {
 
         <div className="mt-10 pt-6 border-t border-black/10 dark:border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
           <div className="text-xs text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
-            © {currentYear()} Wildlife Exchange. All rights reserved.
+            © {currentYear()} Agchange. All rights reserved.
           </div>
           <div className="text-xs text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
             Texas-only for animal transactions. Equipment may be multi-state.

@@ -60,6 +60,14 @@
       ]
     },
     {
+      "collectionGroup": "emailJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "supportTickets",
       "queryScope": "COLLECTION",
       "fields": [
@@ -824,6 +832,21 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "listingId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "autoBids",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "autoBids",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "enabled", "order": "ASCENDING" }
       ]
     }
   ],

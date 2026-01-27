@@ -105,6 +105,7 @@ function NewListingPageContent() {
   const [sellerAnimalAckModalOpen, setSellerAnimalAckModalOpen] = useState(false);
   const [sellerAnimalAckModalChecked, setSellerAnimalAckModalChecked] = useState(false);
   const pendingPublishPayloadRef = useRef<Record<string, unknown> | null>(null);
+  const [publishAfterAnimalAck, setPublishAfterAnimalAck] = useState(false);
   const [tourRequestedStep, setTourRequestedStep] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';
@@ -391,6 +392,8 @@ function NewListingPageContent() {
             transportReady: formData.transportType !== null,
             sellerOffersDelivery: formData.transportType === 'seller',
           },
+          ...(formData.transportType === 'seller' && { transportOption: 'SELLER_TRANSPORT' as const }),
+          ...(formData.transportType === 'buyer' && { transportOption: 'BUYER_TRANSPORT' as const }),
           protectedTransactionEnabled: formData.protectedTransactionEnabled,
           protectedTransactionDays: formData.protectedTransactionDays,
           ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
@@ -2010,9 +2013,53 @@ function NewListingPageContent() {
             </div>
           </Card>
 
-          <Card className="p-4">
-            <div className="text-sm text-muted-foreground">
-              Note: Buyer protection is available via <strong>Protected Transaction</strong> when enabled.
+          {/* Protected Transaction */}
+          <Card className="p-4 border-2">
+            <div className="space-y-4">
+              <div className="flex items-start space-x-3 min-h-[44px]">
+                <Checkbox
+                  id="protected"
+                  checked={formData.protectedTransactionEnabled}
+                  onCheckedChange={(checked) => {
+                    const enabled = checked as boolean;
+                    setFormData({
+                      ...formData,
+                      protectedTransactionEnabled: enabled,
+                      protectedTransactionDays: enabled && !formData.protectedTransactionDays ? 7 : formData.protectedTransactionDays,
+                    });
+                  }}
+                />
+                <Label htmlFor="protected" className="cursor-pointer flex-1">
+                  <div className="font-medium mb-1">Protected Transaction</div>
+                  <div className="text-sm text-muted-foreground">
+                    Offer buyer protection (dispute window after delivery). Funds release after confirmation or dispute resolution.
+                  </div>
+                </Label>
+              </div>
+              {formData.protectedTransactionEnabled && (
+                <div className="pl-7 space-y-2">
+                  <div className="text-sm font-medium">Protection window</div>
+                  <RadioGroup
+                    value={formData.protectedTransactionDays === 7 ? '7' : formData.protectedTransactionDays === 14 ? '14' : '7'}
+                    onValueChange={(v) =>
+                      setFormData({
+                        ...formData,
+                        protectedTransactionDays: v === '14' ? 14 : 7,
+                      })
+                    }
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="7" id="protect-7" />
+                      <Label htmlFor="protect-7" className="cursor-pointer font-normal">7 days</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="14" id="protect-14" />
+                      <Label htmlFor="protect-14" className="cursor-pointer font-normal">14 days</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -2022,7 +2069,7 @@ function NewListingPageContent() {
               <div>
                 <h3 className="font-semibold text-base mb-1">Transportation</h3>
                 <p className="text-sm text-muted-foreground">
-                  Select who will handle transportation. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                  Select who will handle transportation. Buyer and seller coordinate directly; Agchange does not arrange transport.
                 </p>
               </div>
               <RadioGroup
@@ -2610,6 +2657,15 @@ function NewListingPageContent() {
     }
   };
 
+  // After user accepts seller animal ack modal: formData is updated (disclosures), modal closed.
+  // Trigger publish once React has committed state so handleComplete sees the updated formData.
+  useEffect(() => {
+    if (!publishAfterAnimalAck || sellerAnimalAckModalOpen) return;
+    setPublishAfterAnimalAck(false);
+    void handleComplete({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishAfterAnimalAck, sellerAnimalAckModalOpen]);
+
   // Check if user just returned from authentication and restore form data
   useEffect(() => {
     if (user && typeof window !== 'undefined') {
@@ -2991,7 +3047,7 @@ function NewListingPageContent() {
                   <div className="space-y-2">
                     <div>
                       I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                      Wildlife Exchange does not take custody of animals.
+                      Agchange does not take custody of animals.
                     </div>
                     {/* Category-specific disclosures */}
                     {formData.category === 'sporting_working_dogs' && (
@@ -3055,15 +3111,14 @@ function NewListingPageContent() {
             <Button
               type="button"
               disabled={!Boolean(sellerAnimalAckModalChecked)}
-              onClick={async () => {
+              onClick={() => {
                 // Set ref first to prevent onOpenChange from resetting checkbox
                 sellerAnimalAckForceRef.current = true;
                 setSellerAnimalAttestationAccepted(true);
-                
-                // For all animal categories, update formData to include disclosures (payload will pick them up from formData)
+
                 const category = formData.category;
                 const updatedAttributes: any = { ...formData.attributes };
-                
+
                 if (category === 'sporting_working_dogs') {
                   updatedAttributes.identificationDisclosure = true;
                   updatedAttributes.healthDisclosure = true;
@@ -3076,7 +3131,6 @@ function NewListingPageContent() {
                   updatedAttributes.identificationDisclosure = true;
                   updatedAttributes.healthDisclosure = true;
                 } else if (category === 'horse_equestrian') {
-                  // Horse disclosures are nested in a disclosures object
                   updatedAttributes.disclosures = {
                     ...(updatedAttributes.disclosures || {}),
                     identificationDisclosure: true,
@@ -3085,26 +3139,14 @@ function NewListingPageContent() {
                     titleOrLienDisclosure: true,
                   };
                 }
-                
+
                 if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'horse_equestrian') {
-                  setFormData({
-                    ...formData,
-                    attributes: updatedAttributes,
-                  });
+                  setFormData({ ...formData, attributes: updatedAttributes });
                 }
-                
-                const payload = pendingPublishPayloadRef.current;
-                // Close modal - onOpenChange won't reset checkbox because ref is true
-                setSellerAnimalAckModalOpen(false);
-                // Clear pending payload to prevent re-triggering
+
                 pendingPublishPayloadRef.current = null;
-                // Re-run publish - handleComplete will create new payload from updated formData
-                if (payload) {
-                  // Use setTimeout to ensure state updates have propagated
-                  setTimeout(() => {
-                    void handleComplete(payload);
-                  }, 0);
-                }
+                setPublishAfterAnimalAck(true);
+                setSellerAnimalAckModalOpen(false);
               }}
             >
               I agree &amp; continue to publish

@@ -36,7 +36,7 @@ export default function TrustPage() {
           </div>
           <h1 className="text-4xl font-bold mb-4">Trust & Compliance</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Wildlife Exchange is built for trust, clear disclosures, and compliance workflows for regulated categories—
+            Agchange is built for trust, clear disclosures, and compliance workflows for regulated categories—
             without claiming to be a regulator or approving transfers.
           </p>
         </div>
@@ -111,7 +111,7 @@ export default function TrustPage() {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  For Horse &amp; Equestrian transactions, Wildlife Exchange generates an in-platform Bill of Sale / written transfer document
+                  For Horse &amp; Equestrian transactions, Agchange generates an in-platform Bill of Sale / written transfer document
                   tied to the order. Buyer and seller can view/download it from the order details page.
                 </p>
                 <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
@@ -374,7 +374,7 @@ export default function TrustPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Wildlife Exchange offers optional transaction protection for buyers:
+                Agchange offers optional transaction protection for buyers:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
                 <li><strong>7-day protection window:</strong> Buyer can dispute within 7 days of delivery</li>
@@ -458,7 +458,7 @@ export default function TrustPage() {
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <a href="mailto:compliance@wildlife.exchange" className="flex items-center gap-2">
+                  <a href="mailto:compliance@agchange.com" className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
                     Email Compliance Team
                   </a>

@@ -10,7 +10,7 @@ version: 1
 
 # Payment Security and Fraud Prevention
 
-How Wildlife Exchange keeps your payments secure.
+How Agchange keeps your payments secure.
 
 ## Security Measures
 

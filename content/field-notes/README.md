@@ -9,7 +9,7 @@ Add new posts here as `YYYY-MM-DD-your-slug.md`.
 title: "Your post title"
 description: "1–2 sentence summary for SEO and previews."
 date: "2026-01-16"
-author: "Wildlife Exchange"
+author: "Agchange"
 category: "Guides"
 tags: ["payments", "trust", "transport"]
 coverImage: "/images/Buck_1.webp"

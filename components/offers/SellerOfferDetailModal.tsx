@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOffer, acceptOffer, counterOffer, declineOffer } from '@/lib/offers/api';
 import Image from 'next/image';
+import { OfferAcceptedSuccessModal } from './OfferAcceptedSuccessModal';
 
 type OfferDTO = {
   offerId: string;
@@ -53,6 +54,7 @@ export function SellerOfferDetailModal(props: {
 
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
+  const [acceptSuccessOpen, setAcceptSuccessOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
@@ -79,6 +81,7 @@ export function SellerOfferDetailModal(props: {
     setOffer(null);
     setCounterOpen(false);
     setCounterAmount('');
+    setAcceptSuccessOpen(false);
   }, [offerId]);
 
   const canAct = useMemo(() => offer?.status === 'open' || offer?.status === 'countered', [offer?.status]);
@@ -88,13 +91,11 @@ export function SellerOfferDetailModal(props: {
     setActionLoading(true);
     try {
       await acceptOffer(offer.offerId);
-      toast({ title: 'Accepted', description: 'Offer accepted and listing reserved.' });
       await load();
-      // Close modal after accepting on mobile for better UX
+      setAcceptSuccessOpen(true);
+      // Close detail modal on mobile so success modal is the focus
       if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-        setTimeout(() => {
-          onOpenChange(false);
-        }, 500);
+        onOpenChange(false);
       }
     } catch (e: any) {
       toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
@@ -295,6 +296,16 @@ export function SellerOfferDetailModal(props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OfferAcceptedSuccessModal
+        open={acceptSuccessOpen}
+        onOpenChange={setAcceptSuccessOpen}
+        role="seller"
+        listingTitle={offer?.listingSnapshot?.title}
+        amount={offer?.currentAmount ?? offer?.acceptedAmount}
+        offerId={offer?.offerId}
+        listingId={offer?.listingId}
+      />
     </>
   );
 }

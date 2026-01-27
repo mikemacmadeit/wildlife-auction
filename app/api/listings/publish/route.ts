@@ -394,7 +394,7 @@ export async function POST(request: Request) {
             error: 'Seller acknowledgment required',
             code: 'SELLER_ANIMAL_ACK_REQUIRED',
             message:
-              'Before publishing an animal listing, you must acknowledge that you are solely responsible for representations, permits, and compliance, and that Wildlife Exchange does not take custody of animals.',
+              'Before publishing an animal listing, you must acknowledge that you are solely responsible for representations, permits, and compliance, and that Agchange does not take custody of animals.',
           },
           { status: 400 }
         );
@@ -585,7 +585,7 @@ export async function POST(request: Request) {
       // Admin notifications (email + in-app) for review queues.
       // Non-blocking: listing submission should not fail if notifications fail.
       try {
-        const origin = 'https://wildlife.exchange';
+        const origin = 'https://agchange.com';
         const adminUids = await listAdminRecipientUids(db as any);
         if (adminUids.length > 0) {
           const fanout = async <TType extends any>(params: {

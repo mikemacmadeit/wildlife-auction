@@ -138,33 +138,55 @@ export function ProfileCompletionModal({
     setIsLoading(true);
 
     try {
-      // Build the update object, only including fields with values
-      const updates: any = {
-        profileComplete: true,
-        phoneNumber: formData.phone,
-        profile: {
-          fullName: formData.fullName,
-          location: formData.location,
-          preferences: {
-            verification: true, // Default preference
-            transport: true, // Default preference
-            displayNamePreference: formData.displayNamePreference,
-          },
+      const existing = await getUserProfile(userId);
+      const prevProfile = (existing?.profile || {}) as any;
+
+      const profilePayload: any = {
+        fullName: formData.fullName.trim(),
+        location: formData.location,
+        preferences: {
+          ...(prevProfile?.preferences ?? { verification: true, transport: true }),
+          verification: true,
+          transport: true,
+          displayNamePreference: formData.displayNamePreference,
+        },
+        notifications: prevProfile?.notifications ?? {
+          email: true,
+          sms: false,
+          bids: true,
+          messages: true,
+          promotions: false,
         },
       };
-
-      if (formData.businessName) {
-        updates.profile.businessName = formData.businessName;
+      if (formData.businessName?.trim()) {
+        profilePayload.businessName = formData.businessName.trim();
       }
 
-      // Update user profile
+      const updates: any = {
+        profileComplete: true,
+        displayName: formData.fullName.trim(),
+        phoneNumber: formData.phone.trim(),
+        profile: profilePayload,
+      };
+
       await updateUserProfile(userId, updates);
 
-      // Optional: avatar/logo upload (not required to complete profile)
+      const verify = await getUserProfile(userId);
+      const v = verify?.profile;
+      const ok =
+        !!verify?.phoneNumber?.trim() &&
+        !!v?.fullName?.trim() &&
+        !!v?.location?.city?.trim() &&
+        !!v?.location?.state?.trim() &&
+        !!v?.location?.zip?.trim();
+      if (!ok) {
+        throw new Error('We couldn\'t verify your profile was saved. Please try again.');
+      }
+
       if (avatarUrl) {
         await setCurrentUserAvatarUrl(avatarUrl);
       }
-      
+
       toast({
         title: 'Profile updated successfully!',
         description: 'Your profile has been completed.',
@@ -175,7 +197,7 @@ export function ProfileCompletionModal({
       console.error('Profile update failed:', error);
       toast({
         title: 'Profile update failed',
-        description: error.message || 'An error occurred. Please try again.',
+        description: error?.message || 'An error occurred. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -192,7 +214,7 @@ export function ProfileCompletionModal({
             Complete Your Profile
           </DialogTitle>
           <DialogDescription className="text-base pt-2">
-            We need a few more details to get you started on Wildlife Exchange.
+            We need a few more details to get you started on Agchange.
           </DialogDescription>
         </DialogHeader>
 

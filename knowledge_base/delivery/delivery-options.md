@@ -10,7 +10,7 @@ version: 1
 
 # Delivery and Shipping Options
 
-Understanding delivery options and how they work on Wildlife Exchange.
+Understanding delivery options and how they work on Agchange.
 
 ## Delivery Methods
 

@@ -10,7 +10,7 @@ version: 1
 
 # How to List an Animal for Sale
 
-Step-by-step guide to creating a listing for an animal on Wildlife Exchange.
+Step-by-step guide to creating a listing for an animal on Agchange.
 
 ## Before You Start
 
@@ -24,7 +24,7 @@ Step-by-step guide to creating a listing for an animal on Wildlife Exchange.
 
 ### Step 1: Access the Create Listing Page
 
-1. **Sign in** to your Wildlife Exchange account
+1. **Sign in** to your Agchange account
 2. **Click "Sell"** in the top navigation, OR
 3. **Go to Dashboard** → **"Create Listing"** button, OR
 4. **Navigate to** `/dashboard/listings/new`

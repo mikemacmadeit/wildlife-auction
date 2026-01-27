@@ -1,4 +1,4 @@
-// Marketplace Types for Wildlife Exchange
+// Marketplace Types for Agchange
 
 export type ListingType = 'auction' | 'fixed' | 'classified';
 
@@ -556,10 +556,12 @@ export type TransactionStatus =
   | 'PAID'
   | 'AWAITING_TRANSFER_COMPLIANCE'  // Regulated whitetail: awaiting TPWD transfer permit confirmation
   | 'FULFILLMENT_REQUIRED'
-  | 'READY_FOR_PICKUP'        // BUYER_TRANSPORT
-  | 'PICKUP_SCHEDULED'        // BUYER_TRANSPORT (optional)
+  | 'READY_FOR_PICKUP'        // BUYER_TRANSPORT: seller set location + windows
+  | 'PICKUP_PROPOSED'         // BUYER_TRANSPORT: buyer selected window; seller must agree
+  | 'PICKUP_SCHEDULED'        // BUYER_TRANSPORT: seller agreed; buyer confirms pickup
   | 'PICKED_UP'               // BUYER_TRANSPORT
-  | 'DELIVERY_SCHEDULED'      // SELLER_TRANSPORT
+  | 'DELIVERY_PROPOSED'       // SELLER_TRANSPORT: seller proposed windows; buyer must agree
+  | 'DELIVERY_SCHEDULED'      // SELLER_TRANSPORT: buyer agreed; seller hauls
   | 'OUT_FOR_DELIVERY'        // SELLER_TRANSPORT (optional)
   | 'DELIVERED_PENDING_CONFIRMATION' // SELLER_TRANSPORT
   | 'COMPLETED'
@@ -751,13 +753,24 @@ export interface Order {
     pickupCode?: string;
     confirmedAt?: Date;
     proofPhotos?: string[];
+    /** When buyer proposed a window (selected from seller's options). */
+    proposedAt?: Date;
+    /** When seller agreed to the proposed pickup time. */
+    agreedAt?: Date;
   };
-  
+
   /**
    * Delivery workflow (SELLER_TRANSPORT)
+   * Seller proposes delivery windows (hauling); buyer agrees to one.
    */
   delivery?: {
+    /** Legacy: single ETA. Prefer agreedWindow when using propose/agree flow. */
     eta?: Date;
+    /** Proposed delivery windows (seller). Buyer agrees to one. */
+    windows?: Array<{ start: Date; end: Date }>;
+    proposedAt?: Date;
+    agreedWindow?: { start: Date; end: Date };
+    agreedAt?: Date;
     transporter?: { name?: string; phone?: string; plate?: string };
     proofUploads?: Array<{ type: string; url: string; uploadedAt: Date }>;
     deliveredAt?: Date;

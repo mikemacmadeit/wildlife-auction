@@ -10,7 +10,7 @@ version: 1
 
 # How Refunds Work
 
-Complete guide to understanding refunds on Wildlife Exchange.
+Complete guide to understanding refunds on Agchange.
 
 ## When You Can Get a Refund
 

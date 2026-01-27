@@ -10,7 +10,7 @@ version: 1
 
 # Account Security Guide
 
-How to keep your Wildlife Exchange account secure and protected.
+How to keep your Agchange account secure and protected.
 
 ## Password Security
 
@@ -93,7 +93,7 @@ How to keep your Wildlife Exchange account secure and protected.
 
 **What is phishing:**
 - Fake emails or messages
-- Pretend to be from Wildlife Exchange
+- Pretend to be from Agchange
 - Ask for password or personal info
 - Include suspicious links
 - Try to steal your account

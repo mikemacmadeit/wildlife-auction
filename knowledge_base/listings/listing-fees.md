@@ -10,7 +10,7 @@ version: 1
 
 # Understanding Listing Fees
 
-Wildlife Exchange charges fees when your item sells. Here's how it works.
+Agchange charges fees when your item sells. Here's how it works.
 
 ## When Fees Apply
 

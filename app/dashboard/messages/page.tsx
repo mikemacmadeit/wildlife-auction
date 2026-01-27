@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ArrowLeft, Archive, Inbox, MoreVertical, Search, CheckCheck } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MessageThreadComponent } from '@/components/messaging/MessageThread';
-import { getOrCreateThread, markThreadAsRead, setThreadArchived, subscribeToAllUserThreads } from '@/lib/firebase/messages';
+import { getOrCreateThread, getThreadById, markThreadAsRead, setThreadArchived, subscribeToAllUserThreads } from '@/lib/firebase/messages';
 import { getListingById } from '@/lib/firebase/listings';
 import { getUserProfile } from '@/lib/firebase/users';
 import { markNotificationsAsReadByType } from '@/lib/firebase/notifications';
@@ -41,7 +41,9 @@ export default function MessagesPage() {
 
   const listingIdParam = searchParams?.get('listingId') || null;
   const sellerIdParam = searchParams?.get('sellerId') || null;
-  const threadIdParam = searchParams?.get('threadId') || null;
+  const threadIdFromParams = searchParams?.get('threadId') || null;
+  const [threadIdFromUrlFallback, setThreadIdFromUrlFallback] = useState<string | null>(null);
+  const threadIdParam = threadIdFromParams || threadIdFromUrlFallback;
 
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
@@ -65,6 +67,7 @@ export default function MessagesPage() {
   const pathnameRef = useRef<string | null>(null);
   const isNavigatingAwayRef = useRef<boolean>(false);
   const subscriptionCallbackThrottleRef = useRef<number | null>(null);
+  const deepLinkFetchAttemptedRef = useRef<string | null>(null);
 
   // Track pathname changes and detect navigation away
   useEffect(() => {
@@ -92,8 +95,22 @@ export default function MessagesPage() {
       setSelectedThreadId(null);
       setThread(null);
       setListing(null);
+      setThreadIdFromUrlFallback(null);
+      deepLinkFetchAttemptedRef.current = null;
     }
   }, [pathname]);
+
+  // Notification deep-link: searchParams can lag on client-side nav. Fallback to window.location.search.
+  useEffect(() => {
+    if (typeof window === 'undefined' || pathname !== '/dashboard/messages') return;
+    if (threadIdFromParams) {
+      setThreadIdFromUrlFallback(null);
+      return;
+    }
+    const q = new URLSearchParams(window.location.search);
+    const tid = q.get('threadId')?.trim() || null;
+    setThreadIdFromUrlFallback(tid);
+  }, [pathname, threadIdFromParams]);
 
   // Emergency escape: keyboard shortcut to leave messages
   useEffect(() => {
@@ -434,6 +451,53 @@ export default function MessagesPage() {
       setOtherPartyAvatar(otherProfile?.photoURL || undefined);
     }).catch(() => {});
   }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
+
+  // Notification deep-link: threadId in URL but thread not in subscription yet (race or limit).
+  // Fetch thread by ID so the conversation shows without needing to wait for / rely on subscription.
+  useEffect(() => {
+    if (!user?.uid || !threadIdParam || listingIdParam || sellerIdParam) return;
+    const inThreads = threads.some((x) => x.id === threadIdParam);
+    if (inThreads) {
+      deepLinkFetchAttemptedRef.current = null;
+      return;
+    }
+    if (deepLinkFetchAttemptedRef.current === threadIdParam) return;
+
+    const tm = setTimeout(async () => {
+      if (threads.some((x) => x.id === threadIdParam)) return;
+      deepLinkFetchAttemptedRef.current = threadIdParam;
+      try {
+        const t = await getThreadById(threadIdParam, user.uid);
+        if (!t) return;
+        setThread(t);
+        setSelectedThreadId(threadIdParam);
+        setThreads((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev]));
+        setOptimisticReadThreads((prev) => new Set(prev).add(threadIdParam));
+        markNotificationsAsReadByType(user.uid, 'message_received').catch(() => {});
+        markThreadAsRead(threadIdParam, user.uid).catch(() => {
+          setOptimisticReadThreads((prev) => {
+            const next = new Set(prev);
+            next.delete(threadIdParam);
+            return next;
+          });
+        });
+        router.replace(`/dashboard/messages?threadId=${encodeURIComponent(threadIdParam)}`);
+        const [listingRes, otherRes] = await Promise.allSettled([
+          getListingById(t.listingId),
+          getUserProfile(user.uid === t.buyerId ? t.sellerId : t.buyerId),
+        ]);
+        setListing(listingRes.status === 'fulfilled' ? listingRes.value : null);
+        const otherProfile = otherRes.status === 'fulfilled' ? otherRes.value : null;
+        setOtherPartyName(otherProfile?.displayName || otherProfile?.email?.split('@')[0] || 'User');
+        setOtherPartyAvatar(otherProfile?.photoURL || undefined);
+        setOrderStatus(undefined);
+      } catch {
+        deepLinkFetchAttemptedRef.current = null;
+      }
+    }, 400);
+
+    return () => clearTimeout(tm);
+  }, [listingIdParam, router, sellerIdParam, threadIdParam, threads, user?.uid]);
 
   // Fix: Ensure sidebar clicks work - prevent messages page from blocking sidebar navigation
   useEffect(() => {

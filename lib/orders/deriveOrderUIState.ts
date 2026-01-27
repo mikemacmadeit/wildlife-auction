@@ -16,7 +16,8 @@ export type PurchasesPrimaryAction =
   | { kind: 'complete_transfer'; label: string }
   | { kind: 'view_details'; label: string }
   | { kind: 'select_pickup_window'; label: string }
-  | { kind: 'confirm_pickup'; label: string };
+  | { kind: 'confirm_pickup'; label: string }
+  | { kind: 'agree_delivery'; label: string };
 
 export function deriveOrderUIState(order: Order): {
   statusKey: PurchasesStatusKey;
@@ -65,17 +66,24 @@ export function deriveOrderUIState(order: Order): {
 
   // Transport-aware workflow based on transactionStatus
   if (transportOption === 'BUYER_TRANSPORT') {
-    // BUYER_TRANSPORT flow
     if (txStatus === 'READY_FOR_PICKUP') {
       return {
         statusKey: 'in_transit',
         currentStepLabel: 'Ready for pickup',
-        waitingOn: 'Waiting on you to select pickup window',
+        waitingOn: 'Waiting on you to propose a pickup window',
         needsAction: true,
-        primaryAction: { kind: 'select_pickup_window', label: 'Select pickup window' },
+        primaryAction: { kind: 'select_pickup_window', label: 'Propose pickup window' },
       };
     }
-    
+    if (txStatus === 'PICKUP_PROPOSED') {
+      return {
+        statusKey: 'in_transit',
+        currentStepLabel: 'Pickup proposed',
+        waitingOn: 'Waiting on seller to agree',
+        needsAction: false,
+        primaryAction: { kind: 'view_details', label: 'View details' },
+      };
+    }
     if (txStatus === 'PICKUP_SCHEDULED') {
       return {
         statusKey: 'in_transit',
@@ -85,7 +93,6 @@ export function deriveOrderUIState(order: Order): {
         primaryAction: { kind: 'confirm_pickup', label: 'Confirm pickup' },
       };
     }
-    
     if (txStatus === 'PICKED_UP' || txStatus === 'COMPLETED') {
       return {
         statusKey: 'completed',
@@ -106,7 +113,15 @@ export function deriveOrderUIState(order: Order): {
         primaryAction: { kind: 'confirm_receipt', label: 'Confirm receipt' },
       };
     }
-    
+    if (txStatus === 'DELIVERY_PROPOSED') {
+      return {
+        statusKey: 'in_transit',
+        currentStepLabel: 'Delivery proposed',
+        waitingOn: 'Waiting on you to agree to a window',
+        needsAction: true,
+        primaryAction: { kind: 'agree_delivery', label: 'Agree to window' },
+      };
+    }
     if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {
       return {
         statusKey: 'in_transit',
@@ -116,7 +131,6 @@ export function deriveOrderUIState(order: Order): {
         primaryAction: { kind: 'view_details', label: 'View details' },
       };
     }
-    
     if (txStatus === 'COMPLETED') {
       return {
         statusKey: 'completed',

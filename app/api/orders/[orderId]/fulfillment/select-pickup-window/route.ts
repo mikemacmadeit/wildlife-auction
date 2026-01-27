@@ -1,8 +1,8 @@
 /**
  * POST /api/orders/[orderId]/fulfillment/select-pickup-window
- * 
- * BUYER_TRANSPORT: Buyer selects a pickup window from seller's available windows
- * Transitions: READY_FOR_PICKUP → PICKUP_SCHEDULED
+ *
+ * BUYER_TRANSPORT: Buyer proposes a pickup window (selects from seller's available windows).
+ * Seller must agree via agree-pickup-window. Transitions: READY_FOR_PICKUP → PICKUP_PROPOSED.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -16,9 +16,14 @@ import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { captureException } from '@/lib/monitoring/capture';
 
-const selectPickupWindowSchema = z.object({
-  selectedWindowIndex: z.number().int().min(0),
-});
+const selectPickupWindowSchema = z
+  .object({
+    selectedWindowIndex: z.number().int().min(0).optional(),
+    windowIndex: z.number().int().min(0).optional(),
+  })
+  .refine((d) => typeof d.selectedWindowIndex === 'number' || typeof d.windowIndex === 'number', {
+    message: 'Provide selectedWindowIndex or windowIndex',
+  });
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -74,7 +79,11 @@ export async function POST(
       return json({ error: 'Invalid request data', details: validation.error.flatten() }, { status: 400 });
     }
 
-    const { selectedWindowIndex } = validation.data;
+    const { selectedWindowIndex, windowIndex } = validation.data;
+    const idx = typeof selectedWindowIndex === 'number' ? selectedWindowIndex : (windowIndex ?? -1);
+    if (idx < 0) {
+      return json({ error: 'Invalid request data', details: 'Provide selectedWindowIndex or windowIndex' }, { status: 400 });
+    }
 
     // Get order
     const orderRef = db.collection('orders').doc(orderId);
@@ -103,13 +112,12 @@ export async function POST(
       );
     }
 
-    // Validate status transition
     const currentTxStatus = orderData.transactionStatus as TransactionStatus | undefined;
     if (currentTxStatus !== 'READY_FOR_PICKUP') {
       return json(
-        { 
+        {
           error: 'Invalid status transition',
-          details: `Cannot select pickup window. Current status: ${currentTxStatus || orderData.status}. Order must be in READY_FOR_PICKUP state.`
+          details: `Cannot select pickup window. Current status: ${currentTxStatus || orderData.status}. Order must be in READY_FOR_PICKUP state.`,
         },
         { status: 400 }
       );
@@ -126,67 +134,58 @@ export async function POST(
       );
     }
 
-    // Validate window index
     const windows = orderData.pickup.windows;
-    if (selectedWindowIndex < 0 || selectedWindowIndex >= windows.length) {
+    if (idx < 0 || idx >= windows.length) {
       return json(
-        { 
+        {
           error: 'Invalid window index',
-          details: `Window index ${selectedWindowIndex} is out of range. Available windows: ${windows.length}`
+          details: `Window index ${idx} is out of range. Available windows: ${windows.length}`,
         },
         { status: 400 }
       );
     }
 
-    const selectedWindow = windows[selectedWindowIndex];
+    const selectedWindow = windows[idx];
     
     // Convert Firestore Timestamps to Date objects if needed
     const windowStart = selectedWindow.start?.toDate ? selectedWindow.start.toDate() : new Date(selectedWindow.start);
     const windowEnd = selectedWindow.end?.toDate ? selectedWindow.end.toDate() : new Date(selectedWindow.end);
 
-    // Update order
     const now = new Date();
     const updateData: any = {
-      transactionStatus: 'PICKUP_SCHEDULED' as TransactionStatus,
+      transactionStatus: 'PICKUP_PROPOSED' as TransactionStatus,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
       pickup: {
         ...orderData.pickup,
-        selectedWindow: {
-          start: windowStart,
-          end: windowEnd,
-        },
+        selectedWindow: { start: windowStart, end: windowEnd },
+        proposedAt: now,
       },
     };
 
     await orderRef.update(updateData);
 
-    // Timeline (server-authored, idempotent).
     try {
       await appendOrderTimelineEvent({
         db: db as any,
         orderId,
         event: {
-          id: `PICKUP_WINDOW_SELECTED:${orderId}`,
-          type: 'ORDER_PLACED', // Using placeholder - buyer action
-          label: 'Buyer selected pickup window',
+          id: `PICKUP_PROPOSED:${orderId}`,
+          type: 'ORDER_PLACED',
+          label: 'Buyer proposed pickup window',
           actor: 'buyer',
           visibility: 'seller',
           timestamp: Timestamp.fromDate(now),
-          meta: { 
-            windowStart: windowStart.toISOString(),
-            windowEnd: windowEnd.toISOString(),
-          },
+          meta: { windowStart: windowStart.toISOString(), windowEnd: windowEnd.toISOString() },
         },
       });
     } catch {
-      // best-effort
+      /* best-effort */
     }
 
-    // Emit notification to seller
     try {
       const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
-      const listingTitle = listingDoc.data()?.title || 'Your listing';
+      const listingTitle = (listingDoc.data() as any)?.title || 'Your listing';
       const ev = await emitAndProcessEventForUser({
         type: 'Order.PickupWindowSelected',
         actorId: buyerId,
@@ -222,12 +221,9 @@ export async function POST(
     return json({
       success: true,
       orderId,
-      transactionStatus: 'PICKUP_SCHEDULED',
-      selectedWindow: {
-        start: windowStart.toISOString(),
-        end: windowEnd.toISOString(),
-      },
-      message: 'Pickup window selected successfully.',
+      transactionStatus: 'PICKUP_PROPOSED',
+      selectedWindow: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
+      message: 'Pickup window proposed. Seller must agree to confirm.',
     });
   } catch (error: any) {
     console.error('Error selecting pickup window:', error);

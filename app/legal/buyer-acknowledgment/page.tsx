@@ -6,9 +6,9 @@ import { Shield, AlertTriangle } from 'lucide-react';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 
 export const metadata: Metadata = {
-  title: 'Buyer Acknowledgment | Wildlife Exchange',
+  title: 'Buyer Acknowledgment | Agchange',
   description:
-    'Buyer acknowledgments for Wildlife Exchange, including live animal risk and due diligence requirements.',
+    'Buyer acknowledgments for Agchange, including live animal risk and due diligence requirements.',
 };
 
 export default function BuyerAcknowledgmentPage() {
@@ -31,7 +31,7 @@ export default function BuyerAcknowledgmentPage() {
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription className="text-sm">
           This acknowledgment applies to animal categories and is required before purchase/checkout where applicable.
-          Wildlife Exchange is not the seller and does not take custody of animals or goods.
+          Agchange is not the seller and does not take custody of animals or goods.
         </AlertDescription>
       </Alert>
 
@@ -42,7 +42,7 @@ export default function BuyerAcknowledgmentPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              You acknowledge that any sale agreement is solely between you and the seller. Wildlife Exchange is a marketplace technology provider
+              You acknowledge that any sale agreement is solely between you and the seller. Agchange is a marketplace technology provider
               and is not a party to the buyer–seller contract.
             </p>
           </CardContent>
@@ -59,7 +59,7 @@ export default function BuyerAcknowledgmentPage() {
               disease exposure, injury, illness, escape, and mortality.
             </p>
             <p>
-              Wildlife Exchange makes no representations or warranties regarding health, viability, genetics, temperament, training, or future performance.
+              Agchange makes no representations or warranties regarding health, viability, genetics, temperament, training, or future performance.
               Any representations are made solely by the seller.
             </p>
           </CardContent>
@@ -85,7 +85,7 @@ export default function BuyerAcknowledgmentPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
               You acknowledge that risk of loss, injury, illness, escape, or death transfers to you upon delivery or pickup, as between you and the seller.
-              Wildlife Exchange bears no responsibility before, during, or after transport.
+              Agchange bears no responsibility before, during, or after transport.
             </p>
           </CardContent>
         </Card>

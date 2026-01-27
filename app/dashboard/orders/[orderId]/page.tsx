@@ -405,11 +405,12 @@ export default function BuyerOrderDetailPage() {
             const txStatus: string = getEffectiveTransactionStatus(order);
             const transportOption = order.transportOption || 'SELLER_TRANSPORT';
             if (txStatus === 'DELIVERED_PENDING_CONFIRMATION' && transportOption === 'SELLER_TRANSPORT') {
-              // Scroll to confirm receipt button
               const el = document.getElementById('confirm-receipt-section');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else if (txStatus === 'DELIVERY_PROPOSED') {
+              const el = document.getElementById('agree-delivery');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_SCHEDULED') {
-              // Scroll to pickup section
               const el = document.getElementById('fulfillment-section');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -491,6 +492,47 @@ export default function BuyerOrderDetailPage() {
                       <Separator />
                     </>
                   )}
+                  {txStatus === 'DELIVERY_PROPOSED' && order.delivery?.windows?.length && (
+                    <div id="agree-delivery">
+                      <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-2">
+                        <div><strong>Seller proposed:</strong> Pick one window that works for you.</div>
+                        {order.delivery.transporter?.name && <div><strong>Hauler:</strong> {order.delivery.transporter.name}</div>}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="font-semibold text-sm">Agree to delivery window</div>
+                        <div className="space-y-2">
+                          {order.delivery.windows.map((w: any, idx: number) => {
+                            const start = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
+                            const end = w?.end?.toDate ? w.end.toDate() : new Date(w?.end);
+                            return (
+                              <Button
+                                key={idx}
+                                variant="outline"
+                                className="w-full justify-start"
+                                disabled={processing !== null}
+                                onClick={async () => {
+                                  try {
+                                    setProcessing('confirm');
+                                    await postAuthJson(`/api/orders/${order.id}/fulfillment/agree-delivery`, { agreedWindowIndex: idx });
+                                    toast({ title: 'Success', description: 'Delivery window agreed. Seller will haul within this timeframe.' });
+                                    const refreshed = await getOrderById(order.id);
+                                    if (refreshed) setOrder(refreshed);
+                                  } catch (e: any) {
+                                    toast({ title: 'Error', description: e?.message || 'Failed to agree', variant: 'destructive' });
+                                  } finally {
+                                    setProcessing(null);
+                                  }
+                                }}
+                              >
+                                {start.toLocaleString()} – {end.toLocaleString()}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Separator />
+                    </div>
+                  )}
                   {(txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') && (
                     <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
                       <div className="font-semibold text-blue-900 dark:text-blue-100">
@@ -501,8 +543,8 @@ export default function BuyerOrderDetailPage() {
                   )}
                   {txStatus === 'FULFILLMENT_REQUIRED' && (
                     <div className="text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded border border-orange-200 dark:border-orange-800">
-                      <div className="font-semibold text-orange-900 dark:text-orange-100">Waiting for Seller to Start Fulfillment</div>
-                      <div className="text-xs mt-1">Seller needs to schedule delivery.</div>
+                      <div className="font-semibold text-orange-900 dark:text-orange-100">Waiting for Seller to Propose Delivery</div>
+                      <div className="text-xs mt-1">Seller will propose delivery windows. You will agree to one.</div>
                     </div>
                   )}
                   {txStatus === 'COMPLETED' && (
@@ -540,7 +582,8 @@ export default function BuyerOrderDetailPage() {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <div className="font-semibold text-sm">Select Pickup Window</div>
+                        <div className="font-semibold text-sm">Propose pickup window</div>
+                        <div className="text-xs text-muted-foreground">Choose a window. Seller must agree before you can confirm pickup.</div>
                         <div className="space-y-2">
                           {order.pickup.windows.map((window: any, idx: number) => {
                             const start = (window.start && typeof window.start === 'object' && typeof window.start.toDate === 'function') 
@@ -559,9 +602,9 @@ export default function BuyerOrderDetailPage() {
                                   try {
                                     setProcessing('select_window');
                                     await postAuthJson(`/api/orders/${order.id}/fulfillment/select-pickup-window`, {
-                                      windowIndex: idx,
+                                      selectedWindowIndex: idx,
                                     });
-                                    toast({ title: 'Success', description: 'Pickup window selected.' });
+                                    toast({ title: 'Success', description: 'Pickup window proposed. Seller must agree.' });
                                     const refreshed = await getOrderById(order.id);
                                     if (refreshed) setOrder(refreshed);
                                   } catch (e: any) {
@@ -579,6 +622,14 @@ export default function BuyerOrderDetailPage() {
                       </div>
                       <Separator />
                     </>
+                  )}
+                  {txStatus === 'PICKUP_PROPOSED' && order.pickup?.selectedWindow && (
+                    <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting for seller to agree</div>
+                      <div className="text-xs mt-1">
+                        You proposed {new Date(order.pickup.selectedWindow.start).toLocaleString()} – {new Date(order.pickup.selectedWindow.end).toLocaleString()}. Seller must agree before you can confirm pickup.
+                      </div>
+                    </div>
                   )}
                   {txStatus === 'PICKUP_SCHEDULED' && order.pickup?.selectedWindow && (
                     <>

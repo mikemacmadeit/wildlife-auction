@@ -143,7 +143,7 @@ const baseHandler: Handler = async () => {
           continue;
         }
 
-        const title = String(payload.title || 'Wildlife Exchange');
+        const title = String(payload.title || 'Agchange');
         const body = String(payload.body || '');
         const deepLinkUrl = payload.deepLinkUrl ? String(payload.deepLinkUrl) : undefined;
 

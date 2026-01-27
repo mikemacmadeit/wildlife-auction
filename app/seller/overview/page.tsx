@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { useAuth } from '@/hooks/use-auth';
 import { listSellerListings } from '@/lib/firebase/listings';
-import { getOrdersForUser } from '@/lib/firebase/orders';
+import { getOrdersForUser, filterSellerRelevantOrders } from '@/lib/firebase/orders';
 import { Listing, Order, UserProfile } from '@/lib/types';
 import { getUserProfile, isProfileComplete } from '@/lib/firebase/users';
 import { getEffectiveListingStatus } from '@/lib/listings/effectiveStatus';
@@ -243,7 +243,7 @@ export default function SellerOverviewPage() {
         setListings(listingsRes.value);
 
         if (ordersRes.status === 'fulfilled') {
-          setOrders(ordersRes.value);
+          setOrders(filterSellerRelevantOrders(ordersRes.value));
         } else {
           // Non-fatal: keep page usable even if orders fail
           setOrders([]);

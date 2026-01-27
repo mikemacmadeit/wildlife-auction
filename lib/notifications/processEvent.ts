@@ -106,7 +106,12 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
     }
     case 'Order.DeliveryScheduled': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryScheduled' }>;
-      return `Delivery scheduled for "${p.listingTitle}". ETA: ${new Date(p.eta).toLocaleString()}. ${p.orderUrl}`;
+      if (p.eta) return `Delivery scheduled for "${p.listingTitle}". ETA: ${new Date(p.eta).toLocaleString()}. ${p.orderUrl}`;
+      return `Seller proposed delivery windows for "${p.listingTitle}". Agree to one: ${p.orderUrl}`;
+    }
+    case 'Order.DeliveryAgreed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAgreed' }>;
+      return `Buyer agreed to delivery window for "${p.listingTitle}". ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
     }
     case 'Order.PickupReady': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupReady' }>;
@@ -114,7 +119,11 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
     }
     case 'Order.PickupWindowSelected': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupWindowSelected' }>;
-      return `Buyer selected pickup window for "${p.listingTitle}". Window: ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
+      return `Buyer proposed pickup window for "${p.listingTitle}". Agree to confirm: ${p.orderUrl}`;
+    }
+    case 'Order.PickupWindowAgreed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupWindowAgreed' }>;
+      return `Seller agreed to pickup window for "${p.listingTitle}". ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
     }
     case 'Order.PickupConfirmed': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupConfirmed' }>;
@@ -334,11 +343,22 @@ function buildEmailJobPayload(params: {
     }
     case 'Order.DeliveryScheduled': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryScheduled' }>;
-      // Use order_in_transit template for now (can be enhanced later)
       return {
         template: 'order_in_transit',
         templatePayload: {
           buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryAgreed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAgreed' }>;
+      return {
+        template: 'order_received',
+        templatePayload: {
+          sellerName: recipientName,
           orderId: p.orderId,
           listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,
@@ -360,11 +380,22 @@ function buildEmailJobPayload(params: {
     }
     case 'Order.PickupWindowSelected': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupWindowSelected' }>;
-      // Use order_received template for now (can be enhanced later)
       return {
         template: 'order_received',
         templatePayload: {
           sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.PickupWindowAgreed': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupWindowAgreed' }>;
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
           orderId: p.orderId,
           listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,

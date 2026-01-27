@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const posts = await getFieldNotesByAuthorSlug(params.slug);
   const name = posts[0]?.author || 'Author';
   return {
-    title: `${name} | Field Notes | Wildlife Exchange`,
-    description: `Posts by ${name} on Wildlife Exchange Field Notes.`,
+    title: `${name} | Field Notes | Agchange`,
+    description: `Posts by ${name} on Agchange Field Notes.`,
     alternates: { canonical: `/field-notes/authors/${params.slug}` },
   };
 }

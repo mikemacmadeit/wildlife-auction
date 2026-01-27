@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const post = await getFieldNoteBySlug(params.slug);
   if (!post) return {};
 
-  const title = `${post.title} | Field Notes | Wildlife Exchange`;
+  const title = `${post.title} | Field Notes | Agchange`;
   return {
     title,
     description: post.description,
@@ -49,7 +49,7 @@ export default async function FieldNotePostPage({ params }: { params: { slug: st
     headline: post.title,
     description: post.description,
     datePublished: post.date,
-    author: post.author ? { '@type': 'Person', name: post.author } : { '@type': 'Organization', name: 'Wildlife Exchange' },
+    author: post.author ? { '@type': 'Person', name: post.author } : { '@type': 'Organization', name: 'Agchange' },
     image: post.coverImage ? [post.coverImage] : undefined,
     mainEntityOfPage: {
       '@type': 'WebPage',

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getFieldNotesTags } from '@/lib/content/field-notes';
 
 export const metadata: Metadata = {
-  title: 'Tags | Field Notes | Wildlife Exchange',
+  title: 'Tags | Field Notes | Agchange',
   description: 'Browse Field Notes posts by tag.',
   alternates: { canonical: '/field-notes/tags' },
 };

@@ -11,7 +11,7 @@
  * - "buy wildlife" / "sell wildlife"
  * - "wildlife marketplace" (as descriptor)
  * 
- * Exception: "Wildlife Exchange" as brand name is allowed.
+ * Exception: "Agchange" as brand name is allowed.
  */
 
 import { readFileSync, readdirSync, statSync } from 'fs';
@@ -27,7 +27,7 @@ const BANNED_TERMS = [
 ];
 
 const ALLOWED_EXCEPTIONS = [
-  'Wildlife Exchange', // Brand name
+  'Agchange', // Brand name
   'wildlife_exotics', // Category enum value (not display text)
   'EXOTIC_SPECIES', // Constant name
   'exotic-species', // File name

@@ -10,15 +10,15 @@ version: 1
 
 # Frequently Asked Questions (FAQ)
 
-Answers to the most common questions about Wildlife Exchange.
+Answers to the most common questions about Agchange.
 
 ## General Questions
 
-### What is Wildlife Exchange?
+### What is Agchange?
 
-Wildlife Exchange is a trusted online marketplace for buying and selling animals, livestock, ranch equipment, and related items. We connect buyers and sellers in a secure, transparent platform with buyer and seller protection.
+Agchange is a trusted online marketplace for buying and selling animals, livestock, ranch equipment, and related items. We connect buyers and sellers in a secure, transparent platform with buyer and seller protection.
 
-### Is Wildlife Exchange free to use?
+### Is Agchange free to use?
 
 **For buyers:** Yes, creating an account and browsing is free. You only pay when you make a purchase.
 
@@ -35,7 +35,7 @@ Yes, email verification is required to:
 ### How do I verify my email?
 
 1. Check your email inbox after signing up
-2. Look for verification email from Wildlife Exchange
+2. Look for verification email from Agchange
 3. Check spam folder if not in inbox
 4. Click the verification link
 5. You'll be redirected and verified
@@ -164,7 +164,7 @@ Delivery times vary:
 
 ## Safety Questions
 
-### Is Wildlife Exchange safe?
+### Is Agchange safe?
 
 Yes, we prioritize safety:
 - Verified accounts
@@ -198,9 +198,9 @@ Yes, we prioritize safety:
 - Edge
 - Most modern browsers
 
-### Can I use Wildlife Exchange on mobile?
+### Can I use Agchange on mobile?
 
-Yes, Wildlife Exchange works on:
+Yes, Agchange works on:
 - Mobile browsers (Chrome, Safari, Firefox)
 - Responsive design for mobile
 - Full functionality on mobile devices
@@ -225,7 +225,7 @@ Yes, Wildlife Exchange works on:
 
 ## Related Articles
 
-- [What Is Wildlife Exchange](/help/what-is-wildlife-exchange)
+- [What Is Agchange](/help/what-is-agchange)
 - [How to Buy](/help/how-to-buy)
 - [How to Sell](/help/how-to-sell)
 - [Contact Support](/help/contact-support)

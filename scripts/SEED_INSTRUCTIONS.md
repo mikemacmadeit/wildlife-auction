@@ -123,3 +123,14 @@ After seeding, verify in Firebase Console:
 2. Check `listings` collection - should have 5 documents
 3. Check that all listings have `status: 'active'`
 4. Check that all listings have `sellerId` matching the user's UID
+
+## Removing Stripe-risky test listings
+
+If a test user created listings that are problematic for payment-processor review (e.g. Lion, zebra), use the one-off cleanup script:
+
+```bash
+npx tsx scripts/delete-stripe-risky-listings.ts --dry-run   # preview only
+npx tsx scripts/delete-stripe-risky-listings.ts             # delete matches
+```
+
+Same Firebase Admin prerequisites as `seed-listings-admin.ts`. The script deletes listings whose **title** is exactly "Lion" or "Frank the Zebro". To remove other titles or by species, edit `TITLES_TO_DELETE` in the script.

@@ -29,7 +29,7 @@ import Image from 'next/image';
 For logos or simple image tags:
 
 ```tsx
-<img src="/logos/logo.png" alt="Wildlife Exchange Logo" />
+<img src="/logos/logo.png" alt="Agchange Logo" />
 ```
 
 ### Background Images in CSS

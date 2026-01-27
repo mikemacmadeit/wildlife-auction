@@ -450,7 +450,7 @@ export default function AdminKnowledgeBasePage() {
                 id="title"
                 value={formData.title}
                 onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="How to Buy on Wildlife Exchange"
+                placeholder="How to Buy on Agchange"
               />
             </div>
 

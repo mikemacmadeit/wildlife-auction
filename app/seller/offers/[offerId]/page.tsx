@@ -12,6 +12,7 @@ import { Loader2, ArrowLeft, CheckCircle2, XCircle, Handshake, Clock } from 'luc
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getOffer, acceptOffer, counterOffer, declineOffer } from '@/lib/offers/api';
+import { OfferAcceptedSuccessModal } from '@/components/offers/OfferAcceptedSuccessModal';
 
 type OfferDTO = {
   offerId: string;
@@ -49,6 +50,7 @@ export default function SellerOfferDetailPage() {
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [acceptSuccessOpen, setAcceptSuccessOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -77,8 +79,8 @@ export default function SellerOfferDetailPage() {
     setActionLoading(true);
     try {
       await acceptOffer(offer.offerId);
-      toast({ title: 'Accepted', description: 'Offer accepted and listing reserved.' });
       await load();
+      setAcceptSuccessOpen(true);
     } catch (e: any) {
       toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
@@ -150,7 +152,7 @@ export default function SellerOfferDetailPage() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" onClick={() => router.push('/seller/offers')} className="min-h-[40px]">
+        <Button variant="outline" onClick={() => router.push('/dashboard/bids-offers?tab=offers')} className="min-h-[40px]">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -274,6 +276,16 @@ export default function SellerOfferDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OfferAcceptedSuccessModal
+        open={acceptSuccessOpen}
+        onOpenChange={setAcceptSuccessOpen}
+        role="seller"
+        listingTitle={offer?.listingSnapshot?.title}
+        amount={offer?.currentAmount ?? offer?.acceptedAmount}
+        offerId={offer?.offerId}
+        listingId={offer?.listingId}
+      />
     </div>
   );
 }

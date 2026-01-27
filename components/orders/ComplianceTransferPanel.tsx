@@ -144,7 +144,7 @@ export function ComplianceTransferPanel({ order, role, onConfirm }: ComplianceTr
       <CardContent className="space-y-4">
         <Alert>
           <AlertDescription className="text-sm text-gray-700">
-            <strong>Legal Notice:</strong> Wildlife Exchange facilitates transactions between permitted parties.
+            <strong>Legal Notice:</strong> Agchange facilitates transactions between permitted parties.
             Buyer and seller are solely responsible for complying with all Texas Parks & Wildlife transfer and
             possession requirements prior to delivery or pickup.
           </AlertDescription>

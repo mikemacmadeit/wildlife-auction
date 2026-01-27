@@ -356,7 +356,7 @@ export default function DashboardLayout({
                 <div className="h-full w-full dark:hidden">
                   <Image
                     src="/images/Kudu.png"
-                    alt="Wildlife Exchange Logo"
+                    alt="Agchange Logo"
                     width={40}
                     height={40}
                     className="h-full w-full object-contain opacity-90"
@@ -383,7 +383,7 @@ export default function DashboardLayout({
             {!sidebarCollapsed && (
               <div className="flex flex-col overflow-hidden">
                 <span className="text-lg font-extrabold text-foreground leading-tight whitespace-nowrap">
-                  Wildlife Exchange
+                  Agchange
                 </span>
                 <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                   Dashboard
@@ -585,13 +585,13 @@ export default function DashboardLayout({
           <div className="relative h-8 w-8">
             <Image
               src="/images/Kudu.png"
-              alt="Wildlife Exchange"
+              alt="Agchange"
               width={32}
               height={32}
               className="h-full w-full object-contain"
             />
           </div>
-          <span className="text-lg font-bold">Wildlife Exchange</span>
+          <span className="text-lg font-bold">Agchange</span>
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />

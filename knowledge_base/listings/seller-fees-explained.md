@@ -10,11 +10,11 @@ version: 1
 
 # What Are Seller Fees?
 
-Understanding the fees associated with selling on Wildlife Exchange.
+Understanding the fees associated with selling on Agchange.
 
 ## Overview
 
-**Wildlife Exchange fees:**
+**Agchange fees:**
 - **Listing fees:** Typically free or low cost to list
 - **Transaction fees:** Percentage of final sale price
 - **Payment processing:** Handled by payment processor (Stripe)
@@ -104,7 +104,7 @@ Understanding the fees associated with selling on Wildlife Exchange.
 
 ## Fee Comparison
 
-**Wildlife Exchange vs. other platforms:**
+**Agchange vs. other platforms:**
 - Competitive fee structure
 - No listing fees (unlike some platforms)
 - Fees only when you sell

@@ -1,5 +1,17 @@
 # Netlify Deployment Guide
 
+## Deploy like normal (push to Netlify)
+
+**Your repo root is the app.** To deploy:
+
+1. Commit and push to `main`:  
+   `git add -A && git commit -m "your message" && git push origin main`
+2. Netlify builds automatically. Wait for the deploy to show "Published" in the Deploys tab.
+
+**Netlify Build settings:** Base directory must be **empty**. This repo has no subdirectory — the app is the repo root. If Base directory is set to `project` or anything else, clear it and redeploy.
+
+---
+
 ## Step-by-Step: Connect GitHub to Netlify
 
 ### Step 1: Push Latest Changes to GitHub
@@ -31,11 +43,11 @@ git push origin main
    - Click on `mikemacmadeit/wildlife-auction`
 
 5. **Configure Build Settings**
-   Netlify should auto-detect Next.js, but verify:
-   - **Base directory**: Leave empty (or `project` if deploying from subdirectory)
-   - **Build command**: `npm run build`
+   Netlify reads `netlify.toml` from this repo; you usually don't need to override. If you set anything manually:
+   - **Base directory**: Leave **empty** (this repo root is the app)
+   - **Build command**: from `netlify.toml` (or `npm run build` as fallback)
    - **Publish directory**: `.next`
-   - **Node version**: Use latest (or 18.x)
+   - **Node version**: 18.x or 20.x
 
 6. **Click "Deploy site"**
 

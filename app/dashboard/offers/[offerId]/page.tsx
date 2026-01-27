@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { acceptOffer, counterOffer, declineOffer, getOffer, withdrawOffer } from '@/lib/offers/api';
 import { createCheckoutSession } from '@/lib/stripe/api';
+import { OfferAcceptedSuccessModal } from '@/components/offers/OfferAcceptedSuccessModal';
 
 function formatTimeLeft(expiresAtMs?: number | null): string {
   if (!expiresAtMs) return '—';
@@ -39,6 +40,7 @@ export default function BuyerOfferDetailPage() {
 
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
+  const [acceptSuccessOpen, setAcceptSuccessOpen] = useState(false);
 
   const load = async () => {
     if (!offerId) return;
@@ -79,8 +81,8 @@ export default function BuyerOfferDetailPage() {
     setActionLoading(true);
     try {
       await acceptOffer(String(offerId));
-      toast({ title: 'Offer accepted', description: 'You accepted the counter offer.' });
       await load();
+      setAcceptSuccessOpen(true);
     } catch (e: any) {
       toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
@@ -167,7 +169,7 @@ export default function BuyerOfferDetailPage() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" onClick={() => router.push('/dashboard/offers')} className="min-h-[40px]">
+        <Button variant="outline" onClick={() => router.push('/dashboard/bids-offers?tab=offers')} className="min-h-[40px]">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -307,6 +309,19 @@ export default function BuyerOfferDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OfferAcceptedSuccessModal
+        open={acceptSuccessOpen}
+        onOpenChange={setAcceptSuccessOpen}
+        role="buyer"
+        listingTitle={offer?.listingSnapshot?.title}
+        amount={offer ? Number(offer.acceptedAmount ?? offer.currentAmount) : undefined}
+        offerId={offerId ?? undefined}
+        listingId={offer?.listingId}
+        onCheckout={() => {
+          if (offer?.listingId) router.push(`/listing/${offer.listingId}`);
+        }}
+      />
     </div>
   );
 }

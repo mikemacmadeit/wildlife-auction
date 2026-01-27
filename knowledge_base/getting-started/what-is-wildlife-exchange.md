@@ -1,6 +1,6 @@
 ---
-title: "What Is Wildlife Exchange?"
-slug: "what-is-wildlife-exchange"
+title: "What Is Agchange?"
+slug: "what-is-agchange"
 category: "getting-started"
 audience: ["all"]
 tags: ["getting-started", "what is", "about", "platform", "marketplace", "overview", "introduction"]
@@ -8,13 +8,13 @@ enabled: true
 version: 2
 ---
 
-# What Is Wildlife Exchange?
+# What Is Agchange?
 
-Wildlife Exchange is a trusted online marketplace for buying and selling animals, livestock, ranch equipment, and related items. We connect buyers and sellers in a secure, transparent platform.
+Agchange is a trusted online marketplace for buying and selling animals, livestock, ranch equipment, and related items. We connect buyers and sellers in a secure, transparent platform.
 
 ## What We Are
 
-**Wildlife Exchange is:**
+**Agchange is:**
 - An online marketplace for animals and livestock
 - A platform for ranch equipment and related items
 - A secure place to buy and sell with protection
@@ -125,7 +125,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 - Protected by fraud detection
 - Processed through the platform and released according to marketplace confirmation and dispute rules
 
-## Why Use Wildlife Exchange?
+## Why Use Agchange?
 
 ### For Buyers
 
@@ -147,7 +147,7 @@ Wildlife Exchange is a trusted online marketplace for buying and selling animals
 
 ## Getting Started
 
-**New to Wildlife Exchange?**
+**New to Agchange?**
 
 1. **Sign up** - Create a free account
 2. **Verify email** - Required for purchases

@@ -10,7 +10,7 @@ version: 1
 
 # What Payment Methods Are Accepted?
 
-Wildlife Exchange accepts multiple secure payment methods for your convenience.
+Agchange accepts multiple secure payment methods for your convenience.
 
 ## Accepted Payment Methods
 
@@ -103,7 +103,7 @@ Wildlife Exchange accepts multiple secure payment methods for your convenience.
 - Encrypted and secure
 - Processed through trusted payment processors
 - Protected by industry-standard security
-- Never stored on Wildlife Exchange servers
+- Never stored on Agchange servers
 
 **Your payment information:**
 - Is encrypted during transmission
@@ -135,7 +135,7 @@ Wildlife Exchange accepts multiple secure payment methods for your convenience.
 
 **How payments are handled:**
 1. **Payment is processed** when you complete checkout
-2. **Funds are held securely** by Wildlife Exchange
+2. **Funds are held securely** by Agchange
 3. **Seller is notified** of your purchase
 4. **Delivery is arranged** between you and seller
 5. **Funds are released** to seller when you confirm delivery
@@ -174,7 +174,7 @@ Wildlife Exchange accepts multiple secure payment methods for your convenience.
 **Credit/Debit Cards:**
 - Standard processing fees apply
 - Fees are included in the total shown
-- No additional fees from Wildlife Exchange
+- No additional fees from Agchange
 
 **ACH:**
 - Lower fees than credit cards

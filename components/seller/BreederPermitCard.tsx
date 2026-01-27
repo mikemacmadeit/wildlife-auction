@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { FileText, Loader2, Eye, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { FileText, Loader2, Eye, Upload, AlertCircle, CheckCircle2, Clock, FileCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { uploadSellerPermitDocument, type DocumentUploadProgress } from '@/lib/firebase/storage-documents';
@@ -50,11 +50,15 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
   const [expiresAt, setExpiresAt] = useState(''); // yyyy-mm-dd
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
 
-  const canSubmit = useMemo(() => !!user?.uid && !!file && !uploading, [file, uploading, user?.uid]);
+  const canSubmit = useMemo(() => !!user?.uid && !!file && !uploading && !submitting, [file, submitting, uploading, user?.uid]);
+
+  const waitingOnApproval = (permit?.status === 'pending' && !!permit?.documentUrl) || justSubmitted;
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
@@ -185,12 +189,16 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
   const handleSubmit = useCallback(async () => {
     if (!user?.uid || !file) return;
     setUploading(true);
+    setSubmitting(false);
     setError(null);
     setProgress(0);
     try {
       const storage = await uploadSellerPermitDocument(user.uid, file, (p: DocumentUploadProgress) => {
-        setProgress(Math.round(p.progress * 0.9));
+        setProgress(Math.round(p.progress * 0.85));
       });
+
+      setSubmitting(true);
+      setProgress(92);
 
       const token = await user.getIdToken();
       const res = await fetch('/api/seller/breeder-permit', {
@@ -208,9 +216,10 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
 
       setProgress(100);
       setFile(null);
+      setJustSubmitted(true);
       toast({
         title: 'Submitted for review',
-        description: 'Your breeder permit has been uploaded and submitted to the compliance team.',
+        description: 'Your breeder permit has been uploaded and is awaiting approval. We’ll update this card when our team has reviewed it.',
       });
       await load();
     } catch (e: any) {
@@ -218,9 +227,20 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
       setError(e?.message || 'Failed to upload breeder permit');
     } finally {
       setUploading(false);
+      setSubmitting(false);
       setProgress(0);
     }
   }, [expiresAt, file, load, permitNumber, toast, user]);
+
+  useEffect(() => {
+    if (!justSubmitted) return;
+    if (permit?.status === 'pending' && permit?.documentUrl) {
+      setJustSubmitted(false);
+      return;
+    }
+    const t = setTimeout(() => setJustSubmitted(false), 5000);
+    return () => clearTimeout(t);
+  }, [justSubmitted, permit?.status, permit?.documentUrl]);
 
   const compactVerified = props.compactWhenVerified === true;
   const showDismissHint = props.showDismissHint === true;
@@ -271,6 +291,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             <AlertDescription>
               <div className="font-semibold">Rejected</div>
               <div className="text-sm mt-1">{permit.rejectionReason}</div>
+              <div className="text-sm mt-2 text-muted-foreground">Upload a new document below to resubmit.</div>
             </AlertDescription>
           </Alert>
         ) : null}
@@ -298,8 +319,41 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
           </div>
         ) : null}
 
+        {waitingOnApproval ? (
+          <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-6 space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Clock className="h-6 w-6 text-primary" />
+              </div>
+              <div className="space-y-1 flex-1 min-w-0">
+                <h3 className="font-semibold text-lg">Waiting on approval</h3>
+                <p className="text-sm text-muted-foreground">
+                  Your TPWD breeder permit has been submitted and is under review. We'll update this card when our team has reviewed it—usually within 1–2 business days. You'll get an email if we need anything.
+                </p>
+                {permit?.uploadedAt ? (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Submitted {new Date(permit.uploadedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                    {permit.permitNumber ? ' · Permit #' + permit.permitNumber : ''}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            {permit?.documentUrl ? (
+              <Button variant="outline" onClick={() => setShowPreview(true)} className="w-full sm:w-auto">
+                <FileCheck className="h-4 w-4 mr-2" />
+                View submitted document
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading…
+              </div>
+            )}
+          </div>
+        ) : null}
+
         {/* Overview UX: once verified, keep this card “read-only” and hide the upload form. */}
-        {compactVerified && permit?.status === 'verified' ? null : (
+        {compactVerified && permit?.status === 'verified' ? null : waitingOnApproval ? null : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="tpwd-permit-number">Permit number</Label>
@@ -308,7 +362,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
               value={permitNumber}
               onChange={(e) => setPermitNumber(e.target.value)}
               placeholder="e.g. TPWD-XXXXXX"
-              disabled={uploading}
+              disabled={uploading || submitting}
             />
           </div>
           <div className="space-y-2">
@@ -318,13 +372,13 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              disabled={uploading}
+              disabled={uploading || submitting}
             />
           </div>
         </div>
         )}
 
-        {compactVerified && permit?.status === 'verified' ? null : (
+        {compactVerified && permit?.status === 'verified' ? null : waitingOnApproval ? null : (
         <div className="space-y-2">
           <Label htmlFor="tpwd-permit-file">Upload permit (PDF or image)</Label>
           <Input
@@ -332,7 +386,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             type="file"
             accept="application/pdf,image/*"
             onChange={(e) => onFile(e.target.files?.[0] || null)}
-            disabled={uploading}
+            disabled={uploading || submitting}
           />
           <div className="text-xs text-muted-foreground">
             Allowed: PDF/JPG/PNG/WEBP. Max 10MB.
@@ -340,25 +394,25 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
         </div>
         )}
 
-        {uploading ? (
+        {(uploading || submitting) ? (
           <div className="space-y-2">
             <Progress value={progress} />
-            <div className="text-xs text-muted-foreground">Uploading…</div>
+            <div className="text-xs text-muted-foreground">{submitting ? 'Submitting…' : 'Uploading…'}</div>
           </div>
         ) : null}
 
-        {compactVerified && permit?.status === 'verified' ? null : (
+        {compactVerified && permit?.status === 'verified' ? null : waitingOnApproval ? null : (
         <div className="flex items-center gap-2">
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
             className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-muted disabled:text-muted-foreground"
           >
-            {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            {(uploading || submitting) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
             Submit for review
           </Button>
           {permit?.documentUrl ? (
-            <Button variant="outline" onClick={() => setShowPreview(true)} disabled={uploading}>
+            <Button variant="outline" onClick={() => setShowPreview(true)} disabled={uploading || submitting}>
               <Eye className="h-4 w-4 mr-2" />
               View current
             </Button>

@@ -13,6 +13,7 @@ import { getAdminDb } from '../../lib/firebase/admin';
 import { emitAndProcessEventForUser } from '../../lib/notifications/emitEvent';
 import { getSiteUrl } from '../../lib/site-url';
 import { logInfo, logWarn, logError } from '../../lib/monitoring/logger';
+import { tryDispatchEmailJobNow } from '../../lib/email/dispatchEmailJobNow';
 
 const THRESHOLDS: Array<{ key: '24h' | '1h' | '10m' | '2m'; seconds: number }> = [
   { key: '24h', seconds: 24 * 60 * 60 },
@@ -123,7 +124,17 @@ const baseHandler: Handler = async () => {
             },
             optionalHash: threshold.key,
           });
-          if (res.ok && res.created) emitted++;
+          if (res.ok && res.created) {
+            emitted++;
+            try {
+              await Promise.race([
+                tryDispatchEmailJobNow({ db: db as any, jobId: res.eventId, waitForJob: true }),
+                new Promise((resolve) => setTimeout(resolve, 3000)),
+              ]);
+            } catch {
+              /* best-effort */
+            }
+          }
         }
       }
     }

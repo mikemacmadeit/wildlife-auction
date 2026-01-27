@@ -10,7 +10,7 @@ version: 1
 
 # Understanding Listing Types
 
-Wildlife Exchange offers different listing types to suit your selling needs.
+Agchange offers different listing types to suit your selling needs.
 
 ## Auction Listings
 

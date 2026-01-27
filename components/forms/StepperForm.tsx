@@ -64,11 +64,19 @@ export function StepperForm({
   const isLastStep = currentStep === steps.length - 1;
   const attention = new Set(attentionStepIds || []);
 
+  const scrollToTop = () => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Allow parent to request a step jump (e.g. publish validation failure -> jump to the step with missing fields).
   useEffect(() => {
     if (!activeStepId) return;
     const idx = steps.findIndex((s) => s.id === activeStepId);
-    if (idx >= 0 && idx !== currentStep) setCurrentStep(idx);
+    if (idx >= 0 && idx !== currentStep) {
+      setCurrentStep(idx);
+      scrollToTop();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStepId, steps]);
 
@@ -96,12 +104,14 @@ export function StepperForm({
       onComplete(formData);
     } else {
       setCurrentStep(currentStep + 1);
+      scrollToTop();
     }
   };
 
   const handlePrevious = () => {
     if (!isFirstStep) {
       setCurrentStep(currentStep - 1);
+      scrollToTop();
     }
   };
 
@@ -122,6 +132,7 @@ export function StepperForm({
     }
     
     setCurrentStep(index);
+    scrollToTop();
   };
 
   return (

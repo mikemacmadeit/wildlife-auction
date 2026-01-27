@@ -164,6 +164,55 @@ export const createUserDocument = async (
       }
       throw error;
     }
+  } else if (additionalData) {
+    // User doc already exists (e.g. bootstrap-user ran first). Merge registration
+    // additionalData so phone, location, businessName are not lost.
+    const existingProfile = (existingUser.profile || {}) as any;
+    const updates: Partial<UserProfile> = {
+      updatedAt: new Date(),
+      displayName: additionalData.fullName ?? existingUser.displayName ?? user.displayName ?? '',
+      phoneNumber: additionalData.phone ?? existingUser.phoneNumber ?? undefined,
+      profile: {
+        ...existingProfile,
+        fullName: additionalData.fullName ?? existingProfile?.fullName ?? '',
+        location: additionalData.location ?? existingProfile?.location ?? {
+          city: '',
+          state: '',
+          zip: '',
+        },
+        preferences: existingProfile?.preferences ?? { verification: true, transport: true },
+        notifications: existingProfile?.notifications ?? {
+          email: true,
+          sms: false,
+          bids: true,
+          messages: true,
+          promotions: false,
+        },
+        ...(additionalData.businessName ? { businessName: additionalData.businessName } : {}),
+      },
+    };
+
+    try {
+      await updateDocument<UserProfile>('users', user.uid, updates as Partial<UserProfile>);
+      const latest = await getDocument<UserProfile>('users', user.uid).catch(() => null);
+      if (latest) await upsertPublicProfile(user.uid, latest);
+      else await upsertPublicProfile(user.uid, { ...existingUser, ...updates } as any);
+    } catch (error) {
+      const code = String((error as any)?.code || '');
+      const msg = String((error as any)?.message || '');
+      const isPermissionDenied =
+        code === 'permission-denied' ||
+        msg.toLowerCase().includes('missing or insufficient permissions') ||
+        msg.toLowerCase().includes('permission denied');
+      console.error('Error merging registration data into user document:', error);
+      if (isPermissionDenied) {
+        throw new Error(
+          'Firestore permission denied while updating your user profile. ' +
+            'Deploy project/firestore.rules and retry.'
+        );
+      }
+      throw error;
+    }
   }
 };
 

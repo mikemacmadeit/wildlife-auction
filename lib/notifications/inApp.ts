@@ -280,7 +280,7 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'user_welcome',
-        title: 'Welcome to Wildlife Exchange',
+        title: 'Welcome to Agchange',
         body: 'Your next great deal is one bid away.',
         deepLinkUrl: p.dashboardUrl,
         linkLabel: 'Go to dashboard',

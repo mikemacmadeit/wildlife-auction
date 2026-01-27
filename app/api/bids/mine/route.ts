@@ -17,7 +17,11 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
     init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : (init?.headers as Record<string, string> | undefined);
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json', ...(headers || {}) },
+    headers: {
+      'content-type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      ...(headers || {}),
+    },
   });
 }
 
@@ -165,8 +169,12 @@ export async function GET(request: Request) {
           if (updatedAt && (!prev.myLastBidAt || updatedAt > prev.myLastBidAt)) prev.myLastBidAt = updatedAt;
         }
       }
-    } catch {
-      // If autoBids collectionGroup isn't available, keep the bids-only view.
+    } catch (e: any) {
+      // If autoBids collectionGroup query fails (e.g. missing index), keep bids-only view.
+      // Users with max-bid-only (no visible bid doc) may not see those listings—ensure autoBids indexes are deployed.
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[bids/mine] autoBids collectionGroup skipped', (e as Error)?.message || String(e));
+      }
     }
 
     const listingIds = Array.from(grouped.keys()).slice(0, limitN);

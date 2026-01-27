@@ -119,7 +119,7 @@ export default function HowItWorksPage() {
     {
       icon: Truck,
       title: 'Delivery Planning',
-      description: 'Coordinate pickup and delivery details with the seller after purchase. Wildlife Exchange does not provide or arrange transport.',
+      description: 'Coordinate pickup and delivery details with the seller after purchase. Agchange does not provide or arrange transport.',
       color: 'text-primary',
       bgColor: 'bg-primary/10',
       borderColor: 'border-primary/20',
@@ -158,7 +158,7 @@ export default function HowItWorksPage() {
                 <Sparkles className="relative h-12 w-12 md:h-16 md:w-16 text-primary" />
               </div>
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight font-founders">
-                How Wildlife Exchange works
+                How Agchange works
               </h1>
             </motion.div>
 
@@ -176,7 +176,7 @@ export default function HowItWorksPage() {
               transition={{ duration: 0.6, delay: 0.6 }}
               className="text-base md:text-lg text-muted-foreground max-w-3xl mx-auto pt-4"
             >
-              Wildlife Exchange connects breeders, ranchers, and buyers across Texas. Whether you're selling trophy whitetail, registered livestock, cattle, or equipment, our platform makes listing and buying straightforward and secure.
+              Agchange connects breeders, ranchers, and buyers across Texas. Whether you're selling trophy whitetail, registered livestock, cattle, or equipment, our platform makes listing and buying straightforward and secure.
             </motion.p>
 
             <motion.div

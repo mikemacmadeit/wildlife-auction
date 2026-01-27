@@ -100,10 +100,10 @@ export function LegalDocsModal(props: {
                   <Section title="A) Marketplace-only status">
                     <Bullets
                       items={[
-                        'Wildlife Exchange is a technology platform only.',
-                        'Wildlife Exchange is not the seller, dealer, broker, agent, or auctioneer.',
-                        'Wildlife Exchange does not take title to any animal or good.',
-                        'Wildlife Exchange does not inspect, house, handle, transport, or take custody of animals or goods.',
+                        'Agchange is a technology platform only.',
+                        'Agchange is not the seller, dealer, broker, agent, or auctioneer.',
+                        'Agchange does not take title to any animal or good.',
+                        'Agchange does not inspect, house, handle, transport, or take custody of animals or goods.',
                       ]}
                     />
                   </Section>
@@ -112,7 +112,7 @@ export function LegalDocsModal(props: {
                     <Bullets
                       items={[
                         'Buyers and sellers contract directly with each other.',
-                        'Wildlife Exchange is not a party to the transaction.',
+                        'Agchange is not a party to the transaction.',
                         'Any sale agreement is solely between buyer and seller.',
                       ]}
                     />
@@ -122,7 +122,7 @@ export function LegalDocsModal(props: {
                     <Bullets
                       items={[
                         'Live animals involve inherent risks (handling stress, transport stress, disease exposure, acclimation issues, injury, illness, escape, mortality).',
-                        'Wildlife Exchange makes no representations regarding health, viability, genetics, temperament, training, or future performance.',
+                        'Agchange makes no representations regarding health, viability, genetics, temperament, training, or future performance.',
                         'Seller representations are made solely by the seller.',
                         'Buyer is responsible for due diligence (permits, records, veterinary checks, facility checks).',
                       ]}
@@ -133,7 +133,7 @@ export function LegalDocsModal(props: {
                     <Bullets
                       items={[
                         'Risk of loss, injury, illness, escape, or death transfers to the buyer upon delivery or pickup (as applicable).',
-                        'Wildlife Exchange bears no responsibility before, during, or after transport.',
+                        'Agchange bears no responsibility before, during, or after transport.',
                       ]}
                     />
                   </Section>
@@ -143,7 +143,7 @@ export function LegalDocsModal(props: {
                       items={[
                         'All listings are provided “AS-IS, WHERE-IS.”',
                         'No express or implied warranties (including merchantability or fitness for a particular purpose).',
-                        'Wildlife Exchange disclaims all warranties to the maximum extent permitted by law.',
+                        'Agchange disclaims all warranties to the maximum extent permitted by law.',
                       ]}
                     />
                   </Section>
@@ -151,9 +151,9 @@ export function LegalDocsModal(props: {
                   <Section title="F) Transport disclaimer">
                     <Bullets
                       items={[
-                        'Wildlife Exchange does not arrange or provide transportation.',
+                        'Agchange does not arrange or provide transportation.',
                         'Any transport is between buyer, seller, and/or third-party carriers.',
-                        'Wildlife Exchange is not responsible for transport outcomes.',
+                        'Agchange is not responsible for transport outcomes.',
                       ]}
                     />
                   </Section>
@@ -161,7 +161,7 @@ export function LegalDocsModal(props: {
                   <Section title="G) Indemnification (critical)">
                     <Bullets
                       items={[
-                        'Sellers must defend, indemnify, and hold harmless Wildlife Exchange from claims arising from their listings and sales.',
+                        'Sellers must defend, indemnify, and hold harmless Agchange from claims arising from their listings and sales.',
                         'This includes claims related to animal injury, illness, death, disease, misrepresentation, legality, compliance, title/lien issues, and transport outcomes.',
                       ]}
                     />
@@ -170,8 +170,8 @@ export function LegalDocsModal(props: {
                   <Section title="H) Limitation of liability">
                     <Bullets
                       items={[
-                        'Wildlife Exchange is not liable for indirect, incidental, punitive, or consequential damages.',
-                        'Total liability is capped at the fees paid to Wildlife Exchange by you in the prior 12 months.',
+                        'Agchange is not liable for indirect, incidental, punitive, or consequential damages.',
+                        'Total liability is capped at the fees paid to Agchange by you in the prior 12 months.',
                       ]}
                     />
                   </Section>
@@ -198,7 +198,7 @@ export function LegalDocsModal(props: {
                   <Section title="Category-level disclaimers (animals)">
                     <Bullets
                       items={[
-                        'Wildlife Exchange does not take custody, possession, or control of any animal at any time.',
+                        'Agchange does not take custody, possession, or control of any animal at any time.',
                         'Health and legality representations are made solely by the seller.',
                         'Buyers must perform their own due diligence.',
                         'Risk transfers upon delivery or pickup (buyer/seller handle logistics).',
@@ -209,9 +209,9 @@ export function LegalDocsModal(props: {
                   <Section title="Category-level disclaimers (equipment / vehicles)">
                     <Bullets
                       items={[
-                        'Listings are “AS-IS, WHERE-IS.” Wildlife Exchange makes no warranty of condition, title, or fitness.',
+                        'Listings are “AS-IS, WHERE-IS.” Agchange makes no warranty of condition, title, or fitness.',
                         'Buyer and seller handle inspection, title/VIN verification, liens, taxes, and transfer paperwork.',
-                        'Wildlife Exchange does not provide transport; hauling/shipping is arranged between buyer, seller, and third parties.',
+                        'Agchange does not provide transport; hauling/shipping is arranged between buyer, seller, and third parties.',
                       ]}
                     />
                   </Section>
@@ -247,7 +247,7 @@ export function LegalDocsModal(props: {
                   <Section title="Indemnification reinforcement">
                     <Bullets
                       items={[
-                        'You must defend, indemnify, and hold harmless Wildlife Exchange for claims arising from your listings and sales.',
+                        'You must defend, indemnify, and hold harmless Agchange for claims arising from your listings and sales.',
                       ]}
                     />
                   </Section>
@@ -264,7 +264,7 @@ export function LegalDocsModal(props: {
                   <Section title="Buyer acknowledgments (animals)">
                     <Bullets
                       items={[
-                        'The contract is between you and the seller; Wildlife Exchange is not a party.',
+                        'The contract is between you and the seller; Agchange is not a party.',
                         'Live animals involve inherent risk; outcomes are not guaranteed.',
                         'You will perform your own due diligence (permits/records/inspection).',
                         'Risk transfers upon delivery or pickup.',

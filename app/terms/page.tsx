@@ -6,9 +6,9 @@ import { Shield, Gavel, AlertTriangle, Mail } from 'lucide-react';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | Wildlife Exchange',
+  title: 'Terms of Service | Agchange',
   description:
-    'Terms of Service for using Wildlife Exchange, including marketplace-only status, live animal risk, and arbitration.',
+    'Terms of Service for using Agchange, including marketplace-only status, live animal risk, and arbitration.',
 };
 
 const EFFECTIVE_DATE = LEGAL_VERSIONS.tos.effectiveDateLabel;
@@ -30,7 +30,7 @@ export default function TermsPage() {
       <Alert className="mb-8">
         <Shield className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          <strong>Important:</strong> Wildlife Exchange is a technology marketplace only. We are not the seller, dealer, broker,
+          <strong>Important:</strong> Agchange is a technology marketplace only. We are not the seller, dealer, broker,
           agent, or auctioneer. We do not take title, custody, possession, or control of animals or goods. “Verified” means a document
           was reviewed for marketplace workflow completeness—it does <strong>not</strong> mean a regulator approved a transfer.
         </AlertDescription>
@@ -43,7 +43,7 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              By accessing or using Wildlife Exchange (the “Services”), you agree to these Terms of Service (“Terms”).
+              By accessing or using Agchange (the “Services”), you agree to these Terms of Service (“Terms”).
               If you do not agree, do not use the Services.
             </p>
             <p>
@@ -58,7 +58,7 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Wildlife Exchange provides software that allows users to list items and communicate with other users. Wildlife Exchange is a
+              Agchange provides software that allows users to list items and communicate with other users. Agchange is a
               technology platform only and is not a seller, dealer, broker, agent, or auctioneer.
             </p>
             <ul className="list-disc ml-5 space-y-1">
@@ -75,11 +75,11 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Buyers and sellers contract directly with each other. Wildlife Exchange is not a party to the transaction and does not become an
+              Buyers and sellers contract directly with each other. Agchange is not a party to the transaction and does not become an
               owner of, or responsible for, any listed animal or good.
             </p>
             <p>
-              Any sale agreement, bill of sale, or transfer documentation is between buyer and seller. Wildlife Exchange may provide tools or
+              Any sale agreement, bill of sale, or transfer documentation is between buyer and seller. Agchange may provide tools or
               templates for convenience but makes no representation about the sufficiency of those documents for any particular transaction.
             </p>
           </CardContent>
@@ -104,7 +104,7 @@ export default function TermsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
               <strong>All animal transactions are Texas-only.</strong> Buyers and sellers must comply with applicable Texas laws and regulations.
-              Wildlife Exchange may apply geographic restrictions and workflow checks to support these requirements.
+              Agchange may apply geographic restrictions and workflow checks to support these requirements.
             </p>
             <p>Equipment and vehicle listings may be multi-state unless otherwise stated.</p>
           </CardContent>
@@ -120,7 +120,7 @@ export default function TermsPage() {
               disease exposure, injury, illness, escape, and mortality.
             </p>
             <p>
-              Wildlife Exchange makes no representations or warranties regarding the health, viability, genetics, temperament, training, or future
+              Agchange makes no representations or warranties regarding the health, viability, genetics, temperament, training, or future
               performance of any animal. Any representations are made solely by the seller.
             </p>
             <p>
@@ -137,7 +137,7 @@ export default function TermsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
               As between buyer and seller, risk of loss, injury, illness, escape, or death transfers to the buyer upon delivery or pickup (as applicable).
-              Wildlife Exchange bears no responsibility before, during, or after transport.
+              Agchange bears no responsibility before, during, or after transport.
             </p>
           </CardContent>
         </Card>
@@ -148,11 +148,11 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              All listings are provided “AS-IS, WHERE-IS.” To the maximum extent permitted by law, Wildlife Exchange disclaims all warranties,
+              All listings are provided “AS-IS, WHERE-IS.” To the maximum extent permitted by law, Agchange disclaims all warranties,
               express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
             </p>
             <p>
-              Wildlife Exchange does not warrant the quality, health, condition, legality, or transferability of any animal or good listed by sellers.
+              Agchange does not warrant the quality, health, condition, legality, or transferability of any animal or good listed by sellers.
             </p>
           </CardContent>
         </Card>
@@ -163,8 +163,8 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Wildlife Exchange does not arrange or provide transportation. Any pickup, delivery, shipping, hauling, or other transport is arranged
-              solely between buyer, seller, and/or third-party carriers. Wildlife Exchange is not responsible for transport outcomes.
+              Agchange does not arrange or provide transportation. Any pickup, delivery, shipping, hauling, or other transport is arranged
+              solely between buyer, seller, and/or third-party carriers. Agchange is not responsible for transport outcomes.
             </p>
           </CardContent>
         </Card>
@@ -211,10 +211,10 @@ export default function TermsPage() {
             <CardTitle>12) Payments and platform fees</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>Payments are processed by Stripe. Wildlife Exchange may collect marketplace fees.</p>
+            <p>Payments are processed by Stripe. Agchange may collect marketplace fees.</p>
             <p>
-              Wildlife Exchange processes payments through the platform and releases funds according to marketplace workflow rules (for example, dispute windows or required document uploads).
-              This relates to payment settlement only and does not mean Wildlife Exchange takes custody of any animal or good.
+              Agchange processes payments through the platform and releases funds according to marketplace workflow rules (for example, dispute windows or required document uploads).
+              This relates to payment settlement only and does not mean Agchange takes custody of any animal or good.
             </p>
           </CardContent>
         </Card>
@@ -271,12 +271,12 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Sellers agree to defend, indemnify, and hold harmless Wildlife Exchange and its owners, directors, officers, employees, and contractors
+              Sellers agree to defend, indemnify, and hold harmless Agchange and its owners, directors, officers, employees, and contractors
               from and against any claims arising out of or relating to their listings and transactions, including claims related to animal injury, illness,
               death, disease, misrepresentation, legality, compliance, title/lien issues, and transport outcomes.
             </p>
             <p>
-              All users agree to indemnify and hold Wildlife Exchange harmless from claims arising out of their use of the Services or violation of these Terms.
+              All users agree to indemnify and hold Agchange harmless from claims arising out of their use of the Services or violation of these Terms.
             </p>
           </CardContent>
         </Card>
@@ -287,12 +287,12 @@ export default function TermsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              To the maximum extent permitted by law, Wildlife Exchange will not be liable for indirect, incidental, special, consequential, or punitive
+              To the maximum extent permitted by law, Agchange will not be liable for indirect, incidental, special, consequential, or punitive
               damages, or any loss of profits or revenues.
             </p>
             <p>
-              To the maximum extent permitted by law, Wildlife Exchange’s total liability for any claim arising out of or relating to the Services will not
-              exceed the fees paid to Wildlife Exchange by you in the twelve (12) months before the event giving rise to the claim.
+              To the maximum extent permitted by law, Agchange’s total liability for any claim arising out of or relating to the Services will not
+              exceed the fees paid to Agchange by you in the twelve (12) months before the event giving rise to the claim.
             </p>
           </CardContent>
         </Card>
@@ -332,7 +332,7 @@ export default function TermsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2 text-foreground">
               <Mail className="h-4 w-4 text-primary" />
-              <span className="font-semibold">support@wildlife.exchange</span>
+              <span className="font-semibold">support@agchange.com</span>
             </div>
             <p>
               You can also reach us via the{' '}

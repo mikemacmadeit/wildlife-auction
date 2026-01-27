@@ -10,7 +10,7 @@ version: 1
 
 # Email Verification
 
-Verifying your email address is required to use certain features on Wildlife Exchange.
+Verifying your email address is required to use certain features on Agchange.
 
 ## Why Verify Your Email?
 

@@ -12,7 +12,7 @@ import { CheckCircle2, Clock, Circle, AlertTriangle, User, Calendar } from 'luci
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { formatDate, formatDistanceToNow } from '@/lib/utils';
+import { formatDate, formatDistanceToNow, isValidNonEpochDate } from '@/lib/utils';
 import type { Order } from '@/lib/types';
 import { getOrderMilestones, type MilestoneOwnerRole } from '@/lib/orders/progress';
 import {
@@ -120,15 +120,15 @@ export function OrderMilestoneTimeline({
                         )}
                       </div>
 
-                      {/* Dates */}
+                      {/* Dates — only show when valid (avoid "Dec 31, 1969" / "56 years ago") */}
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        {milestone.completedAt && (
+                        {milestone.completedAt && isValidNonEpochDate(milestone.completedAt) && (
                           <span className="inline-flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             Completed {formatDate(milestone.completedAt)}
                           </span>
                         )}
-                        {milestone.dueAt && !milestone.completedAt && (
+                        {milestone.dueAt && !milestone.completedAt && isValidNonEpochDate(milestone.dueAt) && (
                           <span className="inline-flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             Due {formatDate(milestone.dueAt)} ({formatDistanceToNow(milestone.dueAt)})

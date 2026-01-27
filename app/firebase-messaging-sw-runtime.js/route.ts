@@ -47,7 +47,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   try {
-    const title = payload?.notification?.title || 'Wildlife Exchange';
+    const title = payload?.notification?.title || 'Agchange';
     const body = payload?.notification?.body || '';
     const deepLinkUrl = payload?.data?.deepLinkUrl || '';
     self.registration.showNotification(title, {

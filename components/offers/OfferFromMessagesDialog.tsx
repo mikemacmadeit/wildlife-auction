@@ -27,7 +27,9 @@ function isOfferableListing(l: any): boolean {
   if (status !== 'active') return false;
   if (type !== 'fixed' && type !== 'classified') return false;
   const enabled = Boolean(l?.bestOfferSettings?.enabled ?? l?.bestOfferEnabled);
-  return enabled === true;
+  if (!enabled) return false;
+  if (l?.offerReservedByOfferId) return false;
+  return true;
 }
 
 export function OfferFromMessagesDialog(props: {

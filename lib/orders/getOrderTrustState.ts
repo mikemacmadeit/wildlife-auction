@@ -55,7 +55,7 @@ export function getOrderTrustState(order: Order): OrderTrustState {
   
   if (transportOption === 'BUYER_TRANSPORT') {
     // BUYER_TRANSPORT flow
-    if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_SCHEDULED') {
+    if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_PROPOSED' || txStatus === 'PICKUP_SCHEDULED') {
       return 'in_transit';
     }
     
@@ -64,7 +64,7 @@ export function getOrderTrustState(order: Order): OrderTrustState {
     }
   } else {
     // SELLER_TRANSPORT flow
-    if (txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') {
+    if (txStatus === 'DELIVERY_PROPOSED' || txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') {
       return 'in_transit';
     }
     

@@ -2,7 +2,7 @@
 title: "Trust badges, explained"
 description: "A plain-English guide to what our trust badges mean, what we verify, and how to buy with confidence."
 date: "2026-01-16"
-author: "Wildlife Exchange"
+author: "Agchange"
 category: "Trust"
 tags: ["trust", "compliance", "verification"]
 coverImage: "/images/Greater kudu.webp"

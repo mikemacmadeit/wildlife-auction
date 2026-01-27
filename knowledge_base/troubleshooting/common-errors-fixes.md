@@ -10,7 +10,7 @@ version: 1
 
 # Common Errors and How to Fix Them
 
-Quick fixes for the most common errors and issues on Wildlife Exchange.
+Quick fixes for the most common errors and issues on Agchange.
 
 ## Account and Login Errors
 

@@ -1,5 +1,5 @@
 ---
-title: "How to Sell on Wildlife Exchange"
+title: "How to Sell on Agchange"
 slug: "how-to-sell"
 category: "getting-started"
 audience: ["seller", "all"]
@@ -8,9 +8,9 @@ enabled: true
 version: 2
 ---
 
-# How to Sell on Wildlife Exchange
+# How to Sell on Agchange
 
-Complete guide to becoming a successful seller on Wildlife Exchange.
+Complete guide to becoming a successful seller on Agchange.
 
 ## Getting Started as a Seller
 
@@ -79,7 +79,7 @@ Complete guide to becoming a successful seller on Wildlife Exchange.
 - Used by millions of businesses worldwide
 - Industry-standard security
 - Your bank details are encrypted
-- Wildlife Exchange never sees your bank information
+- Agchange never sees your bank information
 
 ## Step 3: Understand Listing Types
 

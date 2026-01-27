@@ -29,7 +29,7 @@ export async function enablePushForCurrentDevice(params: {
       return {
         ok: false,
         error:
-          'Notification permission is blocked in your browser. Enable notifications for wildlife.exchange in your browser/site settings, then try again.',
+          'Notification permission is blocked in your browser. Enable notifications for agchange.com in your browser/site settings, then try again.',
         code: 'PERMISSION_DENIED',
       };
     }

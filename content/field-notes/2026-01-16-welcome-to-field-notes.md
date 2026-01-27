@@ -1,8 +1,8 @@
 ---
 title: "Welcome to Field Notes"
-description: "Behind-the-scenes updates, marketplace education, and trust-first guidance for buying and selling on Wildlife Exchange."
+description: "Behind-the-scenes updates, marketplace education, and trust-first guidance for buying and selling on Agchange."
 date: "2026-01-16"
-author: "Wildlife Exchange"
+author: "Agchange"
 category: "Company"
 tags: ["updates", "guides", "trust"]
 coverImage: "/images/Buck_1.webp"

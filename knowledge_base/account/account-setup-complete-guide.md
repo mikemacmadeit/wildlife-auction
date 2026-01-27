@@ -10,7 +10,7 @@ version: 1
 
 # Complete Account Setup Guide
 
-Step-by-step guide to setting up your Wildlife Exchange account completely.
+Step-by-step guide to setting up your Agchange account completely.
 
 ## Why Complete Your Account?
 
@@ -47,7 +47,7 @@ Step-by-step guide to setting up your Wildlife Exchange account completely.
 
 **How to verify:**
 1. Check your email inbox
-2. Look for email from Wildlife Exchange
+2. Look for email from Agchange
 3. Click the verification link
 4. You'll be redirected and verified
 
@@ -110,7 +110,7 @@ Step-by-step guide to setting up your Wildlife Exchange account completely.
 - Industry-standard security
 - Used by millions of businesses
 - Your information is encrypted
-- Wildlife Exchange never sees your bank details
+- Agchange never sees your bank details
 
 ## Step 5: Understand Account Types
 

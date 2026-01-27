@@ -34,17 +34,24 @@ export function FirstTimeTourBanner(props: {
   if (!ready || !visible) return null;
 
   return (
-    <div className={cn('rounded-xl border-2 border-border/50 bg-card p-4 sm:p-5 shadow-sm', className)}>
+    <div
+      className={cn(
+        'rounded-xl border-2 p-4 sm:p-5 shadow-lg',
+        'bg-zinc-900 border-zinc-700 text-white',
+        'dark:bg-zinc-100 dark:border-zinc-300 dark:text-zinc-900',
+        className
+      )}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+          <div className="h-10 w-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center flex-shrink-0 dark:bg-primary/20 dark:border-primary/40">
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm sm:text-base font-extrabold text-foreground">
+            <p className="text-sm sm:text-base font-extrabold">
               Want a 30-second tour?
             </p>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            <p className="text-xs sm:text-sm text-zinc-400 dark:text-zinc-600 mt-0.5">
               We’ll point out the key controls on this page. Nothing will auto-run unless you click Start tour.
             </p>
           </div>
@@ -55,7 +62,6 @@ export function FirstTimeTourBanner(props: {
             type="button"
             className="min-h-[44px] font-semibold"
             onClick={async () => {
-              // If they start (or later exit/complete) we never want to show this banner again.
               await setTourBannerDismissed(uid, helpKey);
               setVisible(false);
               onDismissed?.();
@@ -67,7 +73,7 @@ export function FirstTimeTourBanner(props: {
           <Button
             type="button"
             variant="outline"
-            className="min-h-[44px] font-semibold"
+            className="min-h-[44px] font-semibold border-zinc-500 text-zinc-200 hover:bg-zinc-800 hover:text-white dark:border-zinc-400 dark:text-zinc-700 dark:hover:bg-zinc-200 dark:hover:text-zinc-900"
             onClick={async () => {
               await setTourBannerDismissed(uid, helpKey);
               setVisible(false);

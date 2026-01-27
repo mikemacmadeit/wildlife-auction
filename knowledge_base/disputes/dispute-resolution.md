@@ -10,7 +10,7 @@ version: 1
 
 # Dispute Resolution Process
 
-How disputes are reviewed and resolved on Wildlife Exchange.
+How disputes are reviewed and resolved on Agchange.
 
 ## Process Overview
 

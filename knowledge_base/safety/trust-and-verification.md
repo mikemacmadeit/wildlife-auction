@@ -10,7 +10,7 @@ version: 1
 
 # Trust and Verification
 
-Wildlife Exchange uses verification and trust features to keep the platform safe.
+Agchange uses verification and trust features to keep the platform safe.
 
 ## Seller Verification
 

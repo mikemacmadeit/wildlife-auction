@@ -612,7 +612,7 @@ export function MessageThreadComponent({
             <AlertTriangle className="h-2.5 w-2.5 md:h-4 md:w-4 text-orange-700 dark:text-orange-300 flex-shrink-0" />
             <AlertDescription className="text-[10px] md:text-sm text-orange-950 dark:text-orange-50 leading-tight">
               <span className="hidden md:inline">
-                <strong className="font-semibold">For your safety:</strong> Keep communication and payment on Wildlife Exchange. Contact info unlocks after payment is completed.
+                <strong className="font-semibold">For your safety:</strong> Keep communication and payment on Agchange. Contact info unlocks after payment is completed.
               </span>
               <span className="md:hidden font-medium">Contact unlocks after payment.</span>
             </AlertDescription>

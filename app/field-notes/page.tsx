@@ -5,11 +5,11 @@ import { FieldNotesIndexClient } from '@/components/content/FieldNotesIndexClien
 import { InlineEmailCapture } from '@/components/marketing/InlineEmailCapture';
 
 export const metadata: Metadata = {
-  title: 'Field Notes | Wildlife Exchange',
-  description: 'Guides, insights, and trust-first education for high-ticket marketplace transactions on Wildlife Exchange.',
+  title: 'Field Notes | Agchange',
+  description: 'Guides, insights, and trust-first education for high-ticket marketplace transactions on Agchange.',
   openGraph: {
-    title: 'Field Notes | Wildlife Exchange',
-    description: 'Guides, insights, and trust-first education for high-ticket marketplace transactions on Wildlife Exchange.',
+    title: 'Field Notes | Agchange',
+    description: 'Guides, insights, and trust-first education for high-ticket marketplace transactions on Agchange.',
     type: 'website',
     url: '/field-notes',
   },
@@ -27,7 +27,7 @@ export default async function FieldNotesIndexPage() {
         <div className="rounded-2xl border bg-card p-6 md:p-10 overflow-hidden relative">
           <div className="pointer-events-none absolute inset-0 opacity-[0.35] [background:radial-gradient(80%_60%_at_20%_0%,hsl(var(--primary)/.18)_0%,transparent_60%),radial-gradient(60%_60%_at_80%_10%,hsl(var(--accent)/.16)_0%,transparent_55%)]" />
           <div className="relative space-y-3">
-            <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Wildlife Exchange</div>
+            <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Agchange</div>
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight font-founders">
               Field Notes
             </h1>

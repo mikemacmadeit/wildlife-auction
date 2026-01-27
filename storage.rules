@@ -13,7 +13,8 @@ service firebase.storage {
       return isAuthenticated() && (
         request.auth.token.role == 'admin' ||
         request.auth.token.role == 'super_admin' ||
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin']
+        (firestore.get(/databases/(default)/documents/users/$(request.auth.uid)) != null &&
+         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'])
       );
     }
 
@@ -62,10 +63,11 @@ service firebase.storage {
     // MESSAGE THREAD ATTACHMENTS (Participant-shared)
     // ============================================
     // Path: messageThreads/{threadId}/attachments/{attachmentId}/{fileName}
-    // Allows buyer+seller in the thread to share images securely.
+    // Write/delete: buyer+seller only. Read: anyone with the URL (used in <img src>).
+    // Download URLs are used in messages; the browser loads them via unauthenticated GET.
+    // Attachment paths use unguessable IDs; write remains participant-only.
     match /messageThreads/{threadId}/attachments/{attachmentId}/{fileName} {
-      allow read: if isMessageThreadParticipant(threadId);
-      // Restrict uploads to images and a sane size ceiling.
+      allow read: if true;
       allow write: if isMessageThreadParticipant(threadId) &&
         request.resource != null &&
         request.resource.size < 10 * 1024 * 1024 &&

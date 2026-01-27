@@ -21,13 +21,13 @@ import Link from 'next/link';
 <Link href="/" className="flex items-center gap-2">
   <Image
     src="/logos/logo.png"
-    alt="Wildlife Exchange Logo"
+    alt="Agchange Logo"
     width={120}
     height={40}
     priority
     className="h-8 w-auto"
   />
-  <span className="text-xl font-bold">Wildlife Exchange</span>
+  <span className="text-xl font-bold">Agchange</span>
 </Link>
 ```
 
@@ -36,7 +36,7 @@ import Link from 'next/link';
 ```tsx
 <Image
   src="/logos/logo-icon.svg"
-  alt="Wildlife Exchange"
+  alt="Agchange"
   width={32}
   height={32}
 />

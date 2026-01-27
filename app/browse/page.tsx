@@ -109,7 +109,8 @@ export default function BrowsePage() {
   const showSkeleton = useMinLoading(!loading, 300);
   const [nextCursor, setNextCursor] = useState<BrowseCursor | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  
+  const isInitialLoadRef = useRef(true);
+
   // View mode with localStorage persistence
   // Initialize to 'card' to ensure server/client consistency
   const [viewMode, setViewMode] = useState<ViewMode>('card');
@@ -392,14 +393,17 @@ export default function BrowsePage() {
     }
   };
   
-  // Load initial page (resets pagination)
-  const loadInitial = async () => {
+  // Load initial page (resets pagination).
+  // When isRefetch (we already have listings): keep them visible, don't clear — avoids glitchy swap to skeleton.
+  const loadInitial = async (isRefetch?: boolean) => {
     try {
       setLoading(true);
       setError(null);
-      setListings([]);
-      setNextCursor(null);
-      setHasMore(false);
+      if (!isRefetch) {
+        setListings([]);
+        setNextCursor(null);
+        setHasMore(false);
+      }
       
       const browseFilters = getBrowseFilters();
       const browseSort = getBrowseSort();
@@ -431,6 +435,7 @@ export default function BrowsePage() {
       });
     } finally {
       setLoading(false);
+      isInitialLoadRef.current = false;
     }
   };
   
@@ -468,14 +473,28 @@ export default function BrowsePage() {
     }
   };
   
-  // Load initial page when filters/sort change
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load initial page when filters/sort change. Debounce refetches so rapid filter clicks feel smooth.
   useEffect(() => {
-    // Only Active listings have an "ending soon" concept.
     if (listingStatus !== 'active' && sortBy === 'ending-soon') {
       setSortBy('newest');
       return;
     }
-    loadInitial();
+    const isRefetch = listings.length > 0;
+    const run = () => loadInitial(isRefetch);
+
+    if (isRefetch) {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+      fetchDebounceRef.current = setTimeout(run, 180);
+      return () => {
+        if (fetchDebounceRef.current) {
+          clearTimeout(fetchDebounceRef.current);
+          fetchDebounceRef.current = null;
+        }
+      };
+    }
+    run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType, filters, sortBy, listingStatus, debouncedSearchQuery]);
 
@@ -1247,9 +1266,9 @@ export default function BrowsePage() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-2 md:py-6">
         <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
-          {/* Desktop filter rail */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-[104px]">
+          {/* Desktop filter rail: scrollable when tall; overscroll-contain prevents scroll chaining to page */}
+          <aside className="hidden lg:block self-start">
+            <div className="sticky top-[104px] max-h-[calc(100vh-104px)] overflow-y-auto overflow-x-hidden overscroll-contain min-h-0 pr-1 -mr-1 [scrollbar-gutter:stable]">
               <BrowseFiltersSidebar value={filters} onChange={handleFilterChange} onClearAll={clearFilters} />
             </div>
           </aside>
@@ -1396,10 +1415,10 @@ export default function BrowsePage() {
           </div>
             </div>
 
-            {/* Loading State */}
-            {(loading || showSkeleton) && !error && (
+            {/* Full skeleton only on initial load (no listings yet). Refetches keep previous results visible. */}
+            {(loading || showSkeleton) && !error && listings.length === 0 && isInitialLoadRef.current && (
               <div className="py-12 animate-in fade-in-0 duration-200">
-                <SkeletonListingGrid count={12} />
+                <SkeletonListingGrid count={12} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" />
               </div>
             )}
 
@@ -1412,7 +1431,7 @@ export default function BrowsePage() {
             )}
 
             {/* Empty State */}
-            {!loading && !showSkeleton && !error && sortedListings.length === 0 && (
+            {!error && sortedListings.length === 0 && !((loading || showSkeleton) && listings.length === 0 && isInitialLoadRef.current) && (
               <EmptyState
                 icon={activeFilterCount > 0 ? Filter : Sparkles}
                 title={activeFilterCount > 0 ? 'No results match your filters' : 'No listings yet'}
@@ -1430,53 +1449,62 @@ export default function BrowsePage() {
               />
             )}
 
-            {/* Listings Grid/List */}
-            {!loading && !showSkeleton && !error && sortedListings.length > 0 && (
+            {/* Listings Grid/List — show when we have results; during refetch keep previous results + "Updating" indicator */}
+            {!error && sortedListings.length > 0 && !((loading || showSkeleton) && listings.length === 0 && isInitialLoadRef.current) && (
               <>
-                {/* Mobile: always list view (eBay-style) */}
-                <div className="md:hidden space-y-3">
-                  <AnimatePresence>
-                    {sortedListings.map((listing) => (
-                      <ListItem key={listing.id} listing={listing} variant="browseMobile" />
-                    ))}
-                  </AnimatePresence>
-                </div>
-
-                {/* Desktop/tablet: respect view mode */}
-                {viewMode === 'card' ? (
-                  <div className="hidden md:block w-full">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                      <AnimatePresence>
-                        {sortedListings.map((listing) =>
-                          listing.featured ? (
-                            <div key={listing.id} className="w-full">
-                              <FeaturedListingCard listing={listing} className="h-full" />
-                            </div>
-                          ) : (
-                            <div key={listing.id} className="w-full">
-                              <ListingCard listing={listing} className="h-full" />
-                            </div>
-                          )
-                        )}
-                      </AnimatePresence>
-                    </div>
+                {/* Subtle "Updating…" bar when refetching (filters changed); dim grid slightly */}
+                {loading && listings.length > 0 && (
+                  <div className="flex items-center gap-2 py-2 px-3 mb-2 rounded-lg bg-muted/50 text-muted-foreground text-sm animate-in fade-in-0 duration-150">
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    <span>Updating…</span>
                   </div>
-                ) : (
-                  <div className="hidden md:block w-full space-y-4">
+                )}
+                <div className={cn('transition-opacity duration-150', loading && listings.length > 0 && 'opacity-85')}>
+                  {/* Mobile: always list view (eBay-style) */}
+                  <div className="md:hidden space-y-3">
                     <AnimatePresence>
                       {sortedListings.map((listing) => (
-                        <ListItem key={listing.id} listing={listing} />
+                        <ListItem key={listing.id} listing={listing} variant="browseMobile" />
                       ))}
                     </AnimatePresence>
                   </div>
-                )}
+
+                  {/* Desktop/tablet: respect view mode */}
+                  {viewMode === 'card' ? (
+                    <div className="hidden md:block w-full">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        <AnimatePresence>
+                          {sortedListings.map((listing) =>
+                            listing.featured ? (
+                              <div key={listing.id} className="w-full">
+                                <FeaturedListingCard listing={listing} className="h-full" />
+                              </div>
+                            ) : (
+                              <div key={listing.id} className="w-full">
+                                <ListingCard listing={listing} className="h-full" />
+                              </div>
+                            )
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="hidden md:block w-full space-y-4">
+                      <AnimatePresence>
+                        {sortedListings.map((listing) => (
+                          <ListItem key={listing.id} listing={listing} />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Load More Button */}
                 {hasMore && (
                   <div className="flex justify-center mt-8">
                     <Button
                       onClick={loadMore}
-                      disabled={loadingMore}
+                      disabled={loadingMore || loading}
                       variant="outline"
                       size="lg"
                       className="min-w-[200px]"

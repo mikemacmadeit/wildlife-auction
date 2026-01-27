@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,16 +146,32 @@ function badgeVariantForUnifiedStatus(status: UnifiedRow['status']) {
   return 'outline';
 }
 
+const TAB_VALUES = ['needs_action', 'bids', 'offers', 'history'] as const;
+type TabValue = (typeof TAB_VALUES)[number];
+
+function parseTabFromSearchParams(sp: URLSearchParams | null): TabValue {
+  const t = sp?.get('tab')?.toLowerCase();
+  if (t && TAB_VALUES.includes(t as TabValue)) return t as TabValue;
+  return 'needs_action';
+}
+
 export default function BidsOffersPage() {
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<'needs_action' | 'bids' | 'offers' | 'history'>('needs_action');
+  const [tab, setTabState] = useState<TabValue>('needs_action');
+  const setTab = setTabState;
+
+  // Sync tab from ?tab= when landing (e.g. Back from offer detail → ?tab=offers).
+  useEffect(() => {
+    const t = parseTabFromSearchParams(searchParams);
+    setTabState(t);
+  }, [searchParams]);
   const [unreadNeedsAction, setUnreadNeedsAction] = useState(0);
   const [unreadBids, setUnreadBids] = useState(0);
   const [unreadOffers, setUnreadOffers] = useState(0);
   const [unreadHistory, setUnreadHistory] = useState(0);
-  const [unreadSellerOfferReceived, setUnreadSellerOfferReceived] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all'); // applies in Bids tab
   const [sortKey, setSortKey] = useState<SortKey>('ending_soon');
   const [query, setQuery] = useState('');
@@ -234,6 +251,14 @@ export default function BidsOffersPage() {
     load();
   }, [authLoading, load, user]);
 
+  // Clear bids/offers on logout so we never show another user's data (e.g. shared device).
+  useEffect(() => {
+    if (!authLoading && !user) {
+      setBids([]);
+      setOffers([]);
+    }
+  }, [authLoading, user]);
+
   // Unread notification badges for tabs (these should clear when the user clicks into the tab).
   useEffect(() => {
     if (!user?.uid) {
@@ -245,8 +270,7 @@ export default function BidsOffersPage() {
     }
 
     const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received'];
-    // Buyer-side offers page: buyer mainly receives counter/accepted/declined/expired.
-    const offerTypes: NotificationType[] = ['offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+    const offerTypes: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
     const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
     const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
 
@@ -262,26 +286,11 @@ export default function BidsOffersPage() {
     return () => unsubs.forEach((fn) => fn());
   }, [user?.uid]);
 
-  // Seller offers badge (top link): only count *new offers received*.
-  useEffect(() => {
-    if (!user?.uid) {
-      setUnreadSellerOfferReceived(0);
-      return;
-    }
-    const types: NotificationType[] = ['offer_received'];
-    try {
-      return subscribeToUnreadCountByTypes(user.uid, types, (c) => setUnreadSellerOfferReceived(c || 0));
-    } catch {
-      setUnreadSellerOfferReceived(0);
-      return;
-    }
-  }, [user?.uid]);
-
   const clearTabNotifs = useCallback(
     async (nextTab: 'needs_action' | 'bids' | 'offers' | 'history') => {
       if (!user?.uid) return;
       const bidTypes: NotificationType[] = ['bid_outbid', 'bid_received'];
-      const offerTypes: NotificationType[] = ['offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
+      const offerTypes: NotificationType[] = ['offer_received', 'offer_countered', 'offer_accepted', 'offer_declined', 'offer_expired'];
       const needsActionTypes: NotificationType[] = ['bid_outbid', 'offer_countered', 'offer_accepted'];
       const historyTypes: NotificationType[] = ['offer_declined', 'offer_expired'];
 
@@ -537,36 +546,10 @@ export default function BidsOffersPage() {
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Bids & Offers</h1>
             </div>
             <p className="text-sm text-muted-foreground">
-              Your command center for auctions + offers. See what needs action, raise max bids, and complete accepted deals.
+              Your command center for auctions and offers. Manage bids, offers you&apos;ve sent, and offers you&apos;ve received—all in one place.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <Button asChild variant="secondary" className="min-h-[40px]">
-              <Link href="/dashboard/offers">
-                <Handshake className="h-4 w-4 mr-2" />
-                My offers (sent)
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="min-h-[40px]">
-              <Link
-                href="/seller/offers"
-                onClick={() => {
-                  if (!user?.uid) return;
-                  // Clear the badge as soon as they click into the seller offers inbox.
-                  markNotificationsAsReadByTypes(user.uid, ['offer_received']).catch(() => {});
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  <Handshake className="h-4 w-4" />
-                  <span>Offers received (seller)</span>
-                  {unreadSellerOfferReceived > 0 ? (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                      {unreadSellerOfferReceived}
-                    </Badge>
-                  ) : null}
-                </span>
-              </Link>
-            </Button>
             <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Refresh

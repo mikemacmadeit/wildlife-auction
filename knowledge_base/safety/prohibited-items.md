@@ -10,7 +10,7 @@ version: 1
 
 # Prohibited Items and Content
 
-Wildlife Exchange has rules about what can and cannot be listed or sold.
+Agchange has rules about what can and cannot be listed or sold.
 
 ## Prohibited Items
 

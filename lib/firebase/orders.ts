@@ -250,6 +250,38 @@ function toOrder(docId: string, data: OrderDoc): Order {
     timeline: timeline as any,
     fulfillmentSlaDeadlineAt: (data as any).fulfillmentSlaDeadlineAt ? toDateSafe((data as any).fulfillmentSlaDeadlineAt) : undefined,
     fulfillmentSlaStartedAt: (data as any).fulfillmentSlaStartedAt ? toDateSafe((data as any).fulfillmentSlaStartedAt) : undefined,
+    transportOption: (data as any).transportOption,
+    transactionStatus: (data as any).transactionStatus,
+    delivery: (data as any).delivery ? (() => {
+      const d = (data as any).delivery;
+      const mapWindow = (w: any) => ({
+        start: w?.start ? toDateSafe(w.start) : undefined,
+        end: w?.end ? toDateSafe(w.end) : undefined,
+      });
+      return {
+        ...d,
+        eta: d.eta ? toDateSafe(d.eta) : undefined,
+        windows: Array.isArray(d.windows) ? d.windows.map(mapWindow) : undefined,
+        agreedWindow: d.agreedWindow ? mapWindow(d.agreedWindow) : undefined,
+        agreedAt: d.agreedAt ? toDateSafe(d.agreedAt) : undefined,
+        proposedAt: d.proposedAt ? toDateSafe(d.proposedAt) : undefined,
+      };
+    })() : undefined,
+    pickup: (data as any).pickup ? (() => {
+      const p = (data as any).pickup;
+      const mapWindow = (w: any) => ({
+        start: w?.start ? toDateSafe(w.start) : undefined,
+        end: w?.end ? toDateSafe(w.end) : undefined,
+      });
+      return {
+        ...p,
+        windows: Array.isArray(p.windows) ? p.windows.map(mapWindow) : undefined,
+        selectedWindow: p.selectedWindow ? mapWindow(p.selectedWindow) : undefined,
+        confirmedAt: p.confirmedAt ? toDateSafe(p.confirmedAt) : undefined,
+        proposedAt: p.proposedAt ? toDateSafe(p.proposedAt) : undefined,
+        agreedAt: p.agreedAt ? toDateSafe(p.agreedAt) : undefined,
+      };
+    })() : undefined,
   };
 }
 
@@ -384,6 +416,23 @@ export async function getOrdersForUser(
     }
     
     return toOrder(doc.id, normalizedData);
+  });
+}
+
+/**
+ * Filter orders for seller-facing UIs (sales, overview).
+ * Excludes:
+ * - Pending orders with a checkout session (abandoned checkout skeletons).
+ * - Cancelled orders that never had payment (failed/abandoned checkout attempts).
+ * "Cancelled" in sales = paid-then-cancelled or refunded; not "attempted but never paid".
+ */
+export function filterSellerRelevantOrders<T extends { status?: string; paidAt?: unknown; stripeCheckoutSessionId?: string }>(
+  orders: T[]
+): T[] {
+  return orders.filter((o) => {
+    if (o.status === 'pending' && o.stripeCheckoutSessionId) return false;
+    if (o.status === 'cancelled' && !o.paidAt) return false;
+    return true;
   });
 }
 

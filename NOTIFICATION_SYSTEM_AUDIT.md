@@ -60,13 +60,29 @@ The notification system has been comprehensively reviewed and fixed. All critica
 
 **Fix:** `tryDispatchEmailJobNow()` now clears `deliverAfterAt` when dispatching immediately, allowing emails to send right away while still respecting delays for scheduled dispatch.
 
+### ✅ Issue 4: Outbid / Ending Soon Emails Not Dispatched (Jan 2026)
+**Problem:** "You've been outbid" and other auction emails sometimes never sent because:
+1. **Auto-bid path**: `POST /api/auctions/[auctionId]/auto-bid/set` emitted `Auction.Outbid` and `Auction.HighBidder` but never called `tryDispatchEmailJobNow()`, so those emails relied only on the scheduled dispatcher.
+2. **Ending soon**: `auctionEndingSoon` scheduled function emitted `Auction.EndingSoon` but did not trigger immediate email dispatch.
+3. **emailJobs index**: `dispatchEmailJobs` queries `emailJobs` with `status == 'queued'` + `orderBy('createdAt')`; the composite index was missing, which could cause the scheduled dispatcher to fail in production.
+
+**Fix:**
+- **Auto-bid route**: Added `tryDispatchEmailJobNow` for both Outbid (previous high bidder) and HighBidder (new high bidder) when events are created. Fire-and-forget with 3s timeout.
+- **auctionEndingSoon**: After each `Auction.EndingSoon` emit, call `tryDispatchEmailJobNow` (best-effort, 3s timeout) so ending-soon emails go out immediately.
+- **firestore.indexes.json**: Added composite index `emailJobs` on `(status ASC, createdAt ASC)` for the dispatch query.
+
+**Files Changed:**
+- `app/api/auctions/[auctionId]/auto-bid/set/route.ts`
+- `netlify/functions/auctionEndingSoon.ts`
+- `firestore.indexes.json`
+
 ## Notification Types and Status
 
 ### ✅ Auction Notifications
 - **Auction.WatchStarted** - ✅ Working (in-app + email)
-- **Auction.HighBidder** - ✅ Fixed (immediate email dispatch, bypasses 30min delay)
-- **Auction.Outbid** - ✅ Fixed (immediate email dispatch, bypasses 5min delay)
-- **Auction.EndingSoon** - ✅ Fixed (now processes immediately)
+- **Auction.HighBidder** - ✅ Fixed (immediate email dispatch from bid-place + auto-bid set)
+- **Auction.Outbid** - ✅ Fixed (immediate email dispatch from bid-place + auto-bid set; Issue 4)
+- **Auction.EndingSoon** - ✅ Fixed (immediate email dispatch from auctionEndingSoon; Issue 4)
 - **Auction.Won** - ✅ Working (immediate email dispatch)
 - **Auction.Lost** - ✅ Working (scheduled dispatch)
 - **Auction.BidReceived** - ✅ Working (in-app only, for sellers)

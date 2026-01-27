@@ -123,17 +123,20 @@ export async function GET(request: Request) {
       return bm - am;
     });
 
-    return json({
-      ok: true,
-      offers: offers.slice(0, limitN),
-      offerLimit: listingId
-        ? {
-            limit: offerLimit,
-            used: offersUsedForListing || 0,
-            left: Math.max(0, offerLimit - (offersUsedForListing || 0)),
-          }
-        : undefined,
-    });
+    return json(
+      {
+        ok: true,
+        offers: offers.slice(0, limitN),
+        offerLimit: listingId
+          ? {
+              limit: offerLimit,
+              used: offersUsedForListing || 0,
+              left: Math.max(0, offerLimit - (offersUsedForListing || 0)),
+            }
+          : undefined,
+      },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (e: any) {
     return json(
       {

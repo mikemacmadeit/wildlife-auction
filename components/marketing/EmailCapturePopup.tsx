@@ -310,7 +310,7 @@ export function EmailCapturePopup(props: { source?: string }) {
 
               <div className="pt-2 border-t">
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  By subscribing, you agree to receive emails from Wildlife Exchange. Unsubscribe anytime.{' '}
+                  By subscribing, you agree to receive emails from Agchange. Unsubscribe anytime.{' '}
                   <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
                     Privacy
                   </Link>{' '}

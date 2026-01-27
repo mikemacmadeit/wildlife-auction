@@ -2,7 +2,7 @@
 title: "Large purchases: Card vs Bank Transfer vs Wire"
 description: "Why banks decline big card charges, when to choose bank transfer, and when wire is the best fit for high-ticket sales."
 date: "2026-01-16"
-author: "Wildlife Exchange"
+author: "Agchange"
 category: "Payments"
 tags: ["payments", "bank-transfer", "wire", "checkout"]
 coverImage: "/images/Scimitar-horned oryx.webp"
@@ -19,7 +19,7 @@ For high-ticket purchases, **bank rails** (bank transfer or wire) usually have f
 - **\$10k–\$25k**: Card can work, but bank transfer often has fewer declines.
 - **\$25k+**: Prefer bank transfer or wire for predictability.
 
-Wildlife Exchange can present multiple payment options at checkout; we recommend a path based on amount and reliability.
+Agchange can present multiple payment options at checkout; we recommend a path based on amount and reliability.
 
 ## Why large card charges fail (even if you “have the money”)
 
@@ -69,7 +69,7 @@ Best next steps:
 - [ ] Decide your payment rail **before** you bid/offer: card vs bank vs wire
 - [ ] If using card, call your issuer for an “allow” on the amount
 - [ ] Keep all communication in `/dashboard/messages`
-- [ ] Pay only through Wildlife Exchange checkout (never off-platform)
+- [ ] Pay only through Agchange checkout (never off-platform)
 
 ## Related guides
 

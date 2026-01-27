@@ -10,7 +10,7 @@ version: 1
 
 # Buyer Safety Tips
 
-How to stay safe when buying on Wildlife Exchange.
+How to stay safe when buying on Agchange.
 
 ## Before You Buy
 
@@ -58,7 +58,7 @@ How to stay safe when buying on Wildlife Exchange.
 - ❌ Pay before seeing item (except through platform)
 
 **ALWAYS:**
-- ✅ Use Wildlife Exchange checkout
+- ✅ Use Agchange checkout
 - ✅ Pay through platform payment system
 - ✅ Use protected payment methods
 - ✅ Keep payment on platform
@@ -85,7 +85,7 @@ How to stay safe when buying on Wildlife Exchange.
 ### Use Platform Messaging
 
 **Stay on platform:**
-- Use Wildlife Exchange messaging
+- Use Agchange messaging
 - Keep communication on-platform
 - Don't share personal contact info unnecessarily
 - Report suspicious messages

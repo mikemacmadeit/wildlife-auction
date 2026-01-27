@@ -19,6 +19,16 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * True if date is defined, valid, and not Unix epoch (0).
+ * Use to avoid showing "Dec 31, 1969" / "56 years ago" when we default missing dates to epoch.
+ */
+export function isValidNonEpochDate(date?: Date | null): date is Date {
+  if (!date || !(date instanceof Date)) return false;
+  const t = date.getTime();
+  return Number.isFinite(t) && t > 0;
+}
+
+/**
  * Format a date for display
  */
 export function formatDate(date?: Date | null): string {
@@ -41,6 +51,8 @@ export function formatDate(date?: Date | null): string {
     console.warn('formatDate: Invalid date value', date);
     return 'Invalid date';
   }
+  // Treat epoch (0) as "no date" to avoid "Dec 31, 1969"
+  if (dateObj.getTime() === 0) return 'N/A';
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',

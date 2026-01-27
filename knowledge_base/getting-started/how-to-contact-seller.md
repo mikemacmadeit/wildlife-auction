@@ -126,12 +126,12 @@ Learn how to reach out to sellers with questions about their listings.
 **Want to share contact info?**
 - You can share phone number or email in messages
 - Be cautious about sharing personal information
-- Use Wildlife Exchange messaging when possible (safer)
+- Use Agchange messaging when possible (safer)
 
 ## Safety Tips
 
 **Stay safe when contacting sellers:**
-- **Use Wildlife Exchange messaging** - Keeps communication on-platform
+- **Use Agchange messaging** - Keeps communication on-platform
 - **Don't share payment info** - Never send money outside the platform
 - **Meet in public** - If meeting in person, choose a safe location
 - **Trust your instincts** - If something seems off, be cautious

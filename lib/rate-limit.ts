@@ -99,8 +99,8 @@ export const RATE_LIMITS = {
   stripe: { windowMs: 60 * 1000, maxRequests: 20, requireRedisInProd: true }, // 20 requests per minute
   // Admin operations (very restrictive)
   admin: { windowMs: 60 * 1000, maxRequests: 10, requireRedisInProd: true }, // 10 requests per minute
-  // Checkout (very restrictive - prevent abuse)
-  checkout: { windowMs: 60 * 1000, maxRequests: 5, requireRedisInProd: true }, // 5 requests per minute
+  // Checkout (restrict abuse but allow legitimate retries; 5 was too strict → 429 on retries)
+  checkout: { windowMs: 60 * 1000, maxRequests: 12, requireRedisInProd: true }, // 12 requests per minute per user+listing
   // Messaging (restrict writes/abuse)
   messages: { windowMs: 60 * 1000, maxRequests: 20, requireRedisInProd: true }, // 20 requests per minute
   // Support/contact form (restrict spam/abuse)

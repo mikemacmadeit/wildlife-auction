@@ -227,9 +227,26 @@ service cloud.firestore {
                          'purchaseReservedUntil'
                        ]) &&
                        // Auction-critical fields must be locked while an auction is active.
-                       // These fields are authoritative and/or affect fairness and settlement.
+                       // Exception: seller may unpublish (status -> draft) without touching bids/endsAt/etc.
                        (
                          !(resource.data.type == 'auction' && resource.data.status == 'active') ||
+                         (request.resource.data.status == 'draft' &&
+                          !request.resource.data.diff(resource.data).changedKeys().hasAny([
+                            'type',
+                            'endsAt',
+                            'startingBid',
+                            'startingBidCents',
+                            'reservePrice',
+                            'reservePriceCents',
+                            'currentBid',
+                            'currentBidCents',
+                            'currentBidderId',
+                            'metrics',
+                            'endedAt',
+                            'auctionFinalizedAt',
+                            'auctionResultStatus',
+                            'auctionPaymentDueAt'
+                          ])) ||
                          !request.resource.data.diff(resource.data).changedKeys().hasAny([
                            'type',
                            'status',

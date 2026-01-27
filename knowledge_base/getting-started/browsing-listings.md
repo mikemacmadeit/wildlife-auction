@@ -10,7 +10,7 @@ version: 1
 
 # Browsing and Searching Listings
 
-Learn how to find what you're looking for on Wildlife Exchange.
+Learn how to find what you're looking for on Agchange.
 
 ## Browsing Listings
 

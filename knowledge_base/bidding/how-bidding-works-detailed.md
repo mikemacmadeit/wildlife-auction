@@ -10,7 +10,7 @@ version: 2
 
 # How Bidding Works - Complete Guide
 
-Complete guide to understanding and participating in auctions on Wildlife Exchange.
+Complete guide to understanding and participating in auctions on Agchange.
 
 ## Understanding Auctions
 

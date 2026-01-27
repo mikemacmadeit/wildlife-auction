@@ -26,7 +26,7 @@ import {
   Info,
 } from 'lucide-react';
 import type { Listing, Order } from '@/lib/types';
-import { getOrdersForUser } from '@/lib/firebase/orders';
+import { getOrdersForUser, filterSellerRelevantOrders } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocument } from '@/lib/firebase/firestore';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -144,8 +144,7 @@ export default function SellerSalesPage() {
     setLoading(true);
     try {
       const sellerOrdersRaw = await getOrdersForUser(user.uid, 'seller');
-      // Avoid showing checkout-abandoned "pending" skeleton orders as real sales.
-      const sellerOrders = sellerOrdersRaw.filter((o) => !(o.status === 'pending' && o.stripeCheckoutSessionId));
+      const sellerOrders = filterSellerRelevantOrders(sellerOrdersRaw);
       // Prefer server-authored snapshots for list rendering (avoid N+1 listing reads).
       // Fallback to a listing fetch only if snapshot is missing (older historical orders).
       const needsListing = sellerOrders.filter((o) => !o.listingSnapshot?.title);

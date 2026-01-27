@@ -6,8 +6,8 @@ import { Mail, Shield, ArrowRight } from 'lucide-react';
 import { ContactForm } from '@/components/support/ContactForm';
 
 export const metadata: Metadata = {
-  title: 'Contact | Wildlife Exchange',
-  description: 'Contact Wildlife Exchange support for help with listings, transactions, or compliance workflow questions.',
+  title: 'Contact | Agchange',
+  description: 'Contact Agchange support for help with listings, transactions, or compliance workflow questions.',
 };
 
 export default function ContactPage() {

@@ -254,6 +254,16 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
+              {listing.transportOption === 'SELLER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Seller delivers">
+                  Seller Transport
+                </Badge>
+              )}
+              {listing.transportOption === 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Buyer arranges pickup">
+                  Buyer Transport
+                </Badge>
+              )}
               {/* Protected Transaction Badge */}
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
                 <Badge 
@@ -266,18 +276,24 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               )}
             </div>
 
-            {/* Mobile: show Protected badge when enabled */}
-            {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
-              <div className="sm:hidden absolute bottom-2 right-2 z-20">
-                <Badge
-                  variant="success"
-                  className="font-semibold text-xs shadow-warm"
-                  title="Protected Transaction"
-                >
+            {/* Mobile: transport + Protected badges */}
+            <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
+              {listing.transportOption === 'SELLER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
+                  Seller Transport
+                </Badge>
+              )}
+              {listing.transportOption === 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
+                  Buyer Transport
+                </Badge>
+              )}
+              {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
+                <Badge variant="success" className="font-semibold text-xs shadow-warm" title="Protected Transaction">
                   Protected {listing.protectedTransactionDays} Days
                 </Badge>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
 
             {/* Social proof (watchers + bids) */}
             {/* Keep SOLD on mobile; hide other social proof on mobile */}

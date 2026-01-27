@@ -5,9 +5,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shield, Lock, Mail } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Wildlife Exchange',
+  title: 'Privacy Policy | Agchange',
   description:
-    'Learn how Wildlife Exchange collects, uses, and shares information to provide a trusted Texas marketplace.',
+    'Learn how Agchange collects, uses, and shares information to provide a trusted Texas marketplace.',
 };
 
 const EFFECTIVE_DATE = 'January 2026';
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Wildlife Exchange (“Wildlife Exchange,” “we,” “us”) provides a marketplace platform that helps buyers and
+              Agchange (“Agchange,” “we,” “us”) provides a marketplace platform that helps buyers and
               sellers connect to list and transact livestock, wildlife/exotics, and ranch equipment.
             </p>
             <p>

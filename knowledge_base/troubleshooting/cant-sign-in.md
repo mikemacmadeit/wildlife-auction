@@ -10,7 +10,7 @@ version: 2
 
 # Can't Sign In
 
-Having trouble signing in to your Wildlife Exchange account? This guide covers the most common sign-in issues and how to fix them.
+Having trouble signing in to your Agchange account? This guide covers the most common sign-in issues and how to fix them.
 
 ## Quick Fixes (Try These First)
 
@@ -52,7 +52,7 @@ Having trouble signing in to your Wildlife Exchange account? This guide covers t
 **What this means:** You need to verify your email address before you can sign in.
 
 **Solutions:**
-1. **Check your inbox** - Look for a verification email from Wildlife Exchange
+1. **Check your inbox** - Look for a verification email from Agchange
 2. **Check spam folder** - Verification emails sometimes go to spam
 3. **Resend verification email:**
    - Go to the sign-in page
@@ -91,7 +91,7 @@ Having trouble signing in to your Wildlife Exchange account? This guide covers t
 **Solutions:**
 1. **Wait a few minutes** and try again - Sometimes it's a temporary server issue
 2. **Try again later** - If the problem persists, wait 30 minutes
-3. **Check Wildlife Exchange status** - There may be scheduled maintenance
+3. **Check Agchange status** - There may be scheduled maintenance
 4. **Contact support** - If the issue continues, we can help investigate
 
 ## Step-by-Step Password Reset
@@ -102,7 +102,7 @@ If you've forgotten your password, follow these steps:
 2. **Click "Forgot Password"** link below the sign-in form
 3. **Enter your email address** - Use the email you used to create your account
 4. **Click "Send Reset Link"**
-5. **Check your email** - Look for an email from Wildlife Exchange
+5. **Check your email** - Look for an email from Agchange
 6. **Check spam folder** - Reset emails sometimes go to spam
 7. **Click the reset link** in the email (link expires after 24 hours)
 8. **Enter your new password** - Choose a strong, unique password
@@ -114,10 +114,10 @@ If you've forgotten your password, follow these steps:
 
 If you need to verify your email:
 
-1. **Check your inbox** for a verification email from Wildlife Exchange
+1. **Check your inbox** for a verification email from Agchange
 2. **Check spam/junk folder** - Verification emails sometimes go there
 3. **Click the verification link** in the email
-4. **You'll be redirected** to Wildlife Exchange and your email will be verified
+4. **You'll be redirected** to Agchange and your email will be verified
 5. **Try signing in again**
 
 **To resend verification email:**
@@ -141,7 +141,7 @@ If you need to verify your email:
 
 ### Safari
 - Preferences → Privacy → Manage Website Data
-- Click "Remove All" or remove specific Wildlife Exchange data
+- Click "Remove All" or remove specific Agchange data
 
 ### Edge
 - Settings → Privacy → Clear browsing data

@@ -99,18 +99,18 @@ export default function SellerOrderDetailPage() {
   const txStatus = order ? getEffectiveTransactionStatus(order) : null;
   const transportOption = order?.transportOption || 'SELLER_TRANSPORT';
 
-  // Dialog states for fulfillment forms
   const [scheduleDeliveryOpen, setScheduleDeliveryOpen] = useState(false);
-  const [deliveryEta, setDeliveryEta] = useState('');
-  const [transporterName, setTransporterName] = useState('');
-  const [transporterPhone, setTransporterPhone] = useState('');
-  const [transporterPlate, setTransporterPlate] = useState('');
-  
+  const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
+  const [haulerName, setHaulerName] = useState('');
+  const [haulerPhone, setHaulerPhone] = useState('');
+  const [haulerPlate, setHaulerPlate] = useState('');
+
   const [setPickupInfoOpen, setSetPickupInfoOpen] = useState(false);
   const [pickupLocation, setPickupLocation] = useState('');
-  const [pickupWindows, setPickupWindows] = useState<Array<{start: string, end: string}>>([{start: '', end: ''}]);
-  
+  const [pickupWindows, setPickupWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
+
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
+  const [agreePickupOpen, setAgreePickupOpen] = useState(false);
 
   // FulfillmentPanel component (inline in same file)
   function FulfillmentPanel() {
@@ -150,34 +150,50 @@ export default function SellerOrderDetailPage() {
         {transportOption === 'SELLER_TRANSPORT' ? (
           <>
             {/* Delivery Info Display */}
-            {order.delivery?.eta && (
+            {(order.delivery?.windows?.length || order.delivery?.agreedWindow || order.delivery?.eta) && (
               <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-3">
-                <div><strong>Scheduled ETA:</strong> {new Date(order.delivery.eta).toLocaleString()}</div>
-                {order.delivery.transporter?.name && <div><strong>Transporter:</strong> {order.delivery.transporter.name}</div>}
-                {order.delivery.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
-                {order.delivery.transporter?.plate && <div><strong>License Plate/Tracking:</strong> {order.delivery.transporter.plate}</div>}
+                {order.delivery?.agreedWindow && (
+                  <div><strong>Agreed window:</strong> {new Date(order.delivery.agreedWindow.start).toLocaleString()} – {new Date(order.delivery.agreedWindow.end).toLocaleString()}</div>
+                )}
+                {!order.delivery?.agreedWindow && order.delivery?.eta && (
+                  <div><strong>Scheduled ETA:</strong> {new Date(order.delivery.eta).toLocaleString()}</div>
+                )}
+                {!order.delivery?.agreedWindow && !order.delivery?.eta && order.delivery?.windows?.length && (
+                  <div><strong>Proposed windows:</strong>{' '}
+                    {order.delivery.windows.map((w: any, i: number) => {
+                      const s = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
+                      const e = w?.end?.toDate ? w.end.toDate() : new Date(w?.end);
+                      return <span key={i}>{i ? '; ' : ''}{s.toLocaleString()} – {e.toLocaleString()}</span>;
+                    })}
+                  </div>
+                )}
+                {order.delivery?.transporter?.name && <div><strong>Hauler:</strong> {order.delivery.transporter.name}</div>}
+                {order.delivery?.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
+                {order.delivery?.transporter?.plate && <div><strong>License plate / truck:</strong> {order.delivery.transporter.plate}</div>}
               </div>
             )}
 
-            {/* Actions based on status */}
             {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && (
               <>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <div className="font-semibold text-sm">Schedule Delivery</div>
-                    <div className="text-xs text-muted-foreground">Set delivery ETA and transporter information.</div>
+                    <div className="font-semibold text-sm">Propose delivery</div>
+                    <div className="text-xs text-muted-foreground">Propose delivery windows (hauling). Buyer will agree to one.</div>
                   </div>
-                  <Button
-                    variant="default"
-                    disabled={processing !== null}
-                    onClick={() => setScheduleDeliveryOpen(true)}
-                  >
+                  <Button variant="default" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
                     <Calendar className="h-4 w-4 mr-2" />
-                    Schedule Delivery
+                    Propose delivery
                   </Button>
                 </div>
                 <Separator />
               </>
+            )}
+
+            {txStatus === 'DELIVERY_PROPOSED' && (
+              <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
+                <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting on buyer</div>
+                <div className="text-xs mt-1">Buyer must agree to a delivery window. You will be notified.</div>
+              </div>
             )}
 
             {txStatus === 'DELIVERY_SCHEDULED' && (
@@ -317,9 +333,28 @@ export default function SellerOrderDetailPage() {
 
             {txStatus === 'READY_FOR_PICKUP' && (
               <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting for buyer to schedule pickup</div>
-                <div className="text-xs mt-1">Buyer will select a pickup window.</div>
+                <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting for buyer to propose pickup</div>
+                <div className="text-xs mt-1">Buyer will choose a window. You must agree before they can confirm pickup.</div>
               </div>
+            )}
+
+            {txStatus === 'PICKUP_PROPOSED' && order.pickup?.selectedWindow && (
+              <>
+                <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-2">
+                  <div><strong>Buyer proposed:</strong> {new Date(order.pickup.selectedWindow.start).toLocaleString()} – {new Date(order.pickup.selectedWindow.end).toLocaleString()}</div>
+                </div>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="font-semibold text-sm">Agree to pickup window</div>
+                    <div className="text-xs text-muted-foreground">Confirm this time works for you.</div>
+                  </div>
+                  <Button variant="default" disabled={processing !== null} onClick={() => setAgreePickupOpen(true)}>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Agree to window
+                  </Button>
+                </div>
+                <Separator />
+              </>
             )}
 
             {txStatus === 'PICKUP_SCHEDULED' && (
@@ -456,17 +491,18 @@ export default function SellerOrderDetailPage() {
                     variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
                     disabled={!!nextAction.blockedReason}
                     onClick={() => {
-                      if (nextAction.ctaAction.startsWith('/')) {
-                        window.location.href = nextAction.ctaAction;
-                      } else if (nextAction.ctaAction.includes('schedule-delivery')) {
+                      if (nextAction.ctaAction.includes('schedule-delivery')) {
                         setScheduleDeliveryOpen(true);
                       } else if (nextAction.ctaAction.includes('set-pickup')) {
                         setSetPickupInfoOpen(true);
+                      } else if (nextAction.ctaAction.includes('agree-pickup')) {
+                        setAgreePickupOpen(true);
                       } else if (nextAction.ctaAction.includes('mark-out')) {
                         setMarkOutForDeliveryOpen(true);
                       } else if (nextAction.ctaAction.includes('mark-delivered')) {
-                        // Trigger mark delivered flow
                         window.location.href = `/seller/orders/${order.id}#mark-delivered`;
+                      } else if (nextAction.ctaAction.startsWith('/')) {
+                        window.location.href = nextAction.ctaAction;
                       }
                     }}
                   >
@@ -486,14 +522,10 @@ export default function SellerOrderDetailPage() {
             const txStatus = getEffectiveTransactionStatus(order);
             const transportOption = order.transportOption || 'SELLER_TRANSPORT';
             if (txStatus === 'FULFILLMENT_REQUIRED') {
-              if (transportOption === 'SELLER_TRANSPORT') {
-                setScheduleDeliveryOpen(true);
-              } else {
-                setSetPickupInfoOpen(true);
-              }
-            } else if (txStatus === 'DELIVERY_SCHEDULED') {
-              setMarkOutForDeliveryOpen(true);
-            }
+              if (transportOption === 'SELLER_TRANSPORT') setScheduleDeliveryOpen(true);
+              else setSetPickupInfoOpen(true);
+            } else if (txStatus === 'PICKUP_PROPOSED') setAgreePickupOpen(true);
+            else if (txStatus === 'DELIVERY_SCHEDULED') setMarkOutForDeliveryOpen(true);
           }}
         />
 
@@ -646,69 +678,139 @@ export default function SellerOrderDetailPage() {
           <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
         </div>
 
-        {/* Schedule Delivery Dialog */}
+        {/* Propose Delivery Dialog (hauling – windows + hauler) */}
         <Dialog open={scheduleDeliveryOpen} onOpenChange={setScheduleDeliveryOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Schedule Delivery</DialogTitle>
-              <DialogDescription>Set delivery ETA and optional transporter information.</DialogDescription>
+              <DialogTitle>Propose delivery</DialogTitle>
+              <DialogDescription>Propose when you can deliver (hauling). Add one or more windows. Buyer will agree to one.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Delivery ETA *</Label>
-                <Input
-                  type="datetime-local"
-                  value={deliveryEta}
-                  onChange={(e) => setDeliveryEta(e.target.value)}
-                  required
-                />
+                <Label>Delivery windows *</Label>
+                <div className="space-y-2 mt-1">
+                  {deliveryWindows.map((w, idx) => (
+                    <div key={idx} className="flex gap-2 items-end">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Start</Label>
+                          <Input type="datetime-local" value={w.start} onChange={(e) => {
+                            const n = [...deliveryWindows];
+                            n[idx] = { ...n[idx], start: e.target.value };
+                            setDeliveryWindows(n);
+                          }} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">End</Label>
+                          <Input type="datetime-local" value={w.end} onChange={(e) => {
+                            const n = [...deliveryWindows];
+                            n[idx] = { ...n[idx], end: e.target.value };
+                            setDeliveryWindows(n);
+                          }} />
+                        </div>
+                      </div>
+                      {deliveryWindows.length > 1 && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => setDeliveryWindows(deliveryWindows.filter((_, i) => i !== idx))}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDeliveryWindows([...deliveryWindows, { start: '', end: '' }])}>
+                    Add window
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label>Transporter Name (optional)</Label>
-                <Input value={transporterName} onChange={(e) => setTransporterName(e.target.value)} placeholder="e.g., FedEx, UPS" />
-              </div>
-              <div>
-                <Label>Transporter Phone (optional)</Label>
-                <Input value={transporterPhone} onChange={(e) => setTransporterPhone(e.target.value)} placeholder="Phone number" />
-              </div>
-              <div>
-                <Label>License Plate / Tracking (optional)</Label>
-                <Input value={transporterPlate} onChange={(e) => setTransporterPlate(e.target.value)} placeholder="License plate or tracking number" />
+              <div className="text-xs text-muted-foreground">Hauler / truck (optional)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Name</Label>
+                  <Input value={haulerName} onChange={(e) => setHaulerName(e.target.value)} placeholder="e.g. John Smith" />
+                </div>
+                <div>
+                  <Label className="text-xs">Phone</Label>
+                  <Input value={haulerPhone} onChange={(e) => setHaulerPhone(e.target.value)} placeholder="Phone" />
+                </div>
+                <div>
+                  <Label className="text-xs">License plate / truck</Label>
+                  <Input value={haulerPlate} onChange={(e) => setHaulerPlate(e.target.value)} placeholder="Optional" />
+                </div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setScheduleDeliveryOpen(false)}>Cancel</Button>
               <Button
-                disabled={!deliveryEta || processing !== null}
+                disabled={processing !== null || deliveryWindows.some(w => !w.start || !w.end)}
                 onClick={async () => {
                   try {
                     setProcessing('delivered');
-                    const body: any = { eta: new Date(deliveryEta).toISOString() };
-                    if (transporterName || transporterPhone || transporterPlate) {
+                    const body: any = {
+                      windows: deliveryWindows.filter(w => w.start && w.end).map(w => ({ start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() })),
+                    };
+                    if (haulerName || haulerPhone || haulerPlate) {
                       body.transporter = {
-                        ...(transporterName ? { name: transporterName } : {}),
-                        ...(transporterPhone ? { phone: transporterPhone } : {}),
-                        ...(transporterPlate ? { plate: transporterPlate } : {}),
+                        ...(haulerName ? { name: haulerName } : {}),
+                        ...(haulerPhone ? { phone: haulerPhone } : {}),
+                        ...(haulerPlate ? { plate: haulerPlate } : {}),
                       };
                     }
                     await postAuthJson(`/api/orders/${order.id}/fulfillment/schedule-delivery`, body);
-                    toast({ title: 'Success', description: 'Delivery scheduled successfully.' });
+                    toast({ title: 'Success', description: 'Delivery windows proposed. Buyer will agree to one.' });
                     setScheduleDeliveryOpen(false);
-                    setDeliveryEta('');
-                    setTransporterName('');
-                    setTransporterPhone('');
-                    setTransporterPlate('');
+                    setDeliveryWindows([{ start: '', end: '' }]);
+                    setHaulerName('');
+                    setHaulerPhone('');
+                    setHaulerPlate('');
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to schedule delivery', variant: 'destructive' });
+                    toast({ title: 'Error', description: e?.message || 'Failed to propose delivery', variant: 'destructive' });
                   } finally {
                     setProcessing(null);
                   }
                 }}
               >
                 {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Schedule Delivery
+                Propose delivery
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Agree to Pickup Window Dialog */}
+        <Dialog open={agreePickupOpen} onOpenChange={setAgreePickupOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agree to pickup window</DialogTitle>
+              <DialogDescription>Buyer proposed this window. Confirm it works for you.</DialogDescription>
+            </DialogHeader>
+            {order?.pickup?.selectedWindow && (
+              <div className="text-sm py-2">
+                <strong>Window:</strong>{' '}
+                {new Date(order.pickup.selectedWindow.start).toLocaleString()} – {new Date(order.pickup.selectedWindow.end).toLocaleString()}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAgreePickupOpen(false)}>Cancel</Button>
+              <Button
+                disabled={processing !== null}
+                onClick={async () => {
+                  try {
+                    setProcessing('delivered');
+                    await postAuthJson(`/api/orders/${order.id}/fulfillment/agree-pickup-window`, {});
+                    toast({ title: 'Success', description: 'Pickup window agreed. Buyer can confirm pickup with the code.' });
+                    setAgreePickupOpen(false);
+                    const refreshed = await getOrderById(order.id);
+                    if (refreshed) setOrder(refreshed);
+                  } catch (e: any) {
+                    toast({ title: 'Error', description: e?.message || 'Failed to agree', variant: 'destructive' });
+                  } finally {
+                    setProcessing(null);
+                  }
+                }}
+              >
+                {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                Agree to window
               </Button>
             </DialogFooter>
           </DialogContent>

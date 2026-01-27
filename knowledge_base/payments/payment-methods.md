@@ -10,7 +10,7 @@ version: 1
 
 # Payment Methods
 
-Wildlife Exchange accepts multiple payment methods for your convenience.
+Agchange accepts multiple payment methods for your convenience.
 
 ## Available Payment Methods
 

@@ -10,7 +10,7 @@ version: 1
 
 # Refunds and Returns
 
-Understanding when and how refunds work on Wildlife Exchange.
+Understanding when and how refunds work on Agchange.
 
 ## When Refunds Are Available
 

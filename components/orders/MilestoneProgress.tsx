@@ -42,70 +42,32 @@ export function MilestoneProgress({
     const items: MilestoneItem[] = [];
 
     if (transportOption === 'SELLER_TRANSPORT') {
-      // SELLER_TRANSPORT milestones
+      const proposed = ['DELIVERY_PROPOSED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const scheduled = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const out = ['OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const deliveredPending = ['DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
       const completed = txStatus === 'COMPLETED';
 
       items.push(
-        {
-          key: 'scheduled',
-          label: 'Delivery scheduled',
-          completed: scheduled,
-          current: txStatus === 'DELIVERY_SCHEDULED',
-        },
-        {
-          key: 'out',
-          label: 'Out for delivery',
-          completed: out,
-          current: txStatus === 'OUT_FOR_DELIVERY',
-        },
-        {
-          key: 'delivered',
-          label: 'Delivered (pending confirmation)',
-          completed: deliveredPending,
-          current: txStatus === 'DELIVERED_PENDING_CONFIRMATION',
-        },
-        {
-          key: 'completed',
-          label: 'Completed',
-          completed: completed,
-          current: txStatus === 'COMPLETED',
-        }
+        { key: 'proposed', label: 'Delivery proposed', completed: proposed, current: txStatus === 'DELIVERY_PROPOSED' },
+        { key: 'scheduled', label: 'Buyer agreed', completed: scheduled, current: txStatus === 'DELIVERY_SCHEDULED' },
+        { key: 'out', label: 'Out for delivery', completed: out, current: txStatus === 'OUT_FOR_DELIVERY' },
+        { key: 'delivered', label: 'Delivered (pending confirmation)', completed: deliveredPending, current: txStatus === 'DELIVERED_PENDING_CONFIRMATION' },
+        { key: 'completed', label: 'Completed', completed, current: txStatus === 'COMPLETED' }
       );
     } else {
-      // BUYER_TRANSPORT milestones
-      const pickupInfo = ['READY_FOR_PICKUP', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
-      const windowSelected = ['PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
+      const pickupInfo = ['READY_FOR_PICKUP', 'PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
+      const windowProposed = ['PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
+      const agreed = ['PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
       const pickupConfirmed = ['PICKED_UP', 'COMPLETED'].includes(txStatus);
       const completed = txStatus === 'COMPLETED';
 
       items.push(
-        {
-          key: 'pickupInfo',
-          label: 'Pickup info set',
-          completed: pickupInfo,
-          current: txStatus === 'READY_FOR_PICKUP',
-        },
-        {
-          key: 'windowSelected',
-          label: 'Pickup window selected',
-          completed: windowSelected,
-          current: txStatus === 'PICKUP_SCHEDULED',
-        },
-        {
-          key: 'pickupConfirmed',
-          label: 'Pickup confirmed',
-          completed: pickupConfirmed,
-          current: txStatus === 'PICKED_UP',
-        },
-        {
-          key: 'completed',
-          label: 'Completed',
-          completed: completed,
-          current: txStatus === 'COMPLETED',
-        }
+        { key: 'pickupInfo', label: 'Pickup info set', completed: pickupInfo, current: txStatus === 'READY_FOR_PICKUP' },
+        { key: 'windowProposed', label: 'Pickup proposed', completed: windowProposed, current: txStatus === 'PICKUP_PROPOSED' },
+        { key: 'agreed', label: 'Seller agreed', completed: agreed, current: txStatus === 'PICKUP_SCHEDULED' },
+        { key: 'pickupConfirmed', label: 'Pickup confirmed', completed: pickupConfirmed, current: txStatus === 'PICKED_UP' },
+        { key: 'completed', label: 'Completed', completed, current: txStatus === 'COMPLETED' }
       );
     }
 

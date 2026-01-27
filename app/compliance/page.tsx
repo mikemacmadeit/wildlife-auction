@@ -18,7 +18,7 @@ export default function CompliancePage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-4">Compliance & Regulations</h1>
         <p className="text-lg text-muted-foreground">
-          Wildlife Exchange enforces Texas-only animal transactions and marketplace document workflows. Buyers and sellers remain responsible for legal compliance.
+          Agchange enforces Texas-only animal transactions and marketplace document workflows. Buyers and sellers remain responsible for legal compliance.
         </p>
       </div>
 
@@ -288,7 +288,7 @@ export default function CompliancePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Wildlife Exchange uses a payout-hold workflow to protect both buyers and sellers:
+                Agchange uses a payout-hold workflow to protect both buyers and sellers:
               </p>
               <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-4">
                 <li>Buyer pays platform via Stripe Checkout at purchase</li>

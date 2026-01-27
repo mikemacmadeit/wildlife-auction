@@ -396,6 +396,28 @@ function toThread(docSnap: QueryDocumentSnapshot<DocumentData>): MessageThread {
 }
 
 /**
+ * Fetch a single thread by ID. Used for notification deep-links when the thread
+ * may not be in the subscription result yet (e.g. race, limit). Returns null if
+ * not found or user is not a participant.
+ */
+export async function getThreadById(threadId: string, userId: string): Promise<MessageThread | null> {
+  const threadRef = doc(db, 'messageThreads', threadId);
+  const snap = await getDoc(threadRef);
+  if (!snap.exists()) return null;
+  const data = snap.data() as any;
+  const buyerId = data?.buyerId;
+  const sellerId = data?.sellerId;
+  if (userId !== buyerId && userId !== sellerId) return null;
+  return {
+    id: snap.id,
+    ...data,
+    createdAt: data?.createdAt?.toDate?.() || new Date(),
+    updatedAt: data?.updatedAt?.toDate?.() || new Date(),
+    lastMessageAt: data?.lastMessageAt?.toDate?.(),
+  } as MessageThread;
+}
+
+/**
  * Subscribe to threads for a user role (buyer OR seller) in real-time.
  * Uses an ordered query when indexes are available; falls back to unordered + client sort.
  */

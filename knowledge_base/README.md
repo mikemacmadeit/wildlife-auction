@@ -26,7 +26,7 @@ Each markdown file must include frontmatter with the following fields:
 
 ```markdown
 ---
-title: "How to Buy on Wildlife Exchange"
+title: "How to Buy on Agchange"
 slug: "how-to-buy"
 category: "getting-started"
 audience: ["buyer", "all"]

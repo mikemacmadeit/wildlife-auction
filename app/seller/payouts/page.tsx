@@ -672,7 +672,7 @@ export default function SellerPayoutsPage() {
                   )}
                   
                   <p className="pt-2 text-xs text-muted-foreground">
-                    Wildlife Exchange takes a 5% platform fee on each transaction. The remaining amount is transferred directly to your bank account.
+                    Agchange takes a 5% platform fee on each transaction. The remaining amount is transferred directly to your bank account.
                   </p>
                 </div>
               </CardContent>

@@ -6,9 +6,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getFieldNotesIndex, toUrlSlug } from '@/lib/content/field-notes';
 
 export const metadata: Metadata = {
-  title: 'Guides | Field Notes | Wildlife Exchange',
+  title: 'Guides | Field Notes | Agchange',
   description:
-    'Guides on payments, compliance, delivery/pickup, and how to buy/sell with confidence on Wildlife Exchange.',
+    'Guides on payments, compliance, delivery/pickup, and how to buy/sell with confidence on Agchange.',
   alternates: { canonical: '/field-notes/guides' },
 };
 

@@ -92,7 +92,7 @@ export default function RegisterPage() {
 
                 // User has accepted terms - proceed normally
                 toast({
-                  title: 'Welcome to Wildlife Exchange!',
+                  title: 'Welcome to Agchange!',
                   description: 'Your account has been created successfully with Google.',
                 });
                 router.push(getRedirectPath());
@@ -195,6 +195,12 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
+    const regKey = 'we:registration-in-progress:v1';
+    try {
+      if (typeof window !== 'undefined') sessionStorage.setItem(regKey, '1');
+    } catch {
+      /* ignore */
+    }
 
     try {
       // Create Firebase Auth user
@@ -204,7 +210,7 @@ export default function RegisterPage() {
         formData.fullName
       );
 
-      // Create user document in Firestore
+      // Create user document in Firestore (bootstrap is skipped while regKey is set)
       if (userCredential.user) {
         await createUserDocument(userCredential.user, {
           fullName: formData.fullName,
@@ -212,6 +218,12 @@ export default function RegisterPage() {
           phone: formData.phone,
           location: formData.location,
         });
+
+        try {
+          if (typeof window !== 'undefined') sessionStorage.removeItem(regKey);
+        } catch {
+          /* ignore */
+        }
 
         // Record legal acceptance server-side (non-spoofable).
         try {
@@ -232,13 +244,18 @@ export default function RegisterPage() {
 
         toast({
           title: 'Account created successfully!',
-          description: 'Welcome to Wildlife Exchange! Please check your email to verify your account.',
+          description: 'Welcome to Agchange! Please check your email to verify your account.',
         });
 
         // Redirect to saved path or dashboard after successful registration
         router.push(getRedirectPath());
       }
     } catch (error: any) {
+      try {
+        if (typeof window !== 'undefined') sessionStorage.removeItem(regKey);
+      } catch {
+        /* ignore */
+      }
       let errorMessage = 'An error occurred while creating your account. Please try again.';
       
       if (error.code === 'auth/email-already-in-use') {
@@ -289,7 +306,7 @@ export default function RegisterPage() {
 
           // User has accepted terms - proceed normally
           toast({
-            title: 'Welcome to Wildlife Exchange!',
+            title: 'Welcome to Agchange!',
             description: 'Your account has been created successfully.',
           });
 
@@ -379,11 +396,11 @@ export default function RegisterPage() {
                 />
               </div>
               <span className="text-3xl font-extrabold text-foreground">
-                Wildlife Exchange
+                Agchange
               </span>
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold text-foreground leading-tight">
-              Create your Wildlife Exchange account
+              Create your Agchange account
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
               Join Texas&apos; premier marketplace for registered livestock and breeder animal sales. Connect with verified sellers and serious buyers.

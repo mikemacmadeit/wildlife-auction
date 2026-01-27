@@ -14,6 +14,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { computeNextState, getMinIncrementCents, type AutoBidEntry } from '@/lib/auctions/proxyBidding';
+import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -229,8 +230,19 @@ export async function POST(request: Request, ctx: { params: Promise<{ auctionId:
       });
     }
 
+    const trySendEmail = async (eventId: string) => {
+      try {
+        await Promise.race([
+          tryDispatchEmailJobNow({ db: db as any, jobId: eventId, waitForJob: true }),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      } catch {
+        /* best-effort */
+      }
+    };
+
     if (result.prevBidderId && newBidderId && result.prevBidderId !== newBidderId) {
-      await emitAndProcessEventForUser({
+      const outbidRes = await emitAndProcessEventForUser({
         type: 'Auction.Outbid',
         actorId: userId,
         entityType: 'listing',
@@ -246,10 +258,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ auctionId:
         },
         optionalHash: `autobid:${auctionId}:${userId}:${maxBidCents}`,
       });
+      if (outbidRes?.created) void trySendEmail(outbidRes.eventId);
     }
 
     if (newBidderId === userId) {
-      await emitAndProcessEventForUser({
+      const highBidderRes = await emitAndProcessEventForUser({
         type: 'Auction.HighBidder',
         actorId: userId,
         entityType: 'listing',
@@ -266,6 +279,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ auctionId:
         },
         optionalHash: `autobid:${auctionId}:${userId}:${maxBidCents}`,
       });
+      if (highBidderRes?.created) void trySendEmail(highBidderRes.eventId);
     }
 
     return json(result);

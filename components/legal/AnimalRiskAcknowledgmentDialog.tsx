@@ -29,7 +29,7 @@ export function AnimalRiskAcknowledgmentDialog(props: {
 
         <div className="space-y-3 text-sm text-muted-foreground">
           <ul className="list-disc ml-5 space-y-1">
-            <li>Wildlife Exchange is a marketplace only and does not take custody, possession, or control of animals.</li>
+            <li>Agchange is a marketplace only and does not take custody, possession, or control of animals.</li>
             <li>Health and legality representations are made solely by the seller.</li>
             <li>Live animals have inherent risk (stress, illness, injury, escape, mortality).</li>
             <li>Risk transfers upon delivery or pickup (buyer and seller handle logistics).</li>

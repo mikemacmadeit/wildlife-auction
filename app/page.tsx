@@ -885,7 +885,7 @@ export default function HomePage() {
         <div className="absolute inset-0 z-0">
           <Image
             src="/images/Buck_1.webp"
-            alt="Wildlife Exchange Hero Background"
+            alt="Agchange Hero Background"
             fill
             className="object-cover object-[50%_20%]"
             priority
@@ -912,7 +912,7 @@ export default function HomePage() {
                 <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-barletta text-[hsl(37,27%,70%)] whitespace-nowrap">
-                Wildlife Exchange
+                Agchange
               </h1>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">

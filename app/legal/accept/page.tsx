@@ -148,7 +148,7 @@ export default function LegalAcceptPage() {
         <Alert>
           <Shield className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            Wildlife Exchange is a marketplace platform only. The legal docs below explain that buyer/seller contract directly and
+            Agchange is a marketplace platform only. The legal docs below explain that buyer/seller contract directly and
             that live animal transactions carry inherent risk.
           </AlertDescription>
         </Alert>

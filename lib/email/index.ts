@@ -418,7 +418,7 @@ export const EMAIL_EVENT_REGISTRY = [
       listingTitle: 'Trophy Whitetail Buck - 180+ Class Score',
       amount: 18500,
       orderDate: new Date().toISOString(),
-      orderUrl: 'https://wildlife.exchange/dashboard/orders?orderId=ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders?orderId=ORD_123456',
     },
     render: (data: OrderConfirmationEmailData) => {
       const { subject, html } = getOrderConfirmationEmail(data);
@@ -435,7 +435,7 @@ export const EMAIL_EVENT_REGISTRY = [
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
       deliveryDate: new Date().toISOString(),
-      orderUrl: 'https://wildlife.exchange/dashboard/orders?orderId=ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders?orderId=ORD_123456',
     },
     render: (data: DeliveryConfirmationEmailData) => {
       const { subject, html } = getDeliveryConfirmationEmail(data);
@@ -451,7 +451,7 @@ export const EMAIL_EVENT_REGISTRY = [
       buyerName: 'Alex Johnson',
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: OrderInTransitEmailData) => {
       const { subject, html } = getOrderInTransitEmail(data);
@@ -467,7 +467,7 @@ export const EMAIL_EVENT_REGISTRY = [
       buyerName: 'Alex Johnson',
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: OrderPreparingEmailData) => {
       const { subject, html } = getOrderPreparingEmail(data);
@@ -501,7 +501,7 @@ export const EMAIL_EVENT_REGISTRY = [
       winnerName: 'Alex Johnson',
       listingTitle: 'Blackbuck Trophy Buck',
       winningBid: 9500,
-      orderUrl: 'https://wildlife.exchange/listing/abc123',
+      orderUrl: 'https://agchange.com/listing/abc123',
       auctionEndDate: new Date().toISOString(),
     },
     render: (data: AuctionWinnerEmailData) => {
@@ -518,7 +518,7 @@ export const EMAIL_EVENT_REGISTRY = [
       outbidderName: 'Alex Johnson',
       listingTitle: 'Blackbuck Trophy Buck',
       newBidAmount: 9850,
-      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      listingUrl: 'https://agchange.com/listing/abc123',
       auctionEndsAt: new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString(),
     },
     render: (data: AuctionOutbidEmailData) => {
@@ -533,11 +533,11 @@ export const EMAIL_EVENT_REGISTRY = [
     schema: welcomeSchema,
     samplePayload: {
       userName: 'Alex',
-      dashboardUrl: 'https://wildlife.exchange/dashboard/notifications',
+      dashboardUrl: 'https://agchange.com/dashboard/notifications',
     },
     render: (data: WelcomeEmailData) => {
       const { subject, html } = getWelcomeEmail(data);
-      return { subject, preheader: `Welcome to Wildlife Exchange`, html };
+      return { subject, preheader: `Welcome to Agchange`, html };
     },
   },
   {
@@ -549,7 +549,7 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Alex',
       listingTitle: 'Blackbuck Trophy Buck',
       yourBidAmount: 9900,
-      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      listingUrl: 'https://agchange.com/listing/abc123',
       auctionEndsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
     },
     render: (data: AuctionHighBidderEmailData) => {
@@ -568,7 +568,7 @@ export const EMAIL_EVENT_REGISTRY = [
       bidAmount: 9900,
       currentBidAmount: 9900,
       isHighBidder: true,
-      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      listingUrl: 'https://agchange.com/listing/abc123',
       auctionEndsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
     },
     render: (data: BidPlacedEmailData) => {
@@ -585,7 +585,7 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Alex',
       listingTitle: 'Axis Doe (Breeder Stock)',
       threshold: '10m',
-      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      listingUrl: 'https://agchange.com/listing/abc123',
       auctionEndsAt: new Date(Date.now() + 1000 * 60 * 10).toISOString(),
       currentBidAmount: 4500,
     },
@@ -602,7 +602,7 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Alex',
       listingTitle: 'Blackbuck Trophy Buck',
-      listingUrl: 'https://wildlife.exchange/listing/abc123',
+      listingUrl: 'https://agchange.com/listing/abc123',
       finalBidAmount: 11000,
     },
     render: (data: AuctionLostEmailData) => {
@@ -620,7 +620,7 @@ export const EMAIL_EVENT_REGISTRY = [
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
       daysSinceDelivery: 3,
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: DeliveryCheckInEmailData) => {
       const { subject, html } = getDeliveryCheckInEmail(data);
@@ -636,7 +636,7 @@ export const EMAIL_EVENT_REGISTRY = [
       sellerName: 'Jordan',
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      orderUrl: 'https://wildlife.exchange/seller/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/seller/orders/ORD_123456',
     },
     render: (data: OrderReceivedEmailData) => {
       const { subject, html } = getOrderReceivedEmail(data);
@@ -652,7 +652,7 @@ export const EMAIL_EVENT_REGISTRY = [
       buyerName: 'Alex Johnson',
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: OrderDeliveredEmailData) => {
       const { subject, html } = getOrderDeliveredEmail(data);
@@ -669,7 +669,7 @@ export const EMAIL_EVENT_REGISTRY = [
       orderId: 'ORD_123456',
       listingTitle: 'Axis Doe (Breeder Stock)',
       amount: 5000,
-      orderUrl: 'https://wildlife.exchange/seller/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/seller/orders/ORD_123456',
     },
     render: (data: OrderAcceptedEmailData) => {
       const { subject, html } = getOrderAcceptedEmail(data);
@@ -683,7 +683,7 @@ export const EMAIL_EVENT_REGISTRY = [
     schema: profileIncompleteReminderSchema,
     samplePayload: {
       userName: 'Alex',
-      settingsUrl: 'https://wildlife.exchange/dashboard/account',
+      settingsUrl: 'https://agchange.com/dashboard/account',
       missingFields: ['phone', 'location'],
     },
     render: (data: ProfileIncompleteReminderEmailData) => {
@@ -699,9 +699,9 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Alex',
       listings: [
-        { title: 'Blackbuck Trophy Buck', url: 'https://wildlife.exchange/listing/abc123', price: 9500, endsAt: new Date().toISOString() },
+        { title: 'Blackbuck Trophy Buck', url: 'https://agchange.com/listing/abc123', price: 9500, endsAt: new Date().toISOString() },
       ],
-      unsubscribeUrl: 'https://wildlife.exchange/dashboard/settings/notifications',
+      unsubscribeUrl: 'https://agchange.com/dashboard/settings/notifications',
     },
     render: (data: WeeklyDigestEmailData) => {
       const { subject, html } = getWeeklyDigestEmail(data);
@@ -717,8 +717,8 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Alex',
       queryName: 'Whitetail under $12k',
       resultsCount: 4,
-      searchUrl: 'https://wildlife.exchange/browse?type=auction',
-      unsubscribeUrl: 'https://wildlife.exchange/dashboard/settings/notifications',
+      searchUrl: 'https://agchange.com/browse?type=auction',
+      unsubscribeUrl: 'https://agchange.com/dashboard/settings/notifications',
     },
     render: (data: SavedSearchAlertEmailData) => {
       const { subject, html } = getSavedSearchAlertEmail(data);
@@ -733,8 +733,8 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Jordan',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      threadUrl: 'https://wildlife.exchange/seller/messages?threadId=THREAD_123',
-      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
+      threadUrl: 'https://agchange.com/seller/messages?threadId=THREAD_123',
+      listingUrl: 'https://agchange.com/listing/LISTING_123',
       senderRole: 'buyer',
       preview: 'Hi! Is transport available this week?',
     },
@@ -750,8 +750,8 @@ export const EMAIL_EVENT_REGISTRY = [
     schema: verifyEmailSchema,
     samplePayload: {
       userName: 'Alex',
-      verifyUrl: 'https://wildlife.exchange/__/auth/action?mode=verifyEmail&oobCode=abc123',
-      dashboardUrl: 'https://wildlife.exchange/dashboard/account?verified=1',
+      verifyUrl: 'https://agchange.com/__/auth/action?mode=verifyEmail&oobCode=abc123',
+      dashboardUrl: 'https://agchange.com/dashboard/account?verified=1',
     },
     render: (data: VerifyEmailEmailData) => {
       const { subject, html } = getVerifyEmailEmail(data);
@@ -767,7 +767,7 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Alex',
       listingTitle: 'Axis Doe (Breeder Stock)',
       amount: 8500,
-      offerUrl: 'https://wildlife.exchange/dashboard/offers/ABC123',
+      offerUrl: 'https://agchange.com/dashboard/offers/ABC123',
     },
     render: (data: OfferAcceptedEmailData) => {
       const { subject, html } = getOfferAcceptedEmail(data);
@@ -783,7 +783,7 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Alex',
       listingTitle: 'Axis Doe (Breeder Stock)',
       amount: 8500,
-      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+      offerUrl: 'https://agchange.com/dashboard/offers',
       expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     },
     render: (data: OfferSubmittedEmailData) => {
@@ -800,7 +800,7 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Jordan',
       listingTitle: 'Axis Doe (Breeder Stock)',
       amount: 8500,
-      offerUrl: 'https://wildlife.exchange/seller/offers',
+      offerUrl: 'https://agchange.com/seller/offers',
       expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     },
     render: (data: OfferReceivedEmailData) => {
@@ -817,7 +817,7 @@ export const EMAIL_EVENT_REGISTRY = [
       userName: 'Alex',
       listingTitle: 'Axis Doe (Breeder Stock)',
       amount: 9000,
-      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+      offerUrl: 'https://agchange.com/dashboard/offers',
       expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     },
     render: (data: OfferCounteredEmailData) => {
@@ -833,7 +833,7 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Alex',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+      offerUrl: 'https://agchange.com/dashboard/offers',
     },
     render: (data: OfferDeclinedEmailData) => {
       const { subject, html } = getOfferDeclinedEmail(data);
@@ -848,7 +848,7 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Alex',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      offerUrl: 'https://wildlife.exchange/dashboard/offers',
+      offerUrl: 'https://agchange.com/dashboard/offers',
     },
     render: (data: OfferExpiredEmailData) => {
       const { subject, html } = getOfferExpiredEmail(data);
@@ -863,7 +863,7 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Jordan',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
+      listingUrl: 'https://agchange.com/listing/LISTING_123',
     },
     render: (data: ListingApprovedEmailData) => {
       const { subject, html } = getListingApprovedEmail(data);
@@ -878,7 +878,7 @@ export const EMAIL_EVENT_REGISTRY = [
     samplePayload: {
       userName: 'Jordan',
       listingTitle: 'Axis Doe (Breeder Stock)',
-      editUrl: 'https://wildlife.exchange/seller/listings/LISTING_123/edit',
+      editUrl: 'https://agchange.com/seller/listings/LISTING_123/edit',
       reason: 'Missing required permit documentation.',
     },
     render: (data: ListingRejectedEmailData) => {
@@ -901,9 +901,9 @@ export const EMAIL_EVENT_REGISTRY = [
       category: 'wildlife_exotics',
       listingType: 'auction',
       complianceStatus: 'pending_review',
-      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
-      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
-      adminComplianceUrl: 'https://wildlife.exchange/dashboard/admin/compliance',
+      listingUrl: 'https://agchange.com/listing/LISTING_123',
+      adminQueueUrl: 'https://agchange.com/dashboard/admin/listings',
+      adminComplianceUrl: 'https://agchange.com/dashboard/admin/compliance',
     },
     render: (data: AdminListingSubmittedEmailData) => {
       const { subject, html } = getAdminListingSubmittedEmail(data);
@@ -922,8 +922,8 @@ export const EMAIL_EVENT_REGISTRY = [
       sellerId: 'SELLER_234',
       sellerName: 'Kerry Carpenter',
       complianceStatus: 'pending_review',
-      listingUrl: 'https://wildlife.exchange/listing/LISTING_234',
-      adminComplianceUrl: 'https://wildlife.exchange/dashboard/admin/compliance',
+      listingUrl: 'https://agchange.com/listing/LISTING_234',
+      adminComplianceUrl: 'https://agchange.com/dashboard/admin/compliance',
     },
     render: (data: AdminListingComplianceReviewEmailData) => {
       const { subject, html } = getAdminListingComplianceReviewEmail(data);
@@ -941,8 +941,8 @@ export const EMAIL_EVENT_REGISTRY = [
       listingId: 'LISTING_345',
       sellerId: 'SELLER_345',
       sellerName: 'New Seller',
-      listingUrl: 'https://wildlife.exchange/listing/LISTING_345',
-      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+      listingUrl: 'https://agchange.com/listing/LISTING_345',
+      adminQueueUrl: 'https://agchange.com/dashboard/admin/listings',
     },
     render: (data: AdminListingAdminApprovalEmailData) => {
       const { subject, html } = getAdminListingAdminApprovalEmail(data);
@@ -960,8 +960,8 @@ export const EMAIL_EVENT_REGISTRY = [
       listingId: 'LISTING_123',
       sellerId: 'SELLER_123',
       sellerName: 'Jordan Smith',
-      listingUrl: 'https://wildlife.exchange/listing/LISTING_123',
-      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+      listingUrl: 'https://agchange.com/listing/LISTING_123',
+      adminQueueUrl: 'https://agchange.com/dashboard/admin/listings',
     },
     render: (data: AdminListingApprovedEmailData) => {
       const { subject, html } = getAdminListingApprovedEmail(data);
@@ -980,7 +980,7 @@ export const EMAIL_EVENT_REGISTRY = [
       sellerId: 'SELLER_123',
       sellerName: 'Jordan Smith',
       reason: 'Missing required permit documentation.',
-      adminQueueUrl: 'https://wildlife.exchange/dashboard/admin/listings',
+      adminQueueUrl: 'https://agchange.com/dashboard/admin/listings',
     },
     render: (data: AdminListingRejectedEmailData) => {
       const { subject, html } = getAdminListingRejectedEmail(data);
@@ -1000,7 +1000,7 @@ export const EMAIL_EVENT_REGISTRY = [
       buyerId: 'BUYER_123',
       disputeType: 'protected_transaction_dispute',
       reason: 'death',
-      adminOpsUrl: 'https://wildlife.exchange/dashboard/admin/ops',
+      adminOpsUrl: 'https://agchange.com/dashboard/admin/ops',
     },
     render: (data: AdminDisputeOpenedEmailData) => {
       const { subject, html } = getAdminDisputeOpenedEmail(data);
@@ -1019,7 +1019,7 @@ export const EMAIL_EVENT_REGISTRY = [
       permitNumber: 'TPWD-123456',
       storagePath: 'breederPermits/SELLER_123/permit.pdf',
       documentUrl: 'https://storage.googleapis.com/example/permit.pdf',
-      adminComplianceUrl: 'https://wildlife.exchange/dashboard/admin/compliance',
+      adminComplianceUrl: 'https://agchange.com/dashboard/admin/compliance',
     },
     render: (data: AdminBreederPermitSubmittedEmailData) => {
       const { subject, html } = getAdminBreederPermitSubmittedEmail(data);
@@ -1040,7 +1040,7 @@ export const EMAIL_EVENT_REGISTRY = [
       recipientName: 'Alex Johnson',
       orderId: 'ORD_123456',
       listingTitle: 'Whitetail Breeder Buck - 180+ Class',
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: OrderTransferComplianceRequiredEmailData) => {
       const { subject, html } = getOrderTransferComplianceRequiredEmail(data);
@@ -1061,7 +1061,7 @@ export const EMAIL_EVENT_REGISTRY = [
       recipientName: 'Jordan Smith',
       orderId: 'ORD_123456',
       listingTitle: 'Whitetail Breeder Buck - 180+ Class',
-      orderUrl: 'https://wildlife.exchange/seller/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/seller/orders/ORD_123456',
     },
     render: (data: OrderComplianceBuyerConfirmedEmailData) => {
       const { subject, html } = getOrderComplianceBuyerConfirmedEmail(data);
@@ -1082,7 +1082,7 @@ export const EMAIL_EVENT_REGISTRY = [
       recipientName: 'Alex Johnson',
       orderId: 'ORD_123456',
       listingTitle: 'Whitetail Breeder Buck - 180+ Class',
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: OrderComplianceSellerConfirmedEmailData) => {
       const { subject, html } = getOrderComplianceSellerConfirmedEmail(data);
@@ -1103,7 +1103,7 @@ export const EMAIL_EVENT_REGISTRY = [
       recipientName: 'Alex Johnson',
       orderId: 'ORD_123456',
       listingTitle: 'Whitetail Breeder Buck - 180+ Class',
-      orderUrl: 'https://wildlife.exchange/dashboard/orders/ORD_123456',
+      orderUrl: 'https://agchange.com/dashboard/orders/ORD_123456',
     },
     render: (data: OrderComplianceUnlockedEmailData) => {
       const { subject, html } = getOrderComplianceUnlockedEmail(data);

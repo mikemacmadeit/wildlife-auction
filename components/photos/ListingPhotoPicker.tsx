@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw, Crop } from 'lucide-react';
+import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw, Crop, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
@@ -210,6 +211,7 @@ export function ListingPhotoPicker(props: {
         multiple
         className="hidden"
         disabled={uploading}
+        aria-label="Upload photos"
         onChange={async (e) => {
           const files = Array.from(e.target.files || []);
           await handleUploadFiles(files);
@@ -242,11 +244,28 @@ export function ListingPhotoPicker(props: {
                   setManageOpen(true);
                   void refreshManage();
                 }}
+                disabled={uploading}
               >
                 Manage uploads
               </Button>
             </div>
           </div>
+
+          {uploading ? (
+            <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5 flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              </div>
+              <div className="flex-1 w-full space-y-2 min-w-0">
+                <div className="font-semibold text-foreground">Uploading…</div>
+                <p className="text-sm text-muted-foreground">Preparing and uploading your photo. This usually takes a few seconds.</p>
+                <Progress value={uploadPct} className="h-2" />
+                {uploadPct > 0 ? (
+                  <div className="text-xs text-muted-foreground">{Math.round(uploadPct)}%</div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {selected.length ? (
             <div className="space-y-3">
@@ -276,6 +295,7 @@ export function ListingPhotoPicker(props: {
                   type="button"
                   className="min-h-[44px] font-semibold"
                   onClick={startDeviceUpload}
+                  disabled={uploading}
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Add photos
@@ -288,7 +308,12 @@ export function ListingPhotoPicker(props: {
               <div className="text-sm text-muted-foreground">
                 Listings with 4–8 photos get more buyer interest.
               </div>
-              <Button type="button" className="min-h-[44px] font-semibold" onClick={startDeviceUpload}>
+              <Button
+                type="button"
+                className="min-h-[44px] font-semibold"
+                onClick={startDeviceUpload}
+                disabled={uploading}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 Add photos
               </Button>

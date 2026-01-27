@@ -143,9 +143,11 @@ export function shouldEscalateToAdmin(order: Order): boolean {
   // Only escalate active fulfillment states
   const activeStates: string[] = [
     'FULFILLMENT_REQUIRED',
+    'DELIVERY_PROPOSED',
     'DELIVERY_SCHEDULED',
     'DELIVERED_PENDING_CONFIRMATION',
     'READY_FOR_PICKUP',
+    'PICKUP_PROPOSED',
     'PICKUP_SCHEDULED',
   ];
   
@@ -231,7 +233,7 @@ export function getReminderSchedule(order: Order): number[] {
     // Ensure all reminder hours are >= 0
     const safeReminderHours = RECEIPT_REMINDER_HOURS.map(h => Math.max(0, h));
     reminders = safeReminderHours.map(h => deliveredAtMs + h * 60 * 60 * 1000);
-  } else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_SCHEDULED') {
+  } else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_PROPOSED' || txStatus === 'PICKUP_SCHEDULED') {
     // Ensure all reminder hours are >= 0
     const safeReminderHours = PICKUP_REMINDER_HOURS.map(h => Math.max(0, h));
     reminders = safeReminderHours.map(h => paidAtMs + h * 60 * 60 * 1000);

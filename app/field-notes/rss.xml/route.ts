@@ -32,9 +32,9 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>${escapeXml('Wildlife Exchange — Field Notes')}</title>
+    <title>${escapeXml('Agchange — Field Notes')}</title>
     <link>${escapeXml(`${site}/field-notes`)}</link>
-    <description>${escapeXml('Guides, insights, and trust-first education for Wildlife Exchange.')}</description>
+    <description>${escapeXml('Guides, insights, and trust-first education for Agchange.')}</description>
     <language>en-us</language>
     ${items.join('\n')}
   </channel>

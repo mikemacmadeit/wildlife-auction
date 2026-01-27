@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { acceptOffer, counterOffer, declineOffer, getOffer, withdrawOffer } from '@/lib/offers/api';
 import { Loader2, Handshake, Clock, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
+import { OfferAcceptedSuccessModal } from './OfferAcceptedSuccessModal';
 
 type OfferDTO = {
   offerId: string;
@@ -53,6 +54,7 @@ export function BuyerOfferDetailModal(props: {
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState<OfferDTO | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [acceptSuccessOpen, setAcceptSuccessOpen] = useState(false);
 
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
@@ -90,25 +92,23 @@ export function BuyerOfferDetailModal(props: {
       return;
     }
     if (!offer.listingId) return;
-    if (hasRedirected) return; // Prevent multiple redirects
-    
-    // Only auto-redirect on mobile
+    if (hasRedirected) return;
+    if (acceptSuccessOpen) return; // We're showing success modal; don't redirect
+
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
     if (isMobile) {
       setHasRedirected(true);
-      // Close modal and redirect to listing page for checkout
       onOpenChange(false);
-      setTimeout(() => {
-        router.push(`/listing/${offer.listingId}`);
-      }, 300);
+      setTimeout(() => router.push(`/listing/${offer.listingId}`), 300);
     }
-  }, [offer?.status, offer?.listingId, open, onOpenChange, router, hasRedirected]);
+  }, [offer?.status, offer?.listingId, open, onOpenChange, router, hasRedirected, acceptSuccessOpen]);
 
   useEffect(() => {
     setOffer(null);
     setCounterOpen(false);
     setCounterAmount('');
     setHasRedirected(false);
+    setAcceptSuccessOpen(false);
   }, [offerId]);
 
   const canWithdraw = useMemo(() => offer?.status === 'open' || offer?.status === 'countered', [offer?.status]);
@@ -141,32 +141,13 @@ export function BuyerOfferDetailModal(props: {
 
   const doAccept = async () => {
     if (!offer?.offerId || !offer?.listingId) return;
-    const listingId = offer.listingId;
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
     setActionLoading(true);
     try {
       await acceptOffer(String(offer.offerId));
-      toast({ title: 'Accepted', description: 'You accepted the counter offer.' });
-      
-      // Reload to get updated status - wait a bit for server to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((r) => setTimeout(r, 400));
       await load();
-      
-      // Double-check the offer is accepted after reload
-      await new Promise(resolve => setTimeout(resolve, 300));
-      await load();
-      
       onDidMutate?.();
-      
-      // On mobile, immediately redirect to checkout after accepting
-      if (isMobile) {
-        // Close modal and redirect to listing page for checkout
-        onOpenChange(false);
-        // Small delay to allow modal close animation
-        setTimeout(() => {
-          router.push(`/listing/${listingId}`);
-        }, 200);
-      }
+      setAcceptSuccessOpen(true);
     } catch (e: any) {
       toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
@@ -379,6 +360,20 @@ export function BuyerOfferDetailModal(props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OfferAcceptedSuccessModal
+        open={acceptSuccessOpen}
+        onOpenChange={setAcceptSuccessOpen}
+        role="buyer"
+        listingTitle={offer?.listingSnapshot?.title}
+        amount={offer ? Number(offer.acceptedAmount ?? offer.currentAmount) : undefined}
+        offerId={offer?.offerId}
+        listingId={offer?.listingId}
+        onCheckout={() => {
+          onOpenChange(false);
+          if (offer?.listingId) router.push(`/listing/${offer.listingId}`);
+        }}
+      />
     </>
   );
 }

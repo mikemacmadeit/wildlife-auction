@@ -21,7 +21,7 @@ const badgeConfig = {
     verified: {
       icon: CheckCircle2,
       label: 'Verified Eligible',
-      description: 'Listing verified by Wildlife Exchange. Seller identity confirmed and eligible to trade.',
+      description: 'Listing verified by Agchange. Seller identity confirmed and eligible to trade.',
       // Sage in light mode, Olive in dark mode for verified
       color: 'text-foreground bg-primary/15 border-primary/30 dark:bg-primary/20 dark:border-primary/40',
       iconColor: 'text-primary dark:text-primary/90',
@@ -29,7 +29,7 @@ const badgeConfig = {
   transport: {
     icon: Truck,
     label: 'Transport Ready',
-    description: 'Buyer and seller coordinate pickup/delivery directly. Wildlife Exchange does not arrange transport.',
+    description: 'Buyer and seller coordinate pickup/delivery directly. Agchange does not arrange transport.',
     // Olive accent for transport - soft chip
     color: 'text-foreground bg-accent/15 border-accent/30 dark:bg-accent/10 dark:border-accent/25',
     iconColor: 'text-accent dark:text-accent/90',

@@ -1236,7 +1236,7 @@ function EditListingPageContent() {
                   <Label htmlFor="seller-animal-attestation-edit" className="cursor-pointer flex-1">
                     <div className="font-medium">
                       I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                      Wildlife Exchange does not take custody of animals.
+                      Agchange does not take custody of animals.
                     </div>
                   </Label>
                 </div>
@@ -1384,7 +1384,7 @@ function EditListingPageContent() {
               <div>
                 <h3 className="font-semibold text-base mb-1">Transportation</h3>
                 <p className="text-sm text-muted-foreground">
-                  Select who will handle transportation. Buyer and seller coordinate directly; Wildlife Exchange does not arrange transport.
+                  Select who will handle transportation. Buyer and seller coordinate directly; Agchange does not arrange transport.
                 </p>
               </div>
               <RadioGroup
@@ -1592,6 +1592,8 @@ function EditListingPageContent() {
         transportReady: formData.transportType !== null,
         sellerOffersDelivery: formData.transportType === 'seller',
       },
+      ...(formData.transportType === 'seller' && { transportOption: 'SELLER_TRANSPORT' as const }),
+      ...(formData.transportType === 'buyer' && { transportOption: 'BUYER_TRANSPORT' as const }),
       attributes: formData.attributes as ListingAttributes,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
       protectedTransactionDays: formData.protectedTransactionDays,

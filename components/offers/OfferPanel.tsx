@@ -25,6 +25,7 @@ import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErr
 import { WireInstructionsDialog } from '@/components/payments/WireInstructionsDialog';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
+import { OfferAcceptedSuccessModal } from './OfferAcceptedSuccessModal';
 
 type OfferDTO = {
   offerId: string;
@@ -87,6 +88,7 @@ export function OfferPanel(props: { listing: Listing }) {
   }>(null);
   const [animalAckOpen, setAnimalAckOpen] = useState(false);
   const [animalRiskAcked, setAnimalRiskAcked] = useState(false);
+  const [acceptSuccessOpen, setAcceptSuccessOpen] = useState(false);
 
   const isAnimalListing = useMemo(() => isAnimalCategory(listing.category as any), [listing.category]);
 
@@ -140,6 +142,16 @@ export function OfferPanel(props: { listing: Listing }) {
   }, [refresh]);
 
   const openMakeOffer = () => {
+    const reserved = !!(listing as any)?.offerReservedByOfferId;
+    const mine = !!offer && offer.offerId === (listing as any)?.offerReservedByOfferId;
+    if (reserved && !mine) {
+      toast({
+        title: 'Listing reserved',
+        description: 'An offer has been accepted. You cannot make an offer while it\'s reserved.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setMode('make');
     setAmount('');
     setNote('');
@@ -190,6 +202,19 @@ export function OfferPanel(props: { listing: Listing }) {
     if (typeof minPrice === 'number' && Number.isFinite(minPrice) && n < minPrice) {
       toast({ title: 'Offer too low', description: `Minimum offer is $${minPrice}.`, variant: 'destructive' });
       return;
+    }
+
+    if (mode === 'make') {
+      const reserved = !!(listing as any)?.offerReservedByOfferId;
+      const mine = !!offer && offer.offerId === (listing as any)?.offerReservedByOfferId;
+      if (reserved && !mine) {
+        toast({
+          title: 'Listing reserved',
+          description: 'An offer has been accepted. You cannot make an offer while it\'s reserved.',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -268,8 +293,8 @@ export function OfferPanel(props: { listing: Listing }) {
     setLoading(true);
     try {
       await acceptOffer(offer.offerId);
-      toast({ title: 'Accepted', description: 'Offer accepted. You can now checkout at the agreed price.' });
       await refresh();
+      setAcceptSuccessOpen(true);
     } catch (e: any) {
       toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
     } finally {
@@ -354,9 +379,14 @@ export function OfferPanel(props: { listing: Listing }) {
   if (!eligible) return null;
   if (user?.uid === listing.sellerId) return null;
 
+  const offerReserved = !!(listing as any)?.offerReservedByOfferId;
+  const isReservedForMyOffer =
+    offerReserved && !!offer && offer.offerId === (listing as any)?.offerReservedByOfferId;
+
   const status = offer?.status;
   const isActive = !status ? false : ACTIVE_OFFER_STATUSES.has(status);
-  const showMake = !offer || !isActive;
+  const showMake = (!offer || !isActive) && !(offerReserved && !isReservedForMyOffer);
+  const showReservedForOthers = offerReserved && !isReservedForMyOffer;
   const timeLeft = offer?.expiresAt ? formatTimeLeft(offer.expiresAt) : '—';
 
   const canWithdraw = status === 'open' || status === 'countered';
@@ -407,7 +437,11 @@ export function OfferPanel(props: { listing: Listing }) {
         </div>
       ) : null}
 
-      {showMake ? (
+      {showReservedForOthers ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 px-3 py-3 text-sm text-amber-900 dark:text-amber-100">
+          This listing is reserved. An offer has been accepted. You cannot make an offer while it&apos;s reserved.
+        </div>
+      ) : showMake ? (
         <div className="flex flex-col sm:flex-row gap-2">
           <Button onClick={openMakeOffer} disabled={loading || (offersLeft !== null && offersLeft <= 0)} className="min-h-[44px] font-semibold">
             <DollarSign className="h-4 w-4 mr-2" />
@@ -605,7 +639,7 @@ export function OfferPanel(props: { listing: Listing }) {
               ) : null}
 
               <div className="text-xs text-muted-foreground">
-                By selecting <span className="font-semibold text-foreground">Send offer</span>, you authorize Wildlife Exchange to charge your selected payment method if the seller accepts your offer.
+                By selecting <span className="font-semibold text-foreground">Send offer</span>, you authorize Agchange to charge your selected payment method if the seller accepts your offer.
               </div>
             </div>
           )}
@@ -743,6 +777,17 @@ export function OfferPanel(props: { listing: Listing }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OfferAcceptedSuccessModal
+        open={acceptSuccessOpen}
+        onOpenChange={setAcceptSuccessOpen}
+        role="buyer"
+        listingTitle={listing?.title}
+        amount={offer ? Number(offer.acceptedAmount ?? offer.currentAmount) : undefined}
+        offerId={offer?.offerId}
+        listingId={listing?.id}
+        onCheckout={() => checkout()}
+      />
     </div>
   );
 }

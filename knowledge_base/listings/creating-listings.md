@@ -10,7 +10,7 @@ version: 1
 
 # Creating a Listing
 
-Learn how to create and publish listings on Wildlife Exchange.
+Learn how to create and publish listings on Agchange.
 
 ## Before You Start
 

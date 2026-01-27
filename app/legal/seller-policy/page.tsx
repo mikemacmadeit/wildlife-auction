@@ -6,9 +6,9 @@ import { Shield, FileText } from 'lucide-react';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 
 export const metadata: Metadata = {
-  title: 'Seller Policy | Wildlife Exchange',
+  title: 'Seller Policy | Agchange',
   description:
-    'Seller policy for Wildlife Exchange, including animal-specific obligations and indemnification requirements.',
+    'Seller policy for Agchange, including animal-specific obligations and indemnification requirements.',
 };
 
 export default function SellerPolicyPage() {
@@ -30,7 +30,7 @@ export default function SellerPolicyPage() {
       <Alert className="mb-8">
         <Shield className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          Sellers list and sell directly to buyers. Wildlife Exchange is not a seller, dealer, broker, agent, or auctioneer,
+          Sellers list and sell directly to buyers. Agchange is not a seller, dealer, broker, agent, or auctioneer,
           and is not a party to the buyer–seller contract.
         </AlertDescription>
       </Alert>
@@ -39,7 +39,7 @@ export default function SellerPolicyPage() {
         <Card>
           <CardHeader>
             <CardTitle>1) Seller representations (required)</CardTitle>
-            <CardDescription>By listing, you represent and warrant the following to buyers and to Wildlife Exchange.</CardDescription>
+            <CardDescription>By listing, you represent and warrant the following to buyers and to Agchange.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <ul className="list-disc ml-5 space-y-1">
@@ -73,7 +73,7 @@ export default function SellerPolicyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              You agree to defend, indemnify, and hold harmless Wildlife Exchange and its owners, directors, officers, employees, and contractors
+              You agree to defend, indemnify, and hold harmless Agchange and its owners, directors, officers, employees, and contractors
               from and against any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys’ fees) arising out of or
               related to:
             </p>
@@ -94,7 +94,7 @@ export default function SellerPolicyPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
               The platform may require certain disclosures and documents (by category) to publish listings or release payouts. These are marketplace
-              workflow requirements and do not create any warranty by Wildlife Exchange.
+              workflow requirements and do not create any warranty by Agchange.
             </p>
             <p>
               Any “verified” label means a document was reviewed for workflow completeness; it does <strong>not</strong> mean a regulator approved a transfer.

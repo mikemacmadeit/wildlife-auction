@@ -7,6 +7,7 @@
     "dev:3001": "next dev -p 3001",
     "prebuild": "node scripts/write-build-info.mjs && node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
     "build": "next build",
+    "build:netlify": "node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && (npx tsx scripts/checkKBUpdates.ts 2>&1 || echo 'KB check skipped or failed - continuing build') && npx next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",

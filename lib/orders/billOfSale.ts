@@ -181,7 +181,7 @@ export async function renderBillOfSalePdfBuffer(data: BillOfSaleData): Promise<B
         margin: 54,
         info: {
           Title: 'Bill of Sale / Written Transfer',
-          Author: 'Wildlife Exchange',
+          Author: 'Agchange',
           Subject: `Order ${data.orderId}`,
           CreationDate: new Date(`${data.saleDateIso}T00:00:00Z`),
           ModDate: new Date(`${data.saleDateIso}T00:00:00Z`),

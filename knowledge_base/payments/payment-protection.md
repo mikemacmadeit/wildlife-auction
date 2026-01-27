@@ -10,7 +10,7 @@ version: 1
 
 # Payment Protection and Security
 
-Your payments are protected and secure on Wildlife Exchange.
+Your payments are protected and secure on Agchange.
 
 ## How Protection Works
 

@@ -41,7 +41,7 @@ export default function SellerLogisticsPage() {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              Note: Wildlife Exchange does not arrange pickup, transport, or delivery. Parties coordinate directly.
+              Note: Agchange does not arrange pickup, transport, or delivery. Parties coordinate directly.
             </div>
           </CardContent>
         </Card>

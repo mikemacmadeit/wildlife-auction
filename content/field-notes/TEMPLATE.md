@@ -2,7 +2,7 @@
 title: "GUIDE: Replace me with a specific, searchable title"
 description: "1–2 sentence summary for SEO previews. Keep it specific and trust-first."
 date: "2026-01-20"
-author: "Wildlife Exchange"
+author: "Agchange"
 category: "Guides"
 tags: ["payments", "compliance", "delivery", "buying", "selling"]
 coverImage: "/images/Buck_1.webp"
@@ -36,7 +36,7 @@ Use “marketplace review” language. Do **not** imply regulator approval.
 
 ## Common mistakes
 
-Buyer and seller coordinate directly. Wildlife Exchange does not arrange transport.
+Buyer and seller coordinate directly. Agchange does not arrange transport.
 
 ## Checklist (copy/paste)
 

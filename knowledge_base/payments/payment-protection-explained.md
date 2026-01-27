@@ -10,7 +10,7 @@ version: 1
 
 # How Payment Protection Works
 
-Understanding how Wildlife Exchange protects your payments and purchases.
+Understanding how Agchange protects your payments and purchases.
 
 ## What Is Payment Protection?
 
@@ -98,7 +98,7 @@ Understanding how Wildlife Exchange protects your payments and purchases.
 - Encrypted during transmission
 - Processed through trusted processors (Stripe)
 - Protected by fraud detection
-- Never stored on Wildlife Exchange servers
+- Never stored on Agchange servers
 - Industry-standard security
 
 ### Funds Held Securely

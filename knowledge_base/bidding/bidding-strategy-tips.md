@@ -10,7 +10,7 @@ version: 1
 
 # Bidding Strategy and Tips
 
-Expert tips and strategies for successful bidding on Wildlife Exchange auctions.
+Expert tips and strategies for successful bidding on Agchange auctions.
 
 ## Understanding Auction Dynamics
 

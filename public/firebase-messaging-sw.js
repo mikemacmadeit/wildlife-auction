@@ -72,7 +72,7 @@
       const n = payload?.notification || {};
       const data = payload?.data || {};
 
-      const title = String(n.title || 'Wildlife Exchange');
+      const title = String(n.title || 'Agchange');
       const body = String(n.body || '');
       const deepLinkUrl = data.deepLinkUrl ? String(data.deepLinkUrl) : '';
 

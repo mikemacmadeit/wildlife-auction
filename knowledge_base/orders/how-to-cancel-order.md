@@ -10,7 +10,7 @@ version: 1
 
 # How to Cancel an Order
 
-Learn when and how to cancel an order on Wildlife Exchange.
+Learn when and how to cancel an order on Agchange.
 
 ## When You Can Cancel
 

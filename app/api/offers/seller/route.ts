@@ -111,7 +111,10 @@ export async function GET(request: Request) {
       return bm - am;
     });
 
-    return json({ ok: true, offers: offers.slice(0, limitN) });
+    return json(
+      { ok: true, offers: offers.slice(0, limitN) },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (e: any) {
     const msg = String(e?.message || 'Unknown error');
     const code = String(e?.code || '');

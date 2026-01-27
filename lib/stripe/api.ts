@@ -326,15 +326,20 @@ export async function createCheckoutSession(
   }
 
   if (!response.ok) {
-    const error = await response.json();
-    const errorMessage =
-      error.message ||
-      (error.code ? `${error.code}: ${error.error || 'Checkout failed'}` : undefined) ||
-      error.error ||
+    const error = await response.json().catch(() => ({} as any));
+    let errorMessage =
+      error?.message ||
+      (error?.code ? `${error.code}: ${error?.error || 'Checkout failed'}` : undefined) ||
+      error?.error ||
       'Failed to create checkout session';
-    // Don't log expected configuration errors
-    const isConfigError = errorMessage.includes('Stripe is not configured') || 
-                          errorMessage.includes('STRIPE_SECRET_KEY');
+    if (response.status === 429) {
+      const sec = Math.ceil(Number(error?.retryAfter ?? response.headers.get('Retry-After')) || 0);
+      errorMessage = sec > 0
+        ? `Too many requests. Please try again in ${sec} seconds.`
+        : errorMessage;
+    }
+    const isConfigError = errorMessage.includes('Stripe is not configured') ||
+      errorMessage.includes('STRIPE_SECRET_KEY');
     if (!isConfigError) {
       console.error('Failed to create checkout session:', errorMessage);
     }
@@ -382,11 +387,17 @@ export async function createWireIntent(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({} as any));
-    const errorMessage =
-      error.message ||
-      (error.code ? `${error.code}: ${error.error || 'Wire setup failed'}` : undefined) ||
-      error.error ||
+    let errorMessage =
+      error?.message ||
+      (error?.code ? `${error.code}: ${error?.error || 'Wire setup failed'}` : undefined) ||
+      error?.error ||
       'Failed to create wire transfer instructions';
+    if (response.status === 429) {
+      const sec = Math.ceil(Number(error?.retryAfter ?? response.headers.get('Retry-After')) || 0);
+      errorMessage = sec > 0
+        ? `Too many requests. Please try again in ${sec} seconds.`
+        : errorMessage;
+    }
     const err: any = new Error(errorMessage);
     if (error?.stripe?.requestId) err.requestId = error.stripe.requestId;
     if (error?.stripe?.code) err.stripeCode = error.stripe.code;

@@ -101,6 +101,8 @@ export interface CreateListingInput {
     insuranceAvailable: boolean;
     transportReady: boolean;
   };
+  /** SELLER_TRANSPORT | BUYER_TRANSPORT – who handles transport. Used for order fulfillment + badges. */
+  transportOption?: 'SELLER_TRANSPORT' | 'BUYER_TRANSPORT';
   attributes: ListingAttributes; // Category-specific structured attributes
   // Protected Transaction fields
   protectedTransactionEnabled?: boolean;
@@ -353,6 +355,8 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     resubmittedAt: timestampToDate((doc as any).resubmittedAt) || null,
     resubmittedForRejectionAt: timestampToDate((doc as any).resubmittedForRejectionAt) || null,
     resubmissionCount: typeof (doc as any).resubmissionCount === 'number' ? (doc as any).resubmissionCount : undefined,
+    // Transport option (fulfillment + badges)
+    transportOption: (doc as any).transportOption === 'SELLER_TRANSPORT' || (doc as any).transportOption === 'BUYER_TRANSPORT' ? (doc as any).transportOption : undefined,
     // Protected Transaction fields
     protectedTransactionEnabled: doc.protectedTransactionEnabled,
     protectedTransactionDays: doc.protectedTransactionDays,
@@ -435,6 +439,7 @@ function toListingDocInput(
     sellerId,
     sellerSnapshot,
     trust: listingInput.trust,
+    ...(listingInput.transportOption && { transportOption: listingInput.transportOption }),
     ...(listingInput.subcategory !== undefined && { subcategory: listingInput.subcategory }),
     attributes: listingInput.attributes as Record<string, any>, // Store as plain object in Firestore
     metrics: {

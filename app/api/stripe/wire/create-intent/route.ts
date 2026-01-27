@@ -328,6 +328,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Seller is not ready to receive payouts yet. Please try later.', code: 'SELLER_NOT_PAYOUT_READY' }, { status: 400 });
     }
 
+    // Verify Connect account exists and platform can use it (avoids "No such destination" from Stripe).
+    try {
+      await stripe.accounts.retrieve(String(sellerStripeAccountId || ''));
+    } catch (accErr: any) {
+      const msg = String(accErr?.message || '').toLowerCase();
+      const invalid =
+        msg.includes('no such account') ||
+        msg.includes('invalid') ||
+        msg.includes('no such destination') ||
+        /account.*does not exist|doesn't exist/i.test(msg);
+      logWarn('Wire create-intent: seller Connect account invalid or missing', {
+        route: '/api/stripe/wire/create-intent',
+        listingId,
+        sellerId: listingData.sellerId,
+        sellerStripeAccountId: String(sellerStripeAccountId || ''),
+        error: accErr?.message,
+      });
+      return NextResponse.json(
+        {
+          error:
+            invalid
+              ? "The seller's payment account is not set up correctly. Please try another listing or contact the seller."
+              : 'Seller payment account could not be verified. Please try again or use a different payment method.',
+          code: 'SELLER_ACCOUNT_INVALID',
+        },
+        { status: 400 }
+      );
+    }
+
     // Fees (flat)
     const platformFeeCents = calculatePlatformFee(amountCents);
     const sellerAmountCents = amountCents - platformFeeCents;
@@ -689,10 +718,31 @@ export async function POST(request: Request) {
         }
       : null;
 
+    const errMsg = String(error?.message || '').toLowerCase();
+    const stripeMsg = typeof stripePayload?.message === 'string' ? stripePayload.message.toLowerCase() : '';
+
+    // "No such destination" / invalid Connect destination → 400 with friendly message.
+    const looksLikeInvalidDestination =
+      /no such destination|invalid.*destination|destination.*invalid|account.*does not exist|transfer_data/i.test(errMsg) ||
+      /no such destination|invalid.*destination|destination.*invalid|account.*does not exist|transfer_data/i.test(stripeMsg);
+
     console.error('Error creating wire transfer intent:', {
       message: String(error?.message || error),
       stripe: stripePayload || undefined,
     });
+
+    if (looksLikeInvalidDestination) {
+      return NextResponse.json(
+        {
+          error:
+            "The seller's payment account is not set up correctly. Please try another listing or contact the seller.",
+          code: 'SELLER_ACCOUNT_INVALID',
+          message:
+            "The seller's payment account is not set up correctly. Please try another listing or contact the seller.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Common actionable message for misconfigured bank transfer rails.
     const looksLikeBankTransferNotEnabled =

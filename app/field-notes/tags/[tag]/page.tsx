@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: { params: { tag: string } }):
   const posts = await getFieldNotesByTagSlug(params.tag);
   const label = posts.length ? (posts.find((p) => (p.tags || []).some(() => true))?.tags || [])[0] : params.tag;
   return {
-    title: `#${label || params.tag} | Field Notes | Wildlife Exchange`,
-    description: `Posts tagged #${label || params.tag} on Wildlife Exchange Field Notes.`,
+    title: `#${label || params.tag} | Field Notes | Agchange`,
+    description: `Posts tagged #${label || params.tag} on Agchange Field Notes.`,
     alternates: { canonical: `/field-notes/tags/${params.tag}` },
   };
 }
