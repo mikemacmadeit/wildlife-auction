@@ -106,8 +106,19 @@ export default function SportingWorkingDogsBrowsePage() {
     fetchListings(true);
   }, [fetchListings]);
 
+  const isDogListing = useCallback((l: Listing) => {
+    const cat = (l?.category ?? '').toString().toLowerCase();
+    if (/dog/i.test(cat)) return true;
+    const species = (l as any)?.species ?? (l as any)?.attributes?.speciesId ?? '';
+    if (String(species).toLowerCase() === 'dog') return true;
+    const breed = ((l as any)?.attributes?.breed ?? '').toString().toLowerCase();
+    const terms = ['golden', 'retriever', 'labrador', 'lab ', 'lab,', 'pointer', 'setter', 'hound', 'shepherd', 'doodle', 'beagle', 'terrier', 'dachshund'];
+    if (terms.some((t) => breed.includes(t))) return true;
+    return /dog/i.test((l?.title ?? '').toString());
+  }, []);
+
   const filteredListings = useMemo(() => {
-    let result = listings;
+    let result = listings.filter((l) => !isDogListing(l));
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.toLowerCase();
       result = result.filter((listing) => {
@@ -123,7 +134,7 @@ export default function SportingWorkingDogsBrowsePage() {
       });
     }
     return result;
-  }, [listings, debouncedSearchQuery]);
+  }, [listings, debouncedSearchQuery, isDogListing]);
 
   if (loading && listings.length === 0) {
     return (

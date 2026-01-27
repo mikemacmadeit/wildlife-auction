@@ -142,7 +142,7 @@ export function Footer() {
                 variant="secondary"
                 className="bg-black/5 dark:bg-white/10 text-[hsl(37_27%_20%)] dark:text-[hsl(37_27%_88%)] border border-black/10 dark:border-white/10"
               >
-                Delayed settlement + payout gating
+                Pre-listing verification + seller eligibility
               </Badge>
             </div>
           </div>
@@ -294,7 +294,7 @@ export function Footer() {
             © {currentYear()} Agchange. All rights reserved.
           </div>
           <div className="text-xs text-[hsl(37_27%_45%)] dark:text-[hsl(37_27%_70%)]">
-            Texas-only for animal transactions. Equipment may be multi-state.
+            Texas-only animal listings (equipment may be multi-state).
           </div>
         </div>
       </div>

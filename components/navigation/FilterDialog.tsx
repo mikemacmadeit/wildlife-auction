@@ -28,7 +28,7 @@ import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import { FilterState, ListingType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
-  BROWSE_CATEGORIES as categories,
+  BROWSE_CATEGORIES_FOR_DISPLAY as categories,
   BROWSE_TYPES as types,
   BROWSE_SPECIES as species,
   BROWSE_STATES as states,

@@ -80,6 +80,18 @@ function toMillisSafe(value: any): number | null {
   return null;
 }
 
+function isDogListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  if (/dog/i.test(cat)) return true;
+  const species = (l as any)?.species ?? (l as any)?.attributes?.speciesId ?? '';
+  if (String(species).toLowerCase() === 'dog') return true;
+  const breed = ((l as any)?.attributes?.breed ?? (l as any)?.breed ?? '').toString().toLowerCase();
+  const dogBreedTerms = ['golden', 'retriever', 'labrador', 'lab ', 'lab,', 'pointer', 'setter', 'hound', 'shepherd', 'doodle', 'beagle', 'terrier', 'dachshund'];
+  if (dogBreedTerms.some((t) => breed.includes(t))) return true;
+  if (/dog/i.test((l?.title ?? '').toString())) return true;
+  return false;
+}
+
 export default function BrowsePage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -516,6 +528,9 @@ export default function BrowsePage() {
   // (Full-text search, city-level location, metadata fields, etc.)
   const filteredListings = useMemo(() => {
     let result = [...listings];
+
+    // Hide dog-related listings for Stripe review (inline filter, no backend change)
+    result = result.filter((l) => !isDogListing(l));
 
     // Exclude ended auctions from active feed; they appear only when user filters for "Completed"
     if (listingStatus === 'active') {

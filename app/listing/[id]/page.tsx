@@ -1905,8 +1905,8 @@ export default function ListingDetailPage() {
                         </TooltipProvider>
                       </li>
                       <li>
-                        <span className="font-semibold">Delayed settlement & payout gating:</span>{' '}
-                        Payments are processed through the platform and released according to marketplace confirmation and dispute rules. Payout is released only after delivery/acceptance requirements are met, and after TPWD Transfer Approval is uploaded and verified.
+                        <span className="font-semibold">Pre-listing verification + seller eligibility:</span>{' '}
+                        Payments are processed through the platform. Seller verification and listing review apply; after TPWD Transfer Approval is uploaded and verified, buyer and seller coordinate transfer.
                       </li>
                       <li>
                         <span className="font-semibold">Coordination:</span>{' '}

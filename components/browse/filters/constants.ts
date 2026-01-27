@@ -12,6 +12,11 @@ export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'ranch_vehicles', label: 'Ranch Vehicles & Trailers' },
 ];
 
+/** Categories to show in Browse by Category / filters (hides dog-related for Stripe review). */
+export const BROWSE_CATEGORIES_FOR_DISPLAY = BROWSE_CATEGORIES.filter(
+  (c) => !/dog/i.test((c.label || '') + (c.value || ''))
+);
+
 export const BROWSE_TYPES: { value: ListingType; label: string }[] = [
   { value: 'auction', label: 'Auction' },
   { value: 'fixed', label: 'Fixed Price' },

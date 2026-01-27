@@ -40,6 +40,22 @@ function toDateSafe(v: any): Date | null {
   return null;
 }
 
+/** Inline filter: hide dog-related listings from UI for Stripe review (no backend change). */
+function isDogListing(l: Listing): boolean {
+  const cat = (l?.category ?? '').toString().toLowerCase();
+  const slug = cat;
+  const label = cat;
+  if (/dog/i.test(cat) || /dog/i.test(slug) || /dog/i.test(label)) return true;
+  const species = (l as any)?.species ?? (l as any)?.attributes?.speciesId ?? '';
+  if (String(species).toLowerCase() === 'dog') return true;
+  const breed = ((l as any)?.attributes?.breed ?? (l as any)?.breed ?? '').toString().toLowerCase();
+  const dogBreedTerms = ['golden', 'retriever', 'labrador', 'lab ', 'lab,', 'pointer', 'setter', 'hound', 'shepherd', 'doodle', 'beagle', 'terrier', 'dachshund'];
+  if (dogBreedTerms.some((t) => breed.includes(t))) return true;
+  const title = (l?.title ?? '').toString().toLowerCase();
+  if (/dog/i.test(title)) return true;
+  return false;
+}
+
 export default function HomePage() {
   const { user, loading: authLoading, initialized } = useAuth();
   const { recentIds } = useRecentlyViewed();
@@ -388,13 +404,13 @@ export default function HomePage() {
     };
   }, [savedSellers, user?.uid]);
 
-  // Memoize derived listings to prevent recreation on each render
-  const featuredListings = useMemo(() => stableListings.filter(l => l.featured).slice(0, 3), [stableListings]);
-  const recentListings = useMemo(() => stableListings.slice(0, 6), [stableListings]);
+  // Memoize derived listings to prevent recreation on each render. Dog-related listings filtered for Stripe review.
+  const featuredListings = useMemo(() => stableListings.filter((l) => l.featured && !isDogListing(l)), [stableListings]);
+  const recentListings = useMemo(() => stableListings.filter((l) => !isDogListing(l)).slice(0, 6), [stableListings]);
 
   const signedInDiscoveryListings = useMemo(() => {
     if (!user?.uid) return [];
-    if (mostWatched?.length) return mostWatched.slice(0, 12);
+    if (mostWatched?.length) return mostWatched.filter((l) => !isDogListing(l)).slice(0, 12);
     return recentListings.slice(0, 12);
   }, [mostWatched, recentListings, user?.uid]);
 
@@ -1022,7 +1038,7 @@ export default function HomePage() {
                   subtitle="Your latest clicks — fast way back in."
                   href="/dashboard/recently-viewed"
                 />
-                <ListingRail listings={recentlyViewedListings} emptyText="No recently viewed listings yet." />
+                <ListingRail listings={recentlyViewedListings.filter((l) => !isDogListing(l))} emptyText="No recently viewed listings yet." />
               </div>
             ) : null}
 
@@ -1036,7 +1052,7 @@ export default function HomePage() {
                     <span className="text-xs text-muted-foreground">{watchlistListings.length} watched</span>
                   }
                 />
-                <ListingRail listings={watchlistListings} emptyText="No watched items yet. Tap the heart on any listing." />
+                <ListingRail listings={watchlistListings.filter((l) => !isDogListing(l))} emptyText="No watched items yet. Tap the heart on any listing." />
               </div>
             ) : null}
 
@@ -1201,7 +1217,7 @@ export default function HomePage() {
                   href="/dashboard/watchlist"
                   actionLabel="See sellers"
                 />
-                <ListingRail listings={newFromSavedSellers} emptyText="No active listings from your saved sellers yet." />
+                <ListingRail listings={newFromSavedSellers.filter((l) => !isDogListing(l))} emptyText="No active listings from your saved sellers yet." />
               </div>
             ) : null}
             </div>
@@ -1225,7 +1241,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          {/* Mobile-only: compact 2-column grid (icons + title only) */}
+          {/* Mobile-only: compact 2-column grid (icons + title only). Dog-related category hidden for Stripe review. */}
           <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto md:hidden">
             {[
               { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-9 h-9 icon-primary-color mask-icon-whitetail-breeder" /> },
@@ -1255,7 +1271,7 @@ export default function HomePage() {
               { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-9 h-9 icon-primary-color mask-icon-hunting-blind" /> },
               { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-9 h-9 icon-primary-color mask-icon-tractor" /> },
               { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-9 h-9 icon-primary-color mask-icon-top-drive" /> },
-            ].map((c) => (
+            ].filter((c) => !/dog/i.test((c.label || '') + (c.href || ''))).map((c) => (
               <Link key={c.href} href={c.href} className="group">
                 <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors">
                   <CardContent className="p-3">
@@ -1424,7 +1440,8 @@ export default function HomePage() {
               </Link>
             </motion.div>
 
-            {/* Sporting & Working Dogs */}
+            {/* Sporting & Working Dogs — hidden for Stripe review (category not deleted, filter at render) */}
+            {!['sporting_working_dogs', 'dog'].some((x) => /dog/i.test(x)) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1446,6 +1463,7 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
 
             {/* Hunting & Outfitter Assets */}
             <motion.div
@@ -1492,13 +1510,13 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            <ListingRail listings={stableListings.filter(l => l.featured)} emptyText="No featured listings right now." />
+            <ListingRail listings={featuredListings} emptyText="No featured listings right now." />
           </div>
         </section>
       )}
 
       {/* Most Watched */}
-      {!loading && mostWatched.length > 0 && (
+      {!loading && mostWatched.filter((l) => !isDogListing(l)).length > 0 && (
         <section className="py-12 md:py-16 bg-background border-t border-border/50">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -1512,13 +1530,13 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            <ListingRail listings={mostWatched} emptyText="No watched listings yet." />
+            <ListingRail listings={mostWatched.filter((l) => !isDogListing(l))} emptyText="No watched listings yet." />
           </div>
         </section>
       )}
 
       {/* Ending Soon */}
-      {!loading && endingSoon.length > 0 && (
+      {!loading && endingSoon.filter((l) => !isDogListing(l)).length > 0 && (
         <section className="py-12 md:py-16 bg-background border-t border-border/50">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -1532,7 +1550,7 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-                <ListingRail listings={stableEndingSoon} emptyText="No auctions ending soon." />
+                <ListingRail listings={stableEndingSoon.filter((l) => !isDogListing(l))} emptyText="No auctions ending soon." />
           </div>
         </section>
       )}
@@ -1719,10 +1737,10 @@ export default function HomePage() {
 
               <div className="flex flex-wrap items-center justify-center gap-2 mb-7">
                 <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
-                  Texas-only for animal transactions
+                  Texas-only animal listings (equipment may be multi-state)
                 </span>
                 <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
-                  Delayed settlement + payout gating
+                  Pre-listing verification + seller eligibility
                 </span>
                 <span className="text-xs px-3 py-1 rounded-full border bg-muted/30">
                   Equipment can be multi-state

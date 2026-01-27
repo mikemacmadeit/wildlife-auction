@@ -12,7 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import type { FilterState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
-  BROWSE_CATEGORIES,
+  BROWSE_CATEGORIES_FOR_DISPLAY,
   BROWSE_EQUIPMENT_CONDITION_OPTIONS,
   BROWSE_QUANTITY_OPTIONS,
   BROWSE_SPECIES,
@@ -83,7 +83,7 @@ export function BrowseFiltersSidebar(props: {
           <AccordionTrigger className="text-sm font-bold">Category</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-2">
-              {BROWSE_CATEGORIES.map((c) => {
+              {BROWSE_CATEGORIES_FOR_DISPLAY.map((c) => {
                 const checked = value.category === c.value;
                 return (
                   <div key={c.value} className="flex items-center gap-3 min-h-[40px]">
