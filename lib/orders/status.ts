@@ -133,7 +133,11 @@ export function requiresSellerAction(order: Order): boolean {
   }
 
   if (status === 'FULFILLMENT_REQUIRED') {
-    return true; // Seller must start fulfillment
+    if (transportOption === 'SELLER_TRANSPORT') {
+      const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+      return hasBuyerAddress; // Seller can propose only after buyer sets address
+    }
+    return true; // Seller must start fulfillment (e.g. BUYER_TRANSPORT: set pickup info)
   }
 
   if (transportOption === 'SELLER_TRANSPORT') {
@@ -158,7 +162,11 @@ export function requiresBuyerAction(order: Order): boolean {
 
   if (transportOption === 'BUYER_TRANSPORT') {
     return status === 'READY_FOR_PICKUP' || status === 'PICKUP_SCHEDULED';
-  } else {
-    return status === 'DELIVERY_PROPOSED' || status === 'DELIVERED_PENDING_CONFIRMATION';
   }
+  // SELLER_TRANSPORT: buyer sets address first, then agrees to window, then confirms receipt
+  if (status === 'FULFILLMENT_REQUIRED') {
+    const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+    return !hasBuyerAddress;
+  }
+  return status === 'DELIVERY_PROPOSED' || status === 'DELIVERED_PENDING_CONFIRMATION';
 }

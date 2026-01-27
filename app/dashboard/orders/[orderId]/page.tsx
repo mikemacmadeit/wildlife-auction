@@ -72,8 +72,19 @@ export default function BuyerOrderDetailPage() {
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'select_window' | 'confirm_pickup' | null>(null);
+  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'select_window' | 'confirm_pickup' | 'set_address' | 'location' | null>(null);
   const [pickupCodeInput, setPickupCodeInput] = useState('');
+  const [deliveryAddressForm, setDeliveryAddressForm] = useState({
+    line1: '',
+    line2: '',
+    city: '',
+    state: '',
+    zip: '',
+    deliveryInstructions: '',
+    lat: undefined as number | undefined,
+    lng: undefined as number | undefined,
+    pinLabel: '',
+  });
 
   const loadOrder = useCallback(async (cancelledRef?: { current: boolean }) => {
     // Allow calling without cancelledRef for manual reloads
@@ -156,6 +167,7 @@ export default function BuyerOrderDetailPage() {
     transportOption === 'SELLER_TRANSPORT' &&
     (txStatus === 'DELIVERED_PENDING_CONFIRMATION' ||
      txStatus === 'OUT_FOR_DELIVERY' ||
+     txStatus === 'DELIVERY_SCHEDULED' ||
      !!order.deliveredAt ||
      !!order.deliveryConfirmedAt);
      
@@ -412,7 +424,10 @@ export default function BuyerOrderDetailPage() {
           onAction={() => {
             const txStatus: string = getEffectiveTransactionStatus(order);
             const transportOption = order.transportOption || 'SELLER_TRANSPORT';
-            if (txStatus === 'DELIVERED_PENDING_CONFIRMATION' && transportOption === 'SELLER_TRANSPORT') {
+            if (txStatus === 'FULFILLMENT_REQUIRED' && transportOption === 'SELLER_TRANSPORT' && !order.delivery?.buyerAddress) {
+              const el = document.getElementById('set-delivery-address');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION' && transportOption === 'SELLER_TRANSPORT') {
               const el = document.getElementById('confirm-receipt-section');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else if (txStatus === 'DELIVERY_PROPOSED') {
@@ -445,7 +460,7 @@ export default function BuyerOrderDetailPage() {
           <Card className="border-border/60" id="fulfillment-section">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Fulfillment Status</CardTitle>
-              <CardDescription>{transportOption === 'SELLER_TRANSPORT' ? 'Track delivery progress and confirm receipt.' : 'Schedule pickup and confirm pickup with code.'}</CardDescription>
+              <CardDescription>Track delivery. You confirm receipt to complete the transaction.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Milestone Progress */}
@@ -456,8 +471,8 @@ export default function BuyerOrderDetailPage() {
               <Separator />
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <div className="font-semibold text-sm">Fulfillment Actions</div>
-                  <div className="text-xs text-muted-foreground">Complete fulfillment steps based on transport type.</div>
+                  <div className="font-semibold text-sm">Fulfillment</div>
+                  <div className="text-xs text-muted-foreground">Agree to the delivery window, then confirm receipt to complete.</div>
                 </div>
               </div>
               {transportOption === 'SELLER_TRANSPORT' ? (
@@ -469,12 +484,12 @@ export default function BuyerOrderDetailPage() {
                       {order.delivery.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
                     </div>
                   )}
-                  {txStatus === 'DELIVERED_PENDING_CONFIRMATION' && (
+                  {(txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
                     <>
                       <div id="confirm-receipt-section" className="flex items-center justify-between gap-3 flex-wrap">
                         <div>
                           <div className="font-semibold text-sm">Confirm Receipt</div>
-                          <div className="text-xs text-muted-foreground">Confirm you received the order to complete the transaction.</div>
+                          <div className="text-xs text-muted-foreground">Confirm you received the order to complete the transaction. Only you can complete it—the seller does not mark delivery.</div>
                         </div>
                         <Button
                           variant="default"
@@ -549,10 +564,165 @@ export default function BuyerOrderDetailPage() {
                       <div className="text-xs mt-1">Waiting for delivery to arrive.</div>
                     </div>
                   )}
-                  {txStatus === 'FULFILLMENT_REQUIRED' && (
-                    <div className="text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded border border-orange-200 dark:border-orange-800">
-                      <div className="font-semibold text-orange-900 dark:text-orange-100">Waiting for Seller to Propose Delivery</div>
-                      <div className="text-xs mt-1">Seller will propose delivery windows. You will agree to one.</div>
+                  {txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress && (
+                    <div id="set-delivery-address" className="space-y-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+                      <div>
+                        <div className="font-semibold text-foreground">Set delivery address</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">This is the first step. The seller will use this address to propose a delivery date. You’ll then confirm the date and confirm receipt when it arrives.</div>
+                      </div>
+                      <div className="grid gap-3 text-sm">
+                        <div>
+                          <label className="font-medium text-foreground">Street address</label>
+                          <Input
+                            value={deliveryAddressForm.line1}
+                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line1: e.target.value }))}
+                            placeholder="123 Main St"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium text-foreground">Apt, suite, etc. (optional)</label>
+                          <Input
+                            value={deliveryAddressForm.line2}
+                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line2: e.target.value }))}
+                            placeholder="Unit 4"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="font-medium text-foreground">City</label>
+                            <Input
+                              value={deliveryAddressForm.city}
+                              onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, city: e.target.value }))}
+                              placeholder="City"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-medium text-foreground">State</label>
+                            <Input
+                              value={deliveryAddressForm.state}
+                              onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
+                              placeholder="TX"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="font-medium text-foreground">ZIP code</label>
+                          <Input
+                            value={deliveryAddressForm.zip}
+                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                            placeholder="12345"
+                            className="mt-1 max-w-[120px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium text-foreground">Delivery instructions (optional)</label>
+                          <Input
+                            value={deliveryAddressForm.deliveryInstructions}
+                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, deliveryInstructions: e.target.value }))}
+                            placeholder="Gate code, gate left open, etc."
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={processing === 'set_address' || processing === 'location'}
+                            onClick={() => {
+                              if (!navigator.geolocation) {
+                                toast({ title: 'Not supported', description: 'Location is not available in this browser.', variant: 'destructive' });
+                                return;
+                              }
+                              setProcessing('location');
+                              navigator.geolocation.getCurrentPosition(
+                                (pos) => {
+                                  setDeliveryAddressForm((f) => ({ ...f, lat: pos.coords.latitude, lng: pos.coords.longitude, pinLabel: 'My location' }));
+                                  toast({ title: 'Location captured', description: 'Pin set to your current location. Seller will see this on a map.' });
+                                  setProcessing(null);
+                                },
+                                () => {
+                                  toast({ title: 'Could not get location', description: 'Check permissions or enter address manually.', variant: 'destructive' });
+                                  setProcessing(null);
+                                },
+                                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                              );
+                            }}
+                          >
+                            {processing === 'location' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                            Use my location (add pin for seller)
+                          </Button>
+                          {(deliveryAddressForm.lat != null && deliveryAddressForm.lng != null) && (
+                            <span className="text-xs text-muted-foreground">Pin set: {deliveryAddressForm.pinLabel || `${deliveryAddressForm.lat.toFixed(4)}, ${deliveryAddressForm.lng.toFixed(4)}`}</span>
+                          )}
+                        </div>
+                        <Button
+                          className="w-full mt-2"
+                          disabled={!deliveryAddressForm.line1.trim() || !deliveryAddressForm.city.trim() || !deliveryAddressForm.state.trim() || !deliveryAddressForm.zip.trim() || processing === 'set_address' || processing === 'location'}
+                          onClick={async () => {
+                            try {
+                              setProcessing('set_address');
+                              await postAuthJson(`/api/orders/${order.id}/set-delivery-address`, {
+                                line1: deliveryAddressForm.line1.trim(),
+                                line2: deliveryAddressForm.line2.trim() || undefined,
+                                city: deliveryAddressForm.city.trim(),
+                                state: deliveryAddressForm.state.trim(),
+                                zip: deliveryAddressForm.zip.trim(),
+                                deliveryInstructions: deliveryAddressForm.deliveryInstructions.trim() || undefined,
+                                lat: deliveryAddressForm.lat,
+                                lng: deliveryAddressForm.lng,
+                                pinLabel: deliveryAddressForm.pinLabel || undefined,
+                              });
+                              toast({ title: 'Address saved', description: 'Seller will use this to propose a delivery date. You’ll get notified when they do.' });
+                              const refreshed = await getOrderById(order.id);
+                              if (refreshed) setOrder(refreshed);
+                            } catch (e: any) {
+                              toast({ title: 'Error', description: e?.message || 'Failed to save address', variant: 'destructive' });
+                            } finally {
+                              setProcessing(null);
+                            }
+                          }}
+                        >
+                          {processing === 'set_address' ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Saving…
+                            </>
+                          ) : (
+                            'Save delivery address'
+                          )}
+                        </Button>
+                      </div>
+                      <Separator />
+                    </div>
+                  )}
+                  {txStatus === 'FULFILLMENT_REQUIRED' && order.delivery?.buyerAddress && (
+                    <div className="space-y-2">
+                      <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
+                        <div className="font-semibold text-green-900 dark:text-green-100">Delivery address set</div>
+                        <div className="text-xs mt-1 text-green-800 dark:text-green-200 font-mono">
+                          {[order.delivery.buyerAddress.line1, order.delivery.buyerAddress.line2, [order.delivery.buyerAddress.city, order.delivery.buyerAddress.state, order.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                          {order.delivery.buyerAddress.deliveryInstructions && ` — ${order.delivery.buyerAddress.deliveryInstructions}`}
+                        </div>
+                        {(order.delivery.buyerAddress.lat != null && order.delivery.buyerAddress.lng != null) && (
+                          <a
+                            href={`https://www.google.com/maps?q=${order.delivery.buyerAddress.lat},${order.delivery.buyerAddress.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary underline mt-1 inline-block"
+                          >
+                            View pin on map
+                          </a>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded border border-orange-200 dark:border-orange-800">
+                        <div className="font-semibold text-orange-900 dark:text-orange-100">Waiting for seller to propose delivery date</div>
+                        <div className="text-xs mt-1">Seller will propose delivery windows using this address. You’ll agree to a date, then confirm receipt when it arrives.</div>
+                      </div>
                     </div>
                   )}
                   {txStatus === 'COMPLETED' && (

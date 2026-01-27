@@ -96,6 +96,7 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
 
   // Fulfillment milestones (transport-aware)
   if (transportOption === 'SELLER_TRANSPORT') {
+    const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
     const deliveryProposed = ['DELIVERY_PROPOSED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
     const deliveryScheduled = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
     const outForDelivery = ['OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
@@ -103,13 +104,23 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
     const completed = txStatus === 'COMPLETED';
 
     milestones.push({
-      key: 'schedule_delivery',
-      label: 'Propose delivery',
-      isComplete: deliveryProposed,
-      isCurrent: txStatus === 'FULFILLMENT_REQUIRED' && !deliveryProposed,
+      key: 'set_delivery_address',
+      label: 'Set delivery address',
+      isComplete: hasBuyerAddress,
+      isCurrent: txStatus === 'FULFILLMENT_REQUIRED' && !hasBuyerAddress,
       isBlocked: txStatus === 'AWAITING_TRANSFER_COMPLIANCE',
+      ownerRole: 'buyer',
+      helpText: 'Buyer sets address or drops a pin. Seller uses it to propose a delivery date.',
+    });
+
+    milestones.push({
+      key: 'schedule_delivery',
+      label: 'Propose delivery date',
+      isComplete: deliveryProposed,
+      isCurrent: txStatus === 'FULFILLMENT_REQUIRED' && hasBuyerAddress && !deliveryProposed,
+      isBlocked: txStatus === 'AWAITING_TRANSFER_COMPLIANCE' || (txStatus === 'FULFILLMENT_REQUIRED' && !hasBuyerAddress),
       ownerRole: 'seller',
-      helpText: 'Propose delivery windows (hauling). Buyer agrees to one.',
+      helpText: 'Propose delivery windows. Buyer confirms a date that works.',
     });
 
     milestones.push({
@@ -334,10 +345,21 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
         };
       }
       if (txStatus === 'FULFILLMENT_REQUIRED') {
+        const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+        if (!hasBuyerAddress) {
+          return {
+            title: 'Set delivery address',
+            description: 'Add your delivery address or drop a pin. The seller will use it to propose a delivery date.',
+            ctaLabel: 'Set address',
+            ctaAction: `/dashboard/orders/${order.id}#set-delivery-address`,
+            severity: 'warning',
+            ownerRole: 'buyer',
+          };
+        }
         return {
           title: 'Waiting on seller',
-          description: 'Seller needs to propose delivery windows. You will be notified when ready.',
-          ctaLabel: 'View Details',
+          description: 'Seller will propose a delivery date using your address. You’ll confirm the date, then confirm receipt when it arrives.',
+          ctaLabel: 'View order',
           ctaAction: `/dashboard/orders/${order.id}`,
           severity: 'info',
           ownerRole: 'seller',
@@ -391,9 +413,20 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
   if (role === 'seller') {
     if (transportOption === 'SELLER_TRANSPORT') {
       if (txStatus === 'FULFILLMENT_REQUIRED') {
+        const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+        if (!hasBuyerAddress) {
+          return {
+            title: 'Waiting for buyer to set delivery address',
+            description: 'The buyer sets their delivery address first. Once they do, you’ll see it and can propose a delivery date.',
+            ctaLabel: 'View order',
+            ctaAction: `/seller/orders/${order.id}`,
+            severity: 'info',
+            ownerRole: 'buyer',
+          };
+        }
         return {
-          title: 'Propose delivery',
-          description: 'Propose delivery windows (hauling). Buyer will agree to one.',
+          title: 'Propose delivery date',
+          description: 'Propose delivery windows. Buyer will confirm a date that works.',
           ctaLabel: ORDER_COPY.actions.scheduleDelivery,
           ctaAction: `/seller/orders/${order.id}#schedule-delivery`,
           severity: 'warning',

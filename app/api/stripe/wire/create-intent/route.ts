@@ -394,10 +394,8 @@ export async function POST(request: Request) {
       stripeCustomerId,
     });
 
-    // Determine transport option from listing (default to SELLER_TRANSPORT if not set)
-    const transportOption = (listingData as any)?.transportOption || 
-                           ((listingData as any)?.trust?.sellerOffersDelivery ? 'SELLER_TRANSPORT' : 'BUYER_TRANSPORT') ||
-                           'SELLER_TRANSPORT';
+    // Seller always arranges delivery; buyer confirms receipt. All orders use SELLER_TRANSPORT flow.
+    const transportOption = 'SELLER_TRANSPORT';
     
     // STRIPE CONNECT DESTINATION CHARGE: Seller receives funds immediately, platform fee deducted automatically
     const pi = await stripe.paymentIntents.create({

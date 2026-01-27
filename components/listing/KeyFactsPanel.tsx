@@ -235,6 +235,17 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       detail: 'Buyer & seller coordinate directly (platform does not arrange transport).',
       badge: { variant: 'outline' as const, label: 'Seller-provided', color: '' },
     },
+    // Seller delivery details (radius, timeframe, notes) when set on the listing
+    (listing as any).deliveryDetails && ((listing as any).deliveryDetails.maxDeliveryRadiusMiles != null || ((listing as any).deliveryDetails.deliveryTimeframe || '').trim() || ((listing as any).deliveryDetails.deliveryNotes || '').trim()) && {
+      icon: Truck,
+      label: 'Delivery details',
+      value: [
+        (listing as any).deliveryDetails.maxDeliveryRadiusMiles != null ? `Up to ${(listing as any).deliveryDetails.maxDeliveryRadiusMiles} miles` : null,
+        ((listing as any).deliveryDetails.deliveryTimeframe || '').trim() || null,
+      ].filter(Boolean).join(' · ') || 'Seller arranges delivery',
+      detail: ((listing as any).deliveryDetails.deliveryNotes || '').trim() || undefined,
+      badge: { variant: 'outline' as const, label: 'From listing', color: '' },
+    },
   ].filter(Boolean) as Array<{
     icon: React.ComponentType<{ className?: string }>;
     label: string;

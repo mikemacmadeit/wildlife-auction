@@ -456,14 +456,9 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                       {watchers} {watchers === 1 ? 'watching' : 'watching'}
                     </Badge>
                   )}
-                  {listing.transportOption === 'SELLER_TRANSPORT' && (
-                    <Badge variant="outline" className="text-[11px] font-semibold" title="Seller delivers">
-                      Seller Transport
-                    </Badge>
-                  )}
-                  {listing.transportOption === 'BUYER_TRANSPORT' && (
-                    <Badge variant="outline" className="text-[11px] font-semibold" title="Buyer arranges pickup">
-                      Buyer Transport
+                  {listing.transportOption !== 'BUYER_TRANSPORT' && (
+                    <Badge variant="outline" className="text-[11px] font-semibold" title="Seller schedules delivery; buyer confirms receipt">
+                      Seller arranges delivery
                     </Badge>
                   )}
                   {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (

@@ -113,6 +113,10 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAgreed' }>;
       return `Buyer agreed to delivery window for "${p.listingTitle}". ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
     }
+    case 'Order.DeliveryAddressSet': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAddressSet' }>;
+      return `Buyer set delivery address for "${p.listingTitle}". Propose a delivery date: ${p.orderUrl}`;
+    }
     case 'Order.PickupReady': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupReady' }>;
       return `Pickup ready for "${p.listingTitle}" at ${p.location}. Select a time window: ${p.orderUrl}`;
@@ -359,6 +363,18 @@ function buildEmailJobPayload(params: {
         template: 'order_received',
         templatePayload: {
           sellerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryAddressSet': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAddressSet' }>;
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
           orderId: p.orderId,
           listingTitle: p.listingTitle,
           orderUrl: p.orderUrl,

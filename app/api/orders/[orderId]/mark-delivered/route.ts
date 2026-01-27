@@ -1,28 +1,15 @@
 /**
  * POST /api/orders/[orderId]/mark-delivered
- * 
- * Seller marks order as delivered
- * Transitions: paid/in_transit → delivered
+ *
+ * Sellers cannot confirm delivery. Only the buyer confirms receipt to complete the transaction.
+ * This route always returns 400. Sellers use "Mark out for delivery" when the order is on the way.
  */
 
 // IMPORTANT: Avoid importing `NextRequest` / `NextResponse` from `next/server` in this repo.
-// In the current environment, production builds can fail resolving an internal Next module
-// (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { OrderStatus, TransactionStatus } from '@/lib/types';
-import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
-import { emitAndProcessEventForUser } from '@/lib/notifications';
-import { getSiteUrl } from '@/lib/site-url';
-import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { captureException } from '@/lib/monitoring/capture';
-import { logWarn } from '@/lib/monitoring/logger';
-
-const markDeliveredSchema = z.object({
-  deliveryProofUrls: z.array(z.string().url()).optional(),
-});
 
 function json(body: any, init?: { status?: number; headers?: Record<string, string> }) {
   return new Response(JSON.stringify(body), {
@@ -71,21 +58,6 @@ export async function POST(
     const sellerId = decodedToken.uid;
     const orderId = params.orderId;
 
-    // Parse and validate request body
-    let body;
-    try {
-      body = await request.json();
-    } catch (error) {
-      body = {}; // Optional body
-    }
-
-    const validation = markDeliveredSchema.safeParse(body);
-    if (!validation.success) {
-      return json({ error: 'Invalid request data', details: validation.error.flatten() }, { status: 400 });
-    }
-
-    const { deliveryProofUrls } = validation.data;
-
     // Get order
     const orderRef = db.collection('orders').doc(orderId);
     const orderDoc = await orderRef.get();
@@ -101,171 +73,14 @@ export async function POST(
       return json({ error: 'Unauthorized - You can only mark your own orders as delivered' }, { status: 403 });
     }
 
-    // Validate transport option - this endpoint is for SELLER_TRANSPORT only
-    const transportOption = orderData.transportOption || 'SELLER_TRANSPORT';
-    if (transportOption !== 'SELLER_TRANSPORT') {
-      return json(
-        { 
-          error: 'Invalid transport option',
-          details: 'This endpoint is for SELLER_TRANSPORT orders only. Use pickup endpoints for BUYER_TRANSPORT orders.'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate status transition - check transactionStatus if available, else legacy status
-    const currentTxStatus = orderData.transactionStatus as TransactionStatus | undefined;
-    const currentLegacyStatus = orderData.status as OrderStatus;
-    
-    // Allowed states: FULFILLMENT_REQUIRED, DELIVERY_SCHEDULED, OUT_FOR_DELIVERY
-    const allowedTxStatuses: TransactionStatus[] = ['FULFILLMENT_REQUIRED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'];
-    const allowedLegacyStatuses: OrderStatus[] = ['paid', 'paid_held', 'in_transit'];
-    
-    const isValidTransition = currentTxStatus 
-      ? allowedTxStatuses.includes(currentTxStatus)
-      : allowedLegacyStatuses.includes(currentLegacyStatus);
-    
-    if (!isValidTransition) {
-      return json(
-        { 
-          error: 'Invalid status transition',
-          details: `Cannot mark delivered. Current status: ${currentTxStatus || currentLegacyStatus}`
-        },
-        { status: 400 }
-      );
-    }
-
-    // Check if already delivered or beyond
-    if (currentTxStatus === 'DELIVERED_PENDING_CONFIRMATION' || currentTxStatus === 'COMPLETED' || 
-        ['delivered', 'accepted', 'buyer_confirmed', 'ready_to_release', 'completed', 'disputed'].includes(currentLegacyStatus)) {
-      return json({ error: `Order is already ${currentTxStatus || currentLegacyStatus}` }, { status: 400 });
-    }
-
-    // FIX-003: Transaction guard to prevent delivery vs dispute race condition
-    const now = new Date();
-    try {
-      await db.runTransaction(async (tx) => {
-        const orderSnap = await tx.get(orderRef);
-        if (!orderSnap.exists) {
-          throw new Error('Order not found');
-        }
-        const txOrderData = orderSnap.data()!;
-        
-        // Check if dispute is open (race condition guard)
-        const hasDispute = txOrderData.disputeOpenedAt || 
-                          txOrderData.protectedDisputeStatus && txOrderData.protectedDisputeStatus !== 'none' ||
-                          txOrderData.transactionStatus === 'DISPUTE_OPENED';
-        
-        if (hasDispute) {
-          throw new Error('CONFLICT_DISPUTE_OPEN');
-        }
-        
-        // Update order to delivered
-        const updateData: any = {
-          status: 'delivered' as OrderStatus, // Legacy status for backward compatibility
-          transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' as TransactionStatus, // NEW: Primary status
-          deliveredAt: now,
-          updatedAt: now,
-          lastUpdatedByRole: 'seller',
-        };
-
-        // Populate delivery object
-        updateData.delivery = {
-          ...(txOrderData.delivery || {}),
-          deliveredAt: now,
-          ...(deliveryProofUrls && deliveryProofUrls.length > 0 ? { 
-            proofUploads: [
-              ...(txOrderData.delivery?.proofUploads || []),
-              ...deliveryProofUrls.map(url => ({ type: 'delivery_proof', url, uploadedAt: now }))
-            ]
-          } : {}),
-        };
-
-        // Legacy field for backward compatibility
-        if (deliveryProofUrls && deliveryProofUrls.length > 0) {
-          updateData.deliveryProofUrls = deliveryProofUrls;
-        }
-
-        tx.update(orderRef, updateData);
-      });
-    } catch (error: any) {
-      if (error.message === 'CONFLICT_DISPUTE_OPEN') {
-        return json({ 
-          error: 'Cannot mark delivered - dispute is open',
-          code: 'CONFLICT_DISPUTE_OPEN'
-        }, { status: 409 });
-      }
-      throw error;
-    }
-
-    // Timeline (server-authored, idempotent).
-    try {
-      await appendOrderTimelineEvent({
-        db: db as any,
-        orderId,
-        event: {
-          id: `DELIVERED:${orderId}`,
-          type: 'DELIVERED',
-          label: 'Seller marked delivered',
-          actor: 'seller',
-          visibility: 'buyer',
-          timestamp: Timestamp.fromDate(now),
-          ...(deliveryProofUrls?.length ? { meta: { deliveryProofUrlsCount: deliveryProofUrls.length } } : {}),
-        },
-      });
-    } catch (e) {
-      logWarn('Failed to append mark-delivered timeline event (best-effort)', {
-        endpoint: '/api/orders/[orderId]/mark-delivered',
-        orderId: params.orderId,
-        error: String(e),
-      });
-    }
-
-    // Emit notification to buyer
-    try {
-      const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
-      const listingTitle = listingDoc.data()?.title || 'Your order';
-      const ev = await emitAndProcessEventForUser({
-        type: 'Order.Delivered',
-        actorId: sellerId,
-        entityType: 'order',
-        entityId: orderId,
-        targetUserId: orderData.buyerId,
-        payload: {
-          type: 'Order.Delivered',
-          orderId,
-          listingId: orderData.listingId,
-          listingTitle,
-          orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
-        },
-        optionalHash: `delivered:${now.toISOString()}`,
-      });
-      if (ev?.ok && ev.created) {
-        void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
-          captureException(err instanceof Error ? err : new Error(String(err)), {
-            context: 'email-dispatch',
-            eventType: 'Order.Delivered',
-            jobId: ev.eventId,
-            orderId: params.orderId,
-            endpoint: '/api/orders/[orderId]/mark-delivered',
-          });
-        });
-      }
-    } catch (e) {
-      captureException(e instanceof Error ? e : new Error(String(e)), {
-        endpoint: '/api/orders/[orderId]/mark-delivered',
-        orderId: params.orderId,
-        context: 'Order.Delivered notification event',
-      });
-    }
-
-    return json({
-      success: true,
-      orderId,
-      status: 'delivered',
-      deliveredAt: now,
-      message: 'Order marked as delivered. Buyer can now accept or dispute.',
-    });
+    // Sellers cannot confirm delivery. Only the buyer confirms receipt to complete the transaction.
+    return json(
+      {
+        error: 'Sellers cannot confirm delivery',
+        details: 'Only the buyer confirms receipt to complete the transaction. Use "Mark out for delivery" when the order is on the way; the buyer will confirm receipt when they receive it.',
+      },
+      { status: 400 }
+    );
   } catch (error: any) {
     captureException(error instanceof Error ? error : new Error(String(error)), {
       endpoint: '/api/orders/[orderId]/mark-delivered',

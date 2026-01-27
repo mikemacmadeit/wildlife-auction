@@ -191,14 +191,9 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </div>
             ) : null}
             <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
-              {listing.transportOption === 'SELLER_TRANSPORT' && (
-                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
-                  Seller Transport
-                </Badge>
-              )}
-              {listing.transportOption === 'BUYER_TRANSPORT' && (
-                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
-                  Buyer Transport
+              {listing.transportOption !== 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Seller schedules delivery; buyer confirms receipt">
+                  Seller arranges delivery
                 </Badge>
               )}
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
@@ -262,14 +257,9 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             </div>
             {/* Transport + Protected badges (desktop content) */}
             <div className="hidden sm:flex items-center gap-2 flex-wrap">
-              {listing.transportOption === 'SELLER_TRANSPORT' && (
-                <Badge variant="outline" className="text-[11px] font-semibold" title="Seller delivers">
-                  Seller Transport
-                </Badge>
-              )}
-              {listing.transportOption === 'BUYER_TRANSPORT' && (
-                <Badge variant="outline" className="text-[11px] font-semibold" title="Buyer arranges pickup">
-                  Buyer Transport
+              {listing.transportOption !== 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="text-[11px] font-semibold" title="Seller schedules delivery; buyer confirms receipt">
+                  Seller arranges delivery
                 </Badge>
               )}
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (

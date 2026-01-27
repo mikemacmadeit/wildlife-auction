@@ -407,6 +407,19 @@ export interface Listing {
    * Required for all listings (enforced at creation)
    */
   transportOption?: 'SELLER_TRANSPORT' | 'BUYER_TRANSPORT';
+
+  /**
+   * Seller delivery details for SELLER_TRANSPORT listings.
+   * Set on the listing create/edit Transportation step; shown to buyers.
+   */
+  deliveryDetails?: {
+    /** Maximum distance (miles) the seller will deliver from their location. */
+    maxDeliveryRadiusMiles?: number;
+    /** When the seller plans to deliver (e.g. "Within 3–5 days of payment", "Estimated 1 week"). */
+    deliveryTimeframe?: string;
+    /** Additional delivery notes (loading, facility access, preferred times, etc.). */
+    deliveryNotes?: string;
+  };
   
   // Category-specific attributes (replaces old metadata)
   subcategory?: string; // Optional subcategory within the 3 top categories
@@ -761,9 +774,23 @@ export interface Order {
 
   /**
    * Delivery workflow (SELLER_TRANSPORT)
-   * Seller proposes delivery windows (hauling); buyer agrees to one.
+   * Flow: buyer sets delivery address first → seller sees it and proposes dates → buyer confirms date → buyer confirms receipt.
    */
   delivery?: {
+    /** Buyer-provided delivery address (set first after payment). Seller uses this to schedule delivery. */
+    buyerAddress?: {
+      line1: string;
+      line2?: string;
+      city: string;
+      state: string;
+      zip: string;
+      deliveryInstructions?: string;
+      /** Optional dropped-pin or “use my location” coordinates. */
+      lat?: number;
+      lng?: number;
+      pinLabel?: string;
+    };
+    buyerAddressSetAt?: Date;
     /** Legacy: single ETA. Prefer agreedWindow when using propose/agree flow. */
     eta?: Date;
     /** Proposed delivery windows (seller). Buyer agrees to one. */

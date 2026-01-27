@@ -103,6 +103,12 @@ export interface CreateListingInput {
   };
   /** SELLER_TRANSPORT | BUYER_TRANSPORT – who handles transport. Used for order fulfillment + badges. */
   transportOption?: 'SELLER_TRANSPORT' | 'BUYER_TRANSPORT';
+  /** Seller delivery details for SELLER_TRANSPORT (radius miles, timeframe, notes). */
+  deliveryDetails?: {
+    maxDeliveryRadiusMiles?: number;
+    deliveryTimeframe?: string;
+    deliveryNotes?: string;
+  };
   attributes: ListingAttributes; // Category-specific structured attributes
   // Protected Transaction fields
   protectedTransactionEnabled?: boolean;
@@ -358,6 +364,8 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     resubmissionCount: typeof (doc as any).resubmissionCount === 'number' ? (doc as any).resubmissionCount : undefined,
     // Transport option (fulfillment + badges)
     transportOption: (doc as any).transportOption === 'SELLER_TRANSPORT' || (doc as any).transportOption === 'BUYER_TRANSPORT' ? (doc as any).transportOption : undefined,
+    // Seller delivery details (radius, timeframe, notes) for SELLER_TRANSPORT
+    deliveryDetails: (doc as any).deliveryDetails && typeof (doc as any).deliveryDetails === 'object' ? { ...(doc as any).deliveryDetails } : undefined,
     // Protected Transaction fields
     protectedTransactionEnabled: doc.protectedTransactionEnabled,
     protectedTransactionDays: doc.protectedTransactionDays,
@@ -441,6 +449,13 @@ function toListingDocInput(
     sellerSnapshot,
     trust: listingInput.trust,
     ...(listingInput.transportOption && { transportOption: listingInput.transportOption }),
+    ...(listingInput.deliveryDetails && typeof listingInput.deliveryDetails === 'object' && (listingInput.deliveryDetails.maxDeliveryRadiusMiles != null || (listingInput.deliveryDetails.deliveryTimeframe || '').trim() || (listingInput.deliveryDetails.deliveryNotes || '').trim()) && {
+      deliveryDetails: {
+        ...(listingInput.deliveryDetails.maxDeliveryRadiusMiles != null && { maxDeliveryRadiusMiles: listingInput.deliveryDetails.maxDeliveryRadiusMiles }),
+        ...((listingInput.deliveryDetails.deliveryTimeframe || '').trim() && { deliveryTimeframe: (listingInput.deliveryDetails.deliveryTimeframe || '').trim() }),
+        ...((listingInput.deliveryDetails.deliveryNotes || '').trim() && { deliveryNotes: (listingInput.deliveryDetails.deliveryNotes || '').trim() }),
+      },
+    }),
     ...(listingInput.subcategory !== undefined && { subcategory: listingInput.subcategory }),
     attributes: listingInput.attributes as Record<string, any>, // Store as plain object in Firestore
     metrics: {

@@ -37,6 +37,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.DeliveryCheckIn',
   'Order.DeliveryScheduled', // Seller proposed/scheduled delivery (SELLER_TRANSPORT)
   'Order.DeliveryAgreed', // Buyer agreed to delivery window (SELLER_TRANSPORT)
+  'Order.DeliveryAddressSet', // Buyer set delivery address; seller can now propose date (SELLER_TRANSPORT)
   'Order.PickupReady', // Seller set pickup info (BUYER_TRANSPORT)
   'Order.PickupWindowSelected', // Buyer selected pickup window (BUYER_TRANSPORT)
   'Order.PickupWindowAgreed', // Seller agreed to pickup window (BUYER_TRANSPORT)
@@ -276,6 +277,13 @@ export type NotificationEventPayload =
       orderUrl: string;
       windowStart: string;
       windowEnd: string;
+    }
+  | {
+      type: 'Order.DeliveryAddressSet';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
     }
   | {
       type: 'Order.PickupReady';

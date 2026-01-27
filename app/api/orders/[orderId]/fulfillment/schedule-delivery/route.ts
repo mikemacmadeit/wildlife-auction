@@ -141,6 +141,17 @@ export async function POST(
       );
     }
 
+    const buyerAddress = (orderData.delivery as any)?.buyerAddress;
+    if ((currentTxStatus === 'FULFILLMENT_REQUIRED' || legacyOk) && (!buyerAddress || !buyerAddress.line1)) {
+      return json(
+        {
+          error: 'Buyer must set delivery address first',
+          details: 'The buyer sets the delivery address after payment. Once they do, you can propose a delivery date. Ask them to open the order and complete "Set delivery address".',
+        },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
     const windowsWithDates = useWindows
       ? windows!.map((w) => ({ start: new Date(w.start), end: new Date(w.end) }))

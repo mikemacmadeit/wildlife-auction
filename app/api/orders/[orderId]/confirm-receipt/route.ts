@@ -82,15 +82,17 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       );
     }
 
-    // Require the seller to have marked at least "in transit" (or delivered/admin-confirmed),
-    // otherwise buyers get stuck waiting on a redundant seller "delivered" action.
+    // Buyer can confirm receipt once: delivery is scheduled (seller proposed, buyer agreed), or out for delivery, or in transit/delivered.
+    // Sellers do not confirm delivery; only the buyer confirms receipt to complete the transaction.
+    const txStatus = (orderData.transactionStatus as string) || '';
     const hasInTransit = currentStatus === 'in_transit' || !!orderData.inTransitAt;
     const hasDeliveredMarker = !!orderData.deliveredAt || !!orderData.deliveryConfirmedAt || currentStatus === 'delivered';
-    if (!hasInTransit && !hasDeliveredMarker) {
+    const deliveryScheduledOrOut = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus);
+    if (!hasInTransit && !hasDeliveredMarker && !deliveryScheduledOrOut) {
       return json(
         {
-          error: 'Not yet in transit',
-          details: 'The seller must mark the order as in transit before you can confirm receipt.',
+          error: 'Delivery not yet scheduled or in progress',
+          details: 'The seller must propose a delivery window and you must agree before you can confirm receipt. Once the order is on the way (or delivered), use Confirm receipt to complete the transaction.',
         },
         { status: 400 }
       );
@@ -103,6 +105,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
     const now = new Date();
     const updateData: any = {
       status: 'buyer_confirmed' as OrderStatus,
+      transactionStatus: 'COMPLETED' as TransactionStatus,
       buyerConfirmedAt: now,
       acceptedAt: now, // legacy
       buyerAcceptedAt: now, // protected transaction legacy
@@ -110,7 +113,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       lastUpdatedByRole: 'buyer',
     };
 
-    // Ensure we have a delivery marker even if seller never pressed "delivered".
+    // Ensure we have a delivery marker; only the buyer confirms receipt to complete the transaction.
     if (!orderData.deliveredAt) {
       updateData.deliveredAt = now;
     }

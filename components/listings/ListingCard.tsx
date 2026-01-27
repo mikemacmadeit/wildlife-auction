@@ -267,14 +267,9 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
-              {listing.transportOption === 'SELLER_TRANSPORT' && (
-                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Seller delivers">
-                  Seller Transport
-                </Badge>
-              )}
-              {listing.transportOption === 'BUYER_TRANSPORT' && (
-                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Buyer arranges pickup">
-                  Buyer Transport
+              {listing.transportOption !== 'BUYER_TRANSPORT' && (
+                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Seller schedules delivery; buyer confirms receipt">
+                  Seller arranges delivery
                 </Badge>
               )}
               {/* Protected Transaction Badge */}
@@ -291,14 +286,9 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
 
             {/* Mobile: transport + Protected badges */}
             <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
-              {listing.transportOption === 'SELLER_TRANSPORT' && (
+              {listing.transportOption !== 'BUYER_TRANSPORT' && (
                 <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
-                  Seller Transport
-                </Badge>
-              )}
-              {listing.transportOption === 'BUYER_TRANSPORT' && (
-                <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
-                  Buyer Transport
+                  Seller arranges delivery
                 </Badge>
               )}
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (

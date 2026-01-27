@@ -537,13 +537,9 @@ export default function SellerSalesPage() {
                                   }
                                   return <Badge variant="outline" className="text-xs">{hoursRemaining}h remaining</Badge>;
                                 })()}
-                                {transportOption === 'BUYER_TRANSPORT' ? (
-                                  <Badge variant="outline" className="font-semibold text-xs">
-                                    Buyer Transport
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="font-semibold text-xs">
-                                    Seller Transport
+                                {transportOption !== 'BUYER_TRANSPORT' && (
+                                  <Badge variant="outline" className="font-semibold text-xs" title="Seller schedules delivery; buyer confirms receipt">
+                                    Seller arranges delivery
                                   </Badge>
                                 )}
                                 {txStatus === 'SELLER_NONCOMPLIANT' ? (

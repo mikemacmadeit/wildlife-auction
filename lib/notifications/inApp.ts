@@ -263,6 +263,18 @@ export function buildInAppNotification(params: {
         metadata: { listingId: p.listingId, orderId: p.orderId, daysSinceDelivery: p.daysSinceDelivery },
       };
     }
+    case 'Order.DeliveryAddressSet': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAddressSet' }>;
+      return {
+        ...base,
+        type: 'order_delivery_address_set',
+        title: 'Delivery address set',
+        body: `Buyer set a delivery address for "${p.listingTitle}". Propose a delivery date when ready.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
     case 'Payout.Released': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Payout.Released' }>;
       return {

@@ -52,15 +52,26 @@ export function NextActionBanner({
   // Determine if this role needs to act
   const actionRequired = role === 'seller' ? needsSellerAction : needsBuyerAction;
 
+  const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+
   // Build action details based on status and transport (must be before early return for hooks rules)
   const actionDetails = useMemo(() => {
     if (role === 'seller') {
       if (txStatus === 'FULFILLMENT_REQUIRED') {
         if (transportOption === 'SELLER_TRANSPORT') {
+          if (!hasBuyerAddress) {
+            return {
+              title: 'Waiting for buyer to set delivery address',
+              description: 'The buyer sets their address first. Once they do, you can propose a delivery date.',
+              urgency: 'normal' as const,
+              ctaLabel: 'View order',
+              icon: <MapPin className="h-5 w-5" />,
+            };
+          }
           return {
-            title: 'Action required: Propose delivery',
-            description: 'Propose delivery windows (hauling). Buyer will agree to one.',
-            urgency: isSlaOverdue ? 'overdue' : isSlaUrgent ? 'urgent' : 'normal',
+            title: 'Action required: Propose delivery date',
+            description: 'Propose delivery windows. Buyer will confirm a date that works.',
+            urgency: (isSlaOverdue ? 'overdue' : isSlaUrgent ? 'urgent' : 'normal') as 'overdue' | 'urgent' | 'normal',
             ctaLabel: 'Propose Delivery',
             icon: <Truck className="h-5 w-5" />,
           };
@@ -95,6 +106,15 @@ export function NextActionBanner({
     }
 
     if (role === 'buyer') {
+      if (txStatus === 'FULFILLMENT_REQUIRED' && transportOption === 'SELLER_TRANSPORT' && !hasBuyerAddress) {
+        return {
+          title: 'Action required: Set delivery address',
+          description: 'Add your delivery address or drop a pin. The seller will use it to propose a delivery date.',
+          urgency: 'normal' as const,
+          ctaLabel: 'Set address',
+          icon: <MapPin className="h-5 w-5" />,
+        };
+      }
       if (txStatus === 'DELIVERY_PROPOSED') {
         return {
           title: 'Action required: Agree to delivery window',
@@ -145,7 +165,7 @@ export function NextActionBanner({
     }
 
     return null;
-  }, [txStatus, transportOption, role, isSlaOverdue, isSlaUrgent]);
+  }, [txStatus, transportOption, role, isSlaOverdue, isSlaUrgent, hasBuyerAddress]);
 
   // If no action required for this role, don't show banner
   if (!actionRequired && !isSlaOverdue) {

@@ -251,6 +251,15 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: { email: { perHour: 2, perDay: 4 }, sms: { perHour: 2, perDay: 4 } },
         allowDuringQuietHours: true,
       };
+    case 'Order.DeliveryAddressSet':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
     case 'Payout.Released':
       return {
         category: 'orders',

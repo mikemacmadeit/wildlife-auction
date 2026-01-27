@@ -72,6 +72,13 @@ export interface ListingDoc {
     transportReady: boolean;
   };
 
+  /** Seller delivery details for SELLER_TRANSPORT (radius, timeframe, notes). */
+  deliveryDetails?: {
+    maxDeliveryRadiusMiles?: number;
+    deliveryTimeframe?: string;
+    deliveryNotes?: string;
+  };
+
   // Category-specific attributes (replaces old metadata)
   subcategory?: string; // Optional subcategory within the 3 top categories
   attributes: Record<string, any>; // Category-specific structured attributes (stored as plain object in Firestore)

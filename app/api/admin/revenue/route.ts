@@ -238,12 +238,38 @@ export async function GET(request: Request) {
       }
     }
 
+    // Build transaction-level list for the period (newest first, cap 500)
+    const MAX_TRANSACTIONS = 500;
+    const transactions = ordersSnapshot.docs
+      .map((doc) => {
+        const d = doc.data();
+        const paidAt = d.paidAt?.toDate?.() as Date | undefined;
+        if (!paidAt) return null;
+        const amount = typeof d.amount === 'number' && Number.isFinite(d.amount) ? d.amount : 0;
+        const platformFee = platformFeeFromOrder(d);
+        const listingTitle = (d.listingSnapshot?.title || d.listingTitle || '') as string;
+        return {
+          orderId: doc.id,
+          paidAt: paidAt.toISOString(),
+          listingId: (d.listingId as string) || '',
+          listingTitle: listingTitle || '—',
+          amount,
+          platformFee,
+          sellerId: (d.sellerId as string) || '',
+          status: (d.status as string) || '',
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
+      .slice(0, MAX_TRANSACTIONS);
+
     logInfo('Revenue report generated', {
       route: '/api/admin/revenue',
       adminId,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       ordersProcessed: ordersSnapshot.size,
+      transactionsReturned: transactions.length,
     });
 
     return json({
@@ -275,6 +301,7 @@ export async function GET(request: Request) {
         last30Days: ordersCount30d,
         inPeriod: ordersSnapshot.size,
       },
+      transactions,
       generatedAt: new Date().toISOString(),
     });
   } catch (error: any) {

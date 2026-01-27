@@ -125,6 +125,11 @@ function NewListingPageContent() {
     coverPhotoId?: string;
     verification: boolean;
     transportType: 'seller' | 'buyer' | null;
+    deliveryDetails: {
+      maxDeliveryRadiusMiles: number | '';
+      deliveryTimeframe: string;
+      deliveryNotes: string;
+    };
     protectedTransactionEnabled: boolean;
     protectedTransactionDays: 7 | 14 | null;
     bestOffer: {
@@ -156,7 +161,12 @@ function NewListingPageContent() {
     photos: [],
     coverPhotoId: undefined,
     verification: false,
-    transportType: null as 'seller' | 'buyer' | null,
+    transportType: 'seller' as 'seller' | 'buyer' | null,
+    deliveryDetails: {
+      maxDeliveryRadiusMiles: '' as number | '',
+      deliveryTimeframe: '',
+      deliveryNotes: '',
+    },
     protectedTransactionEnabled: false,
     protectedTransactionDays: null,
     bestOffer: {
@@ -244,6 +254,7 @@ function NewListingPageContent() {
       coverPhotoId: formData.coverPhotoId,
       verification: formData.verification,
       transportType: formData.transportType,
+      deliveryDetails: formData.deliveryDetails,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
       protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,
@@ -390,11 +401,18 @@ function NewListingPageContent() {
           trust: {
             verified: formData.verification,
             insuranceAvailable: false,
-            transportReady: formData.transportType !== null,
-            sellerOffersDelivery: formData.transportType === 'seller',
+            transportReady: true,
+            sellerOffersDelivery: true,
           },
-          ...(formData.transportType === 'seller' && { transportOption: 'SELLER_TRANSPORT' as const }),
-          ...(formData.transportType === 'buyer' && { transportOption: 'BUYER_TRANSPORT' as const }),
+          transportOption: 'SELLER_TRANSPORT' as const,
+          ...((() => {
+            const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+            const maxMiles = dd.maxDeliveryRadiusMiles === '' || dd.maxDeliveryRadiusMiles === undefined ? undefined : Number(dd.maxDeliveryRadiusMiles);
+            const timeframe = (dd.deliveryTimeframe ?? '').trim() || undefined;
+            const notes = (dd.deliveryNotes ?? '').trim() || undefined;
+            const hasAny = maxMiles !== undefined || timeframe !== undefined || notes !== undefined;
+            return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(notes && { deliveryNotes: notes }) } } : {};
+          })()),
           protectedTransactionEnabled: formData.protectedTransactionEnabled,
           protectedTransactionDays: formData.protectedTransactionDays,
           ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
@@ -2074,46 +2092,115 @@ function NewListingPageContent() {
             </div>
           </Card>
 
-          {/* Transportation Section */}
+          {/* Transportation — seller always arranges delivery */}
           <Card className="p-4 border-2">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-base mb-1">Transportation</h3>
-                <p className="text-sm text-muted-foreground">
-                  Select who will handle transportation. Buyer and seller coordinate directly; Agchange does not arrange transport.
-                </p>
-              </div>
-              <RadioGroup
-                value={formData.transportType || ''}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, transportType: value === 'seller' || value === 'buyer' ? value : null })
-                }
-                className="space-y-3"
-              >
-                <div className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
-                  <RadioGroupItem value="seller" id="transport-seller" className="mt-1" />
-                  <Label htmlFor="transport-seller" className="cursor-pointer flex-1">
-                    <div className="font-medium mb-1">Seller Transport</div>
-                    <div className="text-sm text-muted-foreground">
-                      You (the seller) will deliver. Buyer and seller coordinate delivery details directly.
-                    </div>
-                  </Label>
-                </div>
-                <div className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
-                  <RadioGroupItem value="buyer" id="transport-buyer" className="mt-1" />
-                  <Label htmlFor="transport-buyer" className="cursor-pointer flex-1">
-                    <div className="font-medium mb-1">Buyer Transport</div>
-                    <div className="text-sm text-muted-foreground">
-                      Buyer must handle transportation. Buyer arranges pickup/delivery.
-                    </div>
-                  </Label>
-                </div>
-              </RadioGroup>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base">Delivery</h3>
+              <p className="text-sm text-muted-foreground">
+                You are responsible for scheduling delivery. You’ll propose a delivery window; the buyer agrees to that date. You coordinate until you agree. The buyer confirms receipt to complete the transaction. Agchange does not arrange transport.
+              </p>
+              <p className="text-xs text-muted-foreground pt-1">
+                Seller arranges delivery · Buyer confirms receipt
+              </p>
             </div>
           </Card>
         </div>
       ),
       validate: () => true, // Verification and transportation options are optional
+    },
+    {
+      id: 'transportation',
+      title: 'Transportation',
+      description: 'Delivery radius, timeframe & notes',
+      content: (
+        <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Buyers see this when you offer delivery. It helps them decide before buying and sets clear expectations.
+          </p>
+
+          <Card className="p-4 border-2">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="maxDeliveryRadiusMiles" className="font-medium">
+                  Maximum delivery radius (miles)
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  How far you’re willing to deliver from your location. Leave blank if you prefer to discuss per buyer.
+                </p>
+                <Input
+                  id="maxDeliveryRadiusMiles"
+                  type="number"
+                  min={0}
+                  max={500}
+                  placeholder="e.g. 150"
+                  className="mt-2 max-w-[140px]"
+                  value={formData.deliveryDetails?.maxDeliveryRadiusMiles === '' || formData.deliveryDetails?.maxDeliveryRadiusMiles === undefined ? '' : formData.deliveryDetails.maxDeliveryRadiusMiles}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFormData({
+                      ...formData,
+                      deliveryDetails: {
+                        ...formData.deliveryDetails,
+                        maxDeliveryRadiusMiles: v === '' ? '' : (parseInt(v, 10) || 0),
+                      },
+                    });
+                  }}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="deliveryTimeframe" className="font-medium">
+                  Delivery timeframe
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When you plan to deliver or your estimated window (e.g. “Within 3–5 days of payment”, “Estimated 1 week”, “Flexible — contact after purchase”).
+                </p>
+                <Input
+                  id="deliveryTimeframe"
+                  type="text"
+                  placeholder="e.g. Within 3–5 days of payment"
+                  className="mt-2"
+                  value={formData.deliveryDetails?.deliveryTimeframe ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      deliveryDetails: {
+                        ...formData.deliveryDetails,
+                        deliveryTimeframe: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="deliveryNotes" className="font-medium">
+                  Additional delivery notes
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Loading requirements, facility access, preferred contact times, or anything else buyers should know.
+                </p>
+                <Textarea
+                  id="deliveryNotes"
+                  placeholder="e.g. Loading ramp available. Call when 30 minutes out."
+                  className="mt-2 min-h-[80px]"
+                  value={formData.deliveryDetails?.deliveryNotes ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      deliveryDetails: {
+                        ...formData.deliveryDetails,
+                        deliveryNotes: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+      ),
+      validate: () => true,
     },
     {
       id: 'review',
@@ -2159,8 +2246,7 @@ function NewListingPageContent() {
                           </Badge>
                         )}
                         {formData.verification && <Badge>Verification</Badge>}
-                        {formData.transportType === 'seller' && <Badge variant="outline">Seller Transport</Badge>}
-                        {formData.transportType === 'buyer' && <Badge variant="outline">Buyer Transport</Badge>}
+                        <Badge variant="outline">Seller arranges delivery</Badge>
                         {formData.protectedTransactionEnabled && (
                           <Badge variant="outline">
                             Protected ({formData.protectedTransactionDays ?? '—'} days)
@@ -2264,8 +2350,8 @@ function NewListingPageContent() {
               trust: {
                 verified: !!formData.verification,
                 insuranceAvailable: false,
-                transportReady: formData.transportType !== null,
-                sellerOffersDelivery: formData.transportType === 'seller',
+                transportReady: true,
+                sellerOffersDelivery: true,
               },
               attributes: (formData.attributes || {}) as any,
               durationDays: formData.durationDays,
@@ -2305,8 +2391,20 @@ function NewListingPageContent() {
                   <div className="mt-2 space-y-1">
                     <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
                     <div><span className="text-muted-foreground">Transportation:</span> <span className="font-medium">
-                      {formData.transportType === 'seller' ? 'Seller Transport' : formData.transportType === 'buyer' ? 'Buyer Transport' : 'Not specified'}
+                      Seller arranges delivery
                     </span></div>
+                    {(() => {
+                      const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+                      const hasAny = (dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined) || (dd.deliveryTimeframe ?? '').trim() || (dd.deliveryNotes ?? '').trim();
+                      return hasAny ? (
+                        <div className="mt-2 space-y-1 pt-1 border-t border-border/60">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery details</div>
+                          {dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined && <div><span className="text-muted-foreground">Max radius:</span> <span className="font-medium">{dd.maxDeliveryRadiusMiles} miles</span></div>}
+                          {(dd.deliveryTimeframe ?? '').trim() && <div><span className="text-muted-foreground">Timeframe:</span> <span className="font-medium">{(dd.deliveryTimeframe ?? '').trim()}</span></div>}
+                          {(dd.deliveryNotes ?? '').trim() && <div><span className="text-muted-foreground">Notes:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryNotes ?? '').trim()}</span></div>}
+                        </div>
+                      ) : null;
+                    })()}
                     <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
                     {formData.type === 'fixed' && (
                       <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
@@ -2381,7 +2479,10 @@ function NewListingPageContent() {
             // Step 6: Verification & Transportation - accessible once photos are done (optional)
             completed.push('verification');
             
-            // Step 7: Review - accessible once verification is accessible (final step)
+            // Step 7: Transportation - delivery radius, timeframe, notes
+            completed.push('transportation');
+            
+            // Step 8: Review - accessible once transportation is done (final step)
             completed.push('review');
           }
         }
@@ -2533,11 +2634,18 @@ function NewListingPageContent() {
         trust: {
           verified: formData.verification,
           insuranceAvailable: false,
-          transportReady: formData.transportType !== null,
-          sellerOffersDelivery: formData.transportType === 'seller',
+          transportReady: true,
+          sellerOffersDelivery: true,
         },
-        // NEW: Transport option (required for fulfillment workflow)
-        transportOption: formData.transportType === 'seller' ? 'SELLER_TRANSPORT' : formData.transportType === 'buyer' ? 'BUYER_TRANSPORT' : undefined,
+        transportOption: 'SELLER_TRANSPORT' as const,
+        ...((() => {
+          const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+          const maxMiles = dd.maxDeliveryRadiusMiles === '' || dd.maxDeliveryRadiusMiles === undefined ? undefined : Number(dd.maxDeliveryRadiusMiles);
+          const timeframe = (dd.deliveryTimeframe ?? '').trim() || undefined;
+          const notes = (dd.deliveryNotes ?? '').trim() || undefined;
+          const hasAny = maxMiles !== undefined || timeframe !== undefined || notes !== undefined;
+          return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(notes && { deliveryNotes: notes }) } } : {};
+        })()),
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
         ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
@@ -2806,9 +2914,18 @@ function NewListingPageContent() {
         trust: {
           verified: formData.verification,
           insuranceAvailable: false,
-          transportReady: formData.transportType !== null,
-          sellerOffersDelivery: formData.transportType === 'seller',
+          transportReady: true,
+          sellerOffersDelivery: true,
         },
+        transportOption: 'SELLER_TRANSPORT' as const,
+        ...((() => {
+          const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+          const maxMiles = dd.maxDeliveryRadiusMiles === '' || dd.maxDeliveryRadiusMiles === undefined ? undefined : Number(dd.maxDeliveryRadiusMiles);
+          const timeframe = (dd.deliveryTimeframe ?? '').trim() || undefined;
+          const notes = (dd.deliveryNotes ?? '').trim() || undefined;
+          const hasAny = maxMiles !== undefined || timeframe !== undefined || notes !== undefined;
+          return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(notes && { deliveryNotes: notes }) } } : {};
+        })()),
         protectedTransactionEnabled: formData.protectedTransactionEnabled,
         protectedTransactionDays: formData.protectedTransactionDays,
         ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
@@ -2949,7 +3066,12 @@ function NewListingPageContent() {
                 if (p?.formData) {
                   // Back-compat: classified listings are deprecated; coerce old drafts to fixed.
                   const t = (p.formData as any)?.type;
-                  const next = { ...p.formData, ...(t === 'classified' ? { type: 'fixed' } : {}) };
+                  const defaultDeliveryDetails = { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+                  const next = {
+                    ...p.formData,
+                    ...(t === 'classified' ? { type: 'fixed' } : {}),
+                    deliveryDetails: { ...defaultDeliveryDetails, ...(p.formData as any)?.deliveryDetails },
+                  };
                   setFormData(next);
                 }
                 if (typeof p?.sellerAttestationAccepted === 'boolean') setSellerAttestationAccepted(p.sellerAttestationAccepted);

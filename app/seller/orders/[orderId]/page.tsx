@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, PackageCheck, Calendar, MapPin, Clock, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, Calendar, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -71,7 +71,7 @@ export default function SellerOrderDetailPage() {
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
+  const [processing, setProcessing] = useState<'preparing' | 'in_transit' | null>(null);
 
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
@@ -96,21 +96,6 @@ export default function SellerOrderDetailPage() {
   useEffect(() => {
     if (!authLoading) void loadOrder();
   }, [authLoading, loadOrder]);
-
-  const handleMarkDelivered = useCallback(async () => {
-    if (!order) return;
-    try {
-      setProcessing('delivered');
-      await postAuthJson(`/api/orders/${order.id}/mark-delivered`, {});
-      toast({ title: 'Updated', description: 'Marked delivered.' });
-      const refreshed = await getOrderById(order.id);
-      if (refreshed) setOrder(refreshed);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
-    } finally {
-      setProcessing(null);
-    }
-  }, [order, toast]);
 
   useEffect(() => {
     if (!orderId || !user?.uid) return;
@@ -176,7 +161,34 @@ export default function SellerOrderDetailPage() {
         {/* SELLER_TRANSPORT Panel */}
         {transportOption === 'SELLER_TRANSPORT' ? (
           <>
-            {/* Delivery Info Display */}
+            {/* Buyer delivery address — seller uses this to schedule delivery */}
+            {order.delivery?.buyerAddress && (
+              <div className="text-sm bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1 mb-3">
+                <div className="font-semibold text-foreground flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Delivery address (from buyer)
+                </div>
+                <div className="text-foreground font-mono text-xs leading-relaxed">
+                  {[order.delivery.buyerAddress.line1, order.delivery.buyerAddress.line2, [order.delivery.buyerAddress.city, order.delivery.buyerAddress.state, order.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                </div>
+                {order.delivery.buyerAddress.deliveryInstructions && (
+                  <div className="text-muted-foreground text-xs pt-1">Instructions: {order.delivery.buyerAddress.deliveryInstructions}</div>
+                )}
+                {(order.delivery.buyerAddress.lat != null && order.delivery.buyerAddress.lng != null) && (
+                  <a
+                    href={`https://www.google.com/maps?q=${order.delivery.buyerAddress.lat},${order.delivery.buyerAddress.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                  >
+                    <MapPin className="h-3 w-3" />
+                    {order.delivery.buyerAddress.pinLabel || 'View pin on map'}
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Delivery Info Display — windows, ETA, hauler */}
             {(order.delivery?.windows?.length || order.delivery?.agreedWindow || order.delivery?.eta) && (
               <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-3">
                 {order.delivery?.agreedWindow && (
@@ -200,12 +212,24 @@ export default function SellerOrderDetailPage() {
               </div>
             )}
 
-            {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && (
+            {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && !order.delivery?.buyerAddress && (
+              <div className="text-sm text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 mb-3">
+                <div className="font-semibold flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Waiting for buyer to set delivery address
+                </div>
+                <div className="text-xs mt-1 text-amber-800 dark:text-amber-200">
+                  The buyer must add their delivery address (or drop a pin) first. Once they do, you’ll see it here and can propose a delivery date. They’ll confirm the date, then confirm receipt when it arrives.
+                </div>
+              </div>
+            )}
+
+            {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && order.delivery?.buyerAddress && (
               <>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <div className="font-semibold text-sm">Propose delivery</div>
-                    <div className="text-xs text-muted-foreground">Propose delivery windows (hauling). Buyer will agree to one.</div>
+                    <div className="font-semibold text-sm">Propose delivery date</div>
+                    <div className="text-xs text-muted-foreground">Propose delivery windows. Buyer will confirm a date that works.</div>
                   </div>
                   <Button variant="default" size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
                     <Calendar className="h-4 w-4 mr-2" />
@@ -246,25 +270,10 @@ export default function SellerOrderDetailPage() {
             )}
 
             {(txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
-              <>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="font-semibold text-sm">Mark Delivered</div>
-                    <div className="text-xs text-muted-foreground">Mark the order as delivered (buyer can also confirm receipt).</div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="lg"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
-                    disabled={processing !== null}
-                    onClick={handleMarkDelivered}
-                  >
-                    {processing === 'delivered' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PackageCheck className="h-4 w-4 mr-2" />}
-                    Mark Delivered
-                  </Button>
-                </div>
-                <Separator />
-              </>
+              <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded border border-border/50">
+                <div className="font-semibold text-foreground">Waiting on buyer to confirm receipt</div>
+                <div className="text-xs mt-1">Only the buyer confirms receipt to complete the transaction. Once they receive the order, they will confirm in their order page.</div>
+              </div>
             )}
 
             {txStatus === 'DELIVERED_PENDING_CONFIRMATION' && (
@@ -597,12 +606,10 @@ export default function SellerOrderDetailPage() {
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                {transportOption === 'SELLER_TRANSPORT' ? 'Delivery Fulfillment' : 'Pickup Fulfillment'}
+                Delivery
               </CardTitle>
               <CardDescription>
-                {transportOption === 'SELLER_TRANSPORT' 
-                  ? 'Schedule and track delivery progress.' 
-                  : 'Set pickup location and time windows for buyer.'}
+                Propose a delivery window; the buyer agrees. Only the buyer confirms receipt to complete the transaction.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">

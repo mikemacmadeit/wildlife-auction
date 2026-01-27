@@ -459,10 +459,8 @@ export async function handleCheckoutSessionCompleted(
     const protectedTransactionDays = listingData.protectedTransactionDays || null;
     const protectedTermsVersion = listingData.protectedTermsVersion || 'v1';
     
-    // Get transport option from listing (required for fulfillment workflow)
-    const transportOption = (listingData as any)?.transportOption || 
-                           ((listingData as any)?.trust?.sellerOffersDelivery ? 'SELLER_TRANSPORT' : 'BUYER_TRANSPORT') ||
-                           'SELLER_TRANSPORT';
+    // Seller always arranges delivery; buyer confirms receipt. All new orders use SELLER_TRANSPORT flow.
+    const transportOption = 'SELLER_TRANSPORT';
 
     // Check if transfer permit is required (whitetail_breeder)
     const transferPermitRequired = listingCategory === 'whitetail_breeder';

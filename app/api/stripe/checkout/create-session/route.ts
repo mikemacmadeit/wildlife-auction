@@ -1006,10 +1006,8 @@ export async function POST(request: Request) {
      * - This is a marketplace facilitation model; platform does not take custody of funds or goods.
      */
     
-    // Determine transport option from listing (default to SELLER_TRANSPORT if not set for backward compatibility)
-    const transportOption = (listingData as any)?.transportOption || 
-                           ((listingData as any)?.trust?.sellerOffersDelivery ? 'SELLER_TRANSPORT' : 'BUYER_TRANSPORT') ||
-                           'SELLER_TRANSPORT';
+    // Seller always arranges delivery; buyer confirms receipt. All orders use the same fulfillment flow.
+    const transportOption = 'SELLER_TRANSPORT';
     
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],

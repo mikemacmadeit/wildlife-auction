@@ -165,6 +165,13 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     daysSinceDelivery: z.number().int().nonnegative(),
   }),
   z.object({
+    type: z.literal('Order.DeliveryAddressSet'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    orderUrl: urlSchema,
+  }),
+  z.object({
     type: z.literal('Payout.Released'),
     orderId: baseString,
     listingId: baseString,

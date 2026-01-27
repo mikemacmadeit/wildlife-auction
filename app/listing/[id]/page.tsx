@@ -2040,14 +2040,9 @@ export default function ListingDetailPage() {
                         showTooltips={true}
                         showIcons={true}
                       />
-                      {listing!.transportOption === 'SELLER_TRANSPORT' && (
-                        <Badge variant="outline" className="text-xs font-medium" title="Seller delivers">
-                          Seller Transport
-                        </Badge>
-                      )}
-                      {listing!.transportOption === 'BUYER_TRANSPORT' && (
-                        <Badge variant="outline" className="text-xs font-medium" title="Buyer arranges pickup">
-                          Buyer Transport
+                      {listing!.transportOption !== 'BUYER_TRANSPORT' && (
+                        <Badge variant="outline" className="text-xs font-medium" title="Seller schedules delivery; buyer confirms receipt">
+                          Seller arranges delivery
                         </Badge>
                       )}
                       {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
@@ -2136,14 +2131,28 @@ export default function ListingDetailPage() {
                               ? 'Transfer/pickup details will be coordinated directly with the seller after purchase and required approvals.'
                               : 'Shipping options will be discussed with the seller after purchase.'}
                           </p>
-                          {(listing!.trust?.transportReady || listing!.trust?.sellerOffersDelivery) && (
+                          {(listing!.trust?.transportReady || listing!.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT') && (
                             <div className="flex items-center gap-2">
-                              <Truck className="h-4 w-4 text-primary" />
+                              <Truck className="h-4 w-4 text-primary flex-shrink-0" />
                               <span>
-                                {listing!.trust?.sellerOffersDelivery
-                                  ? 'Seller offers delivery (buyer & seller coordinate directly)'
+                                {(listing!.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')
+                                  ? 'Seller arranges delivery (buyer & seller coordinate directly)'
                                   : 'Delivery/pickup details available (buyer & seller coordinate directly)'}
                               </span>
+                            </div>
+                          )}
+                          {(listing as any).deliveryDetails && ((listing as any).deliveryDetails.maxDeliveryRadiusMiles != null || ((listing as any).deliveryDetails.deliveryTimeframe || '').trim() || ((listing as any).deliveryDetails.deliveryNotes || '').trim()) && (
+                            <div className="mt-3 rounded-lg border bg-muted/20 p-3 space-y-1.5">
+                              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Seller delivery details</div>
+                              {(listing as any).deliveryDetails.maxDeliveryRadiusMiles != null && (
+                                <div><span className="text-muted-foreground">Max radius:</span> <span className="font-medium">{(listing as any).deliveryDetails.maxDeliveryRadiusMiles} miles</span></div>
+                              )}
+                              {((listing as any).deliveryDetails.deliveryTimeframe || '').trim() && (
+                                <div><span className="text-muted-foreground">Timeframe:</span> <span className="font-medium">{(listing as any).deliveryDetails.deliveryTimeframe.trim()}</span></div>
+                              )}
+                              {((listing as any).deliveryDetails.deliveryNotes || '').trim() && (
+                                <div><span className="text-muted-foreground">Notes:</span> <span className="font-medium whitespace-pre-wrap">{(listing as any).deliveryDetails.deliveryNotes.trim()}</span></div>
+                              )}
                             </div>
                           )}
                         </div>
