@@ -422,9 +422,15 @@ export async function markOrderAsPaid(
   });
 }
 
+/** Statuses that mean "awaiting payment" – orders in these states must not appear in buyer "My purchases" until payment completes. */
+const AWAITING_PAYMENT_STATUSES = ['pending', 'awaiting_bank_transfer', 'awaiting_wire'] as const;
+
 /**
  * Get orders for a user (as buyer or seller)
  * CRITICAL: Normalizes data on read to prevent int32 serialization errors
+ *
+ * For buyers: only returns orders where payment has been confirmed (excludes pending / awaiting_bank_transfer /
+ * awaiting_wire). This ensures "My purchases" shows only actual purchases, not abandoned or in-progress checkouts.
  */
 export async function getOrdersForUser(
   userId: string,
@@ -438,7 +444,7 @@ export async function getOrdersForUser(
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => {
+  const orders = snapshot.docs.map((doc) => {
     // Normalize data immediately after reading to prevent int32 serialization errors
     const rawData = doc.data() as OrderDoc;
     const normalizedData = normalizeFirestoreValue(rawData) as OrderDoc;
@@ -450,6 +456,11 @@ export async function getOrdersForUser(
     
     return toOrder(doc.id, normalizedData);
   });
+
+  if (role === 'buyer') {
+    return orders.filter((o) => !(AWAITING_PAYMENT_STATUSES as readonly string[]).includes(o.status ?? ''));
+  }
+  return orders;
 }
 
 /**

@@ -95,6 +95,7 @@ import {
 import { getEligiblePaymentMethods } from '@/lib/payments/gating';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
+import { DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -1536,13 +1537,42 @@ export default function ListingDetailPage() {
                       <div className="flex items-start gap-2">
                         <Truck className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="font-semibold">Delivery / pickup</div>
-                          <div className="text-xs text-muted-foreground">
-                            {listing!.trust?.sellerOffersDelivery
-                              ? 'Seller indicates they may offer delivery. Buyer & seller arrange logistics directly after purchase.'
-                              : listing!.trust?.transportReady
-                              ? 'Seller has provided delivery/pickup details. Buyer & seller arrange logistics directly after purchase.'
-                              : 'Buyer & seller arrange logistics directly after purchase.'}
+                          <div className="font-semibold">Transportation</div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {listing!.transportOption === 'SELLER_TRANSPORT' ? (
+                              <>
+                                <p>Seller arranges delivery. Buyer & seller coordinate after purchase.</p>
+                                {listing!.deliveryDetails && (
+                                  <ul className="list-disc ml-4 space-y-0.5">
+                                    {listing!.deliveryDetails.maxDeliveryRadiusMiles != null ? (
+                                      <li>Up to {listing!.deliveryDetails.maxDeliveryRadiusMiles} miles from seller</li>
+                                    ) : null}
+                                    {listing!.deliveryDetails.deliveryTimeframe ? (
+                                      <li>
+                                        {DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === listing!.deliveryDetails!.deliveryTimeframe)?.label ??
+                                          listing!.deliveryDetails.deliveryTimeframe.replace(/_/g, '–')}
+                                      </li>
+                                    ) : null}
+                                    {listing!.deliveryDetails.deliveryStatusExplanation ? (
+                                      <li>{listing!.deliveryDetails.deliveryStatusExplanation}</li>
+                                    ) : null}
+                                    {listing!.deliveryDetails.deliveryNotes ? (
+                                      <li>{listing!.deliveryDetails.deliveryNotes}</li>
+                                    ) : null}
+                                  </ul>
+                                )}
+                              </>
+                            ) : listing!.transportOption === 'BUYER_TRANSPORT' ? (
+                              <p>Buyer arranges pickup or transport. Buyer & seller coordinate after purchase.</p>
+                            ) : (
+                              <>
+                                {listing!.trust?.sellerOffersDelivery
+                                  ? 'Seller may offer delivery. Buyer & seller arrange logistics directly after purchase.'
+                                  : listing!.trust?.transportReady
+                                  ? 'Delivery/pickup details from seller. Buyer & seller arrange logistics after purchase.'
+                                  : 'Buyer & seller arrange logistics directly after purchase.'}
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2085,6 +2115,60 @@ export default function ListingDetailPage() {
                           <div className="text-xs text-muted-foreground mt-1">ZIP {listing!.location.zip}</div>
                         ) : null}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Transportation: who handles it + seller delivery details */}
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Transportation</div>
+                    </div>
+                    <div className="text-sm space-y-2">
+                      {listing!.transportOption === 'SELLER_TRANSPORT' ? (
+                        <>
+                          <p className="font-semibold text-foreground">Seller arranges delivery</p>
+                          <p className="text-muted-foreground">Seller will deliver; buyer and seller coordinate after purchase.</p>
+                          {listing!.deliveryDetails && (listing!.deliveryDetails.maxDeliveryRadiusMiles != null || listing!.deliveryDetails.deliveryTimeframe || listing!.deliveryDetails.deliveryNotes || listing!.deliveryDetails.deliveryStatusExplanation) && (
+                            <dl className="grid gap-1.5 pt-1 border-t border-border/60 mt-2">
+                              {listing!.deliveryDetails.maxDeliveryRadiusMiles != null ? (
+                                <div>
+                                  <dt className="text-xs text-muted-foreground">Delivery radius</dt>
+                                  <dd className="font-medium">Up to {listing!.deliveryDetails.maxDeliveryRadiusMiles} miles</dd>
+                                </div>
+                              ) : null}
+                              {listing!.deliveryDetails.deliveryTimeframe ? (
+                                <div>
+                                  <dt className="text-xs text-muted-foreground">Timeframe</dt>
+                                  <dd className="font-medium">
+                                    {DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === listing!.deliveryDetails!.deliveryTimeframe)?.label ??
+                                      listing!.deliveryDetails.deliveryTimeframe.replace(/_/g, '–')}
+                                  </dd>
+                                </div>
+                              ) : null}
+                              {listing!.deliveryDetails.deliveryStatusExplanation ? (
+                                <div>
+                                  <dt className="text-xs text-muted-foreground">Details</dt>
+                                  <dd className="text-muted-foreground">{listing!.deliveryDetails.deliveryStatusExplanation}</dd>
+                                </div>
+                              ) : null}
+                              {listing!.deliveryDetails.deliveryNotes ? (
+                                <div>
+                                  <dt className="text-xs text-muted-foreground">Notes</dt>
+                                  <dd className="text-muted-foreground">{listing!.deliveryDetails.deliveryNotes}</dd>
+                                </div>
+                              ) : null}
+                            </dl>
+                          )}
+                        </>
+                      ) : listing!.transportOption === 'BUYER_TRANSPORT' ? (
+                        <>
+                          <p className="font-semibold text-foreground">Buyer arranges pickup or transport</p>
+                          <p className="text-muted-foreground">Buyer is responsible for pickup or arranging transport; coordinate with seller after purchase.</p>
+                        </>
+                      ) : (
+                        <p className="text-muted-foreground">Buyer and seller arrange logistics directly after purchase.</p>
+                      )}
                     </div>
                   </div>
 

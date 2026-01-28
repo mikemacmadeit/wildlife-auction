@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
+import { DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 
 interface KeyFactsPanelProps {
   listing: Listing;
@@ -222,13 +223,23 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         return markings ? `Markings: ${markings}` : undefined;
       })(),
     },
-    listing.trust?.transportReady && {
+    // Transport option: who handles transportation (new transportation fields)
+    (listing.transportOption === 'SELLER_TRANSPORT' || listing.transportOption === 'BUYER_TRANSPORT') && {
+      icon: Truck,
+      label: 'Transport',
+      value: listing.transportOption === 'SELLER_TRANSPORT' ? 'Seller arranges delivery' : 'Buyer arranges pickup',
+      detail: listing.transportOption === 'SELLER_TRANSPORT'
+        ? 'Seller delivers; you coordinate after purchase.'
+        : 'Buyer handles pickup or transport; coordinate with seller after purchase.',
+      badge: { variant: 'outline' as const, label: listing.transportOption === 'SELLER_TRANSPORT' ? 'Seller delivery' : 'Buyer pickup', color: '' },
+    },
+    listing.trust?.transportReady && !listing.transportOption && {
       icon: Truck,
       label: 'Transport',
       value: 'Ready',
       badge: { variant: 'outline' as const, label: 'Coordinated', color: '' },
     },
-    listing.trust?.sellerOffersDelivery && {
+    listing.trust?.sellerOffersDelivery && !listing.transportOption && {
       icon: Truck,
       label: 'Delivery',
       value: 'Seller offers delivery',
@@ -236,14 +247,16 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       badge: { variant: 'outline' as const, label: 'Seller-provided', color: '' },
     },
     // Seller delivery details (radius, timeframe, notes) when set on the listing
-    (listing as any).deliveryDetails && ((listing as any).deliveryDetails.maxDeliveryRadiusMiles != null || ((listing as any).deliveryDetails.deliveryTimeframe || '').trim() || ((listing as any).deliveryDetails.deliveryNotes || '').trim()) && {
+    listing.deliveryDetails && (listing.deliveryDetails.maxDeliveryRadiusMiles != null || (listing.deliveryDetails.deliveryTimeframe || '').trim() || (listing.deliveryDetails.deliveryNotes || '').trim() || (listing.deliveryDetails.deliveryStatusExplanation || '').trim()) && {
       icon: Truck,
       label: 'Delivery details',
       value: [
-        (listing as any).deliveryDetails.maxDeliveryRadiusMiles != null ? `Up to ${(listing as any).deliveryDetails.maxDeliveryRadiusMiles} miles` : null,
-        ((listing as any).deliveryDetails.deliveryTimeframe || '').trim() || null,
+        listing.deliveryDetails.maxDeliveryRadiusMiles != null ? `Up to ${listing.deliveryDetails.maxDeliveryRadiusMiles} miles` : null,
+        (listing.deliveryDetails.deliveryTimeframe || '').trim()
+          ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === listing.deliveryDetails!.deliveryTimeframe)?.label ?? listing.deliveryDetails.deliveryTimeframe.replace(/_/g, '–'))
+          : null,
       ].filter(Boolean).join(' · ') || 'Seller arranges delivery',
-      detail: ((listing as any).deliveryDetails.deliveryNotes || '').trim() || undefined,
+      detail: [listing.deliveryDetails.deliveryStatusExplanation, listing.deliveryDetails.deliveryNotes].filter(Boolean).join(' — ') || undefined,
       badge: { variant: 'outline' as const, label: 'From listing', color: '' },
     },
   ].filter(Boolean) as Array<{

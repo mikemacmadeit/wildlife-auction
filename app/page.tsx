@@ -951,19 +951,19 @@ export default function HomePage() {
             transition={{ duration: 0.8 }}
             className="max-w-4xl mx-auto"
           >
-            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
-              <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0">
+            <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-5 lg:gap-6 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap px-4">
+              <div className="hidden md:block relative h-12 w-12 sm:h-16 sm:w-16 md:h-24 md:w-24 lg:h-32 lg:w-32 flex-shrink-0">
                 <div className="h-full w-full mask-kudu bg-[hsl(37_27%_70%)]" />
               </div>
-              {/* Lighter green (primary) for "Ag", beige for "change"; dark wrapper matches navbar palette on dark bg. */}
+              {/* Lighter green (primary) for "Ag", beige for "change". */}
               <div className="dark">
-                <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight font-barletta-inline text-[hsl(37,27%,70%)] whitespace-nowrap">
+                <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-8xl font-extrabold tracking-tight font-barletta-inline text-[hsl(37,27%,70%)] whitespace-nowrap">
                   <BrandLogoText className="text-inherit" />
                 </h1>
               </div>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-white/90 font-medium px-4">
-              Texas-only marketplace for registered livestock, horses &amp; ranch assets
+              Texas-only marketplace for whitetail breeders, registered livestock &amp; cattle
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               <Button

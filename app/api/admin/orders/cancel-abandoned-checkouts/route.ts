@@ -11,6 +11,8 @@
  * Query params:
  *   limit=50     Max orders to process (default 50).
  *   dryRun=1     If set, only report what would be cancelled; do not write.
+ *   all=1        If set, cancel ALL awaiting-payment orders (no Stripe session check). Use to clear
+ *                orders that were created without a completed purchase so they stop appearing in My purchases.
  */
 
 export const dynamic = 'force-dynamic';
@@ -18,9 +20,59 @@ export const runtime = 'nodejs';
 
 import { Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin, json } from '@/app/api/admin/_util';
+import type { getAdminDb } from '@/lib/firebase/admin';
 import { stripe, isStripeConfigured } from '@/lib/stripe/config';
 
 const AWAITING_STATUSES = ['pending', 'awaiting_bank_transfer', 'awaiting_wire'] as const;
+
+async function cancelOrderAndClearReservation(
+  db: ReturnType<typeof getAdminDb>,
+  orderId: string,
+  data: { listingId?: string },
+  dryRun: boolean
+): Promise<{ ok: boolean; message?: string }> {
+  if (dryRun) return { ok: true, message: 'Would cancel (dry run)' };
+  const now = new Date();
+  const orderRef = db.collection('orders').doc(orderId);
+  await orderRef.set({ status: 'cancelled', updatedAt: now, lastUpdatedByRole: 'admin' }, { merge: true });
+  const listingId = data.listingId;
+  if (listingId) {
+    try {
+      const listingRef = db.collection('listings').doc(String(listingId));
+      const reservationRef = listingRef.collection('purchaseReservations').doc(orderId);
+      await db.runTransaction(async (tx) => {
+        const listingSnap = await tx.get(listingRef);
+        if (!listingSnap.exists) return;
+        const l = listingSnap.data() as any;
+        const rs = await tx.get(reservationRef);
+        if (rs.exists) {
+          const r = rs.data() as any;
+          const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
+          if (q > 0 && typeof l?.quantityAvailable === 'number' && Number.isFinite(l.quantityAvailable)) {
+            tx.update(listingRef, {
+              quantityAvailable: Math.max(0, Math.floor(l.quantityAvailable)) + q,
+              updatedAt: Timestamp.fromDate(now),
+              updatedBy: 'system',
+            });
+          }
+          tx.delete(reservationRef);
+        }
+        if (l?.purchaseReservedByOrderId === orderId) {
+          tx.update(listingRef, {
+            purchaseReservedByOrderId: null,
+            purchaseReservedAt: null,
+            purchaseReservedUntil: null,
+            updatedAt: Timestamp.fromDate(now),
+            updatedBy: 'system',
+          });
+        }
+      });
+    } catch (e: any) {
+      return { ok: true, message: `Order cancelled but listing clear failed: ${e?.message || e}` };
+    }
+  }
+  return { ok: true };
+}
 
 export async function POST(request: Request) {
   const admin = await requireAdmin(request);
@@ -30,15 +82,15 @@ export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)));
   const dryRun = searchParams.get('dryRun') === '1' || searchParams.get('dryRun') === 'true';
+  const cancelAll = searchParams.get('all') === '1' || searchParams.get('all') === 'true';
 
-  if (!isStripeConfigured() || !stripe) {
+  if (!cancelAll && (!isStripeConfigured() || !stripe)) {
     return json({ ok: false, error: 'Stripe is not configured' }, { status: 503 });
   }
 
   const results: { orderId: string; sessionId: string; action: 'cancelled' | 'skipped_not_expired' | 'skipped_terminal' | 'error'; message?: string }[] = [];
   let cancelled = 0;
 
-  // Orders that look "awaiting payment" and have a checkout session
   const ordersSnap = await db
     .collection('orders')
     .where('status', 'in', AWAITING_STATUSES)
@@ -52,13 +104,24 @@ export async function POST(request: Request) {
       ? data.stripeCheckoutSessionId
       : null;
 
+    if (cancelAll) {
+      try {
+        const out = await cancelOrderAndClearReservation(db, orderId, data, dryRun);
+        cancelled++;
+        results.push({ orderId, sessionId: sessionId ?? '', action: 'cancelled', message: out.message });
+      } catch (e: any) {
+        results.push({ orderId, sessionId: sessionId ?? '', action: 'error', message: e?.message || String(e) });
+      }
+      continue;
+    }
+
     if (!sessionId) {
       results.push({ orderId, sessionId: '', action: 'skipped_terminal', message: 'No checkout session id' });
       continue;
     }
 
     try {
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const session = await stripe!.checkout.sessions.retrieve(sessionId);
       if (session.status !== 'expired') {
         results.push({
           orderId,
@@ -131,6 +194,7 @@ export async function POST(request: Request) {
   return json({
     ok: true,
     dryRun,
+    cancelAll: cancelAll ?? undefined,
     totalScanned: ordersSnap.size,
     cancelled,
     results,

@@ -105,6 +105,30 @@ export async function GET(request: Request) {
       // best-effort
     }
 
+    // Hydrate seller display names (for "Seller" column in Offers tab).
+    try {
+      const sellerIds = Array.from(new Set(offers.map((o: any) => String(o.sellerId || '')).filter(Boolean)));
+      const userSnaps = await Promise.all(sellerIds.map((id) => db.collection('users').doc(id).get().catch(() => null as any)));
+      const sellerNameByUid = new Map<string, string>();
+      userSnaps.forEach((s: any, idx: number) => {
+        const uid = sellerIds[idx];
+        if (s && s.exists) {
+          const d = s.data() as any;
+          const name = d?.displayName || d?.profile?.fullName || '';
+          if (name) sellerNameByUid.set(uid, name);
+        }
+      });
+      offers = offers.map((o: any) => ({
+        ...o,
+        sellerDisplayName:
+          sellerNameByUid.get(String(o.sellerId || '')) ??
+          (o.listingSnapshot as any)?.sellerSnapshot?.displayName ??
+          undefined,
+      }));
+    } catch {
+      // best-effort
+    }
+
     offers.sort((a: any, b: any) => {
       const am = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
       const bm = typeof b.updatedAt === 'number' ? b.updatedAt : 0;

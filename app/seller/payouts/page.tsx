@@ -305,10 +305,18 @@ export default function SellerPayoutsPage() {
             const stripeTransferId = typeof data?.stripeTransferId === 'string' ? data.stripeTransferId : undefined;
             const statusRaw = String(data?.status || '') as OrderStatus;
 
-            const isCompleted = !!stripeTransferId || statusRaw === 'completed';
-            const isAvailable = !isCompleted && statusRaw === 'ready_to_release';
+            // Payout semantics: we use destination charges — seller is paid at payment time.
+            // "Pending" = only orders still awaiting payment. Everything post-payment is "completed".
+            const AWAITING_PAYMENT: OrderStatus[] = ['pending', 'awaiting_bank_transfer', 'awaiting_wire'];
+            const PAID_OR_TERMINAL: OrderStatus[] = [
+              'completed', 'paid', 'paid_held', 'in_transit', 'delivered',
+              'buyer_confirmed', 'accepted', 'ready_to_release', 'refunded', 'cancelled', 'disputed',
+            ];
+            const isPending = AWAITING_PAYMENT.includes(statusRaw as OrderStatus);
+            const isCompleted = !!stripeTransferId || PAID_OR_TERMINAL.includes(statusRaw as OrderStatus);
+            const isAvailable = !isCompleted && !isPending && statusRaw === 'ready_to_release'; // legacy; usually false
 
-            const status: PayoutRowStatus = isCompleted ? 'completed' : isAvailable ? 'available' : 'pending';
+            const status: PayoutRowStatus = isPending ? 'pending' : isCompleted ? 'completed' : isAvailable ? 'available' : 'pending';
 
             return {
               id: orderId,
@@ -715,7 +723,7 @@ export default function SellerPayoutsPage() {
                 {formatCurrency(totalPending)}
               </div>
               <p className="text-xs text-muted-foreground font-medium">
-                Awaiting processing
+                Awaiting buyer payment
               </p>
             </CardContent>
           </Card>

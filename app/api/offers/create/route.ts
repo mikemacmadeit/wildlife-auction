@@ -194,16 +194,24 @@ export async function POST(request: Request) {
         },
       ];
 
+      const sellerId = String(listing.sellerId || '');
+      let sellerDisplayName = '';
+      if (sellerId) {
+        const sellerSnap = await tx.get(db.collection('users').doc(sellerId));
+        const d = sellerSnap.exists ? (sellerSnap.data() as any) : null;
+        sellerDisplayName = d?.displayName || d?.profile?.fullName || '';
+      }
       const offerDoc: any = {
         listingId,
         listingSnapshot: {
           title: String(listing.title || ''),
           category: listing.category,
           type: listing.type,
-          sellerId: listing.sellerId,
+          sellerId,
           imageUrl: getPrimaryListingImageUrl(listing) || undefined,
+          sellerSnapshot: sellerDisplayName ? { displayName: sellerDisplayName } : undefined,
         },
-        sellerId: listing.sellerId,
+        sellerId,
         buyerId,
         currency: 'usd',
         status: shouldAutoAccept ? 'accepted' : 'open',

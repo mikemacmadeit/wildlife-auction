@@ -65,6 +65,7 @@ type OfferRow = {
   listingImageUrl?: string;
   sellerId?: string;
   buyerId?: string;
+  sellerDisplayName?: string; // Hydrated by API for Offers tab "Seller" column
   status: string;
   currentAmount: number;
   acceptedAmount?: number;
@@ -412,7 +413,7 @@ export default function BidsOffersPage() {
       const image =
         o.listingImageUrl ||
         (Array.isArray(o.listingSnapshot?.images) ? o.listingSnapshot!.images!.find((u) => typeof u === 'string' && u) : undefined);
-      const sellerName = o.listingSnapshot?.sellerSnapshot?.displayName;
+      const sellerName = o.sellerDisplayName ?? o.listingSnapshot?.sellerSnapshot?.displayName;
       const yourAmount = Number(o.acceptedAmount ?? o.currentAmount ?? 0);
       const listingType = o.listingSnapshot?.type;
       const updatedAt = typeof o.updatedAt === 'number' ? o.updatedAt : 0;
@@ -1010,12 +1011,13 @@ export default function BidsOffersPage() {
                     <div className="space-y-3">
                       {bidRows.map((r) => (
                         <div key={r.id} className="rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors">
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-                            <div className="flex items-start gap-3 min-w-0">
+                          <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 w-full">
+                            {/* Thumb + title/seller — same pattern as offers */}
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
                               <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <Badge variant="outline" className="text-xs">
                                     Auction
@@ -1024,39 +1026,43 @@ export default function BidsOffersPage() {
                                     {r.status}
                                   </Badge>
                                   {r.timeLeftMs !== null ? (
-                                    <span className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
-                                      Time left {formatTimeLeftFromMs(r.timeLeftMs)}
-                                    </span>
+                                    <Badge variant="secondary" className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
+                                      {formatTimeLeftFromMs(r.timeLeftMs)}
+                                    </Badge>
                                   ) : null}
                                 </div>
-                                <div className="font-semibold leading-snug truncate mt-1">{getDisplayTitle(r)}</div>
+                                <div className="font-semibold leading-snug truncate mt-1" title={getDisplayTitle(r)}>{getDisplayTitle(r)}</div>
                                 {getDisplayTitle(r) === 'Listing removed or deleted' && (
                                   <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
                                 )}
-                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {getDisplaySeller(r) || '—'}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
-                              <div>
-                                <div className="text-xs text-muted-foreground">Current</div>
-                                <div className="font-semibold">{isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)}</div>
+                            {/* Stats — fixed column widths so values align across cards (match offers style) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 sm:gap-y-1 shrink-0 w-full sm:w-auto sm:min-w-[fit-content] lg:order-2">
+                              <div className="min-w-[4.5rem]">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider">Current</div>
+                                <div className="font-semibold tabular-nums">{isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)}</div>
                               </div>
-                              <div>
-                                <div className="text-xs text-muted-foreground">Your max</div>
-                                <div className="font-semibold">{formatMoney(r.myMaxBid)}</div>
+                              <div className="min-w-[4.5rem]">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider">Your max</div>
+                                <div className="font-semibold tabular-nums">{formatMoney(r.myMaxBid)}</div>
                               </div>
-                              <div className="hidden sm:block">
-                                <div className="text-xs text-muted-foreground">Your bids</div>
-                                <div className="font-semibold">{r.myBidCount}</div>
+                              <div className="min-w-[3.5rem] hidden sm:block">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider">Bids</div>
+                                <div className="font-semibold tabular-nums">{r.myBidCount}</div>
                               </div>
-                              <div className="hidden sm:block">
-                                <div className="text-xs text-muted-foreground">Ends</div>
-                                <div className="font-semibold">{isListingRemoved(r) ? '—' : (r.endsAt ? new Date(r.endsAt).toLocaleString() : '—')}</div>
+                              <div className="min-w-0 sm:min-w-[7rem]">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider">Ends</div>
+                                <div className="font-semibold text-sm tabular-nums truncate" title={r.endsAt ? new Date(r.endsAt).toLocaleString() : undefined}>
+                                  {isListingRemoved(r) ? '—' : (r.endsAt ? new Date(r.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')}
+                                </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 justify-end">
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3">
                               {isListingRemoved(r) ? (
                                 <>
                                   <Button variant="outline" size="sm" asChild>
@@ -1219,8 +1225,8 @@ export default function BidsOffersPage() {
                                         <div className="font-semibold tabular-nums">{formatMoney(r.yourAmount)}</div>
                                       </div>
                                       <div className="min-w-0">
-                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Offer</div>
-                                        <div className="font-mono text-sm truncate" title={r.id}>{r.id.slice(0, 8)}…</div>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider">Seller</div>
+                                        <div className="font-medium text-sm truncate" title={r.sellerName || undefined}>{r.sellerName || '—'}</div>
                                       </div>
                                       <div className="min-w-[4.5rem] sm:min-w-[5rem]">
                                         <div className="text-xs text-muted-foreground uppercase tracking-wider">Listing</div>
