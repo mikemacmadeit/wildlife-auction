@@ -94,8 +94,9 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
     });
   }
 
-  // Fulfillment milestones (transport-aware)
-  if (transportOption === 'SELLER_TRANSPORT') {
+  // Fulfillment milestones — seller delivery only (buyer pickup removed)
+  const effectiveTransport = 'SELLER_TRANSPORT' as const;
+  if (effectiveTransport === 'SELLER_TRANSPORT') {
     const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
     const deliveryProposed = ['DELIVERY_PROPOSED', 'DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
     const deliveryScheduled = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION', 'COMPLETED'].includes(txStatus);
@@ -111,6 +112,9 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
       isBlocked: txStatus === 'AWAITING_TRANSFER_COMPLIANCE',
       ownerRole: 'buyer',
       helpText: 'Buyer sets address or drops a pin. Seller uses it to propose a delivery date.',
+      completedAt: hasBuyerAddress && isValidNonEpochDate((order.delivery as any)?.buyerAddressSetAt)
+        ? (order.delivery as any).buyerAddressSetAt
+        : undefined,
     });
 
     milestones.push({
@@ -164,54 +168,6 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
       helpText: 'Confirm you received the order to complete the transaction.',
       completedAt: isValidNonEpochDate(order.buyerConfirmedAt ?? order.acceptedAt) ? (order.buyerConfirmedAt ?? order.acceptedAt) : undefined,
     });
-  } else {
-    // BUYER_TRANSPORT milestones
-    const pickupInfoSet = ['READY_FOR_PICKUP', 'PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
-    const windowProposed = ['PICKUP_PROPOSED', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
-    const pickupAgreed = ['PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED'].includes(txStatus);
-    const pickupConfirmed = ['PICKED_UP', 'COMPLETED'].includes(txStatus);
-    const completed = txStatus === 'COMPLETED';
-
-    milestones.push({
-      key: 'set_pickup_info',
-      label: 'Set pickup information',
-      isComplete: pickupInfoSet,
-      isCurrent: txStatus === 'FULFILLMENT_REQUIRED' && !pickupInfoSet,
-      isBlocked: txStatus === 'AWAITING_TRANSFER_COMPLIANCE',
-      ownerRole: 'seller',
-      helpText: 'Provide pickup location, time windows, and pickup code.',
-    });
-
-    milestones.push({
-      key: 'select_pickup_window',
-      label: 'Propose pickup window',
-      isComplete: windowProposed,
-      isCurrent: txStatus === 'READY_FOR_PICKUP' && !windowProposed,
-      isBlocked: false,
-      ownerRole: 'buyer',
-      helpText: 'Choose a time window. Seller must agree.',
-    });
-
-    milestones.push({
-      key: 'agree_pickup',
-      label: 'Seller agrees to pickup',
-      isComplete: pickupAgreed,
-      isCurrent: txStatus === 'PICKUP_PROPOSED' && !pickupAgreed,
-      isBlocked: false,
-      ownerRole: 'seller',
-      helpText: 'Agree to the buyer’s proposed pickup window.',
-    });
-
-    milestones.push({
-      key: 'confirm_pickup',
-      label: 'Confirm pickup',
-      isComplete: pickupConfirmed,
-      isCurrent: txStatus === 'PICKUP_SCHEDULED' && !pickupConfirmed,
-      isBlocked: false,
-      ownerRole: 'buyer',
-      helpText: 'Enter the pickup code to confirm you received the order.',
-      completedAt: isValidNonEpochDate(order.buyerConfirmedAt ?? order.acceptedAt) ? (order.buyerConfirmedAt ?? order.acceptedAt) : undefined,
-    });
   }
 
   // Completion milestone
@@ -235,7 +191,6 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
  */
 export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | 'admin'): NextRequiredAction | null {
   const txStatus = getEffectiveTransactionStatus(order);
-  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
   const isRegulated = isRegulatedWhitetailDeal(order);
 
   // Terminal states
@@ -310,203 +265,124 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
   }
 
-  // Role-specific actions
+  // Role-specific actions (seller delivery only)
   if (role === 'buyer') {
-    if (transportOption === 'SELLER_TRANSPORT') {
-      if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+    if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+      return {
+        title: 'Confirm receipt',
+        description: 'Confirm you received the order to complete the transaction.',
+        ctaLabel: ORDER_COPY.actions.confirmReceipt,
+        ctaAction: `/dashboard/orders/${order.id}#confirm-receipt`,
+        severity: 'info',
+        dueAt: isValidNonEpochDate(order.disputeDeadlineAt) ? order.disputeDeadlineAt : undefined,
+        ownerRole: 'buyer',
+      };
+    }
+    if (txStatus === 'DELIVERY_PROPOSED') {
+      return {
+        title: 'Agree to delivery window',
+        description: 'Seller proposed delivery windows. Agree to one that works for you.',
+        ctaLabel: 'Agree to window',
+        ctaAction: `/dashboard/orders/${order.id}#agree-delivery`,
+        severity: 'warning',
+        ownerRole: 'buyer',
+      };
+    }
+    if (['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus)) {
+      return {
+        title: 'Waiting for delivery',
+        description: 'Your order is on its way. You will be able to confirm receipt once it arrives.',
+        ctaLabel: 'View Details',
+        ctaAction: `/dashboard/orders/${order.id}`,
+        severity: 'info',
+        ownerRole: 'seller',
+      };
+    }
+    if (txStatus === 'FULFILLMENT_REQUIRED') {
+      const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+      if (!hasBuyerAddress) {
         return {
-          title: 'Confirm receipt',
-          description: 'Confirm you received the order to complete the transaction.',
-          ctaLabel: ORDER_COPY.actions.confirmReceipt,
-          ctaAction: `/dashboard/orders/${order.id}#confirm-receipt`,
-          severity: 'info',
-          dueAt: isValidNonEpochDate(order.disputeDeadlineAt) ? order.disputeDeadlineAt : undefined,
-          ownerRole: 'buyer',
-        };
-      }
-      if (txStatus === 'DELIVERY_PROPOSED') {
-        return {
-          title: 'Agree to delivery window',
-          description: 'Seller proposed delivery windows. Agree to one that works for you.',
-          ctaLabel: 'Agree to window',
-          ctaAction: `/dashboard/orders/${order.id}#agree-delivery`,
+          title: 'Set delivery address',
+          description: 'Add your delivery address or drop a pin. The seller will use it to propose a delivery date.',
+          ctaLabel: 'Set address',
+          ctaAction: `/dashboard/orders/${order.id}#set-delivery-address`,
           severity: 'warning',
           ownerRole: 'buyer',
         };
       }
-      if (['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY'].includes(txStatus)) {
-        return {
-          title: 'Waiting for delivery',
-          description: 'Your order is on its way. You will be able to confirm receipt once it arrives.',
-          ctaLabel: 'View Details',
-          ctaAction: `/dashboard/orders/${order.id}`,
-          severity: 'info',
-          ownerRole: 'seller',
-        };
-      }
-      if (txStatus === 'FULFILLMENT_REQUIRED') {
-        const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
-        if (!hasBuyerAddress) {
-          return {
-            title: 'Set delivery address',
-            description: 'Add your delivery address or drop a pin. The seller will use it to propose a delivery date.',
-            ctaLabel: 'Set address',
-            ctaAction: `/dashboard/orders/${order.id}#set-delivery-address`,
-            severity: 'warning',
-            ownerRole: 'buyer',
-          };
-        }
-        return {
-          title: 'Waiting on seller',
-          description: 'Seller will propose a delivery date using your address. You’ll confirm the date, then confirm receipt when it arrives.',
-          ctaLabel: 'View order',
-          ctaAction: `/dashboard/orders/${order.id}`,
-          severity: 'info',
-          ownerRole: 'seller',
-        };
-      }
-    } else {
-      // BUYER_TRANSPORT
-      if (txStatus === 'READY_FOR_PICKUP') {
-        return {
-          title: 'Propose pickup window',
-          description: 'Choose a time window. Seller must agree before you confirm pickup.',
-          ctaLabel: ORDER_COPY.actions.selectPickupWindow,
-          ctaAction: `/dashboard/orders/${order.id}#pickup`,
-          severity: 'warning',
-          ownerRole: 'buyer',
-        };
-      }
-      if (txStatus === 'PICKUP_PROPOSED') {
-        return {
-          title: 'Waiting on seller',
-          description: 'You proposed a pickup window. Seller must agree before you can confirm pickup.',
-          ctaLabel: 'View Details',
-          ctaAction: `/dashboard/orders/${order.id}#pickup`,
-          severity: 'info',
-          ownerRole: 'seller',
-        };
-      }
-      if (txStatus === 'PICKUP_SCHEDULED') {
-        return {
-          title: 'Confirm pickup',
-          description: 'Enter the pickup code to confirm you received the order.',
-          ctaLabel: ORDER_COPY.actions.confirmPickup,
-          ctaAction: `/dashboard/orders/${order.id}#pickup`,
-          severity: 'warning',
-          ownerRole: 'buyer',
-        };
-      }
-      if (txStatus === 'FULFILLMENT_REQUIRED') {
-        return {
-          title: 'Waiting on seller',
-          description: 'Seller needs to set pickup information. You will be notified when ready.',
-          ctaLabel: 'View Details',
-          ctaAction: `/dashboard/orders/${order.id}`,
-          severity: 'info',
-          ownerRole: 'seller',
-        };
-      }
+      return {
+        title: 'Waiting on seller',
+        description: 'Seller will propose a delivery date using your address. You’ll confirm the date, then confirm receipt when it arrives.',
+        ctaLabel: 'View order',
+        ctaAction: `/dashboard/orders/${order.id}`,
+        severity: 'info',
+        ownerRole: 'seller',
+      };
     }
   }
 
   if (role === 'seller') {
-    if (transportOption === 'SELLER_TRANSPORT') {
-      if (txStatus === 'FULFILLMENT_REQUIRED') {
-        const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
-        if (!hasBuyerAddress) {
-          return {
-            title: 'Waiting for buyer to set delivery address',
-            description: 'The buyer sets their delivery address first. Once they do, you’ll see it and can propose a delivery date.',
-            ctaLabel: 'View order',
-            ctaAction: `/seller/orders/${order.id}`,
-            severity: 'info',
-            ownerRole: 'buyer',
-          };
-        }
+    if (txStatus === 'FULFILLMENT_REQUIRED') {
+      const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+      if (!hasBuyerAddress) {
         return {
-          title: 'Propose delivery date',
-          description: 'Propose delivery windows. Buyer will confirm a date that works.',
-          ctaLabel: ORDER_COPY.actions.scheduleDelivery,
-          ctaAction: `/seller/orders/${order.id}#schedule-delivery`,
-          severity: 'warning',
-          dueAt: isValidNonEpochDate(order.fulfillmentSlaDeadlineAt) ? order.fulfillmentSlaDeadlineAt : undefined,
-          ownerRole: 'seller',
-        };
-      }
-      if (txStatus === 'DELIVERY_PROPOSED') {
-        return {
-          title: 'Waiting on buyer',
-          description: 'Buyer must agree to a delivery window. You will be notified.',
-          ctaLabel: 'View Details',
+          title: 'Waiting for buyer to set delivery address',
+          description: 'The buyer sets their delivery address first. Once they do, you’ll see it and can propose a delivery date.',
+          ctaLabel: 'View order',
           ctaAction: `/seller/orders/${order.id}`,
           severity: 'info',
           ownerRole: 'buyer',
         };
       }
-      if (txStatus === 'DELIVERY_SCHEDULED') {
-        return {
-          title: 'Mark out for delivery',
-          description: 'Update status when the order is on its way.',
-          ctaLabel: ORDER_COPY.actions.markOutForDelivery,
-          ctaAction: `/seller/orders/${order.id}#mark-out`,
-          severity: 'info',
-          ownerRole: 'seller',
-        };
-      }
-      if (txStatus === 'OUT_FOR_DELIVERY') {
-        return {
-          title: 'Mark delivered',
-          description: 'Mark the order as delivered once it arrives.',
-          ctaLabel: ORDER_COPY.actions.markDelivered,
-          ctaAction: `/seller/orders/${order.id}#mark-delivered`,
-          severity: 'info',
-          ownerRole: 'seller',
-        };
-      }
-      if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
-        return {
-          title: 'Waiting on buyer',
-          description: 'Waiting for buyer to confirm receipt.',
-          ctaLabel: 'View Details',
-          ctaAction: `/seller/orders/${order.id}`,
-          severity: 'info',
-          ownerRole: 'buyer',
-        };
-      }
-    } else {
-      // BUYER_TRANSPORT
-      if (txStatus === 'FULFILLMENT_REQUIRED') {
-        return {
-          title: 'Set pickup information',
-          description: 'Provide pickup location, time windows, and pickup code.',
-          ctaLabel: ORDER_COPY.actions.setPickupInfo,
-          ctaAction: `/seller/orders/${order.id}#set-pickup`,
-          severity: 'warning',
-          dueAt: isValidNonEpochDate(order.fulfillmentSlaDeadlineAt) ? order.fulfillmentSlaDeadlineAt : undefined,
-          ownerRole: 'seller',
-        };
-      }
-      if (txStatus === 'PICKUP_PROPOSED') {
-        return {
-          title: 'Agree to pickup window',
-          description: 'Buyer proposed a pickup window. Agree to confirm the time.',
-          ctaLabel: 'Agree to window',
-          ctaAction: `/seller/orders/${order.id}#agree-pickup`,
-          severity: 'warning',
-          ownerRole: 'seller',
-        };
-      }
-      if (['READY_FOR_PICKUP', 'PICKUP_SCHEDULED'].includes(txStatus)) {
-        return {
-          title: 'Waiting on buyer',
-          description: txStatus === 'PICKUP_SCHEDULED' ? 'Waiting for buyer to confirm pickup with code.' : 'Waiting for buyer to propose a pickup window.',
-          ctaLabel: 'View Details',
-          ctaAction: `/seller/orders/${order.id}`,
-          severity: 'info',
-          ownerRole: 'buyer',
-        };
-      }
+      return {
+        title: 'Propose delivery date',
+        description: 'Propose delivery windows. Buyer will confirm a date that works.',
+        ctaLabel: ORDER_COPY.actions.scheduleDelivery,
+        ctaAction: `/seller/orders/${order.id}#schedule-delivery`,
+        severity: 'warning',
+        dueAt: isValidNonEpochDate(order.fulfillmentSlaDeadlineAt) ? order.fulfillmentSlaDeadlineAt : undefined,
+        ownerRole: 'seller',
+      };
+    }
+    if (txStatus === 'DELIVERY_PROPOSED') {
+      return {
+        title: 'Waiting on buyer',
+        description: 'Buyer must agree to a delivery window. You will be notified.',
+        ctaLabel: 'View Details',
+        ctaAction: `/seller/orders/${order.id}`,
+        severity: 'info',
+        ownerRole: 'buyer',
+      };
+    }
+    if (txStatus === 'DELIVERY_SCHEDULED') {
+      return {
+        title: 'Mark out for delivery',
+        description: 'Update status when the order is on its way.',
+        ctaLabel: ORDER_COPY.actions.markOutForDelivery,
+        ctaAction: `/seller/orders/${order.id}#mark-out`,
+        severity: 'info',
+        ownerRole: 'seller',
+      };
+    }
+    if (txStatus === 'OUT_FOR_DELIVERY') {
+      return {
+        title: 'Mark delivered',
+        description: 'Mark the order as delivered once it arrives.',
+        ctaLabel: ORDER_COPY.actions.markDelivered,
+        ctaAction: `/seller/orders/${order.id}#mark-delivered`,
+        severity: 'info',
+        ownerRole: 'seller',
+      };
+    }
+    if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+      return {
+        title: 'Waiting on buyer',
+        description: 'Waiting for buyer to confirm receipt.',
+        ctaLabel: 'View Details',
+        ctaAction: `/seller/orders/${order.id}`,
+        severity: 'info',
+        ownerRole: 'buyer',
+      };
     }
   }
 
@@ -521,8 +397,6 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     if (txStatus === 'FULFILLMENT_REQUIRED') blockingRole = 'seller';
     else if (txStatus === 'DELIVERY_PROPOSED') blockingRole = 'buyer';
     else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') blockingRole = 'buyer';
-    else if (txStatus === 'PICKUP_PROPOSED') blockingRole = 'seller';
-    else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_SCHEDULED') blockingRole = 'buyer';
 
     const severity: NextActionSeverity = isSlaOverdue ? 'danger' : isSlaUrgent ? 'warning' : 'info';
 

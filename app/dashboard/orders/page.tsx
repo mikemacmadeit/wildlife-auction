@@ -569,17 +569,8 @@ export default function OrdersPage() {
   };
 
   const canAcceptOrDispute = (order: Order): boolean => {
-    // Use transactionStatus - seller already paid immediately, no transfer ID check needed
     const txStatus = getEffectiveTransactionStatus(order);
-    const transportOption = order.transportOption || 'SELLER_TRANSPORT';
-    
-    if (transportOption === 'SELLER_TRANSPORT') {
-      // Can confirm receipt when delivered
-      return txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY';
-    } else {
-      // BUYER_TRANSPORT - can confirm pickup when scheduled
-      return txStatus === 'PICKUP_SCHEDULED';
-    }
+    return txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY';
   };
 
   const isDisputeDeadlinePassed = (order: Order): boolean => {
@@ -1111,12 +1102,7 @@ export default function OrdersPage() {
                 handleOpenDispute(order.id);
                 return;
               }
-              if (ui.primaryAction.kind === 'select_pickup_window' || ui.primaryAction.kind === 'confirm_pickup') {
-                // Route to order detail page where the pickup forms are
-                window.location.href = `/dashboard/orders/${order.id}`;
-                return;
-              }
-              // complete_transfer / view_details -> open drawer
+              // complete_transfer / view_details / agree_delivery / set_address -> open drawer or detail
               setDrawerOrderId(order.id);
             };
 

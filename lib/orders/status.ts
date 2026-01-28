@@ -57,18 +57,7 @@ export function getEffectiveTransactionStatus(order: Order): TransactionStatus {
       return 'PENDING_PAYMENT';
 
     case 'in_transit':
-      // Check transport option to determine correct status
-      if (order.transportOption === 'BUYER_TRANSPORT') {
-        // For buyer transport, in_transit might mean seller marked preparing
-        // Check if pickup info is set
-        if (order.pickup?.location && order.pickup?.windows) {
-          return order.pickup?.selectedWindow ? 'PICKUP_SCHEDULED' : 'READY_FOR_PICKUP';
-        }
-        return 'READY_FOR_PICKUP';
-      } else {
-        // For seller transport, in_transit means out for delivery
-        return 'OUT_FOR_DELIVERY';
-      }
+      return 'OUT_FOR_DELIVERY';
 
     case 'delivered':
       return 'DELIVERED_PENDING_CONFIRMATION';
@@ -124,7 +113,6 @@ export function isFulfillmentStatus(status: TransactionStatus): boolean {
  */
 export function requiresSellerAction(order: Order): boolean {
   const status = getEffectiveTransactionStatus(order);
-  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
 
   // Compliance gate: seller must confirm compliance for regulated deals
   if (status === 'AWAITING_TRANSFER_COMPLIANCE' && isRegulatedWhitetailDeal(order)) {
@@ -133,18 +121,11 @@ export function requiresSellerAction(order: Order): boolean {
   }
 
   if (status === 'FULFILLMENT_REQUIRED') {
-    if (transportOption === 'SELLER_TRANSPORT') {
-      const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
-      return hasBuyerAddress; // Seller can propose only after buyer sets address
-    }
-    return true; // Seller must start fulfillment (e.g. BUYER_TRANSPORT: set pickup info)
+    const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+    return hasBuyerAddress; // Seller can propose only after buyer sets address
   }
 
-  if (transportOption === 'SELLER_TRANSPORT') {
-    return status === 'DELIVERY_SCHEDULED' || status === 'OUT_FOR_DELIVERY';
-  } else {
-    return status === 'PICKUP_PROPOSED';
-  }
+  return status === 'DELIVERY_SCHEDULED' || status === 'OUT_FOR_DELIVERY';
 }
 
 /**
@@ -152,7 +133,6 @@ export function requiresSellerAction(order: Order): boolean {
  */
 export function requiresBuyerAction(order: Order): boolean {
   const status = getEffectiveTransactionStatus(order);
-  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
 
   // Compliance gate: buyer must confirm compliance for regulated deals
   if (status === 'AWAITING_TRANSFER_COMPLIANCE' && isRegulatedWhitetailDeal(order)) {
@@ -160,10 +140,6 @@ export function requiresBuyerAction(order: Order): boolean {
     return !confirmations.buyerConfirmed; // Buyer needs to confirm
   }
 
-  if (transportOption === 'BUYER_TRANSPORT') {
-    return status === 'READY_FOR_PICKUP' || status === 'PICKUP_SCHEDULED';
-  }
-  // SELLER_TRANSPORT: buyer sets address first, then agrees to window, then confirms receipt
   if (status === 'FULFILLMENT_REQUIRED') {
     const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
     return !hasBuyerAddress;

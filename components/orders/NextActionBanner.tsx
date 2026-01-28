@@ -108,7 +108,7 @@ export function NextActionBanner({
     if (role === 'buyer') {
       if (txStatus === 'FULFILLMENT_REQUIRED' && transportOption === 'SELLER_TRANSPORT' && !hasBuyerAddress) {
         return {
-          title: 'Action required: Set delivery address',
+          title: 'Set delivery address',
           description: 'Add your delivery address or drop a pin. The seller will use it to propose a delivery date.',
           urgency: 'normal' as const,
           ctaLabel: 'Set address',

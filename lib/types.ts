@@ -851,7 +851,7 @@ export interface Order {
     proposedAt?: Date;
     agreedWindow?: { start: Date; end: Date };
     agreedAt?: Date;
-    transporter?: { name?: string; phone?: string; plate?: string };
+    transporter?: { name?: string; phone?: string; plate?: string; make?: string; model?: string; color?: string };
     proofUploads?: Array<{ type: string; url: string; uploadedAt: Date }>;
     deliveredAt?: Date;
     buyerConfirmedAt?: Date;

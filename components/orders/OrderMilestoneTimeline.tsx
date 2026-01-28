@@ -29,6 +29,8 @@ export interface OrderMilestoneTimelineProps {
   role?: MilestoneTimelineRole;
   className?: string;
   showHelpText?: boolean;
+  /** Optional content below the timeline (e.g. scheduled window, actions) */
+  footer?: React.ReactNode;
 }
 
 const ROLE_LABELS: Record<MilestoneOwnerRole, string> = {
@@ -43,6 +45,7 @@ export function OrderMilestoneTimeline({
   role = 'buyer',
   className,
   showHelpText = true,
+  footer,
 }: OrderMilestoneTimelineProps) {
   const milestones = useMemo(() => getOrderMilestones(order), [order]);
 
@@ -173,6 +176,12 @@ export function OrderMilestoneTimeline({
             </div>
           );
         })}
+        {footer ? (
+          <>
+            <div className="my-3 border-t border-border/60" />
+            {footer}
+          </>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -34,6 +34,9 @@ const scheduleDeliverySchema = z.object({
       name: z.string().optional(),
       phone: z.string().optional(),
       plate: z.string().optional(),
+      make: z.string().optional(),
+      model: z.string().optional(),
+      color: z.string().optional(),
     })
     .optional(),
 });

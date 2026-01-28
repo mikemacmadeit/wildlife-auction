@@ -223,15 +223,13 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         return markings ? `Markings: ${markings}` : undefined;
       })(),
     },
-    // Transport option: who handles transportation (new transportation fields)
-    (listing.transportOption === 'SELLER_TRANSPORT' || listing.transportOption === 'BUYER_TRANSPORT') && {
+    // Transport: seller delivery only
+    (listing.transportOption === 'SELLER_TRANSPORT' || listing.transportOption === 'BUYER_TRANSPORT' || !listing.transportOption) && {
       icon: Truck,
       label: 'Transport',
-      value: listing.transportOption === 'SELLER_TRANSPORT' ? 'Seller arranges delivery' : 'Buyer arranges pickup',
-      detail: listing.transportOption === 'SELLER_TRANSPORT'
-        ? 'Seller delivers; you coordinate after purchase.'
-        : 'Buyer handles pickup or transport; coordinate with seller after purchase.',
-      badge: { variant: 'outline' as const, label: listing.transportOption === 'SELLER_TRANSPORT' ? 'Seller delivery' : 'Buyer pickup', color: '' },
+      value: 'Seller arranges delivery',
+      detail: 'Seller delivers; you coordinate after purchase.',
+      badge: { variant: 'outline' as const, label: 'Seller delivery', color: '' },
     },
     listing.trust?.transportReady && !listing.transportOption && {
       icon: Truck,

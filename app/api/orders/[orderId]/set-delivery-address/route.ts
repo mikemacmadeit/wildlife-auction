@@ -3,14 +3,14 @@
  *
  * Buyer sets delivery address (or dropped pin) after payment.
  * This is the first fulfillment step: seller uses this address to propose delivery dates.
- * Buyer-only; SELLER_TRANSPORT orders only.
+ * Buyer-only. All orders use seller delivery.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
-import { TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
@@ -75,7 +75,12 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const validation = setDeliveryAddressSchema.safeParse(body);
     if (!validation.success) {
-      return json({ error: 'Invalid request data', details: validation.error.flatten() }, { status: 400 });
+      const first = validation.error.errors[0];
+      const message = first ? `${first.path.join('.')}: ${first.message}` : 'Invalid request data';
+      return json(
+        { error: 'Invalid request data', message, details: validation.error.flatten() },
+        { status: 400 }
+      );
     }
 
     const { line1, line2, city, state, zip, deliveryInstructions, lat, lng, pinLabel } = validation.data;
@@ -91,25 +96,16 @@ export async function POST(
       return json({ error: 'Unauthorized - You can only set delivery address for your own orders' }, { status: 403 });
     }
 
-    const transportOption = orderData.transportOption || 'SELLER_TRANSPORT';
-    if (transportOption !== 'SELLER_TRANSPORT') {
-      return json(
-        { error: 'Invalid transport option', details: 'This endpoint is for seller-delivery orders only.' },
-        { status: 400 }
-      );
-    }
-
-    const currentTxStatus = (orderData.transactionStatus as TransactionStatus) || '';
-    const allowedStatuses: TransactionStatus[] = ['FULFILLMENT_REQUIRED', 'AWAITING_TRANSFER_COMPLIANCE'];
-    const legacyOk = ['paid', 'paid_held'].includes(String(orderData.status || ''));
-    const ok =
-      (currentTxStatus && allowedStatuses.includes(currentTxStatus)) ||
-      (!currentTxStatus && legacyOk && orderData.paidAt);
-    if (!ok) {
+    // All orders use seller delivery; no transport-option check needed.
+    // Use same effective status as client so "set address" is allowed whenever the UI shows it
+    const effectiveStatus = getEffectiveTransactionStatus(orderData as any);
+    const canSetAddress = ['FULFILLMENT_REQUIRED', 'AWAITING_TRANSFER_COMPLIANCE'].includes(effectiveStatus);
+    if (!canSetAddress) {
       return json(
         {
           error: 'Cannot set address now',
-          details: 'Delivery address can be set after payment, before the seller proposes delivery.',
+          message: 'Delivery address can be set after payment, before the seller proposes delivery.',
+          details: `Effective status is "${effectiveStatus}".`,
         },
         { status: 400 }
       );

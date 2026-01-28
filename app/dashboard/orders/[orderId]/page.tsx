@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -29,9 +29,7 @@ import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
-import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { NextActionBanner } from '@/components/orders/NextActionBanner';
-import { MilestoneProgress } from '@/components/orders/MilestoneProgress';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { getNextRequiredAction } from '@/lib/orders/progress';
@@ -39,7 +37,7 @@ import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
-import { formatDate } from '@/lib/utils';
+import { formatDate, isValidNonEpochDate } from '@/lib/utils';
 
 async function postAuthJson(path: string, body?: any): Promise<any> {
   const { auth } = await import('@/lib/firebase/config');
@@ -55,7 +53,10 @@ async function postAuthJson(path: string, body?: any): Promise<any> {
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.message || json?.error || 'Request failed');
+  if (!res.ok) {
+    const msg = json?.message ?? json?.error ?? (typeof json?.details?.formErrors?.[0] === 'string' ? json.details.formErrors[0] : null) ?? 'Request failed';
+    throw new Error(msg);
+  }
   return json;
 }
 
@@ -72,8 +73,8 @@ export default function BuyerOrderDetailPage() {
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'select_window' | 'confirm_pickup' | 'set_address' | 'location' | null>(null);
-  const [pickupCodeInput, setPickupCodeInput] = useState('');
+  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'set_address' | 'location' | null>(null);
+  const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
   const [deliveryAddressForm, setDeliveryAddressForm] = useState({
     line1: '',
     line2: '',
@@ -160,11 +161,8 @@ export default function BuyerOrderDetailPage() {
 
   // Use transactionStatus - seller already paid immediately, no transfer ID check needed
   const txStatus: TransactionStatus | null = order ? getEffectiveTransactionStatus(order) : null;
-  const transportOption = order?.transportOption || 'SELLER_TRANSPORT';
-  
   const canConfirmReceipt =
     !!order &&
-    transportOption === 'SELLER_TRANSPORT' &&
     (txStatus === 'DELIVERED_PENDING_CONFIRMATION' ||
      txStatus === 'OUT_FOR_DELIVERY' ||
      txStatus === 'DELIVERY_SCHEDULED' ||
@@ -187,6 +185,18 @@ export default function BuyerOrderDetailPage() {
     const el = document.getElementById('report-issue');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [issueParam]);
+
+  // When buyer must set delivery address first, open the modal after a short delay so they're prompted immediately
+  const hasOpenedAddressModalRef = useRef(false);
+  useEffect(() => {
+    if (!order?.id || issueParam) return;
+    const txStatus = getEffectiveTransactionStatus(order);
+    const needsAddress = txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress;
+    if (!needsAddress || hasOpenedAddressModalRef.current) return;
+    hasOpenedAddressModalRef.current = true;
+    const t = setTimeout(() => setSetAddressModalOpen(true), 400);
+    return () => clearTimeout(t);
+  }, [order?.id, order?.delivery?.buyerAddress, order?.transactionStatus, issueParam]);
 
   if (authLoading || loading) {
     return (
@@ -306,6 +316,9 @@ export default function BuyerOrderDetailPage() {
                     Total ${order.amount.toLocaleString()}
                   </Badge>
                 ) : null}
+                <Badge variant="outline" className="font-semibold text-xs capitalize">
+                  {String(order.status || '').replaceAll('_', ' ')}
+                </Badge>
                 {trustState ? (
                   <Badge variant="secondary" className="font-semibold text-xs capitalize">
                     {trustState.replaceAll('_', ' ')}
@@ -376,8 +389,8 @@ export default function BuyerOrderDetailPage() {
                   }
                 }}
               >
-                {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Mark delivered
+                {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                Confirm receipt
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -404,6 +417,11 @@ export default function BuyerOrderDetailPage() {
                   <Button
                     variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
                     onClick={() => {
+                      const onThisPage = typeof window !== 'undefined' && window.location.pathname === `/dashboard/orders/${order.id}`;
+                      if (nextAction.ctaAction.includes('set-delivery-address') && onThisPage) {
+                        setSetAddressModalOpen(true);
+                        return;
+                      }
                       if (nextAction.ctaAction.startsWith('/')) {
                         window.location.href = nextAction.ctaAction;
                       }
@@ -423,18 +441,13 @@ export default function BuyerOrderDetailPage() {
           role="buyer"
           onAction={() => {
             const txStatus: string = getEffectiveTransactionStatus(order);
-            const transportOption = order.transportOption || 'SELLER_TRANSPORT';
-            if (txStatus === 'FULFILLMENT_REQUIRED' && transportOption === 'SELLER_TRANSPORT' && !order.delivery?.buyerAddress) {
-              const el = document.getElementById('set-delivery-address');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION' && transportOption === 'SELLER_TRANSPORT') {
+            if (txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress) {
+              setSetAddressModalOpen(true);
+            } else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
               const el = document.getElementById('confirm-receipt-section');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else if (txStatus === 'DELIVERY_PROPOSED') {
               const el = document.getElementById('agree-delivery');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_SCHEDULED') {
-              const el = document.getElementById('fulfillment-section');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           }}
@@ -450,38 +463,41 @@ export default function BuyerOrderDetailPage() {
           }}
         />
 
-        {/* Order Milestone Timeline (shared truth) */}
-        <OrderMilestoneTimeline order={order} role="buyer" />
-
-        {/* Legacy TransactionTimeline (keeping for backward compatibility) */}
-        <TransactionTimeline order={order} role="buyer" />
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border-border/60" id="fulfillment-section">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Fulfillment Status</CardTitle>
-              <CardDescription>Track delivery. You confirm receipt to complete the transaction.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Milestone Progress */}
-              <div className="mb-4">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Progress</div>
-                <MilestoneProgress order={order} role="buyer" />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="font-semibold text-sm">Fulfillment</div>
-                  <div className="text-xs text-muted-foreground">Agree to the delivery window, then confirm receipt to complete.</div>
-                </div>
-              </div>
-              {transportOption === 'SELLER_TRANSPORT' ? (
-                <>
-                  {order.delivery?.eta && (
+        {/* Order Progress — timeline + scheduled window, actions, report issue */}
+        <OrderMilestoneTimeline
+          order={order}
+          role="buyer"
+          footer={
+            <div id="fulfillment-section" className="space-y-3">
+                  {/* Delivery address — show on Order Progress once buyer has submitted it */}
+                  {order.delivery?.buyerAddress && (
+                    <div className="text-sm bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="font-semibold text-green-900 dark:text-green-100">Delivery address</div>
+                      <div className="text-xs mt-1 text-green-800 dark:text-green-200 font-mono">
+                        {[order.delivery.buyerAddress.line1, order.delivery.buyerAddress.line2, [order.delivery.buyerAddress.city, order.delivery.buyerAddress.state, order.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                        {order.delivery.buyerAddress.deliveryInstructions && ` — ${order.delivery.buyerAddress.deliveryInstructions}`}
+                      </div>
+                      {(order.delivery.buyerAddress.lat != null && order.delivery.buyerAddress.lng != null) && (
+                        <a
+                          href={`https://www.google.com/maps?q=${order.delivery.buyerAddress.lat},${order.delivery.buyerAddress.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary underline mt-1 inline-block"
+                        >
+                          View pin on map
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {(order.delivery?.agreedWindow || (order.delivery?.eta && isValidNonEpochDate(new Date(order.delivery.eta)))) && (
                     <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
-                      <div><strong>Scheduled ETA:</strong> {new Date(order.delivery.eta).toLocaleString()}</div>
-                      {order.delivery.transporter?.name && <div><strong>Transporter:</strong> {order.delivery.transporter.name}</div>}
-                      {order.delivery.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
+                      {order.delivery?.agreedWindow ? (
+                        <div><strong>Scheduled window:</strong> {formatDate(order.delivery.agreedWindow.start)} – {formatDate(order.delivery.agreedWindow.end)}</div>
+                      ) : order.delivery?.eta && isValidNonEpochDate(new Date(order.delivery.eta)) ? (
+                        <div><strong>Scheduled ETA:</strong> {formatDate(new Date(order.delivery.eta))}</div>
+                      ) : null}
+                      {order.delivery?.transporter?.name && <div><strong>Transporter:</strong> {order.delivery.transporter.name}</div>}
+                      {order.delivery?.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
                     </div>
                   )}
                   {(txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
@@ -556,328 +572,6 @@ export default function BuyerOrderDetailPage() {
                       <Separator />
                     </div>
                   )}
-                  {(txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') && (
-                    <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                      <div className="font-semibold text-blue-900 dark:text-blue-100">
-                        {txStatus === 'OUT_FOR_DELIVERY' ? 'Out for Delivery' : 'Delivery Scheduled'}
-                      </div>
-                      <div className="text-xs mt-1">Waiting for delivery to arrive.</div>
-                    </div>
-                  )}
-                  {txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress && (
-                    <div id="set-delivery-address" className="space-y-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
-                      <div>
-                        <div className="font-semibold text-foreground">Set delivery address</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">This is the first step. The seller will use this address to propose a delivery date. You’ll then confirm the date and confirm receipt when it arrives.</div>
-                      </div>
-                      <div className="grid gap-3 text-sm">
-                        <div>
-                          <label className="font-medium text-foreground">Street address</label>
-                          <Input
-                            value={deliveryAddressForm.line1}
-                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line1: e.target.value }))}
-                            placeholder="123 Main St"
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-medium text-foreground">Apt, suite, etc. (optional)</label>
-                          <Input
-                            value={deliveryAddressForm.line2}
-                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line2: e.target.value }))}
-                            placeholder="Unit 4"
-                            className="mt-1"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="font-medium text-foreground">City</label>
-                            <Input
-                              value={deliveryAddressForm.city}
-                              onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, city: e.target.value }))}
-                              placeholder="City"
-                              className="mt-1"
-                            />
-                          </div>
-                          <div>
-                            <label className="font-medium text-foreground">State</label>
-                            <Input
-                              value={deliveryAddressForm.state}
-                              onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
-                              placeholder="TX"
-                              className="mt-1"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="font-medium text-foreground">ZIP code</label>
-                          <Input
-                            value={deliveryAddressForm.zip}
-                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                            placeholder="12345"
-                            className="mt-1 max-w-[120px]"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-medium text-foreground">Delivery instructions (optional)</label>
-                          <Input
-                            value={deliveryAddressForm.deliveryInstructions}
-                            onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, deliveryInstructions: e.target.value }))}
-                            placeholder="Gate code, gate left open, etc."
-                            className="mt-1"
-                          />
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={processing === 'set_address' || processing === 'location'}
-                            onClick={() => {
-                              if (!navigator.geolocation) {
-                                toast({ title: 'Not supported', description: 'Location is not available in this browser.', variant: 'destructive' });
-                                return;
-                              }
-                              setProcessing('location');
-                              navigator.geolocation.getCurrentPosition(
-                                (pos) => {
-                                  setDeliveryAddressForm((f) => ({ ...f, lat: pos.coords.latitude, lng: pos.coords.longitude, pinLabel: 'My location' }));
-                                  toast({ title: 'Location captured', description: 'Pin set to your current location. Seller will see this on a map.' });
-                                  setProcessing(null);
-                                },
-                                () => {
-                                  toast({ title: 'Could not get location', description: 'Check permissions or enter address manually.', variant: 'destructive' });
-                                  setProcessing(null);
-                                },
-                                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-                              );
-                            }}
-                          >
-                            {processing === 'location' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-                            Use my location (add pin for seller)
-                          </Button>
-                          {(deliveryAddressForm.lat != null && deliveryAddressForm.lng != null) && (
-                            <span className="text-xs text-muted-foreground">Pin set: {deliveryAddressForm.pinLabel || `${deliveryAddressForm.lat.toFixed(4)}, ${deliveryAddressForm.lng.toFixed(4)}`}</span>
-                          )}
-                        </div>
-                        <Button
-                          className="w-full mt-2"
-                          disabled={!deliveryAddressForm.line1.trim() || !deliveryAddressForm.city.trim() || !deliveryAddressForm.state.trim() || !deliveryAddressForm.zip.trim() || processing === 'set_address' || processing === 'location'}
-                          onClick={async () => {
-                            try {
-                              setProcessing('set_address');
-                              await postAuthJson(`/api/orders/${order.id}/set-delivery-address`, {
-                                line1: deliveryAddressForm.line1.trim(),
-                                line2: deliveryAddressForm.line2.trim() || undefined,
-                                city: deliveryAddressForm.city.trim(),
-                                state: deliveryAddressForm.state.trim(),
-                                zip: deliveryAddressForm.zip.trim(),
-                                deliveryInstructions: deliveryAddressForm.deliveryInstructions.trim() || undefined,
-                                lat: deliveryAddressForm.lat,
-                                lng: deliveryAddressForm.lng,
-                                pinLabel: deliveryAddressForm.pinLabel || undefined,
-                              });
-                              toast({ title: 'Address saved', description: 'Seller will use this to propose a delivery date. You’ll get notified when they do.' });
-                              const refreshed = await getOrderById(order.id);
-                              if (refreshed) setOrder(refreshed);
-                            } catch (e: any) {
-                              toast({ title: 'Error', description: e?.message || 'Failed to save address', variant: 'destructive' });
-                            } finally {
-                              setProcessing(null);
-                            }
-                          }}
-                        >
-                          {processing === 'set_address' ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Saving…
-                            </>
-                          ) : (
-                            'Save delivery address'
-                          )}
-                        </Button>
-                      </div>
-                      <Separator />
-                    </div>
-                  )}
-                  {txStatus === 'FULFILLMENT_REQUIRED' && order.delivery?.buyerAddress && (
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
-                        <div className="font-semibold text-green-900 dark:text-green-100">Delivery address set</div>
-                        <div className="text-xs mt-1 text-green-800 dark:text-green-200 font-mono">
-                          {[order.delivery.buyerAddress.line1, order.delivery.buyerAddress.line2, [order.delivery.buyerAddress.city, order.delivery.buyerAddress.state, order.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
-                          {order.delivery.buyerAddress.deliveryInstructions && ` — ${order.delivery.buyerAddress.deliveryInstructions}`}
-                        </div>
-                        {(order.delivery.buyerAddress.lat != null && order.delivery.buyerAddress.lng != null) && (
-                          <a
-                            href={`https://www.google.com/maps?q=${order.delivery.buyerAddress.lat},${order.delivery.buyerAddress.lng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary underline mt-1 inline-block"
-                          >
-                            View pin on map
-                          </a>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded border border-orange-200 dark:border-orange-800">
-                        <div className="font-semibold text-orange-900 dark:text-orange-100">Waiting for seller to propose delivery date</div>
-                        <div className="text-xs mt-1">Seller will propose delivery windows using this address. You’ll agree to a date, then confirm receipt when it arrives.</div>
-                      </div>
-                    </div>
-                  )}
-                  {txStatus === 'COMPLETED' && (
-                    <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
-                      <div className="font-semibold">Transaction Complete</div>
-                      <div className="text-xs mt-1">Receipt confirmed. Seller was paid immediately upon successful payment.</div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Block pickup actions if compliance gate is active */}
-                  {txStatus === 'AWAITING_TRANSFER_COMPLIANCE' && (
-                    <div className="text-sm text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-semibold">TPWD Transfer Compliance Required</div>
-                          <div className="text-xs mt-1 text-amber-800 dark:text-amber-200">
-                            Pickup scheduling is blocked until both buyer and seller confirm TPWD transfer permit compliance.
-                            Complete the compliance confirmation above to unlock pickup scheduling.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {(txStatus as string) === 'READY_FOR_PICKUP' && order.pickup?.location && order.pickup?.windows && (txStatus as string) !== 'AWAITING_TRANSFER_COMPLIANCE' && (
-                    <>
-                      <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
-                        <div><strong>Pickup Location:</strong> {order.pickup.location}</div>
-                        {order.pickup.pickupCode && (
-                          <div className="font-mono font-semibold text-sm text-foreground">
-                            Pickup Code: {order.pickup.pickupCode}
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="font-semibold text-sm">Propose pickup window</div>
-                        <div className="text-xs text-muted-foreground">Choose a window. Seller must agree before you can confirm pickup.</div>
-                        <div className="space-y-2">
-                          {order.pickup.windows.map((window: any, idx: number) => {
-                            const start = (window.start && typeof window.start === 'object' && typeof window.start.toDate === 'function') 
-                              ? window.start.toDate() 
-                              : new Date(window.start || 0);
-                            const end = (window.end && typeof window.end === 'object' && typeof window.end.toDate === 'function')
-                              ? window.end.toDate()
-                              : new Date(window.end || 0);
-                            return (
-                              <Button
-                                key={idx}
-                                variant="outline"
-                                className="w-full justify-start"
-                                disabled={processing !== null}
-                                onClick={async () => {
-                                  try {
-                                    setProcessing('select_window');
-                                    await postAuthJson(`/api/orders/${order.id}/fulfillment/select-pickup-window`, {
-                                      selectedWindowIndex: idx,
-                                    });
-                                    toast({ title: 'Success', description: 'Pickup window proposed. Seller must agree.' });
-                                    const refreshed = await getOrderById(order.id);
-                                    if (refreshed) setOrder(refreshed);
-                                  } catch (e: any) {
-                                    toast({ title: 'Error', description: e?.message || 'Failed to select window', variant: 'destructive' });
-                                  } finally {
-                                    setProcessing(null);
-                                  }
-                                }}
-                              >
-                                {start.toLocaleString()} - {end.toLocaleString()}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <Separator />
-                    </>
-                  )}
-                  {txStatus === 'PICKUP_PROPOSED' && order.pickup?.selectedWindow && (
-                    <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                      <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting for seller to agree</div>
-                      <div className="text-xs mt-1">
-                        You proposed {new Date(order.pickup.selectedWindow.start).toLocaleString()} – {new Date(order.pickup.selectedWindow.end).toLocaleString()}. Seller must agree before you can confirm pickup.
-                      </div>
-                    </div>
-                  )}
-                  {txStatus === 'PICKUP_SCHEDULED' && order.pickup?.selectedWindow && (
-                    <>
-                      <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
-                        <div><strong>Scheduled Window:</strong></div>
-                        <div>
-                          {new Date(order.pickup.selectedWindow.start).toLocaleString()} - {new Date(order.pickup.selectedWindow.end).toLocaleString()}
-                        </div>
-                        {order.pickup.pickupCode && (
-                          <div className="font-mono font-semibold text-sm text-foreground mt-2">
-                            Pickup Code: {order.pickup.pickupCode}
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="font-semibold text-sm">Confirm Pickup</div>
-                        <div className="text-xs text-muted-foreground">Enter the pickup code provided by the seller.</div>
-                        <Input
-                          id="pickup-code"
-                          placeholder="Enter 6-digit pickup code"
-                          maxLength={6}
-                          disabled={processing !== null}
-                          onChange={(e) => {
-                            const code = e.target.value.replace(/\D/g, '').slice(0, 6);
-                            (e.target as HTMLInputElement).value = code;
-                            setPickupCodeInput(code);
-                          }}
-                        />
-                        <Button
-                          variant="default"
-                          className="w-full"
-                          disabled={!pickupCodeInput || pickupCodeInput.length !== 6 || processing !== null}
-                          onClick={async () => {
-                            try {
-                              setProcessing('confirm_pickup');
-                              await postAuthJson(`/api/orders/${order.id}/fulfillment/confirm-pickup`, {
-                                pickupCode: pickupCodeInput,
-                              });
-                              toast({ title: 'Pickup confirmed', description: 'Transaction complete. Seller was paid immediately upon successful payment.' });
-                              const refreshed = await getOrderById(order.id);
-                              if (refreshed) setOrder(refreshed);
-                              setPickupCodeInput('');
-                            } catch (e: any) {
-                              toast({ title: 'Error', description: e?.message || 'Failed to confirm pickup', variant: 'destructive' });
-                            } finally {
-                              setProcessing(null);
-                            }
-                          }}
-                        >
-                          {processing === 'confirm_pickup' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                          Confirm Pickup
-                        </Button>
-                      </div>
-                      <Separator />
-                    </>
-                  )}
-                  {txStatus === 'FULFILLMENT_REQUIRED' && (
-                    <div className="text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded border border-orange-200 dark:border-orange-800">
-                      <div className="font-semibold text-orange-900 dark:text-orange-100">Waiting for Seller to Set Pickup Info</div>
-                      <div className="text-xs mt-1">Seller needs to set pickup location and windows.</div>
-                    </div>
-                  )}
-                  {txStatus === 'COMPLETED' && (
-                    <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
-                      <div className="font-semibold">Transaction Complete</div>
-                      <div className="text-xs mt-1">Pickup confirmed. Seller was paid immediately upon successful payment.</div>
-                    </div>
-                  )}
-                </>
-              )}
               <Separator />
               <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
                 <div>
@@ -905,43 +599,11 @@ export default function BuyerOrderDetailPage() {
                   Report an issue
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          }
+        />
 
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Order details</CardTitle>
-              <CardDescription>Quick reference links and metadata.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="font-semibold text-sm">Listing</div>
-                  <div className="text-xs text-muted-foreground">{listing?.title || 'Listing'}</div>
-                </div>
-                {listing?.id ? (
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/listing/${listing.id}`}>View listing</Link>
-                  </Button>
-                ) : null}
-              </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-border/60 p-3 bg-background/40">
-                  <div className="text-xs text-muted-foreground">Status</div>
-                  <div className="text-sm font-semibold mt-0.5">{String(order.status).replaceAll('_', ' ')}</div>
-                </div>
-                <div className="rounded-lg border border-border/60 p-3 bg-background/40">
-                  <div className="text-xs text-muted-foreground">Payment</div>
-                  <div className="text-sm font-semibold mt-0.5">
-                    {String((order as any).paymentMethod || '—').replaceAll('_', ' ')}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60">
+        <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Bill of Sale</CardTitle>
               <CardDescription>View/download the written transfer. You can also upload a signed copy.</CardDescription>
@@ -1014,8 +676,143 @@ export default function BuyerOrderDetailPage() {
             </CardContent>
           </Card>
 
-          <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
-        </div>
+        <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
+
+        {/* Set delivery address modal — once saved, "Set delivery address" shows complete on the timeline and address appears in the footer below */}
+        <Dialog open={setAddressModalOpen} onOpenChange={setSetAddressModalOpen}>
+          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden max-w-lg sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Set delivery address</DialogTitle>
+              <DialogDescription>Add your delivery address or drop a pin. The seller will use it to propose a delivery date.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
+              <div>
+                <label className="font-medium text-foreground text-sm">Street address *</label>
+                <Input
+                  value={deliveryAddressForm.line1}
+                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line1: e.target.value }))}
+                  placeholder="123 Main St"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="font-medium text-foreground text-sm">Apt, suite, etc. (optional)</label>
+                <Input
+                  value={deliveryAddressForm.line2}
+                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line2: e.target.value }))}
+                  placeholder="Unit 4"
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-medium text-foreground text-sm">City *</label>
+                  <Input
+                    value={deliveryAddressForm.city}
+                    onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="City"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="font-medium text-foreground text-sm">State *</label>
+                  <Input
+                    value={deliveryAddressForm.state}
+                    onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
+                    placeholder="TX"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="font-medium text-foreground text-sm">ZIP code *</label>
+                <Input
+                  value={deliveryAddressForm.zip}
+                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                  placeholder="12345"
+                  className="mt-1 max-w-[120px]"
+                />
+              </div>
+              <div>
+                <label className="font-medium text-foreground text-sm">Delivery instructions (optional)</label>
+                <Input
+                  value={deliveryAddressForm.deliveryInstructions}
+                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, deliveryInstructions: e.target.value }))}
+                  placeholder="Gate code, gate left open, etc."
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={processing === 'set_address' || processing === 'location'}
+                  onClick={() => {
+                    if (!navigator.geolocation) {
+                      toast({ title: 'Not supported', description: 'Location is not available in this browser.', variant: 'destructive' });
+                      return;
+                    }
+                    setProcessing('location');
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setDeliveryAddressForm((f) => ({ ...f, lat: pos.coords.latitude, lng: pos.coords.longitude, pinLabel: 'My location' }));
+                        toast({ title: 'Location captured', description: 'Pin set to your current location. Seller will see this on a map.' });
+                        setProcessing(null);
+                      },
+                      () => {
+                        toast({ title: 'Could not get location', description: 'Check permissions or enter address manually.', variant: 'destructive' });
+                        setProcessing(null);
+                      },
+                      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                    );
+                  }}
+                >
+                  {processing === 'location' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                  Use my location (add pin for seller)
+                </Button>
+                {(deliveryAddressForm.lat != null && deliveryAddressForm.lng != null) && (
+                  <span className="text-xs text-muted-foreground">Pin set: {deliveryAddressForm.pinLabel || `${deliveryAddressForm.lat.toFixed(4)}, ${deliveryAddressForm.lng.toFixed(4)}`}</span>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="border-t pt-4">
+              <Button variant="outline" onClick={() => setSetAddressModalOpen(false)}>Cancel</Button>
+              <Button
+                disabled={!deliveryAddressForm.line1.trim() || !deliveryAddressForm.city.trim() || !deliveryAddressForm.state.trim() || !deliveryAddressForm.zip.trim() || processing === 'set_address' || processing === 'location'}
+                onClick={async () => {
+                  try {
+                    setProcessing('set_address');
+                    const payload = {
+                      line1: String(deliveryAddressForm.line1 ?? '').trim(),
+                      city: String(deliveryAddressForm.city ?? '').trim(),
+                      state: String(deliveryAddressForm.state ?? '').trim(),
+                      zip: String(deliveryAddressForm.zip ?? '').trim(),
+                    } as Record<string, unknown>;
+                    if (deliveryAddressForm.line2?.trim()) payload.line2 = deliveryAddressForm.line2.trim();
+                    if (deliveryAddressForm.deliveryInstructions?.trim()) payload.deliveryInstructions = deliveryAddressForm.deliveryInstructions.trim();
+                    if (typeof deliveryAddressForm.lat === 'number' && typeof deliveryAddressForm.lng === 'number') {
+                      payload.lat = deliveryAddressForm.lat;
+                      payload.lng = deliveryAddressForm.lng;
+                    }
+                    if (deliveryAddressForm.pinLabel?.trim()) payload.pinLabel = deliveryAddressForm.pinLabel.trim();
+                    await postAuthJson(`/api/orders/${order.id}/set-delivery-address`, payload);
+                    toast({ title: 'Address saved', description: 'The seller will use it to propose a delivery date.' });
+                    const refreshed = await getOrderById(order.id);
+                    if (refreshed) setOrder(refreshed);
+                    setSetAddressModalOpen(false);
+                  } catch (e: any) {
+                    toast({ title: 'Error', description: e?.message || 'Failed to save address', variant: 'destructive' });
+                  } finally {
+                    setProcessing(null);
+                  }
+                }}
+              >
+                {processing === 'set_address' ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…</> : 'Set address'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

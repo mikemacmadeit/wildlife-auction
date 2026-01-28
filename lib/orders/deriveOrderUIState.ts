@@ -26,9 +26,8 @@ export function deriveOrderUIState(order: Order): {
   needsAction: boolean;
   primaryAction: PurchasesPrimaryAction;
 } {
-  // Use effective transaction status as source of truth
+  // Use effective transaction status as source of truth (seller delivery only)
   const txStatus = getEffectiveTransactionStatus(order);
-  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
 
   // Disputes override everything else
   if (txStatus === 'DISPUTE_OPENED' || (order.disputeStatus && order.disputeStatus !== 'none' && order.disputeStatus !== 'cancelled')) {
@@ -64,82 +63,42 @@ export function deriveOrderUIState(order: Order): {
     }
   }
 
-  // Transport-aware workflow based on transactionStatus
-  if (transportOption === 'BUYER_TRANSPORT') {
-    if (txStatus === 'READY_FOR_PICKUP') {
-      return {
-        statusKey: 'in_transit',
-        currentStepLabel: 'Ready for pickup',
-        waitingOn: 'Waiting on you to propose a pickup window',
-        needsAction: true,
-        primaryAction: { kind: 'select_pickup_window', label: 'Propose pickup window' },
-      };
-    }
-    if (txStatus === 'PICKUP_PROPOSED') {
-      return {
-        statusKey: 'in_transit',
-        currentStepLabel: 'Pickup proposed',
-        waitingOn: 'Waiting on seller to agree',
-        needsAction: false,
-        primaryAction: { kind: 'view_details', label: 'View details' },
-      };
-    }
-    if (txStatus === 'PICKUP_SCHEDULED') {
-      return {
-        statusKey: 'in_transit',
-        currentStepLabel: 'Pickup scheduled',
-        waitingOn: 'Waiting on you to confirm pickup',
-        needsAction: true,
-        primaryAction: { kind: 'confirm_pickup', label: 'Confirm pickup' },
-      };
-    }
-    if (txStatus === 'PICKED_UP' || txStatus === 'COMPLETED') {
-      return {
-        statusKey: 'completed',
-        currentStepLabel: 'Transaction complete',
-        waitingOn: undefined,
-        needsAction: false,
-        primaryAction: { kind: 'view_details', label: 'View details' },
-      };
-    }
-  } else {
-    // SELLER_TRANSPORT flow
-    if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
-      return {
-        statusKey: 'delivered',
-        currentStepLabel: 'Delivered',
-        waitingOn: 'Waiting on you to confirm receipt',
-        needsAction: true,
-        primaryAction: { kind: 'confirm_receipt', label: 'Confirm receipt' },
-      };
-    }
-    if (txStatus === 'DELIVERY_PROPOSED') {
-      return {
-        statusKey: 'in_transit',
-        currentStepLabel: 'Delivery proposed',
-        waitingOn: 'Waiting on you to agree to a window',
-        needsAction: true,
-        primaryAction: { kind: 'agree_delivery', label: 'Agree to window' },
-      };
-    }
-    if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {
-      return {
-        statusKey: 'in_transit',
-        currentStepLabel: txStatus === 'OUT_FOR_DELIVERY' ? 'Out for delivery' : 'Delivery scheduled',
-        waitingOn: 'Waiting on delivery',
-        needsAction: false,
-        primaryAction: { kind: 'view_details', label: 'View details' },
-      };
-    }
-    if (txStatus === 'COMPLETED') {
-      return {
-        statusKey: 'completed',
-        currentStepLabel: 'Transaction complete',
-        waitingOn: undefined,
-        needsAction: false,
-        primaryAction: { kind: 'view_details', label: 'View details' },
-      };
-    }
+  // Seller delivery workflow
+  if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+    return {
+      statusKey: 'delivered',
+      currentStepLabel: 'Delivered',
+      waitingOn: 'Waiting on you to confirm receipt',
+      needsAction: true,
+      primaryAction: { kind: 'confirm_receipt', label: 'Confirm receipt' },
+    };
+  }
+  if (txStatus === 'DELIVERY_PROPOSED') {
+    return {
+      statusKey: 'in_transit',
+      currentStepLabel: 'Delivery proposed',
+      waitingOn: 'Waiting on you to agree to a window',
+      needsAction: true,
+      primaryAction: { kind: 'agree_delivery', label: 'Agree to window' },
+    };
+  }
+  if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {
+    return {
+      statusKey: 'in_transit',
+      currentStepLabel: txStatus === 'OUT_FOR_DELIVERY' ? 'Out for delivery' : 'Delivery scheduled',
+      waitingOn: 'Waiting on delivery',
+      needsAction: false,
+      primaryAction: { kind: 'view_details', label: 'View details' },
+    };
+  }
+  if (txStatus === 'COMPLETED') {
+    return {
+      statusKey: 'completed',
+      currentStepLabel: 'Transaction complete',
+      waitingOn: undefined,
+      needsAction: false,
+      primaryAction: { kind: 'view_details', label: 'View details' },
+    };
   }
 
   // AWAITING_TRANSFER_COMPLIANCE - compliance gate for regulated whitetail deals
@@ -168,9 +127,7 @@ export function deriveOrderUIState(order: Order): {
     return {
       statusKey: 'held', // Maps to "Fulfillment in progress" badge
       currentStepLabel: 'Payment received',
-      waitingOn: transportOption === 'BUYER_TRANSPORT' 
-        ? 'Waiting on seller to set pickup information'
-        : 'Waiting on seller to begin preparing',
+      waitingOn: 'Waiting on seller to begin preparing',
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },
     };

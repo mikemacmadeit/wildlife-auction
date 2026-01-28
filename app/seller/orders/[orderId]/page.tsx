@@ -27,9 +27,7 @@ import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
-import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { NextActionBanner } from '@/components/orders/NextActionBanner';
-import { MilestoneProgress } from '@/components/orders/MilestoneProgress';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { getNextRequiredAction } from '@/lib/orders/progress';
@@ -105,24 +103,28 @@ export default function SellerOrderDetailPage() {
     return () => unsub();
   }, [orderId, user?.uid]);
 
+  useEffect(() => {
+    if (!markDeliveredOpen || !order?.id) return;
+    getDocuments('order', order.id, 'DELIVERY_PROOF').then((docs) => setHasDeliveryProof(docs.length > 0));
+  }, [markDeliveredOpen, order?.id]);
+
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
   
   const txStatus = order ? getEffectiveTransactionStatus(order) : null;
-  const transportOption = order?.transportOption || 'SELLER_TRANSPORT';
 
   const [scheduleDeliveryOpen, setScheduleDeliveryOpen] = useState(false);
   const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
   const [haulerName, setHaulerName] = useState('');
   const [haulerPhone, setHaulerPhone] = useState('');
   const [haulerPlate, setHaulerPlate] = useState('');
-
-  const [setPickupInfoOpen, setSetPickupInfoOpen] = useState(false);
-  const [pickupLocation, setPickupLocation] = useState('');
-  const [pickupWindows, setPickupWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
+  const [haulerMake, setHaulerMake] = useState('');
+  const [haulerModel, setHaulerModel] = useState('');
+  const [haulerColor, setHaulerColor] = useState('');
 
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
-  const [agreePickupOpen, setAgreePickupOpen] = useState(false);
+  const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
+  const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
 
   // FulfillmentPanel component (inline in same file)
   function FulfillmentPanel() {
@@ -158,9 +160,8 @@ export default function SellerOrderDetailPage() {
           </Badge>
         </div>
 
-        {/* SELLER_TRANSPORT Panel */}
-        {transportOption === 'SELLER_TRANSPORT' ? (
-          <>
+        {/* Seller delivery panel only */}
+        <>
             {/* Buyer delivery address — seller uses this to schedule delivery */}
             {order.delivery?.buyerAddress && (
               <div className="text-sm bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1 mb-3">
@@ -301,107 +302,6 @@ export default function SellerOrderDetailPage() {
               </div>
             )}
           </>
-        ) : (
-          /* BUYER_TRANSPORT Panel */
-          <>
-            {/* Pickup Info Display */}
-            {order.pickup?.location && (
-              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-3">
-                <div><strong>Pickup Location:</strong> {order.pickup.location}</div>
-                {order.pickup.pickupCode && (
-                  <div className="font-mono font-semibold text-sm text-foreground mt-2">
-                    <strong>Pickup Code:</strong> {order.pickup.pickupCode}
-                  </div>
-                )}
-                {order.pickup.windows && order.pickup.windows.length > 0 && (
-                  <div className="mt-2">
-                    <strong>Available Windows:</strong>
-                    {order.pickup.windows.map((window: any, idx: number) => {
-                      const start = window.start?.toDate ? window.start.toDate() : new Date(window.start);
-                      const end = window.end?.toDate ? window.end.toDate() : new Date(window.end);
-                      return (
-                        <div key={idx} className="text-xs mt-1">
-                          {start.toLocaleString()} - {end.toLocaleString()}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {order.pickup.selectedWindow && (
-                  <div className="mt-2">
-                    <strong>Selected Window:</strong>
-                    <div className="text-xs">
-                      {new Date(order.pickup.selectedWindow.start).toLocaleString()} - {new Date(order.pickup.selectedWindow.end).toLocaleString()}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Actions based on status */}
-            {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && (
-              <>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="font-semibold text-sm">Set Pickup Info</div>
-                    <div className="text-xs text-muted-foreground">Set pickup location and available time windows. A pickup code will be generated.</div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="lg"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
-                    disabled={processing !== null}
-                    onClick={() => setSetPickupInfoOpen(true)}
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Set Pickup Info
-                  </Button>
-                </div>
-                <Separator />
-              </>
-            )}
-
-            {txStatus === 'READY_FOR_PICKUP' && (
-              <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting for buyer to propose pickup</div>
-                <div className="text-xs mt-1">Buyer will choose a window. You must agree before they can confirm pickup.</div>
-              </div>
-            )}
-
-            {txStatus === 'PICKUP_PROPOSED' && order.pickup?.selectedWindow && (
-              <>
-                <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-2">
-                  <div><strong>Buyer proposed:</strong> {new Date(order.pickup.selectedWindow.start).toLocaleString()} – {new Date(order.pickup.selectedWindow.end).toLocaleString()}</div>
-                </div>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="font-semibold text-sm">Agree to pickup window</div>
-                    <div className="text-xs text-muted-foreground">Confirm this time works for you.</div>
-                  </div>
-                  <Button variant="default" size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30" disabled={processing !== null} onClick={() => setAgreePickupOpen(true)}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Agree to window
-                  </Button>
-                </div>
-                <Separator />
-              </>
-            )}
-
-            {txStatus === 'PICKUP_SCHEDULED' && (
-              <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting for pickup confirmation</div>
-                <div className="text-xs mt-1">Buyer will confirm pickup with the code.</div>
-              </div>
-            )}
-
-            {(txStatus === 'PICKED_UP' || txStatus === 'COMPLETED') && (
-              <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
-                <div className="font-semibold">Transaction Complete</div>
-                <div className="text-xs mt-1">Pickup confirmed. Seller was paid immediately upon successful payment.</div>
-              </div>
-            )}
-          </>
-        )}
       </>
     );
   }
@@ -523,8 +423,6 @@ export default function SellerOrderDetailPage() {
                       nextAction.severity === 'danger'
                         ? 'font-semibold'
                         : nextAction.ctaAction.includes('schedule-delivery') ||
-                            nextAction.ctaAction.includes('set-pickup') ||
-                            nextAction.ctaAction.includes('agree-pickup') ||
                             nextAction.ctaAction.includes('mark-out') ||
                             nextAction.ctaAction.includes('mark-delivered')
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30'
@@ -534,8 +432,6 @@ export default function SellerOrderDetailPage() {
                       nextAction.severity === 'danger'
                         ? 'destructive'
                         : nextAction.ctaAction.includes('schedule-delivery') ||
-                            nextAction.ctaAction.includes('set-pickup') ||
-                            nextAction.ctaAction.includes('agree-pickup') ||
                             nextAction.ctaAction.includes('mark-out') ||
                             nextAction.ctaAction.includes('mark-delivered')
                           ? 'default'
@@ -547,12 +443,10 @@ export default function SellerOrderDetailPage() {
                     onClick={async () => {
                       if (nextAction.ctaAction.includes('schedule-delivery')) {
                         setScheduleDeliveryOpen(true);
-                      } else if (nextAction.ctaAction.includes('set-pickup')) {
-                        setSetPickupInfoOpen(true);
-                      } else if (nextAction.ctaAction.includes('agree-pickup')) {
-                        setAgreePickupOpen(true);
                       } else if (nextAction.ctaAction.includes('mark-out')) {
                         setMarkOutForDeliveryOpen(true);
+                      } else if (nextAction.ctaAction.includes('mark-delivered')) {
+                        setMarkDeliveredOpen(true);
                       } else if (nextAction.ctaAction.startsWith('/')) {
                         window.location.href = nextAction.ctaAction;
                       }
@@ -575,12 +469,9 @@ export default function SellerOrderDetailPage() {
           role="seller"
           onAction={() => {
             const txStatus = getEffectiveTransactionStatus(order);
-            const transportOption = order.transportOption || 'SELLER_TRANSPORT';
-            if (txStatus === 'FULFILLMENT_REQUIRED') {
-              if (transportOption === 'SELLER_TRANSPORT') setScheduleDeliveryOpen(true);
-              else setSetPickupInfoOpen(true);
-            } else if (txStatus === 'PICKUP_PROPOSED') setAgreePickupOpen(true);
+            if (txStatus === 'FULFILLMENT_REQUIRED') setScheduleDeliveryOpen(true);
             else if (txStatus === 'DELIVERY_SCHEDULED') setMarkOutForDeliveryOpen(true);
+            else if (txStatus === 'OUT_FOR_DELIVERY') setMarkDeliveredOpen(true);
           }}
         />
 
@@ -594,29 +485,18 @@ export default function SellerOrderDetailPage() {
           }}
         />
 
-        {/* Order Milestone Timeline (shared truth) */}
+        {/* Order Progress — single canonical timeline */}
         <OrderMilestoneTimeline order={order} role="seller" />
-
-        {/* Legacy TransactionTimeline (keeping for backward compatibility) */}
-        <TransactionTimeline order={order} role="seller" />
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                Delivery
-              </CardTitle>
+              <CardTitle className="text-base">Delivery</CardTitle>
               <CardDescription>
                 Propose a delivery window; the buyer agrees. Only the buyer confirms receipt to complete the transaction.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Milestone Progress */}
-              <div className="mb-4">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Progress</div>
-                <MilestoneProgress order={order} role="seller" />
-              </div>
-              <Separator />
               <FulfillmentPanel />
             </CardContent>
           </Card>
@@ -734,29 +614,29 @@ export default function SellerOrderDetailPage() {
 
         {/* Propose Delivery Dialog (hauling – windows + hauler) */}
         <Dialog open={scheduleDeliveryOpen} onOpenChange={setScheduleDeliveryOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Propose delivery</DialogTitle>
-              <DialogDescription>Propose when you can deliver (hauling). Add one or more windows. Buyer will agree to one.</DialogDescription>
+          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden w-[calc(100vw-2rem)] sm:w-full max-w-2xl p-3 sm:p-4 md:p-6">
+            <DialogHeader className="shrink-0 pb-2 pr-8">
+              <DialogTitle className="text-base sm:text-lg">Propose delivery</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm mt-0.5">Propose when you can deliver (hauling). Add one or more windows. Buyer will agree to one.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 -mx-1 px-1">
               <div>
-                <Label>Delivery windows *</Label>
-                <div className="space-y-2 mt-1">
+                <Label className="text-sm">Delivery windows *</Label>
+                <div className="space-y-3 mt-1">
                   {deliveryWindows.map((w, idx) => (
-                    <div key={idx} className="flex gap-2 items-end">
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <div>
+                    <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                        <div className="min-w-0">
                           <Label className="text-xs">Start</Label>
-                          <Input type="datetime-local" value={w.start} onChange={(e) => {
+                          <Input type="datetime-local" className="w-full min-w-0" value={w.start} onChange={(e) => {
                             const n = [...deliveryWindows];
                             n[idx] = { ...n[idx], start: e.target.value };
                             setDeliveryWindows(n);
                           }} />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <Label className="text-xs">End</Label>
-                          <Input type="datetime-local" value={w.end} onChange={(e) => {
+                          <Input type="datetime-local" className="w-full min-w-0" value={w.end} onChange={(e) => {
                             const n = [...deliveryWindows];
                             n[idx] = { ...n[idx], end: e.target.value };
                             setDeliveryWindows(n);
@@ -764,7 +644,7 @@ export default function SellerOrderDetailPage() {
                         </div>
                       </div>
                       {deliveryWindows.length > 1 && (
-                        <Button type="button" variant="outline" size="sm" onClick={() => setDeliveryWindows(deliveryWindows.filter((_, i) => i !== idx))}>
+                        <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto shrink-0" onClick={() => setDeliveryWindows(deliveryWindows.filter((_, i) => i !== idx))}>
                           Remove
                         </Button>
                       )}
@@ -776,22 +656,34 @@ export default function SellerOrderDetailPage() {
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">Hauler / truck (optional)</div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                <div className="min-w-0">
                   <Label className="text-xs">Name</Label>
-                  <Input value={haulerName} onChange={(e) => setHaulerName(e.target.value)} placeholder="e.g. John Smith" />
+                  <Input value={haulerName} onChange={(e) => setHaulerName(e.target.value)} placeholder="e.g. John Smith" className="w-full" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Label className="text-xs">Phone</Label>
-                  <Input value={haulerPhone} onChange={(e) => setHaulerPhone(e.target.value)} placeholder="Phone" />
+                  <Input value={haulerPhone} onChange={(e) => setHaulerPhone(e.target.value)} placeholder="Phone" className="w-full" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Label className="text-xs">License plate / truck</Label>
-                  <Input value={haulerPlate} onChange={(e) => setHaulerPlate(e.target.value)} placeholder="Optional" />
+                  <Input value={haulerPlate} onChange={(e) => setHaulerPlate(e.target.value)} placeholder="Optional" className="w-full" />
+                </div>
+                <div className="min-w-0">
+                  <Label className="text-xs">Make</Label>
+                  <Input value={haulerMake} onChange={(e) => setHaulerMake(e.target.value)} placeholder="e.g. Ford" className="w-full" />
+                </div>
+                <div className="min-w-0">
+                  <Label className="text-xs">Model</Label>
+                  <Input value={haulerModel} onChange={(e) => setHaulerModel(e.target.value)} placeholder="e.g. F-150" className="w-full" />
+                </div>
+                <div className="min-w-0">
+                  <Label className="text-xs">Color</Label>
+                  <Input value={haulerColor} onChange={(e) => setHaulerColor(e.target.value)} placeholder="e.g. White" className="w-full" />
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="shrink-0 pt-3 border-t mt-2">
               <Button variant="outline" onClick={() => setScheduleDeliveryOpen(false)}>Cancel</Button>
               <Button
                 disabled={processing !== null || deliveryWindows.some(w => !w.start || !w.end)}
@@ -801,11 +693,14 @@ export default function SellerOrderDetailPage() {
                     const body: any = {
                       windows: deliveryWindows.filter(w => w.start && w.end).map(w => ({ start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() })),
                     };
-                    if (haulerName || haulerPhone || haulerPlate) {
+                    if (haulerName || haulerPhone || haulerPlate || haulerMake || haulerModel || haulerColor) {
                       body.transporter = {
                         ...(haulerName ? { name: haulerName } : {}),
                         ...(haulerPhone ? { phone: haulerPhone } : {}),
                         ...(haulerPlate ? { plate: haulerPlate } : {}),
+                        ...(haulerMake ? { make: haulerMake } : {}),
+                        ...(haulerModel ? { model: haulerModel } : {}),
+                        ...(haulerColor ? { color: haulerColor } : {}),
                       };
                     }
                     await postAuthJson(`/api/orders/${order.id}/fulfillment/schedule-delivery`, body);
@@ -815,6 +710,9 @@ export default function SellerOrderDetailPage() {
                     setHaulerName('');
                     setHaulerPhone('');
                     setHaulerPlate('');
+                    setHaulerMake('');
+                    setHaulerModel('');
+                    setHaulerColor('');
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                   } catch (e: any) {
@@ -826,45 +724,6 @@ export default function SellerOrderDetailPage() {
               >
                 {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Propose delivery
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Agree to Pickup Window Dialog */}
-        <Dialog open={agreePickupOpen} onOpenChange={setAgreePickupOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Agree to pickup window</DialogTitle>
-              <DialogDescription>Buyer proposed this window. Confirm it works for you.</DialogDescription>
-            </DialogHeader>
-            {order?.pickup?.selectedWindow && (
-              <div className="text-sm py-2">
-                <strong>Window:</strong>{' '}
-                {new Date(order.pickup.selectedWindow.start).toLocaleString()} – {new Date(order.pickup.selectedWindow.end).toLocaleString()}
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAgreePickupOpen(false)}>Cancel</Button>
-              <Button
-                disabled={processing !== null}
-                onClick={async () => {
-                  try {
-                    setProcessing('delivered');
-                    await postAuthJson(`/api/orders/${order.id}/fulfillment/agree-pickup-window`, {});
-                    toast({ title: 'Success', description: 'Pickup window agreed. Buyer can confirm pickup with the code.' });
-                    setAgreePickupOpen(false);
-                    const refreshed = await getOrderById(order.id);
-                    if (refreshed) setOrder(refreshed);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to agree', variant: 'destructive' });
-                  } finally {
-                    setProcessing(null);
-                  }
-                }}
-              >
-                {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                Agree to window
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -903,120 +762,66 @@ export default function SellerOrderDetailPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Set Pickup Info Dialog */}
-        <Dialog open={setPickupInfoOpen} onOpenChange={setSetPickupInfoOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Mark Delivered Dialog — requires delivery photo before marking delivered */}
+        <Dialog
+          open={markDeliveredOpen}
+          onOpenChange={(open) => {
+            setMarkDeliveredOpen(open);
+            if (!open) setHasDeliveryProof(false);
+          }}
+        >
+          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden max-w-lg">
             <DialogHeader>
-              <DialogTitle>Set Pickup Information</DialogTitle>
-              <DialogDescription>Set pickup location and available time windows. A pickup code will be generated automatically.</DialogDescription>
+              <DialogTitle>Mark delivered</DialogTitle>
+              <DialogDescription>
+                Upload a photo of the animal delivered. This is required before you can mark the order as delivered.
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
               <div>
-                <Label>Pickup Location *</Label>
-                <Textarea
-                  value={pickupLocation}
-                  onChange={(e) => setPickupLocation(e.target.value)}
-                  placeholder="Full address or detailed location instructions"
-                  required
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label>Available Pickup Windows *</Label>
-                <div className="space-y-2">
-                  {pickupWindows.map((window, idx) => (
-                    <div key={idx} className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <Label className="text-xs">Start</Label>
-                        <Input
-                          type="datetime-local"
-                          value={window.start}
-                          onChange={(e) => {
-                            const newWindows = [...pickupWindows];
-                            newWindows[idx].start = e.target.value;
-                            setPickupWindows(newWindows);
-                          }}
-                          required
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs">End</Label>
-                        <Input
-                          type="datetime-local"
-                          value={window.end}
-                          onChange={(e) => {
-                            const newWindows = [...pickupWindows];
-                            newWindows[idx].end = e.target.value;
-                            setPickupWindows(newWindows);
-                          }}
-                          required
-                        />
-                      </div>
-                      {pickupWindows.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPickupWindows(pickupWindows.filter((_, i) => i !== idx));
-                          }}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPickupWindows([...pickupWindows, { start: '', end: '' }])}
-                  >
-                    Add Window
-                  </Button>
-                </div>
+                <Label className="text-sm">Delivery photo (required)</Label>
+                <p className="text-xs text-muted-foreground mb-2">Photo of the animal at delivery.</p>
+                {order && (
+                  <DocumentUpload
+                    entityType="order"
+                    entityId={order.id}
+                    documentType="DELIVERY_PROOF"
+                    onUploadComplete={() => setHasDeliveryProof(true)}
+                    required
+                  />
+                )}
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSetPickupInfoOpen(false)}>Cancel</Button>
+            <DialogFooter className="border-t pt-3">
+              <Button variant="outline" onClick={() => { setMarkDeliveredOpen(false); setHasDeliveryProof(false); }}>
+                Cancel
+              </Button>
               <Button
-                disabled={!pickupLocation.trim() || pickupWindows.some(w => !w.start || !w.end) || processing !== null}
+                disabled={!hasDeliveryProof || processing === 'delivered'}
                 onClick={async () => {
+                  if (!order?.id) return;
                   try {
                     setProcessing('delivered');
-                    await postAuthJson(`/api/orders/${order.id}/fulfillment/set-pickup-info`, {
-                      location: pickupLocation.trim(),
-                      windows: pickupWindows.filter(w => w.start && w.end),
-                    });
-                    toast({ title: 'Success', description: 'Pickup information set. Share the pickup code with the buyer.' });
-                    setSetPickupInfoOpen(false);
-                    setPickupLocation('');
-                    setPickupWindows([{ start: '', end: '' }]);
+                    await postAuthJson(`/api/orders/${order.id}/mark-delivered`, {});
+                    toast({ title: 'Success', description: 'Order marked as delivered. Buyer can confirm receipt.' });
+                    setMarkDeliveredOpen(false);
+                    setHasDeliveryProof(false);
                     const refreshed = await getOrderById(order.id);
-                    if (refreshed) {
-                      setOrder(refreshed);
-                      // Show pickup code in a toast or alert
-                      if (refreshed.pickup?.pickupCode) {
-                        toast({
-                          title: 'Pickup Code Generated',
-                          description: `Share this code with the buyer: ${refreshed.pickup.pickupCode}`,
-                          duration: 10000,
-                        });
-                      }
-                    }
+                    if (refreshed) setOrder(refreshed);
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to set pickup info', variant: 'destructive' });
+                    toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
                   } finally {
                     setProcessing(null);
                   }
                 }}
               >
-                {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Save Pickup Info
+                {processing === 'delivered' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Mark delivered
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </div>
     </div>
   );

@@ -50,34 +50,24 @@ export function getOrderTrustState(order: Order): OrderTrustState {
     return 'awaiting_payment';
   }
 
-  // Transport-aware fulfillment states
-  const transportOption = order.transportOption || 'SELLER_TRANSPORT';
-  
-  if (transportOption === 'BUYER_TRANSPORT') {
-    // BUYER_TRANSPORT flow
-    if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_PROPOSED' || txStatus === 'PICKUP_SCHEDULED') {
-      return 'in_transit';
-    }
-    
-    if (txStatus === 'PICKED_UP') {
-      return 'completed';
-    }
-  } else {
-    // SELLER_TRANSPORT flow
-    if (txStatus === 'DELIVERY_PROPOSED' || txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') {
-      return 'in_transit';
-    }
-    
-    if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
-      // Check protection window (legacy field for backward compatibility)
-      if (order.payoutHoldReason === 'protection_window' && order.protectionEndsAt) {
-        const protectionEnds = new Date(order.protectionEndsAt);
-        if (protectionEnds.getTime() > Date.now()) {
-          return 'protection_window';
-        }
+  // Fulfillment states (seller delivery only; legacy pickup statuses mapped for backward compat)
+  if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_PROPOSED' || txStatus === 'PICKUP_SCHEDULED') {
+    return 'in_transit';
+  }
+  if (txStatus === 'PICKED_UP') {
+    return 'completed';
+  }
+  if (txStatus === 'DELIVERY_PROPOSED' || txStatus === 'DELIVERY_SCHEDULED' || txStatus === 'OUT_FOR_DELIVERY') {
+    return 'in_transit';
+  }
+  if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+    if (order.payoutHoldReason === 'protection_window' && order.protectionEndsAt) {
+      const protectionEnds = new Date(order.protectionEndsAt);
+      if (protectionEnds.getTime() > Date.now()) {
+        return 'protection_window';
       }
-      return 'delivered';
     }
+    return 'delivered';
   }
 
   // FULFILLMENT_REQUIRED - payment received, awaiting fulfillment start

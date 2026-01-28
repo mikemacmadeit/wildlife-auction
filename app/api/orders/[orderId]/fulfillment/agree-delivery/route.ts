@@ -34,8 +34,14 @@ function json(body: any, init?: { status?: number; headers?: Record<string, stri
 
 export async function POST(
   request: Request,
-  { params }: { params: { orderId: string } }
+  ctx: { params: Promise<{ orderId: string }> | { orderId: string } }
 ) {
+  const params = typeof (ctx.params as any)?.then === 'function' ? await (ctx.params as Promise<{ orderId: string }>) : (ctx.params as { orderId: string });
+  const orderId = params?.orderId;
+  if (!orderId) {
+    return json({ error: 'Order ID required' }, { status: 400 });
+  }
+
   try {
     const auth = getAdminAuth();
     const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
@@ -62,7 +68,6 @@ export async function POST(
     }
 
     const buyerId = decodedToken.uid;
-    const orderId = params.orderId;
 
     const body = await request.json();
     const validation = agreeDeliverySchema.safeParse(body);
@@ -123,16 +128,14 @@ export async function POST(
     const agreedWindow = { start, end };
 
     const now = new Date();
-    const updateData: any = {
+    // Use dot notation so we never spread raw Firestore data (avoids serialization/500 issues)
+    const updateData: Record<string, unknown> = {
       transactionStatus: 'DELIVERY_SCHEDULED' as TransactionStatus,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
-      delivery: {
-        ...(orderData.delivery || {}),
-        agreedWindow,
-        agreedAt: now,
-        eta: start, // legacy consumers
-      },
+      'delivery.agreedWindow': agreedWindow,
+      'delivery.agreedAt': now,
+      'delivery.eta': start,
     };
 
     const sanitized = sanitizeFirestorePayload(updateData);
@@ -188,7 +191,7 @@ export async function POST(
             context: 'email-dispatch',
             eventType: 'Order.DeliveryAgreed',
             jobId: ev.eventId,
-            orderId: params.orderId,
+            orderId,
             endpoint: '/api/orders/[orderId]/fulfillment/agree-delivery',
           });
         });
