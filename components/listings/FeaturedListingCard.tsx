@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { Listing } from '@/lib/types';
+import { Listing, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -284,7 +284,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                       </span>
                     )}
                   </div>
-                  {quantity && quantity > 1 ? (
+                  {quantity && quantity > 1 && !isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode) ? (
                     <div className="text-xs text-muted-foreground font-medium truncate">
                       Qty: {quantity}
                     </div>

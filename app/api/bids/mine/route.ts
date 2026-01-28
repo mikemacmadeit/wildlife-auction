@@ -227,12 +227,16 @@ export async function GET(request: Request) {
       const endsAtMs = tsToMillis(listing?.endsAt);
       const isEnded = typeof endsAtMs === 'number' ? endsAtMs <= now : false;
       const currentHighestBid = Number(listing?.currentBid ?? listing?.startingBid ?? 0);
-      const currentHighestBidderId = listing?.currentBidderId || undefined;
+      // Normalize to string for reliable comparison (listing.currentBidderId is the source of truth)
+      const currentHighestBidderId = (listing?.currentBidderId != null && String(listing.currentBidderId).trim() !== '')
+        ? String(listing.currentBidderId).trim()
+        : undefined;
+      const uidNorm = String(uid || '').trim();
 
       let status: 'WINNING' | 'OUTBID' | 'WON' | 'LOST' = 'OUTBID';
       if (type === 'auction') {
-        if (isEnded) status = currentHighestBidderId === uid ? 'WON' : 'LOST';
-        else status = currentHighestBidderId === uid ? 'WINNING' : 'OUTBID';
+        if (isEnded) status = currentHighestBidderId === uidNorm ? 'WON' : 'LOST';
+        else status = currentHighestBidderId === uidNorm ? 'WINNING' : 'OUTBID';
       } else {
         // Non-auction listings shouldn't normally have bids, but be defensive.
         status = 'OUTBID';

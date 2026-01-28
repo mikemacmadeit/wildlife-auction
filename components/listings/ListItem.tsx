@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2, Gavel, Tag, Clock, Heart } from 'lucide-react';
 import { format } from 'date-fns';
-import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, HorseAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, HorseAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -105,8 +105,10 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
       return Number.isFinite(n) && n > 0 ? n : null;
     })();
 
+    // Group lots: show only list price; never show Qty or per-unit breakdown.
+    const isGroupLot = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
     const qtyLabel = (() => {
-      if (!quantity || quantity < 1) return null;
+      if (isGroupLot || !quantity || quantity < 1) return null;
       if (listing.category === 'cattle_livestock') return `${quantity} head`;
       if (listing.category === 'sporting_working_dogs') return `${quantity} dog${quantity === 1 ? '' : 's'}`;
       if (listing.category === 'horse_equestrian') return `${quantity} horse${quantity === 1 ? '' : 's'}`;

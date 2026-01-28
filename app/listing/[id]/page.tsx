@@ -72,7 +72,6 @@ import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
-import { getWinningBidder } from '@/lib/firebase/bids';
 import { placeBidServer } from '@/lib/api/bids';
 import {
   Tooltip,
@@ -169,11 +168,13 @@ export default function ListingDetailPage() {
   const soldAtDate = useMemo(() => toDateSafe(soldAtRaw), [soldAtRaw]);
 
   // Per-user: show "You're the highest bidder" only when the signed-in viewer is the current high bidder on an active auction.
+  // Use normalized string comparison so WINNING/OUTBID matches bids/mine and backend.
   const isCurrentHighBidder = useMemo(() => {
     if (!user?.uid || !listing || listing.type !== 'auction' || isSold) return false;
     const ended = typeof endsAtMs === 'number' ? endsAtMs <= Date.now() : false;
     if (ended) return false;
-    return (listing as any)?.currentBidderId === user.uid;
+    const bidderId = String((listing as any)?.currentBidderId ?? '').trim();
+    return bidderId !== '' && bidderId === String(user.uid).trim();
   }, [user?.uid, listing?.id, listing?.type, (listing as any)?.currentBidderId, isSold, endsAtMs]);
 
   // Use photo focal points (selected during upload) to match object-cover crop on the listing page gallery.
@@ -210,7 +211,8 @@ export default function ListingDetailPage() {
       setWinningBidAmount(null);
       return;
     }
-    const winner = listing.currentBidderId && listing.currentBidderId === user.uid;
+    const bidderId = String((listing as any)?.currentBidderId ?? '').trim();
+    const winner = bidderId !== '' && bidderId === String(user.uid).trim();
     setIsWinningBidder(Boolean(winner));
     if (winner) {
       const amt = Number(listing.currentBid || listing.startingBid || 0);
@@ -731,10 +733,11 @@ export default function ListingDetailPage() {
       }
     }
 
-    // Verify user is still the winning bidder
+    // Verify user is still the winning bidder (use listing as source of truth; it's updated in same transaction as bids)
     try {
-      const winningBid = await getWinningBidder(listingId);
-      if (!winningBid || winningBid.bidderId !== user.uid) {
+      const currentHighBidderId = (listing as any)?.currentBidderId ? String((listing as any).currentBidderId).trim() : '';
+      const isWinner = currentHighBidderId === String(user.uid).trim();
+      if (!isWinner) {
         toast({
           title: 'Not the Winner',
           description: 'You are not the winning bidder for this auction.',
@@ -744,7 +747,7 @@ export default function ListingDetailPage() {
         return;
       }
 
-      const amt = Number(winningBidAmount || listing!.currentBid || listing!.startingBid || 0);
+      const amt = Number(winningBidAmount ?? (listing as any)?.currentBid ?? (listing as any)?.startingBid ?? 0);
       setPendingCheckout({ amountUsd: Number.isFinite(amt) ? amt : 0 });
       if (isAnimalListing && !animalRiskAcked) setAnimalAckOpen(true);
       else setPaymentDialogOpen(true);

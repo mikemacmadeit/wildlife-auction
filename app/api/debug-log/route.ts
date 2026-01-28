@@ -4,16 +4,22 @@
  * Only available in development.
  */
 
-import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function json(body: object, init?: { status?: number }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 export async function POST(request: Request) {
   if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ ok: false }, { status: 404 });
+    return json({ ok: false }, { status: 404 });
   }
   try {
     const body = await request.json();
@@ -24,8 +30,8 @@ export async function POST(request: Request) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.appendFileSync(file, line);
-    return NextResponse.json({ ok: true });
+    return json({ ok: true });
   } catch {
-    return NextResponse.json({ ok: false }, { status: 500 });
+    return json({ ok: false }, { status: 500 });
   }
 }

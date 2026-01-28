@@ -42,7 +42,11 @@ export function AutoBidPanel(props: {
   const [docState, setDocState] = useState<AutoBidDoc | null>(null);
   const [maxUsd, setMaxUsd] = useState<string>('');
 
-  const isWinning = Boolean(user?.uid && props.currentHighBidderId && user.uid === props.currentHighBidderId);
+  const isWinning = Boolean(
+    user?.uid &&
+    props.currentHighBidderId &&
+    String(props.currentHighBidderId).trim() === String(user.uid).trim()
+  );
 
   useEffect(() => {
     if (!user?.uid) {

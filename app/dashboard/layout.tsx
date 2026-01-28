@@ -754,12 +754,15 @@ export default function DashboardLayout({
                     'flex flex-col items-center justify-center gap-1',
                     'hover:bg-background/50 active:bg-background',
                     'min-h-[44px] touch-manipulation',
-                    active && 'text-primary'
+                    active && 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]'
                   )}
                 >
                   <div className="relative">
                     <Icon
-                      className={cn('h-5 w-5', active ? 'text-primary' : 'text-muted-foreground')}
+                      className={cn(
+                        'h-5 w-5',
+                        active ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
+                      )}
                     />
                     {item.badge && item.badge > 0 && (
                       <Badge
@@ -773,7 +776,7 @@ export default function DashboardLayout({
                   <span
                     className={cn(
                       'text-[10px] font-medium',
-                      active ? 'text-primary' : 'text-muted-foreground'
+                      active ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
                     )}
                   >
                     {item.label.split(' ')[0]}

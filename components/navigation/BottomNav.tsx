@@ -44,11 +44,21 @@ export function BottomNav() {
                 'flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-muted/50 active:bg-muted',
                 'min-h-[44px] touch-manipulation',
-                isActive && 'text-primary'
+                isActive && 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]'
               )}
             >
-              <Icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
-              <span className={cn('text-xs font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>
+              <Icon
+                className={cn(
+                  'h-5 w-5',
+                  isActive ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
+                )}
+              />
+              <span
+                className={cn(
+                  'text-xs font-medium',
+                  isActive ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
+                )}
+              >
                 {item.label}
               </span>
             </Link>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -95,7 +95,8 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
     listing.currentBidderId === user.uid
   );
 
-  // Get key attributes to display on card
+  // Get key attributes to display on card. Group lots: no Qty/per-unit line (list price only).
+  const isGroupLot = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
   const getKeyAttributes = () => {
     if (!listing.attributes) return null;
     
@@ -104,7 +105,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
       return [
         attrs.speciesId && `Species: ${attrs.speciesId}`,
         attrs.sex && `Sex: ${attrs.sex}`,
-        attrs.quantity && `Qty: ${attrs.quantity}`,
+        !isGroupLot && attrs.quantity && `Qty: ${attrs.quantity}`,
       ].filter(Boolean).slice(0, 2);
     }
     
@@ -154,7 +155,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
       return [
         attrs.breed ? `Breed: ${attrs.breed}` : null,
         attrs.sex ? `Sex: ${attrs.sex}` : null,
-        attrs.quantity ? `Qty: ${attrs.quantity}` : null,
+        !isGroupLot && attrs.quantity ? `Qty: ${attrs.quantity}` : null,
       ].filter(Boolean).slice(0, 2);
     }
     
