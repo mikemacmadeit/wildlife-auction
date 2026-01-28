@@ -318,6 +318,7 @@ export default function SellerPayoutsPage() {
 
             const status: PayoutRowStatus = isPending ? 'pending' : isCompleted ? 'completed' : isAvailable ? 'available' : 'pending';
 
+            const paidAtDate = toDateSafe(data?.paidAt);
             return {
               id: orderId,
               orderId,
@@ -328,14 +329,14 @@ export default function SellerPayoutsPage() {
               sellerAmount,
               status,
               orderStatus: statusRaw,
-              paidAt: toDateSafe(data?.paidAt),
+              paidAt: paidAtDate,
               releaseEligibleAt: toDateSafe(data?.releaseEligibleAt),
               releasedAt: toDateSafe(data?.releasedAt),
               stripeTransferId,
             } satisfies PayoutRow;
           })
-          // keep only orders that represent a real money flow
-          .filter((r) => r.listingId && r.amount > 0 && r.sellerAmount >= 0);
+          // keep only orders that represent a real money flow; hide abandoned checkouts (cancelled, never paid)
+          .filter((r) => r.listingId && r.amount > 0 && r.sellerAmount >= 0 && !(r.orderStatus === 'cancelled' && !r.paidAt));
 
         rows.sort((a, b) => {
           const aMs = (a.releasedAt || a.releaseEligibleAt || a.paidAt)?.getTime?.() || 0;

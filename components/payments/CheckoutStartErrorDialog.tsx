@@ -23,23 +23,23 @@ export function CheckoutStartErrorDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg border-2 w-[calc(100vw-2rem)] sm:w-full">
-        <DialogHeader>
-          <DialogTitle>Checkout couldn’t be started</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden sm:max-w-lg border-2 w-[calc(100vw-2rem)] sm:w-full p-3 sm:p-4 md:p-6">
+        <DialogHeader className="shrink-0 pb-2 pr-8">
+          <DialogTitle className="text-base sm:text-lg">Checkout couldn’t be started</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm mt-0.5">
             {failedWasCard
               ? 'Try again with card, or use ACH/wire if available for this order.'
-              : 'That option didn’t work — but card is available for this order. Use "Pay with card" below to continue.'}
+              : 'That option didn’t work — but card is available. Use "Pay with card" below.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="rounded-lg border bg-muted/20 p-3 text-sm">
-            <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 -mx-1 px-1">
+          <div className="rounded-lg border bg-muted/20 p-2.5 sm:p-3 text-xs sm:text-sm">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="font-semibold">What happened</div>
-              <Badge variant="secondary">Tried: {attemptedMethod}</Badge>
+              <Badge variant="secondary" className="text-[10px] sm:text-xs">Tried: {attemptedMethod}</Badge>
             </div>
-            <div className="text-muted-foreground mt-1">{errorMessage}</div>
+            <div className="text-muted-foreground mt-1 break-words">{errorMessage}</div>
           </div>
 
           <div className="space-y-2">
@@ -77,17 +77,17 @@ export function CheckoutStartErrorDialog(props: {
           </div>
 
           {technicalDetails ? (
-            <div className="rounded-lg border p-3">
+            <div className="rounded-lg border p-2.5 sm:p-3">
               <button
                 type="button"
-                className="w-full flex items-center justify-between text-sm font-semibold"
+                className="w-full flex items-center justify-between text-xs sm:text-sm font-semibold"
                 onClick={() => setShowTech((s) => !s)}
               >
                 Technical details
                 {showTech ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
               {showTech ? (
-                <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-muted-foreground max-h-[30vh] overflow-y-auto overflow-x-hidden">
+                <pre className="mt-2 whitespace-pre-wrap break-all text-[11px] sm:text-xs text-muted-foreground max-h-[20vh] sm:max-h-[30vh] overflow-y-auto overflow-x-hidden">
                   {technicalDetails}
                 </pre>
               ) : null}

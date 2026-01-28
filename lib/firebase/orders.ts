@@ -422,15 +422,19 @@ export async function markOrderAsPaid(
   });
 }
 
-/** Statuses that mean "awaiting payment" – orders in these states must not appear in buyer "My purchases" until payment completes. */
+/** Statuses that mean "awaiting payment" – must not appear in buyer "My purchases" until payment completes. */
 const AWAITING_PAYMENT_STATUSES = ['pending', 'awaiting_bank_transfer', 'awaiting_wire'] as const;
+
+/** Buyer "My purchases" only shows real purchases: exclude awaiting payment and cancelled (abandoned checkouts). */
+const BUYER_HIDDEN_STATUSES = [...AWAITING_PAYMENT_STATUSES, 'cancelled'] as const;
 
 /**
  * Get orders for a user (as buyer or seller)
  * CRITICAL: Normalizes data on read to prevent int32 serialization errors
  *
- * For buyers: only returns orders where payment has been confirmed (excludes pending / awaiting_bank_transfer /
- * awaiting_wire). This ensures "My purchases" shows only actual purchases, not abandoned or in-progress checkouts.
+ * For buyers: only returns orders that are real purchases. Excludes pending / awaiting_bank_transfer /
+ * awaiting_wire (abandoned or in-progress checkouts) and cancelled (e.g. abandoned checkouts that were
+ * cleaned up), so "My purchases" never shows those.
  */
 export async function getOrdersForUser(
   userId: string,
@@ -458,7 +462,7 @@ export async function getOrdersForUser(
   });
 
   if (role === 'buyer') {
-    return orders.filter((o) => !(AWAITING_PAYMENT_STATUSES as readonly string[]).includes(o.status ?? ''));
+    return orders.filter((o) => !(BUYER_HIDDEN_STATUSES as readonly string[]).includes(o.status ?? ''));
   }
   return orders;
 }

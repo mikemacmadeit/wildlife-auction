@@ -40,32 +40,32 @@ export function PaymentMethodDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-2 bg-background shadow-premium overflow-x-hidden w-[calc(100vw-2rem)] sm:w-full sm:max-w-3xl lg:max-w-4xl">
-        <DialogHeader>
-          <div className="flex items-start justify-between gap-3 flex-wrap">
+      <DialogContent className="border-2 bg-background shadow-premium overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[90vh] w-[calc(100vw-2rem)] sm:w-full sm:max-w-3xl lg:max-w-4xl p-3 sm:p-4 md:p-6">
+        <DialogHeader className="shrink-0 space-y-1 pb-2 sm:pb-0">
+          <div className="flex items-start justify-between gap-2 sm:gap-3 flex-wrap pr-8">
             <div className="min-w-0">
-              <DialogTitle>Choose payment method</DialogTitle>
-              <DialogDescription className="hidden sm:block">
+              <DialogTitle className="text-base sm:text-lg">Choose payment method</DialogTitle>
+              <DialogDescription className="hidden sm:block text-xs mt-0.5">
                 Select how you&apos;d like to pay. All payments are encrypted and processed securely.
               </DialogDescription>
             </div>
-            <Badge variant="secondary" className="font-semibold shrink-0 max-w-full tabular-nums">
+            <Badge variant="secondary" className="font-semibold shrink-0 max-w-full tabular-nums text-xs">
               {amountLabel}
             </Badge>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-1">
-            <span className="inline-flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5" aria-hidden />
-              Secure checkout — your payment is encrypted.
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Lock className="h-3 w-3 shrink-0" aria-hidden />
+              Secure checkout
             </span>
             <span className="hidden sm:inline">·</span>
-            <span className="inline-flex items-center gap-1">Secured by Stripe</span>
+            <span>Secured by Stripe</span>
           </div>
         </DialogHeader>
 
-        {/* Compact layout (no scrolling) */}
         <TooltipProvider>
-          <div className="space-y-3 sm:space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden -mx-1 px-1">
+          <div className="space-y-2 sm:space-y-4">
             {options.map((opt) => {
               const Icon = opt.icon;
               const isRec = opt.key === recommended;
@@ -86,7 +86,7 @@ export function PaymentMethodDialog(props: {
                 <Button
                   variant="outline"
                   className={cn(
-                    'w-full min-h-[56px] h-auto py-3 px-3 sm:px-4 text-left border-2 rounded-xl',
+                    'w-full min-h-[48px] sm:min-h-[56px] h-auto py-2.5 sm:py-3 px-2.5 sm:px-4 text-left border-2 rounded-xl',
                     'transition-colors',
                     isRec && isEnabled
                       ? 'border-primary/40 bg-primary/5 hover:bg-primary/10'
@@ -101,7 +101,7 @@ export function PaymentMethodDialog(props: {
                     <div className="flex items-start gap-3 min-w-0">
                       <div
                         className={cn(
-                          'h-9 w-9 rounded-xl border flex items-center justify-center shrink-0',
+                          'h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl border flex items-center justify-center shrink-0',
                           isRec && isEnabled ? 'bg-primary/10 border-primary/25' : 'bg-muted/20 border-border/60'
                         )}
                       >
@@ -148,9 +148,10 @@ export function PaymentMethodDialog(props: {
               );
             })}
 
-            <div className="text-[11px] text-muted-foreground rounded-lg border bg-muted/20 px-3 py-2">
+            <div className="text-[11px] text-muted-foreground rounded-lg border bg-muted/20 px-2.5 sm:px-3 py-1.5 sm:py-2">
               {canUseBankRails ? 'Card is fastest. ACH/wire can help on larger purchases.' : 'Sign in + verify email for ACH/wire.'}
             </div>
+          </div>
           </div>
         </TooltipProvider>
       </DialogContent>

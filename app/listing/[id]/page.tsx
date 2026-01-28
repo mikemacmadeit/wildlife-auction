@@ -798,7 +798,13 @@ export default function ListingDetailPage() {
       }
 
       setIsPlacingBid(true);
-      const qty = listing.type === 'fixed' ? Math.max(1, Math.min(buyQuantity, buyNowAvailability.available || 1)) : 1;
+      // Group lot: entire lot is one price; always send quantity 1 so Stripe total = listing price (not price × count).
+      const qty =
+        listing.type === 'fixed'
+          ? buyNowAvailability.isGroupListing
+            ? 1
+            : Math.max(1, Math.min(buyQuantity, buyNowAvailability.available || 1))
+          : 1;
 
       // Client-side eligibility guard for nicer UX (server also enforces).
       if (method !== 'card' && !eligiblePaymentMethods.includes(method as any)) {
