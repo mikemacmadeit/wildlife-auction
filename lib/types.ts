@@ -268,6 +268,24 @@ export function isGroupLotQuantityMode(mode: string | undefined): boolean {
   return mode === 'group_lot' || mode === 'group';
 }
 
+/** Effective quantity mode derived from mode + quantity. Matches form's "show sex/age" and quantity-by-sex logic. */
+export function getEffectiveQuantityMode(mode: string | undefined, quantity: number | undefined): 'single' | 'fixed_group' | 'group_lot' {
+  if (mode === 'group_lot' || mode === 'group') return 'group_lot';
+  if (mode === 'fixed_group' || mode === 'individual') return 'fixed_group';
+  if (mode === 'single') return 'single';
+  return typeof quantity === 'number' && quantity === 1 ? 'single' : 'fixed_group';
+}
+
+/** True when listing is a single animal (sex/age apply; require sex/age only then). Use with getEffectiveQuantityMode so undefined mode + quantity 1 is treated as single. */
+export function isSingleAnimalQuantityMode(mode: string | undefined): boolean {
+  return mode !== 'fixed_group' && mode !== 'group_lot' && mode !== 'group';
+}
+
+/** Prefer this when you have quantity: matches form logic so require-sex/require-quantity-by-sex align with what’s shown. */
+export function isSingleAnimalListing(mode: string | undefined, quantity: number | undefined): boolean {
+  return getEffectiveQuantityMode(mode, quantity) === 'single';
+}
+
 // Union type for category-specific attributes
 export type ListingAttributes =
   | WhitetailBreederAttributes

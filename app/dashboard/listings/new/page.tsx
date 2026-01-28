@@ -28,6 +28,7 @@ import {
   EquipmentAttributes,
   WhitetailBreederAttributes,
   SportingWorkingDogAttributes,
+  isSingleAnimalListing,
 } from '@/lib/types';
 import { AlertCircle } from 'lucide-react';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
@@ -1245,11 +1246,12 @@ function NewListingPageContent() {
               if (formData.category === 'whitetail_breeder') {
                 const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
                 const errs: string[] = [];
+                const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
                 if (!attrs.tpwdBreederPermitNumber?.trim()) errs.push('TPWD Breeder Permit Number');
                 if (!attrs.breederFacilityId?.trim()) errs.push('Breeder Facility ID');
                 if (!attrs.deerIdTag?.trim()) errs.push('Deer ID Tag');
                 if (!(attrs as any).tpwdPermitExpirationDate) errs.push('Permit Expiration Date');
-                if (!attrs.sex) errs.push('Sex');
+                if (isSingle && !attrs.sex) errs.push('Sex');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
                 if (!attrs.cwdDisclosureChecklist?.cwdAware) errs.push('CWD Awareness acknowledgment');
                 if (!attrs.cwdDisclosureChecklist?.cwdCompliant) errs.push('CWD Compliance confirmation');
@@ -1258,21 +1260,20 @@ function NewListingPageContent() {
               if (formData.category === 'wildlife_exotics') {
                 const attrs = formData.attributes as Partial<WildlifeAttributes>;
                 const errs: string[] = [];
+                const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
                 if (!attrs.speciesId) errs.push('Species');
-                if (!attrs.sex) errs.push('Sex');
+                if (isSingle && !attrs.sex) errs.push('Sex');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                // Disclosures are now handled in the final seller acknowledgment step, not in step validation
                 return errs;
               }
               if (formData.category === 'cattle_livestock') {
                 const attrs = formData.attributes as Partial<CattleAttributes>;
                 const errs: string[] = [];
+                const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
                 if (!attrs.breed?.trim()) errs.push('Breed');
-                if (!attrs.sex) errs.push('Sex');
-                // Registered is modeled as a checkbox; defaulting to false is acceptable, but if it's still unset, flag it.
+                if (isSingle && !attrs.sex) errs.push('Sex');
                 if ((attrs as any).registered !== true && (attrs as any).registered !== false) errs.push('Registered');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                // Disclosures are now handled in the final seller acknowledgment step, not in step validation
                 const hasAge =
                   typeof (attrs as any).age === 'number'
                     ? Number.isFinite((attrs as any).age)
@@ -1284,22 +1285,26 @@ function NewListingPageContent() {
               if (formData.category === 'horse_equestrian') {
                 const attrs: any = formData.attributes as any;
                 const errs: string[] = [];
+                const isSingle = isSingleAnimalListing(attrs.quantityMode, attrs.quantity);
                 if (attrs.speciesId !== 'horse') errs.push('Species');
-                if (!attrs.sex) errs.push('Sex');
+                if (isSingle && !attrs.sex) errs.push('Sex');
                 if (attrs.registered !== true && attrs.registered !== false) errs.push('Registered');
                 if (attrs.registered === true && !String(attrs.registrationNumber || '').trim()) errs.push('Registration Number');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                // Disclosures are now handled in the final seller acknowledgment step, not in step validation
                 return errs;
               }
               if (formData.category === 'sporting_working_dogs') {
-                const attrs = formData.attributes as Partial<SportingWorkingDogAttributes>;
+                const attrs: any = formData.attributes as any;
                 const errs: string[] = [];
-                if ((attrs as any).speciesId !== 'dog') errs.push('Species');
-                if (!attrs.breed?.trim()) errs.push('Breed');
-                if (!attrs.sex) errs.push('Sex');
-                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
-                // Disclosures are now handled in the final seller acknowledgment step, not validated here
+                const isSingle = isSingleAnimalListing(attrs.quantityMode, attrs.quantity);
+                if (attrs.speciesId !== 'dog') errs.push('Species');
+                if (!String(attrs.breed || '').trim()) errs.push('Breed');
+                if (isSingle && !attrs.sex) errs.push('Sex');
+                if (isSingle) {
+                  const hasAge = typeof attrs.age === 'number' ? Number.isFinite(attrs.age) : !!String(attrs.age || '').trim();
+                  if (!hasAge) errs.push('Age');
+                }
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity');
                 return errs;
               }
               if (formData.category === 'ranch_equipment' || formData.category === 'ranch_vehicles' || formData.category === 'hunting_outfitter_assets') {
@@ -1357,13 +1362,14 @@ function NewListingPageContent() {
         if (formData.category === 'whitetail_breeder') {
           const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
           const errors: string[] = [];
-          
+          const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
+
           if (!attrs.tpwdBreederPermitNumber?.trim()) errors.push('TPWD Breeder Permit Number');
           if (!attrs.breederFacilityId?.trim()) errors.push('Breeder Facility ID');
           if (!attrs.deerIdTag?.trim()) errors.push('Deer ID Tag');
           if (!(attrs as any).tpwdPermitExpirationDate) errors.push('Permit Expiration Date');
-          if (!attrs.sex) errors.push('Sex');
-          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (isSingle && !attrs.sex) errors.push('Sex');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           if (!attrs.cwdDisclosureChecklist?.cwdAware) errors.push('CWD Awareness acknowledgment');
           if (!attrs.cwdDisclosureChecklist?.cwdCompliant) errors.push('CWD Compliance confirmation');
 
@@ -1401,9 +1407,10 @@ function NewListingPageContent() {
         if (formData.category === 'wildlife_exotics') {
           const attrs = formData.attributes as Partial<WildlifeAttributes>;
           const errors: string[] = [];
+          const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
           if (!attrs.speciesId) errors.push('Species');
-          if (!attrs.sex) errors.push('Sex');
-          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (isSingle && !attrs.sex) errors.push('Sex');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           if (errors.length) {
             toast({
@@ -1418,10 +1425,11 @@ function NewListingPageContent() {
         if (formData.category === 'cattle_livestock') {
           const attrs = formData.attributes as Partial<CattleAttributes>;
           const errors: string[] = [];
+          const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
           if (!attrs.breed?.trim()) errors.push('Breed');
-          if (!attrs.sex) errors.push('Sex');
+          if (isSingle && !attrs.sex) errors.push('Sex');
           if ((attrs as any).registered !== true && (attrs as any).registered !== false) errors.push('Registered');
-          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           const hasAge =
             typeof (attrs as any).age === 'number'
@@ -1442,11 +1450,12 @@ function NewListingPageContent() {
         if (formData.category === 'horse_equestrian') {
           const attrs: any = formData.attributes as any;
           const errors: string[] = [];
+          const isSingle = isSingleAnimalListing(attrs.quantityMode, attrs.quantity);
           if (attrs.speciesId !== 'horse') errors.push('Species');
-          if (!attrs.sex) errors.push('Sex');
+          if (isSingle && !attrs.sex) errors.push('Sex');
           if (attrs.registered !== true && attrs.registered !== false) errors.push('Registered');
           if (attrs.registered === true && !String(attrs.registrationNumber || '').trim()) errors.push('Registration Number');
-          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           if (errors.length) {
             toast({
@@ -1461,10 +1470,15 @@ function NewListingPageContent() {
         if (formData.category === 'sporting_working_dogs') {
           const attrs: any = formData.attributes as any;
           const errors: string[] = [];
+          const isSingle = isSingleAnimalListing(attrs.quantityMode, attrs.quantity);
           if (attrs.speciesId !== 'dog') errors.push('Species');
           if (!String(attrs.breed || '').trim()) errors.push('Breed');
-          if (!attrs.sex) errors.push('Sex');
-          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
+          if (isSingle && !attrs.sex) errors.push('Sex');
+          if (isSingle) {
+            const hasAge = typeof attrs.age === 'number' ? Number.isFinite(attrs.age) : !!String(attrs.age || '').trim();
+            if (!hasAge) errors.push('Age');
+          }
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not validated here
           if (errors.length) {
             toast({

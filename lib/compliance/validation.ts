@@ -15,6 +15,7 @@ import {
   HorseAttributes,
   SportingWorkingDogAttributes,
   EXOTIC_SPECIES,
+  isSingleAnimalListing,
 } from '@/lib/types';
 import { isTexasOnlyCategory } from '@/lib/compliance/requirements';
 
@@ -115,9 +116,11 @@ export function validateProhibitedContent(
  * Validate whitetail breeder compliance requirements
  */
 export function validateWhitetailBreeder(attributes: WhitetailBreederAttributes): void {
-  // Core required fields
-  if (!attributes.sex || String(attributes.sex).trim() === '') {
-    throw new Error('Sex is required for whitetail breeder listings.');
+  // Core required fields (sex/age only for single-animal listings)
+  if (isSingleAnimalListing((attributes as any).quantityMode, (attributes as any).quantity)) {
+    if (!attributes.sex || String(attributes.sex).trim() === '') {
+      throw new Error('Sex is required for whitetail breeder listings.');
+    }
   }
   if (typeof (attributes as any).quantity !== 'number' || !Number.isFinite((attributes as any).quantity) || (attributes as any).quantity < 1) {
     throw new Error('Quantity is required and must be at least 1 for whitetail breeder listings.');
@@ -197,8 +200,10 @@ export function validateWildlifeExotics(attributes: WildlifeAttributes): void {
     throw new Error('Species ID is required for wildlife/exotics listings.');
   }
 
-  if (!attributes.sex || String(attributes.sex).trim() === '') {
-    throw new Error('Sex is required for wildlife/exotics listings.');
+  if (isSingleAnimalListing((attributes as any).quantityMode, (attributes as any).quantity)) {
+    if (!attributes.sex || String(attributes.sex).trim() === '') {
+      throw new Error('Sex is required for wildlife/exotics listings.');
+    }
   }
 
   if (typeof (attributes as any).quantity !== 'number' || !Number.isFinite((attributes as any).quantity) || (attributes as any).quantity < 1) {
@@ -240,15 +245,17 @@ export function validateCattle(attributes: CattleAttributes): void {
     throw new Error('Breed is required for cattle listings.');
   }
 
-  if (!attributes.sex || String(attributes.sex).trim() === '') {
-    throw new Error('Sex is required for cattle listings.');
+  if (isSingleAnimalListing((attributes as any).quantityMode, (attributes as any).quantity)) {
+    if (!attributes.sex || String(attributes.sex).trim() === '') {
+      throw new Error('Sex is required for cattle listings.');
+    }
   }
 
   if (typeof (attributes as any).quantity !== 'number' || !Number.isFinite((attributes as any).quantity) || (attributes as any).quantity < 1) {
     throw new Error('Quantity is required and must be at least 1 for cattle listings.');
   }
-  
-  // Require either age or weightRange
+
+  // Require either age or weightRange for all (age field is only shown for single-animal)
   const hasAge =
     typeof (attributes as any).age === 'number'
       ? Number.isFinite((attributes as any).age)
@@ -357,9 +364,11 @@ export function validateHorse(attributes: HorseAttributes): void {
     throw new Error('Horse listings must have speciesId = "horse".');
   }
 
-  const sex = String((attributes as any).sex || '').trim();
-  if (!sex) {
-    throw new Error('Sex is required for horse listings.');
+  if (isSingleAnimalListing((attributes as any).quantityMode, (attributes as any).quantity)) {
+    const sex = String((attributes as any).sex || '').trim();
+    if (!sex) {
+      throw new Error('Sex is required for horse listings.');
+    }
   }
 
   // Registered must be explicitly set
@@ -405,17 +414,18 @@ export function validateSportingWorkingDogs(attributes: SportingWorkingDogAttrib
     throw new Error('Breed is required for Sporting & Working Dogs listings.');
   }
 
-  const hasAge =
-    typeof (attributes as any).age === 'number'
-      ? Number.isFinite((attributes as any).age)
-      : !!String((attributes as any).age || '').trim();
-  if (!hasAge) {
-    throw new Error('Age is required for Sporting & Working Dogs listings.');
-  }
-
-  const sex = String((attributes as any).sex || '').trim();
-  if (!sex) {
-    throw new Error('Sex is required for Sporting & Working Dogs listings.');
+  if (isSingleAnimalListing((attributes as any).quantityMode, (attributes as any).quantity)) {
+    const hasAge =
+      typeof (attributes as any).age === 'number'
+        ? Number.isFinite((attributes as any).age)
+        : !!String((attributes as any).age || '').trim();
+    if (!hasAge) {
+      throw new Error('Age is required for Sporting & Working Dogs listings.');
+    }
+    const sex = String((attributes as any).sex || '').trim();
+    if (!sex) {
+      throw new Error('Sex is required for Sporting & Working Dogs listings.');
+    }
   }
 
   if ((attributes as any).identificationDisclosure !== true) {

@@ -198,70 +198,74 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="single" id="horse-qty-single" className="mt-0.5" />
               <Label htmlFor="horse-qty-single" className="cursor-pointer flex-1">
-                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="font-medium">Single Animal</div>
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="fixed_group" id="horse-qty-fixed" className="mt-0.5" />
               <Label htmlFor="horse-qty-fixed" className="cursor-pointer flex-1">
-                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="font-medium">Fixed Group</div>
                 <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="group_lot" id="horse-qty-lot" className="mt-0.5" />
               <Label htmlFor="horse-qty-lot" className="cursor-pointer flex-1">
-                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="font-medium">Group Lot</div>
                 <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="horse-sex" className="text-base font-semibold">
-            Sex <span className="text-destructive">*</span>
-          </Label>
-          <Select value={(attributes as Partial<HorseAttributes>).sex || 'unknown'} onValueChange={(value) => updateAttribute('sex', value)}>
-            <SelectTrigger id="horse-sex" className={cn('min-h-[48px]', hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="stallion">Stallion</SelectItem>
-              <SelectItem value="mare">Mare</SelectItem>
-              <SelectItem value="gelding">Gelding</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
-            </SelectContent>
-          </Select>
-          {hasError('Sex') ? <p className="text-sm text-destructive">Sex selection is required</p> : null}
-        </div>
+        {normalizeQuantityMode((attributes as Partial<HorseAttributes>).quantityMode, (attributes as Partial<HorseAttributes>).quantity) === 'single' && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="horse-sex" className="text-base font-semibold">
+                Sex <span className="text-destructive">*</span>
+              </Label>
+              <Select value={(attributes as Partial<HorseAttributes>).sex || 'unknown'} onValueChange={(value) => updateAttribute('sex', value)}>
+                <SelectTrigger id="horse-sex" className={cn('min-h-[48px]', hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stallion">Stallion</SelectItem>
+                  <SelectItem value="mare">Mare</SelectItem>
+                  <SelectItem value="gelding">Gelding</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+              {hasError('Sex') ? <p className="text-sm text-destructive">Sex selection is required</p> : null}
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="horse-age" className="text-base font-semibold">Age (years, optional)</Label>
-          <Input
-            id="horse-age"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.1"
-            placeholder="e.g., 4 or 7.5"
-            value={(() => {
-              const v = (attributes as Partial<HorseAttributes>).age as any;
-              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
-            })()}
-            onChange={(e) => {
-              const raw = e.target.value;
-              if (!raw) {
-                updateAttribute('age', undefined);
-                return;
-              }
-              const n = Number(raw);
-              updateAttribute('age', Number.isFinite(n) ? n : undefined);
-            }}
-            className="min-h-[48px] text-base"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="horse-age" className="text-base font-semibold">Age (years, optional)</Label>
+              <Input
+                id="horse-age"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.1"
+                placeholder="e.g., 4 or 7.5"
+                value={(() => {
+                  const v = (attributes as Partial<HorseAttributes>).age as any;
+                  return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+                })()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    updateAttribute('age', undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  updateAttribute('age', Number.isFinite(n) ? n : undefined);
+                }}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+          </>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="horse-registered" className="text-base font-semibold">
@@ -373,7 +377,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="horse-qty-male"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<HorseAttributes>).quantityMale === 'number' ? (attributes as Partial<HorseAttributes>).quantityMale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<HorseAttributes>).quantityMale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<HorseAttributes>;
@@ -390,7 +398,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="horse-qty-female"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<HorseAttributes>).quantityFemale === 'number' ? (attributes as Partial<HorseAttributes>).quantityFemale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<HorseAttributes>).quantityFemale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<HorseAttributes>;
@@ -537,54 +549,58 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="whitetail-sex" className="text-base font-semibold">
-            Sex <span className="text-destructive">*</span>
-          </Label>
-          <Select
-            value={(attributes as Partial<WhitetailBreederAttributes>).sex || 'unknown'}
-            onValueChange={(value) => updateAttribute('sex', value)}
-          >
-            <SelectTrigger id="whitetail-sex" className={`min-h-[48px] ${hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
-            </SelectContent>
-          </Select>
-          {hasError('Sex') && (
-            <p className="text-sm text-destructive">Sex selection is required</p>
-          )}
-        </div>
+        {normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity) === 'single' && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="whitetail-sex" className="text-base font-semibold">
+                Sex <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={(attributes as Partial<WhitetailBreederAttributes>).sex || 'unknown'}
+                onValueChange={(value) => updateAttribute('sex', value)}
+              >
+                <SelectTrigger id="whitetail-sex" className={`min-h-[48px] ${hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+              {hasError('Sex') && (
+                <p className="text-sm text-destructive">Sex selection is required</p>
+              )}
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="whitetail-age" className="text-base font-semibold">Age (years, optional)</Label>
-          <Input
-            id="whitetail-age"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.1"
-            placeholder="e.g., 3 or 5.5"
-            value={(() => {
-              const v = (attributes as Partial<WhitetailBreederAttributes>).age as any;
-              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
-            })()}
-            onChange={(e) => {
-              const raw = e.target.value;
-              if (!raw) {
-                updateAttribute('age', undefined);
-                return;
-              }
-              const n = Number(raw);
-              updateAttribute('age', Number.isFinite(n) ? n : undefined);
-            }}
-            className="min-h-[48px] text-base"
-          />
-          <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="whitetail-age" className="text-base font-semibold">Age (years, optional)</Label>
+              <Input
+                id="whitetail-age"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.1"
+                placeholder="e.g., 3 or 5.5"
+                value={(() => {
+                  const v = (attributes as Partial<WhitetailBreederAttributes>).age as any;
+                  return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+                })()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    updateAttribute('age', undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  updateAttribute('age', Number.isFinite(n) ? n : undefined);
+                }}
+                className="min-h-[48px] text-base"
+              />
+              <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
+            </div>
+          </>
+        )}
 
         <div className="space-y-2">
           <Label className="text-base font-semibold">How is this listing sold?</Label>
@@ -604,21 +620,21 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="single" id="whitetail-qty-single" className="mt-0.5" />
               <Label htmlFor="whitetail-qty-single" className="cursor-pointer flex-1">
-                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="font-medium">Single Animal</div>
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="fixed_group" id="whitetail-qty-fixed" className="mt-0.5" />
               <Label htmlFor="whitetail-qty-fixed" className="cursor-pointer flex-1">
-                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="font-medium">Fixed Group</div>
                 <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="group_lot" id="whitetail-qty-lot" className="mt-0.5" />
               <Label htmlFor="whitetail-qty-lot" className="cursor-pointer flex-1">
-                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="font-medium">Group Lot</div>
                 <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
@@ -642,7 +658,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="whitetail-qty-male"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<WhitetailBreederAttributes>).quantityMale === 'number' ? (attributes as Partial<WhitetailBreederAttributes>).quantityMale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<WhitetailBreederAttributes>).quantityMale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<WhitetailBreederAttributes>;
@@ -659,7 +679,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="whitetail-qty-female"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<WhitetailBreederAttributes>).quantityFemale === 'number' ? (attributes as Partial<WhitetailBreederAttributes>).quantityFemale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<WhitetailBreederAttributes>).quantityFemale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<WhitetailBreederAttributes>;
@@ -783,78 +807,82 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="single" id="wildlife-qty-single" className="mt-0.5" />
               <Label htmlFor="wildlife-qty-single" className="cursor-pointer flex-1">
-                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="font-medium">Single Animal</div>
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="fixed_group" id="wildlife-qty-fixed" className="mt-0.5" />
               <Label htmlFor="wildlife-qty-fixed" className="cursor-pointer flex-1">
-                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="font-medium">Fixed Group</div>
                 <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="group_lot" id="wildlife-qty-lot" className="mt-0.5" />
               <Label htmlFor="wildlife-qty-lot" className="cursor-pointer flex-1">
-                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="font-medium">Group Lot</div>
                 <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="wildlife-sex" className="text-base font-semibold">
-            Sex <span className="text-destructive">*</span>
-          </Label>
-          <Select
-            value={(attributes as Partial<WildlifeAttributes>).sex || 'unknown'}
-            onValueChange={(value) => updateAttribute('sex', value)}
-          >
-            <SelectTrigger
-              id="wildlife-sex"
-              className={cn(
-                'min-h-[48px]',
-                hasError('Sex') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
-              )}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity) === 'single' && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="wildlife-sex" className="text-base font-semibold">
+                Sex <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={(attributes as Partial<WildlifeAttributes>).sex || 'unknown'}
+                onValueChange={(value) => updateAttribute('sex', value)}
+              >
+                <SelectTrigger
+                  id="wildlife-sex"
+                  className={cn(
+                    'min-h-[48px]',
+                    hasError('Sex') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+                  )}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="wildlife-age" className="text-base font-semibold">Age (years, optional)</Label>
-          <Input
-            id="wildlife-age"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.1"
-            placeholder="e.g., 3 or 5.5"
-            value={(() => {
-              const v = (attributes as Partial<WildlifeAttributes>).age as any;
-              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
-            })()}
-            onChange={(e) => {
-              const raw = e.target.value;
-              if (!raw) {
-                updateAttribute('age', undefined);
-                return;
-              }
-              const n = Number(raw);
-              updateAttribute('age', Number.isFinite(n) ? n : undefined);
-            }}
-            className="min-h-[48px] text-base"
-          />
-          <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="wildlife-age" className="text-base font-semibold">Age (years, optional)</Label>
+              <Input
+                id="wildlife-age"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.1"
+                placeholder="e.g., 3 or 5.5"
+                value={(() => {
+                  const v = (attributes as Partial<WildlifeAttributes>).age as any;
+                  return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+                })()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    updateAttribute('age', undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  updateAttribute('age', Number.isFinite(n) ? n : undefined);
+                }}
+                className="min-h-[48px] text-base"
+              />
+              <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
+            </div>
+          </>
+        )}
 
         {normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity) !== 'single' && (
           <div className="space-y-2">
@@ -873,7 +901,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="wildlife-qty-male"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<WildlifeAttributes>).quantityMale === 'number' ? (attributes as Partial<WildlifeAttributes>).quantityMale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<WildlifeAttributes>).quantityMale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<WildlifeAttributes>;
@@ -890,7 +922,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="wildlife-qty-female"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<WildlifeAttributes>).quantityFemale === 'number' ? (attributes as Partial<WildlifeAttributes>).quantityFemale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<WildlifeAttributes>).quantityFemale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<WildlifeAttributes>;
@@ -1005,21 +1041,21 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="single" id="cattle-qty-single" className="mt-0.5" />
               <Label htmlFor="cattle-qty-single" className="cursor-pointer flex-1">
-                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="font-medium">Single Animal</div>
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="fixed_group" id="cattle-qty-fixed" className="mt-0.5" />
               <Label htmlFor="cattle-qty-fixed" className="cursor-pointer flex-1">
-                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="font-medium">Fixed Group</div>
                 <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, heifers, yearlings.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="group_lot" id="cattle-qty-lot" className="mt-0.5" />
               <Label htmlFor="cattle-qty-lot" className="cursor-pointer flex-1">
-                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="font-medium">Group Lot</div>
                 <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
@@ -1054,7 +1090,8 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                       id={id}
                       type="number"
                       min={0}
-                      value={typeof val === 'number' && val >= 0 ? val : ''}
+                      placeholder="0"
+                      value={typeof val === 'number' && val > 0 ? val : ''}
                       onChange={(e) => {
                         const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                         const curr = attributes as Partial<CattleAttributes>;
@@ -1085,60 +1122,64 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="cattle-sex" className="text-base font-semibold">
-            Primary sex <span className="text-muted-foreground font-normal">(for search when all same)</span>
-          </Label>
-          <Select
-            value={(attributes as Partial<CattleAttributes>).sex || 'unknown'}
-            onValueChange={(value) => updateAttribute('sex', value)}
-          >
-            <SelectTrigger
-              id="cattle-sex"
-              className={cn(
-                'min-h-[48px]',
-                hasError('Sex') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
-              )}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="bull">Bull</SelectItem>
-              <SelectItem value="cow">Cow</SelectItem>
-              <SelectItem value="heifer">Heifer</SelectItem>
-              <SelectItem value="steer">Steer</SelectItem>
-              <SelectItem value="unknown">Unknown / Mixed</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">Used for filtering when all head are the same sex; use &quot;Unknown / Mixed&quot; when you have more than one sex above.</p>
-        </div>
+        {normalizeQuantityMode((attributes as Partial<CattleAttributes>).quantityMode, (attributes as Partial<CattleAttributes>).quantity) === 'single' && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="cattle-sex" className="text-base font-semibold">
+                Primary sex <span className="text-muted-foreground font-normal">(for search when all same)</span>
+              </Label>
+              <Select
+                value={(attributes as Partial<CattleAttributes>).sex || 'unknown'}
+                onValueChange={(value) => updateAttribute('sex', value)}
+              >
+                <SelectTrigger
+                  id="cattle-sex"
+                  className={cn(
+                    'min-h-[48px]',
+                    hasError('Sex') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+                  )}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bull">Bull</SelectItem>
+                  <SelectItem value="cow">Cow</SelectItem>
+                  <SelectItem value="heifer">Heifer</SelectItem>
+                  <SelectItem value="steer">Steer</SelectItem>
+                  <SelectItem value="unknown">Unknown / Mixed</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Used for filtering when all head are the same sex; use &quot;Unknown / Mixed&quot; when you have more than one sex above.</p>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="cattle-age" className="text-base font-semibold">Age (years, optional)</Label>
-          <Input
-            id="cattle-age"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.1"
-            placeholder="e.g., 3 or 5.5"
-            value={(() => {
-              const v = (attributes as Partial<CattleAttributes>).age as any;
-              return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
-            })()}
-            onChange={(e) => {
-              const raw = e.target.value;
-              if (!raw) {
-                updateAttribute('age', undefined);
-                return;
-              }
-              const n = Number(raw);
-              updateAttribute('age', Number.isFinite(n) ? n : undefined);
-            }}
-            className="min-h-[48px] text-base"
-          />
-          <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="cattle-age" className="text-base font-semibold">Age (years, optional)</Label>
+              <Input
+                id="cattle-age"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.1"
+                placeholder="e.g., 3 or 5.5"
+                value={(() => {
+                  const v = (attributes as Partial<CattleAttributes>).age as any;
+                  return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+                })()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    updateAttribute('age', undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  updateAttribute('age', Number.isFinite(n) ? n : undefined);
+                }}
+                className="min-h-[48px] text-base"
+              />
+              <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
+            </div>
+          </>
+        )}
 
         <div className="space-y-2">
           <div className={cn('flex items-start space-x-3 min-h-[44px]', hasError('Registered') && 'rounded-lg border-2 border-destructive p-3')}>
@@ -1252,52 +1293,54 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="single" id="dog-qty-single" className="mt-0.5" />
               <Label htmlFor="dog-qty-single" className="cursor-pointer flex-1">
-                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="font-medium">Single Animal</div>
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="fixed_group" id="dog-qty-fixed" className="mt-0.5" />
               <Label htmlFor="dog-qty-fixed" className="cursor-pointer flex-1">
-                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="font-medium">Fixed Group</div>
                 <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for litters, cohorts.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
               <RadioGroupItem value="group_lot" id="dog-qty-lot" className="mt-0.5" />
               <Label htmlFor="dog-qty-lot" className="cursor-pointer flex-1">
-                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="font-medium">Group Lot</div>
                 <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="dog-sex" className="text-base font-semibold">
-            Sex <span className="text-destructive">*</span>
-          </Label>
-          <Select
-            value={(attributes as Partial<SportingWorkingDogAttributes>).sex || 'unknown'}
-            onValueChange={(value) => updateAttribute('sex', value)}
-          >
-            <SelectTrigger
-              id="dog-sex"
-              className={cn(
-                'min-h-[48px]',
-                hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
-              )}
+        {normalizeQuantityMode((attributes as Partial<SportingWorkingDogAttributes>).quantityMode, (attributes as Partial<SportingWorkingDogAttributes>).quantity) === 'single' && (
+          <div className="space-y-2">
+            <Label htmlFor="dog-sex" className="text-base font-semibold">
+              Sex <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={(attributes as Partial<SportingWorkingDogAttributes>).sex || 'unknown'}
+              onValueChange={(value) => updateAttribute('sex', value)}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
-            </SelectContent>
-          </Select>
-          {hasError('Sex') ? <p className="text-sm text-destructive">Sex selection is required</p> : null}
-        </div>
+              <SelectTrigger
+                id="dog-sex"
+                className={cn(
+                  'min-h-[48px]',
+                  hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+                )}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="unknown">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasError('Sex') ? <p className="text-sm text-destructive">Sex selection is required</p> : null}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -1333,33 +1376,35 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             ) : null}
             {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="dog-age" className="text-base font-semibold">
-              Age (years, optional)
-            </Label>
-            <Input
-              id="dog-age"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.1"
-              placeholder="e.g., 1.5"
-              value={(() => {
-                const v = (attributes as Partial<SportingWorkingDogAttributes>).age as any;
-                return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
-              })()}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (!raw) {
-                  updateAttribute('age', undefined);
-                  return;
-                }
-                const n = Number(raw);
-                updateAttribute('age', Number.isFinite(n) ? n : undefined);
-              }}
-              className="min-h-[48px] text-base"
-            />
-          </div>
+          {normalizeQuantityMode((attributes as Partial<SportingWorkingDogAttributes>).quantityMode, (attributes as Partial<SportingWorkingDogAttributes>).quantity) === 'single' && (
+            <div className="space-y-2">
+              <Label htmlFor="dog-age" className="text-base font-semibold">
+                Age (years, optional)
+              </Label>
+              <Input
+                id="dog-age"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.1"
+                placeholder="e.g., 1.5"
+                value={(() => {
+                  const v = (attributes as Partial<SportingWorkingDogAttributes>).age as any;
+                  return typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+                })()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    updateAttribute('age', undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  updateAttribute('age', Number.isFinite(n) ? n : undefined);
+                }}
+                className="min-h-[48px] text-base"
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1390,7 +1435,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="dog-qty-male"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<SportingWorkingDogAttributes>).quantityMale === 'number' ? (attributes as Partial<SportingWorkingDogAttributes>).quantityMale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<SportingWorkingDogAttributes>).quantityMale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<SportingWorkingDogAttributes>;
@@ -1407,7 +1456,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                   id="dog-qty-female"
                   type="number"
                   min={0}
-                  value={typeof (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale === 'number' ? (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale : ''}
+                  placeholder="0"
+                  value={(() => {
+                    const n = (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale;
+                    return typeof n === 'number' && n > 0 ? n : '';
+                  })()}
                   onChange={(e) => {
                     const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                     const curr = attributes as Partial<SportingWorkingDogAttributes>;
