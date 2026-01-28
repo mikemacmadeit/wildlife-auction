@@ -253,7 +253,7 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       value: [
         listing.deliveryDetails.maxDeliveryRadiusMiles != null ? `Up to ${listing.deliveryDetails.maxDeliveryRadiusMiles} miles` : null,
         (listing.deliveryDetails.deliveryTimeframe || '').trim()
-          ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === listing.deliveryDetails!.deliveryTimeframe)?.label ?? listing.deliveryDetails.deliveryTimeframe.replace(/_/g, '–'))
+          ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === listing.deliveryDetails!.deliveryTimeframe)?.label ?? (listing.deliveryDetails.deliveryTimeframe ?? '').replace(/_/g, '–'))
           : null,
       ].filter(Boolean).join(' · ') || 'Seller arranges delivery',
       detail: [listing.deliveryDetails.deliveryStatusExplanation, listing.deliveryDetails.deliveryNotes].filter(Boolean).join(' — ') || undefined,
