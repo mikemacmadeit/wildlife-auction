@@ -461,7 +461,7 @@ export default function SellerSalesPage() {
 
                 // Use shared progress model for next action
                 const nextActionData = getNextRequiredAction(o, 'seller');
-                const nextActionHrefBase = nextActionData.ctaAction.startsWith('/') ? nextActionData.ctaAction : `/seller/orders/${o.id}`;
+                const nextActionHrefBase = nextActionData ? (nextActionData.ctaAction.startsWith('/') ? nextActionData.ctaAction : `/seller/orders/${o.id}`) : `/seller/orders/${o.id}`;
                 const nextAction = nextActionData ? {
                   label: nextActionData.ctaLabel,
                   href: nextActionHrefBase.includes('/seller/orders/') ? (nextActionHrefBase.includes('?') ? `${nextActionHrefBase}&from=sales` : `${nextActionHrefBase}?from=sales`) : nextActionHrefBase,

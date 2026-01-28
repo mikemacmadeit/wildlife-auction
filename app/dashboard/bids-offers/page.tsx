@@ -463,7 +463,7 @@ export default function BidsOffersPage() {
         const next = new Set(prev);
         next.add(listingId);
         try {
-          if (user?.uid) localStorage.setItem(`bids_offers_dismissed_${user.uid}`, JSON.stringify([...next]));
+          if (user?.uid) localStorage.setItem(`bids_offers_dismissed_${user.uid}`, JSON.stringify(Array.from(next)));
         } catch {}
         return next;
       });

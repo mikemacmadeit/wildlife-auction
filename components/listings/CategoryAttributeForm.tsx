@@ -39,6 +39,14 @@ type ListingAttributes =
   | HorseAttributes
   | SportingWorkingDogAttributes;
 
+type QuantityModeNew = 'single' | 'fixed_group' | 'group_lot';
+function normalizeQuantityMode(mode: string | undefined, quantity: number | undefined): QuantityModeNew {
+  if (mode === 'group_lot' || mode === 'group') return 'group_lot';
+  if (mode === 'fixed_group' || mode === 'individual') return 'fixed_group';
+  if (mode === 'single') return 'single';
+  return typeof quantity === 'number' && quantity === 1 ? 'single' : 'fixed_group';
+}
+
 interface CategoryAttributeFormProps {
   category: ListingCategory;
   // Union (not intersection): each category has its own attribute shape.
@@ -124,13 +132,13 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
       quantityCow: putIn === 'cow' ? total : 0,
       quantityHeifer: putIn === 'heifer' ? total : 0,
       quantitySteer: putIn === 'steer' ? total : 0,
-    });
+    } as Partial<ListingAttributes>);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   // Whitetail, Wildlife, Horse, Dogs: migrate legacy single quantity into quantityMale/quantityFemale
   useEffect(() => {
-    const maleFemaleCategories = ['whitetail_breeder', 'wildlife_exotics', 'horse_equestrian', 'sporting_working_dogs'] as const;
+    const maleFemaleCategories: ListingCategory[] = ['whitetail_breeder', 'wildlife_exotics', 'horse_equestrian', 'sporting_working_dogs'];
     if (!maleFemaleCategories.includes(category)) return;
     const a = attributes as any;
     const hasBreakdown = a.quantityMale !== undefined || a.quantityFemale !== undefined;
@@ -145,7 +153,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
       quantity: total,
       quantityMale: isMale ? total : isFemale ? 0 : total,
       quantityFemale: isFemale ? total : isMale ? 0 : 0,
-    });
+    } as Partial<ListingAttributes>);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
@@ -171,24 +179,41 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Group or individual</Label>
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
-            value={(attributes as Partial<HorseAttributes>).quantityMode || 'individual'}
-            onValueChange={(v: 'group' | 'individual') => updateAttribute('quantityMode', v)}
+            value={normalizeQuantityMode((attributes as Partial<HorseAttributes>).quantityMode, (attributes as Partial<HorseAttributes>).quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<HorseAttributes>;
+              const sex = a.sex ?? 'unknown';
+              const isMale = sex === 'stallion' || sex === 'gelding';
+              const isFemale = sex === 'mare';
+              if (v === 'single') {
+                onChange({ ...a, quantityMode: 'single', quantity: 1, quantityMale: isMale ? 1 : 0, quantityFemale: isFemale ? 1 : 0 } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
             className="flex flex-col gap-2"
           >
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="individual" id="horse-qty-individual" className="mt-0.5" />
-              <Label htmlFor="horse-qty-individual" className="cursor-pointer flex-1">
-                <div className="font-medium">Individual</div>
-                <div className="text-sm text-muted-foreground">Buyers may choose how many to purchase.</div>
+              <RadioGroupItem value="single" id="horse-qty-single" className="mt-0.5" />
+              <Label htmlFor="horse-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="group" id="horse-qty-group" className="mt-0.5" />
-              <Label htmlFor="horse-qty-group" className="cursor-pointer flex-1">
-                <div className="font-medium">Group</div>
-                <div className="text-sm text-muted-foreground">This is a group listing. All will be purchased together for the listed price.</div>
+              <RadioGroupItem value="fixed_group" id="horse-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="horse-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="horse-qty-lot" className="mt-0.5" />
+              <Label htmlFor="horse-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
@@ -331,54 +356,58 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
 
         {/* Disclosures are now handled in the final seller acknowledgment step, not in the attributes form */}
 
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Quantity by sex <span className="text-destructive">*</span>
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Enter how many male (stallion/gelding) and female (mare).
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="horse-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
-              <Input
-                id="horse-qty-male"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<HorseAttributes>).quantityMale === 'number' ? (attributes as Partial<HorseAttributes>).quantityMale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<HorseAttributes>;
-                  const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
+        {normalizeQuantityMode((attributes as Partial<HorseAttributes>).quantityMode, (attributes as Partial<HorseAttributes>).quantity) !== 'single' && (
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">
+              Quantity by sex <span className="text-destructive">*</span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {normalizeQuantityMode((attributes as Partial<HorseAttributes>).quantityMode, (attributes as Partial<HorseAttributes>).quantity) === 'group_lot'
+                ? 'Enter total count by sex for display. Buyers purchase the entire lot for the listing price.'
+                : 'Enter how many male (stallion/gelding) and female (mare).'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="horse-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
+                <Input
+                  id="horse-qty-male"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<HorseAttributes>).quantityMale === 'number' ? (attributes as Partial<HorseAttributes>).quantityMale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<HorseAttributes>;
+                    const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="horse-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
+                <Input
+                  id="horse-qty-female"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<HorseAttributes>).quantityFemale === 'number' ? (attributes as Partial<HorseAttributes>).quantityFemale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<HorseAttributes>;
+                    const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="horse-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
-              <Input
-                id="horse-qty-female"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<HorseAttributes>).quantityFemale === 'number' ? (attributes as Partial<HorseAttributes>).quantityFemale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<HorseAttributes>;
-                  const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
-            </div>
+            <p className="text-sm font-medium text-foreground">
+              Total: {(attributes as Partial<HorseAttributes>).quantity ?? 0}
+            </p>
+            {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Total quantity must be at least 1</p> : null}
           </div>
-          <p className="text-sm font-medium text-foreground">
-            Total: {(attributes as Partial<HorseAttributes>).quantity ?? 0}
-          </p>
-          {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Total quantity must be at least 1</p> : null}
-        </div>
+        )}
       </div>
     );
   }
@@ -558,79 +587,98 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Group or individual</Label>
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
-            value={(attributes as Partial<WhitetailBreederAttributes>).quantityMode || 'individual'}
-            onValueChange={(v: 'group' | 'individual') => updateAttribute('quantityMode', v)}
+            value={normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<WhitetailBreederAttributes>;
+              const sex = a.sex ?? 'unknown';
+              if (v === 'single') {
+                onChange({ ...a, quantityMode: 'single', quantity: 1, quantityMale: sex === 'male' ? 1 : 0, quantityFemale: sex === 'female' ? 1 : 0 } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
             className="flex flex-col gap-2"
           >
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="individual" id="whitetail-qty-individual" className="mt-0.5" />
-              <Label htmlFor="whitetail-qty-individual" className="cursor-pointer flex-1">
-                <div className="font-medium">Individual</div>
-                <div className="text-sm text-muted-foreground">Buyers may choose how many to purchase.</div>
+              <RadioGroupItem value="single" id="whitetail-qty-single" className="mt-0.5" />
+              <Label htmlFor="whitetail-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="group" id="whitetail-qty-group" className="mt-0.5" />
-              <Label htmlFor="whitetail-qty-group" className="cursor-pointer flex-1">
-                <div className="font-medium">Group</div>
-                <div className="text-sm text-muted-foreground">This is a group listing. All will be purchased together for the listed price.</div>
+              <RadioGroupItem value="fixed_group" id="whitetail-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="whitetail-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="whitetail-qty-lot" className="mt-0.5" />
+              <Label htmlFor="whitetail-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Quantity by sex <span className="text-destructive">*</span>
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Enter how many male and female.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="whitetail-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
-              <Input
-                id="whitetail-qty-male"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<WhitetailBreederAttributes>).quantityMale === 'number' ? (attributes as Partial<WhitetailBreederAttributes>).quantityMale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<WhitetailBreederAttributes>;
-                  const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
+        {normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity) !== 'single' && (
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">
+              Quantity by sex <span className="text-destructive">*</span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity) === 'group_lot'
+                ? 'Enter total count by sex for display. Buyers purchase the entire lot for the listing price.'
+                : 'Enter how many male and female.'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="whitetail-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
+                <Input
+                  id="whitetail-qty-male"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<WhitetailBreederAttributes>).quantityMale === 'number' ? (attributes as Partial<WhitetailBreederAttributes>).quantityMale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<WhitetailBreederAttributes>;
+                    const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="whitetail-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
+                <Input
+                  id="whitetail-qty-female"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<WhitetailBreederAttributes>).quantityFemale === 'number' ? (attributes as Partial<WhitetailBreederAttributes>).quantityFemale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<WhitetailBreederAttributes>;
+                    const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="whitetail-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
-              <Input
-                id="whitetail-qty-female"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<WhitetailBreederAttributes>).quantityFemale === 'number' ? (attributes as Partial<WhitetailBreederAttributes>).quantityFemale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<WhitetailBreederAttributes>;
-                  const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
-            </div>
+            <p className="text-sm font-medium text-foreground">
+              Total: {(attributes as Partial<WhitetailBreederAttributes>).quantity ?? 0}
+            </p>
+            {hasError('Quantity (must be at least 1)') && (
+              <p className="text-sm text-destructive">Total quantity must be at least 1</p>
+            )}
           </div>
-          <p className="text-sm font-medium text-foreground">
-            Total: {(attributes as Partial<WhitetailBreederAttributes>).quantity ?? 0}
-          </p>
-          {hasError('Quantity (must be at least 1)') && (
-            <p className="text-sm text-destructive">Total quantity must be at least 1</p>
-          )}
-        </div>
+        )}
 
         <div className={`space-y-4 p-4 border rounded-lg bg-muted/50 ${hasError('CWD Awareness acknowledgment') || hasError('CWD Compliance confirmation') ? 'border-destructive border-2' : ''}`}>
           <Label className="text-base font-semibold">
@@ -718,24 +766,39 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Group or individual</Label>
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
-            value={(attributes as Partial<WildlifeAttributes>).quantityMode || 'individual'}
-            onValueChange={(v: 'group' | 'individual') => updateAttribute('quantityMode', v)}
+            value={normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<WildlifeAttributes>;
+              const sex = a.sex ?? 'unknown';
+              if (v === 'single') {
+                onChange({ ...a, quantityMode: 'single', quantity: 1, quantityMale: sex === 'male' ? 1 : 0, quantityFemale: sex === 'female' ? 1 : 0 } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
             className="flex flex-col gap-2"
           >
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="individual" id="wildlife-qty-individual" className="mt-0.5" />
-              <Label htmlFor="wildlife-qty-individual" className="cursor-pointer flex-1">
-                <div className="font-medium">Individual</div>
-                <div className="text-sm text-muted-foreground">Buyers may choose how many to purchase.</div>
+              <RadioGroupItem value="single" id="wildlife-qty-single" className="mt-0.5" />
+              <Label htmlFor="wildlife-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="group" id="wildlife-qty-group" className="mt-0.5" />
-              <Label htmlFor="wildlife-qty-group" className="cursor-pointer flex-1">
-                <div className="font-medium">Group</div>
-                <div className="text-sm text-muted-foreground">This is a group listing. All will be purchased together for the listed price.</div>
+              <RadioGroupItem value="fixed_group" id="wildlife-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="wildlife-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="wildlife-qty-lot" className="mt-0.5" />
+              <Label htmlFor="wildlife-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
@@ -793,54 +856,58 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           <p className="text-xs text-muted-foreground">Numbers only (decimals ok). Stored as a number for filtering.</p>
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Quantity by sex <span className="text-destructive">*</span>
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Enter how many male and female.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="wildlife-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
-              <Input
-                id="wildlife-qty-male"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<WildlifeAttributes>).quantityMale === 'number' ? (attributes as Partial<WildlifeAttributes>).quantityMale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<WildlifeAttributes>;
-                  const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
+        {normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity) !== 'single' && (
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">
+              Quantity by sex <span className="text-destructive">*</span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity) === 'group_lot'
+                ? 'Enter total count by sex for display. Buyers purchase the entire lot for the listing price.'
+                : 'Enter how many male and female.'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="wildlife-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
+                <Input
+                  id="wildlife-qty-male"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<WildlifeAttributes>).quantityMale === 'number' ? (attributes as Partial<WildlifeAttributes>).quantityMale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<WildlifeAttributes>;
+                    const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="wildlife-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
+                <Input
+                  id="wildlife-qty-female"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<WildlifeAttributes>).quantityFemale === 'number' ? (attributes as Partial<WildlifeAttributes>).quantityFemale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<WildlifeAttributes>;
+                    const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="wildlife-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
-              <Input
-                id="wildlife-qty-female"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<WildlifeAttributes>).quantityFemale === 'number' ? (attributes as Partial<WildlifeAttributes>).quantityFemale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<WildlifeAttributes>;
-                  const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
-            </div>
+            <p className="text-sm font-medium text-foreground">
+              Total: {(attributes as Partial<WildlifeAttributes>).quantity ?? 0}
+            </p>
+            {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Total quantity must be at least 1</p> : null}
           </div>
-          <p className="text-sm font-medium text-foreground">
-            Total: {(attributes as Partial<WildlifeAttributes>).quantity ?? 0}
-          </p>
-          {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Total quantity must be at least 1</p> : null}
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="wildlife-location-type" className="text-base font-semibold">Location Type (Optional)</Label>
@@ -912,83 +979,111 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Group or individual</Label>
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
-            value={(attributes as Partial<CattleAttributes>).quantityMode || 'individual'}
-            onValueChange={(v: 'group' | 'individual') => updateAttribute('quantityMode', v)}
+            value={normalizeQuantityMode((attributes as Partial<CattleAttributes>).quantityMode, (attributes as Partial<CattleAttributes>).quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<CattleAttributes>;
+              const sex = a.sex ?? 'cow';
+              const putIn = sex === 'bull' ? 'bull' : sex === 'heifer' ? 'heifer' : sex === 'steer' ? 'steer' : 'cow';
+              if (v === 'single') {
+                onChange({
+                  ...a,
+                  quantityMode: 'single',
+                  quantity: 1,
+                  quantityBull: putIn === 'bull' ? 1 : 0,
+                  quantityCow: putIn === 'cow' ? 1 : 0,
+                  quantityHeifer: putIn === 'heifer' ? 1 : 0,
+                  quantitySteer: putIn === 'steer' ? 1 : 0,
+                } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
             className="flex flex-col gap-2"
           >
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="individual" id="cattle-qty-individual" className="mt-0.5" />
-              <Label htmlFor="cattle-qty-individual" className="cursor-pointer flex-1">
-                <div className="font-medium">Individual</div>
-                <div className="text-sm text-muted-foreground">Buyers may choose how many to purchase.</div>
+              <RadioGroupItem value="single" id="cattle-qty-single" className="mt-0.5" />
+              <Label htmlFor="cattle-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="group" id="cattle-qty-group" className="mt-0.5" />
-              <Label htmlFor="cattle-qty-group" className="cursor-pointer flex-1">
-                <div className="font-medium">Group</div>
-                <div className="text-sm text-muted-foreground">This is a group listing. All will be purchased together for the listed price.</div>
+              <RadioGroupItem value="fixed_group" id="cattle-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="cattle-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, heifers, yearlings.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="cattle-qty-lot" className="mt-0.5" />
+              <Label htmlFor="cattle-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Quantity by sex <span className="text-destructive">*</span>
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Enter the number of head for each sex in this listing (e.g. 5 bulls, 5 heifers).
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { key: 'quantityBull' as const, label: 'Bull', id: 'cattle-qty-bull' },
-              { key: 'quantityCow' as const, label: 'Cow', id: 'cattle-qty-cow' },
-              { key: 'quantityHeifer' as const, label: 'Heifer', id: 'cattle-qty-heifer' },
-              { key: 'quantitySteer' as const, label: 'Steer', id: 'cattle-qty-steer' },
-            ].map(({ key, label, id }) => {
-              const c = attributes as Partial<CattleAttributes>;
-              const val = c[key] ?? 0;
-              return (
-                <div key={key} className="space-y-1">
-                  <Label htmlFor={id} className="text-sm font-medium text-muted-foreground">
-                    {label}
-                  </Label>
-                  <Input
-                    id={id}
-                    type="number"
-                    min={0}
-                    value={typeof val === 'number' && val >= 0 ? val : ''}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                      const curr = attributes as Partial<CattleAttributes>;
-                      const next = { ...curr, [key]: v };
-                      const total =
-                        (Number(next.quantityBull) || 0) +
-                        (Number(next.quantityCow) || 0) +
-                        (Number(next.quantityHeifer) || 0) +
-                        (Number(next.quantitySteer) || 0);
-                      onChange({ ...next, quantity: total });
-                    }}
-                    className={cn(
-                      'min-h-[48px] text-base',
-                      hasError('Quantity (must be at least 1)') &&
-                        'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
-                    )}
-                  />
-                </div>
-              );
-            })}
+        {normalizeQuantityMode((attributes as Partial<CattleAttributes>).quantityMode, (attributes as Partial<CattleAttributes>).quantity) !== 'single' && (
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">
+              Quantity by sex <span className="text-destructive">*</span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {normalizeQuantityMode((attributes as Partial<CattleAttributes>).quantityMode, (attributes as Partial<CattleAttributes>).quantity) === 'group_lot'
+                ? 'Enter total count by sex for display. Buyers purchase the entire lot for the listing price.'
+                : 'Enter the number of head for each sex in this listing (e.g. 5 bulls, 5 heifers).'}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { key: 'quantityBull' as const, label: 'Bull', id: 'cattle-qty-bull' },
+                { key: 'quantityCow' as const, label: 'Cow', id: 'cattle-qty-cow' },
+                { key: 'quantityHeifer' as const, label: 'Heifer', id: 'cattle-qty-heifer' },
+                { key: 'quantitySteer' as const, label: 'Steer', id: 'cattle-qty-steer' },
+              ].map(({ key, label, id }) => {
+                const c = attributes as Partial<CattleAttributes>;
+                const val = c[key] ?? 0;
+                return (
+                  <div key={key} className="space-y-1">
+                    <Label htmlFor={id} className="text-sm font-medium text-muted-foreground">
+                      {label}
+                    </Label>
+                    <Input
+                      id={id}
+                      type="number"
+                      min={0}
+                      value={typeof val === 'number' && val >= 0 ? val : ''}
+                      onChange={(e) => {
+                        const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                        const curr = attributes as Partial<CattleAttributes>;
+                        const next = { ...curr, [key]: v };
+                        const total =
+                          (Number(next.quantityBull) || 0) +
+                          (Number(next.quantityCow) || 0) +
+                          (Number(next.quantityHeifer) || 0) +
+                          (Number(next.quantitySteer) || 0);
+                        onChange({ ...next, quantity: total });
+                      }}
+                      className={cn(
+                        'min-h-[48px] text-base',
+                        hasError('Quantity (must be at least 1)') &&
+                          'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background'
+                      )}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              Total: {(attributes as Partial<CattleAttributes>).quantity ?? 0} head
+            </p>
+            {hasError('Quantity (must be at least 1)') ? (
+              <p className="text-sm text-destructive">Total quantity must be at least 1</p>
+            ) : null}
           </div>
-          <p className="text-sm font-medium text-foreground">
-            Total: {(attributes as Partial<CattleAttributes>).quantity ?? 0} head
-          </p>
-          {hasError('Quantity (must be at least 1)') ? (
-            <p className="text-sm text-destructive">Total quantity must be at least 1</p>
-          ) : null}
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="cattle-sex" className="text-base font-semibold">
@@ -1140,24 +1235,39 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </div>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Group or individual</Label>
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
-            value={(attributes as Partial<SportingWorkingDogAttributes>).quantityMode || 'individual'}
-            onValueChange={(v: 'group' | 'individual') => updateAttribute('quantityMode', v)}
+            value={normalizeQuantityMode((attributes as Partial<SportingWorkingDogAttributes>).quantityMode, (attributes as Partial<SportingWorkingDogAttributes>).quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<SportingWorkingDogAttributes>;
+              const sex = a.sex ?? 'unknown';
+              if (v === 'single') {
+                onChange({ ...a, quantityMode: 'single', quantity: 1, quantityMale: sex === 'male' ? 1 : 0, quantityFemale: sex === 'female' ? 1 : 0 } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
             className="flex flex-col gap-2"
           >
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="individual" id="dog-qty-individual" className="mt-0.5" />
-              <Label htmlFor="dog-qty-individual" className="cursor-pointer flex-1">
-                <div className="font-medium">Individual</div>
-                <div className="text-sm text-muted-foreground">Buyers may choose how many to purchase.</div>
+              <RadioGroupItem value="single" id="dog-qty-single" className="mt-0.5" />
+              <Label htmlFor="dog-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">1️⃣ Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="group" id="dog-qty-group" className="mt-0.5" />
-              <Label htmlFor="dog-qty-group" className="cursor-pointer flex-1">
-                <div className="font-medium">Group</div>
-                <div className="text-sm text-muted-foreground">This is a group listing. All will be purchased together for the listed price.</div>
+              <RadioGroupItem value="fixed_group" id="dog-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="dog-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">2️⃣ Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for litters, cohorts.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="dog-qty-lot" className="mt-0.5" />
+              <Label htmlFor="dog-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">3️⃣ Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
               </Label>
             </div>
           </RadioGroup>
@@ -1263,54 +1373,58 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           />
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Quantity by sex <span className="text-destructive">*</span>
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Enter how many male and female.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="dog-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
-              <Input
-                id="dog-qty-male"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<SportingWorkingDogAttributes>).quantityMale === 'number' ? (attributes as Partial<SportingWorkingDogAttributes>).quantityMale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<SportingWorkingDogAttributes>;
-                  const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
+        {normalizeQuantityMode((attributes as Partial<SportingWorkingDogAttributes>).quantityMode, (attributes as Partial<SportingWorkingDogAttributes>).quantity) !== 'single' && (
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">
+              Quantity by sex <span className="text-destructive">*</span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {normalizeQuantityMode((attributes as Partial<SportingWorkingDogAttributes>).quantityMode, (attributes as Partial<SportingWorkingDogAttributes>).quantity) === 'group_lot'
+                ? 'Enter total count by sex for display. Buyers purchase the entire lot for the listing price.'
+                : 'Enter how many male and female.'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="dog-qty-male" className="text-sm font-medium text-muted-foreground">Male</Label>
+                <Input
+                  id="dog-qty-male"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<SportingWorkingDogAttributes>).quantityMale === 'number' ? (attributes as Partial<SportingWorkingDogAttributes>).quantityMale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<SportingWorkingDogAttributes>;
+                    const next = { ...curr, quantityMale: v, quantityFemale: curr.quantityFemale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="dog-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
+                <Input
+                  id="dog-qty-female"
+                  type="number"
+                  min={0}
+                  value={typeof (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale === 'number' ? (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale : ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                    const curr = attributes as Partial<SportingWorkingDogAttributes>;
+                    const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
+                    const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
+                    onChange({ ...next, quantity: total });
+                  }}
+                  className={cn('min-h-[48px] text-base', hasError('Quantity') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="dog-qty-female" className="text-sm font-medium text-muted-foreground">Female</Label>
-              <Input
-                id="dog-qty-female"
-                type="number"
-                min={0}
-                value={typeof (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale === 'number' ? (attributes as Partial<SportingWorkingDogAttributes>).quantityFemale : ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
-                  const curr = attributes as Partial<SportingWorkingDogAttributes>;
-                  const next = { ...curr, quantityFemale: v, quantityMale: curr.quantityMale ?? 0 };
-                  const total = (Number(next.quantityMale) || 0) + (Number(next.quantityFemale) || 0);
-                  onChange({ ...next, quantity: total });
-                }}
-                className={cn('min-h-[48px] text-base', hasError('Quantity') && 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background')}
-              />
-            </div>
+            <p className="text-sm font-medium text-foreground">
+              Total: {(attributes as Partial<SportingWorkingDogAttributes>).quantity ?? 0}
+            </p>
+            {hasError('Quantity') ? <p className="text-sm text-destructive">Total quantity must be at least 1</p> : null}
           </div>
-          <p className="text-sm font-medium text-foreground">
-            Total: {(attributes as Partial<SportingWorkingDogAttributes>).quantity ?? 0}
-          </p>
-          {hasError('Quantity') ? <p className="text-sm text-destructive">Total quantity must be at least 1</p> : null}
-        </div>
+        )}
 
         {/* Disclosures are now handled in the final seller acknowledgment step, not in the attributes form */}
       </div>

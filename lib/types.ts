@@ -113,8 +113,8 @@ export interface WhitetailBreederAttributes {
     cwdCompliant: boolean; // Seller confirms compliance
   };
   healthNotes?: string; // Optional
-  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
-  quantityMode?: 'group' | 'individual';
+  /** single = one animal/one price (no quantity collected); fixed_group = per-unit price × quantity; group_lot = all for one total price. Legacy: 'group'→group_lot, 'individual'→fixed_group. */
+  quantityMode?: 'single' | 'fixed_group' | 'group_lot' | 'group' | 'individual';
 }
 
 export interface WildlifeAttributes {
@@ -129,8 +129,8 @@ export interface WildlifeAttributes {
   /** Count by sex. When set, quantity = quantityMale + quantityFemale. */
   quantityMale?: number;
   quantityFemale?: number;
-  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
-  quantityMode?: 'group' | 'individual';
+  /** single = one animal/one price; fixed_group = per-unit price × quantity; group_lot = all for one total price. Legacy: 'group'|'individual' supported. */
+  quantityMode?: 'single' | 'fixed_group' | 'group_lot' | 'group' | 'individual';
   locationType?: 'seller_location' | 'facility'; // Optional
   animalIdDisclosure: boolean; // Required: seller confirms animals are properly identified/tagged
   healthDisclosure: boolean; // Required: health disclosure acknowledged
@@ -158,8 +158,8 @@ export interface CattleAttributes {
   quantityCow?: number;
   quantityHeifer?: number;
   quantitySteer?: number;
-  /** 'group' = all head sold together for listed price; 'individual' = buyer may choose how many (default). */
-  quantityMode?: 'group' | 'individual';
+  /** single = one animal/one price; fixed_group = per-unit price × quantity; group_lot = all for one total price. Legacy: 'group'|'individual' supported. */
+  quantityMode?: 'single' | 'fixed_group' | 'group_lot' | 'group' | 'individual';
   identificationDisclosure: boolean; // Required: ear tags/brand present
   healthDisclosure: boolean; // Required: health disclosure acknowledged
   healthNotes?: string; // Optional
@@ -191,8 +191,8 @@ export interface HorseAttributes {
   /** Count by sex. Male = stallion/gelding, Female = mare. When set, quantity = quantityMale + quantityFemale. */
   quantityMale?: number;
   quantityFemale?: number;
-  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
-  quantityMode?: 'group' | 'individual';
+  /** single = one animal/one price; fixed_group = per-unit price × quantity; group_lot = all for one total price. Legacy: 'group'|'individual' supported. */
+  quantityMode?: 'single' | 'fixed_group' | 'group_lot' | 'group' | 'individual';
 }
 
 export type EquipmentType = 
@@ -259,8 +259,13 @@ export interface SportingWorkingDogAttributes {
   /** Count by sex. When set, quantity = quantityMale + quantityFemale. */
   quantityMale?: number;
   quantityFemale?: number;
-  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
-  quantityMode?: 'group' | 'individual';
+  /** single = one animal/one price; fixed_group = per-unit price × quantity; group_lot = all for one total price. Legacy: 'group'|'individual' supported. */
+  quantityMode?: 'single' | 'fixed_group' | 'group_lot' | 'group' | 'individual';
+}
+
+/** True when listing is sold as one total price for all (group lot). Use for hiding per-unit quantity selector. */
+export function isGroupLotQuantityMode(mode: string | undefined): boolean {
+  return mode === 'group_lot' || mode === 'group';
 }
 
 // Union type for category-specific attributes
@@ -688,6 +693,7 @@ export type OrderTimelineEventType =
   | 'TRANSFER_PERMIT_REQUESTED'
   | 'TRANSFER_PERMIT_SUBMITTED'
   | 'TRANSFER_PERMIT_APPROVED'
+  | 'DELIVERY_ADDRESS_SET'
   | 'SELLER_PREPARING'
   | 'SELLER_SHIPPED'
   | 'DELIVERED'

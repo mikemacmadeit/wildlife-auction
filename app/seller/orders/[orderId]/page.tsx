@@ -71,7 +71,7 @@ export default function SellerOrderDetailPage() {
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'preparing' | 'in_transit' | null>(null);
+  const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
 
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
@@ -553,8 +553,6 @@ export default function SellerOrderDetailPage() {
                         setAgreePickupOpen(true);
                       } else if (nextAction.ctaAction.includes('mark-out')) {
                         setMarkOutForDeliveryOpen(true);
-                      } else if (nextAction.ctaAction.includes('mark-delivered')) {
-                        await handleMarkDelivered();
                       } else if (nextAction.ctaAction.startsWith('/')) {
                         window.location.href = nextAction.ctaAction;
                       }

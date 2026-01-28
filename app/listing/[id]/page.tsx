@@ -70,7 +70,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { getWinningBidder } from '@/lib/firebase/bids';
 import { placeBidServer } from '@/lib/api/bids';
@@ -270,7 +270,7 @@ export default function ListingDetailPage() {
       typeof (listing as any)?.quantityAvailable === 'number' && Number.isFinite((listing as any).quantityAvailable)
         ? Math.max(0, Math.floor((listing as any).quantityAvailable))
         : total;
-    const isGroupListing = (listing as any)?.attributes?.quantityMode === 'group';
+    const isGroupListing = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
     const canChooseQuantity = listing.type === 'fixed' && available > 1 && !isGroupListing;
     return { total, available, canChooseQuantity, isGroupListing };
   }, [listing]);
