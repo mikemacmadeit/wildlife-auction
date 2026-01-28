@@ -5,6 +5,7 @@
 
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { auth } from '@/lib/firebase/config';
+import { BUILD_INFO } from '@/lib/build-info';
 
 const API_BASE = '/api/stripe';
 
@@ -289,12 +290,21 @@ export async function createCheckoutSession(
     throw new Error('Failed to get authentication token');
   }
 
+  // #region agent log
+  const clientBuild = BUILD_INFO?.shortSha ?? BUILD_INFO?.builtAtIso ?? 'unknown';
+  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'lib/stripe/api.ts createCheckoutSession', message: 'client calling create-session', data: { clientBuild, builtAtIso: BUILD_INFO?.builtAtIso, listingId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
+  // #endregion
+
+  const reqHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+    'X-Client-Build': clientBuild,
+    ...(BUILD_INFO?.builtAtIso ? { 'X-Client-Built': BUILD_INFO.builtAtIso } : {}),
+  };
+
   let response = await fetch(`${API_BASE}/checkout/create-session`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: reqHeaders,
     body: JSON.stringify({
       listingId,
       ...(offerId ? { offerId } : {}),
@@ -310,10 +320,7 @@ export async function createCheckoutSession(
     if (token) {
       response = await fetch(`${API_BASE}/checkout/create-session`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { ...reqHeaders, Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           listingId,
           ...(offerId ? { offerId } : {}),

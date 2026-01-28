@@ -26,6 +26,7 @@ import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/requirements';
 import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 import { isGroupLotQuantityMode } from '@/lib/types';
+import { BUILD_INFO } from '@/lib/build-info';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -153,6 +154,16 @@ export async function POST(request: Request) {
     }
 
     const { listingId, offerId, quantity: quantityRaw, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
+
+    // #region agent log
+    const serverBuild = BUILD_INFO?.shortSha ?? BUILD_INFO?.builtAtIso ?? 'unknown';
+    const clientBuild = request.headers.get('x-client-build') ?? 'none';
+    const referer = request.headers.get('referer') ?? 'none';
+    const origin = request.headers.get('origin') ?? 'none';
+    logInfo('Checkout create-session build identity', { serverBuild, clientBuild, referer: referer.slice(0, 80), origin: origin.slice(0, 80), listingId, buyerId });
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'create-session/route.ts POST', message: 'build identity', data: { serverBuild, clientBuild, referer: referer.slice(0, 120), origin: origin.slice(0, 80), listingId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => {});
+    // #endregion
+
     // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
     const normalizedPaymentMethod =
       paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');
@@ -665,6 +676,35 @@ export async function POST(request: Request) {
       );
     }
 
+    // Verify Connect account exists in Stripe before creating session (avoids "No such destination" for that user).
+    // Cache can say "ready" while the account was later revoked/deleted; this catches it for all payment methods.
+    try {
+      await stripe.accounts.retrieve(String(sellerStripeAccountId));
+    } catch (accErr: any) {
+      const msg = String(accErr?.message || '').toLowerCase();
+      const invalid =
+        msg.includes('no such account') ||
+        msg.includes('invalid') ||
+        msg.includes('no such destination') ||
+        /account.*does not exist|doesn't exist/i.test(msg);
+      logWarn('Checkout create-session: seller Connect account invalid or missing', {
+        route: '/api/stripe/checkout/create-session',
+        listingId,
+        sellerId: listingData.sellerId,
+        sellerStripeAccountId: String(sellerStripeAccountId),
+        error: accErr?.message,
+      });
+      return NextResponse.json(
+        {
+          error: invalid
+            ? "The seller's payment account is not set up correctly. Please try another listing or contact the seller."
+            : 'Seller payment account could not be verified. Please try again or use a different payment method.',
+          code: 'SELLER_ACCOUNT_INVALID',
+        },
+        { status: 400 }
+      );
+    }
+
     // Calculate fees (flat fee for all sellers/categories; never trust client)
     const feePercent = MARKETPLACE_FEE_PERCENT;
     const amount = Math.round(purchaseTotalAmount * 100); // Convert to cents
@@ -838,6 +878,26 @@ export async function POST(request: Request) {
             stripe: { type: stripeError?.type, code: stripeError?.code },
           },
           { status: 503 }
+        );
+      }
+      // Stripe can throw "No such destination" at session create even if accounts.retrieve passed (e.g. restricted account).
+      const destinationRelated =
+        lower.includes('no such destination') ||
+        lower.includes('invalid destination') ||
+        /destination.*invalid|account.*cannot be used|cannot use.*destination/i.test(msg);
+      if (destinationRelated) {
+        logWarn('Checkout create-session: Stripe destination error when creating session', {
+          route: '/api/stripe/checkout/create-session',
+          listingId,
+          sellerId: listingData.sellerId,
+          sellerStripeAccountId: String(sellerStripeAccountId),
+          error: stripeError?.message,
+        });
+        const friendly =
+          "The seller's payment account is not set up correctly. Please try another listing or contact the seller.";
+        return NextResponse.json(
+          { error: friendly, code: 'SELLER_ACCOUNT_INVALID', message: friendly },
+          { status: 400 }
         );
       }
       throw stripeError;

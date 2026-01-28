@@ -32,6 +32,9 @@ Since Netlify is connected to GitHub, it should **automatically deploy** when yo
 - Go to **Deploys** tab
 - Click **"Trigger deploy"** → **"Clear cache and deploy site"**
 
+**To trigger "clear cache and deploy" from the repo** (e.g. for users seeing an old cached experience):
+- Set `NETLIFY_BUILD_HOOK_URL` to your build hook URL (Site configuration > Build & deploy > Build hooks), then run: `npm run deploy:clear-cache`
+
 ### Step 2: Verify Environment Variables
 
 Make sure these environment variables are set in Netlify:
