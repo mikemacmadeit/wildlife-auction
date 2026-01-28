@@ -640,7 +640,7 @@ function NewListingPageContent() {
               <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle, horses, dogs) are restricted to Texas residents only. Equipment/asset listings can be multi-state.
             </AlertDescription>
           </Alert>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
             <Card
               role="button"
               tabIndex={canSelectWhitetail ? 0 : -1}
