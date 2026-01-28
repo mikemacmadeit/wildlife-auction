@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { getSavedSearch } from '@/lib/firebase/savedSearches';
 import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
-import { BROWSE_EQUIPMENT_CONDITION_OPTIONS, BROWSE_STATES } from '@/components/browse/filters/constants';
+import { BROWSE_EQUIPMENT_CONDITION_OPTIONS, BROWSE_STATES, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 import { buildSavedSearchKeys, upsertSavedSearch } from '@/lib/firebase/savedSearches';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import {
@@ -281,6 +281,10 @@ export default function BrowsePage() {
     }
     if (filters.verifiedSeller) summary.push({ label: 'Verified seller', value: 'Yes' });
     if (filters.transportReady) summary.push({ label: 'Transport ready', value: 'Yes' });
+    if (filters.deliveryTimeframe) {
+      const label = DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === filters.deliveryTimeframe)?.label ?? filters.deliveryTimeframe;
+      summary.push({ label: 'Delivery timeframe', value: label });
+    }
     if (filters.endingSoon) summary.push({ label: 'Ending soon', value: 'Within 24h' });
     if (filters.newlyListed) summary.push({ label: 'Newly listed', value: 'Within 7d' });
     if (filters.featured) summary.push({ label: 'Featured', value: 'Yes' });
@@ -393,6 +397,9 @@ export default function BrowsePage() {
     
     if (filters.featured) {
       browseFilters.featured = true;
+    }
+    if (filters.deliveryTimeframe) {
+      browseFilters.deliveryTimeframe = filters.deliveryTimeframe;
     }
     
     // Price filters (Firestore limitation: can only use range on one field)
@@ -786,6 +793,7 @@ export default function BrowsePage() {
     if (filters.papers !== undefined) count++;
     if (filters.verifiedSeller) count++;
     if (filters.transportReady) count++;
+    if (filters.deliveryTimeframe) count++;
     if (filters.endingSoon) count++;
     if (filters.newlyListed) count++;
     if (filters.featured) count++;

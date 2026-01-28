@@ -1015,6 +1015,8 @@ export interface BrowseFilters {
   minPrice?: number;
   maxPrice?: number;
   featured?: boolean;
+  /** Delivery timeframe filter: next_day | 1_3 | 3_7 | 7_14 | 14_30 | 30_60 */
+  deliveryTimeframe?: string;
 }
 
 /**
@@ -1101,6 +1103,11 @@ export const queryListingsForBrowse = async (
     // Featured filter
     if (filters.featured !== undefined) {
       constraints.push(where('featured', '==', filters.featured));
+    }
+
+    // Delivery timeframe filter (deliveryDetails.deliveryTimeframe)
+    if (filters.deliveryTimeframe) {
+      constraints.push(where('deliveryDetails.deliveryTimeframe', '==', filters.deliveryTimeframe));
     }
     
     // Price filtering - Firestore limitation: can only use range on one field

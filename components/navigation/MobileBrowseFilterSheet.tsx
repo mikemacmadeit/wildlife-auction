@@ -33,6 +33,7 @@ import {
   BROWSE_EQUIPMENT_CONDITION_OPTIONS as equipmentConditionOptions,
   BROWSE_SPECIES as species,
   BROWSE_QUANTITY_OPTIONS as quantityOptions,
+  DELIVERY_TIMEFRAME_OPTIONS as deliveryTimeframeOptions,
 } from '@/components/browse/filters/constants';
 
 interface MobileBrowseFilterSheetProps {
@@ -57,6 +58,7 @@ function countActiveFilters(filters: FilterState): number {
     (filters.papers !== undefined ? 1 : 0) +
     (filters.verifiedSeller ? 1 : 0) +
     (filters.transportReady ? 1 : 0) +
+    (filters.deliveryTimeframe ? 1 : 0) +
     (filters.endingSoon ? 1 : 0) +
     (filters.newlyListed ? 1 : 0) +
     (filters.featured ? 1 : 0)
@@ -286,6 +288,32 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
                 {quantityOptions.map((q) => (
                   <SelectItem key={q.value} value={q.value}>
                     {q.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Delivery timeframe */}
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Delivery timeframe</Label>
+            <Select
+              value={localFilters.deliveryTimeframe || '__any__'}
+              onValueChange={(v) =>
+                setLocalFilters((p) => ({
+                  ...p,
+                  deliveryTimeframe: v === '__any__' ? undefined : v,
+                }))
+              }
+            >
+              <SelectTrigger className="min-h-[44px]">
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__">Any</SelectItem>
+                {deliveryTimeframeOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>

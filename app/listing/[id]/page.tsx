@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -252,6 +252,8 @@ export default function ListingDetailPage() {
     if (!listing) return 0;
     if (listing.type === 'fixed') {
       const unit = Number(listing.price || 0) || 0;
+      const isGroup = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
+      if (isGroup) return unit; // group lot: listing price is for the entire lot
       const q = Number.isFinite(buyQuantity) ? Math.max(1, Math.floor(buyQuantity)) : 1;
       return unit * q;
     }
@@ -260,7 +262,7 @@ export default function ListingDetailPage() {
   }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity]);
 
   const buyNowAvailability = useMemo(() => {
-    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false };
+    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false, allowBuyNow: true };
     const attrsQty = Number((listing as any)?.attributes?.quantity ?? 1) || 1;
     const total =
       typeof (listing as any)?.quantityTotal === 'number' && Number.isFinite((listing as any).quantityTotal)
@@ -272,7 +274,9 @@ export default function ListingDetailPage() {
         : total;
     const isGroupListing = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
     const canChooseQuantity = listing.type === 'fixed' && available > 1 && !isGroupListing;
-    return { total, available, canChooseQuantity, isGroupListing };
+    // Allow Buy Now when we have stock, or when listing is active and total > 0 (server enforces actual availability)
+    const allowBuyNow = available > 0 || (listing.status === 'active' && total > 0);
+    return { total, available, canChooseQuantity, isGroupListing, allowBuyNow };
   }, [listing]);
 
   // Keep quantity selection valid when listing loads/updates. For group listings, always use full quantity.
@@ -284,6 +288,45 @@ export default function ListingDetailPage() {
       return Math.min(next, Math.max(1, max));
     });
   }, [buyNowAvailability.available, buyNowAvailability.isGroupListing]);
+
+  // Debug: log Buy Now disabling state once per fixed listing load (runtime evidence for unclickable Buy Now).
+  const buyNowDebugLogged = useRef<string | null>(null);
+  useEffect(() => {
+    if (!listing || listing.type !== 'fixed') return;
+    const id = listing.id;
+    if (buyNowDebugLogged.current === id) return;
+    buyNowDebugLogged.current = id;
+    const offerReserved = !!(listing as any).offerReservedByOfferId;
+    const disabledByStatus = listing.status !== 'active';
+    const disabledByAllow = !buyNowAvailability.allowBuyNow;
+    const disabled =
+      isPlacingBid || checkoutInFlight || disabledByStatus || offerReserved || disabledByAllow;
+    const payload = {
+      tag: 'BuyNow',
+      listingId: id,
+      disabled,
+      reasons: {
+        isPlacingBid,
+        checkoutInFlight,
+        statusNotActive: disabledByStatus,
+        offerReservedByOfferId: offerReserved,
+        allowBuyNow: buyNowAvailability.allowBuyNow,
+      },
+      listing: {
+        status: listing.status,
+        quantityTotal: (listing as any).quantityTotal,
+        quantityAvailable: (listing as any).quantityAvailable,
+        attrsQuantity: (listing as any)?.attributes?.quantity,
+        quantityMode: (listing as any)?.attributes?.quantityMode,
+      },
+      buyNowAvailability: { ...buyNowAvailability },
+    };
+    fetch('/api/debug-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  }, [listing, buyNowAvailability, isPlacingBid, checkoutInFlight]);
 
   const isAnimalListing = useMemo(() => {
     if (!listing?.category) return false;
@@ -632,7 +675,7 @@ export default function ListingDetailPage() {
     // Do NOT check seller Stripe status client-side.
     // Buyers cannot read seller `/users/{uid}` (private fields like stripeAccountId), and `publicProfiles`
     // intentionally excludes Stripe IDs. The server-side checkout route (Admin SDK) is the source of truth.
-    if (listing!.type === 'fixed' && buyNowAvailability.available <= 0) {
+    if (listing!.type === 'fixed' && !buyNowAvailability.allowBuyNow) {
       toast({
         title: 'Sold out',
         description: 'This listing is currently out of available quantity.',
@@ -761,23 +804,20 @@ export default function ListingDetailPage() {
             : 'Wire transfer requires a verified email address.'
         );
       }
-      if (method === 'wire') {
-        const { createWireIntent } = await import('@/lib/stripe/api');
-        const out = await createWireIntent(listing.id, undefined, qty, { buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined });
-        setWireData(out);
-        setWireDialogOpen(true);
-      } else {
-        const { createCheckoutSession } = await import('@/lib/stripe/api');
-        const { url } = await createCheckoutSession(listing.id, undefined, method, qty, {
-          buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
-        });
-        window.location.href = url;
-      }
+      const { createCheckoutSession } = await import('@/lib/stripe/api');
+      const { url } = await createCheckoutSession(listing.id, undefined, method, qty, {
+        buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
+      });
+      window.location.href = url;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
+      const msg = error?.message ? String(error.message) : 'Checkout could not be started.';
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'listing handleSelectPaymentMethod catch', message: 'checkout error set', data: { method, errorMessage: (error?.message && String(error.message).slice(0, 200)), setCheckoutErrorMessage: msg.slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H3' }) }).catch(() => {});
+      // #endregion
       setCheckoutError({
         attemptedMethod: method,
-        message: error?.message ? String(error.message) : 'Checkout could not be started.',
+        message: msg,
         technical: error?.message ? String(error.message) : String(error),
       });
       setCheckoutErrorOpen(true);
@@ -1135,9 +1175,12 @@ export default function ListingDetailPage() {
                         </div>
                       </div>
                     ) : listing!.type === 'fixed' && buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
-                      <div className="mb-4 rounded-lg border bg-muted/30 p-3">
-                        <p className="text-sm font-medium text-foreground">
-                          This is a group listing. All {buyNowAvailability.available} will be purchased for the listed price.
+                      <div className="mb-4 rounded-lg border bg-muted/30 p-3 space-y-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          Quantity: {buyNowAvailability.available}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Group lot — all {buyNowAvailability.available} are sold together for the listed price. Quantity is for your information only; individual selection is not available.
                         </p>
                       </div>
                     ) : null}
@@ -1150,7 +1193,7 @@ export default function ListingDetailPage() {
                           checkoutInFlight ||
                           listing!.status !== 'active' ||
                           !!(listing as any).offerReservedByOfferId ||
-                          buyNowAvailability.available <= 0
+                          !buyNowAvailability.allowBuyNow
                         }
                         className="w-full min-h-[52px] text-base font-bold shadow-lg"
                       >
@@ -1782,9 +1825,12 @@ export default function ListingDetailPage() {
                               </div>
                             </div>
                           ) : buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
-                            <div className="mb-4 rounded-lg border bg-muted/30 p-3">
-                              <p className="text-sm font-medium text-foreground">
-                                This is a group listing. All {buyNowAvailability.available} will be purchased for the listed price.
+                            <div className="mb-4 rounded-lg border bg-muted/30 p-3 space-y-1">
+                              <p className="text-sm font-semibold text-foreground">
+                                Quantity: {buyNowAvailability.available}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Group lot — all {buyNowAvailability.available} are sold together for the listed price. Quantity is for your information only; individual selection is not available.
                               </p>
                             </div>
                           ) : null}
@@ -1796,7 +1842,7 @@ export default function ListingDetailPage() {
                             checkoutInFlight ||
                             listing!.status !== 'active' ||
                             !!(listing as any).offerReservedByOfferId ||
-                            buyNowAvailability.available <= 0
+                            !buyNowAvailability.allowBuyNow
                           }
                           className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >

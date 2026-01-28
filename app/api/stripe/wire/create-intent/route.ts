@@ -26,6 +26,7 @@ import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
 import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
+import { isGroupLotQuantityMode } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -281,7 +282,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'This listing type does not support wire transfer' }, { status: 400 });
     }
 
-    const amountCents = Math.round(purchaseAmountUsd * quantityRequested * 100);
+    // Group lot: listing price is for the entire lot. Otherwise per-unit * quantity.
+    const isGroupLot = isGroupLotQuantityMode((listingData as any)?.attributes?.quantityMode);
+    const amountCents = Math.round((isGroupLot ? purchaseAmountUsd : purchaseAmountUsd * quantityRequested) * 100);
 
     // NOTE: We intentionally do NOT enforce a hard minimum for wire here.
     // If product policy changes later, gate it here server-side.
@@ -345,6 +348,9 @@ export async function POST(request: Request) {
         sellerStripeAccountId: String(sellerStripeAccountId || ''),
         error: accErr?.message,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent accounts.retrieve catch', message: 'returning 400 from accounts.retrieve', data: { status: 400, responseHasMessageField: false, accErrMsg: String(accErr?.message || '').slice(0, 120) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => {});
+      // #endregion
       return NextResponse.json(
         {
           error:
@@ -361,11 +367,31 @@ export async function POST(request: Request) {
     const platformFeeCents = calculatePlatformFee(amountCents);
     const sellerAmountCents = amountCents - platformFeeCents;
 
-    // Ensure Stripe Customer exists (required for customer_balance bank transfer instructions)
+    // Ensure Stripe Customer exists (required for customer_balance bank transfer instructions).
+    // Stored customer id may be stale (e.g. from another Stripe mode or deleted) -> verify and recreate if missing.
     const buyerUserRef = db.collection('users').doc(buyerId);
     const buyerUserDoc = await buyerUserRef.get();
     const buyerUserData = buyerUserDoc.exists ? (buyerUserDoc.data() as any) : {};
     let stripeCustomerId: string | undefined = buyerUserData?.stripeCustomerId;
+
+    if (stripeCustomerId) {
+      try {
+        await stripe.customers.retrieve(stripeCustomerId);
+      } catch (custErr: any) {
+        const msg = String(custErr?.message || '').toLowerCase();
+        const missing = custErr?.code === 'resource_missing' || /no such customer/i.test(msg);
+        if (missing) {
+          logWarn('Wire create-intent: stored Stripe customer missing, creating new', {
+            route: '/api/stripe/wire/create-intent',
+            buyerId,
+            oldCusId: stripeCustomerId,
+          });
+          stripeCustomerId = undefined;
+        } else {
+          throw custErr;
+        }
+      }
+    }
 
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
@@ -461,18 +487,24 @@ export async function POST(request: Request) {
         typeof l?.quantityAvailable === 'number' && Number.isFinite(l.quantityAvailable)
           ? Math.max(0, Math.floor(l.quantityAvailable))
           : liveQuantityTotal;
+      const effectiveAvailable =
+        liveQuantityAvailable > 0
+          ? liveQuantityAvailable
+          : String(l?.status) === 'active' && liveQuantityTotal > 0
+            ? liveQuantityTotal
+            : 0;
       const multiQty = String(l?.type || '') === 'fixed' && !offerId && liveQuantityTotal > 1;
 
       if (!multiQty) {
         if (l.purchaseReservedByOrderId) throw new Error('Listing is reserved pending payment confirmation');
       } else {
         const q = Math.max(1, Math.min(quantityRequested, liveQuantityTotal));
-        if (q > liveQuantityAvailable) throw new Error('Not enough available quantity for this listing.');
+        if (q > effectiveAvailable) throw new Error('Not enough available quantity for this listing.');
         tx.set(
           listingRef,
           {
             quantityTotal: liveQuantityTotal,
-            quantityAvailable: liveQuantityAvailable - q,
+            quantityAvailable: effectiveAvailable - q,
             updatedAt: Timestamp.now(),
             updatedBy: 'system',
           },
@@ -724,12 +756,19 @@ export async function POST(request: Request) {
       /no such destination|invalid.*destination|destination.*invalid|account.*does not exist|transfer_data/i.test(errMsg) ||
       /no such destination|invalid.*destination|destination.*invalid|account.*does not exist|transfer_data/i.test(stripeMsg);
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent route catch', message: 'wire PI error', data: { errMsg: errMsg.slice(0, 200), stripeMsg: stripeMsg.slice(0, 200), looksLikeInvalidDestination, rawErrorMessage: String(error?.message || '').slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
+    // #endregion
+
     console.error('Error creating wire transfer intent:', {
       message: String(error?.message || error),
       stripe: stripePayload || undefined,
     });
 
     if (looksLikeInvalidDestination) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent 400 branch', message: 'returning friendly SELLER_ACCOUNT_INVALID', data: { status: 400 }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
+      // #endregion
       return NextResponse.json(
         {
           error:
@@ -747,17 +786,18 @@ export async function POST(request: Request) {
       typeof stripePayload?.message === 'string' &&
       /customer_balance|bank_transfer|us_bank_transfer|financial_addresses|display_bank_transfer_instructions/i.test(stripePayload.message);
 
-    return NextResponse.json(
-      {
-        error: 'Failed to create wire transfer instructions',
-        message:
-          (looksLikeBankTransferNotEnabled
-            ? 'Wire/Bank transfer is not enabled or not configured on the Stripe account. Please enable Customer Balance → Bank transfer (US bank transfer) in Stripe and try again.'
-            : error?.message) || 'Unknown error',
-        stripe: stripePayload || undefined,
-      },
-      { status: 500 }
-    );
+    const payload500 = {
+      error: 'Failed to create wire transfer instructions',
+      message:
+        (looksLikeBankTransferNotEnabled
+          ? 'Wire/Bank transfer is not enabled or not configured on the Stripe account. Please enable Customer Balance → Bank transfer (US bank transfer) in Stripe and try again.'
+          : error?.message) || 'Unknown error',
+      stripe: stripePayload || undefined,
+    };
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent 500 branch', message: 'returning 500', data: { status: 500, messageToClient: (payload500 as any).message?.slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
+    // #endregion
+    return NextResponse.json(payload500, { status: 500 });
   }
 }
 

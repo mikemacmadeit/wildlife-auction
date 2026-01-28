@@ -20,8 +20,9 @@ export const createCheckoutSessionSchema = z.object({
    * Payment method selection step.
    * - card: Credit/Debit via Stripe Checkout
    * - ach_debit: US bank account (ACH) via Stripe Checkout
+   * - wire: Bank transfer (wire) via Stripe Checkout → redirect to Stripe’s hosted instructions page
    */
-  paymentMethod: z.enum(['card', 'ach_debit', 'ach']).optional(),
+  paymentMethod: z.enum(['card', 'ach_debit', 'ach', 'wire']).optional(),
   /**
    * Buyer acknowledgment required for animal categories.
    * Server will enforce when listing category is an animal category.

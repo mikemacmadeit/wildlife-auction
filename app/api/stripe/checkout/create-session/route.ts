@@ -9,7 +9,6 @@
 // In the current environment, production builds can fail resolving an internal Next module
 // (`next/dist/server/web/exports/next-response`). Route handlers work fine with Web `Request` / `Response`.
 import { Timestamp } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
 import Stripe from 'stripe';
 import { stripe, calculatePlatformFee, getAppUrl, isStripeConfigured } from '@/lib/stripe/config';
 import { getEffectiveSubscriptionTier, getTierWeight } from '@/lib/pricing/subscriptions';
@@ -25,10 +24,8 @@ import { ACH_DEBIT_MIN_TOTAL_USD } from '@/lib/payments/constants';
 import { finalizeAuctionIfNeeded } from '@/lib/auctions/finalizeAuction';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/requirements';
-import { ensureBillOfSaleForOrder } from '@/lib/orders/billOfSale';
-import { recomputeOrderComplianceDocsStatus } from '@/lib/orders/complianceDocsStatus';
-import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
+import { isGroupLotQuantityMode } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -159,7 +156,7 @@ export async function POST(request: Request) {
     // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
     const normalizedPaymentMethod =
       paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');
-    const paymentMethod = normalizedPaymentMethod as 'card' | 'ach_debit';
+    const paymentMethod = normalizedPaymentMethod as 'card' | 'ach_debit' | 'wire';
     const requestedQuantity =
       typeof quantityRaw === 'number' && Number.isFinite(quantityRaw) ? Math.max(1, Math.floor(quantityRaw)) : 1;
 
@@ -473,8 +470,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Quantity is only supported for Buy Now listings', code: 'QUANTITY_NOT_SUPPORTED' }, { status: 400 });
     }
 
-    // Total amount is per-unit price * quantity.
-    const purchaseTotalAmount = purchaseAmount * quantityRequested;
+    // Group lot: listing price is for the entire lot. Otherwise per-unit * quantity.
+    const isGroupLot = isGroupLotQuantityMode((listingData as any)?.attributes?.quantityMode);
+    const purchaseTotalAmount = isGroupLot ? purchaseAmount : purchaseAmount * quantityRequested;
 
     // Prevent buying own listing
     if (listingData.sellerId === buyerId) {
@@ -677,35 +675,16 @@ export async function POST(request: Request) {
     // Stripe + risk controls remain server-side authoritative, but UX should always allow ACH selection.
 
     // Create Stripe Checkout Session. Sellers receive funds via Stripe when buyer pays (no escrow, no payout holds).
-    // (We avoid regulated-service wording here; this is a settlement/payout-hold workflow.)
+    // Orders are created ONLY when payment succeeds (webhook). No order or reservation is created here.
     const baseUrl = getAppUrl();
-    
+    const nowTs = Timestamp.now();
+
     // P0: Collect address for animal listings (TX-only enforcement)
     const requiresAddress = getCategoryRequirements(listingCategory as any).isAnimal;
-    
-    // Reserve listing + create an order *before* creating Stripe session (prevents double-buy).
-    // NOTE: We create the Firestore order now (status=pending) so the reservation has a stable ID.
-    // The webhook will update this order instead of creating a duplicate.
-    const orderRef = db.collection('orders').doc();
-    const orderId = orderRef.id;
-    const nowTs = Timestamp.now();
-    // Extend reservation window to 30 minutes to reduce expiry risk during payment
-    const reserveMinutes = parseInt(process.env.CHECKOUT_RESERVATION_MINUTES || '30', 10);
-    const reserveUntilTs = Timestamp.fromMillis(Date.now() + Math.max(5, reserveMinutes) * 60_000);
-    const reservationCol = listingRef.collection('purchaseReservations');
-    const reservationRef = reservationCol.doc(orderId);
 
-    // Atomically reserve listing and create order skeleton.
-    // IMPORTANT: Firestore transactions require all reads to happen before any writes.
-    await db.runTransaction(async (tx) => {
-      const listingSnap: any = await (tx as any).get(listingRef);
-      if (!listingSnap?.exists) throw new Error('Listing not found');
-      const live = listingSnap.data() as any;
-
-      // If offer checkout, read + validate offer BEFORE any transaction writes.
-      // (Firestore requires all reads to be executed before all writes.)
-      let lockToken: string | null = null;
-      if (offerId && offerRef) {
+    // If offer checkout, lock the offer to prevent duplicate session creation (no order created yet).
+    if (offerId && offerRef) {
+      await db.runTransaction(async (tx) => {
         const offerSnap: any = await (tx as any).get(offerRef);
         if (!offerSnap?.exists) throw new Error('Offer not found');
         const offer = offerSnap.data() as any;
@@ -716,286 +695,11 @@ export async function POST(request: Request) {
           if (existing.startsWith('creating:')) throw new Error('Checkout session is being created. Please retry.');
           throw new Error('Checkout session already exists');
         }
-        lockToken = `creating:${Date.now()}:${buyerId}`;
-      }
-
-      // Build public-safe snapshots for fast "My Purchases" rendering (avoid N+1 listing reads).
-      const photos = Array.isArray(live?.photos) ? live.photos : [];
-      const sortedPhotos = photos.length
-        ? [...photos].sort((a: any, b: any) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
-        : [];
-      const coverPhotoUrl =
-        (sortedPhotos.find((p: any) => typeof p?.url === 'string' && p.url.trim())?.url as string | undefined) ||
-        (Array.isArray(live?.images) ? (live.images.find((u: any) => typeof u === 'string' && u.trim()) as string | undefined) : undefined);
-
-      const city = live?.location?.city ? String(live.location.city) : '';
-      const state = live?.location?.state ? String(live.location.state) : '';
-      const locationLabel = city && state ? `${city}, ${state}` : state || '';
-
-      const sellerDisplayName =
-        String(live?.sellerSnapshot?.displayName || '').trim() ||
-        String(live?.sellerSnapshot?.name || '').trim() ||
-        'Seller';
-      const sellerPhotoURL =
-        typeof live?.sellerSnapshot?.photoURL === 'string' && live.sellerSnapshot.photoURL.trim()
-          ? String(live.sellerSnapshot.photoURL)
-          : undefined;
-
-      // Validate listing availability (server-side authoritative)
-      if (live.type !== 'auction') {
-        if (live.status !== 'active') throw new Error('Listing is not available for purchase');
-        // Read-time guard inside the transaction: treat expired actives as ended.
-        const nowMs = Date.now();
-        const endMsDirect = toMillisSafe((live as any)?.endAt) ?? toMillisSafe((live as any)?.endsAt);
-        const startMs =
-          toMillisSafe((live as any)?.startAt) ??
-          toMillisSafe((live as any)?.publishedAt) ??
-          toMillisSafe((live as any)?.createdAt);
-        const durationDays = coerceDurationDays((live as any)?.durationDays, 7);
-        const endMs = endMsDirect ?? (typeof startMs === 'number' ? computeEndAt(startMs, durationDays) : null);
-        if (typeof endMs === 'number' && endMs <= nowMs) throw new Error('Listing has ended');
-      } else {
-        // Auctions can be status=expired after backend finalization.
-        if (live.status !== 'active' && live.status !== 'expired' && live.status !== 'ended') throw new Error('Auction is not available for purchase');
-      }
-      if (!offerId && live.offerReservedByOfferId) throw new Error('Listing is reserved by an accepted offer');
-
-      const liveAttrsQty = Number(live?.attributes?.quantity ?? 1) || 1;
-      const liveQuantityTotal =
-        typeof live?.quantityTotal === 'number' && Number.isFinite(live.quantityTotal)
-          ? Math.max(1, Math.floor(live.quantityTotal))
-          : Math.max(1, Math.floor(liveAttrsQty));
-      const liveQuantityAvailable =
-        typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)
-          ? Math.max(0, Math.floor(live.quantityAvailable))
-          : liveQuantityTotal;
-      const multiQty = String(live?.type || '') === 'fixed' && !offerId && liveQuantityTotal > 1;
-
-      if (!multiQty) {
-        // Legacy single-reservation behavior.
-        const reservedUntil = typeof live.purchaseReservedUntil?.toDate === 'function' ? live.purchaseReservedUntil.toDate() : null;
-        if (reservedUntil instanceof Date && reservedUntil.getTime() > Date.now()) {
-          throw new Error('Listing is reserved pending payment confirmation. Please try again later.');
-        }
-      } else {
-        const q = Math.max(1, Math.min(quantityRequested, liveQuantityTotal));
-        if (q > liveQuantityAvailable) {
-          throw new Error('Not enough available quantity for this listing.');
-        }
-        // Reserve quantity by decrementing available + recording a reservation doc.
-        tx.set(
-          listingRef,
-          {
-            quantityTotal: liveQuantityTotal,
-            quantityAvailable: liveQuantityAvailable - q,
-            updatedAt: nowTs,
-            updatedBy: 'system',
-          },
-          { merge: true }
-        );
-        tx.set(
-          reservationRef,
-          {
-            id: orderId,
-            orderId,
-            listingId,
-            buyerId,
-            quantity: q,
-            status: 'reserved',
-            createdAt: nowTs,
-            expiresAt: reserveUntilTs,
-          },
-          { merge: true }
-        );
-      }
-
-      // Create order skeleton (will be finalized/updated by webhooks)
-      tx.set(orderRef, {
-        listingId,
-        ...(live.type === 'auction' ? { auctionResultId: listingId } : {}),
-        ...(offerId ? { offerId: String(offerId) } : {}),
-        buyerId,
-        sellerId: live.sellerId,
-        // Redundant but useful: admin tooling often uses listingTitle for display.
-        listingTitle: String(live?.title || 'Listing'),
-        listingSnapshot: {
-          listingId,
-          title: String(live?.title || 'Listing'),
-          type: live?.type ? String(live.type) : undefined,
-          category: live?.category ? String(live.category) : undefined,
-          ...(coverPhotoUrl ? { coverPhotoUrl: String(coverPhotoUrl) } : {}),
-          ...(locationLabel ? { locationLabel } : {}),
-        },
-        sellerSnapshot: {
-          sellerId: String(live?.sellerId || ''),
-          displayName: sellerDisplayName,
-          ...(sellerPhotoURL ? { photoURL: sellerPhotoURL } : {}),
-        },
-        amount: amount / 100,
-        platformFee: platformFee / 100,
-        sellerAmount: sellerAmount / 100,
-        quantity: quantityRequested,
-        unitPrice: listingData.type === 'fixed' ? purchaseAmount : undefined,
-        reservationExpiresAt: reserveUntilTs,
-        status: 'pending',
-        paymentMethod,
-        adminHold: false,
-        timeline: [
-          {
-            id: `ORDER_PLACED:${orderId}`,
-            type: 'ORDER_PLACED',
-            label: 'Order placed',
-            timestamp: nowTs,
-            actor: 'buyer',
-            visibility: 'buyer',
-          },
-        ],
-        ...(categoryReq.isAnimal
-          ? {
-              buyerAcksAnimalRisk: true,
-              buyerAcksAnimalRiskAt: nowTs,
-              buyerAcksAnimalRiskVersion: LEGAL_VERSIONS.buyerAcknowledgment.version,
-            }
-          : {}),
-        ...(live.type === 'auction' && auctionResultSnapshot?.paymentDueAt ? { auctionPaymentDueAt: auctionResultSnapshot.paymentDueAt } : {}),
-        createdAt: nowTs,
-        updatedAt: nowTs,
-        lastUpdatedByRole: 'buyer',
-      });
-
-      // Reserve listing for this order (legacy single-item behavior only).
-      if (!(String(live?.type || '') === 'fixed' && !offerId && (typeof live?.quantityTotal === 'number' ? live.quantityTotal : liveAttrsQty) > 1)) {
-        tx.set(
-          listingRef,
-          {
-            purchaseReservedByOrderId: orderId,
-            purchaseReservedAt: nowTs,
-            purchaseReservedUntil: reserveUntilTs,
-            updatedAt: nowTs,
-          },
-          { merge: true }
-        );
-      }
-
-      // If offer checkout, lock offer against duplicate session creation and link orderId
-      if (offerId && offerRef) {
-        tx.update(offerRef, { checkoutSessionId: lockToken, orderId, updatedAt: nowTs });
-      }
-    });
-
-    const rollbackReservationBestEffort = async () => {
-      try {
-        await db.runTransaction(async (tx) => {
-          const snap: any = await (tx as any).get(listingRef);
-          if (snap?.exists) {
-            const live = snap.data() as any;
-            // Legacy reservation rollback
-            if (live.purchaseReservedByOrderId === orderId) {
-              tx.set(
-                listingRef,
-                {
-                  purchaseReservedByOrderId: null,
-                  purchaseReservedAt: null,
-                  purchaseReservedUntil: null,
-                  updatedAt: Timestamp.now(),
-                },
-                { merge: true }
-              );
-            }
-            // Multi-quantity reservation rollback (best-effort): restore quantityAvailable and remove reservation doc
-            try {
-              const rSnap: any = await (tx as any).get(reservationRef);
-              if (rSnap?.exists) {
-                const r = rSnap.data() as any;
-                const q = typeof r?.quantity === 'number' ? Math.max(1, Math.floor(r.quantity)) : 0;
-                if (q > 0) {
-                  const avail =
-                    typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)
-                      ? Math.max(0, Math.floor(live.quantityAvailable))
-                      : null;
-                  if (avail !== null) {
-                    tx.set(listingRef, { quantityAvailable: avail + q, updatedAt: Timestamp.now(), updatedBy: 'system' }, { merge: true });
-                  }
-                }
-                tx.delete(reservationRef);
-              }
-            } catch {
-              // ignore
-            }
-          }
-          tx.set(orderRef, { status: 'cancelled', updatedAt: Timestamp.now() }, { merge: true });
+        (tx as any).update(offerRef, {
+          checkoutSessionId: `creating:${Date.now()}:${buyerId}`,
+          updatedAt: nowTs,
         });
-      } catch {
-        // ignore rollback failures
-      }
-    };
-
-    // Category-based: ensure Bill of Sale exists (or generate it) before creating a Checkout session.
-    if (categoryReq.requireBillOfSaleAtCheckout) {
-      const buyerSnap = await db.collection('users').doc(buyerId).get();
-      const sellerSnap = await db.collection('users').doc(listingData.sellerId).get();
-      const buyerData = buyerSnap.exists ? (buyerSnap.data() as any) : null;
-      const sellerDataLatest = sellerSnap.exists ? (sellerSnap.data() as any) : null;
-
-      const bucket = getStorage().bucket();
-      const now = nowTs;
-      const bos = await ensureBillOfSaleForOrder({
-        db: db as any,
-        bucket: bucket as any,
-        orderId,
-        listing: {
-          id: listingId,
-          title: String(listingData.title || 'Listing'),
-          category: listingCategory as any,
-          attributes: (listingData as any).attributes || {},
-        },
-        orderAmountUsd: amount / 100,
-        buyer: {
-          uid: buyerId,
-          fullName: String(buyerData?.profile?.fullName || '').trim(),
-          email: String(buyerData?.email || decodedToken.email || '') || null,
-          phoneNumber: String(buyerData?.phoneNumber || '') || null,
-          location: {
-            address: buyerData?.profile?.location?.address || null,
-            city: String(buyerData?.profile?.location?.city || '').trim(),
-            state: String(buyerData?.profile?.location?.state || '').trim(),
-            zip: String(buyerData?.profile?.location?.zip || '').trim(),
-          },
-        },
-        seller: {
-          uid: String(listingData.sellerId),
-          fullName: String(sellerDataLatest?.profile?.fullName || '').trim(),
-          email: String(sellerDataLatest?.email || '') || null,
-          phoneNumber: String(sellerDataLatest?.phoneNumber || '') || null,
-          location: {
-            address: sellerDataLatest?.profile?.location?.address || null,
-            city: String(sellerDataLatest?.profile?.location?.city || '').trim(),
-            state: String(sellerDataLatest?.profile?.location?.state || '').trim(),
-            zip: String(sellerDataLatest?.profile?.location?.zip || '').trim(),
-          },
-        },
-        now,
       });
-
-      if (!bos.ok) {
-        await rollbackReservationBestEffort();
-        return NextResponse.json(
-          {
-            error: 'Bill of Sale required',
-            code: bos.code,
-            message: bos.message,
-            missing: bos.missing || undefined,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Keep order compliance snapshot current (required docs vs provided docs).
-    try {
-      await recomputeOrderComplianceDocsStatus({ db: db as any, orderId });
-    } catch {
-      // ignore; best-effort
     }
 
     /**
@@ -1008,9 +712,50 @@ export async function POST(request: Request) {
     
     // Seller always arranges delivery; buyer confirms receipt. All orders use the same fulfillment flow.
     const transportOption = 'SELLER_TRANSPORT';
+
+    // Wire (bank transfer) requires a Stripe Customer; Checkout then redirects to Stripe’s hosted instructions page.
+    let stripeCustomerIdForWire: string | null = null;
+    if (paymentMethod === 'wire') {
+      const buyerUserRef = db.collection('users').doc(buyerId);
+      const buyerUserDoc = await buyerUserRef.get();
+      const buyerUserData = buyerUserDoc.exists ? (buyerUserDoc.data() as any) : {};
+      let cid: string | undefined = buyerUserData?.stripeCustomerId;
+      if (cid) {
+        try {
+          await stripe.customers.retrieve(cid);
+        } catch (e: any) {
+          const msg = String(e?.message || '').toLowerCase();
+          if (e?.code === 'resource_missing' || /no such customer/i.test(msg)) cid = undefined;
+          else throw e;
+        }
+      }
+      if (!cid) {
+        const customer = await stripe.customers.create({
+          email: decodedToken.email || buyerRecord?.email || undefined,
+          metadata: { buyerId },
+        });
+        cid = customer.id;
+        await buyerUserRef.set({ stripeCustomerId: cid, updatedAt: Timestamp.now() }, { merge: true });
+      }
+      stripeCustomerIdForWire = cid;
+    }
     
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],
+      ...(paymentMethod === 'wire'
+        ? {
+            customer: stripeCustomerIdForWire!,
+            payment_method_types: ['customer_balance'],
+            payment_method_options: {
+              customer_balance: {
+                funding_type: 'bank_transfer',
+                bank_transfer: { type: 'us_bank_transfer' },
+              },
+            } as Stripe.Checkout.SessionCreateParams.PaymentMethodOptions,
+          }
+        : {
+            payment_method_types: paymentMethod === 'ach_debit' ? ['us_bank_account'] : ['card'],
+            customer_email: decodedToken.email || undefined,
+          }),
       line_items: [
         {
           price_data: {
@@ -1038,7 +783,6 @@ export async function POST(request: Request) {
         },
         // Automatic capture (default) - seller is paid immediately upon successful payment
         metadata: {
-          transactionId: orderId,
           listingId: listingId,
           buyerId: buyerId,
           sellerId: listingData.sellerId,
@@ -1047,7 +791,6 @@ export async function POST(request: Request) {
         },
       },
       metadata: {
-        orderId,
         listingId: listingId,
         buyerId: buyerId,
         sellerId: listingData.sellerId,
@@ -1064,7 +807,6 @@ export async function POST(request: Request) {
         transportOption: String(transportOption),
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmount) } : {}),
       },
-      customer_email: decodedToken.email || undefined,
     };
     
     // Require address collection for animal listings (TX-only enforcement)
@@ -1084,8 +826,6 @@ export async function POST(request: Request) {
         idempotencyKey: stripeIdempotencyKey,
       });
     } catch (stripeError: any) {
-      // Roll back reservation + cancel the order skeleton (best-effort).
-      await rollbackReservationBestEffort();
       const msg = String(stripeError?.message || '');
       const lower = msg.toLowerCase();
       if (lower.includes('rejected') || lower.includes('account has been rejected') || lower.includes('cannot create new')) {
@@ -1110,7 +850,6 @@ export async function POST(request: Request) {
         stripeSessionId: session.id,
         listingId,
         buyerId,
-        orderId,
         createdAt: nowTs,
         expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000), // 2 minutes
       }));
@@ -1124,18 +863,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Persist session ID onto the pre-created order (webhook idempotency + buyer/seller visibility).
-    try {
-      const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
-      await orderRef.set(sanitizeFirestorePayload({ stripeCheckoutSessionId: session.id, updatedAt: Timestamp.now() }), { merge: true });
-    } catch {
-      // ignore; webhook can still reconcile by metadata.orderId
-    }
-
     if (offerId && offerRef) {
       try {
         const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
-        await offerRef.set(sanitizeFirestorePayload({ checkoutSessionId: session.id, orderId, updatedAt: Timestamp.now() }), { merge: true });
+        await offerRef.set(sanitizeFirestorePayload({ checkoutSessionId: session.id, updatedAt: Timestamp.now() }), { merge: true });
         await createAuditLog(db, {
           actorUid: buyerId,
           actorRole: 'buyer',

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import type { Listing } from '@/lib/types';
+import { isGroupLotQuantityMode } from '@/lib/types';
 import { createOffer } from '@/lib/offers/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -194,9 +195,14 @@ export function OfferFromMessagesDialog(props: {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
-                {selected && selected.quantityTotal && selected.quantityTotal > 1 && quantity > 1 ? (
+                {selected && !isGroupLotQuantityMode((selected as any)?.attributes?.quantityMode) && selected.quantityTotal && selected.quantityTotal > 1 && quantity > 1 ? (
                   <div className="text-xs text-muted-foreground">
                     ${Number(amount || 0).toLocaleString()} × {quantity} = ${(Number(amount || 0) * quantity).toLocaleString()} total
+                  </div>
+                ) : null}
+                {selected && isGroupLotQuantityMode((selected as any)?.attributes?.quantityMode) && selected.quantityTotal && selected.quantityTotal >= 1 ? (
+                  <div className="text-xs text-muted-foreground">
+                    Quantity: {selected.quantityTotal} (sold as one lot — your offer is for the entire lot)
                   </div>
                 ) : null}
               </div>
@@ -209,7 +215,14 @@ export function OfferFromMessagesDialog(props: {
               </div>
             </div>
 
-            {selected && selected.quantityTotal && selected.quantityTotal > 1 ? (
+            {selected && isGroupLotQuantityMode((selected as any)?.attributes?.quantityMode) && selected.quantityTotal && selected.quantityTotal >= 1 ? (
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                <div className="text-sm font-semibold">Quantity</div>
+                <div className="text-sm text-muted-foreground mt-0.5">
+                  {selected.quantityTotal} — sold as one lot. Your offer is for the entire lot; individual selection is not available.
+                </div>
+              </div>
+            ) : selected && selected.quantityTotal && selected.quantityTotal > 1 ? (
               <div className="space-y-2">
                 <div className="text-sm font-semibold">Quantity</div>
                 <Select

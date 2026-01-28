@@ -195,8 +195,19 @@ export function getAdminApp(): App {
       ? { projectId, clientEmail, privateKey }
       : undefined;
 
+  const storageBucket =
+    process.env.FIREBASE_STORAGE_BUCKET?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ||
+    (projectId ? `${projectId}.firebasestorage.app` : undefined);
+
   // If not configured, fall back to ADC (may work on some platforms). Prefer explicit credentials in prod.
-  adminApp = serviceAccount ? initializeApp({ credential: cert(serviceAccount as any) }) : initializeApp();
+  // storageBucket is required for getStorage().bucket() (e.g. wire/checkout Bill of Sale generation).
+  adminApp = serviceAccount
+    ? initializeApp({
+        credential: cert(serviceAccount as any),
+        ...(storageBucket && { storageBucket }),
+      })
+    : initializeApp();
   return adminApp;
 }
 

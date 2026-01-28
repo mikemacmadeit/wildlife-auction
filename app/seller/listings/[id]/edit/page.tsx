@@ -39,7 +39,7 @@ import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
-import { HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION } from '@/components/browse/filters/constants';
+import { HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 
 function EditListingPageContent() {
   const router = useRouter();
@@ -81,6 +81,7 @@ function EditListingPageContent() {
     deliveryDetails: {
       maxDeliveryRadiusMiles: number | '';
       deliveryTimeframe: string;
+      deliveryStatusExplanation: string;
       deliveryNotes: string;
     };
     protectedTransactionEnabled: boolean;
@@ -115,6 +116,7 @@ function EditListingPageContent() {
     deliveryDetails: {
       maxDeliveryRadiusMiles: '' as number | '',
       deliveryTimeframe: '',
+      deliveryStatusExplanation: '',
       deliveryNotes: '',
     },
     protectedTransactionEnabled: false,
@@ -207,6 +209,7 @@ function EditListingPageContent() {
           deliveryDetails: {
             maxDeliveryRadiusMiles: (listing as any).deliveryDetails?.maxDeliveryRadiusMiles ?? ('' as number | ''),
             deliveryTimeframe: (listing as any).deliveryDetails?.deliveryTimeframe ?? '',
+            deliveryStatusExplanation: (listing as any).deliveryDetails?.deliveryStatusExplanation ?? '',
             deliveryNotes: (listing as any).deliveryDetails?.deliveryNotes ?? '',
           },
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
@@ -241,7 +244,7 @@ function EditListingPageContent() {
           images: listing.images || [],
           verification: listing.trust?.verified || false,
           transportType: 'seller',
-          deliveryDetails: (listing as any).deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryNotes: '' },
+          deliveryDetails: (listing as any).deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' },
           protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
           protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
@@ -1491,7 +1494,7 @@ function EditListingPageContent() {
                   value={(formData.deliveryDetails?.maxDeliveryRadiusMiles === '' || formData.deliveryDetails?.maxDeliveryRadiusMiles === undefined) ? '' : formData.deliveryDetails?.maxDeliveryRadiusMiles}
                   onChange={(e) => {
                     const v = e.target.value;
-                    const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+                    const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
                     setFormData({ ...formData, deliveryDetails: { ...dd, maxDeliveryRadiusMiles: v === '' ? '' : (parseInt(v, 10) || 0) } });
                   }}
                 />
@@ -1501,20 +1504,47 @@ function EditListingPageContent() {
                   Delivery timeframe
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  When you plan to deliver or your estimated window (e.g. &quot;Within 3–5 days of payment&quot;, &quot;Estimated 1 week&quot;, &quot;Flexible — contact after purchase&quot;).
+                  When you plan to deliver. Buyers can filter by this on the browse page.
                 </p>
-                <Input
-                  id="edit-deliveryTimeframe"
-                  type="text"
-                  placeholder="e.g. Within 3–5 days of payment"
-                  className="mt-2"
+                <Select
                   value={formData.deliveryDetails?.deliveryTimeframe ?? ''}
-                  onChange={(e) => {
-                    const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
-                    setFormData({ ...formData, deliveryDetails: { ...dd, deliveryTimeframe: e.target.value } });
+                  onValueChange={(v) => {
+                    const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
+                    setFormData({ ...formData, deliveryDetails: { ...dd, deliveryTimeframe: v, ...(v !== '30_60' ? { deliveryStatusExplanation: '' } : {}) } });
                   }}
-                />
+                >
+                  <SelectTrigger id="edit-deliveryTimeframe" className="mt-2">
+                    <SelectValue placeholder="Select timeframe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DELIVERY_TIMEFRAME_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+              {formData.deliveryDetails?.deliveryTimeframe === '30_60' && (
+                <div>
+                  <Label htmlFor="edit-deliveryStatusExplanation" className="font-medium">
+                    Delivery status explanation <span className="text-destructive">*</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    For 30–60 day delivery, briefly explain why (e.g. custom order, seasonal availability, transport scheduling).
+                  </p>
+                  <Textarea
+                    id="edit-deliveryStatusExplanation"
+                    placeholder="e.g. Delivery scheduled after weaning. We coordinate a pickup window once the animal is ready."
+                    className="mt-2 min-h-[80px]"
+                    value={formData.deliveryDetails?.deliveryStatusExplanation ?? ''}
+                    onChange={(e) => {
+                      const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
+                      setFormData({ ...formData, deliveryDetails: { ...dd, deliveryStatusExplanation: e.target.value } });
+                    }}
+                  />
+                </div>
+              )}
               <div>
                 <Label htmlFor="edit-deliveryNotes" className="font-medium">
                   Additional delivery notes
@@ -1528,7 +1558,7 @@ function EditListingPageContent() {
                   className="mt-2 min-h-[80px]"
                   value={formData.deliveryDetails?.deliveryNotes ?? ''}
                   onChange={(e) => {
-                    const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+                    const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
                     setFormData({ ...formData, deliveryDetails: { ...dd, deliveryNotes: e.target.value } });
                   }}
                 />
@@ -1537,7 +1567,21 @@ function EditListingPageContent() {
           </Card>
         </div>
       ),
-      validate: () => true,
+      validate: () => {
+        const dd = formData.deliveryDetails ?? {};
+        if ((dd.deliveryTimeframe ?? '') === '30_60') {
+          const expl = (dd.deliveryStatusExplanation ?? '').trim();
+          if (!expl) {
+            toast({
+              title: 'Explanation required',
+              description: 'For 30–60 day delivery, please provide a delivery status explanation.',
+              variant: 'destructive',
+            });
+            return false;
+          }
+        }
+        return true;
+      },
     },
     {
       id: 'review',
@@ -1634,13 +1678,16 @@ function EditListingPageContent() {
                 <Badge variant="secondary" className="font-semibold">Seller arranges delivery</Badge>
               </div>
               {(() => {
-                const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
-                const hasAny = (dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined) || (dd.deliveryTimeframe ?? '').trim() || (dd.deliveryNotes ?? '').trim();
+                const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
+                const tf = (dd.deliveryTimeframe ?? '').trim();
+                const hasAny = (dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined) || tf || (dd.deliveryStatusExplanation ?? '').trim() || (dd.deliveryNotes ?? '').trim();
+                const timeframeLabel = tf ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === tf)?.label ?? tf) : '';
                 return hasAny ? (
                   <div className="pt-3 border-t border-border/50 space-y-1.5">
                     <div className="text-sm text-muted-foreground font-medium">Delivery details</div>
                     {dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined && <div className="text-sm"><span className="text-muted-foreground">Max radius:</span> <span className="font-medium">{dd.maxDeliveryRadiusMiles} miles</span></div>}
-                    {(dd.deliveryTimeframe ?? '').trim() && <div className="text-sm"><span className="text-muted-foreground">Timeframe:</span> <span className="font-medium">{(dd.deliveryTimeframe ?? '').trim()}</span></div>}
+                    {timeframeLabel && <div className="text-sm"><span className="text-muted-foreground">Timeframe:</span> <span className="font-medium">{timeframeLabel}</span></div>}
+                    {(dd.deliveryStatusExplanation ?? '').trim() && <div className="text-sm"><span className="text-muted-foreground">Delivery status:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryStatusExplanation ?? '').trim()}</span></div>}
                     {(dd.deliveryNotes ?? '').trim() && <div className="text-sm"><span className="text-muted-foreground">Notes:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryNotes ?? '').trim()}</span></div>}
                   </div>
                 ) : null;
@@ -1670,12 +1717,13 @@ function EditListingPageContent() {
       },
       transportOption: 'SELLER_TRANSPORT' as const,
       ...((() => {
-        const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryNotes: '' };
+        const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
         const maxMiles = dd.maxDeliveryRadiusMiles === '' || dd.maxDeliveryRadiusMiles === undefined ? undefined : Number(dd.maxDeliveryRadiusMiles);
         const timeframe = (dd.deliveryTimeframe ?? '').trim() || undefined;
+        const statusExpl = (dd.deliveryStatusExplanation ?? '').trim() || undefined;
         const notes = (dd.deliveryNotes ?? '').trim() || undefined;
-        const hasAny = maxMiles !== undefined || timeframe !== undefined || notes !== undefined;
-        return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(notes && { deliveryNotes: notes }) } } : {};
+        const hasAny = maxMiles !== undefined || timeframe !== undefined || statusExpl !== undefined || notes !== undefined;
+        return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(statusExpl && { deliveryStatusExplanation: statusExpl }), ...(notes && { deliveryNotes: notes }) } } : {};
       })()),
       attributes: formData.attributes as ListingAttributes,
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
@@ -1784,7 +1832,7 @@ function EditListingPageContent() {
       images: formData.images || [],
       verification: formData.verification,
       transportType: formData.transportType,
-      deliveryDetails: formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryNotes: '' },
+      deliveryDetails: formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' },
       protectedTransactionEnabled: formData.protectedTransactionEnabled,
       protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,

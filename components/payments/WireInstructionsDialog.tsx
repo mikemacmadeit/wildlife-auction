@@ -6,6 +6,49 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
+type AddressLine = { label: string; value: string };
+
+function formatBankAddress(type: string, address: any): AddressLine[] {
+  if (!address || typeof address !== 'object') return [];
+  const a = address as Record<string, unknown>;
+  const line = (label: string, v: unknown) =>
+    v != null && String(v).trim() ? { label, value: String(v).trim() } : null;
+  const fmtAddr = (o: any) => {
+    if (!o || typeof o !== 'object') return '';
+    const parts = [o.line1, o.line2, o.city, o.state, o.postal_code, o.country].filter(Boolean);
+    return parts.join(', ');
+  };
+
+  if (type === 'aba') {
+    return [
+      line('Bank name', a.bank_name),
+      line('Routing number (ABA)', a.routing_number),
+      line('Account number', a.account_number),
+      line('Account type', a.account_type),
+      line('Account holder name', a.account_holder_name),
+      fmtAddr(a.account_holder_address) ? { label: 'Account holder address', value: fmtAddr(a.account_holder_address) } : null,
+      fmtAddr(a.bank_address) ? { label: 'Bank address', value: fmtAddr(a.bank_address) } : null,
+    ].filter(Boolean) as AddressLine[];
+  }
+  if (type === 'swift') {
+    return [
+      line('Bank name', a.bank_name),
+      line('SWIFT code', a.swift_code),
+      line('Account number', a.account_number),
+      line('Account type', a.account_type),
+      line('Account holder name', a.account_holder_name),
+      fmtAddr(a.account_holder_address) ? { label: 'Account holder address', value: fmtAddr(a.account_holder_address) } : null,
+      fmtAddr(a.bank_address) ? { label: 'Bank address', value: fmtAddr(a.bank_address) } : null,
+    ].filter(Boolean) as AddressLine[];
+  }
+  return [];
+}
+
+function bankAddressToCopyText(type: string, address: any): string {
+  const lines = formatBankAddress(type, address);
+  return lines.map(({ label, value }) => `${label}: ${value}`).join('\n');
+}
+
 export function WireInstructionsDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -80,23 +123,39 @@ export function WireInstructionsDialog(props: {
                 <div className="text-sm text-muted-foreground">No bank details were returned by Stripe.</div>
               ) : (
                 <div className="space-y-3">
-                  {addresses.map((fa, idx) => (
-                    <div key={`${fa.type}-${idx}`} className="rounded-md bg-muted/40 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-semibold">{fa.type || 'bank'}</div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copy(JSON.stringify(fa.address, null, 2), 'Bank details JSON')}
-                        >
-                          Copy details
-                        </Button>
+                  {addresses.map((fa, idx) => {
+                    const readable = formatBankAddress(fa.type, fa.address);
+                    const copyText = readable.length ? bankAddressToCopyText(fa.type, fa.address) : JSON.stringify(fa.address, null, 2);
+                    const typeLabel = fa.type === 'aba' ? 'US (ABA / routing)' : fa.type === 'swift' ? 'International (SWIFT)' : fa.type || 'Bank';
+                    return (
+                      <div key={`${fa.type}-${idx}`} className="rounded-md bg-muted/40 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs font-semibold uppercase tracking-wide">{typeLabel}</div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copy(copyText, 'Bank details')}
+                          >
+                            Copy details
+                          </Button>
+                        </div>
+                        {readable.length > 0 ? (
+                          <dl className="mt-2 text-sm space-y-1.5">
+                            {readable.map(({ label, value }) => (
+                              <div key={label} className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                <dt className="text-muted-foreground shrink-0">{label}</dt>
+                                <dd className="font-mono text-xs break-all min-w-0">{value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : (
+                          <pre className="mt-2 text-xs overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all max-h-[220px]">
+                            {JSON.stringify(fa.address, null, 2)}
+                          </pre>
+                        )}
                       </div>
-                      <pre className="mt-2 text-xs overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all max-h-[220px]">
-                        {JSON.stringify(fa.address, null, 2)}
-                      </pre>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

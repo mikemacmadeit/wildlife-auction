@@ -37,6 +37,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
   const isAuction = listing.type === 'auction';
   const isFixed = listing.type === 'fixed';
   const isClassified = listing.type === 'classified';
+  const listingTypeLabel = isAuction ? 'Auction' : isFixed ? 'Fixed Price' : isClassified ? 'Classified' : (listing.type ? String(listing.type) : 'Listing');
   const bestOfferEnabled = Boolean((listing as any).bestOfferEnabled);
   const bidCount = Number((listing as any)?.metrics?.bidCount || 0) || 0;
   const watchers =
@@ -94,22 +95,22 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
   })();
 
   const specs = useMemo(() => {
-    // eBay-style “at a glance” line: Species • Sex • Age
+    // eBay-style “at a glance” line: Species • Sex • Age • Quantity
     const attrs: any = listing.attributes || null;
     if (!attrs) return null;
 
     const quantity = (() => {
-      const q = attrs.quantity;
+      const q = attrs.quantity ?? (listing as any)?.quantityTotal ?? (listing as any)?.quantityAvailable;
       const n = typeof q === 'number' ? q : Number(q);
       return Number.isFinite(n) && n > 0 ? n : null;
     })();
 
     const qtyLabel = (() => {
-      if (!quantity || quantity <= 1) return null;
+      if (!quantity || quantity < 1) return null;
       if (listing.category === 'cattle_livestock') return `${quantity} head`;
-      if (listing.category === 'sporting_working_dogs') return `${quantity} dogs`;
-      if (listing.category === 'horse_equestrian') return `${quantity} horses`;
-      if (listing.category === 'whitetail_breeder' || listing.category === 'wildlife_exotics') return `${quantity} animals`;
+      if (listing.category === 'sporting_working_dogs') return `${quantity} dog${quantity === 1 ? '' : 's'}`;
+      if (listing.category === 'horse_equestrian') return `${quantity} horse${quantity === 1 ? '' : 's'}`;
+      if (listing.category === 'whitetail_breeder' || listing.category === 'wildlife_exotics') return `${quantity} animal${quantity === 1 ? '' : 's'}`;
       return `Qty: ${quantity}`;
     })();
 
@@ -252,7 +253,17 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
               <div className="flex-1 min-w-0 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-extrabold text-[15px] leading-snug line-clamp-2">{listing.title}</div>
+                    <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
+                      <Badge variant="outline" className="text-[10px] font-semibold px-1.5 py-0 h-5">
+                        {listingTypeLabel}
+                      </Badge>
+                      {specs && specs.length > 0 ? (
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {specs.join(' · ')}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="font-extrabold text-[15px] leading-snug line-clamp-2 mt-1">{listing.title}</div>
                     <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
                       <span className="truncate">
@@ -351,10 +362,15 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
             <div className="flex flex-col gap-3 md:grid md:grid-cols-[1fr_220px] md:gap-5 md:items-stretch">
               {/* Left: details */}
               <div className="min-w-0 flex flex-col gap-2">
-                {/* Title (top) */}
-                <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300 pr-10">
-                  {listing.title}
-                </h3>
+                {/* Listing type + title */}
+                <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-10">
+                  <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-2 py-0.5">
+                    {listingTypeLabel}
+                  </Badge>
+                  <h3 className="font-bold text-[15px] sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-300 min-w-0">
+                    {listing.title}
+                  </h3>
+                </div>
 
                 {/* Location */}
                 <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">

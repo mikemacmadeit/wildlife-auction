@@ -273,7 +273,7 @@ export async function createConnectLoginLink(): Promise<{ url: string }> {
 export async function createCheckoutSession(
   listingId: string,
   offerId?: string,
-  paymentMethod?: 'card' | 'ach_debit',
+  paymentMethod?: 'card' | 'ach_debit' | 'wire',
   quantity?: number,
   opts?: { buyerAcksAnimalRisk?: boolean }
 ): Promise<{ url: string; sessionId: string }> {
@@ -398,6 +398,9 @@ export async function createWireIntent(
         ? `Too many requests. Please try again in ${sec} seconds.`
         : errorMessage;
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'lib/stripe/api createWireIntent', message: 'wire !response.ok', data: { status: response.status, bodyMessage: (error && typeof error === 'object' && error.message) ? String(error.message).slice(0, 200) : undefined, bodyError: (error && typeof error === 'object' && error.error) ? String(error.error).slice(0, 200) : undefined, errorMessageWeThrow: String(errorMessage).slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2' }) }).catch(() => {});
+    // #endregion
     const err: any = new Error(errorMessage);
     if (error?.stripe?.requestId) err.requestId = error.stripe.requestId;
     if (error?.stripe?.code) err.stripeCode = error.stripe.code;

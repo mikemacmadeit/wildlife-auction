@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { createOffer, acceptOffer, counterOffer, declineOffer, withdrawOffer, getMyOffers } from '@/lib/offers/api';
 import { createCheckoutSession, createWireIntent } from '@/lib/stripe/api';
 import type { Listing } from '@/lib/types';
+import { isGroupLotQuantityMode } from '@/lib/types';
 import { Loader2, Handshake, Clock, CheckCircle2, XCircle, RefreshCw, DollarSign } from 'lucide-react';
 import { PaymentMethodDialog, type PaymentMethodChoice } from '@/components/payments/PaymentMethodDialog';
 import { CheckoutStartErrorDialog } from '@/components/payments/CheckoutStartErrorDialog';
@@ -91,6 +92,7 @@ export function OfferPanel(props: { listing: Listing }) {
   const [acceptSuccessOpen, setAcceptSuccessOpen] = useState(false);
 
   const isAnimalListing = useMemo(() => isAnimalCategory(listing.category as any), [listing.category]);
+  const isGroupLot = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
 
   const eligible = useMemo(() => {
     const enabled = !!(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled);
@@ -229,7 +231,7 @@ export function OfferPanel(props: { listing: Listing }) {
           n,
           note.trim() ? note.trim() : undefined,
           preferredPaymentMethod,
-          listing.quantityTotal && listing.quantityTotal > 1 ? quantity : undefined
+          !isGroupLot && listing.quantityTotal && listing.quantityTotal > 1 ? quantity : undefined
         );
         if ((res as any)?.offerLimit) setOfferLimit((res as any).offerLimit);
         const newOfferId = String((res as any)?.offerId || (res as any)?.id || '');
@@ -598,10 +600,14 @@ export function OfferPanel(props: { listing: Listing }) {
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold">Total</div>
                   <div className="text-sm font-extrabold">
-                    ${(Number(amount || 0) * (listing.quantityTotal && listing.quantityTotal > 1 ? quantity : 1)).toLocaleString()}
+                    ${(Number(amount || 0) * (isGroupLot ? 1 : (listing.quantityTotal && listing.quantityTotal > 1 ? quantity : 1))).toLocaleString()}
                   </div>
                 </div>
-                {listing.quantityTotal && listing.quantityTotal > 1 && quantity > 1 ? (
+                {isGroupLot && listing.quantityTotal && listing.quantityTotal >= 1 ? (
+                  <div className="text-xs text-muted-foreground">
+                    Quantity: {listing.quantityTotal} (sold as one lot — your offer is for the entire lot)
+                  </div>
+                ) : listing.quantityTotal && listing.quantityTotal > 1 && quantity > 1 ? (
                   <div className="text-xs text-muted-foreground">
                     ${Number(amount || 0).toLocaleString()} × {quantity} items
                   </div>

@@ -17,6 +17,7 @@ import {
   BROWSE_QUANTITY_OPTIONS,
   BROWSE_SPECIES,
   BROWSE_STATES,
+  DELIVERY_TIMEFRAME_OPTIONS,
 } from '@/components/browse/filters/constants';
 
 export function BrowseFiltersSidebar(props: {
@@ -51,6 +52,7 @@ export function BrowseFiltersSidebar(props: {
     if (value.papers !== undefined) count++;
     if (value.verifiedSeller) count++;
     if (value.transportReady) count++;
+    if (value.deliveryTimeframe) count++;
     if (value.endingSoon) count++;
     if (value.newlyListed) count++;
     if (value.featured) count++;
@@ -262,6 +264,26 @@ export function BrowseFiltersSidebar(props: {
                     {BROWSE_QUANTITY_OPTIONS.map((q) => (
                       <SelectItem key={q.value} value={q.value}>
                         {q.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground">Delivery timeframe</Label>
+                <Select
+                  value={value.deliveryTimeframe || '__any__'}
+                  onValueChange={(t) => onChange({ ...value, deliveryTimeframe: t === '__any__' ? undefined : t })}
+                >
+                  <SelectTrigger className="min-h-[44px]">
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__any__">Any</SelectItem>
+                    {DELIVERY_TIMEFRAME_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

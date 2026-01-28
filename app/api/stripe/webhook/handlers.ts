@@ -128,7 +128,7 @@ export async function handleCheckoutSessionCompleted(
 ) {
   try {
     const checkoutSessionId = session.id;
-    const orderIdFromMeta = session.metadata?.orderId;
+    // Orders are created only on payment success; create-session no longer sends orderId.
     const listingId = session.metadata?.listingId;
     const buyerId = session.metadata?.buyerId;
     const sellerId = session.metadata?.sellerId;
@@ -465,60 +465,20 @@ export async function handleCheckoutSessionCompleted(
     // Check if transfer permit is required (whitetail_breeder)
     const transferPermitRequired = listingCategory === 'whitetail_breeder';
 
-    // Create or update order in Firestore (idempotent).
+    // Create or update order in Firestore (idempotent). Resolve only by session id; order is created here when payment succeeds.
     const now = new Date();
     // Dispute window duration (hours) - for internal enforcement only, does not affect Stripe payout timing
     const disputeWindowHours = parseInt(process.env.DISPUTE_WINDOW_HOURS || '72', 10);
     const disputeDeadline = new Date(now.getTime() + disputeWindowHours * 60 * 60 * 1000);
     
-    let orderRef = orderIdFromMeta ? db.collection('orders').doc(String(orderIdFromMeta)) : db.collection('orders').doc();
+    let orderRef: import('firebase-admin/firestore').DocumentReference;
     let existingOrderData: any | null = null;
-    
-    // Refresh reservation if it expired but listing is still available (prevents order creation failure)
-    // This handles cases where payment took longer than reservation window
-    const reservationExpired = listingData.purchaseReservedUntil?.toMillis 
-      ? listingData.purchaseReservedUntil.toMillis() < Date.now()
-      : false;
-    const reservationMatchesOrder = listingData.purchaseReservedByOrderId === orderIdFromMeta;
-    
-    if (reservationExpired && reservationMatchesOrder && isListingActive && !isListingSold) {
-      // Extend reservation by 10 minutes to allow order creation to complete
-      const extendedReservation = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
-      try {
-        await listingRef.set({
-          purchaseReservedUntil: extendedReservation,
-          updatedAt: Timestamp.fromDate(now),
-        }, { merge: true });
-        logInfo('Extended expired reservation for order creation', {
-          requestId,
-          route: '/api/stripe/webhook',
-          listingId,
-          orderId: orderIdFromMeta,
-          checkoutSessionId,
-        });
-      } catch (refreshError) {
-        // Non-blocking: if refresh fails, continue (order creation will handle it)
-        logWarn('Failed to refresh expired reservation', {
-          requestId,
-          route: '/api/stripe/webhook',
-          listingId,
-          orderId: orderIdFromMeta,
-          error: String(refreshError),
-        });
-      }
-    }
-
-    // Prefer explicit orderId from metadata; fall back to checkoutSession lookup.
-    if (orderIdFromMeta) {
-      const snap = await orderRef.get();
-      if (snap.exists) existingOrderData = snap.data() as any;
-    }
-    if (!existingOrderData) {
-      const existingOrderQuery = await ordersRef.where('stripeCheckoutSessionId', '==', checkoutSessionId).limit(1).get();
-      if (!existingOrderQuery.empty) {
-        orderRef = existingOrderQuery.docs[0].ref;
-        existingOrderData = existingOrderQuery.docs[0].data() as any;
-      }
+    const existingOrderQuery = await ordersRef.where('stripeCheckoutSessionId', '==', checkoutSessionId).limit(1).get();
+    if (!existingOrderQuery.empty) {
+      orderRef = existingOrderQuery.docs[0].ref;
+      existingOrderData = existingOrderQuery.docs[0].data() as any;
+    } else {
+      orderRef = ordersRef.doc();
     }
 
     // If already fully processed, treat as idempotent.
@@ -697,8 +657,67 @@ export async function handleCheckoutSessionCompleted(
       platformFeeAmount: platformFee / 100, // Immutable snapshot (matches platformFee)
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
-    // Use safeSet to automatically sanitize payload and prevent int32 serialization errors
-    await safeSet(orderRef, orderData, { merge: true });
+
+    // When creating a new order (no pre-created order), reserve inventory for multi-quantity in the same transaction.
+    const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+    const liveQuantityTotal =
+      typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
+        ? Math.max(1, Math.floor((listingData as any).quantityTotal))
+        : Math.max(1, Math.floor(attrsQty));
+    const isMultiQtyCreate = liveQuantityTotal > 1;
+
+    if (!existingOrderData && isMultiQtyCreate) {
+      const listingSnap = await listingRef.get();
+      if (!listingSnap.exists) {
+        logError('Listing not found when creating multi-qty order', undefined, { requestId, listingId, checkoutSessionId });
+        return;
+      }
+      const live = listingSnap.data() as any;
+      const available =
+        typeof live?.quantityAvailable === 'number' && Number.isFinite(live.quantityAvailable)
+          ? Math.max(0, Math.floor(live.quantityAvailable))
+          : liveQuantityTotal;
+      if (available < quantityFromMeta) {
+        logError('Insufficient quantity when creating order after payment', undefined, {
+          requestId,
+          listingId,
+          checkoutSessionId,
+          quantityFromMeta,
+          available,
+        });
+        return;
+      }
+      const sanitizedOrder = sanitizeFirestorePayload(orderData);
+      panicScanForBadInt32(sanitizedOrder);
+      const reservationCol = listingRef.collection('purchaseReservations');
+      const reservationRef = reservationCol.doc(orderRef.id);
+      const reserveUntilTs = Timestamp.fromMillis(now.getTime() + 48 * 60 * 60 * 1000);
+      await db.runTransaction(async (tx) => {
+        const lSnap = await tx.get(listingRef);
+        if (!lSnap.exists) throw new Error('Listing not found');
+        const d = lSnap.data() as any;
+        const avail =
+          typeof d?.quantityAvailable === 'number' && Number.isFinite(d.quantityAvailable)
+            ? Math.max(0, Math.floor(d.quantityAvailable))
+            : (typeof d?.quantityTotal === 'number' ? Math.max(0, Math.floor(d.quantityTotal)) : 1);
+        if (avail < quantityFromMeta) throw new Error('Insufficient quantity');
+        tx.set(orderRef, sanitizedOrder, { merge: true });
+        tx.set(listingRef, { quantityAvailable: avail - quantityFromMeta, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' }, { merge: true });
+        tx.set(reservationRef, {
+          id: orderRef.id,
+          orderId: orderRef.id,
+          listingId,
+          buyerId,
+          quantity: quantityFromMeta,
+          status: 'reserved',
+          createdAt: Timestamp.fromDate(now),
+          expiresAt: reserveUntilTs,
+        }, { merge: true });
+      });
+    } else {
+      // Use safeSet to automatically sanitize payload and prevent int32 serialization errors
+      await safeSet(orderRef, orderData, { merge: true });
+    }
 
     // Server-authoritative: recompute required/provided/missing docs snapshot after checkout completion.
     try {
