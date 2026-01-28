@@ -96,7 +96,10 @@ export interface WhitetailBreederAttributes {
    * New listing creation should write a number so we can filter/query reliably.
    */
   age?: number | string;
-  quantity: number; // Required, default 1
+  quantity: number; // Required, total (derived from quantityMale + quantityFemale when set)
+  /** Count by sex. When set, quantity = quantityMale + quantityFemale. */
+  quantityMale?: number;
+  quantityFemale?: number;
   tpwdBreederPermitNumber: string; // Required
   breederFacilityId: string; // Required
   /**
@@ -110,6 +113,8 @@ export interface WhitetailBreederAttributes {
     cwdCompliant: boolean; // Seller confirms compliance
   };
   healthNotes?: string; // Optional
+  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
+  quantityMode?: 'group' | 'individual';
 }
 
 export interface WildlifeAttributes {
@@ -120,7 +125,12 @@ export interface WildlifeAttributes {
    * New listing creation should write a number so we can filter/query reliably.
    */
   age?: number | string;
-  quantity: number; // Required, default 1
+  quantity: number; // Required, total (derived from quantityMale + quantityFemale when set)
+  /** Count by sex. When set, quantity = quantityMale + quantityFemale. */
+  quantityMale?: number;
+  quantityFemale?: number;
+  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
+  quantityMode?: 'group' | 'individual';
   locationType?: 'seller_location' | 'facility'; // Optional
   animalIdDisclosure: boolean; // Required: seller confirms animals are properly identified/tagged
   healthDisclosure: boolean; // Required: health disclosure acknowledged
@@ -142,7 +152,14 @@ export interface CattleAttributes {
   registered: boolean; // Required
   registrationNumber?: string; // Required if registered=true
   pregChecked?: boolean; // Optional
-  quantity: number; // Required, default 1
+  quantity: number; // Required, total head (derived from quantityBySex when set)
+  /** Count by sex. When set, quantity = sum of these. Allows e.g. 5 bulls + 5 heifers. */
+  quantityBull?: number;
+  quantityCow?: number;
+  quantityHeifer?: number;
+  quantitySteer?: number;
+  /** 'group' = all head sold together for listed price; 'individual' = buyer may choose how many (default). */
+  quantityMode?: 'group' | 'individual';
   identificationDisclosure: boolean; // Required: ear tags/brand present
   healthDisclosure: boolean; // Required: health disclosure acknowledged
   healthNotes?: string; // Optional
@@ -170,7 +187,12 @@ export interface HorseAttributes {
     transportDisclosure: boolean;
     titleOrLienDisclosure: boolean;
   };
-  quantity: number; // Required, default 1
+  quantity: number; // Required, total (derived from quantityMale + quantityFemale when set)
+  /** Count by sex. Male = stallion/gelding, Female = mare. When set, quantity = quantityMale + quantityFemale. */
+  quantityMale?: number;
+  quantityFemale?: number;
+  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
+  quantityMode?: 'group' | 'individual';
 }
 
 export type EquipmentType = 
@@ -233,7 +255,12 @@ export interface SportingWorkingDogAttributes {
   identificationDisclosure: boolean;
   healthDisclosure: boolean;
   transportDisclosure: boolean;
-  quantity: number; // Required, default 1
+  quantity: number; // Required, total (derived from quantityMale + quantityFemale when set)
+  /** Count by sex. When set, quantity = quantityMale + quantityFemale. */
+  quantityMale?: number;
+  quantityFemale?: number;
+  /** 'group' = all units sold together for listed price; 'individual' = buyer may choose how many (default). */
+  quantityMode?: 'group' | 'individual';
 }
 
 // Union type for category-specific attributes

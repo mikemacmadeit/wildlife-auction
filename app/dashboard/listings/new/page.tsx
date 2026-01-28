@@ -494,22 +494,12 @@ function NewListingPageContent() {
       permitRef,
       (snap) => {
         if (!snap.exists()) {
-          console.log('[TPWD Permit] Document does not exist for user:', user.uid);
           // Don't set to null here - check trust doc first as fallback
           return;
         }
         const data = snap.data() as any;
-        console.log('[TPWD Permit] Document data:', { 
-          status: data?.status, 
-          expiresAt: data?.expiresAt,
-          hasStatus: !!data?.status 
-        });
-        
-        if (!data?.status) {
-          console.warn('[TPWD Permit] Document exists but has no status field');
-          return;
-        }
-        
+        if (!data?.status) return;
+
         const permitData = {
           status: data.status,
           rejectionReason: data.rejectionReason || null,
@@ -517,15 +507,11 @@ function NewListingPageContent() {
           uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
           reviewedAt: data.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data.reviewedAt instanceof Date ? data.reviewedAt.toISOString() : null),
         };
-        
-        console.log('[TPWD Permit] Setting permit data from sellerPermits:', permitData);
         setTpwdPermit(permitData);
       },
       (error) => {
-        console.error('[TPWD Permit] Error listening to breeder permit:', error);
         // If there's a permissions error, try to fetch once as a fallback
         if (error?.code === 'permission-denied') {
-          console.warn('[TPWD Permit] Permission denied, attempting one-time fetch as fallback');
           getDoc(permitRef)
             .then((snap) => {
               if (snap.exists()) {
@@ -541,9 +527,7 @@ function NewListingPageContent() {
                 }
               }
             })
-            .catch((fetchError) => {
-              console.error('[TPWD Permit] Fallback fetch also failed:', fetchError);
-            });
+            .catch(() => {});
         }
       }
     );
@@ -578,10 +562,6 @@ function NewListingPageContent() {
             const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
             
             if (!isExpired) {
-              console.log('[TPWD Permit] Setting permit data from publicSellerTrust (fallback):', {
-                status: 'verified',
-                expiresAt,
-              });
               setTpwdPermit({
                 status: 'verified',
                 rejectionReason: null,
@@ -595,9 +575,7 @@ function NewListingPageContent() {
           }
         }
       },
-      (error) => {
-        console.error('[TPWD Permit] Error listening to publicSellerTrust:', error);
-      }
+      () => {}
     );
     
     return () => {
@@ -621,16 +599,6 @@ function NewListingPageContent() {
   
   const canSelectWhitetail = whitetailPermitStatus === 'verified' && !isPermitExpired;
   
-  // Debug logging for permit status
-  useEffect(() => {
-    console.log('[TPWD Permit Status]', {
-      whitetailPermitStatus,
-      isPermitExpired,
-      canSelectWhitetail,
-      permitData: tpwdPermit,
-    });
-  }, [whitetailPermitStatus, isPermitExpired, canSelectWhitetail, tpwdPermit]);
-
   const numberFromInput = (raw: string): number | null => {
     const s = String(raw || '').trim();
     if (!s) return null;

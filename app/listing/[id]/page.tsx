@@ -260,7 +260,7 @@ export default function ListingDetailPage() {
   }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity]);
 
   const buyNowAvailability = useMemo(() => {
-    if (!listing) return { total: 1, available: 1, canChooseQuantity: false };
+    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false };
     const attrsQty = Number((listing as any)?.attributes?.quantity ?? 1) || 1;
     const total =
       typeof (listing as any)?.quantityTotal === 'number' && Number.isFinite((listing as any).quantityTotal)
@@ -270,17 +270,20 @@ export default function ListingDetailPage() {
       typeof (listing as any)?.quantityAvailable === 'number' && Number.isFinite((listing as any).quantityAvailable)
         ? Math.max(0, Math.floor((listing as any).quantityAvailable))
         : total;
-    return { total, available, canChooseQuantity: listing.type === 'fixed' && available > 1 };
+    const isGroupListing = (listing as any)?.attributes?.quantityMode === 'group';
+    const canChooseQuantity = listing.type === 'fixed' && available > 1 && !isGroupListing;
+    return { total, available, canChooseQuantity, isGroupListing };
   }, [listing]);
 
-  // Keep quantity selection valid when listing loads/updates.
+  // Keep quantity selection valid when listing loads/updates. For group listings, always use full quantity.
   useEffect(() => {
     const max = buyNowAvailability.available || 1;
-    setBuyQuantity((q) => {
-      const next = Number.isFinite(q) ? Math.max(1, Math.floor(q)) : 1;
+    setBuyQuantity((prev) => {
+      if (buyNowAvailability.isGroupListing) return Math.max(1, max);
+      const next = Number.isFinite(prev) ? Math.max(1, Math.floor(prev)) : 1;
       return Math.min(next, Math.max(1, max));
     });
-  }, [buyNowAvailability.available]);
+  }, [buyNowAvailability.available, buyNowAvailability.isGroupListing]);
 
   const isAnimalListing = useMemo(() => {
     if (!listing?.category) return false;
@@ -1131,6 +1134,12 @@ export default function ListingDetailPage() {
                           </div>
                         </div>
                       </div>
+                    ) : listing!.type === 'fixed' && buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
+                      <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+                        <p className="text-sm font-medium text-foreground">
+                          This is a group listing. All {buyNowAvailability.available} will be purchased for the listed price.
+                        </p>
+                      </div>
                     ) : null}
                     {listing!.type === 'fixed' && (
                       <Button 
@@ -1771,6 +1780,12 @@ export default function ListingDetailPage() {
                                   {buyNowAvailability.available} available
                                 </div>
                               </div>
+                            </div>
+                          ) : buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
+                            <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+                              <p className="text-sm font-medium text-foreground">
+                                This is a group listing. All {buyNowAvailability.available} will be purchased for the listed price.
+                              </p>
                             </div>
                           ) : null}
                         <Button 

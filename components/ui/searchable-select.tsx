@@ -51,7 +51,10 @@ export function SearchableSelect(props: {
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn('w-full justify-between min-h-[48px] text-base', buttonClassName)}
+          className={cn(
+            'w-full justify-between min-h-[48px] text-base border-input bg-background hover:bg-background/95',
+            buttonClassName
+          )}
         >
           <span className={cn('truncate text-left', !selected && !rawValue && 'text-muted-foreground')}>
             {displayLabel}
