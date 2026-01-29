@@ -96,9 +96,8 @@ export default function HomePage() {
   const router = useRouter();
   // Use global toast function instead of useToast() hook to prevent re-renders when toast state changes
   const toast = globalToast;
-  const [homeSearchQuery, setHomeSearchQuery] = useState('');
-  
-  // Use ref value for length checks to avoid re-renders
+  // Uncontrolled search input: ref avoids re-renders on every keystroke so listings don't glitch
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [mostWatched, setMostWatched] = useState<Listing[]>([]);
@@ -552,7 +551,7 @@ export default function HomePage() {
 
     // Homepage: enforce consistent card size/height (eBay-style rails).
     // This avoids “some huge, some small” cards when different variants render.
-    const itemClass = 'w-[280px] sm:w-[320px] lg:w-[340px] h-[420px]';
+    const itemClass = 'w-[200px] h-[300px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]';
 
     const startRafLoop = () => {
       const el = scrollerRef.current;
@@ -674,7 +673,7 @@ export default function HomePage() {
     };
 
     return (
-      <div className="group/rail relative [--rail-card-w:280px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
+      <div className="group/rail relative [--rail-card-w:200px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
         {/* Arrows: sit in the rail gutters (ends of the section), not on top of card images */}
         <div
           className={cn(
@@ -826,8 +825,9 @@ export default function HomePage() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (homeSearchQuery.trim()) {
-      router.push(`/browse?search=${encodeURIComponent(homeSearchQuery.trim())}`);
+    const q = searchInputRef.current?.value?.trim() ?? '';
+    if (q) {
+      router.push(`/browse?search=${encodeURIComponent(q)}`);
     } else {
       router.push('/browse');
     }
@@ -911,10 +911,11 @@ export default function HomePage() {
               <form onSubmit={handleSearchSubmit} className="relative w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
+                  ref={searchInputRef}
                   type="text"
+                  name="search"
                   placeholder="Search listings, species, breeds, and locations…"
-                  value={homeSearchQuery}
-                  onChange={(e) => setHomeSearchQuery(e.target.value)}
+                  defaultValue=""
                   className="pl-11 min-h-[52px] text-base rounded-xl bg-background w-full"
                 />
               </form>
@@ -1024,8 +1025,10 @@ export default function HomePage() {
             <div className="space-y-4">
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-xl md:text-2xl font-bold mb-1">Welcome back</h2>
-                  <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <h2 className="text-xl md:text-2xl font-bold">Welcome back</h2>
+                    <p className="text-lg md:text-xl font-semibold text-foreground">{userDisplayName}</p>
+                  </div>
                   <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -1272,19 +1275,19 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          {/* Mobile-only: 3 animal categories. Dog/horse/ranch/hunting hidden. */}
+          {/* Mobile-only: 3 animal categories. Compact stacked layout so long labels fit. */}
           <div className="flex justify-center md:hidden">
-            <div className="grid grid-cols-3 gap-2 max-w-2xl w-full">
+            <div className="grid grid-cols-3 gap-2 w-full max-w-2xl">
             {[
-              { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-9 h-9 icon-primary-color mask-icon-whitetail-breeder" /> },
-              { href: '/browse?category=wildlife_exotics', label: 'Registered & Specialty Livestock', icon: <div className="w-9 h-9 icon-primary-color mask-icon-fallow" /> },
-              { href: '/browse?category=cattle_livestock', label: 'Cattle & Livestock', icon: <div className="w-9 h-9 icon-primary-color mask-icon-bull" /> },
+              { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-8 h-8 icon-primary-color mask-icon-whitetail-breeder" /> },
+              { href: '/browse?category=wildlife_exotics', label: 'Registered & Specialty Livestock', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
+              { href: '/browse?category=cattle_livestock', label: 'Cattle & Livestock', icon: <div className="w-8 h-8 icon-primary-color mask-icon-bull" /> },
               {
                 href: '/browse?category=horse_equestrian',
                 label: 'Horse & Equestrian',
                 icon: (
                   <div
-                    className="w-9 h-9"
+                    className="w-8 h-8"
                     style={{
                       WebkitMaskImage: `url('/images/Horse.png')`,
                       WebkitMaskSize: 'contain',
@@ -1299,19 +1302,17 @@ export default function HomePage() {
                   />
                 ),
               },
-              { href: '/browse?category=sporting_working_dogs', label: 'Sporting Dogs', icon: <div className="w-9 h-9 icon-primary-color mask-icon-dog" /> },
-              { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-9 h-9 icon-primary-color mask-icon-hunting-blind" /> },
-              { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-9 h-9 icon-primary-color mask-icon-tractor" /> },
-              { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-9 h-9 icon-primary-color mask-icon-top-drive" /> },
+              { href: '/browse?category=sporting_working_dogs', label: 'Sporting Dogs', icon: <div className="w-8 h-8 icon-primary-color mask-icon-dog" /> },
+              { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-8 h-8 icon-primary-color mask-icon-hunting-blind" /> },
+              { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-8 h-8 icon-primary-color mask-icon-tractor" /> },
+              { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-8 h-8 icon-primary-color mask-icon-top-drive" /> },
             ].filter((c) => !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.href || ''))).map((c) => (
               <Link key={c.href} href={c.href} className="group">
-                <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors">
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-3 min-h-[56px]">
-                      <div className="flex-shrink-0">{c.icon}</div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-extrabold leading-tight line-clamp-2">{c.label}</div>
-                      </div>
+                <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors h-full">
+                  <CardContent className="p-2 flex flex-col items-center text-center gap-1.5 min-h-0">
+                    <div className="flex-shrink-0">{c.icon}</div>
+                    <div className="text-[11px] font-extrabold leading-tight line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
+                      {c.label}
                     </div>
                   </CardContent>
                 </Card>

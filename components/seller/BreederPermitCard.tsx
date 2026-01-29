@@ -34,7 +34,7 @@ type SellerPermit = {
 };
 
 function statusBadgeVariant(status: PermitStatus | null | undefined) {
-  if (status === 'verified') return 'secondary';
+  if (status === 'verified') return 'success';
   if (status === 'rejected') return 'destructive';
   return 'outline';
 }
@@ -249,27 +249,31 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
 
   return (
     <Card className={props.className}>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              TPWD Breeder Permit
+      <CardHeader className="we-space-y-default">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="we-h4 flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-4 w-4 text-primary" />
+                </span>
+                TPWD Breeder Permit
+              </span>
+              {permit?.status && permit.status !== 'verified' ? (
+                <Badge variant={statusBadgeVariant(permit.status) as any} className="capitalize shrink-0">
+                  {permit.status === 'pending' ? 'Pending review' : permit.status}
+                </Badge>
+              ) : null}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="mt-1.5">
               Upload your breeder permit. Admin will review and (if approved) you'll receive a badge shown on your profile and listings.
             </CardDescription>
             {showDismissHint ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Not a breeder or don't plan to list whitetails? You can exit out of this box (click the X in the corner).
+              <p className="mt-2 text-xs text-muted-foreground">
+                Not a breeder or don't plan to list whitetails? You can close this card (X in the corner).
               </p>
             ) : null}
           </div>
-          {permit?.status ? (
-            <Badge variant={statusBadgeVariant(permit.status) as any} className="capitalize">
-              {permit.status === 'pending' ? 'Pending review' : permit.status}
-            </Badge>
-          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -299,22 +303,20 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
         ) : null}
 
         {permit?.status === 'verified' ? (
-          <div className="space-y-4">
-            <div className="rounded-lg border bg-muted/20 p-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  Permit verified
+          <div className="we-space-y-default">
+            <div className="rounded-lg border border-l-4 border-l-primary bg-primary/5 p-4 we-gap-default flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="min-w-0 space-y-3">
+                <div className="font-semibold flex items-center gap-2 text-foreground">
+                  <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                  Breeder permit verified
                 </div>
-                <div className="mt-2">
-                  <SellerTrustBadges badgeIds={['tpwd_breeder_permit_verified']} />
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <SellerTrustBadges badgeIds={['tpwd_breeder_permit_verified']} className="flex flex-wrap gap-2" />
+                <div className="text-xs text-muted-foreground">
                   {permit.expiresAt ? `Expires: ${new Date(permit.expiresAt).toLocaleDateString()}` : 'No expiration on file.'}
                 </div>
               </div>
               {permit.documentUrl ? (
-                <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
+                <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="shrink-0 w-full sm:w-auto">
                   <Eye className="h-4 w-4 mr-2" />
                   View
                 </Button>
@@ -412,7 +414,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-muted disabled:text-muted-foreground"
+            variant="default"
           >
             {(uploading || submitting) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
             Submit for review

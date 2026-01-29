@@ -4,13 +4,13 @@ import { Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import { ConditionalNavbar } from '@/components/navigation/ConditionalNavbar';
 import { ConditionalFooter } from '@/components/navigation/ConditionalFooter';
+import { MobileBottomNavWhenSignedIn } from '@/components/navigation/MobileBottomNavWhenSignedIn';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { Providers } from '@/components/providers';
 import { FavoritesInitializer } from '@/components/favorites/FavoritesInitializer';
 import { PublicEmailCaptureMount } from '@/components/marketing/PublicEmailCaptureMount';
-import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { getSiteUrl } from '@/lib/site-url';
 import { cookies } from 'next/headers';
 import { SiteGateClient } from '@/components/site/SiteGateClient';
@@ -131,11 +131,11 @@ export default function RootLayout({
             </div>
             <ConditionalNavbar />
             <PublicEmailCaptureMount />
-            <HelpLauncher />
-            <main className="flex-1 relative z-10">
+            <main className="flex-1 relative z-10 pb-20 md:pb-0">
               {children}
             </main>
             <ConditionalFooter />
+            <MobileBottomNavWhenSignedIn />
             <Toaster />
             <SonnerToaster />
             <VisibilityDiagnostics enabled={process.env.NODE_ENV === 'development'} />
@@ -145,11 +145,11 @@ export default function RootLayout({
             <div className="min-h-screen flex flex-col bg-background relative">
               <ConditionalNavbar />
               <PublicEmailCaptureMount />
-              <HelpLauncher />
-              <main className="flex-1 relative z-10">
+              <main className="flex-1 relative z-10 pb-20 md:pb-0">
                 {children}
               </main>
               <ConditionalFooter />
+              <MobileBottomNavWhenSignedIn />
               <Toaster />
               <SonnerToaster />
               <VisibilityDiagnostics enabled={process.env.NODE_ENV === 'development'} />

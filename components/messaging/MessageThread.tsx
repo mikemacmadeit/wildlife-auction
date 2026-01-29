@@ -620,10 +620,10 @@ export function MessageThreadComponent({
         </div>
       )}
 
-      {/* Messages - iPhone-like on mobile */}
+      {/* Messages - distinct list background and bubble surfaces */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto md:p-4 px-3 py-2 md:space-y-4 space-y-3 overscroll-contain touch-pan-y bg-background"
+        className="flex-1 overflow-y-auto md:p-4 px-3 py-2 md:space-y-4 space-y-3 overscroll-contain touch-pan-y bg-messageList"
         style={{ WebkitOverflowScrolling: 'touch' }}
         onScroll={() => {
           const sc = scrollRef.current;
@@ -683,8 +683,8 @@ export function MessageThreadComponent({
                   className={cn(
                     'max-w-[82%] md:max-w-[75%] rounded-2xl md:rounded-lg md:p-3 px-3.5 py-2.5 md:py-3',
                     isSender
-                      ? 'bg-primary text-primary-foreground md:bg-primary/10 md:text-foreground md:border md:border-primary/20'
-                      : 'bg-muted text-foreground md:border md:border-border'
+                      ? 'bg-messageSent/20 text-foreground border border-messageSentBorder/50 dark:bg-messageSent/25 dark:border-messageSentBorder/40'
+                      : 'bg-messageReceived text-foreground border border-border'
                   )}
                 >
                   {atts.length ? (
@@ -716,7 +716,7 @@ export function MessageThreadComponent({
                           className={cn(
                             "underline underline-offset-2",
                             isSender 
-                              ? "text-primary-foreground/90 hover:text-primary-foreground md:text-primary md:hover:text-primary/80"
+                              ? "text-primary hover:text-primary/80"
                               : "text-primary hover:text-primary/80"
                           )}
                         >
@@ -735,9 +735,7 @@ export function MessageThreadComponent({
                   )}
                   <p className={cn(
                     "text-[11px] md:text-xs mt-1",
-                    isSender 
-                      ? "text-primary-foreground/70 md:text-muted-foreground"
-                      : "text-muted-foreground"
+                    "text-muted-foreground"
                   )}>
                     {createdAt ? formatDistanceToNow(createdAt, { addSuffix: true }) : '—'}
                   </p>
@@ -766,7 +764,7 @@ export function MessageThreadComponent({
                 </div>
                 {isSender && (
                   <Avatar className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 self-end mb-0.5">
-                    <AvatarFallback className="bg-primary/20 text-[9px] md:text-xs">You</AvatarFallback>
+                    <AvatarFallback className="bg-primary/20 text-foreground text-[9px] md:text-xs">You</AvatarFallback>
                   </Avatar>
                 )}
               </div>
@@ -776,8 +774,8 @@ export function MessageThreadComponent({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input - Compact on mobile, iPhone-like */}
-      <div className="border-t md:p-4 p-2.5 md:pb-4 pb-2.5 bg-background">
+      {/* Input - distinct bar so it reads as a strip */}
+      <div className="border-t border-border md:p-4 p-2.5 md:pb-4 pb-2.5 bg-messageInput">
         <input
           ref={fileInputRef}
           type="file"

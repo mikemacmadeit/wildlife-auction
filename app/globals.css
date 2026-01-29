@@ -210,6 +210,13 @@
     
     /* Parchment utility (micro-highlight only) */
     --parchment: 40 30% 93%;             /* #F4F0E6 - NOT for card backgrounds */
+
+    /* Messaging: distinct surfaces so threads aren’t all one beige */
+    --message-list: 38 32% 76%;         /* Slightly warmer sand strip */
+    --message-received: 38 36% 85%;     /* Lighter surface for their bubbles */
+    --message-sent: 90 12% 45%;         /* Sage (use with opacity in component) */
+    --message-sent-border: 90 14% 38%;
+    --message-input: 38 36% 82%;        /* Card-alike input bar */
   }
   
   /* Dark Theme - Olivewood Background, Olive Brand (unchanged - looks great) */
@@ -253,6 +260,13 @@
     --chart-3: 40 8% 40%;                /* Bark */
     --chart-4: 75 8% 18%;                /* Dark surface */
     --chart-5: 90 10% 45%;               /* Darker sage */
+
+    /* Messaging: elevated surfaces, not too dark */
+    --message-list: 75 8% 15%;          /* Slightly lighter than background */
+    --message-received: 75 8% 21%;       /* Clear bubble surface */
+    --message-sent: 80 15% 70%;          /* Olive (use with opacity) */
+    --message-sent-border: 80 18% 55%;
+    --message-input: 75 8% 18%;         /* Card-alike input bar */
   }
 }
 
@@ -415,6 +429,30 @@
   }
   .we-scrollbar-hover:hover::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
+  }
+
+  /* Inverted (subtle thumb) for dark sections e.g. browse header chip row; scrollbar on hover, blends with background */
+  .we-scrollbar-hover-inverted {
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+  }
+  .we-scrollbar-hover-inverted::-webkit-scrollbar {
+    width: 10px;
+    height: 6px;
+  }
+  .we-scrollbar-hover-inverted::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .we-scrollbar-hover-inverted::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  .we-scrollbar-hover-inverted:hover {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+  .we-scrollbar-hover-inverted:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
   }
 
   @keyframes shimmer {

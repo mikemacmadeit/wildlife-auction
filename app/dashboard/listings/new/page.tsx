@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Upload, X, Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react';
 import { ListingType, ListingCategory } from '@/lib/types';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/use-auth';
 import { createEmptyListingDraft, createListingDraft, publishListing, updateListing } from '@/lib/firebase/listings';
 import { useToast } from '@/hooks/use-toast';
@@ -3505,8 +3504,6 @@ function NewListingPageContent() {
         </div>
       </div>
 
-      <BottomNav />
-      
       {/* Exit Confirmation Dialog */}
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <DialogContent>

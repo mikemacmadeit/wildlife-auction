@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2, ArrowLeft, Heart, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -25,9 +25,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
 import { FilterBottomSheet } from '@/components/navigation/FilterBottomSheet';
 import { MobileBrowseFilterSheet } from '@/components/navigation/MobileBrowseFilterSheet';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { Badge } from '@/components/ui/badge';
-import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
+import { queryListingsForBrowse, getDistinctListingStates, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
 import { FilterState, ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +59,18 @@ import { Switch } from '@/components/ui/switch';
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 
 type ViewMode = 'card' | 'list';
+
+function getSortChipLabel(sortBy: SortOption, listingStatus: 'active' | 'completed' | 'sold'): string {
+  switch (sortBy) {
+    case 'newest': return listingStatus === 'sold' ? 'Recently sold' : 'Newest';
+    case 'oldest': return listingStatus === 'sold' ? 'Oldest sold' : 'Oldest';
+    case 'price-low': return 'Price: Low';
+    case 'price-high': return 'Price: High';
+    case 'ending-soon': return 'Ending soon';
+    case 'featured': return 'Featured';
+    default: return 'Newest';
+  }
+}
 
 function toMillisSafe(value: any): number | null {
   if (!value) return null;
@@ -118,7 +129,9 @@ export default function BrowsePage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const urlReadRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // Debounce search
   const [filters, setFilters] = useState<FilterState>({});
@@ -155,6 +168,7 @@ export default function BrowsePage() {
   const [savedSearchConfirmId, setSavedSearchConfirmId] = useState<string | null>(null);
   const [savedSearchConfirmDraft, setSavedSearchConfirmDraft] = useState<FilterState | null>(null);
   const [savedSearchConfirmName, setSavedSearchConfirmName] = useState<string>('');
+  const [listingStates, setListingStates] = useState<{ value: string; label: string }[] | null>(null);
 
   // Load from localStorage after hydration (client-side only)
   useEffect(() => {
@@ -164,6 +178,28 @@ export default function BrowsePage() {
         setViewMode(saved);
       }
     }
+  }, []);
+
+  // Item Location: only states that have at least one active listing (desktop + mobile)
+  useEffect(() => {
+    let cancelled = false;
+    getDistinctListingStates()
+      .then((codes) => {
+        if (cancelled) return;
+        const mapped = codes
+          .map((code) => {
+            const entry = BROWSE_STATES.find((s) => s.value === code);
+            return entry ? { value: entry.value, label: entry.label } : null;
+          })
+          .filter((x): x is { value: string; label: string } => x !== null);
+        setListingStates(mapped.length ? mapped : null);
+      })
+      .catch(() => {
+        if (!cancelled) setListingStates(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Deep link: /browse?savedSearchId=... loads criteria for the signed-in user.
@@ -229,8 +265,25 @@ export default function BrowsePage() {
       if (speciesId) next.species = [speciesId];
       return next;
     });
+    urlReadRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // eBay-style: sync browse state to URL so back/forward and sharing work
+  useEffect(() => {
+    if (!urlReadRef.current) return;
+    const q = searchQuery?.trim() || '';
+    const params = new URLSearchParams();
+    if (q) params.set('search', q);
+    if (selectedType !== 'all') params.set('type', selectedType);
+    if (listingStatus !== 'active') params.set('status', listingStatus);
+    if (filters.category) params.set('category', filters.category);
+    if (filters.location?.state) params.set('state', filters.location.state);
+    if (filters.species?.[0]) params.set('speciesId', filters.species[0]);
+    const query = params.toString();
+    const url = query ? `${pathname ?? '/browse'}?${query}` : (pathname ?? '/browse');
+    router.replace(url, { scroll: false });
+  }, [pathname, router, searchQuery, selectedType, listingStatus, filters]);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -513,29 +566,14 @@ export default function BrowsePage() {
       setLoadingMore(false);
     }
   };
-  
-  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load initial page when filters/sort change. Debounce refetches so rapid filter clicks feel smooth.
+  // eBay-style real-time: when user clicks a filter/sort/type, listings update immediately.
   useEffect(() => {
     if (listingStatus !== 'active' && sortBy === 'ending-soon') {
       setSortBy('newest');
       return;
     }
-    const isRefetch = listings.length > 0;
-    const run = () => loadInitial(isRefetch);
-
-    if (isRefetch) {
-      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
-      fetchDebounceRef.current = setTimeout(run, 180);
-      return () => {
-        if (fetchDebounceRef.current) {
-          clearTimeout(fetchDebounceRef.current);
-          fetchDebounceRef.current = null;
-        }
-      };
-    }
-    run();
+    loadInitial(listings.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType, filters, sortBy, listingStatus, debouncedSearchQuery]);
 
@@ -748,7 +786,7 @@ export default function BrowsePage() {
     // also allow setting/clearing it. Treat presence of the key as authoritative (including `undefined`).
     if (Object.prototype.hasOwnProperty.call(next, 'type')) {
       const t = next.type;
-      setSelectedType(t === 'auction' || t === 'fixed' ? t : 'all');
+      setSelectedType(t === 'auction' || t === 'fixed' || t === 'classified' ? t : 'all');
       delete next.type;
     }
     setFilters((prev) => {
@@ -840,25 +878,25 @@ export default function BrowsePage() {
         // otherwise the search bar appears "missing" because it's hidden behind the navbar.
         className="fixed top-20 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
       >
-        <div className="container mx-auto px-4 py-0 md:py-4">
-          <div className="rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-0 md:p-4">
-            <div className="flex flex-col gap-0 md:gap-3">
-              <div className="flex flex-col md:flex-row gap-0 md:gap-3 md:items-center md:justify-between p-1 md:p-0">
-                <div className="flex-1 w-full md:max-w-2xl">
-                  {/* Mobile (eBay-style): full-width search + heart-in-search */}
-                  <div className="md:hidden">
+        <div className="container mx-auto px-3 py-2 md:px-4 md:py-4">
+          <div className="rounded-xl md:rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-2 md:p-4">
+            <div className="flex flex-col gap-2 md:gap-3">
+              {/* Row 1: Mobile = search full width; Desktop = search + Clear */}
+              <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-between">
+                {/* Mobile: search bar full width on its own row */}
+                <div className="w-full min-w-0 md:flex-1 md:max-w-2xl">
+                  <div className="md:hidden w-full">
                     <div className="relative w-full">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70" />
                       <Input
                         type="text"
                         placeholder="Search"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className={cn(
-                          'pl-11 pr-12 min-h-[52px] text-base rounded-full w-full',
-                          'bg-background text-foreground caret-foreground',
-                          'border-border/70 placeholder:text-muted-foreground',
-                          'focus-visible:ring-ring/40 focus-visible:ring-2'
+                          'w-full pl-9 pr-10 min-h-[44px] text-sm rounded-full',
+                          'bg-white/15 border-white/25 text-white placeholder:text-white/60 caret-white',
+                          'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:border-white/40'
                         )}
                       />
                       <Button
@@ -867,10 +905,10 @@ export default function BrowsePage() {
                         size="icon"
                         onClick={quickSaveSearchMobile}
                         disabled={savingSearch}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full hover:bg-muted"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-white/90 hover:bg-white/20 hover:text-white"
                         aria-label="Save search"
                       >
-                        <Heart className="h-5 w-5" />
+                        <Heart className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -898,8 +936,7 @@ export default function BrowsePage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                  {/* Mobile uses eBay-style chip rail + right-side filter sheet (below) */}
+                <div className="hidden md:flex items-center gap-2 w-full md:w-auto flex-shrink-0">
                   <div className="hidden md:block lg:hidden">
                     <FilterDialog
                       filters={{
@@ -914,46 +951,42 @@ export default function BrowsePage() {
                     variant="outline"
                     onClick={clearFilters}
                     disabled={activeFilterCount === 0}
-                    className="min-h-[48px] px-4 font-semibold border-background/30 text-background hover:bg-background/10"
+                    className="h-9 px-3 md:min-h-[48px] md:px-4 text-xs md:text-base font-semibold rounded-full border-background/30 text-background hover:bg-background/10 flex-shrink-0"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                     Clear
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-0 md:gap-2 md:items-center md:justify-between px-1 pb-1 md:px-0 md:pb-0">
-                {/* Type Tabs */}
+              {/* Row 2: Desktop only – type tabs + quick filters. Mobile: buying format is in Filter sheet. */}
+              <div className="hidden md:flex flex-col md:flex-row gap-0 md:gap-2 md:items-center md:justify-between md:px-0 md:pb-0">
                 <Tabs
                   value={selectedType}
                   onValueChange={(value) => setSelectedType(value as ListingType | 'all')}
                   className="w-full md:w-auto"
                 >
-                  {/* No scroll bar needed: 4 tabs always fit */}
-                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-background/10 rounded-xl p-1 border border-background/20">
-                    <TabsTrigger value="all" className="rounded-lg font-semibold min-w-0">
+                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-background/10 rounded-xl p-1 border border-background/20 h-auto">
+                    <TabsTrigger value="all" className="rounded-lg font-semibold min-w-0 text-base py-2">
                       All
                     </TabsTrigger>
-                    <TabsTrigger value="auction" className="rounded-lg font-semibold min-w-0">
-                      <span className="hidden sm:inline-flex items-center gap-2">
+                    <TabsTrigger value="auction" className="rounded-lg font-semibold min-w-0 text-base py-2">
+                      <span className="inline-flex items-center gap-2">
                         <Gavel className="h-4 w-4" />
                         Auctions
                       </span>
-                      <span className="sm:hidden">Auction</span>
                     </TabsTrigger>
-                    <TabsTrigger value="fixed" className="rounded-lg font-semibold min-w-0">
-                      <span className="hidden sm:inline-flex items-center gap-2">
+                    <TabsTrigger value="fixed" className="rounded-lg font-semibold min-w-0 text-base py-2">
+                      <span className="inline-flex items-center gap-2">
                         <Tag className="h-4 w-4" />
                         Fixed Price
                       </span>
-                      <span className="sm:hidden">Buy Now</span>
                     </TabsTrigger>
-                    <TabsTrigger value="classified" className="rounded-lg font-semibold min-w-0">
-                      <span className="hidden sm:inline-flex items-center gap-2">
+                    <TabsTrigger value="classified" className="rounded-lg font-semibold min-w-0 text-base py-2">
+                      <span className="inline-flex items-center gap-2">
                         <MessageSquare className="h-4 w-4" />
                         Classified
                       </span>
-                      <span className="sm:hidden">Classified</span>
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -1015,13 +1048,12 @@ export default function BrowsePage() {
                 </div>
               </div>
 
-              {/* Mobile: eBay-style one-hand chip rail */}
-              <div className="md:hidden -mx-1">
+              {/* Mobile: eBay-style – search bar, then one scrollable row (Filter, Buying format, Sort, Price, Location, List); scrollbar on hover */}
+              <div className="md:hidden pt-1">
                 <div
                   className={cn(
-                    'flex items-center gap-2 px-1',
-                    'overflow-x-auto overflow-y-hidden',
-                    '[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+                    'flex items-center gap-2 min-w-0',
+                    'overflow-x-auto overflow-y-hidden pt-1 pb-2 we-scrollbar-hover-inverted'
                   )}
                 >
                   <MobileBrowseFilterSheet
@@ -1030,7 +1062,8 @@ export default function BrowsePage() {
                       type: selectedType === 'all' ? undefined : (selectedType as any),
                     }}
                     onFiltersChange={handleFilterChange}
-                    className="flex-shrink-0"
+                    listingStates={listingStates}
+                    className="flex-shrink-0 h-8 px-2.5 rounded-full text-xs font-semibold gap-1.5 bg-white/15 border-white/30 text-white hover:bg-white/25"
                   />
 
                   <DropdownMenu>
@@ -1038,9 +1071,57 @@ export default function BrowsePage() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                        className={cn(
+                          'h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25',
+                          listingStatus !== 'active' && 'bg-white/25 border-white/40'
+                        )}
                       >
-                        Sort
+                        {listingStatus === 'active' ? 'Active' : listingStatus === 'completed' ? 'Completed' : 'Sold'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={8} className="w-52">
+                      <DropdownMenuItem onSelect={() => setListingStatus('active')}>Active</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setListingStatus('completed')}>Completed</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setListingStatus('sold')}>Sold</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={filters.location?.state ? 'default' : 'outline'}
+                        className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                      >
+                        Item Location
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={8} className="w-64 max-h-[360px] overflow-y-auto">
+                      <DropdownMenuItem
+                        onSelect={() => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: undefined } }))}
+                      >
+                        Any state
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {(listingStates ?? BROWSE_STATES).map((s) => (
+                        <DropdownMenuItem
+                          key={s.value}
+                          onSelect={() => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: s.value } }))}
+                        >
+                          {s.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                      >
+                        {getSortChipLabel(sortBy, listingStatus)}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" sideOffset={8} className="w-56">
@@ -1060,10 +1141,37 @@ export default function BrowsePage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
 
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          'h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25',
+                          selectedType !== 'all' && 'bg-white/25 border-white/40'
+                        )}
+                      >
+                        {selectedType === 'all'
+                          ? 'Buying format'
+                          : selectedType === 'fixed'
+                            ? 'Buy Now'
+                            : selectedType === 'auction'
+                              ? 'Auction'
+                              : 'Classified'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={8} className="w-52">
+                      <DropdownMenuItem onSelect={() => setSelectedType('all')}>All</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSelectedType('auction')}>Auction</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSelectedType('fixed')}>Buy Now</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSelectedType('classified')}>Classified</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
                   <Button
                     type="button"
                     variant={filters.minPrice !== undefined || filters.maxPrice !== undefined ? 'default' : 'outline'}
-                    className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
                     onClick={() => setPriceDialogOpen(true)}
                   >
                     Price
@@ -1077,7 +1185,7 @@ export default function BrowsePage() {
                         <Button
                           type="button"
                           variant={(filters.healthStatus && filters.healthStatus.length > 0) ? 'default' : 'outline'}
-                          className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                          className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
                         >
                           Condition
                         </Button>
@@ -1105,36 +1213,8 @@ export default function BrowsePage() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         type="button"
-                        variant={filters.location?.state ? 'default' : 'outline'}
-                        className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
-                      >
-                        Location
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" sideOffset={8} className="w-64 max-h-[360px] overflow-y-auto">
-                      <DropdownMenuItem
-                        onSelect={() => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: undefined } }))}
-                      >
-                        Any state
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {BROWSE_STATES.map((s) => (
-                        <DropdownMenuItem
-                          key={s.value}
-                          onSelect={() => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: s.value } }))}
-                        >
-                          {s.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
                         variant="outline"
-                        className="h-10 px-3 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                        className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
                       >
                         {viewMode === 'list' ? 'List' : 'Gallery'}
                       </Button>
@@ -1144,6 +1224,17 @@ export default function BrowsePage() {
                       <DropdownMenuItem onSelect={() => handleViewModeChange('list')}>List</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearFilters}
+                    disabled={activeFilterCount === 0}
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25 disabled:opacity-50"
+                  >
+                    <X className="h-3.5 w-3.5 mr-1.5" />
+                    Clear
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1314,7 +1405,7 @@ export default function BrowsePage() {
           {/* Desktop filter rail: scrollable when tall; overscroll-contain prevents scroll chaining to page */}
           <aside className="hidden lg:block self-start">
             <div className="sticky top-[104px] max-h-[calc(100vh-104px)] overflow-y-auto overflow-x-hidden overscroll-contain min-h-0 pr-1 -mr-1 [scrollbar-gutter:stable]">
-              <BrowseFiltersSidebar value={filters} onChange={handleFilterChange} onClearAll={clearFilters} />
+              <BrowseFiltersSidebar value={filters} onChange={handleFilterChange} onClearAll={clearFilters} listingStates={listingStates} />
             </div>
           </aside>
 
@@ -1395,7 +1486,7 @@ export default function BrowsePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__any__">Item Location</SelectItem>
-                {BROWSE_STATES.map((s) => (
+                {(listingStates ?? BROWSE_STATES).map((s) => (
                   <SelectItem key={s.value} value={s.value}>
                     {s.label}
                   </SelectItem>
@@ -1570,8 +1661,6 @@ export default function BrowsePage() {
           </div>
         </div>
       </div>
-
-      <BottomNav />
 
       {/* Mobile: "Search saved!" confirmation sheet (eBay-style) */}
       <Sheet open={savedSearchConfirmOpen} onOpenChange={setSavedSearchConfirmOpen}>

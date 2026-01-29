@@ -132,13 +132,13 @@ function FavoriteButtonComponent({
         onClick={handleClick}
         disabled={pending}
         className={cn(
-          'hover:bg-primary/10',
+          'h-8 w-8 sm:h-9 sm:w-9 shrink-0 hover:bg-primary/10',
           isFavorited && 'text-primary',
           className
         )}
         aria-label={isFavorited ? 'Remove from watchlist' : 'Add to watchlist'}
       >
-        <Heart className={cn('h-5 w-5 transition-colors duration-200', isFavorited && 'fill-primary text-primary')} />
+        <Heart className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors duration-200', isFavorited && 'fill-primary text-primary')} />
       </Button>
 
       <AuthPromptModal

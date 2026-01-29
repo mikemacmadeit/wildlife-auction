@@ -478,43 +478,41 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-      <Card className="border-2 border-border/60 overflow-hidden">
-        <CardContent className="p-5 md:p-6">
-          <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+      <div className="container mx-auto px-4 py-4 md:py-8 max-w-7xl space-y-4 md:space-y-8">
+      <Card className="border border-border/60 overflow-hidden shadow-warm">
+        <CardContent className="p-4 md:p-6">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h1 className="we-h3 flex flex-wrap items-center gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <Bell className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
-                    Notifications
-                    {unreadCount > 0 ? (
-                      <Badge variant="secondary" className="font-semibold">
-                        {unreadCount} unread
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="font-semibold text-muted-foreground">
-                        All caught up
-                      </Badge>
-                    )}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Auction signals, order updates, messages, and trust alerts—built for speed.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap text-xs">
-                <Badge variant="secondary" className="font-semibold">
-                  {filterCounts.all} total
-                </Badge>
-              </div>
+                </span>
+                Notifications
+                {unreadCount > 0 ? (
+                  <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-semibold text-primary">
+                    {unreadCount} unread
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-sm font-medium text-muted-foreground">
+                    All caught up
+                  </span>
+                )}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                Auction signals, order updates, messages, and trust alerts.
+              </p>
             </div>
-
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0} className="font-semibold min-h-[44px]">
+            <div className="flex flex-row items-center justify-between gap-3 pt-3 border-t border-border/50 min-h-[44px]">
+              <span className="text-xs text-muted-foreground font-medium">
+                {filterCounts.all} total
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={markAllRead}
+                disabled={unreadCount === 0}
+                className="shrink-0 min-h-[44px]"
+              >
                 <CheckCheck className="h-4 w-4 mr-2" />
                 Mark all read
               </Button>
@@ -524,12 +522,12 @@ export default function NotificationsPage() {
       </Card>
 
       <Card className="border-2 border-border/60 overflow-hidden">
-        <CardHeader className="pb-4">
+        <CardHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4">
           <CardTitle className="text-base">Inbox</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 we-scrollbar-hover">
+          <div className="px-4 py-3 md:px-6 md:py-4">
+            <div className="flex items-center gap-3 overflow-x-auto we-scrollbar-hover pb-1 -mx-1 min-h-[44px]">
               {(
                 [
                   { key: 'all', label: 'All' },
@@ -549,12 +547,12 @@ export default function NotificationsPage() {
                     type="button"
                     variant={isActive ? 'default' : 'outline'}
                     onClick={() => setFilter(f.key)}
-                    className="min-h-[40px] rounded-full font-semibold whitespace-nowrap"
+                    className="min-h-[44px] shrink-0 rounded-full font-semibold whitespace-nowrap px-4"
                   >
-                    <Icon className="h-4 w-4 mr-2" />
+                    <Icon className="h-4 w-4 mr-2 shrink-0" />
                     {f.label}
                     {unread > 0 ? (
-                      <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
+                      <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs shrink-0">
                         {unread}
                       </Badge>
                     ) : null}
@@ -595,7 +593,7 @@ export default function NotificationsPage() {
                       <div
                         key={n.id}
                         className={cn(
-                          'relative p-5 flex items-start gap-3 transition-colors group hover:bg-muted/30',
+                          'relative p-4 md:p-5 flex items-start gap-3 transition-colors group hover:bg-muted/30',
                           isUnread && s.unreadRowClass,
                           isUnread && 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary/50'
                         )}
@@ -623,11 +621,11 @@ export default function NotificationsPage() {
                               onClick={() => void markClicked(n.id)}
                               className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40"
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                                <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {tag ? (
-                                      <Badge variant="outline" className={cn('font-extrabold border', tag.className)}>
+                                      <Badge variant="outline" className={cn('font-extrabold border shrink-0', tag.className)}>
                                         {tag.label}
                                       </Badge>
                                     ) : null}
@@ -637,7 +635,7 @@ export default function NotificationsPage() {
                                       </span>
                                     ) : null}
                                   </div>
-                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90')}>
+                                  <div className={cn('text-sm font-semibold mt-0.5', isUnread ? 'text-foreground' : 'text-foreground/90')}>
                                     {n.title}
                                   </div>
                                   <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>
@@ -645,7 +643,7 @@ export default function NotificationsPage() {
                                   </div>
                                   {ago ? <div className="text-xs text-muted-foreground mt-2">{ago}</div> : null}
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                   {isUnread && (
                                     <Badge variant="outline" className={cn('font-semibold', s.newBadgeClass)}>
                                       New
@@ -664,16 +662,16 @@ export default function NotificationsPage() {
                               onClick={() => void markClicked(n.id)}
                               className="w-full text-left rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40"
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                                <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {tag ? (
-                                      <Badge variant="outline" className={cn('font-extrabold border', tag.className)}>
+                                      <Badge variant="outline" className={cn('font-extrabold border shrink-0', tag.className)}>
                                         {tag.label}
                                       </Badge>
                                     ) : null}
                                   </div>
-                                  <div className={cn('text-sm font-semibold', isUnread ? 'text-foreground' : 'text-foreground/90')}>
+                                  <div className={cn('text-sm font-semibold mt-0.5', isUnread ? 'text-foreground' : 'text-foreground/90')}>
                                     {n.title}
                                   </div>
                                   <div className={cn('text-sm mt-0.5 line-clamp-2', isUnread ? 'text-muted-foreground' : 'text-muted-foreground/90')}>

@@ -139,6 +139,9 @@ export function HelpLauncher() {
   // Never show on homepage (per request).
   if (pathname === '/') return null;
 
+  // Hide on notifications page to avoid overlap with bottom nav and content.
+  if (pathname === '/dashboard/notifications') return null;
+
   // Always show HelpLauncher on all pages (not just pages with helpKey)
   // The HelpPanel will show chat and support tabs even without helpKey content
   // Only wait for ready state if we have a helpKey (for tour banner)

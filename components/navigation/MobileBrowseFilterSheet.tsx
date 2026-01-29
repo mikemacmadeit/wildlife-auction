@@ -39,6 +39,8 @@ import {
 interface MobileBrowseFilterSheetProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
+  /** When provided, Item Location only shows states that have at least one active listing. */
+  listingStates?: { value: string; label: string }[] | null;
   className?: string;
 }
 
@@ -65,9 +67,10 @@ function countActiveFilters(filters: FilterState): number {
   );
 }
 
-export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }: MobileBrowseFilterSheetProps) {
+export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingStates, className }: MobileBrowseFilterSheetProps) {
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
+  const locationStateOptions = listingStates ?? states;
 
   useEffect(() => {
     if (!open) setLocalFilters(filters);
@@ -117,7 +120,7 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
           ) : null}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[92vw] sm:max-w-md p-0">
+      <SheetContent side="right" className="w-[75vw] sm:max-w-md p-0">
         <div className="px-4 pt-5 pb-4 border-b border-border/50">
           <SheetHeader>
             <SheetTitle>Filter</SheetTitle>
@@ -152,19 +155,27 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
             </Select>
           </div>
 
-          {/* Listing Type */}
+          {/* Buying format (eBay-style: All, Auction, Buy Now, Classified) */}
           <div className="space-y-3">
-            <Label className="text-sm font-semibold">Listing Type</Label>
+            <Label className="text-sm font-semibold">Buying format</Label>
             <RadioGroup
-              value={localFilters.type || ''}
-              onValueChange={(value) => setLocalFilters((p) => ({ ...p, type: value ? (value as ListingType) : undefined }))}
+              value={localFilters.type || '__all__'}
+              onValueChange={(value) =>
+                setLocalFilters((p) => ({ ...p, type: value === '__all__' ? undefined : (value as ListingType) }))
+              }
               className="space-y-2"
             >
+              <div className="flex items-center gap-3 min-h-[40px]">
+                <RadioGroupItem value="__all__" id="m-type-all" />
+                <Label htmlFor="m-type-all" className="text-sm font-normal cursor-pointer flex-1">
+                  All
+                </Label>
+              </div>
               {types.map((t) => (
                 <div key={t.value} className="flex items-center gap-3 min-h-[40px]">
                   <RadioGroupItem value={t.value} id={`m-type-${t.value}`} />
                   <Label htmlFor={`m-type-${t.value}`} className="text-sm font-normal cursor-pointer flex-1">
-                    {t.label}
+                    {t.value === 'fixed' ? 'Buy Now' : t.label}
                   </Label>
                 </div>
               ))}
@@ -182,7 +193,7 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, className }:
                   location: { ...(p.location || {}), state: v === '__any__' ? undefined : v },
                 }))
               }
-              options={[{ value: '__any__', label: 'Any state' }, ...states]}
+              options={[{ value: '__any__', label: 'Any state' }, ...locationStateOptions]}
               placeholder="State"
               searchPlaceholder="Search states…"
               buttonClassName="min-h-[44px]"

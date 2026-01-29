@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut } from 'lucide-react';
+import { Menu, User, PlusCircle, ChevronDown, LogIn, LayoutDashboard, ShoppingBag, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -32,12 +32,8 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { useAdmin } from '@/hooks/use-admin';
 import { signOutUser } from '@/lib/firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { NotificationsBell } from '@/components/navigation/NotificationsBell';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { BRAND_DISPLAY_NAME } from '@/lib/brand';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 
@@ -46,35 +42,7 @@ export function Navbar() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading } = useAuth();
-  const { isAdmin, loading: adminLoading } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
-
-  // Real-time: show admin approval workload on the global navbar bell
-  // so admins can see it while browsing (not just inside /dashboard).
-  useEffect(() => {
-    if (!user?.uid) {
-      setPendingApprovalsCount(0);
-      return;
-    }
-    if (adminLoading) return;
-    if (!isAdmin) {
-      setPendingApprovalsCount(0);
-      return;
-    }
-
-    try {
-      const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
-      return onSnapshot(
-        qPending,
-        (snap) => setPendingApprovalsCount(snap.size || 0),
-        () => setPendingApprovalsCount(0)
-      );
-    } catch {
-      setPendingApprovalsCount(0);
-      return;
-    }
-  }, [adminLoading, isAdmin, user?.uid]);
 
   const handleSignOut = async () => {
     try {
@@ -168,7 +136,12 @@ export function Navbar() {
               </div>
             </div>
             <span className="sr-only">{BRAND_DISPLAY_NAME}</span>
-            <BrandLogoText className="hidden md:inline text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none" />
+            <BrandLogoText
+              className={cn(
+                'text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none',
+                user ? 'inline' : 'hidden md:inline'
+              )}
+            />
           </Link>
 
           {/* Desktop Navigation - Centered (only on large screens) */}
@@ -243,15 +216,6 @@ export function Navbar() {
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Notifications (all sizes): includes admin pending-approval workload for admins */}
-            {user?.uid ? (
-              <NotificationsBell
-                userId={user.uid}
-                adminPendingApprovalsCount={pendingApprovalsCount}
-                adminPendingApprovalsHref="/dashboard/admin/listings"
-              />
-            ) : null}
-
             {/* Desktop Actions - User Menu */}
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
               <Button
@@ -311,6 +275,12 @@ export function Navbar() {
                           Dashboard
                         </Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard/account" className="flex items-center gap-2 cursor-pointer">
+                          <Settings className="h-4 w-4" />
+                          Account settings
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={handleSignOut}
@@ -349,13 +319,44 @@ export function Navbar() {
               </TooltipProvider>
             </div>
 
-            {/* Mobile Menu */}
+            {/* Mobile: when signed in show account icon (Account settings, Sign out); when signed out show hamburger for nav + Sign in/Up */}
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden min-w-[40px] min-h-[40px] rounded-lg flex-shrink-0"
+                    aria-label="Account menu"
+                  >
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/account" className="flex items-center gap-2 cursor-pointer">
+                      <Settings className="h-4 w-4" />
+                      Account settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="md:hidden min-w-[40px] min-h-[40px] rounded-lg flex-shrink-0"
+                  aria-label="Open menu"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
@@ -524,6 +525,7 @@ export function Navbar() {
                 </div>
               </SheetContent>
             </Sheet>
+            )}
           </div>
         </div>
       </div>

@@ -191,9 +191,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </div>
             ) : null}
             <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
-              <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm" title="Seller schedules delivery; buyer confirms receipt">
-                Seller arranges delivery
-              </Badge>
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
                 <Badge
                   variant="default"
@@ -253,11 +250,8 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 className="flex-wrap gap-2"
               />
             </div>
-            {/* Transport + Protected badges (desktop content) */}
+            {/* Protected badge (desktop content) */}
             <div className="hidden sm:flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-[11px] font-semibold" title="Seller schedules delivery; buyer confirms receipt">
-                Seller arranges delivery
-              </Badge>
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
                 <Badge variant="default" className="bg-green-600 text-white text-[11px] font-semibold" title="Protected Transaction">
                   Protected {listing.protectedTransactionDays} Days

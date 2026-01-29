@@ -24,9 +24,12 @@ export function BrowseFiltersSidebar(props: {
   value: FilterState;
   onChange: (next: FilterState) => void;
   onClearAll: () => void;
+  /** When provided, Item Location only shows states that have at least one active listing. */
+  listingStates?: { value: string; label: string }[] | null;
   className?: string;
 }) {
-  const { value, onChange, onClearAll, className } = props;
+  const { value, onChange, onClearAll, listingStates, className } = props;
+  const locationStateOptions = listingStates ?? BROWSE_STATES;
   const [speciesQuery, setSpeciesQuery] = useState('');
 
   const price = useMemo(() => {
@@ -129,7 +132,7 @@ export function BrowseFiltersSidebar(props: {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__any__">Any</SelectItem>
-                  {BROWSE_STATES.map((s) => (
+                  {locationStateOptions.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
                     </SelectItem>

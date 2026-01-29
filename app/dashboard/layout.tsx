@@ -57,6 +57,7 @@ import { signOutUser } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
+import { LayoutBottomNav } from '@/components/navigation/LayoutBottomNav';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ProfileCompletionGate } from '@/components/auth/ProfileCompletionGate';
 import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
@@ -76,6 +77,7 @@ interface SellerNavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
+  shortLabel?: string;
 }
 
 // Base nav items (always visible) - handles both /dashboard/* and /seller/* routes
@@ -305,13 +307,14 @@ export default function DashboardLayout({
   const mobileBottomNavItems = useMemo(() => {
     const byHref = new Map(navItems.map((n) => [n.href, n] as const));
     const pick = (href: string, fallback: SellerNavItem) => byHref.get(href) || fallback;
-    return [
-      pick('/seller/overview', { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard }),
-      pick('/seller/listings', { href: '/seller/listings', label: 'Listings', icon: Package }),
-      pick('/browse', { href: '/browse', label: 'Browse', icon: Compass }),
-      pick('/dashboard/messages', { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare }),
+    const items = [
+      { href: '/', label: 'Home', icon: Home, shortLabel: 'Home' },
+      { href: '/dashboard/menu', label: 'Dashboard', icon: LayoutGrid, shortLabel: 'Dashboard' },
+      { href: '/dashboard/listings/new', label: 'Sell', icon: PlusCircle, shortLabel: 'Sell' },
+      { ...pick('/browse', { href: '/browse', label: 'Buy', icon: Compass, shortLabel: 'Buy' }), label: 'Buy', shortLabel: 'Buy' },
       pick('/dashboard/notifications', { href: '/dashboard/notifications', label: 'Alerts', icon: Bell }),
     ];
+    return items.map((item) => ({ ...item, shortLabel: (item as { shortLabel?: string }).shortLabel ?? item.label }));
   }, [navItems]);
 
   useEffect(() => {
@@ -345,12 +348,13 @@ export default function DashboardLayout({
           'hidden md:flex md:flex-col',
           sidebarCollapsed ? 'md:w-20' : 'md:w-64',
           'border-r border-border/50 bg-card',
+          'dark:border-r dark:border-white/10 dark:shadow-[inset_-1px_0_0_0_rgba(255,255,255,0.05)]',
           'md:fixed md:inset-y-0 md:left-0'
         )}
         style={{ pointerEvents: 'auto', zIndex: 10000, isolation: 'isolate' }}
       >
             {/* Logo Section */}
-            <div className="flex items-center justify-between h-20 px-4 border-b border-border/50">
+            <div className="flex items-center justify-between h-20 px-4 border-b border-border/50 dark:border-white/10">
               <Link href="/" prefetch className="flex items-center gap-3 group flex-shrink-0">
             <div className="relative h-10 w-10">
               <div className="relative h-full w-full">
@@ -579,149 +583,58 @@ export default function DashboardLayout({
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between h-16 px-4 border-b border-border/50 bg-card">
+      <div className="md:hidden flex items-center justify-between h-16 px-4 border-b border-border/50 bg-card dark:border-white/10">
         <Link href="/" className="flex items-center gap-2">
-          <div className="relative h-8 w-8">
-            <Image
-              src="/images/Kudu.png"
-              alt="Agchange"
-              width={32}
-              height={32}
-              className="h-full w-full object-contain"
+          <div className="relative h-8 w-8 flex-shrink-0">
+            <span
+              role="img"
+              aria-label="Agchange"
+              className="block h-full w-full bg-primary"
+              style={{
+                maskImage: 'url(/images/Kudu.png)',
+                maskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                maskPosition: 'center',
+                WebkitMaskImage: 'url(/images/Kudu.png)',
+                WebkitMaskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+              }}
             />
           </div>
           <BrandLogoText className="text-lg font-bold tracking-tight font-barletta-inline text-foreground" />
         </Link>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="min-w-[40px] min-h-[40px] rounded-lg"
+                aria-label="Account menu"
+              >
+                <User className="h-5 w-5" />
               </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0">
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between p-4 border-b border-border/50">
-                  <span className="text-lg font-bold">Menu</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-                <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {showAdminNav ? (
-                    <>
-                      <div className="px-3 pt-1 mb-2">
-                        <Separator />
-                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 mb-1">
-                          User
-                        </div>
-                      </div>
-                      {baseNavWithBadges.map((item) => {
-                        const Icon = item.icon;
-                        const active = isActive(item.href);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            prefetch={true}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={cn(
-                              'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
-                              'hover:bg-background/50',
-                              'min-h-[44px]',
-                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
-                            )}
-                          >
-                            <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
-                            <span className="flex-1">{item.label}</span>
-                            {item.badge && item.badge > 0 && (
-                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                {item.badge}
-                              </Badge>
-                            )}
-                          </Link>
-                        );
-                      })}
-                      <div className="px-3 pt-1 mt-4 mb-2">
-                        <Separator />
-                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-2 mb-1">
-                          Admin
-                        </div>
-                      </div>
-                      {adminNavWithBadges.map((item) => {
-                        const Icon = item.icon;
-                        const active = isActive(item.href);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            prefetch={true}
-                            onClick={(e) => {
-                              setMobileMenuOpen(false);
-                              const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
-                              // Track navigation result after a short delay
-                              setTimeout(() => {
-                                const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
-                                const navigationOccurred = pathnameBefore !== pathnameAfter;
-                                }, 100);
-                            }}
-                            className={cn(
-                              'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
-                              'hover:bg-background/50',
-                              'min-h-[44px]',
-                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
-                            )}
-                          >
-                            <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
-                            <span className="flex-1">{item.label}</span>
-                            {item.badge && item.badge > 0 && (
-                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                {item.badge}
-                              </Badge>
-                            )}
-                          </Link>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <div className="space-y-1">
-                      {baseNavWithBadges.map((item) => {
-                        const Icon = item.icon;
-                        const active = isActive(item.href);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            prefetch={true}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={cn(
-                              'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
-                              'hover:bg-background/50',
-                              'min-h-[44px]',
-                              active && 'bg-primary/10 text-primary border-l-4 border-primary'
-                            )}
-                          >
-                            <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
-                            <span className="flex-1">{item.label}</span>
-                            {item.badge && item.badge > 0 && (
-                              <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                                {item.badge}
-                              </Badge>
-                            )}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </nav>
-              </div>
-            </SheetContent>
-          </Sheet>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/account" className="flex items-center gap-2 cursor-pointer">
+                  <Settings className="h-4 w-4" />
+                  Account settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ThemeToggle />
+          {/* Mobile: nav links live on Dashboard bottom-nav item (/dashboard/menu); no hamburger. Desktop: sidebar only. */}
         </div>
       </div>
 
@@ -739,53 +652,8 @@ export default function DashboardLayout({
           </ProductionErrorBoundary>
         </main>
 
-        {/* Mobile Bottom Nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-card/80 backdrop-blur-md">
-          <div className="grid grid-cols-5 h-16">
-            {mobileBottomNavItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={true}
-                  className={cn(
-                    'flex flex-col items-center justify-center gap-1',
-                    'hover:bg-background/50 active:bg-background',
-                    'min-h-[44px] touch-manipulation',
-                    active && 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]'
-                  )}
-                >
-                  <div className="relative">
-                    <Icon
-                      className={cn(
-                        'h-5 w-5',
-                        active ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
-                      )}
-                    />
-                    {item.badge && item.badge > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
-                      >
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[10px] font-medium',
-                      active ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
-                    )}
-                  >
-                    {item.label.split(' ')[0]}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+        {/* Mobile Bottom Nav (portaled, safe area, design tokens) */}
+        <LayoutBottomNav items={mobileBottomNavItems} />
       </div>
       </div>
     </RequireAuth>

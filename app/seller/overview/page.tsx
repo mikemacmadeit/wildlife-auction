@@ -665,8 +665,8 @@ export default function SellerOverviewPage() {
         </div>
 
         {/* KPI Snapshot (always first) */}
-        {/* Mobile: show KPIs as 2 rows of 2 (Active Listings + Total Revenue, then Views + Conversion). Desktop unchanged. */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6" data-tour="seller-stats">
+        {/* Mobile: show KPIs as 2 rows of 2. Desktop unchanged. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 lg:gap-6" data-tour="seller-stats">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -674,27 +674,29 @@ export default function SellerOverviewPage() {
                 key={stat.label}
                 className={cn(
                   'border-2 border-border/50 bg-card hover:border-border/70',
-                  'hover:shadow-sm cursor-pointer group'
+                  'hover:shadow-sm cursor-pointer group',
+                  'max-lg:min-h-[120px] max-lg:flex max-lg:flex-col max-lg:justify-between'
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 max-lg:px-4 max-lg:pt-4 max-lg:pb-2">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground max-lg:text-sm max-lg:leading-tight max-lg:flex-1 max-lg:pr-2">
                     {stat.label}
                   </CardTitle>
                   <div
                     className={cn(
-                      'w-10 h-10 rounded-lg border-2 flex items-center justify-center',
+                      'w-10 h-10 rounded-lg border-2 flex items-center justify-center shrink-0',
+                      'max-lg:w-9 max-lg:h-9',
                       stat.bgColor,
                       stat.borderColor,
                       'group-hover:bg-primary/20 group-hover:border-primary/30'
                     )}
                   >
-                    <Icon className={cn('h-5 w-5', stat.color)} />
+                    <Icon className={cn('h-5 w-5 max-lg:h-4 max-lg:w-4', stat.color)} />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground font-medium">{stat.subtext}</p>
+                <CardContent className="max-lg:px-4 max-lg:pb-4 max-lg:pt-0">
+                  <div className="text-2xl md:text-3xl font-extrabold text-foreground mb-1 max-lg:text-2xl max-lg:mb-1.5">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground font-medium max-lg:leading-relaxed max-lg:line-clamp-2">{stat.subtext}</p>
                 </CardContent>
               </Card>
             );
@@ -721,17 +723,17 @@ export default function SellerOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border border-border/60">
+              <Card className="border border-border/60 border-l-4 border-l-amber-500 bg-amber-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sales needing action</div>
-                      <div className="text-2xl font-extrabold mt-1">{sellerQueues.ordersNeedingAnyActionCount}</div>
+                      <div className="text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wide">Sales needing action</div>
+                      <div className="text-2xl font-extrabold mt-1 text-foreground">{sellerQueues.ordersNeedingAnyActionCount}</div>
                       <div className="text-xs text-muted-foreground mt-1">
                         {sellerQueues.ordersNeedingDocsCount} docs · {sellerQueues.ordersNeedingDeliveryUpdateCount} delivery · {sellerQueues.ordersWithIssuesCount} issues
                       </div>
                     </div>
-                    <AlertCircle className="h-5 w-5 text-primary" />
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
                   </div>
                   <Button asChild variant="outline" className="w-full mt-3">
                     <Link href="/seller/sales">
@@ -742,15 +744,15 @@ export default function SellerOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-border/60">
+              <Card className="border border-border/60 border-l-4 border-l-blue-500 bg-blue-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Listings pending review</div>
-                      <div className="text-2xl font-extrabold mt-1">{sellerQueues.pendingReviewListingsCount}</div>
+                      <div className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide">Listings pending review</div>
+                      <div className="text-2xl font-extrabold mt-1 text-foreground">{sellerQueues.pendingReviewListingsCount}</div>
                       <div className="text-xs text-muted-foreground mt-1">Admin/compliance review queue</div>
                     </div>
-                    <Clock className="h-5 w-5 text-primary" />
+                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
                   </div>
                   <Button asChild variant="outline" className="w-full mt-3">
                     <Link href="/seller/listings">
@@ -761,19 +763,19 @@ export default function SellerOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-border/60">
+              <Card className="border border-border/60 border-l-4 border-l-violet-500 bg-violet-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Open offers</div>
-                      <div className="text-2xl font-extrabold mt-1">
+                      <div className="text-xs font-semibold text-violet-800 dark:text-violet-200 uppercase tracking-wide">Open offers</div>
+                      <div className="text-2xl font-extrabold mt-1 text-foreground">
                         {dashboardData?.totals?.offers?.open ?? '—'}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         {dashboardLoading ? 'Loading…' : 'Review and respond quickly'}
                       </div>
                     </div>
-                    <DollarSign className="h-5 w-5 text-primary" />
+                    <MessageSquare className="h-5 w-5 text-violet-600 dark:text-violet-400 shrink-0" />
                   </div>
                   <Button asChild variant="outline" className="w-full mt-3">
                     <Link href="/dashboard/bids-offers">
@@ -784,19 +786,19 @@ export default function SellerOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-border/60">
+              <Card className="border border-border/60 border-l-4 border-l-emerald-600 bg-emerald-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Revenue (gross)</div>
-                      <div className="text-2xl font-extrabold mt-1">
+                      <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">Revenue (gross)</div>
+                      <div className="text-2xl font-extrabold mt-1 text-foreground">
                         {typeof dashboardData?.totals?.revenue?.held === 'number'
                           ? `$${dashboardData.totals.revenue.held.toLocaleString()}`
                           : '—'}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">From sales via Stripe</div>
                     </div>
-                    <Shield className="h-5 w-5 text-primary" />
+                    <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   </div>
                   <Button asChild variant="outline" className="w-full mt-3">
                     <Link href="/seller/payouts">

@@ -26,9 +26,9 @@ export function BottomNav() {
   const nav = (
     <nav
       className={cn(
-        // Render via portal so it stays truly fixed even if a parent has transforms (mobile bug).
         'fixed bottom-0 left-0 right-0 z-[60] md:hidden pb-safe',
-        'border-t border-border/40 bg-background/80 backdrop-blur-md'
+        'border-t border-border/40 bg-background/80 backdrop-blur-md',
+        'shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.06)]'
       )}
     >
       <div className="grid grid-cols-4 h-16">
@@ -43,20 +43,20 @@ export function BottomNav() {
               className={cn(
                 'flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-muted/50 active:bg-muted',
-                'min-h-[44px] touch-manipulation',
-                isActive && 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]'
+                'min-h-[44px] min-w-[44px] touch-manipulation',
+                isActive && 'text-primary'
               )}
             >
               <Icon
                 className={cn(
                   'h-5 w-5',
-                  isActive ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
+                  isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               />
               <span
                 className={cn(
                   'text-xs font-medium',
-                  isActive ? 'text-[hsl(90_12%_45%)] dark:text-[hsl(80_15%_70%)]' : 'text-muted-foreground'
+                  isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
                 {item.label}

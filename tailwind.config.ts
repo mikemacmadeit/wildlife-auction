@@ -63,6 +63,11 @@ const config: Config = {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        messageList: 'hsl(var(--message-list))',
+        messageReceived: 'hsl(var(--message-received))',
+        messageSent: 'hsl(var(--message-sent))',
+        messageSentBorder: 'hsl(var(--message-sent-border))',
+        messageInput: 'hsl(var(--message-input))',
       },
       keyframes: {
         'accordion-down': {

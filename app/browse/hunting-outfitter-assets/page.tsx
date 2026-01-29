@@ -11,7 +11,6 @@ import { ListingCard } from '@/components/listings/ListingCard';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
 import { ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
@@ -136,7 +135,6 @@ export default function HuntingOutfitterAssetsBrowsePage() {
         <div className="container mx-auto px-4 py-6 md:py-8">
           <SkeletonListingGrid count={12} />
         </div>
-        <BottomNav />
       </div>
     );
   }
@@ -242,7 +240,6 @@ export default function HuntingOutfitterAssetsBrowsePage() {
 
         <ScrollToTop />
       </div>
-      <BottomNav />
     </div>
   );
 }

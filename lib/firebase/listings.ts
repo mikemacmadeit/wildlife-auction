@@ -1634,6 +1634,34 @@ export const listEndingSoonAuctions = async (params?: { limitCount?: number }): 
 };
 
 /**
+ * Get distinct state codes from active listings (for Item Location filter).
+ * Only returns states that have at least one active listing.
+ */
+export const getDistinctListingStates = async (): Promise<string[]> => {
+  try {
+    const listingsRef = collection(db, 'listings');
+    const q = query(
+      listingsRef,
+      where('status', '==', 'active'),
+      orderBy('createdAt', 'desc'),
+      limit(500)
+    );
+    const snapshot = await getDocs(q);
+    const states = new Set<string>();
+    snapshot.docs.forEach((d) => {
+      const state = (d.data() as any)?.location?.state;
+      if (typeof state === 'string' && state.trim()) {
+        states.add(state.trim());
+      }
+    });
+    return Array.from(states).sort();
+  } catch (error) {
+    console.warn('getDistinctListingStates failed, returning empty:', error);
+    return [];
+  }
+};
+
+/**
  * List listings by seller (with optional status filter)
  * Returns UI Listing[] (Date fields)
  */

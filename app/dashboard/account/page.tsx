@@ -32,7 +32,12 @@ import {
   Package,
   FileText,
   Award,
-  Loader2
+  Loader2,
+  HelpCircle,
+  MessageSquare,
+  PhoneCall,
+  ListChecks,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -50,6 +55,22 @@ import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 
 import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 import { computePublicSellerTrustFromUser } from '@/lib/seller/badges';
+import { HelpChat } from '@/components/help/HelpChat';
+import { HelpTicketForm } from '@/components/help/HelpTicketForm';
+
+const ACCOUNT_HELP_CHECKLIST = [
+  'Use the "Ask" tab to chat with our AI assistant',
+  'Use the "Support" tab to create a support ticket',
+  'Browse our knowledge base articles for common questions',
+  'Contact support if you need immediate assistance',
+];
+
+const ACCOUNT_HELP_QUICK_ACTIONS = [
+  { label: 'Browse Listings', href: '/browse' },
+  { label: 'Create Listing', href: '/dashboard/listings/new' },
+  { label: 'My Orders', href: '/dashboard/orders' },
+  { label: 'Support', href: '/dashboard/support' },
+];
 
 export default function AccountPage() {
   const { toast } = useToast();
@@ -57,7 +78,8 @@ export default function AccountPage() {
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences' | 'help'>('profile');
+  const [helpSubTab, setHelpSubTab] = useState<'help' | 'chat' | 'support'>('help');
   const [saving, setSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [publicTrust, setPublicTrust] = useState<PublicSellerTrust | null>(null);
@@ -643,7 +665,7 @@ export default function AccountPage() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-auto bg-card border border-border/50 p-1">
+          <TabsList className="grid w-full grid-cols-5 h-auto bg-card border border-border/50 p-1">
             <TabsTrigger value="profile" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
               Profile
             </TabsTrigger>
@@ -655,6 +677,9 @@ export default function AccountPage() {
             </TabsTrigger>
             <TabsTrigger value="preferences" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
               Preferences
+            </TabsTrigger>
+            <TabsTrigger value="help" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+              Help
             </TabsTrigger>
           </TabsList>
 
@@ -1137,6 +1162,71 @@ export default function AccountPage() {
               <NotificationSettingsDialog triggerLabel="Open in modal" triggerVariant="outline" triggerSize="sm" />
             </div>
             <NotificationPreferencesPanel embedded />
+          </TabsContent>
+
+          {/* Help Tab */}
+          <TabsContent value="help" className="space-y-6 mt-6">
+            <Card className="border-2 border-border/50 bg-card">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <HelpCircle className="h-5 w-5 text-primary" />
+                  Help Center
+                </CardTitle>
+                <CardDescription>
+                  Get help, ask questions, or contact support.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={helpSubTab} onValueChange={(v) => setHelpSubTab(v as typeof helpSubTab)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-4">
+                    <TabsTrigger value="help" className="gap-2">
+                      <ListChecks className="h-3.5 w-3.5" />
+                      Help
+                    </TabsTrigger>
+                    <TabsTrigger value="chat" className="gap-2">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Ask
+                    </TabsTrigger>
+                    <TabsTrigger value="support" className="gap-2">
+                      <PhoneCall className="h-3.5 w-3.5" />
+                      Support
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="help" className="space-y-6 mt-0">
+                    <section className="space-y-3">
+                      <h3 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Checklist</h3>
+                      <ul className="space-y-2">
+                        {ACCOUNT_HELP_CHECKLIST.map((item, idx) => (
+                          <li key={idx} className="flex gap-3 text-sm leading-relaxed">
+                            <span className="mt-1 h-2 w-2 rounded-full bg-primary/70 flex-shrink-0" />
+                            <span className="text-foreground">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                    <section className="space-y-3">
+                      <h3 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Quick actions</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {ACCOUNT_HELP_QUICK_ACTIONS.map((qa) => (
+                          <Button key={qa.href} asChild variant="outline" className="justify-between min-h-[44px] font-semibold">
+                            <Link href={qa.href}>
+                              <span className="truncate">{qa.label}</span>
+                              <ExternalLink className="h-4 w-4 opacity-70 ml-2" />
+                            </Link>
+                          </Button>
+                        ))}
+                      </div>
+                    </section>
+                  </TabsContent>
+                  <TabsContent value="chat" className="mt-0 min-h-[320px]">
+                    <HelpChat onSwitchToSupport={() => setHelpSubTab('support')} />
+                  </TabsContent>
+                  <TabsContent value="support" className="mt-0">
+                    <HelpTicketForm />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Preferences Tab */}

@@ -70,6 +70,17 @@ export default function SellerOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
+  const [scheduleDeliveryOpen, setScheduleDeliveryOpen] = useState(false);
+  const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
+  const [haulerName, setHaulerName] = useState('');
+  const [haulerPhone, setHaulerPhone] = useState('');
+  const [haulerPlate, setHaulerPlate] = useState('');
+  const [haulerMake, setHaulerMake] = useState('');
+  const [haulerModel, setHaulerModel] = useState('');
+  const [haulerColor, setHaulerColor] = useState('');
+  const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
+  const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
+  const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
 
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
@@ -112,19 +123,6 @@ export default function SellerOrderDetailPage() {
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
   
   const txStatus = order ? getEffectiveTransactionStatus(order) : null;
-
-  const [scheduleDeliveryOpen, setScheduleDeliveryOpen] = useState(false);
-  const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
-  const [haulerName, setHaulerName] = useState('');
-  const [haulerPhone, setHaulerPhone] = useState('');
-  const [haulerPlate, setHaulerPlate] = useState('');
-  const [haulerMake, setHaulerMake] = useState('');
-  const [haulerModel, setHaulerModel] = useState('');
-  const [haulerColor, setHaulerColor] = useState('');
-
-  const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
-  const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
-  const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
 
   // FulfillmentPanel component (inline in same file)
   function FulfillmentPanel() {

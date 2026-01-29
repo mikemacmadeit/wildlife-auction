@@ -407,20 +407,17 @@ export default function MessagesPage() {
       return;
     }
 
-    // Clear thread immediately if it doesn't match selectedThreadId to prevent showing stale data
-    if (thread && thread.id !== selectedThreadId) {
-      setThread(null);
-      setListing(null);
-    }
-
     const t = threads.find((x) => x.id === selectedThreadId) || null;
     if (!t) {
-      // Thread not found yet - might still be loading
-      // Don't clear thread state, just wait for it to appear in threads array
+      // Thread not in list yet (e.g. deep link) – clear so pane shows Loading
+      if (thread && thread.id !== selectedThreadId) {
+        setThread(null);
+        setListing(null);
+      }
       return;
     }
 
-    // Set thread immediately when found
+    // Set thread directly without clearing first – avoids glitch when opening from inbox
     setThread(t);
     // Optimistically mark as read for immediate UI update
     setOptimisticReadThreads((prev) => new Set(prev).add(selectedThreadId));
@@ -621,9 +618,9 @@ export default function MessagesPage() {
           <div 
             className="lg:hidden relative overflow-hidden" 
             style={{ 
-              height: 'calc(100dvh - 280px)', 
-              minHeight: '400px', 
-              maxHeight: 'calc(100dvh - 280px)'
+              height: 'calc(100dvh - 200px)', 
+              minHeight: '420px', 
+              maxHeight: 'calc(100dvh - 200px)'
             }}
             data-mobile-container
           >
@@ -690,13 +687,12 @@ export default function MessagesPage() {
                               e.preventDefault();
                               e.stopPropagation();
                               if (!user?.uid) return;
-                              // Optimistically mark as read for immediate UI update
+                              const nextThread = threads.find((x) => x.id === item.id) ?? null;
+                              if (nextThread) setThread(nextThread);
                               setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
                               setSelectedThreadId(item.id);
                               router.replace(`/dashboard/messages?threadId=${item.id}`);
-                              // Mark thread as read in Firestore
                               markThreadAsRead(item.id, user.uid).catch(() => {
-                                // On error, remove from optimistic set so it can retry
                                 setOptimisticReadThreads((prev) => {
                                   const next = new Set(prev);
                                   next.delete(item.id);
@@ -933,13 +929,12 @@ export default function MessagesPage() {
                             e.preventDefault();
                             e.stopPropagation();
                             if (!user?.uid) return;
-                            // Optimistically mark as read for immediate UI update
+                            const nextThread = threads.find((x) => x.id === item.id) ?? null;
+                            if (nextThread) setThread(nextThread);
                             setOptimisticReadThreads((prev) => new Set(prev).add(item.id));
                             setSelectedThreadId(item.id);
                             router.replace(`/dashboard/messages?threadId=${item.id}`);
-                            // Mark thread as read in Firestore
                             markThreadAsRead(item.id, user.uid).catch(() => {
-                              // On error, remove from optimistic set so it can retry
                               setOptimisticReadThreads((prev) => {
                                 const next = new Set(prev);
                                 next.delete(item.id);
