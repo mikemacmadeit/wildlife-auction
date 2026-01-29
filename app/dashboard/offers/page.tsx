@@ -113,7 +113,7 @@ export default function MyOffersPage() {
   if (!user) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <Card className="max-w-md w-full">
+        <Card className="max-w-md w-full rounded-xl border border-border/50 bg-card">
           <CardHeader>
             <CardTitle>Sign in required</CardTitle>
           </CardHeader>
@@ -164,7 +164,7 @@ export default function MyOffersPage() {
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
-          <Card className="border-2">
+          <Card className="rounded-xl border border-border/50 bg-card">
             <CardContent className="pt-6">
               {loading ? (
                 <div className="py-10 flex items-center justify-center">

@@ -513,7 +513,7 @@ export function MessageThreadComponent({
   };
 
   return (
-    <div className="flex flex-col h-full overscroll-contain">
+    <div className="flex flex-col h-full min-h-0 overscroll-contain">
       {/* Header - Compact on mobile */}
       <div className="border-b md:p-4 p-3 flex items-center justify-between bg-background flex-shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
@@ -620,10 +620,10 @@ export function MessageThreadComponent({
         </div>
       )}
 
-      {/* Messages - distinct list background and bubble surfaces */}
+      {/* Messages - distinct list background and bubble surfaces; only this area scrolls on mobile */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto md:p-4 px-3 py-2 md:space-y-4 space-y-3 overscroll-contain touch-pan-y bg-messageList"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden md:p-4 px-3 py-2 md:space-y-4 space-y-3 overscroll-contain touch-pan-y bg-messageList"
         style={{ WebkitOverflowScrolling: 'touch' }}
         onScroll={() => {
           const sc = scrollRef.current;

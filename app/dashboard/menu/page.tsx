@@ -34,42 +34,42 @@ import { useAdmin } from '@/hooks/use-admin';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { ChevronRight } from 'lucide-react';
 
-type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type NavItem = { href: string; label: string; subtext: string; icon: React.ComponentType<{ className?: string }> };
 
 const BUYING: NavItem[] = [
-  { href: '/dashboard/watchlist', label: 'Watchlist', icon: Heart },
-  { href: '/dashboard/saved-searches', label: 'Saved Searches', icon: Search },
-  { href: '/dashboard/orders', label: 'Purchases', icon: ShoppingBag },
-  { href: '/dashboard/bids-offers', label: 'Bids & Offers', icon: Gavel },
-  { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
+  { href: '/dashboard/watchlist', label: 'Watchlist', subtext: 'Saved listings and sellers you follow.', icon: Heart },
+  { href: '/dashboard/saved-searches', label: 'Saved Searches', subtext: 'Alerts when new listings match your criteria.', icon: Search },
+  { href: '/dashboard/orders', label: 'Purchases', subtext: 'Orders you bought and delivery status.', icon: ShoppingBag },
+  { href: '/dashboard/bids-offers', label: 'Bids & Offers', subtext: 'Your bids, offers, and auction activity.', icon: Gavel },
+  { href: '/dashboard/notifications', label: 'Notifications', subtext: 'Alerts for outbid, wins, and messages.', icon: Bell },
 ];
 
 const SELLING: NavItem[] = [
-  { href: '/seller/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/seller/listings', label: 'My Listings', icon: Package },
-  { href: '/seller/sales', label: 'Sold', icon: DollarSign },
-  { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
-  { href: '/seller/payouts', label: 'Payouts', icon: CreditCard },
-  { href: '/seller/reputation', label: 'Reputation', icon: Award },
+  { href: '/seller/overview', label: 'Overview', subtext: 'Sales summary and quick actions.', icon: LayoutDashboard },
+  { href: '/seller/listings', label: 'My Listings', subtext: 'Active and draft listings you created.', icon: Package },
+  { href: '/seller/sales', label: 'Sold', subtext: 'Completed sales and order fulfillment.', icon: DollarSign },
+  { href: '/dashboard/messages', label: 'Messages', subtext: 'Conversations with buyers and sellers.', icon: MessageSquare },
+  { href: '/seller/payouts', label: 'Payouts', subtext: 'Earnings and payout history.', icon: CreditCard },
+  { href: '/seller/reputation', label: 'Reputation', subtext: 'Reviews and seller rating.', icon: Award },
 ];
 
 const ACCOUNT: NavItem[] = [
-  { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
-  { href: '/dashboard/account', label: 'Settings', icon: Settings },
+  { href: '/dashboard/support', label: 'Support', subtext: 'Help, FAQs, and contact support.', icon: LifeBuoy },
+  { href: '/dashboard/account', label: 'Settings', subtext: 'Profile, security, and preferences.', icon: Settings },
 ];
 
 const ADMIN: NavItem[] = [
-  { href: '/dashboard/admin/users', label: 'Users', icon: Users },
-  { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
-  { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
-  { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
-  { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
-  { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
-  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
-  { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
-  { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
-  { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
+  { href: '/dashboard/admin/users', label: 'Users', subtext: 'Manage user accounts and roles.', icon: Users },
+  { href: '/dashboard/admin/health', label: 'System Health', subtext: 'Platform status and diagnostics.', icon: HeartPulse },
+  { href: '/dashboard/admin/ops', label: 'Admin Ops', subtext: 'Fulfillment, disputes, and operations.', icon: Shield },
+  { href: '/dashboard/admin/compliance', label: 'Compliance', subtext: 'Listings, orders, and breeder permits.', icon: Shield },
+  { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', subtext: 'Transaction and payout reconciliation.', icon: Search },
+  { href: '/dashboard/admin/revenue', label: 'Revenue', subtext: 'Fees, revenue, and financial reports.', icon: DollarSign },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', subtext: 'Review and approve new listings.', icon: CheckCircle },
+  { href: '/dashboard/admin/messages', label: 'Flagged Messages', subtext: 'Review reported conversations.', icon: MessageSquare },
+  { href: '/dashboard/admin/support', label: 'Support', subtext: 'Support tickets and responses.', icon: HelpCircle },
+  { href: '/dashboard/admin/email-templates', label: 'Email Templates', subtext: 'Manage notification email content.', icon: Mail },
+  { href: '/dashboard/admin/notifications', label: 'Notifications', subtext: 'Events and notification delivery.', icon: Bell },
 ];
 
 function Section({ title, items }: { title: string; items: NavItem[] }) {
@@ -88,13 +88,16 @@ function Section({ title, items }: { title: string; items: NavItem[] }) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-4 py-3 min-h-[48px] border-b border-border/50 last:border-b-0',
+                'flex items-center gap-3 px-4 py-3 min-h-[56px] border-b border-border/50 last:border-b-0',
                 'hover:bg-muted/40 active:bg-muted/60 transition-colors',
                 active && 'bg-primary/10 text-primary'
               )}
             >
-              <Icon className={cn('h-5 w-5 shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
-              <span className="flex-1 font-medium text-sm">{item.label}</span>
+              <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', active ? 'text-primary' : 'text-muted-foreground')} />
+              <div className="flex-1 min-w-0 py-0.5">
+                <div className={cn('font-medium text-sm', active && 'text-primary')}>{item.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 leading-snug">{item.subtext}</div>
+              </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </Link>
           );

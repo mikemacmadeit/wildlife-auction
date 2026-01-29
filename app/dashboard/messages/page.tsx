@@ -80,6 +80,41 @@ export default function MessagesPage() {
     }
   }, [pathname]);
 
+  // Show whole page from top (navbar visible): pin layout to viewport + hide outer scrollbar
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const isMessages = pathname === '/dashboard/messages';
+    if (!isMessages) return;
+
+    const prevRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    // Remove outer scrollbar
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+
+    // Ensure view starts at top (layout is fixed so this clears any prior scroll)
+    const scrollToTop = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    scrollToTop();
+    requestAnimationFrame(scrollToTop);
+    const t = setTimeout(scrollToTop, 50);
+
+    return () => {
+      clearTimeout(t);
+      window.history.scrollRestoration = prevRestoration;
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, [pathname]);
+
   // Keep refs in sync with state
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
@@ -550,7 +585,7 @@ export default function MessagesPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <Card>
+        <Card className="rounded-xl border border-border/50 bg-card">
           <CardContent className="pt-12 pb-12 text-center">
             <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
             <h3 className="text-lg font-semibold mb-2">Sign in required</h3>
@@ -570,7 +605,7 @@ export default function MessagesPage() {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl">
-          <Card>
+          <Card className="rounded-xl border border-border/50 bg-card">
             <CardContent className="pt-12 pb-12 text-center">
               <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">No conversation found</h3>
@@ -589,11 +624,16 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="bg-background pb-20 md:pb-6 min-h-screen" data-messages-container>
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        <div className="mb-4 lg:mb-6">
+    <div
+      className="bg-background pb-20 md:pb-6 min-h-0 flex flex-col overflow-hidden max-md:h-[calc(100dvh-8rem)] max-md:pb-2 md:h-full md:max-h-[100dvh]"
+      data-messages-container
+    >
+      <div className="container mx-auto px-4 py-2 md:py-8 max-w-7xl flex flex-col flex-1 min-h-0 overflow-hidden max-md:py-2">
+        <div className="mb-1 lg:mb-6 shrink-0 max-md:mb-1">
           <Button 
             variant="ghost" 
+            size="sm"
+            className="max-md:h-8 max-md:px-2 max-md:text-sm max-md:mb-1"
             onClick={() => {
               // On mobile, if a thread is selected, go back to inbox first
               if (selectedThreadId && typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -603,31 +643,25 @@ export default function MessagesPage() {
                 // Navigate away from messages page entirely
                 router.push('/seller/overview');
               }
-            }} 
-            className="mb-2"
+            }}
             aria-label="Go back to dashboard"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
+            <ArrowLeft className="h-4 w-4 mr-2 max-md:h-3.5 max-md:w-3.5" aria-hidden="true" />
             Back
           </Button>
-          <h1 className="text-2xl font-bold">Messages</h1>
+          <h1 className="text-lg md:text-2xl font-bold max-md:text-xl">Messages</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-0">
-          {/* Mobile: keep both panes mounted and slide between them for smoothness */}
-          <div 
-            className="lg:hidden relative overflow-hidden" 
-            style={{ 
-              height: 'calc(100dvh - 200px)', 
-              minHeight: '420px', 
-              maxHeight: 'calc(100dvh - 200px)'
-            }}
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 flex-1 min-h-0 min-w-0">
+          {/* Mobile: panes slide; fill space; no page scroll */}
+          <div
+            className="lg:hidden relative overflow-hidden flex-1 min-h-0"
             data-mobile-container
           >
             {/* Inbox pane */}
             <Card
               className={cn(
-                'absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out',
+                'absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out rounded-xl border border-border/50 bg-card',
                 'will-change-transform transform-gpu',
                 selectedThreadId ? '-translate-x-full' : 'translate-x-0'
               )}
@@ -819,7 +853,7 @@ export default function MessagesPage() {
             {/* Thread pane */}
             <Card
               className={cn(
-                'absolute inset-0 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out',
+                'absolute inset-0 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out rounded-xl border border-border/50 bg-card',
                 'will-change-transform transform-gpu',
                 selectedThreadId ? 'translate-x-0' : 'translate-x-full'
               )}
@@ -828,18 +862,19 @@ export default function MessagesPage() {
                 zIndex: selectedThreadId ? 2 : 1
               }}
             >
-              <div className="border-b p-3">
+              <div className="border-b p-2 md:p-3">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="max-md:h-8 max-md:text-xs"
                   onClick={() => {
                     setSelectedThreadId(null);
                     router.replace('/dashboard/messages');
                   }}
                   aria-label="Return to inbox"
                 >
-                  <Inbox className="h-4 w-4 mr-2" aria-hidden="true" />
+                  <Inbox className="h-3.5 w-3.5 md:h-4 md:w-4 mr-2" aria-hidden="true" />
                   Inbox
                 </Button>
               </div>
@@ -873,7 +908,7 @@ export default function MessagesPage() {
           {/* Desktop: original two-pane layout */}
           <Card
             className={cn(
-              'hidden lg:flex flex-col min-h-0 overflow-hidden'
+              'hidden lg:flex flex-col min-h-0 overflow-hidden rounded-xl border border-border/50 bg-card'
             )}
             style={{ height: 'calc(100vh - 300px)', maxHeight: 'calc(100vh - 300px)' }}
           >
@@ -1067,7 +1102,7 @@ export default function MessagesPage() {
           {/* Desktop thread view - hidden on mobile (mobile uses sliding panes above) */}
           <Card
             className={cn(
-              'hidden lg:flex flex-col overflow-hidden min-h-0'
+              'hidden lg:flex flex-col overflow-hidden min-h-0 rounded-xl border border-border/50 bg-card'
             )}
             style={{ height: 'calc(100vh - 300px)', maxHeight: 'calc(100vh - 300px)' }}
           >

@@ -21,13 +21,14 @@ interface ListItemProps {
   listing: Listing;
   /**
    * Mobile browse variant: eBay-style list row (image ~25% width, no seller line, watchers shown).
-   * Other surfaces (watchlist, admin, etc.) should use the default card.
+   * watchlistMobile: mobile watchlist list view – photo left; right: watchers, title, price+time, bids; no sold by / trust / specs.
    */
-  variant?: 'default' | 'browseMobile';
+  variant?: 'default' | 'browseMobile' | 'watchlistMobile';
 }
 
 const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
   function ListItemComponent({ listing, variant = 'default' }, ref) {
+  const isWatchlistMobile = variant === 'watchlistMobile';
   const router = useRouter();
   const { user } = useAuth();
   const sold = getSoldSummary(listing);
@@ -304,6 +305,76 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     </Badge>
                   </div>
                 </div>
+              </div>
+            </div>
+          </Card>
+        </Link>
+      </motion.div>
+    );
+  }
+
+  if (isWatchlistMobile) {
+    return (
+      <motion.div ref={ref} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="w-full">
+        <Link href={`/listing/${listing.id}`} className="block">
+          <Card className="overflow-hidden rounded-xl border border-border/60 bg-card hover:shadow-warm">
+            <div className="flex min-w-0">
+              <div className="relative w-[100px] min-w-[100px] h-[100px] flex-shrink-0 bg-muted rounded-l-xl overflow-hidden">
+                {coverUrl ? (
+                  <Image
+                    src={coverUrl}
+                    alt={listing.title}
+                    fill
+                    className="object-cover object-center"
+                    sizes="100px"
+                    loading="lazy"
+                    quality={85}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">No Image</div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-between relative">
+                <div className="absolute top-1 right-1 z-10">
+                  <FavoriteButton listingId={listing.id} className="h-8 w-8" />
+                </div>
+                <div className="min-w-0 pr-8">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                    <Heart className="h-3 w-3 flex-shrink-0" />
+                    <span>{watchers > 0 ? watchers : 0} watching</span>
+                  </div>
+                  <h3 className="font-bold text-[13px] leading-snug line-clamp-2 mt-0.5">{listing.title}</h3>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {sold.isSold ? (
+                    <span className="text-base font-extrabold text-primary leading-none">{sold.soldPriceLabel}</span>
+                  ) : (
+                    <>
+                      <span className="text-base font-extrabold text-primary leading-none">
+                        ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
+                      </span>
+                      {isAuction && endsAtDate && endsAtDate.getTime() > Date.now() && (
+                        <>
+                          <span className="text-[10px] text-muted-foreground">·</span>
+                          <span className="text-[10px] text-muted-foreground font-medium inline-flex items-center gap-0.5">
+                            <CountdownTimer
+                              endsAt={listing.endsAt as any}
+                              variant="compact"
+                              showIcon={false}
+                              pulseWhenEndingSoon={false}
+                              className="text-[10px]"
+                            />
+                          </span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+                {isAuction && (
+                  <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    {sold.isSold ? 'Sold' : `${bidCount} ${bidCount === 1 ? 'bid' : 'bids'}`}
+                  </div>
+                )}
               </div>
             </div>
           </Card>

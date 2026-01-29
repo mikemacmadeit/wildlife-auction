@@ -679,67 +679,64 @@ export default function BidsOffersPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
+      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
             <div className="flex items-center gap-2">
-              <Gavel className="h-5 w-5 text-primary" />
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Bids & Offers</h1>
+              <Gavel className="h-5 w-5 text-primary shrink-0" />
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight truncate">Bids & Offers</h1>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Your command center for auctions and offers. Manage bids, offers you&apos;ve sent, and offers you&apos;ve received—all in one place.
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Auctions and offers in one place. Manage bids, sent and received offers.
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <Button variant="outline" onClick={load} disabled={loading} className="min-h-[40px]">
-              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              Refresh
-            </Button>
-          </div>
+          <Button variant="outline" onClick={load} disabled={loading} className="min-h-9 h-9 shrink-0">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
         </div>
 
-        {/* Top summary */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-          <Card className="border-border/60">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs sm:text-sm text-muted-foreground">Winning</div>
-                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+        {/* Top summary — compact 2x2 on mobile, 4 cols on desktop */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-3 min-w-0">
+          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+            <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
+              <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Winning</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-base sm:text-xl font-extrabold tabular-nums">{stats.bidWinning}</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary hidden sm:block" />
               </div>
-              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.bidWinning}</div>
             </CardContent>
           </Card>
-          <Card className="border-border/60">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs sm:text-sm text-muted-foreground">Outbid</div>
-                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-600 flex-shrink-0" />
+          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+            <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
+              <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Outbid</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-base sm:text-xl font-extrabold tabular-nums">{stats.bidOutbid}</span>
+                <TrendingUp className="h-3.5 w-3.5 text-orange-600 hidden sm:block" />
               </div>
-              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.bidOutbid}</div>
             </CardContent>
           </Card>
-          <Card className="border-border/60">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs sm:text-sm text-muted-foreground">Offers active</div>
-                <Handshake className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+            <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
+              <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Offers active</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-base sm:text-xl font-extrabold tabular-nums">{stats.offerActive}</span>
+                <Handshake className="h-3.5 w-3.5 text-primary hidden sm:block" />
               </div>
-              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.offerActive}</div>
             </CardContent>
           </Card>
-          <Card className="border-border/60">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs sm:text-sm text-muted-foreground">Accepted offers</div>
-                <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+          <Card className="rounded-xl border border-border/50 bg-card min-w-0">
+            <CardContent className="p-3 sm:p-4 flex flex-row items-center justify-between gap-2 min-w-0">
+              <span className="text-[11px] sm:text-xs text-muted-foreground truncate">Accepted</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-base sm:text-xl font-extrabold tabular-nums">{stats.offerAccepted}</span>
+                <Clock className="h-3.5 w-3.5 text-primary hidden sm:block" />
               </div>
-              <div className="text-xl sm:text-2xl font-extrabold mt-1">{stats.offerAccepted}</div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="border-2">
-          <CardContent className="pt-6 space-y-4">
+        <Card className="rounded-xl border border-border/50 bg-card">
+          <CardContent className="pt-4 sm:pt-6 space-y-4">
             <Tabs
               value={tab}
               onValueChange={(v) => {
@@ -749,63 +746,102 @@ export default function BidsOffersPage() {
               }}
             >
               <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
-                <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto overflow-hidden rounded-xl border border-border/60 bg-muted/40 p-1">
+                {/* Tabs: full-width pill row (like watchlist / orders filters) */}
+                <TabsList className="w-full flex gap-1.5 sm:gap-2 p-0 h-auto bg-transparent">
                   <TabsTrigger
                     value="needs_action"
-                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
-                    <span className="flex items-center gap-2">
-                      Needs action
-                      {unreadNeedsAction > 0 ? (
-                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                          {unreadNeedsAction}
-                        </Badge>
-                      ) : null}
-                    </span>
+                    Needs action
+                    {unreadNeedsAction > 0 ? (
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadNeedsAction}</Badge>
+                    ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="bids"
-                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
-                    <span className="flex items-center gap-2">
-                      Bids
-                      {unreadBids > 0 ? (
-                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                          {unreadBids}
-                        </Badge>
-                      ) : null}
-                    </span>
+                    Bids
+                    {unreadBids > 0 ? (
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadBids}</Badge>
+                    ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="offers"
-                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
-                    <span className="flex items-center gap-2">
-                      Offers
-                      {unreadOffers > 0 ? (
-                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                          {unreadOffers}
-                        </Badge>
-                      ) : null}
-                    </span>
+                    Offers
+                    {unreadOffers > 0 ? (
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadOffers}</Badge>
+                    ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="h-9 rounded-lg font-semibold data-[state=active]:shadow-none data-[state=active]:border data-[state=active]:border-border/60"
+                    className="flex-1 min-w-0 py-2.5 px-2 sm:px-3 rounded-full text-sm font-medium transition-colors bg-muted/40 text-muted-foreground hover:bg-muted/60 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none min-h-[44px] justify-center gap-1.5"
                   >
-                    <span className="flex items-center gap-2">
-                      History
-                      {unreadHistory > 0 ? (
-                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                          {unreadHistory}
-                        </Badge>
-                      ) : null}
-                    </span>
+                    History
+                    {unreadHistory > 0 ? (
+                      <Badge variant="secondary" className="h-5 min-w-[20px] px-1.5 text-xs">{unreadHistory}</Badge>
+                    ) : null}
                   </TabsTrigger>
                 </TabsList>
 
-                <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
-                  <div className="relative w-full sm:w-[320px]">
+                {/* Mobile: horizontal scroll of filters */}
+                <div className="sm:hidden overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover">
+                  <div className="flex items-center gap-2 flex-nowrap min-w-0 py-1">
+                    <div className="relative flex-shrink-0 w-[140px]">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search…"
+                        className="pl-8 h-8 text-sm"
+                      />
+                    </div>
+                    <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                      <SelectTrigger className="h-8 rounded-lg min-w-0 w-auto px-3 text-xs font-medium border-border/60 flex-shrink-0 [&>span]:max-w-[90px] [&>span]:truncate">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ending_soon">Ending soon</SelectItem>
+                        <SelectItem value="newest">Newest</SelectItem>
+                        <SelectItem value="highest_amount">Highest amount</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {tab === 'bids' ? (
+                      <>
+                        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                          <SelectTrigger className="h-8 rounded-lg min-w-0 w-auto px-3 text-xs font-medium border-border/60 flex-shrink-0 [&>span]:max-w-[80px] [&>span]:truncate">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="winning">Winning</SelectItem>
+                            <SelectItem value="outbid">Outbid</SelectItem>
+                            <SelectItem value="accepted">Won</SelectItem>
+                            <SelectItem value="expired">Lost</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <button
+                          type="button"
+                          onClick={() => setHideRemovedListings(!hideRemovedListings)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 h-8 text-xs font-medium flex-shrink-0 whitespace-nowrap',
+                            hideRemovedListings
+                              ? 'border-primary/40 bg-primary/10 text-primary'
+                              : 'border-border/60 bg-muted/40 text-foreground'
+                          )}
+                        >
+                          Hide removed
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Desktop: filters row */}
+                <div className="hidden sm:flex flex-col xl:flex-row gap-2 w-full xl:w-auto xl:items-center">
+                  <div className="relative w-full xl:w-[320px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       value={query}
@@ -872,63 +908,63 @@ export default function BidsOffersPage() {
                           <div
                             key={r.id}
                             className={cn(
-                              'rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors',
-                              r.type === 'offer' && r.status === 'ACCEPTED' && 'border-emerald-500/50 dark:border-emerald-500/30 border-2'
+                              'rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20',
+                              r.type === 'offer' && r.status === 'ACCEPTED' && 'border-emerald-400/40 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20'
                             )}
                           >
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-                            <div className="flex items-start gap-3 min-w-0">
-                              <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 justify-between">
+                            <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+                              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
                               </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline" className="text-xs">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
                                     {r.type === 'bid' ? 'Auction' : 'Offer'}
                                   </Badge>
-                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-xs">
+                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">
                                     {r.status}
                                   </Badge>
                                   {r.timeLeftMs !== null ? (
-                                    <Badge variant="secondary" className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
+                                    <Badge variant="secondary" className={cn('text-[10px] sm:text-xs px-1.5 py-0', timeLeftTone(r.timeLeftMs))}>
                                       {formatTimeLeftFromMs(r.timeLeftMs)}
                                     </Badge>
                                   ) : null}
                                 </div>
-                                <div className="font-semibold leading-snug truncate mt-1">{getDisplayTitle(r)}</div>
+                                <div className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 sm:mt-1">{getDisplayTitle(r)}</div>
                                 {getDisplayTitle(r) === 'Listing removed or deleted' && (
-                                  <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
+                                  <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog.</div>
                                 )}
-                                <div className="text-xs text-muted-foreground mt-0.5">Seller: {getDisplaySeller(r) || '—'}</div>
+                                <div className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
                                 {r.type === 'offer' && r.status === 'ACCEPTED' && (
-                                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1.5 font-medium">
-                                    Complete checkout to secure your purchase—pay now to lock in this price.
+                                  <p className="text-[11px] sm:text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-medium">
+                                    Complete checkout to secure your purchase.
                                   </p>
                                 )}
                                 {r.type === 'offer' && r.status === 'COUNTERED' && (
-                                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 font-medium">
+                                  <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-1 font-medium">
                                     Review and respond before the counter expires.
                                   </p>
                                 )}
                                   {r.type === 'bid' && r.status === 'OUTBID' && (
-                                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-1.5 font-medium">
+                                  <p className="text-[11px] sm:text-xs text-orange-700 dark:text-orange-400 mt-1 font-medium">
                                     Raise your max bid to stay in the running.
                                   </p>
                                 )}
                               </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end flex-wrap">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end flex-wrap mt-1 sm:mt-0">
                               {r.type === 'bid' ? (
                                 isListingRemoved(r) ? (
                                   <>
-                                    <Button variant="outline" size="sm" asChild>
+                                    <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                                       <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="text-muted-foreground hover:text-foreground"
+                                      className="text-muted-foreground hover:text-foreground w-full sm:w-auto"
                                       onClick={() => dismissRemovedListing((r as any).listingId)}
                                     >
                                       <X className="h-4 w-4 mr-1.5" />
@@ -939,6 +975,7 @@ export default function BidsOffersPage() {
                                   <>
                                     <Button
                                       variant="default"
+                                      className="w-full sm:w-auto"
                                       onClick={() => {
                                         const b = r as any;
                                         setRaiseTarget({
@@ -960,7 +997,7 @@ export default function BidsOffersPage() {
                                     >
                                       Raise max bid
                                     </Button>
-                                    <Button variant="outline" asChild>
+                                    <Button variant="outline" asChild className="w-full sm:w-auto">
                                       <Link href={`/listing/${(r as any).listingId}`}>View</Link>
                                     </Button>
                                   </>
@@ -970,7 +1007,7 @@ export default function BidsOffersPage() {
                                   {r.status === 'ACCEPTED' ? (
                                     <Button
                                       onClick={() => openOfferCheckout((r as any).raw)}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold w-full sm:w-auto"
                                     >
                                       Checkout now
                                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -980,8 +1017,8 @@ export default function BidsOffersPage() {
                                       asChild
                                       className={
                                         r.status === 'COUNTERED'
-                                          ? 'bg-amber-600 hover:bg-amber-700 text-white font-semibold shrink-0'
-                                          : 'border-primary/40 text-primary hover:bg-primary/10 shrink-0'
+                                          ? 'bg-amber-600 hover:bg-amber-700 text-white font-semibold w-full sm:w-auto'
+                                          : 'border-primary/40 text-primary hover:bg-primary/10 w-full sm:w-auto'
                                       }
                                       variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
                                     >
@@ -990,7 +1027,7 @@ export default function BidsOffersPage() {
                                       </Link>
                                     </Button>
                                   )}
-                                  <Button variant="outline" asChild>
+                                  <Button variant="outline" asChild className="w-full sm:w-auto">
                                     <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
                                   </Button>
                                 </>
@@ -1010,37 +1047,42 @@ export default function BidsOffersPage() {
                   ) : (
                     <div className="space-y-3">
                       {bidRows.map((r) => (
-                        <div key={r.id} className="rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors">
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 w-full">
-                            {/* Thumb + title/seller — same pattern as offers */}
-                            <div className="flex items-start gap-3 min-w-0 flex-1">
-                              <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                        <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
+                          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 lg:gap-6 w-full">
+                            {/* Thumb + title/seller — compact on mobile */}
+                            <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
+                              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                 {(r as any).listingImage ? <Image src={(r as any).listingImage} alt="" fill className="object-cover" /> : null}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline" className="text-xs">
-                                    Auction
-                                  </Badge>
-                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-xs">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">Auction</Badge>
+                                  <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">
                                     {r.status}
                                   </Badge>
                                   {r.timeLeftMs !== null ? (
-                                    <Badge variant="secondary" className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
+                                    <Badge variant="secondary" className={cn('text-[10px] sm:text-xs px-1.5 py-0', timeLeftTone(r.timeLeftMs))}>
                                       {formatTimeLeftFromMs(r.timeLeftMs)}
                                     </Badge>
                                   ) : null}
                                 </div>
-                                <div className="font-semibold leading-snug truncate mt-1" title={getDisplayTitle(r)}>{getDisplayTitle(r)}</div>
+                                <div className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 sm:mt-1" title={getDisplayTitle(r)}>{getDisplayTitle(r)}</div>
                                 {getDisplayTitle(r) === 'Listing removed or deleted' && (
-                                  <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
+                                  <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog.</div>
                                 )}
-                                <div className="text-xs text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
+                                <div className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">Seller: {getDisplaySeller(r) || '—'}</div>
+                                {/* Mobile: single line for Current · Your max · Ends */}
+                                <div className="sm:hidden text-[11px] text-muted-foreground mt-1">
+                                  {isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)} · Your max {formatMoney(r.myMaxBid)}
+                                  {r.endsAt && !isListingRemoved(r) && (
+                                    <> · Ends {new Date(r.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Stats — fixed column widths so values align across cards (match offers style) */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 sm:gap-y-1 shrink-0 w-full sm:w-auto sm:min-w-[fit-content] lg:order-2">
+                            {/* Stats — desktop only; mobile shown inline above */}
+                            <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 shrink-0 w-full sm:w-auto sm:min-w-[fit-content] lg:order-2">
                               <div className="min-w-[4.5rem]">
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Current</div>
                                 <div className="font-semibold tabular-nums">{isListingRemoved(r) ? '—' : formatMoney(r.currentHighestBid)}</div>
@@ -1061,21 +1103,21 @@ export default function BidsOffersPage() {
                               </div>
                             </div>
 
-                            {/* Actions */}
-                            <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3">
+                            {/* Actions — full-width primary on mobile */}
+                            <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3 flex-wrap sm:flex-nowrap">
                               {isListingRemoved(r) ? (
                                 <>
-                                  <Button variant="outline" size="sm" asChild>
+                                  <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial min-w-0">
                                     <Link href={`/listing/${r.listingId}`}>View listing</Link>
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground flex-1 sm:flex-initial"
                                     onClick={() => dismissRemovedListing(r.listingId)}
                                   >
                                     <X className="h-4 w-4 mr-1.5" />
-                                    Remove from list
+                                    Remove
                                   </Button>
                                 </>
                               ) : (
@@ -1083,6 +1125,7 @@ export default function BidsOffersPage() {
                                   {r.status === 'OUTBID' ? (
                                     <Button
                                       variant="default"
+                                      className="flex-1 sm:flex-initial min-w-0"
                                       onClick={() => {
                                         setRaiseTarget({
                                           listingId: r.listingId,
@@ -1106,6 +1149,7 @@ export default function BidsOffersPage() {
                                   ) : (
                                     <Button
                                       variant="default"
+                                      className="flex-1 sm:flex-initial min-w-0"
                                       onClick={() => {
                                         setRaiseTarget({
                                           listingId: r.listingId,
@@ -1129,22 +1173,22 @@ export default function BidsOffersPage() {
                                   )}
 
                                   <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="icon" className="h-10 w-10">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/listing/${r.listingId}`}>
-                                      <ArrowUpRight className="h-4 w-4 mr-2" />
-                                      View listing
-                                    </Link>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56">
+                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem asChild>
+                                        <Link href={`/listing/${r.listingId}`}>
+                                          <ArrowUpRight className="h-4 w-4 mr-2" />
+                                          View listing
+                                        </Link>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </>
                               )}
                             </div>
@@ -1159,9 +1203,9 @@ export default function BidsOffersPage() {
                   {offerRows.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">No offers match your search.</div>
                   ) : (
-                    <div className="space-y-6">
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">Sent</span> = offers you made on others’ listings. <span className="font-medium text-foreground">Received</span> = offers others made on your listings.
+                    <div className="space-y-4 sm:space-y-6">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Sent</span> = your offers. <span className="font-medium text-foreground">Received</span> = offers on your listings.
                       </p>
 
                       {[
@@ -1182,44 +1226,48 @@ export default function BidsOffersPage() {
                                 <div
                                   key={r.id}
                                   className={cn(
-                                    'rounded-xl border bg-card p-4 hover:bg-muted/20 transition-colors',
-                                    r.status === 'ACCEPTED' && 'border-emerald-500/50 dark:border-emerald-500/30 border-2'
+                                    'rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20',
+                                    r.status === 'ACCEPTED' && 'border-emerald-400/40 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20'
                                   )}
                                 >
-                                  <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 w-full">
-                                    {/* Thumb + title/seller — grows to use full card width */}
-                                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                                      <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                  <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 lg:gap-6 w-full">
+                                    {/* Thumb + title/seller — compact on mobile */}
+                                    <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
+                                      <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                         {r.listingImage ? <Image src={r.listingImage} alt="" fill className="object-cover" /> : null}
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-xs">
+                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                          <Badge variant={badgeVariantForUnifiedStatus(r.status) as any} className="text-[10px] sm:text-xs px-1.5 py-0">
                                             {r.status}
                                           </Badge>
                                           {r.timeLeftMs !== null ? (
-                                            <span className={cn('text-xs', timeLeftTone(r.timeLeftMs))}>
+                                            <span className={cn('text-[10px] sm:text-xs', timeLeftTone(r.timeLeftMs))}>
                                               Expires {formatTimeLeftFromMs(r.timeLeftMs)}
                                             </span>
                                           ) : null}
                                         </div>
-                                        <p className="font-semibold leading-snug mt-1 truncate" title={r.listingTitle}>
+                                        <p className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 mt-0.5 sm:mt-1 truncate" title={r.listingTitle}>
                                           {r.listingTitle}
                                         </p>
                                         {r.listingTitle === 'Listing removed or deleted' && (
-                                          <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog</div>
+                                          <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog</div>
                                         )}
-                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">Seller: {r.sellerName || '—'}</p>
+                                        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">Seller: {r.sellerName || '—'}</p>
+                                        {/* Mobile: single line Amount · Seller · Type */}
+                                        <div className="sm:hidden text-[11px] text-muted-foreground mt-1">
+                                          {formatMoney(r.yourAmount)} · {r.sellerName || '—'} · {r.listingType || '—'}
+                                        </div>
                                         {r.status === 'ACCEPTED' && r.direction === 'out' && (
-                                          <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1.5 font-medium">
+                                          <p className="text-[11px] sm:text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-medium">
                                             Complete checkout to secure your purchase.
                                           </p>
                                         )}
                                       </div>
                                     </div>
 
-                                    {/* Amounts — fixed column widths so values align across all cards */}
-                                    <div className="grid grid-cols-[5.5rem_6.5rem_4.5rem] sm:grid-cols-[5.5rem_8rem_5rem] gap-x-4 gap-y-0 shrink-0 lg:order-2">
+                                    {/* Amounts — desktop only; mobile shown inline above */}
+                                    <div className="hidden sm:grid grid-cols-[5.5rem_6.5rem_4.5rem] sm:grid-cols-[5.5rem_8rem_5rem] gap-x-4 gap-y-0 shrink-0 lg:order-2">
                                       <div className="min-w-[5.5rem]">
                                         <div className="text-xs text-muted-foreground uppercase tracking-wider">Amount</div>
                                         <div className="font-semibold tabular-nums">{formatMoney(r.yourAmount)}</div>
@@ -1234,12 +1282,12 @@ export default function BidsOffersPage() {
                                       </div>
                                     </div>
 
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3">
+                                    {/* Actions — full-width primary on mobile */}
+                                    <div className="flex items-center gap-2 justify-end shrink-0 lg:order-3 flex-wrap sm:flex-nowrap">
                                       {r.status === 'ACCEPTED' && r.direction === 'out' ? (
                                         <Button
                                           onClick={() => openOfferCheckout(r.raw)}
-                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
+                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex-1 sm:flex-initial min-w-0"
                                         >
                                           Checkout now
                                           <ArrowRight className="ml-2 h-4 w-4" />
@@ -1249,8 +1297,8 @@ export default function BidsOffersPage() {
                                           asChild
                                           className={
                                             r.status === 'COUNTERED'
-                                              ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                              : 'border-primary/40 text-primary hover:bg-primary/10'
+                                              ? 'bg-amber-600 hover:bg-amber-700 text-white flex-1 sm:flex-initial min-w-0'
+                                              : 'border-primary/40 text-primary hover:bg-primary/10 flex-1 sm:flex-initial min-w-0'
                                           }
                                           variant={r.status === 'COUNTERED' ? 'default' : 'outline'}
                                         >
@@ -1259,7 +1307,7 @@ export default function BidsOffersPage() {
                                       )}
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                          <Button variant="outline" size="icon" className="h-10 w-10">
+                                          <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
                                             <MoreHorizontal className="h-4 w-4" />
                                           </Button>
                                         </DropdownMenuTrigger>
@@ -1298,16 +1346,16 @@ export default function BidsOffersPage() {
                   ) : (
                     <div className="space-y-3">
                       {filtered.map((r) => (
-                        <div key={r.id} className="rounded-xl border bg-card p-4">
+                        <div key={r.id} className="rounded-xl border border-border/50 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/20">
                           <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="min-w-0">
-                              <div className="font-semibold truncate">{getDisplayTitle(r)}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-sm sm:text-base truncate">{getDisplayTitle(r)}</div>
                               {getDisplayTitle(r) === 'Listing removed or deleted' && (
-                                <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog — not because the auction ended.</div>
+                                <div className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">Removed from catalog.</div>
                               )}
-                              <div className="text-xs text-muted-foreground mt-0.5">{r.type === 'bid' ? 'Auction' : 'Offer'} · {r.status}</div>
+                              <div className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{r.type === 'bid' ? 'Auction' : 'Offer'} · {r.status}</div>
                             </div>
-                            <Button variant="outline" asChild>
+                            <Button variant="outline" size="sm" asChild className="w-full sm:w-auto shrink-0">
                               <Link href={`/listing/${(r as any).listingId}`}>View listing</Link>
                             </Button>
                           </div>

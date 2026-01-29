@@ -24,16 +24,16 @@ let decoded;
 try {
   decoded = Buffer.from(b64, 'base64').toString('utf8');
 } catch (e) {
-  console.error('[netlify-write-firebase-service-account] Failed to base64 decode FIREBASE_SERVICE_ACCOUNT_JSON_BASE64');
-  throw e;
+  console.warn('[netlify-write-firebase-service-account] Failed to base64 decode FIREBASE_SERVICE_ACCOUNT_JSON_BASE64; skipping. Build continues.');
+  process.exit(0);
 }
 
 let json;
 try {
   json = JSON.parse(decoded);
 } catch (e) {
-  console.error('[netlify-write-firebase-service-account] Decoded FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 is not valid JSON');
-  throw e;
+  console.warn('[netlify-write-firebase-service-account] Decoded value is not valid JSON; skipping. Build continues.');
+  process.exit(0);
 }
 
 const outDir = path.join(process.cwd(), 'netlify', 'secrets');

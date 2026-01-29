@@ -138,6 +138,8 @@ export default function SellerSalesPage() {
   const [detailsOpen, setDetailsOpen] = useState<Record<string, boolean>>({});
   const [unreadSalesCount, setUnreadSalesCount] = useState(0);
 
+  const clearSearch = useCallback(() => setSearch(''), []);
+
   const load = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
@@ -331,7 +333,7 @@ export default function SellerSalesPage() {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
-          <Card>
+          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
             <CardContent className="pt-6 text-center">
               <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
               <div className="font-semibold">Sign in required</div>
@@ -346,21 +348,35 @@ export default function SellerSalesPage() {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-6xl space-y-6 min-w-0 overflow-x-hidden">
-        <Card className="border-border/60 bg-gradient-to-br from-card via-card to-muted/25 overflow-hidden">
-          <CardHeader className="pb-4 px-4 pt-4 sm:px-6 sm:pt-6">
-            <CardTitle className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight">Sold</CardTitle>
-            <CardDescription>Track payment → delivery → completion for every order.</CardDescription>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6 pt-0">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative w-full min-w-0">
+        <div className="space-y-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight">Sold</h1>
+          <p className="text-sm text-muted-foreground">Track payment → delivery → completion for every order.</p>
+        </div>
+
+        <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="relative w-full sm:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search orders…" className="pl-9 min-h-11 w-full" aria-label="Search orders" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by title, order #, or status…"
+                  className="pl-9 min-h-11 w-full"
+                  aria-label="Search orders"
+                />
               </div>
-              <Button variant="outline" onClick={() => load()} disabled={loading} className="w-full sm:w-auto min-h-11 shrink-0">
-                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                {search.trim() !== '' && (
+                  <Button type="button" variant="ghost" size="sm" className="font-semibold min-h-11" onClick={clearSearch}>
+                    Clear
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => load()} disabled={loading} className="min-h-11 shrink-0">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" /> : null}
+                  Refresh
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -375,49 +391,68 @@ export default function SellerSalesPage() {
         ) : null}
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full min-w-0">
-          <TabsList className="flex-wrap h-auto gap-1 p-1.5 w-full min-w-0">
-            <TabsTrigger value="needs_action" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
-              <Clock className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
-              <span className="truncate">Needs action</span>
-              {tabCounts.needs_action > 0 && (
-                <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
-                  {tabCounts.needs_action}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="in_progress" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
-              <Truck className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
-              <span className="truncate">In progress</span>
-              {tabCounts.in_progress > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                  {tabCounts.in_progress}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
-              <CheckCircle2 className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
-              <span className="truncate">Completed</span>
-              {tabCounts.completed > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                  {tabCounts.completed}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="cancelled" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">
-              <span className="truncate">Cancelled</span>
-              {tabCounts.cancelled > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                  {tabCounts.cancelled}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="all" className="min-h-11 px-3 py-2.5 text-xs sm:text-sm shrink-0">All</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover">
+            <TabsList className="inline-flex flex-nowrap h-auto gap-1.5 p-0 w-max min-w-full sm:min-w-0 bg-transparent">
+              <TabsTrigger
+                value="needs_action"
+                className="min-h-[44px] px-3 py-2.5 rounded-full text-xs sm:text-sm font-semibold shrink-0 data-[state=inactive]:bg-muted/40 data-[state=inactive]:text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <Clock className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
+                <span className="truncate">Needs action</span>
+                {tabCounts.needs_action > 0 && (
+                  <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold data-[state=inactive]:bg-muted">
+                    {tabCounts.needs_action}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="in_progress"
+                className="min-h-[44px] px-3 py-2.5 rounded-full text-xs sm:text-sm font-semibold shrink-0 data-[state=inactive]:bg-muted/40 data-[state=inactive]:text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <Truck className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
+                <span className="truncate">In progress</span>
+                {tabCounts.in_progress > 0 && (
+                  <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold data-[state=inactive]:bg-muted">
+                    {tabCounts.in_progress}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="completed"
+                className="min-h-[44px] px-3 py-2.5 rounded-full text-xs sm:text-sm font-semibold shrink-0 data-[state=inactive]:bg-muted/40 data-[state=inactive]:text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1.5 shrink-0" aria-hidden />
+                <span className="truncate">Completed</span>
+                {tabCounts.completed > 0 && (
+                  <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold data-[state=inactive]:bg-muted">
+                    {tabCounts.completed}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="cancelled"
+                className="min-h-[44px] px-3 py-2.5 rounded-full text-xs sm:text-sm font-semibold shrink-0 data-[state=inactive]:bg-muted/40 data-[state=inactive]:text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <span className="truncate">Cancelled</span>
+                {tabCounts.cancelled > 0 && (
+                  <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold data-[state=inactive]:bg-muted">
+                    {tabCounts.cancelled}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="all"
+                className="min-h-[44px] px-3 py-2.5 rounded-full text-xs sm:text-sm font-semibold shrink-0 data-[state=inactive]:bg-muted/40 data-[state=inactive]:text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                All
+              </TabsTrigger>
+            </TabsList>
+          </div>
         </Tabs>
 
         <div className={`mt-4 transition-opacity duration-150 ${tabFading ? 'opacity-70' : 'opacity-100'}`}>
           {filtered.length === 0 ? (
-            <Card className="border-border/60">
+            <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
               <CardContent className="pt-6 pb-6 text-center text-sm text-muted-foreground">
                 {tab === 'needs_action' ? (
                   <>
@@ -471,7 +506,7 @@ export default function SellerSalesPage() {
                 const sellerHasAction = nextActionData && nextActionData.ownerRole === 'seller';
 
                 return (
-                  <Card key={o.id} className={`border-border/60 overflow-hidden min-w-0 ${sellerHasAction ? 'ring-1 ring-primary/30' : ''}`}>
+                  <Card key={o.id} className={`rounded-xl border min-w-0 overflow-hidden ${sellerHasAction ? 'border-primary bg-muted/30 dark:bg-muted/20 ring-1 ring-primary/30' : 'border-border/60 bg-muted/30 dark:bg-muted/20'}`}>
                     <CardContent className="p-0 overflow-hidden">
                       {sellerHasAction && (
                         <div className="bg-primary/10 border-b border-primary/20 px-4 py-3">
@@ -501,8 +536,8 @@ export default function SellerSalesPage() {
                           </div>
                         </div>
                       )}
-                      <div className="flex flex-col sm:flex-row gap-4 p-4 min-w-0">
-                        <div className="relative h-24 w-24 shrink-0 rounded-lg overflow-hidden bg-muted border self-start">
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4 min-w-0">
+                        <div className="relative h-16 w-20 sm:h-24 sm:w-24 shrink-0 rounded-lg overflow-hidden bg-muted border self-start">
                           {cover ? (
                             <Image
                               src={String(cover)}
@@ -519,11 +554,11 @@ export default function SellerSalesPage() {
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1 flex flex-col gap-3">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 min-w-0">
+                        <div className="min-w-0 flex-1 flex flex-col gap-2 sm:gap-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3 min-w-0">
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant={badge.variant} className="shrink-0">{badge.label}</Badge>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant={badge.variant} className="shrink-0 text-xs">{badge.label}</Badge>
                                 {/* SLA countdown chip */}
                                 {o.fulfillmentSlaDeadlineAt && (() => {
                                   const now = Date.now();
@@ -548,30 +583,27 @@ export default function SellerSalesPage() {
                                   </Badge>
                                 ) : null}
                               </div>
-                              <div className="mt-2 font-semibold text-foreground leading-snug line-clamp-2">{title}</div>
-                              <div className="mt-1 text-xs text-muted-foreground space-y-0.5 min-w-0">
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                  <span className="font-mono truncate max-w-[120px] sm:max-w-none" title={o.listingId}>Item ID: {o.listingId}</span>
-                                  <span className="text-muted-foreground/70 shrink-0">•</span>
-                                  <span className="font-mono truncate max-w-[100px] sm:max-w-none" title={o.id}>Order: {o.id}</span>
+                              <div className="mt-1.5 sm:mt-2 font-semibold text-sm sm:text-base text-foreground leading-snug line-clamp-2">{title}</div>
+                              <div className="mt-1 text-[11px] sm:text-xs text-muted-foreground space-y-0.5 min-w-0">
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2">
+                                  <span className="font-mono truncate" title={o.id}>#{o.id.slice(0, 8)}</span>
+                                  <span className="truncate text-right sm:text-left" title={buyerLabel}>Buyer: {buyerLabel}</span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                  <span>Sold: {formatShortDate(soldAt)}</span>
-                                  <span className="text-muted-foreground/70 shrink-0">•</span>
-                                  <span>Buyer paid: {formatShortDate(buyerPaidAt)}</span>
-                                  <span className="text-muted-foreground/70 shrink-0">•</span>
-                                  <span className="truncate min-w-0" title={buyerLabel}>Buyer: {buyerLabel}</span>
+                                  <span>Sold {formatShortDate(soldAt)}</span>
+                                  <span className="text-muted-foreground/70 shrink-0 hidden sm:inline">·</span>
+                                  <span className="hidden sm:inline">Paid {formatShortDate(buyerPaidAt)}</span>
                                 </div>
                               </div>
                             </div>
 
                             <div className="shrink-0 flex flex-col sm:items-end gap-2 w-full sm:w-auto">
                               <div className="text-left sm:text-right">
-                                <div className="text-sm text-muted-foreground">Net proceeds</div>
-                                <div className="text-lg font-extrabold tracking-tight">{formatMoney(net)}</div>
+                                <div className="text-xs sm:text-sm text-muted-foreground">Net proceeds</div>
+                                <div className="text-base sm:text-lg font-extrabold tracking-tight">{formatMoney(net)}</div>
                               </div>
-                              <Button asChild size="default" variant="outline" className="font-semibold shadow-warm w-full sm:w-auto min-h-11">
-                                <Link href={`/seller/orders/${o.id}?from=sales`} className="inline-flex items-center justify-center min-h-11">
+                              <Button asChild size="default" variant="outline" className="font-semibold w-full sm:w-auto min-h-10 border-primary text-primary hover:bg-primary/10">
+                                <Link href={`/seller/orders/${o.id}?from=sales`} className="inline-flex items-center justify-center min-h-10">
                                   View details
                                   <ArrowRight className="h-4 w-4 ml-2 shrink-0" aria-hidden />
                                 </Link>

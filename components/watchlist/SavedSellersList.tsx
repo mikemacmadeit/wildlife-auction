@@ -12,10 +12,17 @@ import type { SavedSellerDoc } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Grid3x3, List as ListIcon, Loader2, MessageCircle, Search, Star, Store, Trash2 } from 'lucide-react';
+import { Filter, Grid3x3, List as ListIcon, Loader2, MessageCircle, Search, Star, Store, Trash2 } from 'lucide-react';
 import { unfollowSeller } from '@/lib/firebase/following';
 
 type SortKey = 'recent' | 'highest_rated' | 'most_sales';
@@ -52,59 +59,59 @@ function SellerListCard({ s, activeCount, removing, messaging, onRemove, onMessa
   const shopHref = `/sellers/${s.sellerId}`;
 
   return (
-    <Card className="border-2">
-      <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="relative h-12 w-12 rounded-full overflow-hidden bg-muted shrink-0 border">
+    <Card className="border overflow-hidden rounded-xl w-full">
+      <CardContent className="p-3 md:p-4 w-full">
+        {/* Mobile: full-width layout — row1: avatar | name+stats (flex) | remove; row2: View store | Message (full width) */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 w-full">
+          <div className="flex items-center gap-3 min-w-0 flex-1 w-full md:w-auto pr-10 md:pr-0">
+            <div className="relative h-11 w-11 md:h-12 md:w-12 rounded-full overflow-hidden bg-muted shrink-0 border">
               {s.sellerPhotoURL ? (
                 <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="48px" unoptimized />
               ) : (
-                <div className="h-full w-full flex items-center justify-center text-sm font-extrabold text-muted-foreground">
+                <div className="h-full w-full flex items-center justify-center text-xs md:text-sm font-extrabold text-muted-foreground">
                   {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
-            <div className="min-w-0">
-              <div className="font-extrabold truncate">{s.sellerDisplayName}</div>
+            <div className="min-w-0 flex-1 flex flex-col justify-center">
+              <div className="font-semibold md:font-extrabold text-sm md:text-base truncate">{s.sellerDisplayName}</div>
               <div className="text-xs text-muted-foreground truncate">{usernameLabel}</div>
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="text-xs inline-flex items-center gap-1">
-                  <Star className="h-3.5 w-3.5" />
+              <div className="mt-0.5 md:mt-2 flex items-center gap-1.5 md:gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-0.5">
+                  <Star className="h-3 w-3" />
                   {ratingLabel}
-                  <span className="text-muted-foreground">({s.ratingCount || 0})</span>
-                </Badge>
-                <Badge variant="outline" className="text-xs">Positive {positiveLabel}</Badge>
-                <Badge variant="outline" className="text-xs">Sold {s.itemsSold || 0}</Badge>
-                <Badge variant="outline" className="text-xs">Active {activeCount === null ? '…' : activeCount ?? 0}</Badge>
+                </span>
+                <span className="text-xs text-muted-foreground">·</span>
+                <span className="text-xs text-muted-foreground">Sold {s.itemsSold || 0}</span>
+                <span className="text-xs text-muted-foreground">·</span>
+                <span className="text-xs text-muted-foreground">Active {activeCount ?? 0}</span>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:justify-end sm:flex-wrap">
-            <Button asChild variant="outline" className="min-h-[40px] w-full sm:w-auto">
-              <Link href={shopHref}><Store className="h-4 w-4 mr-2" />View store</Link>
+          {/* Remove: top-right on mobile, inline on desktop */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 md:relative md:top-0 md:right-0 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            disabled={removing}
+            onClick={() => onRemove(s.sellerId)}
+            aria-label="Remove seller"
+          >
+            {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </Button>
+          {/* Actions: full-width row on mobile (2 cols), inline on desktop */}
+          <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:items-center md:gap-2 md:shrink-0">
+            <Button asChild variant="outline" size="sm" className="h-9 w-full text-xs md:min-h-[40px] md:px-3 md:text-sm md:w-auto border-primary text-primary hover:bg-primary/10 hover:text-primary">
+              <Link href={shopHref} className="flex items-center justify-center"><Store className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2 shrink-0" />View store</Link>
             </Button>
             <Button
-              className="min-h-[40px] w-full sm:w-auto"
+              size="sm"
+              className="h-9 w-full text-xs md:min-h-[40px] md:px-3 md:text-sm md:w-auto"
               disabled={messaging || (typeof activeCount === 'number' && activeCount <= 0)}
               onClick={() => onMessage(s.sellerId)}
             >
-              {messaging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
+              {messaging ? <Loader2 className="h-3.5 w-3.5 md:h-4 md:w-4 animate-spin mr-1.5 md:mr-2 shrink-0" /> : <MessageCircle className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2 shrink-0" />}
               Message
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-8 w-8 col-span-2 justify-center sm:h-auto sm:w-auto sm:min-h-[40px] sm:px-3 sm:col-auto",
-                "text-muted-foreground hover:text-destructive hover:bg-destructive/10 sm:!bg-destructive sm:!text-destructive-foreground sm:hover:!bg-destructive/90"
-              )}
-              disabled={removing}
-              onClick={() => onRemove(s.sellerId)}
-              aria-label="Remove seller"
-            >
-              {removing ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin sm:mr-2" /> : <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />}
-              <span className="hidden sm:inline">Remove</span>
             </Button>
           </div>
         </div>
@@ -120,53 +127,56 @@ function SellerGridCard({ s, activeCount, removing, messaging, onRemove, onMessa
   const shopHref = `/sellers/${s.sellerId}`;
 
   return (
-    <Card className="border-2 h-full flex flex-col overflow-hidden">
-      <CardContent className="p-4 flex flex-col flex-1">
-        <div className="flex flex-col items-center text-center mb-3">
-          <div className="relative h-16 w-16 rounded-full overflow-hidden bg-muted shrink-0 border mb-2">
+    <Card className="border h-full flex flex-col overflow-hidden rounded-xl">
+      <CardContent className="p-3 flex flex-col flex-1 md:p-4">
+        {/* Remove button in corner — mobile and desktop */}
+        <div className="absolute top-2 right-2 z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            disabled={removing}
+            onClick={(e) => {
+              e.preventDefault();
+              onRemove(s.sellerId);
+            }}
+            aria-label="Remove seller"
+          >
+            {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+        <div className="flex flex-col items-center text-center mb-2 md:mb-3">
+          <div className="relative h-12 w-12 md:h-16 md:w-16 rounded-full overflow-hidden bg-muted shrink-0 border mb-1.5 md:mb-2">
             {s.sellerPhotoURL ? (
               <Image src={s.sellerPhotoURL} alt="" fill className="object-cover" sizes="64px" unoptimized />
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-xl font-extrabold text-muted-foreground">
+              <div className="h-full w-full flex items-center justify-center text-sm md:text-xl font-extrabold text-muted-foreground">
                 {String(s.sellerDisplayName || 'S').trim().charAt(0).toUpperCase()}
               </div>
             )}
           </div>
-          <div className="font-extrabold truncate w-full">{s.sellerDisplayName}</div>
-          <div className="text-xs text-muted-foreground truncate w-full">{usernameLabel}</div>
-          <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap">
-            <Badge variant="outline" className="text-xs inline-flex items-center gap-0.5">
-              <Star className="h-3 w-3" />
-              {ratingLabel}
-            </Badge>
-            <span className="text-xs text-muted-foreground">·</span>
-            <span className="text-xs text-muted-foreground">Sold {s.itemsSold || 0}</span>
-            <span className="text-xs text-muted-foreground">·</span>
-            <span className="text-xs text-muted-foreground">Active {activeCount === null ? '…' : activeCount ?? 0}</span>
+          <div className="font-semibold md:font-extrabold text-sm md:text-base truncate w-full">{s.sellerDisplayName}</div>
+          <div className="text-[11px] md:text-xs text-muted-foreground truncate w-full">{usernameLabel}</div>
+          <div className="mt-1 md:mt-1.5 flex items-center justify-center gap-1 flex-wrap text-[11px] md:text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5"><Star className="h-2.5 w-2.5 md:h-3 md:w-3" />{ratingLabel}</span>
+            <span>·</span>
+            <span>Sold {s.itemsSold || 0}</span>
+            <span>·</span>
+            <span>Active {activeCount ?? 0}</span>
           </div>
         </div>
-        <div className="mt-auto flex flex-col gap-2">
-          <Button asChild variant="outline" size="sm" className="w-full">
-            <Link href={shopHref}><Store className="h-3.5 w-3.5 mr-1.5" />View store</Link>
+        <div className="mt-auto flex flex-row gap-1.5 md:gap-2">
+          <Button asChild variant="outline" size="sm" className="flex-1 min-w-0 h-8 text-xs md:h-9 md:text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
+            <Link href={shopHref} className="flex items-center justify-center"><Store className="h-3 w-3 md:h-3.5 md:w-3.5 mr-1 shrink-0" />View store</Link>
           </Button>
           <Button
             size="sm"
-            className="w-full"
+            className="flex-1 min-w-0 h-8 text-xs md:h-9 md:text-sm"
             disabled={messaging || (typeof activeCount === 'number' && activeCount <= 0)}
             onClick={() => onMessage(s.sellerId)}
           >
-            {messaging ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5 mr-1.5" />}
+            {messaging ? <Loader2 className="h-3 w-3 md:h-3.5 md:w-3.5 animate-spin mr-1 shrink-0" /> : <MessageCircle className="h-3 w-3 md:h-3.5 md:w-3.5 mr-1 shrink-0" />}
             Message
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            disabled={removing}
-            onClick={() => onRemove(s.sellerId)}
-          >
-            {removing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-            Remove
           </Button>
         </div>
       </CardContent>
@@ -187,6 +197,7 @@ export function SavedSellersList(props: { className?: string }) {
   const [removing, setRemoving] = useState<string | null>(null);
   const [activeCountBySellerId, setActiveCountBySellerId] = useState<Record<string, number | null>>({});
   const [messagingSellerId, setMessagingSellerId] = useState<string | null>(null);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -350,7 +361,71 @@ export function SavedSellersList(props: { className?: string }) {
 
   return (
     <div className={cn('space-y-4', props.className)}>
-      <Card className="border-2 border-border/50 bg-card">
+      {/* Mobile: Filters / Lists / Search row – same pattern as saved listings tab */}
+      <div className="md:hidden space-y-3">
+        <div className="flex items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full h-8 px-3 text-xs font-medium shrink-0"
+              >
+                <Filter className="h-3.5 w-3.5 mr-1" />
+                Filters
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setSortKey('recent')}>
+                Recently saved
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSortKey('highest_rated')}>
+                Highest rated
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSortKey('most_sales')}>
+                Most sales
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {rows.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full h-8 px-3 text-xs font-medium shrink-0"
+              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+            >
+              <ListIcon className="h-3.5 w-3.5 mr-1" />
+              {viewMode === 'list' ? 'List' : 'Grid'}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-full h-8 w-8 shrink-0"
+            onClick={() => setMobileSearchOpen((o) => !o)}
+            aria-label="Search saved sellers"
+          >
+            <Search className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        {mobileSearchOpen && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search sellers…"
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
+              className="pl-10 rounded-full"
+              autoFocus
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: Card header with title, search, sort, view */}
+      <Card className="border-2 border-border/50 bg-card hidden md:block">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
@@ -416,7 +491,7 @@ export function SavedSellersList(props: { className?: string }) {
           </CardContent>
         </Card>
       ) : viewMode === 'list' ? (
-        <div className="space-y-3">
+        <div className="space-y-2 md:space-y-3">
           {filtered.map((s) => (
             <SellerListCard
               key={s.sellerId}
@@ -430,7 +505,7 @@ export function SavedSellersList(props: { className?: string }) {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {filtered.map((s) => (
             <SellerGridCard
               key={s.sellerId}

@@ -673,8 +673,8 @@ export default function SellerOverviewPage() {
               <Card
                 key={stat.label}
                 className={cn(
-                  'border-2 border-border/50 bg-card hover:border-border/70',
-                  'hover:shadow-sm cursor-pointer group',
+                  'rounded-xl border border-border/50 bg-card hover:border-border/70',
+                  'hover:shadow-sm cursor-pointer group transition-colors',
                   'max-lg:min-h-[120px] max-lg:flex max-lg:flex-col max-lg:justify-between'
                 )}
               >
@@ -704,7 +704,7 @@ export default function SellerOverviewPage() {
         </div>
 
         {/* Seller command center (additive): most important operational signals for sellers */}
-        <Card className="border-2 border-border/50 bg-card">
+        <Card className="rounded-xl border border-border/50 bg-card">
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
@@ -723,7 +723,7 @@ export default function SellerOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border border-border/60 border-l-4 border-l-amber-500 bg-amber-500/5">
+              <Card className="rounded-xl border border-border/60 border-l-4 border-l-amber-500 bg-amber-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -744,7 +744,7 @@ export default function SellerOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-border/60 border-l-4 border-l-blue-500 bg-blue-500/5">
+              <Card className="rounded-xl border border-border/60 border-l-4 border-l-blue-500 bg-blue-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -763,7 +763,7 @@ export default function SellerOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-border/60 border-l-4 border-l-violet-500 bg-violet-500/5">
+              <Card className="rounded-xl border border-border/60 border-l-4 border-l-violet-500 bg-violet-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -786,7 +786,7 @@ export default function SellerOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border border-border/60 border-l-4 border-l-emerald-600 bg-emerald-500/5">
+              <Card className="rounded-xl border border-border/60 border-l-4 border-l-emerald-600 bg-emerald-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -814,7 +814,7 @@ export default function SellerOverviewPage() {
 
         {/* Seller Setup Checklist (dual-role account: enables seller capability without splitting accounts) */}
         {user && setupChecklist.isComplete !== true && (
-          <Card className="border-2 border-border/50 bg-card" data-tour="seller-setup-checklist">
+          <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-setup-checklist">
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -1040,7 +1040,7 @@ export default function SellerOverviewPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           {/* Action Required Panel + Performance */}
           <div className="space-y-4">
-            <Card className="border-2 border-border/50 bg-card" data-tour="seller-action-required">
+            <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-action-required">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1126,7 +1126,7 @@ export default function SellerOverviewPage() {
             </Card>
 
             {/* Performance (Lightweight) */}
-            <Card className="border-2 border-border/50 bg-card" data-tour="seller-performance">
+            <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-performance">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
@@ -1168,7 +1168,7 @@ export default function SellerOverviewPage() {
 
           {/* Recent Activity & Performance */}
           <div className="space-y-4">
-            <Card className="border-2 border-border/50 bg-card" data-tour="seller-recent-activity">
+            <Card className="rounded-xl border border-border/50 bg-card" data-tour="seller-recent-activity">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-primary" />

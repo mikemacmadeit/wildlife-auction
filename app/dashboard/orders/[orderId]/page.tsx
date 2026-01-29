@@ -32,7 +32,6 @@ import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { NextActionBanner } from '@/components/orders/NextActionBanner';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
-import { getNextRequiredAction } from '@/lib/orders/progress';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
@@ -396,62 +395,25 @@ export default function BuyerOrderDetailPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Next Step Card */}
-        {(() => {
-          const nextAction = getNextRequiredAction(order, 'buyer');
-          if (!nextAction) return null;
-          
-          return (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="font-semibold text-base mb-1">{nextAction.title}</div>
-                    <div className="text-sm text-muted-foreground">{nextAction.description}</div>
-                    {nextAction.dueAt && (
-                      <div className="text-xs text-muted-foreground mt-2">
-                        Due: {formatDate(nextAction.dueAt)}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
-                    onClick={() => {
-                      const onThisPage = typeof window !== 'undefined' && window.location.pathname === `/dashboard/orders/${order.id}`;
-                      if (nextAction.ctaAction.includes('set-delivery-address') && onThisPage) {
-                        setSetAddressModalOpen(true);
-                        return;
-                      }
-                      if (nextAction.ctaAction.startsWith('/')) {
-                        window.location.href = nextAction.ctaAction;
-                      }
-                    }}
-                  >
-                    {nextAction.ctaLabel}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
-
-        {/* Next Action Banner */}
-        <NextActionBanner
-          order={order}
-          role="buyer"
-          onAction={() => {
-            const txStatus: string = getEffectiveTransactionStatus(order);
-            if (txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress) {
-              setSetAddressModalOpen(true);
-            } else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
-              const el = document.getElementById('confirm-receipt-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else if (txStatus === 'DELIVERY_PROPOSED') {
-              const el = document.getElementById('agree-delivery');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }}
-        />
+        {/* Next Action Banner — hidden when only action is "Set delivery address" (that reminder lives in Order Progress footer to avoid duplicate) */}
+        {!(txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress) && (
+          <NextActionBanner
+            order={order}
+            role="buyer"
+            onAction={() => {
+              const st = getEffectiveTransactionStatus(order);
+              if (st === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress) {
+                setSetAddressModalOpen(true);
+              } else if (st === 'DELIVERED_PENDING_CONFIRMATION') {
+                const el = document.getElementById('confirm-receipt-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              } else if (st === 'DELIVERY_PROPOSED') {
+                const el = document.getElementById('agree-delivery');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }}
+          />
+        )}
 
         {/* Compliance Transfer Panel (for regulated whitetail deals) */}
         <ComplianceTransferPanel
@@ -469,6 +431,25 @@ export default function BuyerOrderDetailPage() {
           role="buyer"
           footer={
             <div id="fulfillment-section" className="space-y-3">
+                  {/* Set delivery address — single reminder in Order Progress when needed (no duplicate with banner) */}
+                  {txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress && (
+                    <>
+                      <div id="set-delivery-address" className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <div className="font-semibold text-sm">Set delivery address</div>
+                          <div className="text-xs text-muted-foreground">Add your delivery address or drop a pin. The seller will use it to propose a delivery date.</div>
+                        </div>
+                        <Button
+                          variant="default"
+                          disabled={processing !== null}
+                          onClick={() => setSetAddressModalOpen(true)}
+                        >
+                          Set address
+                        </Button>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
                   {/* Delivery address — show on Order Progress once buyer has submitted it */}
                   {order.delivery?.buyerAddress && (
                     <div className="text-sm bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
@@ -680,73 +661,80 @@ export default function BuyerOrderDetailPage() {
 
         {/* Set delivery address modal — once saved, "Set delivery address" shows complete on the timeline and address appears in the footer below */}
         <Dialog open={setAddressModalOpen} onOpenChange={setSetAddressModalOpen}>
-          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden max-w-lg sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Set delivery address</DialogTitle>
-              <DialogDescription>Add your delivery address or drop a pin. The seller will use it to propose a delivery date.</DialogDescription>
+          <DialogContent
+            overlayClassName="max-sm:top-16 max-sm:bottom-16 max-sm:left-0 max-sm:right-0"
+            className="flex flex-col w-[calc(100%-1.5rem)] max-w-lg sm:max-w-xl mx-auto pl-5 pr-11 sm:pl-6 sm:pr-6 pt-4 pb-4 sm:pt-6 sm:pb-6 gap-3 sm:gap-4 max-sm:max-h-[calc(100dvh-8rem)] sm:max-h-[90vh]"
+          >
+            <DialogHeader className="flex-shrink-0 space-y-1.5 text-left">
+              <DialogTitle className="text-base sm:text-lg pr-6">Set delivery address</DialogTitle>
+              <DialogDescription className="text-left text-xs sm:text-sm">
+                Add your delivery address or drop a pin. The seller will use it to propose a delivery date.
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
-              <div>
+            <div className="space-y-4 py-1 px-3 min-w-0">
+              <div className="min-w-0">
                 <label className="font-medium text-foreground text-sm">Street address *</label>
                 <Input
                   value={deliveryAddressForm.line1}
                   onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line1: e.target.value }))}
                   placeholder="123 Main St"
-                  className="mt-1"
+                  className="mt-1 w-full min-w-0"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="font-medium text-foreground text-sm">Apt, suite, etc. (optional)</label>
                 <Input
                   value={deliveryAddressForm.line2}
                   onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line2: e.target.value }))}
                   placeholder="Unit 4"
-                  className="mt-1"
+                  className="mt-1 w-full min-w-0"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
+              {/* City, State, ZIP on one row — compact and familiar */}
+              <div className="flex flex-wrap gap-x-3 gap-y-3 sm:gap-x-2 sm:gap-y-0">
+                <div className="flex-1 min-w-0 sm:min-w-[120px]">
                   <label className="font-medium text-foreground text-sm">City *</label>
                   <Input
                     value={deliveryAddressForm.city}
                     onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, city: e.target.value }))}
                     placeholder="City"
-                    className="mt-1"
+                    className="mt-1 w-full min-w-0"
                   />
                 </div>
-                <div>
+                <div className="w-16 shrink-0">
                   <label className="font-medium text-foreground text-sm">State *</label>
                   <Input
                     value={deliveryAddressForm.state}
                     onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
                     placeholder="TX"
-                    className="mt-1"
+                    className="mt-1 w-full"
+                  />
+                </div>
+                <div className="w-24 shrink-0">
+                  <label className="font-medium text-foreground text-sm">ZIP *</label>
+                  <Input
+                    value={deliveryAddressForm.zip}
+                    onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                    placeholder="12345"
+                    className="mt-1 w-full"
                   />
                 </div>
               </div>
-              <div>
-                <label className="font-medium text-foreground text-sm">ZIP code *</label>
-                <Input
-                  value={deliveryAddressForm.zip}
-                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                  placeholder="12345"
-                  className="mt-1 max-w-[120px]"
-                />
-              </div>
-              <div>
+              <div className="min-w-0">
                 <label className="font-medium text-foreground text-sm">Delivery instructions (optional)</label>
                 <Input
                   value={deliveryAddressForm.deliveryInstructions}
                   onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, deliveryInstructions: e.target.value }))}
                   placeholder="Gate code, gate left open, etc."
-                  className="mt-1"
+                  className="mt-1 w-full min-w-0"
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 min-w-0">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="w-full sm:w-auto shrink-0"
                   disabled={processing === 'set_address' || processing === 'location'}
                   onClick={() => {
                     if (!navigator.geolocation) {
@@ -768,17 +756,20 @@ export default function BuyerOrderDetailPage() {
                     );
                   }}
                 >
-                  {processing === 'location' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-                  Use my location (add pin for seller)
+                  {processing === 'location' ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <MapPin className="h-4 w-4 shrink-0" />}
+                  <span className="ml-2 truncate">Use my location (add pin for seller)</span>
                 </Button>
                 {(deliveryAddressForm.lat != null && deliveryAddressForm.lng != null) && (
-                  <span className="text-xs text-muted-foreground">Pin set: {deliveryAddressForm.pinLabel || `${deliveryAddressForm.lat.toFixed(4)}, ${deliveryAddressForm.lng.toFixed(4)}`}</span>
+                  <span className="text-xs text-muted-foreground truncate min-w-0">
+                    Pin set: {deliveryAddressForm.pinLabel || `${deliveryAddressForm.lat.toFixed(4)}, ${deliveryAddressForm.lng.toFixed(4)}`}
+                  </span>
                 )}
               </div>
             </div>
-            <DialogFooter className="border-t pt-4">
-              <Button variant="outline" onClick={() => setSetAddressModalOpen(false)}>Cancel</Button>
+            <DialogFooter className="flex-shrink-0 border-t pt-4 gap-2 sm:gap-2">
+              <Button variant="outline" onClick={() => setSetAddressModalOpen(false)} className="w-full sm:w-auto">Cancel</Button>
               <Button
+                className="w-full sm:w-auto"
                 disabled={!deliveryAddressForm.line1.trim() || !deliveryAddressForm.city.trim() || !deliveryAddressForm.state.trim() || !deliveryAddressForm.zip.trim() || processing === 'set_address' || processing === 'location'}
                 onClick={async () => {
                   try {

@@ -42,7 +42,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
     <nav
       className={cn(
         'fixed left-0 right-0 z-[60] md:hidden flex justify-center px-1 pt-2',
-        'bottom-2 pb-safe', // a little lower; pb-safe for home indicator
+        'bottom-1 pb-safe', // lower; pb-safe for home indicator
       )}
     >
       <div

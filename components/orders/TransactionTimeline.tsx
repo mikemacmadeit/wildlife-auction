@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -21,11 +21,14 @@ import {
   Truck,
   PackageCheck,
   Undo2,
+  MapPin,
+  Calendar,
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { getOrderTrustState, type OrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { getOrderMilestones } from '@/lib/orders/progress';
 
 export type TimelineRole = 'buyer' | 'seller' | 'admin';
 
@@ -119,6 +122,19 @@ export function TransactionTimeline(props: {
 
   const blocked = issue !== 'none' || order.adminHold === true || (order as any).payoutHoldReason === 'chargeback';
   const rank = stateRank(trust);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // When rail variant is used, scroll so the active step is in view (e.g. on mobile cards).
+  useEffect(() => {
+    if (variant !== 'rail') return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector<HTMLElement>('[data-step-status="active"]');
+    if (activeEl) {
+      activeEl.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+    }
+  }, [variant, order?.id, rank]);
 
   const steps: TimelineStep[] = useMemo(() => {
     const buyerCopy = {
@@ -294,6 +310,36 @@ export function TransactionTimeline(props: {
       });
   }, [order, role, trust, rank, blocked, protectionRemaining, txStatus]);
 
+  // Rail variant: use same steps as Order Progress (order detail page) from getOrderMilestones()
+  const railSteps = useMemo((): TimelineStep[] => {
+    if (variant !== 'rail') return [];
+    const milestones = getOrderMilestones(order);
+    const iconFor = (key: string) => {
+      switch (key) {
+        case 'payment': return <DollarSign className="h-4 w-4" />;
+        case 'compliance': return <Shield className="h-4 w-4" />;
+        case 'set_delivery_address': return <MapPin className="h-4 w-4" />;
+        case 'schedule_delivery': return <Calendar className="h-4 w-4" />;
+        case 'agree_delivery': return <CheckCircle2 className="h-4 w-4" />;
+        case 'out_for_delivery': return <Truck className="h-4 w-4" />;
+        case 'delivered': return <PackageCheck className="h-4 w-4" />;
+        case 'confirm_receipt': return <CheckCircle2 className="h-4 w-4" />;
+        case 'completed': return <CheckCircle2 className="h-4 w-4" />;
+        default: return <Clock className="h-4 w-4" />;
+      }
+    };
+    return milestones.map((m) => ({
+      key: m.key,
+      title: m.label,
+      description: undefined,
+      status: (m.isComplete ? 'done' : m.isCurrent ? 'active' : m.isBlocked ? 'blocked' : 'upcoming') as StepStatus,
+      icon: iconFor(m.key),
+      meta: undefined,
+    })) as TimelineStep[];
+  }, [order, variant]);
+
+  const stepsToShow = variant === 'rail' && railSteps.length > 0 ? railSteps : steps;
+
   const StepDot = (s: TimelineStep) => (
     <div
       className={cn(
@@ -310,8 +356,11 @@ export function TransactionTimeline(props: {
   );
 
   const Rail = () => (
-    // Keep the rail contained in its box; allow horizontal scroll only.
-    <div className={cn('overflow-x-auto overflow-y-hidden', dense ? 'pb-0.5' : 'pb-2')}>
+    // Keep the rail contained in its box; allow horizontal scroll only. Hover to show scrollbar.
+    <div
+      ref={scrollContainerRef}
+      className={cn('overflow-x-auto overflow-y-hidden we-scrollbar-hover', dense ? 'pb-0.5' : 'pb-2')}
+    >
       {/* Embedded rails sit inside a padded container already — keep padding tight. */}
       <div
         className={cn(
@@ -319,18 +368,18 @@ export function TransactionTimeline(props: {
           dense ? 'gap-2.5' : 'gap-3',
           embedded ? 'pr-2' : 'pr-8',
           // Avoid over-forcing width so it "fits" better inside its box; still scrolls when needed.
-          embedded
-            ? dense
-              ? 'min-w-[440px]'
-              : 'min-w-[640px]'
+embedded
+              ? dense
+                ? 'min-w-[440px]'
+                : 'min-w-[640px]'
             : dense
               ? 'min-w-[520px]'
               : 'min-w-[760px]'
         )}
       >
-        {steps.map((s, idx) => {
-          const isLast = idx === steps.length - 1;
-          const prev = idx > 0 ? steps[idx - 1] : null;
+        {stepsToShow.map((s, idx) => {
+          const isLast = idx === stepsToShow.length - 1;
+          const prev = idx > 0 ? stepsToShow[idx - 1] : null;
           const leftConnectorClass =
             prev?.status === 'blocked'
               ? 'bg-destructive/30'
@@ -346,6 +395,8 @@ export function TransactionTimeline(props: {
           return (
             <div
               key={s.key}
+              data-step-status={s.status}
+              data-step-key={s.key}
               className={cn(
                 'flex-1',
                 embedded
@@ -401,8 +452,8 @@ export function TransactionTimeline(props: {
       {variant === 'rail' ? (
         <Rail />
       ) : (
-        /* Horizontal stepper (scrolls on small screens) */
-        <div className={cn('overflow-x-auto', dense ? 'pb-1' : 'pb-2')}>
+        /* Horizontal stepper (scrolls on small screens); hover to show scrollbar */
+        <div className={cn('overflow-x-auto overflow-y-hidden we-scrollbar-hover', dense ? 'pb-1' : 'pb-2')}>
           <div className={cn('relative', dense ? 'min-w-[640px]' : 'min-w-[760px]')}>
             <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/70" />
 

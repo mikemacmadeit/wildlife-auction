@@ -138,6 +138,7 @@ export default function WatchlistPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
     type: 'all',
@@ -404,7 +405,7 @@ export default function WatchlistPage() {
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Card>
+        <Card className="rounded-xl border border-border/50 bg-card">
           <CardContent className="pt-6">
             <div className="text-center py-12">
               <Heart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -430,7 +431,7 @@ export default function WatchlistPage() {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Card>
+        <Card className="rounded-xl border border-border/50 bg-card">
           <CardContent className="pt-6">
             <div className="text-center py-12">
               <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
@@ -452,7 +453,113 @@ export default function WatchlistPage() {
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 sm:px-6 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
       <Tabs value={superTab} onValueChange={(v) => setSuperTab(v as SuperTab)} className="w-full">
-        <div className="mb-6 flex items-center justify-center">
+        {/* Mobile: eBay-like header – title, 3 pills, then Filters / Lists / Search row */}
+        <div className="md:hidden space-y-4 mb-6">
+          <h1 className="text-base font-bold">Saved listings</h1>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSuperTab('watchlist')}
+              className={cn(
+                'flex-1 min-w-0 py-2 px-2.5 rounded-full text-xs font-semibold transition-colors',
+                superTab === 'watchlist'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Saved listings
+            </button>
+            <button
+              type="button"
+              onClick={() => setSuperTab('saved-sellers')}
+              className={cn(
+                'flex-1 min-w-0 py-2 px-2.5 rounded-full text-xs font-semibold transition-colors',
+                superTab === 'saved-sellers'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Saved sellers
+            </button>
+            <button
+              type="button"
+              onClick={() => setSuperTab('saved-searches')}
+              className={cn(
+                'flex-1 min-w-0 py-2 px-2.5 rounded-full text-xs font-semibold transition-colors',
+                superTab === 'saved-searches'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Saved searches
+            </button>
+          </div>
+          {superTab === 'watchlist' && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full h-8 px-3 text-xs font-medium shrink-0"
+                    >
+                      <Filter className="h-3.5 w-3.5 mr-1" />
+                      Filters
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {(['newest', 'oldest', 'ending-soon', 'price-low', 'price-high', 'title'] as SortOption[]).map((opt) => (
+                      <DropdownMenuItem key={opt} onSelect={() => setSortBy(opt)}>
+                        {opt === 'newest' && 'Newest First'}
+                        {opt === 'oldest' && 'Oldest First'}
+                        {opt === 'ending-soon' && 'Ending Soon'}
+                        {opt === 'price-low' && 'Price: Low to High'}
+                        {opt === 'price-high' && 'Price: High to Low'}
+                        {opt === 'title' && 'Title A–Z'}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full h-8 px-3 text-xs font-medium shrink-0"
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                >
+                  <ListIcon className="h-3.5 w-3.5 mr-1" />
+                  {viewMode === 'list' ? 'List' : 'Grid'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full h-8 w-8 shrink-0"
+                  onClick={() => setMobileSearchOpen((o) => !o)}
+                  aria-label="Search watchlist"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {mobileSearchOpen && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search watchlist..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 rounded-full"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Desktop: original tab list */}
+        <div className="hidden md:flex mb-6 items-center justify-center">
           <TabsList className="grid grid-cols-3 w-full max-w-xl">
             <TabsTrigger value="watchlist" className="font-semibold">
               Saved listings
@@ -467,7 +574,7 @@ export default function WatchlistPage() {
         </div>
 
         <TabsContent value="saved-searches">
-          <Card className="border-2 border-border/50 bg-card">
+          <Card className="rounded-xl border border-border/50 bg-card">
             <CardContent className="p-4 sm:p-6">
               <SavedSearchesPanel variant="tab" />
             </CardContent>
@@ -479,8 +586,8 @@ export default function WatchlistPage() {
         </TabsContent>
 
         <TabsContent value="watchlist">
-      {/* Header */}
-      <div className="mb-4 md:mb-6">
+      {/* Header – desktop only; mobile uses eBay-like header above */}
+      <div className="mb-4 md:mb-6 hidden md:block">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
@@ -539,9 +646,9 @@ export default function WatchlistPage() {
           </div>
         </div>
 
-        {/* Search and Filters */}
+        {/* Search and Filters – desktop only; mobile uses Filters/Lists/Search pills above */}
         {totalCount > 0 && (
-          <div className="flex flex-col md:flex-row gap-3 mb-4">
+          <div className="hidden md:flex flex-col md:flex-row gap-3 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -617,7 +724,7 @@ export default function WatchlistPage() {
 
           <TabsContent value="active" className="mt-6">
             {filteredAndSorted.length === 0 ? (
-              <Card>
+              <Card className="rounded-xl border border-border/50 bg-card">
                 <CardContent className="pt-6">
                   <div className="text-center py-12">
                     <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -642,7 +749,7 @@ export default function WatchlistPage() {
 
           <TabsContent value="ended" className="mt-6">
             {filteredAndSorted.length === 0 ? (
-              <Card>
+              <Card className="rounded-xl border border-border/50 bg-card">
                 <CardContent className="pt-6">
                   <div className="text-center py-12">
                     <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -665,7 +772,7 @@ export default function WatchlistPage() {
 
           <TabsContent value="sold" className="mt-6">
             {filteredAndSorted.length === 0 ? (
-              <Card>
+              <Card className="rounded-xl border border-border/50 bg-card">
                 <CardContent className="pt-6">
                   <div className="text-center py-12">
                     <CheckCircle2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -703,7 +810,7 @@ export default function WatchlistPage() {
   );
 }
 
-// Watchlist Grid Component
+// Watchlist Grid Component – list view uses watchlistMobile variant on mobile only
 function WatchlistGrid({
   listings,
   viewMode,
@@ -711,24 +818,28 @@ function WatchlistGrid({
   listings: ListingWithStatus[];
   viewMode: ViewMode;
 }) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   if (viewMode === 'list') {
+    const listVariant = isMobile ? 'watchlistMobile' : undefined;
     return (
-      <div className="space-y-3 md:space-y-4 pb-4">
-        <AnimatePresence mode="popLayout">
-          {listings.map((listing, index) => (
-            <motion.div
-              key={listing.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.3, delay: index * 0.02 }}
-              className="relative"
-            >
-              {/* Reuse browse list-view card 1:1 */}
-              <ListItem listing={listing as any} />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+      <div className="pb-4 w-full md:flex md:justify-center">
+        <div className="w-full md:max-w-2xl space-y-3 md:space-y-4">
+          <AnimatePresence mode="popLayout">
+            {listings.map((listing, index) => (
+              <motion.div key={listing.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="w-full">
+                <ListItem listing={listing as any} variant={listVariant} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
     );
   }

@@ -689,41 +689,41 @@ export default function SellerPayoutsPage() {
           </Card>
         )}
 
-        {/* Balance Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        {/* Balance Cards - same line on mobile */}
+        <div className="grid grid-cols-2 gap-3 md:gap-6">
           <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:pb-3 md:px-6">
+              <CardTitle className="text-xs md:text-base font-bold uppercase tracking-wide text-muted-foreground leading-tight">
                 Available Balance
               </CardTitle>
-              <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center shrink-0">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl md:text-4xl font-extrabold text-foreground mb-1">
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-4xl font-extrabold text-foreground mb-0.5 md:mb-1">
                 {formatCurrency(totalAvailable)}
               </div>
-              <p className="text-xs text-muted-foreground font-medium">
+              <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
                 Ready for payout
               </p>
             </CardContent>
           </Card>
 
           <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:pb-3 md:px-6">
+              <CardTitle className="text-xs md:text-base font-bold uppercase tracking-wide text-muted-foreground leading-tight">
                 Pending Payouts
               </CardTitle>
-              <div className="w-10 h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-primary" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center shrink-0">
+                <Clock className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl md:text-4xl font-extrabold text-foreground mb-1">
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-4xl font-extrabold text-foreground mb-0.5 md:mb-1">
                 {formatCurrency(totalPending)}
               </div>
-              <p className="text-xs text-muted-foreground font-medium">
+              <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
                 Awaiting buyer payment
               </p>
             </CardContent>

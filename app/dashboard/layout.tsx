@@ -341,7 +341,15 @@ export default function DashboardLayout({
   return (
     <RequireAuth>
       <ProfileCompletionGate />
-      <div className="min-h-screen bg-background flex flex-col md:flex-row relative" style={{ isolation: 'isolate' }}>
+      <div
+        className={cn(
+          'bg-background flex flex-col md:flex-row relative',
+          pathname?.startsWith('/dashboard/messages')
+            ? 'fixed inset-0 h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden flex flex-col justify-start'
+            : 'min-h-screen'
+        )}
+        style={{ isolation: 'isolate' }}
+      >
       {/* Desktop Sidebar - fixed on desktop to stay above content */}
       <aside
         className={cn(
@@ -643,10 +651,22 @@ export default function DashboardLayout({
         'flex-1 flex flex-col min-w-0 min-h-0',
         sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
       )}>
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto min-h-0 min-w-0 pb-20 md:pb-0 relative" style={{ zIndex: 0 }}>
+        {/* Page Content - no outer scroll on messages */}
+        <main
+          className={cn(
+            'flex-1 min-h-0 min-w-0 pb-20 md:pb-0 relative',
+            pathname?.startsWith('/dashboard/messages') ? 'overflow-hidden' : 'overflow-y-auto'
+          )}
+          style={{ zIndex: 0 }}
+        >
           <ProductionErrorBoundary>
-            <div className="relative" style={{ zIndex: 0 }}>
+            <div
+              className={cn(
+                'relative',
+                pathname?.startsWith('/dashboard/messages') && 'h-full min-h-0 flex flex-col items-stretch'
+              )}
+              style={{ zIndex: 0 }}
+            >
               {children}
             </div>
           </ProductionErrorBoundary>

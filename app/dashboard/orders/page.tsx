@@ -939,22 +939,17 @@ export default function OrdersPage() {
       </Dialog>
 
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">My Purchases</h1>
-            <p className="text-muted-foreground mt-1">
-              Track fulfillment progress, compliance milestones, and delivery—exactly who we’re waiting on.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-border/60 bg-background/60 backdrop-blur px-4 py-3">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total orders</div>
-            <div className="text-2xl font-extrabold">{orders.length}</div>
-          </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">My Purchases</h1>
+          <p className="text-muted-foreground mt-1">
+            Track fulfillment progress, compliance milestones, and delivery—exactly who we’re waiting on.
+          </p>
         </div>
 
-        {/* Controls (eBay-style) */}
+        {/* Controls (eBay-style): mobile = scrollable row of filters; desktop = stacked layout */}
         <Card className="border-border/60 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/50 sticky top-0 z-10">
           <CardContent className="p-4 space-y-4">
+            {/* Search: full width on mobile, constrained on desktop */}
             <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
               <div className="relative w-full md:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -966,12 +961,12 @@ export default function OrdersPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+              {/* Desktop: Date, Category, Needs action */}
+              <div className="hidden md:flex items-center gap-2 flex-wrap justify-end">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground font-semibold">Needs action</span>
                   <Switch checked={needsActionOnly} onCheckedChange={setNeedsActionOnly} />
                 </div>
-
                 <Select value={dateRange} onValueChange={(v) => setDateRange(v as any)}>
                   <SelectTrigger className="min-w-[150px]">
                     <SelectValue placeholder="Date range" />
@@ -983,7 +978,6 @@ export default function OrdersPage() {
                     <SelectItem value="all">All time</SelectItem>
                   </SelectContent>
                 </Select>
-
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger className="min-w-[180px]">
                     <SelectValue placeholder="Category" />
@@ -1000,8 +994,89 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            {/* Status chips */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Mobile: single scrollable row of filter chips (status + Date + Category + Needs action + Clear) */}
+            <div className="md:hidden overflow-x-auto overflow-y-hidden pt-1 pb-2 -mx-1 px-1 we-scrollbar-hover">
+              <div className="flex items-center gap-2 flex-nowrap min-w-0">
+                {statusChipDefs.map((d) => {
+                  const active = statusFilter === d.key;
+                  const count = statusCounts[d.key] || 0;
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => setStatusFilter(d.key)}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
+                        active
+                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                      )}
+                    >
+                      <span>{d.label}</span>
+                      <span className={cn('text-xs rounded-full px-2 py-0.5', active ? 'bg-primary/15' : 'bg-muted')}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+                <Select value={dateRange} onValueChange={(v) => setDateRange(v as any)}>
+                  <SelectTrigger className="h-8 rounded-full min-w-0 w-auto px-3 text-xs font-semibold border-border/60 bg-background/40 flex-shrink-0 [&>span]:max-w-[100px] [&>span]:truncate">
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                    <SelectItem value="365">Last 365 days</SelectItem>
+                    <SelectItem value="all">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="h-8 rounded-full min-w-0 w-auto px-3 text-xs font-semibold border-border/60 bg-background/40 flex-shrink-0 [&>span]:max-w-[90px] [&>span]:truncate">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {uniqueCategories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c.replaceAll('_', ' ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <button
+                  type="button"
+                  onClick={() => setNeedsActionOnly((v) => !v)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition flex-shrink-0 whitespace-nowrap',
+                    needsActionOnly
+                      ? 'border-primary/40 bg-primary/10 text-primary'
+                      : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                  )}
+                >
+                  Needs action
+                </button>
+                {(searchText || statusFilter !== 'all' || categoryFilter !== 'all' || dateRange !== '90' || needsActionOnly) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full h-8 px-3 text-xs font-semibold flex-shrink-0"
+                    onClick={() => {
+                      setSearchText('');
+                      setStatusFilter('all');
+                      setCategoryFilter('all');
+                      setDateRange('90');
+                      setNeedsActionOnly(false);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Desktop: Status chips (wrap as before) */}
+            <div className="hidden md:flex items-center gap-2 flex-wrap">
               {statusChipDefs.map((d) => {
                 const active = statusFilter === d.key;
                 const count = statusCounts[d.key] || 0;
@@ -1031,23 +1106,25 @@ export default function OrdersPage() {
                 Showing <span className="font-semibold">{filteredOrders.length}</span> of{' '}
                 <span className="font-semibold">{orders.length}</span>
               </div>
-              {searchText || statusFilter !== 'all' || categoryFilter !== 'all' || dateRange !== '90' || needsActionOnly ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="font-semibold"
-                  onClick={() => {
-                    setSearchText('');
-                    setStatusFilter('all');
-                    setCategoryFilter('all');
-                    setDateRange('90');
-                    setNeedsActionOnly(false);
-                  }}
-                >
-                  Clear filters
-                </Button>
-              ) : null}
+              <div className="hidden md:block">
+                {searchText || statusFilter !== 'all' || categoryFilter !== 'all' || dateRange !== '90' || needsActionOnly ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="font-semibold"
+                    onClick={() => {
+                      setSearchText('');
+                      setStatusFilter('all');
+                      setCategoryFilter('all');
+                      setDateRange('90');
+                      setNeedsActionOnly(false);
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1115,111 +1192,102 @@ export default function OrdersPage() {
                 )}
               >
                 <CardContent
-                  className="p-4 md:p-5 space-y-4 cursor-pointer"
+                  className="p-3 md:p-5 space-y-3 md:space-y-4 cursor-pointer"
                   onClick={(e) => {
                     const el = e.target as HTMLElement | null;
                     if (el?.closest?.('a,button,input,textarea,select,[data-no-drawer="1"]')) return;
                     setDrawerOrderId(order.id);
                   }}
                 >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="relative h-24 w-24 md:h-28 md:w-28 rounded-2xl overflow-hidden border bg-muted shrink-0 shadow-sm">
-                      {order.listingPhotoURL ? (
-                        <Image
-                          src={order.listingPhotoURL}
-                          alt=""
-                          fill
-                          className="object-cover"
-                          sizes="(min-width: 768px) 112px, 96px"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                          <Package className="h-5 w-5" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Link
-                          href={`/dashboard/orders/${order.id}`}
-                          className="font-extrabold text-base md:text-lg leading-tight hover:underline truncate"
-                          title={order.listingTitle || 'Order'}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setDrawerOrderId(order.id);
-                          }}
-                        >
-                          {order.listingTitle || 'Unknown listing'}
-                        </Link>
+                {/* Mobile: compact card — image + title row, then status, meta, amount, timeline, actions */}
+                <div className="flex gap-3 min-w-0">
+                  <div className="relative h-16 w-16 md:h-28 md:w-28 rounded-xl md:rounded-2xl overflow-hidden border bg-muted shrink-0 shadow-sm">
+                    {order.listingPhotoURL ? (
+                      <Image
+                        src={order.listingPhotoURL}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="(min-width: 768px) 112px, 64px"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                        <Package className="h-5 w-5 md:h-6 md:w-6" />
                       </div>
-
-                      <div className="mt-1 text-sm font-semibold">
-                        {(() => {
-                          const nextAction = getNextRequiredAction(order, 'buyer');
-                          if (nextAction) {
-                            return (
-                              <>
-                                {nextAction.title}
-                                {nextAction.description && (
-                                  <span className="text-muted-foreground font-normal"> · {nextAction.description}</span>
-                                )}
-                              </>
-                            );
-                          }
-                          return (
-                            <>
-                              {ui.currentStepLabel}
-                              {ui.waitingOn ? (
-                                <span className="text-muted-foreground font-normal"> · {ui.waitingOn}</span>
-                              ) : null}
-                            </>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/40 px-2.5 py-1">
-                          <Avatar className="h-6 w-6">
-                            {order.sellerPhotoURL ? <AvatarImage src={order.sellerPhotoURL} alt="" /> : null}
-                            <AvatarFallback className="text-[10px] font-bold">
-                              {(order.sellerDisplayName || 'S').slice(0, 1).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-sm font-semibold leading-none">{order.sellerDisplayName || 'Seller'}</div>
-                        </div>
-
-                        <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                          <span className="capitalize">{order.listingType || 'unknown'}</span>
-                        {order.listingLocationLabel ? (
-                          <>
-                            <span className="text-muted-foreground/60">•</span>
-                            <span className="inline-flex items-center gap-1">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {order.listingLocationLabel}
-                            </span>
-                          </>
-                        ) : null}
-                        <span className="text-muted-foreground/60">•</span>
-                        <span>{(order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt || 0)).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
-
-                  <div className="shrink-0 flex items-center gap-2">
-                    <div className="h-10 w-10 rounded-full border border-border/60 bg-background/60 flex items-center justify-center">
-                      {getStatusIcon(order.status, order)}
+                  <div className="min-w-0 flex-1 flex flex-col justify-center">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        href={`/dashboard/orders/${order.id}`}
+                        className="font-semibold md:font-extrabold text-sm md:text-lg leading-tight hover:underline line-clamp-2 md:truncate"
+                        title={order.listingTitle || 'Order'}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setDrawerOrderId(order.id);
+                        }}
+                      >
+                        {order.listingTitle || 'Unknown listing'}
+                      </Link>
+                      <div className="shrink-0 flex items-center gap-1.5 md:gap-2">
+                        <div className="h-8 w-8 md:h-10 md:w-10 rounded-full border border-border/60 bg-background/60 flex items-center justify-center">
+                          {getStatusIcon(order.status, order)}
+                        </div>
+                        <div className="hidden sm:block">
+                          <StatusBadgeWithTooltip statusKey={ui.statusKey} order={order} />
+                        </div>
+                      </div>
                     </div>
-                    <div className="hidden sm:block">
-                      <StatusBadgeWithTooltip statusKey={ui.statusKey} order={order} />
+                    {/* One clear status line — single line on mobile, full on desktop */}
+                    <div className="mt-0.5 md:mt-1 text-xs md:text-sm text-muted-foreground line-clamp-1 md:line-clamp-none">
+                      {(() => {
+                        const nextAction = getNextRequiredAction(order, 'buyer');
+                        if (nextAction) {
+                          return <span>{nextAction.title}{nextAction.description ? ` · ${nextAction.description}` : ''}</span>;
+                        }
+                        return (
+                          <span>
+                            {ui.currentStepLabel}
+                            {ui.waitingOn ? ` · ${ui.waitingOn}` : ''}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    {/* Meta: seller · location · date — single line on mobile */}
+                    <div className="mt-1 md:mt-2 flex items-center gap-1.5 flex-wrap text-[11px] md:text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 truncate max-w-[140px] md:max-w-none">
+                        <Avatar className="h-4 w-4 md:h-6 md:w-6 shrink-0">
+                          {order.sellerPhotoURL ? <AvatarImage src={order.sellerPhotoURL} alt="" /> : null}
+                          <AvatarFallback className="text-[8px] md:text-[10px] font-bold">
+                            {(order.sellerDisplayName || 'S').slice(0, 1).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{order.sellerDisplayName || 'Seller'}</span>
+                      </span>
+                      <span className="text-muted-foreground/60 shrink-0">·</span>
+                      <span className="capitalize shrink-0">{order.listingType || 'unknown'}</span>
+                      {order.listingLocationLabel ? (
+                        <>
+                          <span className="text-muted-foreground/60 shrink-0">·</span>
+                          <span className="inline-flex items-center gap-0.5 shrink-0">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            <span className="truncate max-w-[80px] md:max-w-none">{order.listingLocationLabel}</span>
+                          </span>
+                        </>
+                      ) : null}
+                      <span className="text-muted-foreground/60 shrink-0">·</span>
+                      <span className="shrink-0">{(order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt || 0)).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border/60 bg-background/40 p-3 md:p-4">
+                {/* Amount + Order: one line on mobile, box on desktop */}
+                <div className="md:hidden flex items-baseline gap-2 text-muted-foreground/80">
+                  <span className="text-lg font-extrabold text-foreground">${order.amount.toLocaleString()}</span>
+                  <span className="text-[11px] font-mono">#{order.id.slice(0, 8)}</span>
+                </div>
+                <div className="hidden md:block rounded-2xl border border-border/60 bg-background/40 p-3 md:p-4">
                   <div className="flex items-end justify-between gap-3 flex-wrap">
                     <div>
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount</div>
@@ -1241,6 +1309,7 @@ export default function OrdersPage() {
                   </div>
                 )}
 
+                {/* Timeline: compact on mobile */}
                 <TransactionTimeline
                   order={order}
                   role="buyer"
@@ -1248,16 +1317,15 @@ export default function OrdersPage() {
                   showTitle={false}
                   variant="rail"
                   embedded
-                  className="rounded-xl border border-border/50 bg-background/40 px-3 py-2"
+                  className="rounded-xl border border-border/50 bg-background/40 px-2 py-1.5 md:px-3 md:py-2"
                 />
 
-                <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap pt-0 md:pt-1">
+                  <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                     {(() => {
                       const nextAction = getNextRequiredAction(order, 'buyer');
                       if (!nextAction) return null;
                       
-                      // Check if this is a simple action that can be done directly
                       const txStatus = getEffectiveTransactionStatus(order);
                       const canHandleDirectly = 
                         txStatus === 'DELIVERED_PENDING_CONFIRMATION' && 
@@ -1266,28 +1334,23 @@ export default function OrdersPage() {
                       return (
                         <Button
                           size="sm"
-                          className="font-semibold"
+                          className="font-semibold w-full sm:w-auto"
                           variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
                           disabled={processingOrderId === order.id || (nextAction.ctaLabel.toLowerCase().includes('confirm') && !canAct)}
                           onClick={async (e) => {
                             e.stopPropagation();
-                            
-                            // Handle simple actions directly
                             if (canHandleDirectly && txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
                               await handleConfirmReceipt(order.id);
                               return;
                             }
-                            
-                            // Navigate to detail page for actions that need forms/dialogs
                             if (nextAction.ctaAction.startsWith('/')) {
                               window.location.href = nextAction.ctaAction;
                             } else {
-                              // Fallback to detail page
                               window.location.href = `/dashboard/orders/${order.id}`;
                             }
                           }}
                         >
-                          {processingOrderId === order.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          {processingOrderId === order.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin shrink-0" /> : null}
                           {nextAction.ctaLabel}
                         </Button>
                       );
@@ -1298,23 +1361,23 @@ export default function OrdersPage() {
                         asChild
                         size="sm"
                         variant="outline"
-                        className="font-semibold"
+                        className="font-semibold w-full sm:w-auto border-primary text-primary hover:bg-primary/10 hover:text-primary"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Link href={`/dashboard/orders/${order.id}`}>
-                          View details
-                          <ArrowRight className="h-4 w-4 ml-2" />
+                        <Link href={`/dashboard/orders/${order.id}`} className="flex items-center justify-center gap-2">
+                          View order
+                          <ArrowRight className="h-4 w-4 shrink-0" />
                         </Link>
                       </Button>
                     ) : null}
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button type="button" variant="outline" size="sm" data-no-drawer="1">
-                          <MoreVertical className="h-4 w-4" />
-                          <span className="sr-only">More actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="outline" size="sm" className="shrink-0 h-8 w-8 p-0 md:h-9 md:px-3" data-no-drawer="1">
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">More actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-[200px]">
                         <DropdownMenuItem asChild>
                           <Link href={`/listing/${order.listingId}`}>View listing</Link>
@@ -1337,7 +1400,6 @@ export default function OrdersPage() {
                         ) : null}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
                 </div>
                 </CardContent>
               </Card>

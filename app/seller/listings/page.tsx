@@ -57,27 +57,27 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
   > = {
     draft: {
       label: 'Draft',
-      className: 'bg-zinc-50 text-zinc-700 border-zinc-200 dark:bg-zinc-900/40 dark:text-zinc-200 dark:border-zinc-700',
+      className: 'bg-white text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-600',
     },
     pending: {
       label: 'Pending approval',
-      className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300',
+      className: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40',
     },
     active: {
       label: 'Active',
-      className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-300',
+      className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40',
     },
     expired: {
       label: type === 'auction' && ended ? 'Ended' : 'Expired',
-      className: 'bg-zinc-500/10 text-zinc-700 border-zinc-500/30 dark:text-zinc-300',
+      className: 'bg-slate-500/10 text-slate-700 border-slate-500/30 dark:bg-slate-500/20 dark:text-slate-300 dark:border-slate-500/40',
     },
     sold: {
       label: 'Sold',
-      className: 'bg-sky-500/10 text-sky-700 border-sky-500/30 dark:text-sky-300',
+      className: 'bg-sky-500/10 text-sky-700 border-sky-500/30 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40',
     },
     removed: {
       label: 'Rejected',
-      className: 'bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-300',
+      className: 'bg-red-500/10 text-red-700 border-red-500/30 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40',
     },
   };
 
@@ -272,7 +272,7 @@ const ListingRow = memo(({
 ));
 ListingRow.displayName = 'ListingRow';
 
-// Memoized Mobile Listing Card
+// Memoized Mobile Listing Card — compact, card styling (gradient/shadow)
 const MobileListingCard = memo(({ 
   listing, 
   effectiveStatus,
@@ -292,87 +292,84 @@ const MobileListingCard = memo(({
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
 }) => (
-  <div key={listing.id} className="p-4 space-y-3">
-    <div className="flex items-start justify-between gap-2 min-w-0">
-      <div className="flex items-start gap-2 flex-1 min-w-0">
-        <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-          {getPrimaryListingImageUrl(listing) ? (
-            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
-          ) : null}
-        </div>
-        <div className="flex-1 min-w-0">
-        <Link
-          href={`/listing/${listing.id}`}
-          className="font-semibold text-sm text-foreground hover:text-primary block mb-1 truncate"
-        >
-          {listing.title}
-        </Link>
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          {getTypeBadge(listing.type)}
-          {getStatusBadge({
-            status: effectiveStatus,
-            type: listing.type,
-            ended: isAuctionEnded(listing),
-          })}
-        </div>
-        </div>
+  <div
+    key={listing.id}
+    className="rounded-xl border border-primary bg-muted/30 dark:bg-muted/20 p-3 sm:p-4 transition-colors hover:bg-muted/40 dark:hover:bg-muted/30"
+  >
+    <div className="flex gap-3 min-w-0">
+      <div className="h-16 w-20 sm:h-20 sm:w-24 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+        {getPrimaryListingImageUrl(listing) ? (
+          <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
+        ) : null}
       </div>
-      <div className="flex-shrink-0">
-        <ListingRowActions
-          listingId={listing.id}
-          status={effectiveStatus}
-          onPromote={() => onPublish(listing)}
-          onResubmit={() => onResubmit(listing)}
-          resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
-          onDuplicate={() => onDuplicate(listing)}
-          onPause={() => onPause(listing)}
-          onDelete={() => onDelete(listing)}
-        />
+      <div className="flex-1 min-w-0 flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-2 min-w-0">
+          <Link
+            href={`/listing/${listing.id}`}
+            className="font-semibold text-sm text-foreground hover:text-primary line-clamp-2 min-w-0"
+          >
+            {listing.title}
+          </Link>
+          <div className="shrink-0">
+            <ListingRowActions
+              listingId={listing.id}
+              status={effectiveStatus}
+              onPromote={() => onPublish(listing)}
+              onResubmit={() => onResubmit(listing)}
+              resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
+              onDuplicate={() => onDuplicate(listing)}
+              onPause={() => onPause(listing)}
+              onDelete={() => onDelete(listing)}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {getTypeBadge(listing.type)}
+            {getStatusBadge({
+              status: effectiveStatus,
+              type: listing.type,
+              ended: isAuctionEnded(listing),
+            })}
+          </div>
+          <div className="text-right font-semibold text-foreground tabular-nums">
+            {listing.type === 'auction'
+              ? listing.currentBid
+                ? `$${listing.currentBid.toLocaleString()}`
+                : 'No bids'
+              : listing.price
+              ? `$${listing.price.toLocaleString()}`
+              : 'Contact'}
+          </div>
+          <div className="text-muted-foreground truncate">
+            {listing.location?.city || '—'}, {listing.location?.state || '—'}
+          </div>
+          <div className="text-right text-muted-foreground">
+            {listing.endsAt
+              ? effectiveStatus === 'active'
+                ? `Ends ${formatTimeRemaining(listing.endsAt)}`
+                : 'Ended'
+              : '—'}
+          </div>
+          <div className="col-span-2 flex items-center gap-2 text-muted-foreground pt-0.5 border-t border-border/40">
+            <span>{listing.metrics.views} views</span>
+            {listing.type === 'auction' && (
+              <>
+                <span>{listing.metrics.favorites} watchers</span>
+                <span>{listing.metrics.bidCount} bids</span>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
-
-    <div className="flex items-center gap-4 text-sm">
-      <div>
-        <span className="text-muted-foreground font-medium">Price: </span>
-        <span className="font-bold text-foreground">
-          {listing.type === 'auction'
-            ? listing.currentBid
-              ? `$${listing.currentBid.toLocaleString()}`
-              : 'No bids'
-            : listing.price
-            ? `$${listing.price.toLocaleString()}`
-            : 'Contact'}
-        </span>
-      </div>
-      {listing.endsAt && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Calendar className="h-3 w-3" />
-          <span>{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
-        </div>
-      )}
-    </div>
-
-    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-      <div className="flex items-center gap-1">
-        <MapPin className="h-3 w-3" />
-        <span>{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <Eye className="h-3 w-3" />
-        <span>{listing.metrics.views} views</span>
-      </div>
-      {listing.type === 'auction' && (
-        <>
-          <div className="flex items-center gap-1">
-            <Users className="h-3 w-3" />
-            <span>{listing.metrics.favorites} watchers</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Gavel className="h-3 w-3" />
-            <span>{listing.metrics.bidCount} bids</span>
-          </div>
-        </>
-      )}
+    <div className="mt-3 pt-3 flex gap-2">
+      <Button variant="default" size="sm" asChild className="min-h-8 flex-1">
+        <Link href={`/listing/${listing.id}`}>View listing</Link>
+      </Button>
+      <Button variant="outline" size="sm" asChild className="min-h-8 flex-1 border-primary text-primary hover:bg-primary/10 hover:text-primary">
+        <Link href={`/seller/listings/${listing.id}/edit`}>Edit listing</Link>
+      </Button>
     </div>
   </div>
 ));
@@ -451,6 +448,46 @@ function SellerListingsPageContent() {
     );
     return Array.from(locations);
   }, [listings]);
+
+  const nowMs = Date.now();
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: listings.length };
+    listings.forEach((l) => {
+      const s = getEffectiveListingStatus(l, nowMs);
+      counts[s] = (counts[s] ?? 0) + 1;
+    });
+    return counts;
+  }, [listings]);
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: listings.length };
+    listings.forEach((l) => {
+      const t = l.type || 'fixed';
+      counts[t] = (counts[t] ?? 0) + 1;
+    });
+    return counts;
+  }, [listings]);
+
+  const statusChipDefs: { key: ListingStatus | 'all'; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'draft', label: 'Draft' },
+    { key: 'active', label: 'Active' },
+    { key: 'sold', label: 'Sold' },
+    { key: 'expired', label: 'Ended' },
+    { key: 'removed', label: 'Removed' },
+  ];
+  const typeChipDefs: { key: ListingType | 'all'; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'auction', label: 'Auction' },
+    { key: 'fixed', label: 'Fixed' },
+    { key: 'classified', label: 'Classified' },
+  ];
+  const hasActiveFilters = searchQuery.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all' || locationFilter !== 'all';
+  const clearFilters = useCallback(() => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setLocationFilter('all');
+  }, []);
 
   // Refresh listings after actions
   const refreshListings = useCallback(async () => {
@@ -641,88 +678,144 @@ function SellerListingsPageContent() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
+      <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8">
+        {/* Header — compact on mobile */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-0.5 sm:mb-2">
               Listings
             </h1>
-            <p className="text-base md:text-lg text-muted-foreground">
-              Manage your listings and track performance
+            <p className="text-xs sm:text-base md:text-lg text-muted-foreground">
+              Manage listings and track performance
             </p>
           </div>
-          <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2">
+          <CreateListingGateButton href="/dashboard/listings/new" className="min-h-[44px] font-semibold gap-2 shrink-0">
             <PlusCircle className="h-4 w-4" />
             Create Listing
           </CreateListingGateButton>
         </div>
 
-        {/* Filters */}
-        <Card className="border-2 border-border/50 bg-card">
-          <CardContent className="pt-6 pb-6 px-4 md:px-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Search */}
-              <div className="relative flex-1">
+        {/* Search + filters (My Purchases / Bids & Offers style) */}
+        <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
+          <CardContent className="p-4 space-y-4">
+            {/* Search: full width on mobile, constrained on desktop */}
+            <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+              <div className="relative w-full md:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search listings..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 h-11 bg-background"
+                  placeholder="Search listings by title…"
+                  className="pl-9"
                 />
               </div>
-
-              {/* Status Filter */}
-              <Select value={statusFilter} onValueChange={handleStatusChange}>
-                <SelectTrigger className="w-full md:w-[180px] h-11 bg-background">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="sold">Sold</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                  <SelectItem value="removed">Removed</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Type Filter */}
-              <Select value={typeFilter} onValueChange={handleTypeChange}>
-                <SelectTrigger className="w-full md:w-[180px] h-11 bg-background">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="auction">Auction</SelectItem>
-                  <SelectItem value="fixed">Fixed Price</SelectItem>
-                  <SelectItem value="classified">Classified</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Location Filter */}
-              <Select value={locationFilter} onValueChange={handleLocationChange}>
-                <SelectTrigger className="w-full md:w-[180px] h-11 bg-background">
-                  <SelectValue placeholder="Location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {uniqueLocations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Desktop: Location select only in top row */}
+              <div className="hidden md:flex items-center gap-2 flex-wrap justify-end">
+                <Select value={locationFilter} onValueChange={handleLocationChange}>
+                  <SelectTrigger className="min-w-[180px]">
+                    <SelectValue placeholder="Location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All locations</SelectItem>
+                    {uniqueLocations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {/* Status + Type chips (mobile: scroll; desktop: wrap) */}
+            <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 we-scrollbar-hover">
+              <div className="flex items-center gap-2 flex-nowrap md:flex-wrap min-w-0">
+                {statusChipDefs.map((d) => {
+                  const active = statusFilter === d.key;
+                  const count = statusCounts[d.key] ?? 0;
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => setStatusFilter(d.key)}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
+                        active
+                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                      )}
+                    >
+                      <span>{d.label}</span>
+                      <span className={cn('text-xs rounded-full px-2 py-0.5', active ? 'bg-primary/15' : 'bg-muted')}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+                {typeChipDefs.map((d) => {
+                  const active = typeFilter === d.key;
+                  const count = typeCounts[d.key] ?? 0;
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => setTypeFilter(d.key)}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition flex-shrink-0 whitespace-nowrap',
+                        active
+                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          : 'border-border/60 bg-background/40 text-foreground hover:bg-muted/40'
+                      )}
+                    >
+                      <span>{d.label}</span>
+                      <span className={cn('text-xs rounded-full px-2 py-0.5', active ? 'bg-primary/15' : 'bg-muted')}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+                <Select value={locationFilter} onValueChange={handleLocationChange}>
+                  <SelectTrigger className="h-8 rounded-full min-w-0 w-auto px-3 text-xs font-semibold border-border/60 bg-background/40 flex-shrink-0 md:hidden [&>span]:max-w-[100px] [&>span]:truncate">
+                    <SelectValue placeholder="Location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All locations</SelectItem>
+                    {uniqueLocations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full h-8 px-3 text-xs font-semibold flex-shrink-0"
+                    onClick={clearFilters}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Desktop: Clear filters link */}
+            {hasActiveFilters && (
+              <div className="hidden md:block text-right">
+                <Button type="button" variant="ghost" size="sm" className="font-semibold" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Loading State */}
         {loading && (
-          <Card className="border-2 border-border/50 bg-card">
+          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
             <CardContent className="pt-12 pb-12 px-6 text-center">
               <div className="inline-block h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
               <p className="text-muted-foreground">Loading listings...</p>
@@ -732,7 +825,7 @@ function SellerListingsPageContent() {
 
         {/* Error State */}
         {error && !loading && (
-          <Card className="border-2 border-border/50 bg-card">
+          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
             <CardContent className="pt-12 pb-12 px-6 text-center">
               <p className="text-destructive mb-4">{error}</p>
               <Button onClick={() => window.location.reload()}>Retry</Button>
@@ -742,7 +835,7 @@ function SellerListingsPageContent() {
 
         {/* Listings Table/Grid */}
         {!loading && !error && filteredListings.length === 0 && (
-          <Card className="border-2 border-border/50 bg-card">
+          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
             <CardContent className="pt-12 pb-12 px-6 text-center">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No listings found</h3>
@@ -760,7 +853,7 @@ function SellerListingsPageContent() {
         )}
 
         {!loading && !error && filteredListings.length > 0 && (
-          <Card className="border-2 border-border/50 bg-card">
+          <Card className="rounded-xl border-0 bg-transparent md:border md:border-border/60 md:bg-muted/30 md:dark:bg-muted/20">
             <CardContent className="p-0">
               {/* Desktop Table */}
               <div className="hidden md:block overflow-hidden">
@@ -818,7 +911,7 @@ function SellerListingsPageContent() {
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-border/30">
+              <div className="md:hidden p-2 sm:p-0 space-y-3">
                 {filteredListings.map((listing) => (
                   <MobileListingCard 
                     key={listing.id} 
