@@ -41,13 +41,13 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
   const nav = (
     <nav
       className={cn(
-        'fixed left-0 right-0 z-[60] md:hidden flex justify-center px-2 pt-2',
+        'fixed left-0 right-0 z-[60] md:hidden flex justify-center px-1 pt-2',
         'bottom-2 pb-safe', // a little lower; pb-safe for home indicator
       )}
     >
       <div
         className={cn(
-          'w-full max-w-[calc(100%-0.5rem)] h-16 rounded-full',
+          'w-full max-w-[calc(100%-0.25rem)] h-16 rounded-full',
           'border border-border/60 bg-background/95 backdrop-blur-md',
           'dark:bg-card dark:border-white/10',
           'shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1),0_4px_12px_rgba(0,0,0,0.08)] dark:shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.4),0_4px_16px_rgba(0,0,0,0.25)]',
@@ -65,25 +65,25 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
               href={item.href}
               prefetch={true}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-1.5 transition-colors',
+                'relative flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-muted/50 active:bg-muted',
                 'min-h-[52px] min-w-[44px] touch-manipulation',
-                active && 'text-primary'
+                active ? 'text-primary' : 'text-white'
               )}
             >
               {/* Sliding bubble pill – animates smoothly between tabs (eBay-style) */}
               {active && (
                 <motion.div
                   layoutId="bottom-nav-bubble"
-                  className="absolute inset-y-0 left-1 right-1 rounded-full bg-primary/15 dark:bg-primary/20 pointer-events-none"
+                  className="absolute inset-y-0 left-[2px] right-[2px] rounded-full bg-primary/15 dark:bg-primary/20 pointer-events-none"
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                 />
               )}
               <div className="relative z-10">
                 <Icon
                   className={cn(
-                    'h-6 w-6',
-                    active ? 'text-primary' : 'text-muted-foreground'
+                    'h-5 w-5',
+                    active ? 'text-primary' : 'text-white'
                   )}
                 />
                 {item.badge != null && item.badge > 0 && (
@@ -97,8 +97,8 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
               </div>
               <span
                 className={cn(
-                  'relative z-10 text-xs font-medium',
-                  active ? 'text-primary' : 'text-muted-foreground'
+                  'relative z-10 text-[10px] font-medium',
+                  active ? 'text-primary' : 'text-white'
                 )}
               >
                 {displayLabel}
