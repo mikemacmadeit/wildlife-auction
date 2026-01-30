@@ -364,6 +364,13 @@ export default function OrdersPage() {
     };
   }, [router, searchParams]);
 
+  // Start at top when opening Purchases (mobile: dashboard main is the scroll container)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const main = document.querySelector('main');
+    if (main) main.scrollTo({ top: 0, left: 0 });
+  }, []);
+
   // Fetch orders when user is loaded
   useEffect(() => {
     if (!authLoading) {

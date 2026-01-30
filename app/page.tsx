@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Spinner } from '@/components/ui/spinner';
+import { ListingRailSkeleton } from '@/components/skeletons/SkeletonCard';
 import { User } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
 // Removed useFavorites import - homepage doesn't need it
@@ -1064,7 +1065,13 @@ export default function HomePage() {
                   href="/browse"
                   actionLabel="Browse all"
                 />
-                <ListingRail listings={signedInDiscoveryListings} emptyText="Browse listings to get started." />
+                {loading ? (
+                  <ListingRailSkeleton count={6} className="animate-in fade-in-0 duration-200" />
+                ) : (
+                  <div className="animate-in fade-in-0 duration-300">
+                    <ListingRail listings={signedInDiscoveryListings} emptyText="Browse listings to get started." />
+                  </div>
+                )}
               </div>
 
             {showRecentlyViewed ? (
@@ -1615,13 +1622,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Loading State */}
+          {/* Loading: skeleton rail (eBay-style, no flash) */}
           {loading && (
-            <div className="py-12 flex flex-col items-center justify-center gap-3 animate-in fade-in-0 duration-150">
-              <Spinner size="xl" className="text-primary" />
-              <p className="text-sm font-semibold text-foreground">Loading listings…</p>
-              <p className="text-xs text-muted-foreground">Getting things ready.</p>
-            </div>
+            <ListingRailSkeleton count={6} className="animate-in fade-in-0 duration-200" />
           )}
 
           {/* Error State */}
@@ -1632,12 +1635,14 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Listings Grid/List */}
+          {/* Listings: fade in when ready (smooth transition from skeleton) */}
           {!loading && !error && (
             recentListings.length > 0 ? (
-              <ListingRail listings={recentListings} emptyText="No listings available yet." />
+              <div className="animate-in fade-in-0 duration-300">
+                <ListingRail listings={recentListings} emptyText="No listings available yet." />
+              </div>
             ) : (
-              <div className="text-center py-12">
+              <div className="text-center py-12 animate-in fade-in-0 duration-300">
                 <p className="text-muted-foreground">No listings available yet.</p>
               </div>
             )

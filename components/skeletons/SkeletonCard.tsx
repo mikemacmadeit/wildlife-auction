@@ -35,3 +35,40 @@ export function SkeletonListingGrid({ count = 6, className }: { count?: number; 
     </div>
   );
 }
+
+/** Single skeleton card sized to match ListingCard in the homepage rail (same dimensions). */
+function ListingRailSkeletonCard({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl border-2 border-border/50 bg-card overflow-hidden flex flex-col',
+        'w-[200px] h-[300px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]',
+        className
+      )}
+    >
+      <Skeleton className="w-full flex-1 min-h-0 rounded-none" />
+      <div className="p-3 space-y-2 flex-shrink-0 border-t border-border/40">
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-3/4 rounded" />
+        <Skeleton className="h-5 w-20 rounded" />
+      </div>
+    </div>
+  );
+}
+
+/** Horizontal skeleton rail matching ListingRail layout (eBay-style loading). */
+export function ListingRailSkeleton({ count = 6, className }: { count?: number; className?: string }) {
+  return (
+    <div className={cn('group/rail relative [--rail-card-w:200px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]', className)}>
+      <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 we-scrollbar-hover snap-x snap-proximity md:px-12">
+        <div className="flex gap-4 min-w-max">
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="snap-start flex-shrink-0 overflow-hidden w-[200px] h-[300px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]">
+              <ListingRailSkeletonCard />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
