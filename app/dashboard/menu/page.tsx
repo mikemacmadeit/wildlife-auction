@@ -60,13 +60,13 @@ const ACCOUNT: NavItem[] = [
 
 const ADMIN: NavItem[] = [
   { href: '/dashboard/admin/users', label: 'Users', subtext: 'Manage user accounts and roles.', icon: Users },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', subtext: 'Review and approve new listings.', icon: CheckCircle },
+  { href: '/dashboard/admin/messages', label: 'Flagged Messages', subtext: 'Review reported conversations.', icon: MessageSquare },
   { href: '/dashboard/admin/health', label: 'System Health', subtext: 'Platform status and diagnostics.', icon: HeartPulse },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', subtext: 'Fulfillment, disputes, and operations.', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', subtext: 'Listings, orders, and breeder permits.', icon: Shield },
   { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', subtext: 'Transaction and payout reconciliation.', icon: Search },
   { href: '/dashboard/admin/revenue', label: 'Revenue', subtext: 'Fees, revenue, and financial reports.', icon: DollarSign },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', subtext: 'Review and approve new listings.', icon: CheckCircle },
-  { href: '/dashboard/admin/messages', label: 'Flagged Messages', subtext: 'Review reported conversations.', icon: MessageSquare },
   { href: '/dashboard/admin/support', label: 'Support', subtext: 'Support tickets and responses.', icon: HelpCircle },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', subtext: 'Manage notification email content.', icon: Mail },
   { href: '/dashboard/admin/notifications', label: 'Notifications', subtext: 'Events and notification delivery.', icon: Bell },

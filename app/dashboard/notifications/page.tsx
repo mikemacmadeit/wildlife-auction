@@ -12,6 +12,7 @@ import { collection, doc, onSnapshot, orderBy, query, limit, updateDoc, serverTi
 import { db } from '@/lib/firebase/config';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -447,12 +448,7 @@ export default function NotificationsPage() {
   if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <div className="flex items-center justify-center min-h-[360px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <div className="text-sm text-muted-foreground">Loading notifications…</div>
-          </div>
-        </div>
+        <PageLoader title="Loading notifications…" subtitle="Getting your alerts ready." className="min-h-[360px]" />
       </div>
     );
   }

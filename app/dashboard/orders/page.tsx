@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter, PartyPopper } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -717,12 +718,7 @@ export default function OrdersPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-          <p className="text-muted-foreground">Loading orders...</p>
-        </div>
-      </div>
+      <PageLoader title="Loading orders…" subtitle="Getting your orders ready." minHeight="screen" />
     );
   }
 
@@ -1331,10 +1327,14 @@ export default function OrdersPage() {
                         txStatus === 'DELIVERED_PENDING_CONFIRMATION' && 
                         nextAction.ctaLabel.toLowerCase().includes('confirm');
                       
+                      const isOutline = nextAction.severity !== 'danger' && nextAction.severity !== 'warning';
                       return (
                         <Button
                           size="sm"
-                          className="font-semibold w-full sm:w-auto"
+                          className={cn(
+                            'font-semibold w-full sm:w-auto',
+                            isOutline && 'border-primary text-primary hover:bg-primary/10 hover:text-primary'
+                          )}
                           variant={nextAction.severity === 'danger' ? 'destructive' : nextAction.severity === 'warning' ? 'default' : 'outline'}
                           disabled={processingOrderId === order.id || (nextAction.ctaLabel.toLowerCase().includes('confirm') && !canAct)}
                           onClick={async (e) => {

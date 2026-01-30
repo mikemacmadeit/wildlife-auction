@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
+import { MOTION } from '@/lib/motion';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +28,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
   function ListingCardComponent({ listing, className }, ref) {
   const router = useRouter();
   const { user } = useAuth();
+  const reducedMotion = useReducedMotion();
   // CRITICAL: Don't call useFavorites() here - it subscribes to state and causes re-renders
   // Access the ref directly from the module-level export to avoid subscribing to state
   const favoriteIdsRef = (globalThis as any).__favoritesRef as React.MutableRefObject<Set<string>> | undefined;
@@ -177,10 +179,10 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 20 }}
+      initial={reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      whileHover={{ y: -4 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: MOTION.durationNormal, ease: MOTION.easeOut }}
+      whileHover={reducedMotion ? undefined : { y: -4 }}
       // Mobile: allow vertical scrolling even when the gesture starts on the card/image.
       className={cn('group touch-manipulation md:touch-auto', className)}
     >
@@ -384,7 +386,14 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                 {/* Price Section */}
                 <div className="flex-shrink-0 min-w-0 overflow-hidden sm:max-w-[65%]">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent truncate">
+                    <span
+                      className={cn(
+                        'text-lg sm:text-xl font-bold truncate',
+                        isCurrentHighBidder
+                          ? 'text-primary dark:text-primary'
+                          : 'text-foreground dark:text-white'
+                      )}
+                    >
                       {priceDisplay}
                     </span>
                     {isCurrentHighBidder && (

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, MessageSquare, Heart, Loader2 } from 'lucide-react';
+import { Search, Shield, TrendingUp, Users, ArrowRight, Gavel, Zap, FileCheck, BookOpen, ChevronLeft, ChevronRight, Star, Store, MessageCircle, MessageSquare, Heart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -19,6 +19,8 @@ import { db } from '@/lib/firebase/config';
 import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
+import { PageLoader } from '@/components/ui/page-loader';
+import { Spinner } from '@/components/ui/spinner';
 import { User } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
 // Removed useFavorites import - homepage doesn't need it
@@ -94,6 +96,11 @@ export default function HomePage() {
   // The homepage itself doesn't need to know about favoriteIds - it just displays listings.
   
   const router = useRouter();
+  // Prefetch /browse after mount to improve first navigation perceived speed (Phase 2A)
+  useEffect(() => {
+    const t = setTimeout(() => router.prefetch('/browse'), 1200);
+    return () => clearTimeout(t);
+  }, [router]);
   // Use global toast function instead of useToast() hook to prevent re-renders when toast state changes
   const toast = globalToast;
   // Uncontrolled search input: ref avoids re-renders on every keystroke so listings don't glitch
@@ -896,12 +903,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       {/* Wait for auth to initialize on initial load */}
       {!initialized && authLoading && !lastUserRef.current ? (
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
-        </div>
+        <PageLoader title="Loading…" subtitle="Getting things ready." className="min-h-[50vh]" />
       ) : effectiveUser ? (
         <>
           {/* Signed-in: Search bar */}
@@ -1031,25 +1033,25 @@ export default function HomePage() {
                   </div>
                   <p className="text-sm md:text-base text-muted-foreground mt-1">Pick up where you left off.</p>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/browse" className="flex items-center gap-2">
-                      <Search className="h-4 w-4" />
-                      Browse
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/dashboard/watchlist" className="flex items-center gap-2">
-                      <Heart className="h-4 w-4" />
-                      Watchlist
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link href="/dashboard/messages" className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Messages
-                    </Link>
-                  </Button>
+                <div className="flex flex-nowrap gap-2 sm:gap-3">
+                    <Button asChild variant="default" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold shadow-md hover:shadow-lg">
+                      <Link href="/browse" className="flex items-center justify-center gap-1.5 sm:gap-2">
+                        <Search className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                        <span className="truncate">Browse</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="secondary" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold border-2 border-border/80 hover:border-primary/40 hover:bg-primary/5">
+                      <Link href="/dashboard/watchlist" className="flex items-center justify-center gap-1.5 sm:gap-2">
+                        <Heart className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                        <span className="truncate">Watchlist</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="secondary" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold border-2 border-border/80 hover:border-primary/40 hover:bg-primary/5">
+                      <Link href="/dashboard/messages" className="flex items-center justify-center gap-1.5 sm:gap-2">
+                        <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                        <span className="truncate">Messages</span>
+                      </Link>
+                    </Button>
                 </div>
               </div>
             </div>
@@ -1615,9 +1617,10 @@ export default function HomePage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="text-center py-12">
-              <div className="inline-block h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-muted-foreground">Loading listings...</p>
+            <div className="py-12 flex flex-col items-center justify-center gap-3 animate-in fade-in-0 duration-150">
+              <Spinner size="xl" className="text-primary" />
+              <p className="text-sm font-semibold text-foreground">Loading listings…</p>
+              <p className="text-xs text-muted-foreground">Getting things ready.</p>
             </div>
           )}
 

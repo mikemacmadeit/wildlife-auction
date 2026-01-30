@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { PageLoader } from '@/components/ui/page-loader';
 import {
   Heart,
   Loader2,
@@ -392,12 +393,7 @@ export default function WatchlistPage() {
   if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading your watchlist...</p>
-          </div>
-        </div>
+        <PageLoader title="Loading your watchlist…" subtitle="Getting your saved listings ready." className="min-h-[400px]" />
       </div>
     );
   }

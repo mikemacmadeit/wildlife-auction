@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useAdmin } from '@/hooks/use-admin';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -232,9 +233,7 @@ export default function AdminKnowledgeBasePage() {
 
   if (adminLoading) {
     return (
-      <div className="min-h-[300px] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <PageLoader title="Loading knowledge base…" subtitle="Getting things ready." className="min-h-[300px]" />
     );
   }
 

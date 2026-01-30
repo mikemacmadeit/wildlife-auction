@@ -94,7 +94,7 @@ export function Footer() {
   };
 
   return (
-    <footer className="relative border-t border-border/50 bg-[hsl(37_27%_98%)] dark:bg-[hsl(75_8%_10%)] text-[hsl(37_27%_15%)] dark:text-[hsl(37_27%_85%)]">
+    <footer className="relative border-t border-border/50 bg-muted/50 dark:bg-[hsl(75_8%_10%)] text-[hsl(37_27%_15%)] dark:text-[hsl(37_27%_85%)]">
       {/* Subtle texture / glow */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 opacity-[0.15] dark:opacity-[0.35] [background:radial-gradient(80%_60%_at_20%_0%,hsl(90_12%_45%/.15)_0%,transparent_60%),radial-gradient(70%_60%_at_80%_10%,hsl(37_27%_50%/.08)_0%,transparent_55%)] dark:[background:radial-gradient(80%_60%_at_20%_0%,hsl(90_12%_28%/.35)_0%,transparent_60%),radial-gradient(70%_60%_at_80%_10%,hsl(37_27%_70%/.18)_0%,transparent_55%)]" />

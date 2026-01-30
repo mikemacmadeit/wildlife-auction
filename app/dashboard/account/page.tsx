@@ -40,6 +40,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageLoader } from '@/components/ui/page-loader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { getPublicSellerTrust, getUserProfile, updateUserProfile } from '@/lib/firebase/users';
@@ -542,12 +543,7 @@ export default function AccountPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-4 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-          <p className="text-muted-foreground">Loading profile...</p>
-        </div>
-      </div>
+      <PageLoader title="Loading profile…" subtitle="Getting your account ready." minHeight="screen" className="pb-bottom-nav-safe md:pb-4" />
     );
   }
 

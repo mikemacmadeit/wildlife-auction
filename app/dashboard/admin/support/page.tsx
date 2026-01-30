@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { useAdmin } from '@/hooks/use-admin';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -312,9 +313,7 @@ export default function AdminSupportPage() {
 
   if (adminLoading) {
     return (
-      <div className="min-h-[300px] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <PageLoader title="Loading support…" subtitle="Getting help resources ready." className="min-h-[300px]" />
     );
   }
 

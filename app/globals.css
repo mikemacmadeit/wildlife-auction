@@ -200,6 +200,13 @@
     --ring: 90 12% 45%;                  /* SAGE (focus ring) */
     
     --radius: 0.5rem;
+
+    /* Motion tokens - single source of truth for animation timing */
+    --motion-duration-fast: 150ms;
+    --motion-duration-normal: 250ms;
+    --motion-duration-slow: 350ms;
+    --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
     
     /* Chart colors */
     --chart-1: 90 12% 45%;               /* Sage */
@@ -267,6 +274,24 @@
     --message-sent: 80 15% 70%;          /* Olive (use with opacity) */
     --message-sent-border: 80 18% 55%;
     --message-input: 75 8% 18%;         /* Card-alike input bar */
+  }
+}
+
+/* Phase 2A: Reduced motion — shorten our motion tokens when user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0.01ms;
+    --motion-duration-normal: 0.01ms;
+    --motion-duration-slow: 0.01ms;
+  }
+  /* Shorten Tailwind animation/transition utilities used by dialogs, accordions, etc. */
+  [class*="animate-"],
+  [class*="duration-"] {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto !important;
   }
 }
 

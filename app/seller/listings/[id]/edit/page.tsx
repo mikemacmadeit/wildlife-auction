@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, ArrowLeft, Save, Loader2, AlertCircle, Send } from 'lucide-react';
 import {
@@ -287,12 +288,7 @@ function EditListingPageContent() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-          <p className="text-muted-foreground">Loading listing...</p>
-        </div>
-      </div>
+      <PageLoader title="Loading listing…" subtitle="Getting the form ready." minHeight="screen" />
     );
   }
 
@@ -338,12 +334,6 @@ function EditListingPageContent() {
             </RadioGroup>
           </div>
 
-          <Alert className="bg-blue-50 border-blue-200">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <strong>Texas-Only:</strong> All animal transactions (whitetail breeder, exotics, cattle, horses, dogs) are restricted to Texas residents only. Equipment/asset listings can be multi-state.
-            </AlertDescription>
-          </Alert>
           <div className="space-y-3">
             <Label className="text-base font-semibold">Category</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

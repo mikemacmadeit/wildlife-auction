@@ -19,6 +19,7 @@ import { MessageThread, Listing } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -576,9 +577,7 @@ export default function MessagesPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
+      <PageLoader title="Loading messages…" subtitle="Getting your conversations ready." minHeight="screen" />
     );
   }
 

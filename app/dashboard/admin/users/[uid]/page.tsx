@@ -33,6 +33,28 @@ function statusBadge(status: string | null | undefined, authDisabled?: boolean) 
   return <Badge variant="outline">Active</Badge>;
 }
 
+function auditActionLabel(actionType: string): string {
+  const map: Record<string, string> = {
+    admin_user_suspended: 'User suspended',
+    admin_user_unsuspended: 'User unsuspended',
+    admin_user_banned: 'User banned',
+    admin_user_unbanned: 'User unbanned',
+    admin_user_disabled: 'Account disabled',
+    admin_user_enabled: 'Account enabled',
+    admin_user_force_logout: 'Force logout',
+    admin_user_messaging_muted: 'Messaging muted',
+    admin_user_messaging_unmuted: 'Messaging unmuted',
+    admin_user_selling_disabled: 'Selling disabled',
+    admin_user_selling_enabled: 'Selling enabled',
+    admin_user_risk_updated: 'Risk label updated',
+    admin_user_note_added: 'Note added',
+    admin_user_role_changed: 'Role changed',
+    admin_user_password_reset_link_created: 'Password reset link created',
+    admin_plan_override: 'Seller tier override',
+  };
+  return map[actionType] || actionType.replace(/_/g, ' ');
+}
+
 export default function AdminUserDossierPage() {
   const router = useRouter();
   const params = useParams<{ uid: string }>();
@@ -124,6 +146,29 @@ export default function AdminUserDossierPage() {
   const adminOverrideAt =
     typeof adminOverrideAtRaw?.toDate === 'function' ? adminOverrideAtRaw.toDate() : adminOverrideAtRaw instanceof Date ? adminOverrideAtRaw : null;
 
+  // Parse Firestore/JSON timestamps for status details (suspended/banned/disabled)
+  const toDateSafe = (v: any): Date | null => {
+    if (!v) return null;
+    if (typeof v?.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v === 'string') {
+      const d = new Date(v);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    const sec = v?.seconds ?? v?._seconds;
+    if (typeof sec === 'number') return new Date(sec * 1000);
+    return null;
+  };
+
+  const userDoc = data?.userDoc;
+  const suspendedAt = toDateSafe(userDoc?.suspendedAt);
+  const suspendedUntil = toDateSafe(userDoc?.suspendedUntil);
+  const bannedAt = toDateSafe(userDoc?.bannedAt);
+  const suspendedBy = (userDoc?.suspendedBy as string) || null;
+  const suspendedReason = (userDoc?.suspendedReason as string) || null;
+  const bannedBy = (userDoc?.bannedBy as string) || null;
+  const bannedReason = (userDoc?.bannedReason as string) || null;
+
   const openConfirm = (params: { title: string; description: string; action: () => Promise<void> }) => {
     setConfirmTitle(params.title);
     setConfirmDescription(params.description);
@@ -171,12 +216,12 @@ export default function AdminUserDossierPage() {
   if (adminLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
-        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
-          <Card className="border-2 border-border/50 bg-card">
-            <CardContent className="pt-6">
+        <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 max-w-7xl">
+          <Card className="rounded-xl border border-border/60 bg-card">
+            <CardContent className="pt-6 px-4 sm:px-6">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <div className="font-semibold">Loading...</div>
+                <div className="font-semibold text-sm md:text-base">Loading...</div>
               </div>
             </CardContent>
           </Card>
@@ -189,11 +234,11 @@ export default function AdminUserDossierPage() {
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-6">
-        <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
-          <Card className="border-2 border-border/50 bg-card">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-destructive">
-                <ShieldAlert className="h-4 w-4" />
+        <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 max-w-7xl">
+          <Card className="rounded-xl border border-border/60 bg-card">
+            <CardContent className="pt-6 px-4 sm:px-6">
+              <div className="flex items-center gap-2 text-destructive text-sm md:text-base">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
                 <div className="font-semibold">Admin access required.</div>
               </div>
             </CardContent>
@@ -205,20 +250,20 @@ export default function AdminUserDossierPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-2">
-            <Button variant="outline" onClick={() => router.push('/dashboard/admin/users')} className="min-h-[40px]">
+      <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 max-w-7xl space-y-4 md:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 flex-wrap">
+          <div className="space-y-2 min-w-0">
+            <Button variant="outline" size="sm" className="w-fit h-9 md:min-h-[40px] md:h-10" onClick={() => router.push('/dashboard/admin/users')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
             <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-foreground">User dossier</h1>
-              <div className="text-sm text-muted-foreground">UID: {uid}</div>
+              <h1 className="text-xl md:text-3xl font-extrabold text-foreground truncate">User dossier</h1>
+              <div className="text-xs md:text-sm text-muted-foreground font-mono truncate">UID: {uid}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={load} disabled={loading}>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="h-9 md:h-10" onClick={load} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Refresh
             </Button>
@@ -226,21 +271,21 @@ export default function AdminUserDossierPage() {
         </div>
 
         {error ? (
-          <Card className="border-2 border-destructive/30 bg-destructive/5">
-            <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
+          <Card className="rounded-xl border border-destructive/30 bg-destructive/5">
+            <CardContent className="pt-4 pb-4 px-3 sm:px-6 text-sm text-destructive">{error}</CardContent>
           </Card>
         ) : null}
 
         {loading ? (
-          <Card className="border-2">
-            <CardContent className="py-10 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          <Card className="rounded-xl border border-border/60">
+            <CardContent className="py-8 md:py-10 flex items-center justify-center text-muted-foreground text-sm md:text-base px-3 sm:px-6">
+              <Loader2 className="h-5 w-5 animate-spin mr-2 shrink-0" />
               Loading…
             </CardContent>
           </Card>
         ) : data ? (
           <>
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
             {/* AI Summary - shown at top for quick context */}
             {uid && (
               <AIAdminSummary
@@ -260,17 +305,17 @@ export default function AdminUserDossierPage() {
               />
             )}
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="text-xl font-extrabold">{displayName}</CardTitle>
-                  <CardDescription>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+              <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-lg md:text-xl font-extrabold break-words">{displayName}</CardTitle>
+                  <CardDescription className="text-xs md:text-sm break-all">
                     {email || '—'} {phone ? ` • ${phone}` : ''}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap gap-2 items-center">
+                <CardContent className="space-y-4 px-3 sm:px-6 pb-4 md:pb-6">
+                  <div className="flex flex-wrap gap-1.5 md:gap-2 items-center">
                     {statusBadge(status, authDisabled)}
                     {role ? <Badge variant="secondary">{role}</Badge> : <Badge variant="outline">role unknown</Badge>}
                     {data.authUser?.emailVerified ? (
@@ -283,34 +328,59 @@ export default function AdminUserDossierPage() {
                     {risk?.label ? <Badge variant={risk.label === 'high' ? 'destructive' : risk.label === 'med' ? 'secondary' : 'outline'}>Risk: {risk.label}</Badge> : null}
                   </div>
 
+                  {/* Status details: who/when/why for suspend, ban, or disable */}
+                  {(status === 'suspended' || status === 'banned' || authDisabled) && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-3 text-sm">
+                      <div className="font-semibold text-foreground mb-1">Status details</div>
+                      {status === 'suspended' && (
+                        <>
+                          {suspendedBy && <div className="text-muted-foreground">Suspended by: <span className="font-mono text-foreground">{suspendedBy}</span></div>}
+                          {suspendedAt && <div className="text-muted-foreground">At: {suspendedAt.toLocaleString()}</div>}
+                          {suspendedUntil && <div className="text-muted-foreground">Until: {suspendedUntil.toLocaleString()}</div>}
+                          {suspendedReason && <div className="mt-1 text-foreground">Reason: {suspendedReason}</div>}
+                        </>
+                      )}
+                      {status === 'banned' && (
+                        <>
+                          {bannedBy && <div className="text-muted-foreground">Banned by: <span className="font-mono text-foreground">{bannedBy}</span></div>}
+                          {bannedAt && <div className="text-muted-foreground">At: {bannedAt.toLocaleString()}</div>}
+                          {bannedReason && <div className="mt-1 text-foreground">Reason: {bannedReason}</div>}
+                        </>
+                      )}
+                      {authDisabled && status !== 'suspended' && status !== 'banned' && (
+                        <div className="text-muted-foreground">Account is disabled (no sign-in). Check audit trail for who/when/why.</div>
+                      )}
+                    </div>
+                  )}
+
                   <Separator />
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                    <div className="rounded-lg border bg-muted/20 p-3">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Listings</div>
-                      <div className="text-lg font-extrabold">{Number(counts.listingsCount || 0).toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Active: {Number(counts.activeListingsCount || 0).toLocaleString()}</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 text-sm">
+                    <div className="rounded-lg border bg-muted/20 p-2.5 md:p-3">
+                      <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">Listings</div>
+                      <div className="text-base md:text-lg font-extrabold">{Number(counts.listingsCount || 0).toLocaleString()}</div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground">Active: {Number(counts.activeListingsCount || 0).toLocaleString()}</div>
                     </div>
-                    <div className="rounded-lg border bg-muted/20 p-3">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sold</div>
-                      <div className="text-lg font-extrabold">{Number(counts.soldListingsCount || 0).toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">GMV sell: ${(Number(counts.gmvSellCents || 0) / 100).toLocaleString()}</div>
+                    <div className="rounded-lg border bg-muted/20 p-2.5 md:p-3">
+                      <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sold</div>
+                      <div className="text-base md:text-lg font-extrabold">{Number(counts.soldListingsCount || 0).toLocaleString()}</div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground">GMV: ${(Number(counts.gmvSellCents || 0) / 100).toLocaleString()}</div>
                     </div>
-                    <div className="rounded-lg border bg-muted/20 p-3">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Orders</div>
-                      <div className="text-lg font-extrabold">{Number(counts.ordersBuyCount || 0).toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">GMV buy: ${(Number(counts.gmvBuyCents || 0) / 100).toLocaleString()}</div>
+                    <div className="rounded-lg border bg-muted/20 p-2.5 md:p-3">
+                      <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">Orders</div>
+                      <div className="text-base md:text-lg font-extrabold">{Number(counts.ordersBuyCount || 0).toLocaleString()}</div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground">GMV: ${(Number(counts.gmvBuyCents || 0) / 100).toLocaleString()}</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle>Internal notes</CardTitle>
-                  <CardDescription>Only visible to admins. Timestamped and audited.</CardDescription>
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Internal notes</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Only visible to admins. Timestamped and audited.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                   <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add an internal note…" rows={3} />
                   <div className="flex gap-2">
                     <Button
@@ -352,22 +422,25 @@ export default function AdminUserDossierPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle>Audit trail</CardTitle>
-                  <CardDescription>Admin actions on this user (requires Firestore index if empty).</CardDescription>
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Audit trail</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Chronological list of admin actions on this user (who, when, reason).</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 sm:px-6 pb-4 md:pb-6">
                   {(data.audits || []).length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No audit entries found.</div>
+                    <div className="text-sm text-muted-foreground">No audit entries found. Ensure the Firestore index for auditLogs (targetUserId + createdAt) is deployed.</div>
                   ) : (
                     data.audits.map((a) => (
                       <div key={a.auditId} className="rounded-lg border bg-muted/20 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="font-semibold text-sm">{a.actionType}</div>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="font-semibold text-sm">{auditActionLabel(a.actionType)}</div>
                           <div className="text-xs text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleString() : '—'}</div>
                         </div>
-                        <div className="text-xs text-muted-foreground">Actor: {a.actorUid} ({a.actorRole})</div>
+                        <div className="text-xs text-muted-foreground mt-1">By: {a.actorUid} ({a.actorRole})</div>
+                        {(a.metadata as { reason?: string })?.reason && (
+                          <div className="text-xs text-foreground mt-1.5 border-l-2 border-muted-foreground/30 pl-2">Reason: {(a.metadata as { reason: string }).reason}</div>
+                        )}
                       </div>
                     ))
                   )}
@@ -375,13 +448,13 @@ export default function AdminUserDossierPage() {
               </Card>
             </div>
 
-            <div className="lg:col-span-1 space-y-6">
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle>Seller tier</CardTitle>
-                  <CardDescription>Admin override for exposure tier. Requires a reason and is audited.</CardDescription>
+            <div className="lg:col-span-1 space-y-4 md:space-y-6">
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Seller tier</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Admin override for exposure tier. Requires a reason and is audited.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm text-muted-foreground">Effective tier</div>
                     <Badge variant={tier === 'premier' ? 'default' : tier === 'priority' ? 'secondary' : 'outline'}>
@@ -472,13 +545,13 @@ export default function AdminUserDossierPage() {
               </Card>
             </div>
 
-            <div className="space-y-6">
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle>Admin actions</CardTitle>
-                  <CardDescription>All actions require a reason and are audited.</CardDescription>
+            <div className="space-y-4 md:space-y-6">
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Admin actions</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">All actions require a reason and are audited.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2 md:space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                   <Button
                     variant="outline"
                     className="w-full justify-start"
@@ -637,12 +710,12 @@ export default function AdminUserDossierPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle>Risk label</CardTitle>
-                  <CardDescription>Manual for now (audited).</CardDescription>
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Risk label</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Manual for now (audited).</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                   <Select value={riskLabel} onValueChange={(v) => setRiskLabel(v as any)}>
                     <SelectTrigger className="h-11">
                       <SelectValue placeholder="Select risk" />
@@ -687,11 +760,11 @@ export default function AdminUserDossierPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle>Stripe</CardTitle>
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Stripe</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 text-sm">
+                <CardContent className="space-y-2 text-xs md:text-sm px-3 sm:px-6 pb-4 md:pb-6">
                   <div>Account: <span className="font-semibold">{stripe.accountId || '—'}</span></div>
                   <div>Onboarding: <span className="font-semibold">{stripe.onboardingStatus || '—'}</span></div>
                   <div>Payouts enabled: <span className="font-semibold">{String(stripe.payoutsEnabled ?? '—')}</span></div>
@@ -700,12 +773,12 @@ export default function AdminUserDossierPage() {
               </Card>
 
               {canEditRole ? (
-                <Card className="border-2">
-                  <CardHeader>
-                    <CardTitle>Role</CardTitle>
-                    <CardDescription>Super-admin only.</CardDescription>
+                <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                  <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                    <CardTitle className="text-base md:text-lg">Role</CardTitle>
+                    <CardDescription className="text-xs md:text-sm">Super-admin only.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                     <Button
                       variant="outline"
                       className="w-full justify-start"
@@ -746,20 +819,20 @@ export default function AdminUserDossierPage() {
         </div>
 
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{confirmTitle}</DialogTitle>
-              <DialogDescription>{confirmDescription}</DialogDescription>
+              <DialogTitle className="text-base md:text-lg">{confirmTitle}</DialogTitle>
+              <DialogDescription className="text-xs md:text-sm">{confirmDescription}</DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reason</div>
-              <Input value={confirmReason} onChange={(e) => setConfirmReason(e.target.value)} placeholder="Required" className="h-11" />
+              <Input value={confirmReason} onChange={(e) => setConfirmReason(e.target.value)} placeholder="Required" className="h-10 md:h-11 text-base" />
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={confirmBusy}>
+            <DialogFooter className="gap-2 flex-wrap sm:flex-nowrap">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={confirmBusy} className="min-h-[40px] flex-1 sm:flex-initial">
                 Cancel
               </Button>
-              <Button onClick={runConfirm} disabled={confirmBusy} className="font-semibold">
+              <Button onClick={runConfirm} disabled={confirmBusy} className="font-semibold min-h-[40px] flex-1 sm:flex-initial">
                 {confirmBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Confirm
               </Button>

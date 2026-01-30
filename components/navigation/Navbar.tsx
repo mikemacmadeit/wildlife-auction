@@ -136,12 +136,15 @@ export function Navbar() {
               </div>
             </div>
             <span className="sr-only">{BRAND_DISPLAY_NAME}</span>
-            <BrandLogoText
+            <span
               className={cn(
-                'text-base sm:text-lg md:text-xl lg:text-2xl font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none',
+                'font-extrabold tracking-tight font-barletta-inline text-[hsl(75,8%,13%)] dark:text-[hsl(37,27%,70%)] truncate max-w-[170px] sm:max-w-none',
                 user ? 'inline' : 'hidden md:inline'
               )}
-            />
+              style={{ fontSize: 'clamp(1.25rem, 5.5vw, 1.625rem)' }}
+            >
+              <BrandLogoText className="text-inherit" />
+            </span>
           </Link>
 
           {/* Desktop Navigation - Centered (only on large screens) */}

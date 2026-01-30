@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -293,9 +294,7 @@ export default function AdminMessagesPage() {
 
   if (adminLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
+      <PageLoader title="Loading…" subtitle="Getting things ready." minHeight="screen" />
     );
   }
 
@@ -315,70 +314,70 @@ export default function AdminMessagesPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
-        <div className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
-            Moderation Inbox
+      <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 max-w-7xl space-y-4 md:space-y-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-4xl font-extrabold text-foreground mb-1 md:mb-2">
+            Flagged Messages
           </h1>
-          <p className="text-base md:text-lg text-muted-foreground">
+          <p className="text-sm md:text-lg text-muted-foreground">
             Review reported conversations and take action.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+          <div className="mt-2 md:mt-3 flex flex-wrap gap-1.5 md:gap-2 text-xs md:text-sm">
             <Badge variant="outline">Total: {counts.total}</Badge>
             <Badge variant="destructive">Open: {counts.open}</Badge>
             <Badge variant="secondary">Reviewing: {counts.reviewing}</Badge>
           </div>
         </div>
 
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+          <CardContent className="pt-4 pb-4 md:pt-6 px-3 sm:px-6">
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground shrink-0" />
               <Input
                 type="search"
-                placeholder="Search by thread ID, listing ID, or user ID..."
+                placeholder="Thread, listing, or user ID…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 min-h-[44px] text-base"
               />
             </div>
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-2 md:space-y-4">
           {filteredThreads.length === 0 ? (
-            <Card>
-              <CardContent className="pt-12 pb-12 text-center">
+            <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:bg-card">
+              <CardContent className="pt-8 pb-8 md:pt-12 md:pb-12 text-center px-3 sm:px-6">
                 <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">No flagged threads</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-base md:text-lg font-semibold mb-2">No flagged threads</h3>
+                <p className="text-xs md:text-sm text-muted-foreground">
                   {searchQuery ? 'No threads match your search' : 'All clear!'}
                 </p>
               </CardContent>
             </Card>
           ) : (
             filteredThreads.map((thread) => (
-              <Card key={thread.id} className="border-2 border-orange-200">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Flag className="h-5 w-5 text-orange-600" />
-                        Thread {thread.id.slice(-8)}
+              <Card key={thread.id} className="rounded-xl border border-orange-200 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 md:pt-6 pb-2 md:pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                        <Flag className="h-4 w-4 md:h-5 md:w-5 text-orange-600 shrink-0" />
+                        <span className="truncate">Thread {thread.id.slice(-8)}</span>
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-xs md:text-sm text-muted-foreground mt-1 truncate">
                         Listing: {thread.listingId}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="destructive">{(thread.moderationStatus || 'open').toUpperCase()}</Badge>
-                      <Badge variant="outline">{thread.flagCount || 1} report(s)</Badge>
-                      <Badge variant="secondary">{thread.violationCount || 0} violations</Badge>
+                    <div className="flex items-center gap-1.5 md:gap-2 flex-wrap shrink-0">
+                      <Badge variant="destructive" className="text-xs">{(thread.moderationStatus || 'open').toUpperCase()}</Badge>
+                      <Badge variant="outline" className="text-xs">{thread.flagCount || 1} report(s)</Badge>
+                      <Badge variant="secondary" className="text-xs">{thread.violationCount || 0} violations</Badge>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <CardContent className="px-3 sm:px-6 pb-4 md:pb-6">
+                  <div className="grid grid-cols-2 gap-2 md:gap-4 text-xs md:text-sm">
                     <div>
                       <p className="text-muted-foreground">Buyer</p>
                       <p className="font-medium">{thread.buyerId}</p>
@@ -424,31 +423,31 @@ export default function AdminMessagesPage() {
                       <div className="text-sm mt-1 text-orange-950 dark:text-orange-50">{thread.flaggedDetails}</div>
                     </div>
                   ) : null}
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={`/listing/${thread.listingId}`} target="_blank">
+                  <div className="mt-3 md:mt-4 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" className="min-h-[36px]" asChild>
+                      <a href={`/listing/${thread.listingId}`} target="_blank" rel="noopener noreferrer">
                         View Listing
                       </a>
                     </Button>
-                    <Button variant="default" size="sm" onClick={() => openThread(thread.id)}>
+                    <Button variant="default" size="sm" className="min-h-[36px]" onClick={() => openThread(thread.id)}>
                       Review & Take Action
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setModeration(thread.id, { moderationStatus: 'reviewing' } as any)}>
+                    <Button variant="outline" size="sm" className="min-h-[36px]" onClick={() => setModeration(thread.id, { moderationStatus: 'reviewing' } as any)}>
                       Mark Reviewing
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="min-h-[36px] border-border/60"
                       onClick={() => setModeration(thread.id, { flagged: false, moderationStatus: 'dismissed', adminReviewed: true } as any)}
-                      className="border-border/60"
                     >
                       Dismiss
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="min-h-[36px] border-green-500/40 text-green-700 hover:text-green-800"
                       onClick={() => setModeration(thread.id, { flagged: false, moderationStatus: 'resolved', adminReviewed: true } as any)}
-                      className="border-green-500/40 text-green-700 hover:text-green-800"
                     >
                       Resolve
                     </Button>
@@ -460,7 +459,7 @@ export default function AdminMessagesPage() {
         </div>
 
         <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="w-[calc(100%-2rem)] max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-orange-600" />
@@ -487,7 +486,7 @@ export default function AdminMessagesPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Conversation */}
-                <div className="lg:col-span-2 border rounded-lg p-3 max-h-[65vh] overflow-y-auto bg-muted/20">
+                <div className="lg:col-span-2 border rounded-lg p-2.5 md:p-3 max-h-[50vh] md:max-h-[65vh] overflow-y-auto bg-muted/20">
                   {activeMessages.length === 0 ? (
                     <div className="text-sm text-muted-foreground py-8 text-center">No messages.</div>
                   ) : (
@@ -659,25 +658,15 @@ export default function AdminMessagesPage() {
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => setModeration(activeThread.id, { moderationStatus: 'reviewing' } as any)}
-                        >
+                        <Button variant="outline" className="min-h-[40px]" onClick={() => setModeration(activeThread.id, { moderationStatus: 'reviewing' } as any)}>
                           <ShieldAlert className="h-4 w-4 mr-2" />
                           Reviewing
                         </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setModeration(activeThread.id, { flagged: false, moderationStatus: 'dismissed', adminReviewed: true } as any)}
-                        >
+                        <Button variant="outline" className="min-h-[40px]" onClick={() => setModeration(activeThread.id, { flagged: false, moderationStatus: 'dismissed', adminReviewed: true } as any)}>
                           <XCircle className="h-4 w-4 mr-2" />
                           Dismiss
                         </Button>
-                        <Button
-                          variant="outline"
-                          className="border-green-500/40 text-green-700 hover:text-green-800"
-                          onClick={() => setModeration(activeThread.id, { flagged: false, moderationStatus: 'resolved', adminReviewed: true } as any)}
-                        >
+                        <Button variant="outline" className="min-h-[40px] border-green-500/40 text-green-700 hover:text-green-800" onClick={() => setModeration(activeThread.id, { flagged: false, moderationStatus: 'resolved', adminReviewed: true } as any)}>
                           <CheckCircle2 className="h-4 w-4 mr-2" />
                           Resolve
                         </Button>

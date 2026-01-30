@@ -13,6 +13,7 @@ import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -175,21 +176,19 @@ export default function OpsHealthPage() {
 
   if (adminLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageLoader title="Loading…" subtitle="Getting things ready." minHeight="screen" />
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 pb-20 md:pb-6">
+        <Card className="rounded-xl border border-border/60 bg-card">
+          <CardContent className="pt-6 px-4 sm:px-6">
             <div className="text-center">
               <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-              <p className="text-muted-foreground">You don't have permission to access this page.</p>
+              <h2 className="text-xl md:text-2xl font-bold mb-2">Access Denied</h2>
+              <p className="text-muted-foreground text-sm md:text-base">You don't have permission to access this page.</p>
             </div>
           </CardContent>
         </Card>
@@ -198,67 +197,81 @@ export default function OpsHealthPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">System Health</h1>
-          <p className="text-muted-foreground">Live operational checks wired to server-side probes (no mock data).</p>
-          <div className="text-xs text-muted-foreground mt-1">
-            Last refreshed: {formatDate(lastRefresh)} {adminHealth?.env ? `• Netlify runtime: ${adminHealth.env.netlifyRuntime ? 'yes' : 'no'}` : ''}
+    <div className="min-h-screen bg-background pb-20 md:pb-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 max-w-5xl space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">System Health</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Live operational checks (server-side probes, no mock data).</p>
+            <div className="text-xs text-muted-foreground mt-1">
+              Last refreshed: {formatDate(lastRefresh)} {adminHealth?.env ? `• Netlify: ${adminHealth.env.netlifyRuntime ? 'yes' : 'no'}` : ''}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <Button onClick={runAutoReleaseNow} disabled={runningAutoRelease || loading} variant="secondary" className="h-9 px-3 md:h-10 md:px-4">
+              <Activity className={`h-4 w-4 mr-2 ${runningAutoRelease ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Run Auto-Release Now</span>
+              <span className="sm:hidden">Auto-Release</span>
+            </Button>
+            <Button onClick={loadHealthData} disabled={loading} variant="outline" className="h-9 px-3 md:h-10 md:px-4">
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={runAutoReleaseNow} disabled={runningAutoRelease || loading} variant="secondary">
-            <Activity className={`h-4 w-4 mr-2 ${runningAutoRelease ? 'animate-spin' : ''}`} />
-            Run Auto-Release Now
-          </Button>
-          <Button onClick={loadHealthData} disabled={loading} variant="outline">
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-8 md:py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="border-2">
-              <CardContent className="pt-6 flex items-center justify-between">
+          {/* One-line status summary for quick tracking */}
+          {(counts.FAIL > 0 || counts.WARN > 0) && adminHealth && (
+            <div className={counts.FAIL > 0 ? 'rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-sm' : 'rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm'}>
+              <span className="font-semibold text-foreground">
+                {counts.FAIL > 0 && `${counts.FAIL} failing`}
+                {counts.FAIL > 0 && counts.WARN > 0 && ' • '}
+                {counts.WARN > 0 && `${counts.WARN} warning${counts.WARN !== 1 ? 's' : ''}`}
+              </span>
+              <span className="text-muted-foreground"> — filter or scroll to review checks below.</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+            <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+              <CardContent className="pt-4 pb-4 md:pt-6 flex items-center justify-between px-3 md:px-6">
                 <div>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fail</div>
-                  <div className="text-2xl font-extrabold">{counts.FAIL || 0}</div>
+                  <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fail</div>
+                  <div className="text-xl md:text-2xl font-extrabold">{counts.FAIL || 0}</div>
                 </div>
-                <XCircle className="h-6 w-6 text-red-600" />
+                <XCircle className="h-5 w-5 md:h-6 md:w-6 text-red-600 shrink-0" />
               </CardContent>
             </Card>
-            <Card className="border-2">
-              <CardContent className="pt-6 flex items-center justify-between">
+            <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+              <CardContent className="pt-4 pb-4 md:pt-6 flex items-center justify-between px-3 md:px-6">
                 <div>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Warn</div>
-                  <div className="text-2xl font-extrabold">{counts.WARN || 0}</div>
+                  <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">Warn</div>
+                  <div className="text-xl md:text-2xl font-extrabold">{counts.WARN || 0}</div>
                 </div>
-                <AlertTriangle className="h-6 w-6 text-amber-600" />
+                <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-amber-600 shrink-0" />
               </CardContent>
             </Card>
-            <Card className="border-2">
-              <CardContent className="pt-6 flex items-center justify-between">
+            <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+              <CardContent className="pt-4 pb-4 md:pt-6 flex items-center justify-between px-3 md:px-6">
                 <div>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">OK</div>
-                  <div className="text-2xl font-extrabold">{counts.OK || 0}</div>
+                  <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">OK</div>
+                  <div className="text-xl md:text-2xl font-extrabold">{counts.OK || 0}</div>
                 </div>
-                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                <CheckCircle2 className="h-5 w-5 md:h-6 md:w-6 text-emerald-600 shrink-0" />
               </CardContent>
             </Card>
-            <Card className="border-2">
-              <CardContent className="pt-6 space-y-2">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Auto-refresh</div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm">{autoRefresh ? 'ON (30s)' : 'OFF'}</div>
-                  <Button size="sm" variant="outline" onClick={() => setAutoRefresh((v) => !v)}>
+            <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+              <CardContent className="pt-4 pb-4 md:pt-6 px-3 md:px-6">
+                <div className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wide">Auto-refresh</div>
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  <span className="text-xs md:text-sm">{autoRefresh ? 'ON (30s)' : 'OFF'}</span>
+                  <Button size="sm" variant="outline" onClick={() => setAutoRefresh((v) => !v)} className="min-h-[32px]">
                     Toggle
                   </Button>
                 </div>
@@ -266,27 +279,33 @@ export default function OpsHealthPage() {
             </Card>
           </div>
 
-          <Card className="border-2">
-            <CardContent className="pt-6 space-y-3">
-              <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                <div className="flex-1">
-                  <Input placeholder="Search checks…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+            <CardHeader className="pb-2 px-3 sm:px-6 pt-4 md:pt-6">
+              <CardTitle className="text-base md:text-lg">Checks</CardTitle>
+              <CardDescription className="text-xs md:text-sm">Filter and search health checks. Copy raw JSON for debugging.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+                <div className="flex-1 min-w-0">
+                  <Input placeholder="Search checks…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-h-[40px] text-base" />
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button variant={statusFilter === 'all' ? 'secondary' : 'outline'} onClick={() => setStatusFilter('all')}>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Button variant={statusFilter === 'all' ? 'secondary' : 'outline'} size="sm" className="min-h-[36px]" onClick={() => setStatusFilter('all')}>
                     All
                   </Button>
-                  <Button variant={statusFilter === 'FAIL' ? 'secondary' : 'outline'} onClick={() => setStatusFilter('FAIL')}>
+                  <Button variant={statusFilter === 'FAIL' ? 'secondary' : 'outline'} size="sm" className="min-h-[36px]" onClick={() => setStatusFilter('FAIL')}>
                     Fail
                   </Button>
-                  <Button variant={statusFilter === 'WARN' ? 'secondary' : 'outline'} onClick={() => setStatusFilter('WARN')}>
+                  <Button variant={statusFilter === 'WARN' ? 'secondary' : 'outline'} size="sm" className="min-h-[36px]" onClick={() => setStatusFilter('WARN')}>
                     Warn
                   </Button>
-                  <Button variant={statusFilter === 'OK' ? 'secondary' : 'outline'} onClick={() => setStatusFilter('OK')}>
+                  <Button variant={statusFilter === 'OK' ? 'secondary' : 'outline'} size="sm" className="min-h-[36px]" onClick={() => setStatusFilter('OK')}>
                     OK
                   </Button>
                   <Button
                     variant="outline"
+                    size="sm"
+                    className="min-h-[36px] shrink-0"
                     disabled={!adminHealth}
                     onClick={async () => {
                       try {
@@ -297,50 +316,50 @@ export default function OpsHealthPage() {
                       }
                     }}
                   >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy JSON
+                    <Copy className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Copy JSON</span>
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             {!adminHealth ? (
-              <Card className="border-2 border-destructive/30 bg-destructive/5">
-                <CardContent className="pt-6 text-sm text-destructive">Health API not available. Try refresh.</CardContent>
+              <Card className="rounded-xl border border-destructive/30 bg-destructive/5">
+                <CardContent className="pt-4 pb-4 px-3 sm:px-6 text-sm text-destructive">Health API not available. Try refresh.</CardContent>
               </Card>
             ) : filteredChecks.length === 0 ? (
-              <Card className="border-2">
-                <CardContent className="pt-6 text-sm text-muted-foreground">No checks match your filters.</CardContent>
+              <Card className="rounded-xl border border-border/60">
+                <CardContent className="pt-4 pb-4 px-3 sm:px-6 text-sm text-muted-foreground">No checks match your filters.</CardContent>
               </Card>
             ) : (
               filteredChecks.map((c) => (
-                <Card key={c.id} className="border-2">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base">{c.title}</CardTitle>
-                        <CardDescription className="mt-1">{c.message}</CardDescription>
+                <Card key={c.id} className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+                  <CardHeader className="pb-2 px-3 sm:px-6 pt-4 md:pt-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm md:text-base break-words">{c.title}</CardTitle>
+                        <CardDescription className="mt-1 text-xs md:text-sm break-words">{c.message}</CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         {statusBadge(c.status)}
-                        <Button size="sm" variant="outline" onClick={() => setExpanded((m) => ({ ...m, [c.id]: !m[c.id] }))}>
+                        <Button size="sm" variant="outline" className="min-h-[36px]" onClick={() => setExpanded((m) => ({ ...m, [c.id]: !m[c.id] }))}>
                           {expanded[c.id] ? 'Hide' : 'Details'}
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   {expanded[c.id] ? (
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                       {c.action ? (
-                        <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                        <div className="rounded-lg border bg-muted/20 p-2.5 md:p-3 text-xs md:text-sm">
                           <div className="font-semibold">Next action</div>
-                          <div className="text-muted-foreground mt-1">{c.action}</div>
+                          <div className="text-muted-foreground mt-1 break-words">{c.action}</div>
                         </div>
                       ) : null}
                       {c.docs ? (
-                        <div className="text-sm">
+                        <div className="text-xs md:text-sm break-all">
                           Docs:{' '}
                           <a className="text-primary hover:underline" href={c.docs} target="_blank" rel="noreferrer">
                             {c.docs}
@@ -348,7 +367,7 @@ export default function OpsHealthPage() {
                         </div>
                       ) : null}
                       {c.details ? (
-                        <pre className="text-xs rounded-lg border bg-muted/20 p-3 overflow-auto">{JSON.stringify(c.details, null, 2)}</pre>
+                        <pre className="text-[10px] md:text-xs rounded-lg border bg-muted/20 p-2.5 md:p-3 overflow-auto max-h-[200px] md:max-h-[280px]">{JSON.stringify(c.details, null, 2)}</pre>
                       ) : (
                         <div className="text-xs text-muted-foreground">No additional details.</div>
                       )}
@@ -359,33 +378,28 @@ export default function OpsHealthPage() {
             )}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Links</CardTitle>
-              <CardDescription>Jump to related admin tools.</CardDescription>
+          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
+            <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+              <CardTitle className="text-base md:text-lg">Quick Links</CardTitle>
+              <CardDescription className="text-xs md:text-sm">Jump to related admin tools.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link href="/dashboard/admin/ops">
-                  <Button variant="outline" className="w-full justify-start">
-                    Admin Ops Dashboard
-                  </Button>
-                </Link>
-                <Link href="/dashboard/admin/reconciliation">
-                  <Button variant="outline" className="w-full justify-start">
-                    Reconciliation
-                  </Button>
-                </Link>
-                <Link href="/dashboard/admin/support">
-                  <Button variant="outline" className="w-full justify-start">
-                    Support
-                  </Button>
-                </Link>
+            <CardContent className="px-3 sm:px-6 pb-4 md:pb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
+                <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
+                  <Link href="/dashboard/admin/ops">Admin Ops Dashboard</Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
+                  <Link href="/dashboard/admin/reconciliation">Reconciliation</Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
+                  <Link href="/dashboard/admin/support">Support</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
         </>
       )}
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { forwardRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { MapPin, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Listing, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
+import { MOTION } from '@/lib/motion';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
@@ -27,6 +28,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
   ({ listing, className, index = 0 }, ref) => {
   const router = useRouter();
   const { user } = useAuth();
+  const reducedMotion = useReducedMotion();
   const sold = getSoldSummary(listing);
   const sellerTxCount = typeof listing.sellerSnapshot?.completedSalesCount === 'number' ? listing.sellerSnapshot.completedSalesCount : null;
   const sellerBadges = Array.isArray(listing.sellerSnapshot?.badges) ? listing.sellerSnapshot!.badges! : [];
@@ -73,10 +75,14 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 20 }}
+      initial={reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      whileHover={{ y: -8 }}
+      transition={
+        reducedMotion
+          ? { duration: 0 }
+          : { duration: MOTION.durationNormal, ease: MOTION.easeOut, delay: index < 12 ? index * 0.04 : 0 }
+      }
+      whileHover={reducedMotion ? undefined : { y: -8 }}
       // Mobile: allow vertical scrolling even when the gesture starts on the card/image.
       className={cn('group touch-manipulation md:touch-auto', className)}
     >
@@ -135,7 +141,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                     className="object-cover transition-transform duration-500 group-hover:scale-110"
                     style={coverObjectPosition ? { objectPosition: coverObjectPosition } : undefined}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    unoptimized
                     priority={index < 2}
                   />
                 </div>
@@ -264,7 +269,14 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               <div className="flex items-center justify-between gap-3 min-w-0 overflow-hidden">
                 <div className="space-y-1 flex-shrink-0 min-w-0 overflow-hidden sm:max-w-[65%]">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent truncate">
+                    <span
+                      className={cn(
+                        'text-2xl font-bold truncate',
+                        isCurrentHighBidder
+                          ? 'text-primary dark:text-primary'
+                          : 'text-foreground dark:text-white'
+                      )}
+                    >
                       {priceDisplay}
                     </span>
                     {isCurrentHighBidder && (

@@ -68,14 +68,14 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
                 'relative flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-muted/50 active:bg-muted',
                 'min-h-[52px] min-w-[44px] touch-manipulation',
-                active ? 'text-primary' : 'text-white'
+                active ? 'text-foreground dark:text-primary' : 'text-foreground dark:text-muted-foreground'
               )}
             >
               {/* Sliding bubble pill – animates smoothly between tabs (eBay-style) */}
               {active && (
                 <motion.div
                   layoutId="bottom-nav-bubble"
-                  className="absolute inset-y-0 left-[2px] right-[2px] rounded-full bg-primary/15 dark:bg-primary/20 pointer-events-none"
+                  className="absolute inset-y-0 left-[2px] right-[2px] rounded-full bg-primary/20 border-transparent pointer-events-none"
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                 />
               )}
@@ -83,7 +83,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
                 <Icon
                   className={cn(
                     'h-5 w-5',
-                    active ? 'text-primary' : 'text-white'
+                    active ? 'text-foreground dark:text-primary' : 'text-foreground dark:text-muted-foreground'
                   )}
                 />
                 {item.badge != null && item.badge > 0 && (
@@ -98,7 +98,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
               <span
                 className={cn(
                   'relative z-10 text-[10px] font-medium',
-                  active ? 'text-primary' : 'text-white'
+                  active ? 'text-foreground dark:text-primary' : 'text-foreground dark:text-muted-foreground'
                 )}
               >
                 {displayLabel}

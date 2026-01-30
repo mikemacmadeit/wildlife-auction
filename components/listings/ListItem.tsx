@@ -16,6 +16,7 @@ import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { BROWSE_SPECIES } from '@/components/browse/filters/constants';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { cn } from '@/lib/utils';
 
 interface ListItemProps {
   listing: Listing;
@@ -283,7 +284,12 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                 <div className="mt-2 flex items-end justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-lg font-extrabold text-primary leading-none">
+                      <span
+                        className={cn(
+                          'text-lg font-extrabold leading-none',
+                          isCurrentHighBidder ? 'text-primary dark:text-primary' : 'text-foreground dark:text-white'
+                        )}
+                      >
                         ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
                       </span>
                       {isCurrentHighBidder && (
@@ -347,10 +353,15 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   {sold.isSold ? (
-                    <span className="text-base font-extrabold text-primary leading-none">{sold.soldPriceLabel}</span>
+                    <span className="text-base font-extrabold text-foreground dark:text-white leading-none">{sold.soldPriceLabel}</span>
                   ) : (
                     <>
-                      <span className="text-base font-extrabold text-primary leading-none">
+                      <span
+                        className={cn(
+                          'text-base font-extrabold leading-none',
+                          isCurrentHighBidder ? 'text-primary dark:text-primary' : 'text-foreground dark:text-white'
+                        )}
+                      >
                         ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
                       </span>
                       {isAuction && endsAtDate && endsAtDate.getTime() > Date.now() && (
@@ -475,7 +486,12 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     </>
                   ) : (
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-primary leading-none">
+                      <span
+                        className={cn(
+                          'text-lg sm:text-xl md:text-2xl font-extrabold leading-none',
+                          isCurrentHighBidder ? 'text-primary dark:text-primary' : 'text-foreground dark:text-white'
+                        )}
+                      >
                         ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
                       </span>
                       {isCurrentHighBidder && (

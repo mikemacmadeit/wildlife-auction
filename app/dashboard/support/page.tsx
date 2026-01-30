@@ -10,6 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -119,9 +120,7 @@ export default function SupportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[300px] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <PageLoader title="Loading support…" subtitle="Getting help resources ready." className="min-h-[300px]" />
     );
   }
 

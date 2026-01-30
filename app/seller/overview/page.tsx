@@ -25,6 +25,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageLoader } from '@/components/ui/page-loader';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { useAuth } from '@/hooks/use-auth';
 import { listSellerListings } from '@/lib/firebase/listings';
@@ -614,12 +615,7 @@ export default function SellerOverviewPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 md:pb-6 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-          <p className="text-muted-foreground">Loading overview...</p>
-        </div>
-      </div>
+      <PageLoader title="Loading overview…" subtitle="Getting your dashboard ready." minHeight="screen" />
     );
   }
 

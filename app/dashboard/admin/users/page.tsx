@@ -435,16 +435,16 @@ export default function AdminUsersPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
-      <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">User Management</h1>
-            <p className="text-base md:text-lg text-muted-foreground">
+      <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8 max-w-7xl space-y-4 md:space-y-8">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-4xl font-extrabold text-foreground mb-1 md:mb-2">User Management</h1>
+            <p className="text-sm md:text-lg text-muted-foreground">
               Search, support, and manage user accounts.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => load()} disabled={loading || !isAdmin}>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" className="h-9 px-3 md:h-10 md:px-4" onClick={() => load()} disabled={loading || !isAdmin}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Refresh
             </Button>
@@ -458,57 +458,59 @@ export default function AdminUsersPage() {
           </Alert>
         )}
 
-        <Card className="border-2 border-border/50 bg-card">
-          <CardHeader className="pb-4">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+        <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+          <CardHeader className="pb-3 md:pb-4 px-3 sm:px-6 pt-4 md:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 flex-wrap">
               <div>
-                <CardTitle className="text-lg">Lookup</CardTitle>
-                <CardDescription>Search by email, uid, phone (token), or name token. Use filters for faster triage.</CardDescription>
+                <CardTitle className="text-base md:text-lg">Lookup</CardTitle>
+                <CardDescription className="text-xs md:text-sm">Search by email, uid, phone, or name. Use filters to narrow.</CardDescription>
               </div>
-              <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                <span className="rounded-full border bg-muted/30 px-2 py-1">Results: {stats.total}</span>
-                <span className="rounded-full border bg-muted/30 px-2 py-1">Admins: {stats.admins}</span>
-                <span className="rounded-full border bg-muted/30 px-2 py-1">Disabled: {stats.disabled}</span>
-                <span className="rounded-full border bg-muted/30 px-2 py-1">Stripe linked: {stats.stripeLinked}</span>
-                {stats.highRisk ? <span className="rounded-full border bg-destructive/10 text-destructive px-2 py-1">High risk: {stats.highRisk}</span> : null}
+              <div className="flex items-center gap-1.5 flex-wrap text-[10px] sm:text-xs text-muted-foreground">
+                <span className="rounded-full border bg-muted/30 px-1.5 py-0.5 sm:px-2 sm:py-1">Results: {stats.total}</span>
+                <span className="rounded-full border bg-muted/30 px-1.5 py-0.5 sm:px-2 sm:py-1">Admins: {stats.admins}</span>
+                <span className="rounded-full border bg-muted/30 px-1.5 py-0.5 sm:px-2 sm:py-1">Disabled: {stats.disabled}</span>
+                <span className="rounded-full border bg-muted/30 px-1.5 py-0.5 sm:px-2 sm:py-1 hidden sm:inline">Stripe: {stats.stripeLinked}</span>
+                {stats.highRisk ? <span className="rounded-full border bg-destructive/10 text-destructive px-1.5 py-0.5 sm:px-2 sm:py-1">High risk: {stats.highRisk}</span> : null}
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-3 md:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <CardContent className="space-y-4 px-3 sm:px-6 pb-4 md:pb-6">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:items-center">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground shrink-0" />
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by email, uid, phone, name…"
-                  className="pl-9 min-h-[44px]"
+                  placeholder="Email, uid, phone, name…"
+                  className="pl-9 min-h-[44px] text-base"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void load();
                   }}
                 />
               </div>
-              <Button onClick={() => load()} disabled={loading || !isAdmin} className="min-h-[44px] font-semibold">
-                Search
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setQuery('');
-                  setCursor(null);
-                  setCursorStack([]);
-                  void load({ query: '' });
-                }}
-                disabled={loading || !isAdmin}
-                className="min-h-[44px] font-semibold"
-              >
-                Clear
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => load()} disabled={loading || !isAdmin} className="min-h-[44px] font-semibold flex-1 sm:flex-initial">
+                  Search
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setQuery('');
+                    setCursor(null);
+                    setCursorStack([]);
+                    void load({ query: '' });
+                  }}
+                  disabled={loading || !isAdmin}
+                  className="min-h-[44px] font-semibold shrink-0"
+                >
+                  Clear
+                </Button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3">
               <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-10 md:h-11 text-sm">
                   <SelectValue placeholder="Role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -519,7 +521,7 @@ export default function AdminUsersPage() {
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-10 md:h-11 text-sm">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -531,7 +533,7 @@ export default function AdminUsersPage() {
                 </SelectContent>
               </Select>
               <Select value={verificationFilter} onValueChange={(v: any) => setVerificationFilter(v)}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-10 md:h-11 text-sm">
                   <SelectValue placeholder="Verification" />
                 </SelectTrigger>
                 <SelectContent>
@@ -541,7 +543,7 @@ export default function AdminUsersPage() {
                 </SelectContent>
               </Select>
               <Select value={riskFilter} onValueChange={(v: any) => setRiskFilter(v)}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-10 md:h-11 text-sm">
                   <SelectValue placeholder="Risk" />
                 </SelectTrigger>
                 <SelectContent>
@@ -553,7 +555,7 @@ export default function AdminUsersPage() {
                 </SelectContent>
               </Select>
               <Select value={sort} onValueChange={(v: any) => setSort(v)}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-10 md:h-11 text-sm">
                   <SelectValue placeholder="Sort" />
                 </SelectTrigger>
                 <SelectContent>
@@ -615,7 +617,156 @@ export default function AdminUsersPage() {
               </Alert>
             )}
 
-            <div className="rounded-xl border border-border/50 overflow-hidden">
+            {/* Mobile: card list */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                <div className="py-8 flex items-center justify-center text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading…
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-sm">No users found.</div>
+              ) : (
+                filtered.map((r) => (
+                  <div
+                    key={r.uid}
+                    className="rounded-xl border border-border/60 bg-card p-3 space-y-3 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <Avatar className="h-11 w-11 shrink-0 border">
+                        <AvatarImage src={r.photoURL || ''} alt={r.displayName || r.email || r.uid} />
+                        <AvatarFallback className="text-xs font-semibold">
+                          {initials(r.displayName || r.email || r.uid)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-foreground truncate">{r.displayName || '—'}</div>
+                        <div className="text-sm text-muted-foreground truncate">{r.email || r.uid}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5">UID: {r.uid}</div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onSelect={async (e) => {
+                              e.preventDefault();
+                              const ok = await safeCopy(r.uid);
+                              toast({ title: ok ? 'Copied' : 'Copy failed', description: ok ? 'UID copied.' : 'Could not copy UID.' });
+                            }}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy UID
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              if (!isSuperAdmin) {
+                                toast({ title: 'Super admin required', description: 'Role changes require super admin.', variant: 'destructive' });
+                                return;
+                              }
+                              handleOpenRole(r);
+                            }}
+                          >
+                            <ShieldAlert className="h-4 w-4 mr-2" />
+                            Set role…
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/admin/users/${r.uid}`}>
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View dossier
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              void passwordResetLink(r);
+                            }}
+                          >
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Password reset link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setSendVerifyTarget(r);
+                              setSendVerifyReason('Support: resend verification email');
+                              setSendVerifyDialogOpen(true);
+                            }}
+                            disabled={r.emailVerified === true}
+                          >
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Send verification email
+                          </DropdownMenuItem>
+                          {r.disabled ? (
+                            <DropdownMenuItem
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                void setDisabled(r, false);
+                              }}
+                            >
+                              <UserCheck className="h-4 w-4 mr-2" />
+                              Enable user
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                void setDisabled(r, true);
+                              }}
+                            >
+                              <UserX className="h-4 w-4 mr-2" />
+                              Disable user
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {roleBadge(r.role)}
+                      {tierBadge((r.subscriptionTier || 'standard') as any, (r.adminPlanOverride || null) as any)}
+                      {r.disabled ? (
+                        <Badge variant="destructive">Disabled</Badge>
+                      ) : (
+                        <Badge variant="outline">Active</Badge>
+                      )}
+                      {r.risk?.label ? (
+                        <Badge variant={r.risk.label === 'high' ? 'destructive' : r.risk.label === 'med' ? 'secondary' : 'outline'}>
+                          {r.risk.label}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button asChild size="sm" className="flex-1 min-h-[36px]">
+                        <Link href={`/dashboard/admin/users/${r.uid}`}>
+                          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                          View dossier
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 min-h-[36px]"
+                        onClick={async () => {
+                          const ok = await safeCopy(r.uid);
+                          toast({ title: ok ? 'UID copied' : 'Copy failed' });
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block rounded-xl border border-border/50 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>

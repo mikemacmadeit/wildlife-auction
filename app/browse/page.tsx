@@ -22,12 +22,16 @@ import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Spinner } from '@/components/ui/spinner';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
 import { FilterBottomSheet } from '@/components/navigation/FilterBottomSheet';
 import { MobileBrowseFilterSheet } from '@/components/navigation/MobileBrowseFilterSheet';
 import { Badge } from '@/components/ui/badge';
 import { queryListingsForBrowse, getDistinctListingStates, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
 import { FilterState, ListingType, Listing } from '@/lib/types';
+import { FLAGS } from '@/lib/featureFlags';
+import { getBrowseCacheEntry, setBrowseCache } from '@/lib/browseCache';
+import { stableStringify } from '@/lib/stableStringify';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { useToast } from '@/hooks/use-toast';
 import { useMinLoading } from '@/hooks/use-min-loading';
@@ -157,6 +161,8 @@ export default function BrowsePage() {
   const [nextCursor, setNextCursor] = useState<BrowseCursor | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const isInitialLoadRef = useRef(true);
+  const lastRevalidatedKeyRef = useRef<string | null>(null);
+  const STALE_REVALIDATE_MS = 12_000;
 
   // View mode with localStorage persistence
   // Initialize to 'card' to ensure server/client consistency
@@ -268,6 +274,21 @@ export default function BrowsePage() {
     urlReadRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Phase 2B: deterministic cache key — must change when any input that affects results changes
+  const cacheKey = useMemo(() => {
+    if (!FLAGS.browseCache) return '';
+    const q = debouncedSearchQuery?.trim() || '';
+    const limit = q ? 120 : 20;
+    return 'browse:' + stableStringify({
+      listingStatus,
+      selectedType,
+      filters,
+      sortBy,
+      searchQuery: q,
+      limit,
+    });
+  }, [listingStatus, selectedType, filters, sortBy, debouncedSearchQuery]);
 
   // eBay-style: sync browse state to URL so back/forward and sharing work
   useEffect(() => {
@@ -489,35 +510,42 @@ export default function BrowsePage() {
   
   // Load initial page (resets pagination).
   // When isRefetch (we already have listings): keep them visible, don't clear — avoids glitchy swap to skeleton.
-  const loadInitial = async (isRefetch?: boolean) => {
+  // When cacheKey is provided and FLAGS.browseCache, updates cache on success (for revalidate or cold load).
+  const loadInitial = async (isRefetch?: boolean, cacheKeyForUpdate?: string) => {
     try {
-      setLoading(true);
+      if (!isRefetch) setLoading(true);
       setError(null);
       if (!isRefetch) {
         setListings([]);
         setNextCursor(null);
         setHasMore(false);
       }
-      
+
       const browseFilters = getBrowseFilters();
       const browseSort = getBrowseSort();
 
-      // IMPORTANT:
-      // Full-text search is client-side only (Firestore doesn't support it here).
-      // To avoid "search feels broken" (0 results simply because the first page doesn't contain matches),
-      // we fetch a larger first page while a query is present.
       const q = debouncedSearchQuery?.trim() || '';
       const limitCount = q ? 120 : 20;
-      
+
       const result = await queryListingsForBrowse({
         limit: limitCount,
         filters: browseFilters,
         sort: browseSort,
       });
-      
+
       setListings(result.items);
       setNextCursor(result.nextCursor);
       setHasMore(result.hasMore);
+      if (FLAGS.browseCache && cacheKeyForUpdate) {
+        setBrowseCache(cacheKeyForUpdate, {
+          listings: result.items,
+          nextCursor: result.nextCursor,
+          hasMore: result.hasMore,
+        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[BROWSE_CACHE] set', cacheKeyForUpdate.slice(0, 80));
+        }
+      }
     } catch (err) {
       console.error('Error fetching listings:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load listings';
@@ -536,25 +564,33 @@ export default function BrowsePage() {
   // Load more (pagination)
   const loadMore = async () => {
     if (!nextCursor || loadingMore) return;
-    
+
     try {
       setLoadingMore(true);
-      
+
       const browseFilters = getBrowseFilters();
       const browseSort = getBrowseSort();
       const q = debouncedSearchQuery?.trim() || '';
       const limitCount = q ? 120 : 20;
-      
+
       const result = await queryListingsForBrowse({
         limit: limitCount,
         cursor: nextCursor,
         filters: browseFilters,
         sort: browseSort,
       });
-      
-      setListings((prev) => [...prev, ...result.items]);
+
+      const combined = [...listings, ...result.items];
+      setListings(combined);
       setNextCursor(result.nextCursor);
       setHasMore(result.hasMore);
+      if (FLAGS.browseCache && cacheKey) {
+        setBrowseCache(cacheKey, {
+          listings: combined,
+          nextCursor: result.nextCursor,
+          hasMore: result.hasMore,
+        });
+      }
     } catch (err) {
       console.error('Error loading more listings:', err);
       toast({
@@ -568,14 +604,40 @@ export default function BrowsePage() {
   };
 
   // eBay-style real-time: when user clicks a filter/sort/type, listings update immediately.
+  // Phase 2B: when FLAGS.browseCache, try cache first; revalidate once if stale (>= 12s).
   useEffect(() => {
     if (listingStatus !== 'active' && sortBy === 'ending-soon') {
       setSortBy('newest');
       return;
     }
+    if (FLAGS.browseCache && cacheKey) {
+      const entry = getBrowseCacheEntry(cacheKey);
+      if (entry) {
+        setListings(entry.data.listings);
+        setNextCursor(entry.data.nextCursor);
+        setHasMore(entry.data.hasMore);
+        setLoading(false);
+        setError(null);
+        isInitialLoadRef.current = false;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[BROWSE_CACHE] hit', cacheKey.slice(0, 80));
+        }
+        const age = Date.now() - entry.ts;
+        if (age >= STALE_REVALIDATE_MS && lastRevalidatedKeyRef.current !== cacheKey) {
+          lastRevalidatedKeyRef.current = cacheKey;
+          loadInitial(true, cacheKey);
+        }
+        return;
+      }
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[BROWSE_CACHE] miss', cacheKey.slice(0, 80));
+      }
+      loadInitial(false, cacheKey);
+      return;
+    }
     loadInitial(listings.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedType, filters, sortBy, listingStatus, debouncedSearchQuery]);
+  }, [selectedType, filters, sortBy, listingStatus, debouncedSearchQuery, cacheKey]);
 
   // Animals don't use "condition" on Browse; only equipment-like categories do.
   // If the user switches away, clear any stale condition selection so results don't look broken.
@@ -1647,8 +1709,8 @@ export default function BrowsePage() {
                     >
                       {loadingMore ? (
                         <>
-                          <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                          Loading...
+                          <Spinner size="sm" className="mr-2 shrink-0" />
+                          Loading…
                         </>
                       ) : (
                         'Load More'

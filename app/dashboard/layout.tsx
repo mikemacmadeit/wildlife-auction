@@ -101,13 +101,13 @@ const baseNavItems: SellerNavItem[] = [
 // Admin nav items (only visible to admins)
 const adminNavItems: SellerNavItem[] = [
   { href: '/dashboard/admin/users', label: 'Users', icon: Users },
+  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
+  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/health', label: 'System Health', icon: HeartPulse },
   { href: '/dashboard/admin/ops', label: 'Admin Ops', icon: Shield },
   { href: '/dashboard/admin/compliance', label: 'Compliance', icon: Shield },
   { href: '/dashboard/admin/reconciliation', label: 'Reconciliation', icon: Search },
   { href: '/dashboard/admin/revenue', label: 'Revenue', icon: DollarSign },
-  { href: '/dashboard/admin/listings', label: 'Approve Listings', icon: CheckCircle },
-  { href: '/dashboard/admin/messages', label: 'Flagged Messages', icon: MessageSquare },
   { href: '/dashboard/admin/support', label: 'Support', icon: HelpCircle },
   { href: '/dashboard/admin/email-templates', label: 'Email Templates', icon: Mail },
   { href: '/dashboard/admin/notifications', label: 'Notifications', icon: Bell },
@@ -124,12 +124,15 @@ export default function DashboardLayout({
   const { isAdmin, isSuperAdmin } = useAdmin();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
-  const [unreadOffersCount, setUnreadOffersCount] = useState<number>(0);
-  const [unreadAdminNotificationsCount, setUnreadAdminNotificationsCount] = useState<number>(0);
-  const [unreadSupportTicketsCount, setUnreadSupportTicketsCount] = useState<number>(0);
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+  // Phase 2A: single badges state to batch subscription updates and reduce layout re-renders
+  const [badges, setBadges] = useState({
+    messages: 0,
+    notifications: 0,
+    offers: 0,
+    adminNotifications: 0,
+    supportTickets: 0,
+    pendingApprovals: 0,
+  });
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
   const [adminNavOpen, setAdminNavOpen] = useState(true);
@@ -137,7 +140,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setAdminEverTrue(false);
-    setPendingApprovalsCount(0);
+    setBadges((prev) => ({ ...prev, pendingApprovals: 0 }));
   }, [user?.uid]);
 
   useEffect(() => {
@@ -172,31 +175,31 @@ export default function DashboardLayout({
   const baseNavWithBadges = useMemo(() => {
     return baseNavItems.map((item) => {
       if (item.href === '/dashboard/messages') {
-        return { ...item, badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined };
+        return { ...item, badge: badges.messages > 0 ? badges.messages : undefined };
       }
       if (item.href === '/dashboard/notifications') {
-        return { ...item, badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined };
+        return { ...item, badge: badges.notifications > 0 ? badges.notifications : undefined };
       }
       if (item.href === '/dashboard/bids-offers') {
-        return { ...item, badge: unreadOffersCount > 0 ? unreadOffersCount : undefined };
+        return { ...item, badge: badges.offers > 0 ? badges.offers : undefined };
       }
       return item;
     });
-  }, [unreadMessagesCount, unreadNotificationsCount, unreadOffersCount]);
+  }, [badges.messages, badges.notifications, badges.offers]);
 
   const adminNavWithBadges = useMemo(() => {
     return adminNavItems.map((item) => {
       if (item.href === '/dashboard/admin/listings') {
-        return { ...item, badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined };
+        return { ...item, badge: badges.pendingApprovals > 0 ? badges.pendingApprovals : undefined };
       }
       if (item.href === '/dashboard/admin/notifications') {
         return {
           ...item,
-          badge: isSuperAdmin && unreadAdminNotificationsCount > 0 ? unreadAdminNotificationsCount : undefined,
+          badge: isSuperAdmin && badges.adminNotifications > 0 ? badges.adminNotifications : undefined,
         };
       }
       if (item.href === '/dashboard/admin/support') {
-        const badge = isAdmin && unreadSupportTicketsCount > 0 ? unreadSupportTicketsCount : undefined;
+        const badge = isAdmin && badges.supportTickets > 0 ? badges.supportTickets : undefined;
         return {
           ...item,
           badge,
@@ -204,7 +207,7 @@ export default function DashboardLayout({
       }
       return item;
     });
-  }, [pendingApprovalsCount, isSuperAdmin, unreadAdminNotificationsCount, isAdmin, unreadSupportTicketsCount]);
+  }, [badges.pendingApprovals, badges.adminNotifications, badges.supportTickets, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -220,11 +223,14 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!user?.uid) {
-      setUnreadMessagesCount(0);
-      setUnreadNotificationsCount(0);
-      setUnreadOffersCount(0);
-      setUnreadAdminNotificationsCount(0);
-      setUnreadSupportTicketsCount(0);
+      setBadges((prev) => ({
+        ...prev,
+        messages: 0,
+        notifications: 0,
+        offers: 0,
+        adminNotifications: 0,
+        supportTickets: 0,
+      }));
       return;
     }
 
@@ -232,29 +238,27 @@ export default function DashboardLayout({
       const unsubs: Array<() => void> = [];
       unsubs.push(
         subscribeToUnreadCountByType(user.uid, 'message_received', (count) => {
-          setUnreadMessagesCount(count || 0);
+          setBadges((prev) => ({ ...prev, messages: count || 0 }));
         })
       );
       unsubs.push(
         subscribeToUnreadCount(user.uid, (count) => {
-          setUnreadNotificationsCount(count || 0);
+          setBadges((prev) => ({ ...prev, notifications: count || 0 }));
         })
       );
 
       if (showAdminNav && isSuperAdmin) {
         unsubs.push(
           subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
-            setUnreadAdminNotificationsCount(count || 0);
+            setBadges((prev) => ({ ...prev, adminNotifications: count || 0 }));
           })
         );
       }
 
       if (showAdminNav && isAdmin) {
-        // Subscribe to support ticket notifications
         unsubs.push(
           subscribeToUnreadCountByTypes(user.uid, ['admin_support_ticket_submitted'], (count) => {
-            console.log('[Dashboard Layout] Support tickets notification count:', count);
-            setUnreadSupportTicketsCount(count || 0);
+            setBadges((prev) => ({ ...prev, supportTickets: count || 0 }));
           })
         );
       }
@@ -270,16 +274,19 @@ export default function DashboardLayout({
       ];
       unsubs.push(
         subscribeToUnreadCountByTypes(user.uid, offerTypes, (count) => {
-          setUnreadOffersCount(count || 0);
+          setBadges((prev) => ({ ...prev, offers: count || 0 }));
         })
       );
       return () => unsubs.forEach((fn) => fn());
     } catch (e) {
       console.error('Failed to subscribe to unread message count:', e);
-      setUnreadMessagesCount(0);
-      setUnreadNotificationsCount(0);
-      setUnreadOffersCount(0);
-      setUnreadSupportTicketsCount(0);
+      setBadges((prev) => ({
+        ...prev,
+        messages: 0,
+        notifications: 0,
+        offers: 0,
+        supportTickets: 0,
+      }));
       return;
     }
   }, [user?.uid, showAdminNav, isSuperAdmin, isAdmin]);
@@ -290,12 +297,12 @@ export default function DashboardLayout({
       const qPending = query(collection(db, 'listings'), where('status', '==', 'pending'));
       const unsub = onSnapshot(
         qPending,
-        (snap) => setPendingApprovalsCount(snap.size || 0),
-        () => setPendingApprovalsCount(0)
+        (snap) => setBadges((prev) => ({ ...prev, pendingApprovals: snap.size || 0 })),
+        () => setBadges((prev) => ({ ...prev, pendingApprovals: 0 }))
       );
       return () => unsub();
     } catch {
-      setPendingApprovalsCount(0);
+      setBadges((prev) => ({ ...prev, pendingApprovals: 0 }));
       return;
     }
   }, [showAdminNav]);
@@ -610,7 +617,9 @@ export default function DashboardLayout({
               }}
             />
           </div>
-          <BrandLogoText className="text-lg font-bold tracking-tight font-barletta-inline text-foreground" />
+          <span className="font-bold tracking-tight font-barletta-inline text-foreground dark:text-[hsl(37,27%,70%)]" style={{ fontSize: 'clamp(1.25rem, 5.5vw, 1.625rem)' }}>
+            <BrandLogoText className="text-inherit" />
+          </span>
         </Link>
         <div className="flex items-center gap-2">
           <DropdownMenu>
