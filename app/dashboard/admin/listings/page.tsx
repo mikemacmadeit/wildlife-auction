@@ -55,6 +55,7 @@ import { Listing, ListingStatus } from '@/lib/types';
 import { User } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
@@ -103,6 +104,9 @@ export default function AdminListingsPage() {
   const [sortType, setSortType] = useState<SortType>('newest');
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
   const [viewingDocTitle, setViewingDocTitle] = useState<string>('Document');
+
+  const searchParams = useSearchParams();
+  const sellerIdFilter = searchParams?.get('sellerId')?.trim() || null;
 
   // Reject dialog state
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -356,6 +360,11 @@ export default function AdminListingsPage() {
     }
     // 'all' shows everything (no filter)
 
+    // Seller filter (from URL ?sellerId=uid, e.g. from user dossier)
+    if (sellerIdFilter) {
+      filtered = filtered.filter((listing) => listing.sellerId === sellerIdFilter);
+    }
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -388,19 +397,17 @@ export default function AdminListingsPage() {
     });
 
     return filtered;
-  }, [listings, filterType, searchQuery, sortType]);
+  }, [listings, filterType, searchQuery, sortType, sellerIdFilter]);
 
-  // Stats
+  // Stats (when sellerId filter is set, show counts for filtered list)
   const stats = useMemo(() => {
-    const total = listings.length;
-    const pending = listings.filter(l => l.status === 'pending').length;
-    const complianceReview = listings.filter(l => l.complianceStatus === 'pending_review' || l.category === 'whitetail_breeder').length;
-    const totalValue = listings.reduce((sum, l) => {
-      return sum + (l.price || l.startingBid || 0);
-    }, 0);
-
+    const source = sellerIdFilter ? filteredAndSortedListings : listings;
+    const total = source.length;
+    const pending = source.filter(l => l.status === 'pending').length;
+    const complianceReview = source.filter(l => l.complianceStatus === 'pending_review' || l.category === 'whitetail_breeder').length;
+    const totalValue = source.reduce((sum, l) => sum + (l.price || l.startingBid || 0), 0);
     return { total, pending, complianceReview, totalValue };
-  }, [listings]);
+  }, [listings, sellerIdFilter, filteredAndSortedListings]);
 
   if (adminLoading) {
     return (
@@ -505,6 +512,20 @@ export default function AdminListingsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {sellerIdFilter && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              Showing listings for seller: <span className="font-mono font-medium text-foreground">{sellerIdFilter}</span>
+            </span>
+            <Button variant="ghost" size="sm" className="shrink-0 h-8" asChild>
+              <Link href="/dashboard/admin/listings">
+                <X className="h-4 w-4 mr-1" />
+                Clear filter
+              </Link>
+            </Button>
+          </div>
+        )}
 
         {/* Filters and Search */}
         <Card className="border">

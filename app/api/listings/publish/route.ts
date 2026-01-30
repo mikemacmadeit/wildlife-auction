@@ -585,7 +585,8 @@ export async function POST(request: Request) {
       // Admin notifications (email + in-app) for review queues.
       // Non-blocking: listing submission should not fail if notifications fail.
       try {
-        const origin = 'https://agchange.com';
+        const { getSiteUrl } = await import('@/lib/site-url');
+        const origin = getSiteUrl();
         const adminUids = await listAdminRecipientUids(db as any);
         if (adminUids.length > 0) {
           const fanout = async <TType extends any>(params: {

@@ -256,7 +256,8 @@ export async function POST(
 
     // Notify admins (email + in-app). Non-blocking.
     try {
-      const origin = 'https://agchange.com';
+      const { getSiteUrl } = await import('@/lib/site-url');
+      const origin = getSiteUrl();
       const adminUids = await listAdminRecipientUids(db as any);
       if (adminUids.length > 0) {
         await emitEventToUsers({

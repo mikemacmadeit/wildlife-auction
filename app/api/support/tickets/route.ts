@@ -207,7 +207,7 @@ export async function POST(request: Request) {
   try {
     const { listAdminRecipientUids } = await import('@/lib/admin/adminRecipients');
     const { emitEventToUsers } = await import('@/lib/notifications/emitEvent');
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://agchange.com';
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://agchange.app';
     const adminUids = await listAdminRecipientUids(db as any);
     if (adminUids.length > 0) {
       await emitEventToUsers({

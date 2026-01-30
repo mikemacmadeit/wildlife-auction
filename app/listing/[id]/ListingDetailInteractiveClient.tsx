@@ -831,9 +831,6 @@ export default function ListingDetailInteractiveClient({
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
       const msg = error?.message ? String(error.message) : 'Checkout could not be started.';
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'listing handleSelectPaymentMethod catch', message: 'checkout error set', data: { method, errorMessage: (error?.message && String(error.message).slice(0, 200)), setCheckoutErrorMessage: msg.slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H3' }) }).catch(() => {});
-      // #endregion
       setCheckoutError({
         attemptedMethod: method,
         message: msg,

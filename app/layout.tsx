@@ -57,11 +57,15 @@ export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: 'Agchange | Texas Livestock & Ranch Marketplace',
   description: 'Buy and sell registered livestock, breeder stock, and ranch essentials across Texas. Auctions, fixed price, and classifieds—built for serious buyers and sellers.',
-  // Icons can be added when favicon files are placed in /public/logos/
-  // icons: {
-  //   icon: '/logos/favicon.ico',
-  //   apple: '/logos/apple-touch-icon.png',
-  // },
+  icons: {
+    icon: [
+      { url: '/favicon/favicon.ico', sizes: 'any' },
+      { url: '/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/favicon/apple-touch-icon.png',
+  },
+  manifest: '/favicon/site.webmanifest',
   openGraph: {
     title: 'Agchange | Texas Livestock & Ranch Marketplace',
     description: 'Texas-only marketplace for registered livestock and ranch animal sales. Verified sellers, transparent listings, secure transactions.',

@@ -348,9 +348,6 @@ export async function POST(request: Request) {
         sellerStripeAccountId: String(sellerStripeAccountId || ''),
         error: accErr?.message,
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent accounts.retrieve catch', message: 'returning 400 from accounts.retrieve', data: { status: 400, responseHasMessageField: false, accErrMsg: String(accErr?.message || '').slice(0, 120) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => {});
-      // #endregion
       return NextResponse.json(
         {
           error:
@@ -756,19 +753,12 @@ export async function POST(request: Request) {
       /no such destination|invalid.*destination|destination.*invalid|account.*does not exist|transfer_data/i.test(errMsg) ||
       /no such destination|invalid.*destination|destination.*invalid|account.*does not exist|transfer_data/i.test(stripeMsg);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent route catch', message: 'wire PI error', data: { errMsg: errMsg.slice(0, 200), stripeMsg: stripeMsg.slice(0, 200), looksLikeInvalidDestination, rawErrorMessage: String(error?.message || '').slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
-    // #endregion
-
     console.error('Error creating wire transfer intent:', {
       message: String(error?.message || error),
       stripe: stripePayload || undefined,
     });
 
     if (looksLikeInvalidDestination) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent 400 branch', message: 'returning friendly SELLER_ACCOUNT_INVALID', data: { status: 400 }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
-      // #endregion
       return NextResponse.json(
         {
           error:
@@ -794,9 +784,6 @@ export async function POST(request: Request) {
           : error?.message) || 'Unknown error',
       stripe: stripePayload || undefined,
     };
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'wire/create-intent 500 branch', message: 'returning 500', data: { status: 500, messageToClient: (payload500 as any).message?.slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
-    // #endregion
     return NextResponse.json(payload500, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@
  * Admin Dashboard for Protected Transactions
  * 
  * Shows orders with:
- * - Status "ready_to_release" (protection window ended, buyer accepted, or eligible)
+ * - Status "ready_to_release" (protection ended; seller was already paid at payment time)
  * - Open disputes requiring admin review
  */
 
@@ -41,7 +41,6 @@ import {
   Search,
   Filter,
   Package,
-  DollarSign,
   FileText,
   Image as ImageIcon,
 } from 'lucide-react';
@@ -50,7 +49,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Order, DisputeStatus, DisputeReason } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { releasePayment } from '@/lib/stripe/api';
+// Funds are direct buyer→seller via Stripe Connect destination charges; no payout release.
 import Link from 'next/link';
 import { AIDisputeSummary } from '@/components/admin/AIDisputeSummary';
 
@@ -104,7 +103,6 @@ export default function AdminProtectedTransactionsPage() {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [showDisputeDialog, setShowDisputeDialog] = useState(false);
-  const [showReleaseDialog, setShowReleaseDialog] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [resolutionType, setResolutionType] = useState<'release' | 'refund' | 'partial_refund'>('release');
   const [refundAmount, setRefundAmount] = useState('');
@@ -218,30 +216,6 @@ export default function AdminProtectedTransactionsPage() {
     return result.sort((a, b) => toMillisSafe((b as any).createdAt) - toMillisSafe((a as any).createdAt));
   }, [orders, filterType, searchQuery]);
 
-  const handleRelease = async (orderId: string) => {
-    if (!user) return;
-
-    try {
-      setProcessingId(orderId);
-      await releasePayment(orderId);
-      toast({
-        title: 'Payment released',
-        description: 'Funds have been transferred to the seller.',
-      });
-      // Refresh orders
-      // await loadOrders();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to release payment',
-        variant: 'destructive',
-      });
-    } finally {
-      setProcessingId(null);
-      setShowReleaseDialog(false);
-    }
-  };
-
   const handleResolveDispute = async () => {
     if (!selectedOrder || !user) return;
 
@@ -345,7 +319,7 @@ export default function AdminProtectedTransactionsPage() {
             Protected Transactions
           </h1>
           <p className="text-base md:text-lg text-muted-foreground">
-            Manage protected transaction orders, disputes, and releases
+            Manage protected transaction orders and disputes. Sellers are paid directly at payment time (buyer→seller).
           </p>
         </div>
 
@@ -370,7 +344,7 @@ export default function AdminProtectedTransactionsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Orders</SelectItem>
-                  <SelectItem value="ready_to_release">Ready to Release</SelectItem>
+                  <SelectItem value="ready_to_release">Protection ended (complete)</SelectItem>
                   <SelectItem value="disputes">Open Disputes</SelectItem>
                   <SelectItem value="protection_window">In Protection Window</SelectItem>
                 </SelectContent>
@@ -420,7 +394,7 @@ export default function AdminProtectedTransactionsPage() {
                         <div className="flex flex-wrap gap-2 mb-2">
                           {getDisputeStatusBadge(order.disputeStatus)}
                           {order.status === 'ready_to_release' && (
-                            <Badge variant="default" className="bg-green-600">Ready to Release</Badge>
+                            <Badge variant="default" className="bg-green-600">Protection ended</Badge>
                           )}
                           {order.payoutHoldReason === 'protection_window' && (
                             <Badge variant="default" className="bg-blue-600">Protection Window Active</Badge>
@@ -498,30 +472,6 @@ export default function AdminProtectedTransactionsPage() {
                         </Button>
                       </Link>
                       
-                      {order.status === 'ready_to_release' && (
-                        <Button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setShowReleaseDialog(true);
-                          }}
-                          disabled={processingId === order.id}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                          size="sm"
-                        >
-                          {processingId === order.id ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              Release Payment
-                            </>
-                          )}
-                        </Button>
-                      )}
-
                       {order.disputeStatus && 
                        ['open', 'needs_evidence', 'under_review'].includes(order.disputeStatus) && (
                         <Button
@@ -552,53 +502,6 @@ export default function AdminProtectedTransactionsPage() {
             </Button>
           </div>
         )}
-
-        {/* Release Dialog */}
-        <Dialog open={showReleaseDialog} onOpenChange={setShowReleaseDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Release Payment</DialogTitle>
-              <DialogDescription>
-                Release funds to seller for order {selectedOrder?.id.slice(-8)}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Seller Payout</p>
-                <p className="text-2xl font-bold">{selectedOrder && formatCurrency(selectedOrder.sellerAmount)}</p>
-              </div>
-              {selectedOrder?.protectionEndsAt && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Protection Window</p>
-                  <p className="text-sm">
-                    {selectedOrder.protectionEndsAt.getTime() < Date.now() 
-                      ? 'Protection window has ended'
-                      : `Ends on ${formatDate(selectedOrder.protectionEndsAt)}`}
-                  </p>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowReleaseDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => selectedOrder && handleRelease(selectedOrder.id)}
-                disabled={processingId === selectedOrder?.id}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {processingId === selectedOrder?.id ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  'Release Payment'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Dispute Resolution Dialog */}
         <Dialog open={showDisputeDialog} onOpenChange={setShowDisputeDialog}>
@@ -671,7 +574,7 @@ export default function AdminProtectedTransactionsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="release">Release to Seller</SelectItem>
+                      <SelectItem value="release">Resolve in seller&apos;s favor (no refund)</SelectItem>
                       <SelectItem value="refund">Full Refund to Buyer</SelectItem>
                       <SelectItem value="partial_refund">Partial Refund</SelectItem>
                     </SelectContent>

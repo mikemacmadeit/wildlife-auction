@@ -384,7 +384,7 @@ function getEmailTemplate(params: {
   const year = new Date().getFullYear();
   // Always use production origin for images/assets to ensure they load correctly
   // The origin param is used for links, but assets should always point to production
-  const productionOrigin = 'https://agchange.com';
+  const productionOrigin = 'https://agchange.app';
   const origin = params.origin || productionOrigin;
   const logoUrl = `${productionOrigin}/images/Kudu.png`;
   // Match homepage hero: the main wordmark uses Barletta Stamp.
@@ -522,7 +522,7 @@ function getEmailTemplate(params: {
                         </td>
                         <td align="right" style="vertical-align: middle;">
                           <a href="${origin}" style="font-family:${fontBody}; font-size: 12px; color:${cParchment}; font-weight: 800; text-decoration:none;">
-                            agchange.com
+                            agchange.app
                           </a>
                         </td>
                       </tr>
@@ -561,7 +561,7 @@ function getEmailTemplate(params: {
                 © ${year} Agchange. All rights reserved.
               </div>
               <div style="font-family: ${fontBody}; font-size: 12px; color:${cBark}; line-height: 1.4; margin-top: 6px;">
-                <a href="${origin}" style="color:${cSage}; text-decoration:none; font-weight:700;">Visit agchange.com</a>
+                <a href="${origin}" style="color:${cSage}; text-decoration:none; font-weight:700;">Visit agchange.app</a>
               </div>
             </td>
           </tr>
@@ -578,7 +578,7 @@ export function getOrderConfirmationEmail(data: OrderConfirmationEmailData): { s
   const subject = `Order Confirmation - ${data.listingTitle}`;
   const preheader = `Order confirmed for ${data.listingTitle}. Payment received.`;
   const origin = tryGetOrigin(data.orderUrl);
-  const contactUrl = `${origin || 'https://agchange.com'}/contact`;
+  const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       Order confirmed
@@ -643,7 +643,7 @@ export function getDeliveryConfirmationEmail(data: DeliveryConfirmationEmailData
   const subject = `Delivery Confirmed - ${data.listingTitle}`;
   const preheader = `Delivery confirmed for ${data.listingTitle}. Review and confirm receipt if everything looks good.`;
   const origin = tryGetOrigin(data.orderUrl);
-  const contactUrl = `${origin || 'https://agchange.com'}/contact`;
+  const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const checkInUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}checkin=1`;
   const issueUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}issue=1`;
   const content = `
@@ -1110,7 +1110,7 @@ export function getAuctionLostEmail(data: AuctionLostEmailData): { subject: stri
   const subject = `Auction ended — ${data.listingTitle}`;
   const preheader = `That one got away. Keep your watchlist tight—new inventory drops weekly.`;
   const origin = tryGetOrigin(data.listingUrl);
-  const browseUrl = `${origin || 'https://agchange.com'}/browse`;
+  const browseUrl = `${origin || 'https://agchange.app'}/browse`;
 
   const finalBidLine =
     typeof data.finalBidAmount === 'number'
@@ -1159,7 +1159,7 @@ export function getDeliveryCheckInEmail(data: DeliveryCheckInEmailData): { subje
   const subject = `Quick check-in — ${data.listingTitle}`;
   const preheader = `How did it go? Confirm receipt or report an issue.`;
   const origin = tryGetOrigin(data.orderUrl);
-  const contactUrl = `${origin || 'https://agchange.com'}/contact`;
+  const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const checkInUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}checkin=1`;
   const issueUrl = `${data.orderUrl}${data.orderUrl.includes('?') ? '&' : '?'}issue=1`;
 
@@ -1236,7 +1236,7 @@ export function getWeeklyDigestEmail(data: WeeklyDigestEmailData): { subject: st
   const subject = `Weekly digest — fresh auctions & inventory`;
   const preheader = `A quick scan of what’s new (Texas-only).`;
   const origin = data.listings?.[0]?.url ? tryGetOrigin(data.listings[0].url) : null;
-  const browseUrl = `${origin || 'https://agchange.com'}/browse`;
+  const browseUrl = `${origin || 'https://agchange.app'}/browse`;
 
   const items = (data.listings || [])
     .slice(0, 12)
@@ -1287,7 +1287,7 @@ export function getSavedSearchAlertEmail(data: SavedSearchAlertEmailData): { sub
   const subject = `Saved search alert — ${data.queryName}`;
   const preheader = `${data.resultsCount} new match${data.resultsCount === 1 ? '' : 'es'} for your search.`;
   const origin = tryGetOrigin(data.searchUrl);
-  const manageUrl = `${origin || 'https://agchange.com'}/dashboard/saved-searches`;
+  const manageUrl = `${origin || 'https://agchange.app'}/dashboard/saved-searches`;
 
   const unsub = data.unsubscribeUrl
     ? `<div style="margin-top: 18px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
@@ -1825,7 +1825,7 @@ export function getOrderTransferComplianceRequiredEmail(
   const subject = `TPWD Transfer Compliance Required — ${data.listingTitle}`;
   const preheader = `TPWD transfer permit compliance confirmation required before fulfillment can proceed.`;
   const origin = tryGetOrigin(data.orderUrl);
-  const contactUrl = `${origin || 'https://agchange.com'}/contact`;
+  const contactUrl = `${origin || 'https://agchange.app'}/contact`;
   const content = `
     <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
       TPWD Transfer Compliance Required

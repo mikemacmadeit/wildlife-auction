@@ -5,4 +5,4 @@
 export const BRAND_DISPLAY_NAME = 'Agchange';
 
 export const SUPPORT_EMAIL =
-  process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@agchange.com';
+  process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@agchange.app';

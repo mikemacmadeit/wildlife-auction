@@ -33,8 +33,9 @@ export async function POST(request: Request, ctx: { params: { userId: string } }
     const email = user.email;
     if (!email) return json({ ok: false, error: 'Target user has no email address' }, { status: 400 });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-    const continueUrl = appUrl ? `${appUrl}/login` : undefined;
+    const { getSiteUrl } = await import('@/lib/site-url');
+    const siteUrl = getSiteUrl();
+    const continueUrl = siteUrl && !siteUrl.includes('localhost') ? `${siteUrl}/login` : undefined;
     const link = await auth.generatePasswordResetLink(email, continueUrl ? { url: continueUrl } : undefined);
 
     await createAuditLog(db as any, {

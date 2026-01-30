@@ -454,7 +454,7 @@ export default function TrustPage() {
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <a href="mailto:compliance@agchange.com" className="flex items-center gap-2">
+                  <a href="mailto:compliance@agchange.app" className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
                     Email Compliance Team
                   </a>

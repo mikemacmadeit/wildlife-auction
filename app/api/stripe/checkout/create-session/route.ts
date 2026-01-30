@@ -155,15 +155,6 @@ export async function POST(request: Request) {
 
     const { listingId, offerId, quantity: quantityRaw, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
 
-    // #region agent log
-    const serverBuild = BUILD_INFO?.shortSha ?? BUILD_INFO?.builtAtIso ?? 'unknown';
-    const clientBuild = request.headers.get('x-client-build') ?? 'none';
-    const referer = request.headers.get('referer') ?? 'none';
-    const origin = request.headers.get('origin') ?? 'none';
-    logInfo('Checkout create-session build identity', { serverBuild, clientBuild, referer: referer.slice(0, 80), origin: origin.slice(0, 80), listingId, buyerId });
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'create-session/route.ts POST', message: 'build identity', data: { serverBuild, clientBuild, referer: referer.slice(0, 120), origin: origin.slice(0, 80), listingId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => {});
-    // #endregion
-
     // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
     const normalizedPaymentMethod =
       paymentMethodRaw === 'ach' ? 'ach_debit' : (paymentMethodRaw || 'card');

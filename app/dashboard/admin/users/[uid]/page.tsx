@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, ArrowLeft, ShieldAlert, UserX, UserCheck, Ban, Clock, RefreshCw, KeyRound, LogOut, MessageSquareOff, BadgeAlert } from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldAlert, UserX, UserCheck, Ban, Clock, RefreshCw, KeyRound, LogOut, MessageSquareOff, BadgeAlert, Copy, ExternalLink, FileText, History } from 'lucide-react';
 import { getEffectiveSubscriptionTier, getTierLabel, type SubscriptionTier } from '@/lib/pricing/subscriptions';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 
@@ -126,6 +126,7 @@ export default function AdminUserDossierPage() {
   const email = data?.authUser?.email || data?.summary?.email || data?.userDoc?.email || null;
   const phone = data?.authUser?.phoneNumber || data?.summary?.phoneNumber || data?.userDoc?.phoneNumber || null;
   const role = data?.summary?.role || data?.userDoc?.role || null;
+  const lastSignInAt = data?.authUser?.lastSignInAt ? new Date(data.authUser.lastSignInAt).toLocaleString() : null;
   const status = data?.summary?.status || null;
   const authDisabled = !!data?.authUser?.disabled || !!data?.summary?.authDisabled;
 
@@ -257,9 +258,44 @@ export default function AdminUserDossierPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-xl md:text-3xl font-extrabold text-foreground truncate">User dossier</h1>
-              <div className="text-xs md:text-sm text-muted-foreground font-mono truncate">UID: {uid}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs md:text-sm text-muted-foreground font-mono truncate">UID: {uid}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={async () => {
+                    if (!uid) return;
+                    try {
+                      await navigator.clipboard.writeText(uid);
+                      toast({ title: 'UID copied' });
+                    } catch {
+                      toast({ title: 'Copy failed', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                {email && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(email);
+                        toast({ title: 'Email copied' });
+                      } catch {
+                        toast({ title: 'Copy failed', variant: 'destructive' });
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -313,11 +349,20 @@ export default function AdminUserDossierPage() {
                   <CardDescription className="text-xs md:text-sm break-all">
                     {email || '—'} {phone ? ` • ${phone}` : ''}
                   </CardDescription>
+                  {lastSignInAt && (
+                    <p className="text-xs text-muted-foreground mt-1">Last sign-in: {lastSignInAt}</p>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4 px-3 sm:px-6 pb-4 md:pb-6">
                   <div className="flex flex-wrap gap-1.5 md:gap-2 items-center">
                     {statusBadge(status, authDisabled)}
-                    {role ? <Badge variant="secondary">{role}</Badge> : <Badge variant="outline">role unknown</Badge>}
+                    {role ? (
+                      <Badge variant={role === 'super_admin' || role === 'admin' ? 'default' : 'secondary'}>
+                        {String(role).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">Role unknown</Badge>
+                    )}
                     {data.authUser?.emailVerified ? (
                       <Badge className="bg-emerald-500 text-emerald-950">Email verified</Badge>
                     ) : (
@@ -372,6 +417,15 @@ export default function AdminUserDossierPage() {
                       <div className="text-[10px] md:text-xs text-muted-foreground">GMV: ${(Number(counts.gmvBuyCents || 0) / 100).toLocaleString()}</div>
                     </div>
                   </div>
+                  <div className="pt-2">
+                    <Link
+                      href={uid ? `/dashboard/admin/listings?sellerId=${encodeURIComponent(uid)}` : '/dashboard/admin/listings'}
+                      className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      View this user&apos;s listings
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -407,7 +461,11 @@ export default function AdminUserDossierPage() {
 
                   <div className="space-y-2">
                     {(data.notes || []).length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No notes yet.</div>
+                      <div className="flex flex-col items-center justify-center py-6 rounded-lg border border-dashed border-border bg-muted/10 text-center">
+                        <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No notes yet.</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Add a note above to record internal context.</p>
+                      </div>
                     ) : (
                       data.notes.map((n) => (
                         <div key={n.id} className="rounded-lg border bg-muted/20 p-3">
@@ -429,7 +487,22 @@ export default function AdminUserDossierPage() {
                 </CardHeader>
                 <CardContent className="space-y-2 px-3 sm:px-6 pb-4 md:pb-6">
                   {(data.audits || []).length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No audit entries found. Ensure the Firestore index for auditLogs (targetUserId + createdAt) is deployed.</div>
+                    <div className="flex flex-col items-center justify-center py-6 rounded-lg border border-dashed border-border bg-muted/10 text-center">
+                      <History className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">No audit entries found.</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Admin actions will appear here.</p>
+                      {typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_FIREBASE_PROJECT_ID && (
+                        <a
+                          href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/indexes`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"
+                        >
+                          Firestore indexes
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        </a>
+                      )}
+                    </div>
                   ) : (
                     data.audits.map((a) => (
                       <div key={a.auditId} className="rounded-lg border bg-muted/20 p-3">
@@ -551,27 +624,29 @@ export default function AdminUserDossierPage() {
                   <CardTitle className="text-base md:text-lg">Admin actions</CardTitle>
                   <CardDescription className="text-xs md:text-sm">All actions require a reason and are audited.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2 md:space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() =>
-                      openConfirm({
-                        title: 'Force logout user?',
-                        description: 'This revokes refresh tokens and forces sign-out across devices.',
-                        action: async () => {
-                          await postJson(`/api/admin/users/${uid}/force-logout`, { reason: confirmReason.trim() });
-                          toast({ title: 'Force logout triggered' });
-                        },
-                      })
-                    }
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Force logout
-                  </Button>
+                <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Account status</p>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() =>
+                        openConfirm({
+                          title: 'Force logout user?',
+                          description: 'This revokes refresh tokens and forces sign-out across devices.',
+                          action: async () => {
+                            await postJson(`/api/admin/users/${uid}/force-logout`, { reason: confirmReason.trim() });
+                            toast({ title: 'Force logout triggered' });
+                          },
+                        })
+                      }
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Force logout
+                    </Button>
 
-                  <Button
-                    variant={flags.messagingMuted ? 'secondary' : 'outline'}
+                    <Button
+                      variant={flags.messagingMuted ? 'secondary' : 'outline'}
                     className="w-full justify-start"
                     onClick={() =>
                       openConfirm({
@@ -683,9 +758,10 @@ export default function AdminUserDossierPage() {
                     <Ban className="h-4 w-4 mr-2" />
                     Ban
                   </Button>
+                  </div>
 
                   <Separator />
-
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tools</p>
                   <Button
                     variant="outline"
                     className="w-full justify-start"
@@ -713,7 +789,11 @@ export default function AdminUserDossierPage() {
               <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
                 <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
                   <CardTitle className="text-base md:text-lg">Risk label</CardTitle>
-                  <CardDescription className="text-xs md:text-sm">Manual for now (audited).</CardDescription>
+                  <CardDescription className="text-xs md:text-sm">
+                    {riskLabel === 'unknown'
+                      ? 'Manual for now (audited). Set when you have enough signal (e.g. disputes, reports).'
+                      : 'Manual for now (audited).'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
                   <Select value={riskLabel} onValueChange={(v) => setRiskLabel(v as any)}>
@@ -763,12 +843,30 @@ export default function AdminUserDossierPage() {
               <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
                 <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
                   <CardTitle className="text-base md:text-lg">Stripe</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Connect account status.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2 text-xs md:text-sm px-3 sm:px-6 pb-4 md:pb-6">
-                  <div>Account: <span className="font-semibold">{stripe.accountId || '—'}</span></div>
-                  <div>Onboarding: <span className="font-semibold">{stripe.onboardingStatus || '—'}</span></div>
-                  <div>Payouts enabled: <span className="font-semibold">{String(stripe.payoutsEnabled ?? '—')}</span></div>
-                  <div>Charges enabled: <span className="font-semibold">{String(stripe.chargesEnabled ?? '—')}</span></div>
+                <CardContent className="space-y-3 px-3 sm:px-6 pb-4 md:pb-6">
+                  <div className="flex flex-wrap gap-2 text-xs md:text-sm">
+                    <span className="font-mono font-semibold">{stripe.accountId || '—'}</span>
+                    {stripe.accountId && (
+                      <a
+                        href={`https://dashboard.stripe.com/connect/accounts/${stripe.accountId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        Open in Stripe
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={stripe.onboardingStatus === 'complete' ? 'default' : 'secondary'}>
+                      Onboarding: {stripe.onboardingStatus || '—'}
+                    </Badge>
+                    <Badge variant={stripe.payoutsEnabled ? 'default' : 'outline'}>Payouts: {String(stripe.payoutsEnabled ?? '—')}</Badge>
+                    <Badge variant={stripe.chargesEnabled ? 'default' : 'outline'}>Charges: {String(stripe.chargesEnabled ?? '—')}</Badge>
+                  </div>
                 </CardContent>
               </Card>
 

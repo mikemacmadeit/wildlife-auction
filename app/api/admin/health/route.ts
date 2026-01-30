@@ -30,6 +30,8 @@ type HealthCheck = {
   details?: Record<string, any>;
   action?: string;
   docs?: string;
+  dashboardUrl?: string;
+  category?: 'connectivity' | 'monitoring' | 'payments' | 'jobs' | 'indexes' | 'flags';
 };
 
 function isMissingIndexError(e: any): boolean {
@@ -107,6 +109,7 @@ export async function GET(request: Request) {
       title: 'Firestore connectivity (Admin)',
       status: 'OK',
       message: 'Firestore Admin SDK can read successfully.',
+      category: 'connectivity',
     });
   } catch (e: any) {
     checks.push({
@@ -116,6 +119,7 @@ export async function GET(request: Request) {
       message: `Firestore Admin SDK read failed: ${e?.message || 'unknown error'}`,
       details: { code: e?.code },
       action: 'Check Firebase Admin credentials and FIREBASE_PROJECT_ID configuration.',
+      category: 'connectivity',
     });
   }
 
@@ -130,6 +134,8 @@ export async function GET(request: Request) {
         : 'Upstash is not configured (dev only).',
       action: 'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.',
       docs: 'https://upstash.com/docs/redis/howto/nextjs-ratelimit',
+      category: 'monitoring',
+      dashboardUrl: 'https://console.upstash.com',
     });
   } else {
     try {
@@ -139,7 +145,10 @@ export async function GET(request: Request) {
         id: 'upstash_redis',
         title: 'Upstash Redis (rate limiting)',
         status: 'OK',
-        message: 'Upstash Redis connected.',
+        message: 'Upstash Redis connected; rate limiting effective.',
+        details: { ping: true },
+        category: 'monitoring',
+        dashboardUrl: 'https://console.upstash.com',
       });
     } catch (e: any) {
       checks.push({
@@ -147,7 +156,10 @@ export async function GET(request: Request) {
         title: 'Upstash Redis (rate limiting)',
         status: 'FAIL',
         message: `Upstash Redis ping failed: ${e?.message || 'unknown error'}`,
+        details: { error: e?.message || 'unknown' },
         action: 'Verify Upstash credentials and network access from Netlify runtime.',
+        category: 'monitoring',
+        dashboardUrl: 'https://console.upstash.com',
       });
     }
   }
@@ -166,15 +178,31 @@ export async function GET(request: Request) {
       },
       action: 'Set STRIPE_SECRET_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, and STRIPE_WEBHOOK_SECRET.',
       docs: 'https://stripe.com/docs/keys',
+      category: 'payments',
+      dashboardUrl: 'https://dashboard.stripe.com',
     });
   } else {
     try {
       // Lightweight call to validate key works (resource_missing is OK).
       await stripe.customers.retrieve('cus_healthcheck_nonexistent');
-      checks.push({ id: 'stripe_api', title: 'Stripe API connectivity', status: 'OK', message: 'Stripe API reachable.' });
+      checks.push({
+        id: 'stripe_api',
+        title: 'Stripe API connectivity',
+        status: 'OK',
+        message: 'Stripe API reachable.',
+        category: 'payments',
+        dashboardUrl: 'https://dashboard.stripe.com',
+      });
     } catch (e: any) {
       if (String(e?.code || '') === 'resource_missing') {
-        checks.push({ id: 'stripe_api', title: 'Stripe API connectivity', status: 'OK', message: 'Stripe API reachable.' });
+        checks.push({
+          id: 'stripe_api',
+          title: 'Stripe API connectivity',
+          status: 'OK',
+          message: 'Stripe API reachable.',
+          category: 'payments',
+          dashboardUrl: 'https://dashboard.stripe.com',
+        });
       } else {
         checks.push({
           id: 'stripe_api',
@@ -183,6 +211,8 @@ export async function GET(request: Request) {
           message: `Stripe API call failed: ${e?.message || 'unknown error'}`,
           details: { code: e?.code, type: e?.type },
           action: 'Check STRIPE_SECRET_KEY and Stripe account permissions.',
+          category: 'payments',
+          dashboardUrl: 'https://dashboard.stripe.com',
         });
       }
     }
@@ -197,12 +227,21 @@ export async function GET(request: Request) {
     details: { provider: process.env.BREVO_API_KEY ? 'brevo' : process.env.RESEND_API_KEY ? 'resend' : 'none' },
     action: emailConfigured ? undefined : 'Set BREVO_API_KEY (preferred) or RESEND_API_KEY for transactional messages.',
   });
+  const sentryServer = !!process.env.SENTRY_DSN;
+  const sentryClient = !!process.env.NEXT_PUBLIC_SENTRY_DSN;
+  const sentryConfigured = sentryServer || sentryClient;
   checks.push({
     id: 'monitoring_sentry',
-    title: 'Monitoring (Sentry) configured',
-    status: !!process.env.SENTRY_DSN || !!process.env.NEXT_PUBLIC_SENTRY_DSN ? 'OK' : 'WARN',
-    message: !!process.env.SENTRY_DSN || !!process.env.NEXT_PUBLIC_SENTRY_DSN ? 'Sentry DSN is set.' : 'Sentry DSN is not set.',
-    action: 'Set SENTRY_DSN (server) and/or NEXT_PUBLIC_SENTRY_DSN (client).',
+    title: 'Monitoring (Sentry)',
+    status: sentryConfigured ? 'OK' : 'WARN',
+    message: sentryConfigured
+      ? (sentryServer && sentryClient ? 'Sentry DSN set (server + client).' : sentryServer ? 'Sentry DSN set (server).' : 'Sentry DSN set (client).')
+      : 'Sentry DSN is not set.',
+    details: { serverDsn: sentryServer, clientDsn: sentryClient },
+    action: sentryConfigured ? undefined : 'Set SENTRY_DSN (server) and/or NEXT_PUBLIC_SENTRY_DSN (client).',
+    category: 'monitoring',
+    dashboardUrl: 'https://sentry.io',
+    docs: 'https://docs.sentry.io/platforms/javascript/guides/nextjs/',
   });
 
   // Emergency flags visibility (ops control)
@@ -211,6 +250,7 @@ export async function GET(request: Request) {
     title: 'Emergency flags',
     status: envBool('GLOBAL_CHECKOUT_FREEZE_ENABLED') || envBool('GLOBAL_PAYOUT_FREEZE_ENABLED') ? 'WARN' : 'OK',
     message: `Checkout freeze: ${envBool('GLOBAL_CHECKOUT_FREEZE_ENABLED') ? 'ON' : 'OFF'} • Payout freeze: ${envBool('GLOBAL_PAYOUT_FREEZE_ENABLED') ? 'ON' : 'OFF'} • Auto-release: ${envBool('AUTO_RELEASE_ENABLED') ? 'ON' : 'OFF'}`,
+    category: 'flags',
   });
 
   // Storage bucket sanity (common prod misconfig)
@@ -224,6 +264,7 @@ export async function GET(request: Request) {
       message: 'Storage bucket env is set to *.firebasestorage.app; canonical default is *.appspot.com (client normalizes this).',
       details: { projectId: pid, storageBucket: bucket, expected: `${pid}.appspot.com` },
       action: `Update NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET to "${pid}.appspot.com" in Netlify env for clarity.`,
+      category: 'connectivity',
     });
   } else {
     checks.push({
@@ -232,30 +273,22 @@ export async function GET(request: Request) {
       status: bucket ? 'OK' : 'WARN',
       message: bucket ? 'Storage bucket env is present.' : 'Storage bucket env is missing (NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET).',
       details: bucket ? { storageBucket: bucket } : undefined,
+      category: 'connectivity',
     });
   }
 
-  // opsHealth freshness (jobs + webhooks)
+  // opsHealth: autoReleaseProtected job was retired (direct buyer→seller model). Show retired check so dashboard doesn't FAIL forever.
   const autoReleaseLastRun = toDateSafe(autoRelease?.lastRunAt);
-  if (!autoReleaseLastRun) {
-    checks.push({
-      id: 'ops_autoReleaseProtected',
-      title: 'Scheduled job: autoReleaseProtected',
-      status: envBool('AUTO_RELEASE_ENABLED') ? 'WARN' : 'DEV',
-      message: 'No run record found yet.',
-      action: envBool('AUTO_RELEASE_ENABLED') ? 'Check Netlify scheduled function deployment/logs.' : 'Enable AUTO_RELEASE_ENABLED only if you want auto-release fallback running.',
-    });
-  } else {
-    const minutesAgo = (Date.now() - autoReleaseLastRun.getTime()) / (1000 * 60);
-    checks.push({
-      id: 'ops_autoReleaseProtected',
-      title: 'Scheduled job: autoReleaseProtected',
-      status: minutesAgo > 25 ? 'FAIL' : minutesAgo > 15 ? 'WARN' : 'OK',
-      message: `Last run ${Math.round(minutesAgo)} min ago.`,
-      details: { lastRunAt: autoReleaseLastRun.toISOString(), errorsCount: autoRelease?.errorsCount ?? null, lastError: autoRelease?.lastError ?? null },
-      action: minutesAgo > 25 ? 'Check Netlify function logs for autoReleaseProtected + verify schedule is enabled.' : undefined,
-    });
-  }
+  checks.push({
+    id: 'ops_autoReleaseProtected',
+    title: 'Scheduled job: autoReleaseProtected (retired)',
+    status: 'OK',
+    message: autoReleaseLastRun
+      ? `Job retired (direct buyer→seller). Last run ${Math.round((Date.now() - autoReleaseLastRun.getTime()) / (1000 * 60))} min ago (historical).`
+      : 'Job retired. Payments are direct buyer→seller; no platform release.',
+    details: autoReleaseLastRun ? { lastRunAt: autoReleaseLastRun.toISOString() } : undefined,
+    category: 'jobs',
+  });
 
   const aggLastRun = toDateSafe(aggregateRevenue?.lastRunAt);
   if (!aggLastRun) {
@@ -265,6 +298,7 @@ export async function GET(request: Request) {
       status: 'WARN',
       message: 'No run record found yet.',
       action: 'Check Netlify scheduled function deployment/logs for aggregateRevenue.',
+      category: 'jobs',
     });
   } else {
     const minutesAgo = (Date.now() - aggLastRun.getTime()) / (1000 * 60);
@@ -275,6 +309,7 @@ export async function GET(request: Request) {
       message: `Last run ${Math.round(minutesAgo)} min ago.`,
       details: { lastRunAt: aggLastRun.toISOString(), processed: aggregateRevenue?.processed ?? null, durationMs: aggregateRevenue?.durationMs ?? null },
       action: minutesAgo > 80 ? 'Check Netlify function logs for aggregateRevenue + verify schedule is enabled.' : undefined,
+      category: 'jobs',
     });
   }
 
@@ -288,6 +323,7 @@ export async function GET(request: Request) {
       details: stripeWebhook ? { lastEventType: stripeWebhook?.lastEventType ?? null, lastEventId: stripeWebhook?.lastEventId ?? null } : undefined,
       action: stripeConfigured ? 'Verify Stripe webhook endpoint + send a test event in Stripe Dashboard.' : 'Configure Stripe keys first.',
       docs: 'https://dashboard.stripe.com/webhooks',
+      category: 'payments',
     });
   } else {
     const hoursAgo = (Date.now() - webhookLast.getTime()) / (1000 * 60 * 60);
@@ -298,6 +334,7 @@ export async function GET(request: Request) {
       message: `Last event ${Math.round(hoursAgo)} hours ago (${String(stripeWebhook?.lastEventType || 'unknown')}).`,
       details: { lastWebhookAt: webhookLast.toISOString(), lastEventType: stripeWebhook?.lastEventType ?? null, lastEventId: stripeWebhook?.lastEventId ?? null },
       action: hoursAgo > 30 ? 'Check Stripe webhook delivery logs + Netlify function logs (/api/stripe/webhook).' : undefined,
+      category: 'payments',
     });
   }
 
@@ -310,6 +347,7 @@ export async function GET(request: Request) {
       title: 'Index: flagged threads (messageThreads flagged + updatedAt)',
       status: 'OK',
       message: 'Composite index is available.',
+      category: 'indexes',
     });
   } catch (e: any) {
     checks.push({
@@ -319,6 +357,7 @@ export async function GET(request: Request) {
       message: isMissingIndexError(e) ? 'Missing composite index (admin/messages will fall back).' : `Query failed: ${e?.message || 'unknown error'}`,
       details: { code: e?.code, indexUrl: extractIndexUrl(e) },
       action: 'Deploy Firestore indexes (firebase deploy --only firestore:indexes).',
+      category: 'indexes',
     });
   }
 
@@ -330,6 +369,7 @@ export async function GET(request: Request) {
       title: 'Index: support tickets (supportTickets status + createdAt)',
       status: 'OK',
       message: 'Composite index is available.',
+      category: 'indexes',
     });
   } catch (e: any) {
     checks.push({
@@ -339,6 +379,7 @@ export async function GET(request: Request) {
       message: isMissingIndexError(e) ? 'Missing composite index (admin/support will fall back).' : `Query failed: ${e?.message || 'unknown error'}`,
       details: { code: e?.code, indexUrl: extractIndexUrl(e) },
       action: 'Deploy Firestore indexes (firebase deploy --only firestore:indexes).',
+      category: 'indexes',
     });
   }
 
@@ -356,6 +397,7 @@ export async function GET(request: Request) {
       title: 'Index: payout holds (orders payoutHoldReason + createdAt)',
       status: 'OK',
       message: 'Composite index is available.',
+      category: 'indexes',
     });
   } catch (e: any) {
     checks.push({
@@ -365,6 +407,7 @@ export async function GET(request: Request) {
       message: isMissingIndexError(e) ? 'Missing composite index (admin/compliance payout holds may fail).' : `Query failed: ${e?.message || 'unknown error'}`,
       details: { code: e?.code, indexUrl: extractIndexUrl(e) },
       action: 'Deploy Firestore indexes (firebase deploy --only firestore:indexes).',
+      category: 'indexes',
     });
   }
 

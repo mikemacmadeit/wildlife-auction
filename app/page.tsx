@@ -22,6 +22,7 @@ import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Spinner } from '@/components/ui/spinner';
 import { ListingRailSkeleton } from '@/components/skeletons/SkeletonCard';
+import { HomepageAdCarousel } from '@/components/home/HomepageAdCarousel';
 import { User } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
 // Removed useFavorites import - homepage doesn't need it
@@ -1607,6 +1608,9 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Ad carousel — under Ending Soon (at least two rows of listings above) */}
+      <HomepageAdCarousel />
 
       {/* Recent Listings */}
       <section className="py-12 md:py-16 bg-background border-t border-border/50">

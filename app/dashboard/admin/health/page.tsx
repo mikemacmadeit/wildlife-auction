@@ -17,7 +17,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, RefreshCw, Activity, AlertTriangle, CheckCircle2, XCircle, Copy } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Copy, ExternalLink, Shield } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 type HealthStatus = 'OK' | 'WARN' | 'FAIL' | 'DEV';
@@ -29,6 +29,8 @@ type HealthCheck = {
   details?: Record<string, any>;
   action?: string;
   docs?: string;
+  dashboardUrl?: string;
+  category?: 'connectivity' | 'monitoring' | 'payments' | 'jobs' | 'indexes' | 'flags';
 };
 
 type AdminHealthResponse = {
@@ -94,7 +96,6 @@ export default function OpsHealthPage() {
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [runningAutoRelease, setRunningAutoRelease] = useState(false);
   const [adminHealth, setAdminHealth] = useState<AdminHealthResponse | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -121,26 +122,6 @@ export default function OpsHealthPage() {
       setLastRefresh(new Date());
     }
   }, [user]);
-
-  const runAutoReleaseNow = useCallback(async () => {
-    // This endpoint exists in Netlify; locally it may 404.
-    setRunningAutoRelease(true);
-    try {
-      const res = await fetch('/.netlify/functions/autoReleaseProtected', { method: 'GET' });
-      const text = await res.text().catch(() => '');
-      if (!res.ok) throw new Error(text || `Failed to invoke auto-release (HTTP ${res.status})`);
-      toast({ title: 'Auto-release triggered', description: 'Scheduler run invoked. Refreshing health…' });
-      await loadHealthData();
-    } catch (error: any) {
-      toast({
-        title: 'Failed to trigger auto-release',
-        description: error?.message || 'This may not be available in local dev. Try in production.',
-        variant: 'destructive',
-      });
-    } finally {
-      setRunningAutoRelease(false);
-    }
-  }, [loadHealthData, toast]);
 
   useEffect(() => {
     if (!adminLoading && isAdmin && user) {
@@ -173,6 +154,87 @@ export default function OpsHealthPage() {
       return hay.includes(q);
     });
   }, [checks, query, statusFilter]);
+
+  const keyServiceIds = ['firebase_firestore', 'upstash_redis', 'monitoring_sentry', 'stripe_api'] as const;
+  const keyServices = useMemo(() => {
+    const list: HealthCheck[] = [];
+    for (const id of keyServiceIds) {
+      const fromCheck = checks.find((c) => c.id === id);
+      if (fromCheck) {
+        list.push(fromCheck);
+        continue;
+      }
+      // Fallback from config so Redis and Sentry always appear even if checks missed
+      if (id === 'upstash_redis' && adminHealth?.config?.rateLimiting) {
+        const r = adminHealth.config.rateLimiting;
+        list.push({
+          id: 'upstash_redis',
+          title: 'Upstash Redis (rate limiting)',
+          status: r.upstashConfigured ? (r.effectiveInNetlify ? 'OK' : 'WARN') : 'FAIL',
+          message: r.upstashConfigured
+            ? (r.effectiveInNetlify ? 'Redis configured and effective.' : 'Redis configured; not effective in this runtime.')
+            : 'Upstash not configured. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.',
+          category: 'monitoring',
+          dashboardUrl: 'https://console.upstash.com',
+        });
+        continue;
+      }
+      if (id === 'monitoring_sentry' && adminHealth?.config?.monitoring) {
+        const s = adminHealth.config.monitoring;
+        list.push({
+          id: 'monitoring_sentry',
+          title: 'Monitoring (Sentry)',
+          status: s.sentryConfigured ? 'OK' : 'WARN',
+          message: s.sentryConfigured ? 'Sentry DSN is set.' : 'Sentry DSN is not set.',
+          category: 'monitoring',
+          dashboardUrl: 'https://sentry.io',
+        });
+        continue;
+      }
+      if (id === 'firebase_firestore' && adminHealth?.config?.firebaseAdmin) {
+        const f = adminHealth.config.firebaseAdmin;
+        list.push({
+          id: 'firebase_firestore',
+          title: 'Firestore connectivity (Admin)',
+          status: f.ok ? 'OK' : 'FAIL',
+          message: f.ok ? 'Firestore Admin SDK available.' : 'Firebase Admin not configured.',
+          category: 'connectivity',
+        });
+        continue;
+      }
+      if (id === 'stripe_api' && adminHealth?.config?.stripe) {
+        const st = adminHealth.config.stripe;
+        list.push({
+          id: 'stripe_api',
+          title: 'Stripe API connectivity',
+          status: st.configured ? 'OK' : 'FAIL',
+          message: st.configured ? 'Stripe configured.' : 'Stripe keys or webhook secret missing.',
+          category: 'payments',
+          dashboardUrl: 'https://dashboard.stripe.com',
+        });
+      }
+    }
+    return list;
+  }, [checks, adminHealth?.config]);
+
+  const categoryOrder: (HealthCheck['category'])[] = ['connectivity', 'monitoring', 'payments', 'jobs', 'indexes', 'flags'];
+  const checksByCategory = useMemo(() => {
+    const map = new Map<HealthCheck['category'], HealthCheck[]>();
+    for (const c of filteredChecks) {
+      const cat = c.category || 'connectivity';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(c);
+    }
+    return categoryOrder.map((cat) => ({ category: cat, checks: map.get(cat) || [] })).filter((g) => g.checks.length > 0);
+  }, [filteredChecks]);
+  const categoryLabels: Record<string, string> = {
+    connectivity: 'Connectivity & storage',
+    monitoring: 'Rate limiting & monitoring',
+    payments: 'Payments (Stripe)',
+    jobs: 'Scheduled jobs',
+    indexes: 'Firestore indexes',
+    flags: 'Emergency flags',
+  };
 
   if (adminLoading) {
     return (
@@ -208,11 +270,6 @@ export default function OpsHealthPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <Button onClick={runAutoReleaseNow} disabled={runningAutoRelease || loading} variant="secondary" className="h-9 px-3 md:h-10 md:px-4">
-              <Activity className={`h-4 w-4 mr-2 ${runningAutoRelease ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Run Auto-Release Now</span>
-              <span className="sm:hidden">Auto-Release</span>
-            </Button>
             <Button onClick={loadHealthData} disabled={loading} variant="outline" className="h-9 px-3 md:h-10 md:px-4">
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -236,6 +293,48 @@ export default function OpsHealthPage() {
               </span>
               <span className="text-muted-foreground"> — filter or scroll to review checks below.</span>
             </div>
+          )}
+
+          {/* Key services at-a-glance: Redis, Sentry, Stripe, Firestore */}
+          {keyServices.length > 0 && (
+            <Card className="rounded-xl border-2 border-border/60 bg-card">
+              <CardHeader className="pb-2 px-3 sm:px-6 pt-4 md:pt-6">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Key services
+                </CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                  Redis (rate limiting), Sentry (errors), Stripe, Firestore — status and quick links.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-6 pb-4 md:pb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                  {keyServices.map((c) => (
+                    <div
+                      key={c.id}
+                      className="rounded-lg border border-border/60 bg-muted/20 p-3 md:p-4 flex flex-col gap-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-semibold truncate">{c.title.replace(/ \(.*\)$/, '')}</span>
+                        {statusBadge(c.status)}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{c.message}</p>
+                      {c.dashboardUrl && (
+                        <a
+                          href={c.dashboardUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1 mt-auto"
+                        >
+                          Open dashboard
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
@@ -324,7 +423,7 @@ export default function OpsHealthPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-2 md:space-y-3">
+          <div className="space-y-6 md:space-y-8">
             {!adminHealth ? (
               <Card className="rounded-xl border border-destructive/30 bg-destructive/5">
                 <CardContent className="pt-4 pb-4 px-3 sm:px-6 text-sm text-destructive">Health API not available. Try refresh.</CardContent>
@@ -334,7 +433,13 @@ export default function OpsHealthPage() {
                 <CardContent className="pt-4 pb-4 px-3 sm:px-6 text-sm text-muted-foreground">No checks match your filters.</CardContent>
               </Card>
             ) : (
-              filteredChecks.map((c) => (
+              checksByCategory.map(({ category, checks: groupChecks }) => (
+                <div key={category}>
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 md:mb-4">
+                    {category != null ? (categoryLabels[category] || category) : 'Other'}
+                  </h2>
+                  <div className="space-y-2 md:space-y-3">
+                    {groupChecks.map((c) => (
                 <Card key={c.id} className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
                   <CardHeader className="pb-2 px-3 sm:px-6 pt-4 md:pt-6">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
@@ -358,6 +463,14 @@ export default function OpsHealthPage() {
                           <div className="text-muted-foreground mt-1 break-words">{c.action}</div>
                         </div>
                       ) : null}
+                      {c.dashboardUrl ? (
+                        <div className="text-xs md:text-sm">
+                          <a className="text-primary hover:underline inline-flex items-center gap-1" href={c.dashboardUrl} target="_blank" rel="noreferrer">
+                            Open dashboard
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                          </a>
+                        </div>
+                      ) : null}
                       {c.docs ? (
                         <div className="text-xs md:text-sm break-all">
                           Docs:{' '}
@@ -374,6 +487,9 @@ export default function OpsHealthPage() {
                     </CardContent>
                   ) : null}
                 </Card>
+                    ))}
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -381,10 +497,10 @@ export default function OpsHealthPage() {
           <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
             <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
               <CardTitle className="text-base md:text-lg">Quick Links</CardTitle>
-              <CardDescription className="text-xs md:text-sm">Jump to related admin tools.</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Jump to admin tools and external dashboards.</CardDescription>
             </CardHeader>
             <CardContent className="px-3 sm:px-6 pb-4 md:pb-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
                 <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
                   <Link href="/dashboard/admin/ops">Admin Ops Dashboard</Link>
                 </Button>
@@ -393,6 +509,18 @@ export default function OpsHealthPage() {
                 </Button>
                 <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
                   <Link href="/dashboard/admin/support">Support</Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
+                  <a href="https://sentry.io" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
+                    Open Sentry
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+                </Button>
+                <Button variant="outline" className="w-full justify-start min-h-[40px] text-sm md:text-base" asChild>
+                  <a href="https://console.upstash.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
+                    Open Upstash (Redis)
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
                 </Button>
               </div>
             </CardContent>

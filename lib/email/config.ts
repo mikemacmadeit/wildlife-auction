@@ -55,5 +55,5 @@ export function isEmailEnabled(): boolean {
 }
 
 // Prefer the new SendGrid-aligned env vars, but keep backwards-compatible fallbacks.
-export const FROM_EMAIL = process.env.EMAIL_FROM || process.env.FROM_EMAIL || 'noreply@wildlifeexchange.com';
+export const FROM_EMAIL = process.env.EMAIL_FROM || process.env.FROM_EMAIL || 'noreply@agchange.app';
 export const FROM_NAME = process.env.EMAIL_FROM_NAME || process.env.FROM_NAME || 'Agchange';

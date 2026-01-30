@@ -290,15 +290,10 @@ export async function createCheckoutSession(
     throw new Error('Failed to get authentication token');
   }
 
-  // #region agent log
-  const clientBuild = BUILD_INFO?.shortSha ?? BUILD_INFO?.builtAtIso ?? 'unknown';
-  fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'lib/stripe/api.ts createCheckoutSession', message: 'client calling create-session', data: { clientBuild, builtAtIso: BUILD_INFO?.builtAtIso, listingId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {});
-  // #endregion
-
   const reqHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
-    'X-Client-Build': clientBuild,
+    'X-Client-Build': BUILD_INFO?.shortSha ?? 'unknown',
     ...(BUILD_INFO?.builtAtIso ? { 'X-Client-Built': BUILD_INFO.builtAtIso } : {}),
   };
 
@@ -405,9 +400,6 @@ export async function createWireIntent(
         ? `Too many requests. Please try again in ${sec} seconds.`
         : errorMessage;
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'lib/stripe/api createWireIntent', message: 'wire !response.ok', data: { status: response.status, bodyMessage: (error && typeof error === 'object' && error.message) ? String(error.message).slice(0, 200) : undefined, bodyError: (error && typeof error === 'object' && error.error) ? String(error.error).slice(0, 200) : undefined, errorMessageWeThrow: String(errorMessage).slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2' }) }).catch(() => {});
-    // #endregion
     const err: any = new Error(errorMessage);
     if (error?.stripe?.requestId) err.requestId = error.stripe.requestId;
     if (error?.stripe?.code) err.stripeCode = error.stripe.code;

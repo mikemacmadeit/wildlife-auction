@@ -58,7 +58,7 @@ export default function AdminNotificationsPage() {
       type: 'Auction.Outbid',
       listingId: 'listing_123',
       listingTitle: 'Blackbuck Trophy Buck',
-      listingUrl: 'https://agchange.com/listing/listing_123',
+      listingUrl: 'https://agchange.app/listing/listing_123',
       newHighBidAmount: 9850,
     })
   );

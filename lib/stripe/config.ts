@@ -1,5 +1,10 @@
 /**
  * Stripe Configuration and Client Initialization
+ *
+ * PAYMENT POLICY: Funds are always direct from buyer to seller.
+ * We use Stripe Connect destination charges: at payment time, the buyer's payment
+ * goes to Stripe; Stripe automatically sends the seller's share to the seller's
+ * Connect account and the platform fee to us. The app never holds or releases funds.
  */
 
 import Stripe from 'stripe';

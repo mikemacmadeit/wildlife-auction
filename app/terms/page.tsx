@@ -331,7 +331,7 @@ export default function TermsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2 text-foreground">
               <Mail className="h-4 w-4 text-primary" />
-              <span className="font-semibold">support@agchange.com</span>
+              <span className="font-semibold">support@agchange.app</span>
             </div>
             <p>
               You can also reach us via the{' '}

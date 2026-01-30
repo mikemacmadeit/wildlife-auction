@@ -171,14 +171,9 @@ export function AIAdminSummary({
       </CardHeader>
       <CardContent>
         {isFeatureDisabled ? (
-          <div className="flex items-start gap-2 text-sm text-muted-foreground py-2">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <div>
-              <div className="font-medium">AI Summary feature is disabled</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Enable AI_ADMIN_SUMMARY_ENABLED in environment variables to use this feature.
-              </div>
-            </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-1.5">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>AI Summary is off. Enable <code className="text-xs bg-muted px-1 rounded">AI_ADMIN_SUMMARY_ENABLED</code> in env to use.</span>
           </div>
         ) : loading && !summary ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">

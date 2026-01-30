@@ -105,7 +105,7 @@ export async function POST(request: Request) {
           error: 'App URL not configured',
           code: 'APP_URL_NOT_CONFIGURED',
           message:
-            'Set APP_URL (or NEXT_PUBLIC_APP_URL) to your production URL (e.g., https://agchange.com) so Stripe can redirect sellers after onboarding.',
+            'Set APP_URL (or NEXT_PUBLIC_APP_URL) to your production URL (e.g., https://agchange.app) so Stripe can redirect sellers after onboarding.',
         },
         { status: 500 }
       );

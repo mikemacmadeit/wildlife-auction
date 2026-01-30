@@ -47,7 +47,7 @@ function getPreviewOrigin(): string | null {
   const origin = window.location?.origin;
   if (!origin) return null;
   // If we're already on production (agchange.com), do not rewrite.
-  if (origin.includes('agchange.com')) return null;
+  if (origin.includes('agchange.app') || origin.includes('agchange.com')) return null;
   return origin.replace(/\/$/, '');
 }
 
@@ -58,6 +58,7 @@ function rewriteUrlsForPreview<T>(value: T): T {
   const visit = (v: any): any => {
     if (typeof v === 'string') {
       // Only rewrite the canonical production origin in preview to avoid CORS failures in srcDoc iframes.
+      if (v.startsWith('https://agchange.app')) return v.replace('https://agchange.app', origin);
       if (v.startsWith('https://agchange.com')) return v.replace('https://agchange.com', origin);
       return v;
     }
@@ -76,7 +77,7 @@ function rewriteUrlsForPreview<T>(value: T): T {
 function rewriteHtmlForPreview(html: string): string {
   const origin = getPreviewOrigin();
   if (!origin) return html;
-  return html.replaceAll('https://agchange.com', origin);
+  return html.replaceAll('https://agchange.app', origin).replaceAll('https://agchange.com', origin);
 }
 
 function safeCopy(text: string): Promise<void> {
