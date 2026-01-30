@@ -1,5 +1,5 @@
 [build]
-command = "node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && (npx tsx scripts/checkKBUpdates.ts 2>&1 || true) && npx next build && node -e \"try{require('fs').rmSync('.next/cache',{recursive:true,force:true})}catch(e){}\""
+command = "node scripts/netlify-set-builds-only-env.mjs && node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && (npx tsx scripts/checkKBUpdates.ts 2>&1 || true) && npx next build && node -e \"try{require('fs').rmSync('.next/cache',{recursive:true,force:true})}catch(e){}\""
 publish = ".next"
 
 [build.environment]
@@ -9,9 +9,5 @@ NODE_VERSION = "20"
 package = "@netlify/plugin-nextjs"
 
 # Functions
-# Important: do NOT include .env/.env.* files in deployed functions.
-# To avoid Lambda 4KB env limit: set FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 (and FIREBASE_PRIVATE_KEY,
-# FIREBASE_CLIENT_EMAIL) to "Builds only" in Netlify → Site configuration → Environment variables.
-# See docs/NETLIFY_LAMBDA_4KB_FIX.md
 [functions."*"]
   included_files = ["netlify/secrets/firebase-service-account.json"]
