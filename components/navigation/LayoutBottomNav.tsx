@@ -42,7 +42,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
     <nav
       className={cn(
         'fixed left-0 right-0 z-[60] md:hidden flex justify-center px-1 pt-2',
-        'bottom-1 pb-safe', // lower; pb-safe for home indicator
+        'bottom-0 pb-[max(env(safe-area-inset-bottom),0.25rem)]', // lower; minimal padding above home indicator
       )}
     >
       <div

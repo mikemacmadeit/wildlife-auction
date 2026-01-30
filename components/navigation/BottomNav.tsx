@@ -26,7 +26,8 @@ export function BottomNav() {
   const nav = (
     <nav
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-[60] md:hidden pb-safe',
+        'fixed bottom-0 left-0 right-0 z-[60] md:hidden',
+        'pb-[max(env(safe-area-inset-bottom),0.25rem)]',
         'border-t border-border/40 bg-background/80 backdrop-blur-md',
         'shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.06)]'
       )}

@@ -356,9 +356,9 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
-  /* Use on pages that render the mobile BottomNav (h-16) so content never sits under it on iOS. */
+  /* Use on pages that render the mobile BottomNav (h-16 + bottom padding) so content never sits under it on iOS. */
   .pb-bottom-nav-safe {
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5rem + max(env(safe-area-inset-bottom), 0.25rem));
   }
   .mb-bottom-nav {
     margin-bottom: 4rem;
