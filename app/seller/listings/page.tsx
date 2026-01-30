@@ -33,6 +33,7 @@ import { listSellerListings, unpublishListing, deleteListing, publishListing, re
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
+import { SellerListingsSkeleton } from '@/components/skeletons/SellerListingsSkeleton';
 import { useRouter } from 'next/navigation';
 import { getEffectiveListingStatus, isAuctionEnded } from '@/lib/listings/effectiveStatus';
 import {
@@ -676,6 +677,11 @@ function SellerListingsPageContent() {
     [router, toast, user?.uid]
   );
 
+  // Loading state — layout-matched skeleton so content loads in place (no flash)
+  if (loading && !error) {
+    return <SellerListingsSkeleton />;
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 max-w-7xl space-y-4 sm:space-y-6 md:space-y-8">
@@ -812,16 +818,6 @@ function SellerListingsPageContent() {
             )}
           </CardContent>
         </Card>
-
-        {/* Loading State */}
-        {loading && (
-          <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20">
-            <CardContent className="pt-12 pb-12 px-6 text-center">
-              <div className="inline-block h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-muted-foreground">Loading listings...</p>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Error State */}
         {error && !loading && (

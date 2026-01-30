@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -293,9 +293,7 @@ export default function AdminMessagesPage() {
   };
 
   if (adminLoading || loading) {
-    return (
-      <PageLoader title="Loading…" subtitle="Getting things ready." minHeight="screen" />
-    );
+    return <DashboardContentSkeleton />;
   }
 
   if (!isAdmin) {

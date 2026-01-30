@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { cn } from '@/lib/utils';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { LayoutGrid, List, Trash2 } from 'lucide-react';
 
 type ViewMode = 'card' | 'list';
@@ -115,9 +116,7 @@ export default function RecentlyViewedPage() {
   if (authLoading) {
     return (
       <div className="container mx-auto px-4 py-10">
-        <Card className="border-2">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">Loading…</CardContent>
-        </Card>
+        <DashboardContentSkeleton />
       </div>
     );
   }

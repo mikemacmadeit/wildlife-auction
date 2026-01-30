@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { SellerContentSkeleton } from '@/components/skeletons/SellerContentSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -131,9 +131,7 @@ export default function SellerOffersPage() {
   }, [tab]);
 
   if (authLoading) {
-    return (
-      <PageLoader title="Loading offers…" subtitle="Getting your offers ready." className="min-h-[60vh]" />
-    );
+    return <SellerContentSkeleton className="min-h-[60vh]" />;
   }
 
   if (!user) {

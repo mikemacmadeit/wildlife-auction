@@ -40,7 +40,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { getPublicSellerTrust, getUserProfile, updateUserProfile } from '@/lib/firebase/users';
@@ -542,9 +542,7 @@ export default function AccountPage() {
 
   // Loading state
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading profile…" subtitle="Getting your account ready." minHeight="screen" className="pb-bottom-nav-safe md:pb-4" />
-    );
+    return <DashboardContentSkeleton className="pb-bottom-nav-safe md:pb-4" />;
   }
 
   // Not authenticated

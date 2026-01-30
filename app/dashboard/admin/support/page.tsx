@@ -9,11 +9,11 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { useAdmin } from '@/hooks/use-admin';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import {
   Loader2,
   Mail,
@@ -313,7 +313,7 @@ export default function AdminSupportPage() {
 
   if (adminLoading) {
     return (
-      <PageLoader title="Loading support…" subtitle="Getting help resources ready." className="min-h-[300px]" />
+      <DashboardContentSkeleton className="min-h-[300px]" />
     );
   }
 

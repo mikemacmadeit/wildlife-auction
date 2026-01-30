@@ -34,7 +34,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { ListingDetailSkeleton } from '@/components/skeletons/ListingDetailSkeleton';
 import { Separator } from '@/components/ui/separator';
 import {
   Accordion,
@@ -888,7 +888,7 @@ export default function ListingDetailClient() {
   // Early returns for loading and error states
   if (loading) {
     return (
-      <PageLoader title="Loading listing…" subtitle="Getting details ready." minHeight="screen" />
+      <ListingDetailSkeleton />
     );
   }
 

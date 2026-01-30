@@ -1,10 +1,5 @@
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 
 export default function Loading() {
-  return (
-    <PageLoader
-      title="Loading watchlist…"
-      subtitle="Getting your saved listings ready."
-    />
-  );
+  return <DashboardContentSkeleton />;
 }

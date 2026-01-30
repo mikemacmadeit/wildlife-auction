@@ -11,7 +11,6 @@ import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -22,6 +21,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import {
   AlertTriangle,
   CheckCircle,
@@ -112,7 +112,7 @@ export default function ReconciliationPage() {
 
   if (adminLoading) {
     return (
-      <PageLoader title="Loading…" subtitle="Getting things ready." minHeight="screen" />
+      <DashboardContentSkeleton />
     );
   }
 

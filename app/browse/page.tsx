@@ -20,7 +20,7 @@ import {
 import { ListingCard } from '@/components/listings/ListingCard';
 import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { ListItem } from '@/components/listings/ListItem';
-import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
+import { SkeletonListingGrid, SkeletonListingList } from '@/components/skeletons/SkeletonCard';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Spinner } from '@/components/ui/spinner';
 import { FilterDialog } from '@/components/navigation/FilterDialog';
@@ -164,9 +164,12 @@ export default function BrowsePage() {
   const lastRevalidatedKeyRef = useRef<string | null>(null);
   const STALE_REVALIDATE_MS = 12_000;
 
-  // View mode with localStorage persistence
-  // Initialize to 'card' to ensure server/client consistency
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
+  // View mode with localStorage persistence — read on first client render so skeleton and content match (no flash)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === 'undefined') return 'card';
+    const saved = localStorage.getItem('browse-view-mode');
+    return saved === 'list' || saved === 'card' ? saved : 'card';
+  });
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearchConfirmOpen, setSavedSearchConfirmOpen] = useState(false);
   const [savedSearchConfirmEmail, setSavedSearchConfirmEmail] = useState(true);
@@ -175,16 +178,6 @@ export default function BrowsePage() {
   const [savedSearchConfirmDraft, setSavedSearchConfirmDraft] = useState<FilterState | null>(null);
   const [savedSearchConfirmName, setSavedSearchConfirmName] = useState<string>('');
   const [listingStates, setListingStates] = useState<{ value: string; label: string }[] | null>(null);
-
-  // Load from localStorage after hydration (client-side only)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('browse-view-mode');
-      if (saved === 'card' || saved === 'list') {
-        setViewMode(saved);
-      }
-    }
-  }, []);
 
   // Item Location: only states that have at least one active listing (desktop + mobile)
   useEffect(() => {
@@ -1466,7 +1459,7 @@ export default function BrowsePage() {
         <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
           {/* Desktop filter rail: scrollable when tall; overscroll-contain prevents scroll chaining to page */}
           <aside className="hidden lg:block self-start">
-            <div className="sticky top-[104px] max-h-[calc(100vh-104px)] overflow-y-auto overflow-x-hidden overscroll-contain min-h-0 pr-1 -mr-1 [scrollbar-gutter:stable]">
+            <div className="sticky top-[104px] max-h-[calc(100vh-104px)] overflow-y-auto overflow-x-hidden overscroll-contain min-h-0 pr-1 -mr-1 we-scrollbar-hover [scrollbar-gutter:stable]">
               <BrowseFiltersSidebar value={filters} onChange={handleFilterChange} onClearAll={clearFilters} listingStates={listingStates} />
             </div>
           </aside>
@@ -1613,10 +1606,21 @@ export default function BrowsePage() {
           </div>
             </div>
 
-            {/* Full skeleton only on initial load (no listings yet). Refetches keep previous results visible. */}
+            {/* Full skeleton only on initial load (no listings yet). Match viewMode so grid/list transition is smooth. Mobile always list. */}
             {(loading || showSkeleton) && !error && listings.length === 0 && isInitialLoadRef.current && (
-              <div className="py-12 animate-in fade-in-0 duration-200">
-                <SkeletonListingGrid count={12} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" />
+              <div className="animate-in fade-in-0 duration-200">
+                <div className="md:hidden">
+                  <SkeletonListingList count={8} variant="browseMobile" />
+                </div>
+                {viewMode === 'card' ? (
+                  <div className="hidden md:block">
+                    <SkeletonListingGrid count={12} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" />
+                  </div>
+                ) : (
+                  <div className="hidden md:block">
+                    <SkeletonListingList count={8} />
+                  </div>
+                )}
               </div>
             )}
 

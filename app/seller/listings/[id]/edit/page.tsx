@@ -15,7 +15,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, ArrowLeft, Save, Loader2, AlertCircle, Send } from 'lucide-react';
 import {
@@ -34,6 +33,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getListingById, updateListing, publishListing } from '@/lib/firebase/listings';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { SellerContentSkeleton } from '@/components/skeletons/SellerContentSkeleton';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
@@ -287,9 +287,7 @@ function EditListingPageContent() {
   }, [listingId, user, authLoading, router, toast]);
 
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading listing…" subtitle="Getting the form ready." minHeight="screen" />
-    );
+    return <SellerContentSkeleton />;
   }
 
   const steps = [

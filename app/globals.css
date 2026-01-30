@@ -450,10 +450,10 @@
   }
   .we-scrollbar-hover:hover {
     scrollbar-width: thin; /* Firefox */
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-color: hsl(var(--primary)) transparent;
   }
   .we-scrollbar-hover:hover::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
+    background: hsl(var(--primary));
   }
 
   /* Inverted (subtle thumb) for dark sections e.g. browse header chip row; scrollbar on hover, blends with background */

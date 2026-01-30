@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import {
   Heart,
   Loader2,
@@ -393,7 +393,7 @@ export default function WatchlistPage() {
   if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <PageLoader title="Loading your watchlist…" subtitle="Getting your saved listings ready." className="min-h-[400px]" />
+        <DashboardContentSkeleton className="min-h-[400px]" />
       </div>
     );
   }

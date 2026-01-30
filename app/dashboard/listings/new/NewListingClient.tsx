@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Upload, X, Loader2, ArrowLeft, Save, CheckCircle2 } from 'lucide-react';
 import { ListingType, ListingCategory } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -2832,9 +2832,7 @@ function NewListingPageContent() {
 
   // Show loading state while checking authentication
   if (authLoading) {
-    return (
-      <PageLoader title="Loading…" subtitle="Getting the form ready." minHeight="screen" />
-    );
+    return <DashboardContentSkeleton className="min-h-screen" />;
   }
 
   const clearAutosave = () => {

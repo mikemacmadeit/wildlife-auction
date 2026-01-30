@@ -25,7 +25,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PageLoader } from '@/components/ui/page-loader';
+import { SellerOverviewSkeleton } from '@/components/skeletons/SellerOverviewSkeleton';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { useAuth } from '@/hooks/use-auth';
 import { listSellerListings } from '@/lib/firebase/listings';
@@ -612,11 +612,9 @@ export default function SellerOverviewPage() {
     };
   }, [listings]);
 
-  // Loading state
+  // Loading state — use layout-matched skeleton so content loads in the same place (no flash)
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading overview…" subtitle="Getting your dashboard ready." minHeight="screen" />
-    );
+    return <SellerOverviewSkeleton />;
   }
 
   // Error state

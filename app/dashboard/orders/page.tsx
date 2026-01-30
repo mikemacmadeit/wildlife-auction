@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Package, CheckCircle, Clock, XCircle, Loader2, AlertTriangle, ArrowRight, MapPin, User, MoreVertical, Search, Truck, Filter, PartyPopper } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -750,11 +750,9 @@ export default function OrdersPage() {
     }
   };
 
-  // Loading state
+  // Loading state — skeleton so content loads in place (smooth like seller overview)
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading orders…" subtitle="Getting your orders ready." minHeight="screen" />
-    );
+    return <DashboardContentSkeleton />;
   }
 
   // Error state

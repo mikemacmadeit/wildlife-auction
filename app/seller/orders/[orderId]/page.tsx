@@ -13,7 +13,6 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -36,6 +35,7 @@ import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { formatDate } from '@/lib/utils';
+import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 
 async function postAuthJson(path: string, body?: any): Promise<any> {
   const { auth } = await import('@/lib/firebase/config');
@@ -306,9 +306,7 @@ export default function SellerOrderDetailPage() {
   }
 
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading order…" subtitle="Getting order details ready." minHeight="screen" />
-    );
+    return <OrderDetailSkeleton />;
   }
 
   if (!user) {

@@ -21,6 +21,22 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
   const [copied, setCopied] = useState(false);
   const isDev = process.env.NODE_ENV === 'development';
 
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'app/error.tsx',
+        message: 'error boundary shown',
+        data: { message: error?.message, digest: error?.digest, name: error?.name },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        hypothesisId: 'D',
+      }),
+    }).catch(() => {});
+  }, [error]);
+  // #endregion
   // Report error to monitoring service
   useEffect(() => {
     reportError(error, {

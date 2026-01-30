@@ -129,6 +129,20 @@ export function NotificationsBell(props: {
     }
 
     const target = toAppPath(String(n.deepLinkUrl || ''));
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'NotificationsBell.tsx:handleClickNotif',
+        message: 'notification click',
+        data: { deepLinkUrl: n.deepLinkUrl, target, hasTarget: !!target },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        hypothesisId: 'C',
+      }),
+    }).catch(() => {});
+    // #endregion
     if (target) {
       router.push(target);
       setOpen(false);

@@ -19,7 +19,7 @@ import { MessageThread, Listing } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -576,9 +576,7 @@ export default function MessagesPage() {
 
 
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading messages…" subtitle="Getting your conversations ready." minHeight="screen" />
-    );
+    return <DashboardContentSkeleton />;
   }
 
   if (!user) {

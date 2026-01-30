@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Set large Firebase env vars to "Builds only" scope in Netlify so they are not
- * sent to Lambda (avoids the 4KB env limit). Requires NETLIFY_AUTH_TOKEN and site id.
+ * sent to Lambda (avoids the 4KB env limit). Runs at start of Netlify build when
+ * NETLIFY_AUTH_TOKEN is set. No-op otherwise (local builds, or add token in Netlify UI).
  *
- * Usage:
- *   NETLIFY_AUTH_TOKEN=xxx node scripts/netlify-set-builds-only-env.mjs
- *   NETLIFY_AUTH_TOKEN=xxx NETLIFY_SITE_ID=xxx node scripts/netlify-set-builds-only-env.mjs
- * Or from repo root with netlify linked: netlify status then use site id.
+ * One-time setup: In Netlify → Site configuration → Environment variables, add
+ *   NETLIFY_AUTH_TOKEN = (create at https://app.netlify.com/user/applications#personal-access-tokens)
+ *   Scope: Builds only (so it's not sent to Lambda). Then deploy; this script runs and fixes the rest.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,37 +26,15 @@ function env(name) {
   return v != null && v !== '' ? v.trim() : '';
 }
 
-function loadEnvLocal() {
-  const p = path.resolve(__dirname, '..', '.env.local');
-  if (!fs.existsSync(p)) return {};
-  const raw = fs.readFileSync(p, 'utf8');
-  const out = {};
-  for (const line of raw.split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t || t.startsWith('#')) continue;
-    const eq = t.indexOf('=');
-    if (eq <= 0) continue;
-    const key = t.slice(0, eq).trim();
-    let val = t.slice(eq + 1).trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))
-      val = val.slice(1, -1).replace(/\\n/g, '\n');
-    out[key] = val;
-  }
-  return out;
-}
-
 async function main() {
   const token = env('NETLIFY_AUTH_TOKEN');
-  let siteId = env('NETLIFY_SITE_ID');
+  // Netlify build provides SITE_ID; CLI/local may use NETLIFY_SITE_ID or .netlify/state.json
+  let siteId = env('SITE_ID') || env('NETLIFY_SITE_ID');
 
   if (!token) {
-    console.error('Missing NETLIFY_AUTH_TOKEN.');
-    console.error('Create one at: https://app.netlify.com/user/applications#personal-access-tokens');
-    console.error('Then run: NETLIFY_AUTH_TOKEN=xxx node scripts/netlify-set-builds-only-env.mjs');
-    process.exit(1);
+    // No-op: don't fail build. User can add token in Netlify UI once to enable auto-fix.
+    process.exit(0);
   }
-
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   if (!siteId) {
     const configPath = path.resolve(__dirname, '..', '.netlify', 'state.json');
@@ -68,9 +46,11 @@ async function main() {
     }
   }
   if (!siteId) {
-    console.error('Missing NETLIFY_SITE_ID. Run from repo with "netlify link" or set NETLIFY_SITE_ID.');
-    process.exit(1);
+    console.warn('[netlify-set-builds-only-env] SITE_ID not set; skipping (no-op).');
+    process.exit(0);
   }
+
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   let site;
   try {
@@ -78,14 +58,14 @@ async function main() {
     if (!r.ok) throw new Error(await r.text());
     site = await r.json();
   } catch (e) {
-    console.error('Failed to get site:', e.message);
-    process.exit(1);
+    console.warn('[netlify-set-builds-only-env] Failed to get site:', e.message, '- skipping.');
+    process.exit(0);
   }
 
   const accountId = site.account_id || site.account_slug;
   if (!accountId) {
-    console.error('Could not determine account id from site.');
-    process.exit(1);
+    console.warn('[netlify-set-builds-only-env] No account id; skipping.');
+    process.exit(0);
   }
 
   let envVars;
@@ -94,8 +74,8 @@ async function main() {
     if (!r.ok) throw new Error(await r.text());
     envVars = await r.json();
   } catch (e) {
-    console.error('Failed to list env vars:', e.message);
-    process.exit(1);
+    console.warn('[netlify-set-builds-only-env] Failed to list env vars:', e.message, '- skipping.');
+    process.exit(0);
   }
 
   const byKey = new Map(envVars.map((e) => [e.key, e]));
@@ -146,6 +126,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e);
-  process.exit(1);
+  console.warn('[netlify-set-builds-only-env]', e.message || e);
+  process.exit(0);
 });

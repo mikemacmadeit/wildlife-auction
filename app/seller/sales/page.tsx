@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { SellerSalesSkeleton } from '@/components/skeletons/SellerSalesSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -323,9 +323,7 @@ export default function SellerSalesPage() {
   }, [buyerProfiles, filtered, user?.uid]);
 
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading sales…" subtitle="Getting your orders ready." minHeight="screen" />
-    );
+    return <SellerSalesSkeleton />;
   }
 
   if (!user) {

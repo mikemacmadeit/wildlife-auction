@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -410,9 +410,7 @@ export default function AdminListingsPage() {
   }, [listings, sellerIdFilter, filteredAndSortedListings]);
 
   if (adminLoading) {
-    return (
-      <PageLoader title="Loading…" subtitle="Getting things ready." minHeight="screen" />
-    );
+    return <DashboardContentSkeleton />;
   }
 
   if (!isAdmin) {

@@ -353,7 +353,7 @@ export default function DashboardLayout({
           'bg-background flex flex-col md:flex-row relative',
           pathname?.startsWith('/dashboard/messages')
             ? 'fixed inset-0 h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden flex flex-col justify-start'
-            : 'min-h-screen'
+            : 'min-h-screen md:h-screen md:overflow-hidden'
         )}
         style={{ isolation: 'isolate' }}
       >
@@ -424,7 +424,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto pl-0 pr-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto pl-0 pr-3 py-4 space-y-1 we-scrollbar-hover">
           {showAdminNav && !sidebarCollapsed ? (
             <div className="space-y-2">
               <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
@@ -664,7 +664,7 @@ export default function DashboardLayout({
         <main
           className={cn(
             'flex-1 min-h-0 min-w-0 pb-20 md:pb-0 relative',
-            pathname?.startsWith('/dashboard/messages') ? 'overflow-hidden' : 'overflow-y-auto'
+            pathname?.startsWith('/dashboard/messages') ? 'overflow-hidden' : 'overflow-y-auto we-scrollbar-hover'
           )}
           style={{ zIndex: 0 }}
         >

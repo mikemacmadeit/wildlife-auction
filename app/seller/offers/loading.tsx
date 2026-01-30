@@ -1,10 +1,5 @@
-import { PageLoader } from '@/components/ui/page-loader';
+import { SellerContentSkeleton } from '@/components/skeletons/SellerContentSkeleton';
 
 export default function Loading() {
-  return (
-    <PageLoader
-      title="Loading offers…"
-      subtitle="Getting your offers ready."
-    />
-  );
+  return <SellerContentSkeleton />;
 }

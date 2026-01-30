@@ -1059,20 +1059,35 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-8">
-              <div className="space-y-4">
+              <div className="space-y-4 min-h-[320px] sm:min-h-[440px]">
                 <SectionHeader
                   title={mostWatched?.length ? "Trending now" : "Explore listings"}
                   subtitle={mostWatched?.length ? "What people are watching right now." : "Fresh listings to start browsing."}
                   href="/browse"
                   actionLabel="Browse all"
                 />
-                {loading ? (
-                  <ListingRailSkeleton count={6} className="animate-in fade-in-0 duration-200" />
-                ) : (
-                  <div className="animate-in fade-in-0 duration-300">
-                    <ListingRail listings={signedInDiscoveryListings} emptyText="Browse listings to get started." />
-                  </div>
-                )}
+                <AnimatePresence mode="wait">
+                  {loading ? (
+                    <motion.div
+                      key="skeleton"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ListingRailSkeleton count={6} />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="content"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <ListingRail listings={signedInDiscoveryListings} emptyText="Browse listings to get started." />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
             {showRecentlyViewed ? (
@@ -1626,31 +1641,52 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Loading: skeleton rail (eBay-style, no flash) */}
-          {loading && (
-            <ListingRailSkeleton count={6} className="animate-in fade-in-0 duration-200" />
-          )}
-
-          {/* Error State */}
-          {error && !loading && (
-            <div className="text-center py-12">
-              <p className="text-destructive mb-4">{error}</p>
-              <Button onClick={() => window.location.reload()}>Retry</Button>
-            </div>
-          )}
-
-          {/* Listings: fade in when ready (smooth transition from skeleton) */}
-          {!loading && !error && (
-            recentListings.length > 0 ? (
-              <div className="animate-in fade-in-0 duration-300">
+          {/* Rail area: min-height so skeleton and content occupy same space (no jump) */}
+          <div className="min-h-[320px] sm:min-h-[440px]">
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div
+                  key="skeleton"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                <ListingRailSkeleton count={6} />
+              </motion.div>
+            ) : error ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="text-center py-12"
+              >
+                <p className="text-destructive mb-4">{error}</p>
+                <Button onClick={() => window.location.reload()}>Retry</Button>
+              </motion.div>
+            ) : recentListings.length > 0 ? (
+              <motion.div
+                key="content"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
                 <ListingRail listings={recentListings} emptyText="No listings available yet." />
-              </div>
+              </motion.div>
             ) : (
-              <div className="text-center py-12 animate-in fade-in-0 duration-300">
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="text-center py-12"
+              >
                 <p className="text-muted-foreground">No listings available yet.</p>
-              </div>
-            )
-          )}
+              </motion.div>
+            )}
+            </AnimatePresence>
+          </div>
         </div>
       </section>
 

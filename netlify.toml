@@ -1,6 +1,5 @@
 [build]
-command = "node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && (npx tsx scripts/checkKBUpdates.ts 2>&1 || true) && npx next build && node -e \"try{require('fs').rmSync('.next/cache',{recursive:true,force:true})}catch(e){}\""
-publish = ".next"
+command = "node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && (npx tsx scripts/checkKBUpdates.ts 2>&1 || true) && npx next build"
 
 [build.environment]
 NODE_VERSION = "20"

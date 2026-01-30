@@ -17,7 +17,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -216,9 +216,7 @@ export default function BuyerOrderDetailPage() {
   }, [order?.id, order?.delivery?.buyerAddress, order?.transactionStatus, issueParam]);
 
   if (authLoading || loading) {
-    return (
-      <PageLoader title="Loading order…" subtitle="Getting order details ready." minHeight="screen" />
-    );
+    return <OrderDetailSkeleton />;
   }
 
   if (!user) {

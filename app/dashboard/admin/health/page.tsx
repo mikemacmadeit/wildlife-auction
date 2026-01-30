@@ -13,7 +13,7 @@ import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -238,7 +238,7 @@ export default function OpsHealthPage() {
 
   if (adminLoading) {
     return (
-      <PageLoader title="Loading…" subtitle="Getting things ready." minHeight="screen" />
+      <DashboardContentSkeleton />
     );
   }
 

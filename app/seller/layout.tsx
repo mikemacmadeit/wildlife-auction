@@ -352,7 +352,7 @@ export default function SellerLayout({
   return (
     <RequireAuth>
       <ProfileCompletionGate />
-      <div className="min-h-screen bg-background flex flex-col md:flex-row relative" style={{ isolation: 'isolate' }}>
+      <div className="min-h-screen bg-background flex flex-col md:flex-row md:h-screen md:overflow-hidden relative" style={{ isolation: 'isolate' }}>
       {/* Desktop Sidebar - fixed on desktop to stay above content */}
       <aside
         className={cn(
@@ -420,7 +420,7 @@ export default function SellerLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 min-h-0">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 min-h-0 we-scrollbar-hover">
           {showAdminNav && !sidebarCollapsed ? (
             <div className="space-y-2">
               <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
@@ -694,7 +694,7 @@ export default function SellerLayout({
         sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
       )}>
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto min-h-0 min-w-0 pb-20 md:pb-0 relative">
+        <main className="flex-1 overflow-y-auto min-h-0 min-w-0 pb-20 md:pb-0 relative we-scrollbar-hover">
           <ProductionErrorBoundary>
             <div className="relative">
               {children}

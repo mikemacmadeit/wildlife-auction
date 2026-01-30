@@ -1,10 +1,6 @@
-import { PageLoader } from '@/components/ui/page-loader';
+import { SellerOverviewSkeleton } from '@/components/skeletons/SellerOverviewSkeleton';
 
+/** Route-level loading: same layout-matched skeleton as page so content loads in place (no flash). */
 export default function Loading() {
-  return (
-    <PageLoader
-      title="Loading overview…"
-      subtitle="Getting your dashboard ready."
-    />
-  );
+  return <SellerOverviewSkeleton />;
 }
