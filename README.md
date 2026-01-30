@@ -101,6 +101,10 @@ cd project
 npm start
 ```
 
+## Netlify deploy
+
+If the deploy fails with **"Your environment variables exceed the 4KB limit imposed by AWS Lambda"**, set the large Firebase vars to **Builds only** in Netlify → Site configuration → Environment variables. See [docs/NETLIFY_LAMBDA_4KB_FIX.md](docs/NETLIFY_LAMBDA_4KB_FIX.md).
+
 ## Available Scripts
 
 - `npm run dev` - Start the development server
