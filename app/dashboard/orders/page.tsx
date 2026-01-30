@@ -364,12 +364,40 @@ export default function OrdersPage() {
     };
   }, [router, searchParams]);
 
-  // Start at top when opening Purchases (mobile: dashboard main is the scroll container)
-  useEffect(() => {
+  // Start at top when opening Purchases; prevent any auto-scroll (restoration, dialog focus, layout)
+  const scrollToTop = useCallback(() => {
     window.scrollTo(0, 0);
-    const main = document.querySelector('main');
-    if (main) main.scrollTo({ top: 0, left: 0 });
+    document.querySelector('main')?.scrollTo({ top: 0, left: 0 });
   }, []);
+  useEffect(() => {
+    const prevRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    scrollToTop();
+    const raf = requestAnimationFrame(() => scrollToTop());
+    const t0 = setTimeout(scrollToTop, 0);
+    const t1 = setTimeout(scrollToTop, 50);
+    const t2 = setTimeout(scrollToTop, 150);
+    const t3 = setTimeout(scrollToTop, 400);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t0);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.history.scrollRestoration = prevRestoration;
+    };
+  }, [scrollToTop]);
+  // When congrats modal opens (e.g. after Stripe redirect), force top again so dialog focus doesn't scroll the page
+  useEffect(() => {
+    if (!showCongratsModal) return;
+    scrollToTop();
+    const raf = requestAnimationFrame(() => scrollToTop());
+    const t = setTimeout(scrollToTop, 100);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
+  }, [showCongratsModal, scrollToTop]);
 
   // Fetch orders when user is loaded
   useEffect(() => {
@@ -902,7 +930,18 @@ export default function OrdersPage() {
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       {/* Post-purchase congratulations modal */}
       <Dialog open={showCongratsModal} onOpenChange={setShowCongratsModal}>
-        <DialogContent className="sm:max-w-md border-2 border-primary/20 bg-card shadow-xl" aria-describedby="congrats-desc">
+        <DialogContent
+          className="sm:max-w-md border-2 border-primary/20 bg-card shadow-xl"
+          aria-describedby="congrats-desc"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            // Focus the primary action without scrolling the page
+            requestAnimationFrame(() => {
+              const btn = document.querySelector('[data-congrats-view-purchase]');
+              if (btn instanceof HTMLElement) btn.focus({ preventScroll: true });
+            });
+          }}
+        >
           <DialogHeader>
             <div className="flex items-center justify-center gap-2 text-primary mb-2">
               <PartyPopper className="h-10 w-10" aria-hidden />
@@ -926,11 +965,10 @@ export default function OrdersPage() {
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-2">
             <Button
+              data-congrats-view-purchase
               onClick={() => {
                 setShowCongratsModal(false);
-                requestAnimationFrame(() => {
-                  document.getElementById('orders-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
+                scrollToTop();
               }}
               className="w-full font-semibold"
               size="lg"

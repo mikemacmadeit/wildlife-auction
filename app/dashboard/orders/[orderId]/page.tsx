@@ -180,6 +180,23 @@ export default function BuyerOrderDetailPage() {
   const checkin = searchParams?.get('checkin') === '1';
   const issueParam = searchParams?.get('issue') === '1';
 
+  // Start at top when opening order detail (no auto-scroll from previous position)
+  useEffect(() => {
+    const prevRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+    const main = document.querySelector('main');
+    if (main) main.scrollTo({ top: 0, left: 0 });
+    const raf = requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      if (main) main.scrollTo({ top: 0, left: 0 });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.history.scrollRestoration = prevRestoration;
+    };
+  }, [orderId]);
+
   useEffect(() => {
     if (!issueParam) return;
     const el = document.getElementById('report-issue');
