@@ -180,36 +180,36 @@ const ListingRow = memo(({
     key={listing.id}
     className="border-b border-border/30 hover:bg-background/50 group"
   >
-    <td className="p-3 align-middle">
-      <div className="flex items-start gap-2">
-        <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+    <td className="p-5 align-middle">
+      <div className="flex items-start gap-4">
+        <div className="h-24 w-32 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative">
           {getPrimaryListingImageUrl(listing) ? (
             <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
           ) : null}
         </div>
-        <div className="flex flex-col gap-1 min-w-0 flex-1">
+        <div className="flex flex-col gap-2 min-w-0 flex-1">
           <Link
             href={`/listing/${listing.id}`}
-            className="font-semibold text-sm text-foreground hover:text-primary group-hover:underline truncate"
+            className="font-semibold text-lg text-foreground hover:text-primary group-hover:underline truncate"
           >
             {listing.title}
           </Link>
           {listing.endsAt && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="h-3 w-3 flex-shrink-0" />
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">{effectiveStatus === 'active' ? `Ends in ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}</span>
             </div>
           )}
         </div>
       </div>
     </td>
-    <td className="p-2 align-middle">
+    <td className="p-4 align-middle">
       <div className="flex justify-start">
         {getTypeBadge(listing.type)}
       </div>
     </td>
-    <td className="p-2 align-middle">
-      <div className="font-bold text-sm text-foreground whitespace-nowrap">
+    <td className="p-4 align-middle">
+      <div className="font-bold text-lg text-foreground whitespace-nowrap">
         {listing.type === 'auction'
           ? listing.currentBid
             ? `$${listing.currentBid.toLocaleString()}`
@@ -219,13 +219,13 @@ const ListingRow = memo(({
           : 'Contact'}
       </div>
     </td>
-    <td className="p-2 align-middle">
-      <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-        <MapPin className="h-3 w-3 flex-shrink-0" />
+    <td className="p-3 align-middle">
+      <div className="flex items-center gap-1 text-sm text-muted-foreground min-w-0">
+        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
         <span className="truncate">{listing.location?.city || 'Unknown'}, {listing.location?.state || 'Unknown'}</span>
       </div>
     </td>
-    <td className="p-2 align-middle">
+    <td className="p-3 align-middle">
       <div className="flex justify-start">
         {getStatusBadge({
           status: effectiveStatus,
@@ -234,27 +234,27 @@ const ListingRow = memo(({
         })}
       </div>
     </td>
-    <td className="p-2 align-middle">
-      <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+    <td className="p-3 align-middle">
+      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
         <div className="flex items-center gap-1.5 whitespace-nowrap">
-          <Eye className="h-3 w-3 flex-shrink-0" />
+          <Eye className="h-3.5 w-3.5 flex-shrink-0" />
           <span>{listing.metrics.views}</span>
         </div>
         {listing.type === 'auction' && (
           <>
             <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <Users className="h-3 w-3 flex-shrink-0" />
+              <Users className="h-3.5 w-3.5 flex-shrink-0" />
               <span>{listing.metrics.favorites}</span>
             </div>
             <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <Gavel className="h-3 w-3 flex-shrink-0" />
+              <Gavel className="h-3.5 w-3.5 flex-shrink-0" />
               <span>{listing.metrics.bidCount}</span>
             </div>
           </>
         )}
       </div>
     </td>
-    <td className="p-2 align-middle">
+    <td className="p-3 align-middle">
       <div className="flex justify-start">
         <ListingRowActions
           listingId={listing.id}
@@ -859,35 +859,35 @@ function SellerListingsPageContent() {
               <div className="hidden md:block overflow-hidden">
                 <table className="w-full table-fixed">
                   <colgroup>
-                    <col className="w-[30%]" />
+                    <col className="w-[34%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[14%]" />
                     <col className="w-[10%]" />
                     <col className="w-[12%]" />
-                    <col className="w-[15%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[13%]" />
                     <col className="w-[10%]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b-2 border-border/50 bg-background/50">
-                      <th className="h-14 px-3 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Listing
                       </th>
-                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Type
                       </th>
-                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Price/Bid
                       </th>
-                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Location
                       </th>
-                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Status
                       </th>
-                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Metrics
                       </th>
-                      <th className="h-14 px-2 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
                         Actions
                       </th>
                     </tr>
