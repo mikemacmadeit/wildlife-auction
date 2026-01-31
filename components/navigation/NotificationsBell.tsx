@@ -82,10 +82,25 @@ export function NotificationsBell(props: {
   // IMPORTANT:
   // The dropdown only loads the latest N notifications for UX, but the bell badge must reflect
   // the user's true unread count (not just the visible slice).
+  // Debounce updates to prevent flicker when multiple notifications change rapidly.
   useEffect(() => {
     if (!userId) return;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let lastCount = 0;
+    
     try {
-      return subscribeToUnreadCount(userId, (count) => setUnreadCount(count || 0));
+      return subscribeToUnreadCount(userId, (count) => {
+        // Only update if count actually changed
+        if (count === lastCount) return;
+        lastCount = count;
+        
+        // Debounce rapid updates (e.g. when marking multiple as read)
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setUnreadCount(count || 0);
+          timeoutId = null;
+        }, 150);
+      });
     } catch (e) {
       console.error('NotificationsBell: failed to subscribe to unread count', e);
       setUnreadCount(0);

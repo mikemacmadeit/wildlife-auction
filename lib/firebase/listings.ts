@@ -86,6 +86,7 @@ export interface CreateListingInput {
     sortOrder?: number;
     focalPoint?: { x: number; y: number };
     cropZoom?: number;
+    cropAspect?: number;
   }>;
   coverPhotoId?: string;
   location: {
@@ -304,6 +305,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
                 ? { x: Math.max(0, Math.min(1, p.focalPoint.x)), y: Math.max(0, Math.min(1, p.focalPoint.y)) }
                 : undefined,
             cropZoom: typeof p?.cropZoom === 'number' && Number.isFinite(p.cropZoom) ? Math.max(1, Math.min(3, p.cropZoom)) : undefined,
+            cropAspect: typeof p?.cropAspect === 'number' && Number.isFinite(p.cropAspect) ? p.cropAspect : undefined,
           }))
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       : undefined;
@@ -550,6 +552,16 @@ export const createListingDraft = async (
       );
     }
 
+    // Validate Best Offer settings: auto-accept cannot be lower than minimum offer
+    if (listingInput.bestOfferSettings) {
+      const minPrice = typeof listingInput.bestOfferSettings.minPrice === 'number' ? listingInput.bestOfferSettings.minPrice : 0;
+      const autoAcceptPrice = typeof listingInput.bestOfferSettings.autoAcceptPrice === 'number' ? listingInput.bestOfferSettings.autoAcceptPrice : 0;
+      
+      if (minPrice > 0 && autoAcceptPrice > 0 && autoAcceptPrice < minPrice) {
+        throw new Error(`Auto-accept price ($${autoAcceptPrice}) must be at least the minimum offer price ($${minPrice})`);
+      }
+    }
+
     // P0: Compliance validation
     validateListingCompliance(
       listingInput.category,
@@ -712,6 +724,16 @@ export const updateListing = async (
         createdBy,
         createdAt,
       });
+    }
+
+    // Validate Best Offer settings: auto-accept cannot be lower than minimum offer
+    if (safeUpdates.bestOfferSettings) {
+      const minPrice = typeof safeUpdates.bestOfferSettings.minPrice === 'number' ? safeUpdates.bestOfferSettings.minPrice : 0;
+      const autoAcceptPrice = typeof safeUpdates.bestOfferSettings.autoAcceptPrice === 'number' ? safeUpdates.bestOfferSettings.autoAcceptPrice : 0;
+      
+      if (minPrice > 0 && autoAcceptPrice > 0 && autoAcceptPrice < minPrice) {
+        throw new Error(`Auto-accept price ($${autoAcceptPrice}) must be at least the minimum offer price ($${minPrice})`);
+      }
     }
 
     // Convert Date objects to Timestamps for Firestore

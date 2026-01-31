@@ -30,6 +30,11 @@ export type ListingPhotoSnapshot = {
    * This is applied at render-time (CSS transform) for thumbnails/cards.
    */
   cropZoom?: number;
+  /**
+   * Crop aspect ratio (width/height). e.g. 4/3 = landscape, 3/4 = portrait, 1 = square.
+   * Used so listing cards can display the image in the same aspect (e.g. portrait photos fit whole animal).
+   */
+  cropAspect?: number;
 };
 
 export function ListingPhotoPicker(props: {
@@ -127,9 +132,9 @@ export function ListingPhotoPicker(props: {
     onChange({ selected: next, coverPhotoId: nextCover });
   };
 
-  const setCrop = (photoId: string, crop: { focalPoint?: FocalPoint; cropZoom?: number }) => {
+  const setCrop = (photoId: string, crop: { focalPoint?: FocalPoint; cropZoom?: number; cropAspect?: number }) => {
     const next = selected.map((s) =>
-      s.photoId === photoId ? { ...s, focalPoint: crop.focalPoint, cropZoom: crop.cropZoom } : s
+      s.photoId === photoId ? { ...s, focalPoint: crop.focalPoint, cropZoom: crop.cropZoom, cropAspect: crop.cropAspect } : s
     );
     onChange({ selected: next, coverPhotoId });
   };
@@ -180,7 +185,9 @@ export function ListingPhotoPicker(props: {
             const crop = await requestCrop({ photoId: res.photoId, url: res.downloadUrl });
             if (crop) {
               workingSelected = workingSelected.map((x) =>
-                x.photoId === res.photoId ? { ...x, focalPoint: crop.focalPoint, cropZoom: crop.zoom } : x
+                x.photoId === res.photoId
+                  ? { ...x, focalPoint: crop.focalPoint, cropZoom: crop.zoom, cropAspect: crop.aspectRatio }
+                  : x
               );
               onChange({ selected: workingSelected, coverPhotoId: workingCover });
             }
@@ -284,7 +291,12 @@ export function ListingPhotoPicker(props: {
                     onRemove={() => removeSelected(p.photoId)}
                     onEditCrop={async () => {
                       const crop = await requestCrop({ photoId: p.photoId, url: p.url });
-                      if (crop) setCrop(p.photoId, { focalPoint: crop.focalPoint, cropZoom: crop.zoom });
+                      if (crop)
+                        setCrop(p.photoId, {
+                          focalPoint: crop.focalPoint,
+                          cropZoom: crop.zoom,
+                          cropAspect: crop.aspectRatio,
+                        });
                     }}
                   />
                 ))}
@@ -380,7 +392,7 @@ export function ListingPhotoPicker(props: {
         </DialogContent>
       </Dialog>
 
-      {/* Crop dialog (focal point for listing cards) */}
+      {/* Crop dialog (focal point for listing cards). Default aspect 4/3; user can pick Portrait for vertical photos. */}
       {cropTarget ? (
         <PhotoCropDialog
           open={cropOpen}
@@ -390,7 +402,6 @@ export function ListingPhotoPicker(props: {
               const resolve = cropResolveRef.current;
               cropResolveRef.current = null;
               setCropTarget(null);
-              // Resolve as "cancel" if closed without saving.
               resolve?.(null);
             }
           }}
@@ -552,6 +563,7 @@ function SelectedTile(props: {
       ? `${Math.round(p.focalPoint.x * 100)}% ${Math.round(p.focalPoint.y * 100)}%`
       : '50% 50%';
   const cropZoom = Number.isFinite(p.cropZoom as any) ? Math.max(1, Math.min(3, Number(p.cropZoom))) : 1;
+  const cropAspect = Number.isFinite(p.cropAspect as any) ? (p.cropAspect as number) : 4 / 3;
   return (
     <div
       className={cn(
@@ -577,7 +589,7 @@ function SelectedTile(props: {
         props.onDragMove(from, idx);
       }}
     >
-      <div className="relative aspect-square">
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: String(cropAspect) }}>
         <div className="absolute inset-0 overflow-hidden">
           <div
             className="absolute inset-0"

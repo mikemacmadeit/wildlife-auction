@@ -388,6 +388,11 @@ export interface Listing {
      * Does not change the underlying image bytes.
      */
     cropZoom?: number;
+    /**
+     * Crop aspect ratio (width/height). e.g. 4/3 = landscape, 3/4 = portrait, 1 = square.
+     * Used so listing cards display the image in the same aspect (e.g. portrait fits whole animal).
+     */
+    cropAspect?: number;
   }>;
   coverPhotoId?: string;
   

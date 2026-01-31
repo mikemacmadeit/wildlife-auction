@@ -56,9 +56,10 @@ function titleCaseFromId(id: string): string {
 /**
  * Searchable options for exotics, using `EXOTIC_SPECIES` as the source of truth for allowed values.
  * NOTE: Values must match stored `attributes.speciesId`.
+ * Alphabetically sorted by label for better UX.
  */
 export const EXOTIC_SPECIES_OPTIONS: SearchableSelectOption[] = EXOTIC_SPECIES.map((id) => ({
   value: id,
   label: LABELS[id] || titleCaseFromId(id),
-}));
+})).sort((a, b) => a.label.localeCompare(b.label));
 

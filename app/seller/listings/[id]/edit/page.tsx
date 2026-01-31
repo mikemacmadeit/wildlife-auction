@@ -892,9 +892,22 @@ function EditListingPageContent() {
                           type="number"
                           placeholder="0"
                           value={formData.bestOffer.minPrice}
-                          onChange={(e) =>
-                            setFormData({ ...formData, bestOffer: { ...formData.bestOffer, minPrice: e.target.value } })
-                          }
+                          onChange={(e) => {
+                            const minPrice = parseFloat(e.target.value) || 0;
+                            const autoAccept = parseFloat(formData.bestOffer.autoAcceptPrice) || 0;
+                            
+                            // If auto-accept is set and would be lower than new minimum, clear it
+                            const newAutoAccept = autoAccept > 0 && autoAccept < minPrice ? '' : formData.bestOffer.autoAcceptPrice;
+                            
+                            setFormData({ 
+                              ...formData, 
+                              bestOffer: { 
+                                ...formData.bestOffer, 
+                                minPrice: e.target.value,
+                                autoAcceptPrice: newAutoAccept
+                              } 
+                            });
+                          }}
                           className="min-h-[44px]"
                         />
                       </div>
@@ -907,14 +920,39 @@ function EditListingPageContent() {
                           type="number"
                           placeholder="0"
                           value={formData.bestOffer.autoAcceptPrice}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const autoAccept = parseFloat(e.target.value) || 0;
+                            const minPrice = parseFloat(formData.bestOffer.minPrice) || 0;
+                            
+                            // Only allow setting auto-accept if it's >= minimum offer
+                            if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
+                              toast({
+                                title: 'Invalid auto-accept price',
+                                description: `Auto-accept must be at least $${minPrice.toLocaleString()} (your minimum offer)`,
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            
                             setFormData({
                               ...formData,
                               bestOffer: { ...formData.bestOffer, autoAcceptPrice: e.target.value },
-                            })
-                          }
+                            });
+                          }}
                           className="min-h-[44px]"
                         />
+                        {(() => {
+                          const minPrice = parseFloat(formData.bestOffer.minPrice) || 0;
+                          const autoAccept = parseFloat(formData.bestOffer.autoAcceptPrice) || 0;
+                          if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
+                            return (
+                              <p className="text-xs text-destructive font-medium">
+                                Must be ≥ ${minPrice.toLocaleString()} (minimum offer)
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
 
                       <div className="space-y-2">

@@ -71,6 +71,10 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
     typeof (cover as any)?.cropZoom === 'number' && Number.isFinite((cover as any).cropZoom)
       ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
       : 1;
+  const coverAspect =
+    typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
+      ? (cover as any).cropAspect
+      : 4 / 3;
 
   return (
     <motion.div
@@ -114,8 +118,11 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             </Badge>
           </div>
 
-          {/* Image with Premium Overlay */}
-          <div className="relative aspect-[4/3] sm:aspect-[16/9] w-full bg-muted overflow-hidden rounded-t-xl">
+          {/* Image - aspect follows crop (portrait/landscape/square) so vertical photos fit whole animal */}
+          <div
+            className="relative w-full bg-muted overflow-hidden rounded-t-xl"
+            style={{ aspectRatio: String(coverAspect) }}
+          >
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/20 to-transparent z-10" />
             {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}

@@ -1757,7 +1757,20 @@ function NewListingPageContent() {
                       value={formatPriceWithCommas(formData.bestOffer.minPrice)}
                       onChange={(e) => {
                         const parsed = parsePriceString(e.target.value);
-                        setFormData({ ...formData, bestOffer: { ...formData.bestOffer, minPrice: parsed } });
+                        const minPrice = parseFloat(parsed) || 0;
+                        const autoAccept = parseFloat(formData.bestOffer.autoAcceptPrice) || 0;
+                        
+                        // If auto-accept is set and would be lower than new minimum, clear it
+                        const newAutoAccept = autoAccept > 0 && autoAccept < minPrice ? '' : formData.bestOffer.autoAcceptPrice;
+                        
+                        setFormData({ 
+                          ...formData, 
+                          bestOffer: { 
+                            ...formData.bestOffer, 
+                            minPrice: parsed,
+                            autoAcceptPrice: newAutoAccept
+                          } 
+                        });
                       }}
                       className="min-h-[44px]"
                     />
@@ -1774,6 +1787,19 @@ function NewListingPageContent() {
                       value={formatPriceWithCommas(formData.bestOffer.autoAcceptPrice)}
                       onChange={(e) => {
                         const parsed = parsePriceString(e.target.value);
+                        const autoAccept = parseFloat(parsed) || 0;
+                        const minPrice = parseFloat(formData.bestOffer.minPrice) || 0;
+                        
+                        // Only allow setting auto-accept if it's >= minimum offer
+                        if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
+                          toast({
+                            title: 'Invalid auto-accept price',
+                            description: `Auto-accept must be at least $${minPrice.toLocaleString()} (your minimum offer)`,
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+                        
                         setFormData({
                           ...formData,
                           bestOffer: { ...formData.bestOffer, autoAcceptPrice: parsed },
@@ -1781,6 +1807,18 @@ function NewListingPageContent() {
                       }}
                       className="min-h-[44px]"
                     />
+                    {(() => {
+                      const minPrice = parseFloat(formData.bestOffer.minPrice) || 0;
+                      const autoAccept = parseFloat(formData.bestOffer.autoAcceptPrice) || 0;
+                      if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
+                        return (
+                          <p className="text-xs text-destructive font-medium">
+                            Must be ≥ ${minPrice.toLocaleString()} (minimum offer)
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <div className="space-y-2">
@@ -2083,7 +2121,7 @@ function NewListingPageContent() {
     {
       id: 'transportation',
       title: 'Transportation',
-      description: 'Delivery radius, timeframe & notes',
+      description: 'Delivery timeframe & details (required)',
       content: (
         <div className="space-y-6">
           <p className="text-sm text-muted-foreground">
@@ -2122,7 +2160,7 @@ function NewListingPageContent() {
 
               <div>
                 <Label htmlFor="deliveryTimeframe" className="font-medium">
-                  Delivery timeframe
+                  Delivery timeframe <span className="text-destructive">*</span>
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   When you plan to deliver. Buyers can filter by this on the browse page.
@@ -2208,6 +2246,16 @@ function NewListingPageContent() {
       ),
       validate: () => {
         const dd = formData.deliveryDetails ?? {};
+        // Delivery timeframe is required
+        if (!(dd.deliveryTimeframe ?? '').trim()) {
+          toast({
+            title: 'Delivery timeframe required',
+            description: 'Please select when you plan to deliver.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        // If 30-60 days, explanation is required
         if ((dd.deliveryTimeframe ?? '') === '30_60') {
           const expl = (dd.deliveryStatusExplanation ?? '').trim();
           if (!expl) {
@@ -2805,7 +2853,11 @@ function NewListingPageContent() {
   useEffect(() => {
     if (!publishAfterAnimalAck || sellerAnimalAckModalOpen) return;
     setPublishAfterAnimalAck(false);
-    void handleComplete({});
+    // Use setTimeout to ensure formData state update has propagated before calling handleComplete
+    const timer = setTimeout(() => {
+      void handleComplete({});
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publishAfterAnimalAck, sellerAnimalAckModalOpen]);
 
@@ -3166,19 +3218,16 @@ function NewListingPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Seller acknowledgment (publish-time) for animal listings (non-whitetail) */}
       <Dialog
         open={sellerAnimalAckModalOpen}
         onOpenChange={(open) => {
           setSellerAnimalAckModalOpen(open);
           if (!open && !sellerAnimalAckForceRef.current) {
-            // Only reset checkbox if modal is closed without accepting (e.g., Cancel or outside click)
-            // Don't reset if we're closing because user accepted (sellerAnimalAckForceRef will be true)
             setSellerAnimalAckModalChecked(false);
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Seller acknowledgment</DialogTitle>
             <DialogDescription>
@@ -3186,15 +3235,16 @@ function NewListingPageContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-              <div className="flex items-start gap-3">
+          <div className="space-y-4 overflow-y-auto flex-1 px-1">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 md:p-4">
+              <div className="flex items-start gap-2 md:gap-3">
                 <Checkbox
                   id="seller-animal-ack-modal"
+                  className="mt-1 min-h-[20px] min-w-[20px]"
                   checked={Boolean(sellerAnimalAckModalChecked)}
                   onCheckedChange={(checked) => setSellerAnimalAckModalChecked(Boolean(checked))}
                 />
-                <Label htmlFor="seller-animal-ack-modal" className="cursor-pointer leading-relaxed">
+                <Label htmlFor="seller-animal-ack-modal" className="cursor-pointer leading-relaxed text-sm">
                   <div className="space-y-2">
                     <div>
                       I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
@@ -3202,9 +3252,9 @@ function NewListingPageContent() {
                     </div>
                     {/* Category-specific disclosures */}
                     {formData.category === 'sporting_working_dogs' && (
-                      <div className="mt-3 pt-3 border-t border-border/40">
-                        <div className="font-medium mb-1">Required disclosures:</div>
-                        <div className="text-sm space-y-1">
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                        <div className="text-xs md:text-sm space-y-1">
                           <div>• I have accurately disclosed identification details (if applicable).</div>
                           <div>• I have disclosed any known health issues and represented the dog honestly.</div>
                           <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
@@ -3212,9 +3262,9 @@ function NewListingPageContent() {
                       </div>
                     )}
                     {formData.category === 'wildlife_exotics' && (
-                      <div className="mt-3 pt-3 border-t border-border/40">
-                        <div className="font-medium mb-1">Required disclosures:</div>
-                        <div className="text-sm space-y-1">
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                        <div className="text-xs md:text-sm space-y-1">
                           <div>• I confirm that animals are properly identified/tagged as required by TAHC regulations.</div>
                           <div>• I acknowledge health disclosure requirements for registered livestock.</div>
                           <div>• I confirm that transfer is Texas-only unless otherwise permitted by regulations.</div>
@@ -3222,18 +3272,18 @@ function NewListingPageContent() {
                       </div>
                     )}
                     {formData.category === 'cattle_livestock' && (
-                      <div className="mt-3 pt-3 border-t border-border/40">
-                        <div className="font-medium mb-1">Required disclosures:</div>
-                        <div className="text-sm space-y-1">
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                        <div className="text-xs md:text-sm space-y-1">
                           <div>• I confirm that animals have proper ear tags/brand identification as required.</div>
                           <div>• I acknowledge health disclosure requirements for livestock.</div>
                         </div>
                       </div>
                     )}
                     {formData.category === 'horse_equestrian' && (
-                      <div className="mt-3 pt-3 border-t border-border/40">
-                        <div className="font-medium mb-1">Required disclosures:</div>
-                        <div className="text-sm space-y-1">
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                        <div className="text-xs md:text-sm space-y-1">
                           <div>• I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).</div>
                           <div>• I have disclosed any known health issues and represented the horse honestly.</div>
                           <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
@@ -3246,24 +3296,28 @@ function NewListingPageContent() {
               </div>
             </div>
 
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs md:text-sm text-muted-foreground px-1">
               After you publish, your listing will be submitted for review and approval.
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-0 flex-shrink-0">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setSellerAnimalAckModalOpen(false)}
+              className="min-h-[44px]"
+              onClick={() => {
+                setSellerAnimalAckModalOpen(false);
+                submittingRef.current = false;
+              }}
             >
               Cancel
             </Button>
             <Button
               type="button"
+              className="min-h-[44px]"
               disabled={!Boolean(sellerAnimalAckModalChecked)}
               onClick={() => {
-                // Set ref first to prevent onOpenChange from resetting checkbox
                 sellerAnimalAckForceRef.current = true;
                 setSellerAnimalAttestationAccepted(true);
 

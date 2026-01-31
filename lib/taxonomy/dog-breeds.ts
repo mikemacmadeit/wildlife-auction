@@ -2,6 +2,7 @@ import type { SearchableSelectOption } from '@/components/ui/searchable-select';
 
 // "Sporting / working dogs" is broad; this list is intentionally large and filter-friendly.
 // Users can choose "Other (not listed)" and enter free-text details as needed.
+// Alphabetically sorted by label for better UX.
 export const DOG_BREED_OPTIONS: SearchableSelectOption[] = [
   { value: 'labrador_retriever', label: 'Labrador Retriever' },
   { value: 'golden_retriever', label: 'Golden Retriever' },
@@ -88,5 +89,5 @@ export const DOG_BREED_OPTIONS: SearchableSelectOption[] = [
   { value: 'american_bulldog', label: 'American Bulldog' },
   { value: 'other', label: 'Other (not listed)' },
   { value: 'mixed', label: 'Mixed / Crossbred' },
-];
+].sort((a, b) => a.label.localeCompare(b.label));
 

@@ -152,6 +152,7 @@ export function MessageThreadComponent({
   }, [latestMessages, olderMessages]);
 
   // Live thread fields (typing/read receipts) subscription
+  // IMPORTANT: Only update state if relevant fields actually changed to prevent flicker
   useEffect(() => {
     if (!thread.id) return;
     try {
@@ -161,14 +162,46 @@ export function MessageThreadComponent({
         (snap) => {
           const d = snap.data() as any;
           if (!d) return;
-          setThreadLive((prev) => ({
-            ...(prev || thread),
-            ...(d || {}),
-            id: thread.id,
-            createdAt: d?.createdAt?.toDate?.() || (prev as any)?.createdAt || thread.createdAt,
-            updatedAt: d?.updatedAt?.toDate?.() || (prev as any)?.updatedAt || thread.updatedAt,
-            lastMessageAt: d?.lastMessageAt?.toDate?.() || (prev as any)?.lastMessageAt,
-          } as any));
+          setThreadLive((prev) => {
+            // Only create new object if typing/read receipt fields actually changed
+            const nextBuyerLastReadAt = d?.buyerLastReadAt?.toDate?.() || (prev as any)?.buyerLastReadAt || null;
+            const nextSellerLastReadAt = d?.sellerLastReadAt?.toDate?.() || (prev as any)?.sellerLastReadAt || null;
+            const nextBuyerTypingUntil = d?.buyerTypingUntil?.toDate?.() || (prev as any)?.buyerTypingUntil || null;
+            const nextSellerTypingUntil = d?.sellerTypingUntil?.toDate?.() || (prev as any)?.sellerTypingUntil || null;
+            
+            const prevBuyerReadMs = (prev as any)?.buyerLastReadAt?.getTime?.() || 0;
+            const prevSellerReadMs = (prev as any)?.sellerLastReadAt?.getTime?.() || 0;
+            const prevBuyerTypingMs = (prev as any)?.buyerTypingUntil?.getTime?.() || 0;
+            const prevSellerTypingMs = (prev as any)?.sellerTypingUntil?.getTime?.() || 0;
+            
+            const nextBuyerReadMs = nextBuyerLastReadAt?.getTime?.() || 0;
+            const nextSellerReadMs = nextSellerLastReadAt?.getTime?.() || 0;
+            const nextBuyerTypingMs = nextBuyerTypingUntil?.getTime?.() || 0;
+            const nextSellerTypingMs = nextSellerTypingUntil?.getTime?.() || 0;
+            
+            // Return previous object reference if nothing meaningful changed
+            if (
+              prevBuyerReadMs === nextBuyerReadMs &&
+              prevSellerReadMs === nextSellerReadMs &&
+              prevBuyerTypingMs === nextBuyerTypingMs &&
+              prevSellerTypingMs === nextSellerTypingMs
+            ) {
+              return prev;
+            }
+            
+            // Something changed - return new object with updated fields
+            return {
+              ...(prev || thread),
+              id: thread.id,
+              buyerLastReadAt: nextBuyerLastReadAt,
+              sellerLastReadAt: nextSellerLastReadAt,
+              buyerTypingUntil: nextBuyerTypingUntil,
+              sellerTypingUntil: nextSellerTypingUntil,
+              createdAt: d?.createdAt?.toDate?.() || (prev as any)?.createdAt || thread.createdAt,
+              updatedAt: d?.updatedAt?.toDate?.() || (prev as any)?.updatedAt || thread.updatedAt,
+              lastMessageAt: d?.lastMessageAt?.toDate?.() || (prev as any)?.lastMessageAt,
+            } as any;
+          });
         },
         () => {
           // ignore

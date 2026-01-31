@@ -128,7 +128,7 @@ export async function getListingForSSR(id: string): Promise<Listing | null> {
       normalizedCategory = 'wildlife_exotics';
     }
 
-    const photoSnapshot = d.photos as Array<{ photoId?: string; url?: string; width?: number; height?: number; sortOrder?: number; focalPoint?: { x: number; y: number }; cropZoom?: number }> | undefined;
+    const photoSnapshot = d.photos as Array<{ photoId?: string; url?: string; width?: number; height?: number; sortOrder?: number; focalPoint?: { x: number; y: number }; cropZoom?: number; cropAspect?: number }> | undefined;
     const normalizedPhotos =
       Array.isArray(photoSnapshot) && photoSnapshot.length
         ? photoSnapshot
@@ -143,6 +143,7 @@ export async function getListingForSSR(id: string): Promise<Listing | null> {
                   ? { x: Math.max(0, Math.min(1, p.focalPoint.x)), y: Math.max(0, Math.min(1, p.focalPoint.y)) }
                   : undefined,
               cropZoom: typeof p?.cropZoom === 'number' && Number.isFinite(p.cropZoom) ? Math.max(1, Math.min(3, p.cropZoom)) : undefined,
+              cropAspect: typeof p?.cropAspect === 'number' && Number.isFinite(p.cropAspect) ? p.cropAspect : undefined,
             }))
             .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
         : undefined;

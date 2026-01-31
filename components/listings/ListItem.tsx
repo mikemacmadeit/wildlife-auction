@@ -90,6 +90,10 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     typeof (cover as any)?.cropZoom === 'number' && Number.isFinite((cover as any).cropZoom)
       ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
       : 1;
+  const coverAspect =
+    typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
+      ? (cover as any).cropAspect
+      : 4 / 3;
 
   const primaryPriceBrowse = (() => {
     if (isAuction) return Number((listing as any).currentBid || (listing as any).startingBid || 0) || 0;

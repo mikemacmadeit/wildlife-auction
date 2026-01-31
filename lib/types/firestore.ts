@@ -42,6 +42,7 @@ export interface ListingDoc {
     sortOrder?: number;
     focalPoint?: { x: number; y: number };
     cropZoom?: number;
+    cropAspect?: number;
   }>;
   coverPhotoId?: string;
 

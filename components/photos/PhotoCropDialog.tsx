@@ -2,14 +2,22 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Cropper, { type Area, type MediaSize } from 'react-easy-crop';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, RectangleHorizontal, RectangleVertical, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
 export type FocalPoint = { x: number; y: number };
-export type PhotoCropResult = { focalPoint: FocalPoint; zoom: number };
+
+/** Width/height ratio (e.g. 4/3 = landscape, 3/4 = portrait). Stored so listing cards can display with same aspect. */
+export type PhotoCropResult = { focalPoint: FocalPoint; zoom: number; aspectRatio: number };
+
+export const CROP_ASPECT_OPTIONS = [
+  { value: 4 / 3, label: 'Landscape', icon: RectangleHorizontal },
+  { value: 3 / 4, label: 'Portrait', icon: RectangleVertical },
+  { value: 1, label: 'Square', icon: Square },
+] as const;
 
 function clamp01(n: number) {
   if (!Number.isFinite(n)) return 0.5;
@@ -20,7 +28,8 @@ export function PhotoCropDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   imageSrc: string;
-  aspect?: number; // width/height
+  /** Default aspect (width/height). User can change via selector. */
+  aspect?: number;
   title?: string;
   description?: string;
   onSave: (result: PhotoCropResult) => void;
@@ -29,12 +38,13 @@ export function PhotoCropDialog(props: {
     open,
     onOpenChange,
     imageSrc,
-    aspect = 4 / 3,
+    aspect: initialAspect = 4 / 3,
     title = 'Adjust thumbnail',
-    description = 'Choose what part of the photo shows on listing cards.',
+    description = 'Choose what part of the photo shows on listing cards. Use Portrait for vertical photos (e.g. full animal).',
     onSave,
   } = props;
 
+  const [aspect, setAspect] = useState(initialAspect);
   const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [media, setMedia] = useState<MediaSize | null>(null);
@@ -43,6 +53,13 @@ export function PhotoCropDialog(props: {
   const reset = useCallback(() => {
     setCrop({ x: 0, y: 0 });
     setZoom(1);
+  }, []);
+
+  const setAspectAndReset = useCallback((newAspect: number) => {
+    setAspect(newAspect);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
   }, []);
 
   const onCropComplete = useCallback((_croppedArea: Area, croppedPixels: Area) => {
@@ -60,8 +77,8 @@ export function PhotoCropDialog(props: {
 
   const cropResult = useMemo<PhotoCropResult>(() => {
     const safeZoom = Number.isFinite(zoom) ? Math.max(1, Math.min(3, zoom)) : 1;
-    return { focalPoint, zoom: safeZoom };
-  }, [focalPoint, zoom]);
+    return { focalPoint, zoom: safeZoom, aspectRatio: aspect };
+  }, [focalPoint, zoom, aspect]);
 
   return (
     <Dialog
@@ -69,7 +86,6 @@ export function PhotoCropDialog(props: {
       onOpenChange={(next) => {
         onOpenChange(next);
         if (!next) {
-          // Keep state (so reopen feels stable), but ensure media/crop data doesn't leak between images.
           setMedia(null);
           setCroppedAreaPixels(null);
         }
@@ -82,10 +98,31 @@ export function PhotoCropDialog(props: {
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Aspect ratio: Portrait fits vertical photos (e.g. full animal in frame). */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Crop shape:</span>
+            {CROP_ASPECT_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const isActive = Math.abs(aspect - opt.value) < 0.01;
+              return (
+                <Button
+                  key={opt.value}
+                  type="button"
+                  variant={isActive ? 'secondary' : 'outline'}
+                  size="sm"
+                  className="min-h-[36px] font-medium"
+                  onClick={() => setAspectAndReset(opt.value)}
+                >
+                  <Icon className="h-4 w-4 mr-1.5" />
+                  {opt.label}
+                </Button>
+              );
+            })}
+          </div>
+
           <div
             className={cn(
               'relative w-full overflow-hidden rounded-lg border bg-black/80',
-              // The cropper needs a concrete height; aspect ratio keeps it consistent.
             )}
             style={{ aspectRatio: String(aspect) }}
           >

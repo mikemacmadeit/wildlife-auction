@@ -175,6 +175,11 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
     typeof (cover as any)?.cropZoom === 'number' && Number.isFinite((cover as any).cropZoom)
       ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
       : 1;
+  // Support vertical/portrait crops so users can fit whole animal (e.g. screenshot or portrait photo).
+  const coverAspect =
+    typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
+      ? (cover as any).cropAspect
+      : 4 / 3;
 
   return (
     <motion.div
@@ -194,8 +199,11 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
           'hover:border-border/70 hover:shadow-lifted hover:-translate-y-0.5',
           className
         )}>
-          {/* Image */}
-          <div className="relative aspect-[4/3] w-full bg-muted overflow-hidden rounded-t-xl">
+          {/* Image - aspect follows crop (portrait 3:4, landscape 4:3, square 1:1) so vertical photos fit whole animal */}
+          <div
+            className="relative w-full bg-muted overflow-hidden rounded-t-xl"
+            style={{ aspectRatio: String(coverAspect) }}
+          >
             {/* Subtle bottom overlay gradient - always visible for readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent z-10" />
             {sold.isSold && <div className="absolute inset-0 bg-black/25 z-[11]" />}

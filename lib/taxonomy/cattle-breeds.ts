@@ -2,6 +2,7 @@ import type { SearchableSelectOption } from '@/components/ui/searchable-select';
 
 // Note: This list is intentionally "broad + common" for marketplace filtering.
 // Users can still choose "Other" and type free-text into a separate field if needed.
+// Alphabetically sorted by label for better UX.
 export const CATTLE_BREED_OPTIONS: SearchableSelectOption[] = [
   { value: 'angus', label: 'Angus' },
   { value: 'black_angus', label: 'Black Angus' },
@@ -42,5 +43,5 @@ export const CATTLE_BREED_OPTIONS: SearchableSelectOption[] = [
   { value: 'guernsey', label: 'Guernsey' },
   { value: 'ayrshire', label: 'Ayrshire' },
   { value: 'other', label: 'Other (not listed)' },
-];
+].sort((a, b) => a.label.localeCompare(b.label));
 
