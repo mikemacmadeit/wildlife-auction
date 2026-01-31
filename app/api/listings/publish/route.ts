@@ -127,8 +127,7 @@ function validatePublishRequiredFields(listingData: any): { ok: true } | { ok: f
       ok: false,
       missing,
       message:
-        'Listing is incomplete or has invalid values. Fix the highlighted fields and try again. ' +
-        '(Drafts can be incomplete; publishing requires all required fields.)',
+        'Your listing is missing some required information or has invalid values. Please fill in or fix the missing items and try publishing again.',
     };
   }
   return { ok: true };
@@ -376,9 +375,9 @@ export async function POST(request: Request) {
     if (listingData.category === 'whitetail_breeder' && listingData.sellerAttestationAccepted !== true) {
       return json(
         {
-          error: 'Seller attestation required',
+          error: 'Certification required',
           message:
-            'Seller attestation is required for whitetail breeder listings. Please certify that permit information is accurate and permit is valid/current.',
+            'Please check the box to certify that your permit information is accurate and your TPWD Deer Breeder Permit is valid and current.',
         },
         { status: 400 }
       );
@@ -391,10 +390,10 @@ export async function POST(request: Request) {
       if (listingData.sellerAnimalAttestationAccepted !== true) {
         return json(
           {
-            error: 'Seller acknowledgment required',
+            error: 'Acknowledgment required',
             code: 'SELLER_ANIMAL_ACK_REQUIRED',
             message:
-              'Before publishing an animal listing, you must acknowledge that you are solely responsible for representations, permits, and compliance, and that Agchange does not take custody of animals.',
+              'Please check the box to confirm you\'ve read and accept the seller acknowledgment before publishing this animal listing.',
           },
           { status: 400 }
         );
@@ -435,9 +434,9 @@ export async function POST(request: Request) {
     if (!payoutsReady) {
       return json(
         {
-          error: 'Payouts setup required',
+          error: 'Payout setup required',
           code: 'PAYOUTS_NOT_READY',
-          message: 'Please connect Stripe payouts before publishing listings so you can get paid.',
+          message: 'Please connect your payout account so you can receive payments when you make a sale. You can still save this listing as a draft.',
         },
         { status: 400 }
       );

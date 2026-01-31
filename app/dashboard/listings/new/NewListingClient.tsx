@@ -1333,7 +1333,7 @@ function NewListingPageContent() {
               </div>
               {!sellerAttestationAccepted && (
                 <p className="text-sm text-destructive">
-                  You must accept the seller attestation to submit a whitetail breeder listing.
+                  Please check the box above to certify your permit information before submitting.
                 </p>
               )}
             </div>
@@ -1368,7 +1368,7 @@ function NewListingPageContent() {
           if (expDate && expDate.getTime() < Date.now()) {
             toast({
               title: 'Permit expired',
-              description: 'Your TPWD Deer Breeder Permit is expired. Renew before submitting.',
+              description: 'Your TPWD Deer Breeder Permit has expired. Please renew it with TPWD before you can submit this listing.',
               variant: 'destructive',
             });
             return false;
@@ -1376,17 +1376,18 @@ function NewListingPageContent() {
 
           if (!sellerAttestationAccepted) {
             toast({
-              title: 'Seller attestation required',
-              description: 'Please accept the seller attestation to proceed.',
+              title: 'Certification required',
+              description: 'Please check the box to certify that your permit information is accurate and your TPWD Deer Breeder Permit is valid and current.',
               variant: 'destructive',
             });
             return false;
           }
           
           if (errors.length > 0) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1402,9 +1403,10 @@ function NewListingPageContent() {
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1427,9 +1429,10 @@ function NewListingPageContent() {
           const hasWeight = !!String(attrs.weightRange || '').trim();
           if (!hasAge && !hasWeight) errors.push('Age or Weight Range');
           if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1447,9 +1450,10 @@ function NewListingPageContent() {
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1470,9 +1474,10 @@ function NewListingPageContent() {
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
           // Disclosures are now handled in the final seller acknowledgment step, not validated here
           if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1492,9 +1497,10 @@ function NewListingPageContent() {
             if (!attrs.vinOrSerial?.trim()) errors.push('VIN or Serial Number');
           }
           if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1518,9 +1524,10 @@ function NewListingPageContent() {
             if (!String(attrs.model || '').trim()) errors.push('Model');
           }
           if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
-              title: 'Missing Required Fields',
-              description: `Please complete: ${errors.join(', ')}`,
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
               variant: 'destructive',
             });
             return false;
@@ -1559,7 +1566,7 @@ function NewListingPageContent() {
               )}
             />
             {validationAttempted.details && String(formData.title || '').trim().length === 0 ? (
-              <div className="text-sm text-destructive">Title is required.</div>
+              <div className="text-sm text-destructive">Please enter a title so buyers know what you're selling.</div>
             ) : null}
           </div>
 
@@ -1585,7 +1592,7 @@ function NewListingPageContent() {
               )}
             />
             {validationAttempted.details && String(formData.description || '').trim().length === 0 ? (
-              <div className="text-sm text-destructive">Description is required.</div>
+              <div className="text-sm text-destructive">Please add a description so buyers can learn more about your listing.</div>
             ) : null}
           </div>
 
@@ -1616,7 +1623,7 @@ function NewListingPageContent() {
                 )}
               />
               {validationAttempted.details && !isPositiveMoney(formData.price) ? (
-                <div className="text-sm text-destructive">Price is required.</div>
+                <div className="text-sm text-destructive">Please enter a price for your listing.</div>
               ) : null}
             </div>
           )}
@@ -1651,7 +1658,7 @@ function NewListingPageContent() {
                   )}
                 />
                 {validationAttempted.details && !isPositiveMoney(formData.startingBid) ? (
-                  <div className="text-sm text-destructive">Starting bid is required.</div>
+                  <div className="text-sm text-destructive">Please enter a starting bid for your auction.</div>
                 ) : null}
               </div>
               <div className="space-y-2">
@@ -1786,19 +1793,7 @@ function NewListingPageContent() {
                       value={formatPriceWithCommas(formData.bestOffer.autoAcceptPrice)}
                       onChange={(e) => {
                         const parsed = parsePriceString(e.target.value);
-                        const autoAccept = parseFloat(parsed) || 0;
-                        const minPrice = parseFloat(formData.bestOffer.minPrice) || 0;
-                        
-                        // Only allow setting auto-accept if it's >= minimum offer
-                        if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
-                          toast({
-                            title: 'Invalid auto-accept price',
-                            description: `Auto-accept must be at least $${minPrice.toLocaleString()} (your minimum offer)`,
-                            variant: 'destructive',
-                          });
-                          return;
-                        }
-                        
+                        // Always update so user can type (e.g. "2000") without being blocked on intermediate values ("2", "20", "200")
                         setFormData({
                           ...formData,
                           bestOffer: { ...formData.bestOffer, autoAcceptPrice: parsed },
@@ -1812,7 +1807,7 @@ function NewListingPageContent() {
                       if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
                         return (
                           <p className="text-xs text-destructive font-medium">
-                            Must be ≥ ${minPrice.toLocaleString()} (minimum offer)
+                            Auto-accept price must be at least ${minPrice.toLocaleString()} (same as or higher than your minimum offer).
                           </p>
                         );
                       }
@@ -1899,7 +1894,7 @@ function NewListingPageContent() {
                 )}
               />
               {validationAttempted.details && String(formData.location.city || '').trim().length === 0 ? (
-                <div className="text-sm text-destructive">City is required.</div>
+                <div className="text-sm text-destructive">Please enter the city where the item is located.</div>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -2249,7 +2244,7 @@ function NewListingPageContent() {
         if (!(dd.deliveryTimeframe ?? '').trim()) {
           toast({
             title: 'Delivery timeframe required',
-            description: 'Please select when you plan to deliver.',
+            description: 'Please select when you plan to deliver so buyers know what to expect.',
             variant: 'destructive',
           });
           return false;
@@ -2260,7 +2255,7 @@ function NewListingPageContent() {
           if (!expl) {
             toast({
               title: 'Explanation required',
-              description: 'For 30–60 day delivery, please provide a delivery status explanation.',
+              description: 'For 30–60 day delivery, please add a short explanation so buyers know the current status of the delivery.',
               variant: 'destructive',
             });
             return false;
@@ -2587,8 +2582,8 @@ function NewListingPageContent() {
     // Whitetail-only hard gate (required even for draft creation)
     if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
       toast({
-        title: 'Seller attestation required',
-        description: 'Please accept the seller attestation before saving or publishing a whitetail breeder listing.',
+        title: 'Certification required',
+        description: 'Please check the box to certify that your permit information is accurate and your TPWD Deer Breeder Permit is valid before saving or publishing.',
         variant: 'destructive',
       });
       submittingRef.current = false;
@@ -2615,8 +2610,8 @@ function NewListingPageContent() {
     // Validate photos
     if (formData.photoIds.length === 0) {
       toast({
-        title: 'Images required',
-        description: 'Please upload at least one photo before publishing.',
+        title: 'At least one photo required',
+        description: 'Please add at least one photo so buyers can see what you\'re selling.',
         variant: 'destructive',
       });
       submittingRef.current = false;
@@ -2625,8 +2620,8 @@ function NewListingPageContent() {
 
     if (!formData.category) {
       toast({
-        title: 'Select a category',
-        description: 'Please choose a category before publishing a listing.',
+        title: 'Choose a category',
+        description: 'Please choose a category (e.g. Cattle, Horses, Equipment) so buyers can find your listing.',
         variant: 'destructive',
       });
       submittingRef.current = false;
@@ -2635,8 +2630,8 @@ function NewListingPageContent() {
 
     if (formData.photoIds.length > 8) {
       toast({
-        title: 'Too many images',
-        description: 'You can upload a maximum of 8 photos per listing.',
+        title: 'Too many photos',
+        description: 'You can add up to 8 photos per listing. Please remove any extra photos.',
         variant: 'destructive',
       });
       submittingRef.current = false;
@@ -2818,8 +2813,8 @@ function NewListingPageContent() {
         setSellerAnimalAckModalChecked(false);
         setSellerAnimalAckModalOpen(true);
         toast({
-          title: 'Seller acknowledgment required',
-          description: 'Please accept the seller acknowledgment to publish this animal listing.',
+          title: 'Acknowledgment required',
+          description: 'Please check the box to confirm you\'ve read and accept the seller acknowledgment before publishing this animal listing.',
           variant: 'destructive',
         });
         return;
@@ -2830,14 +2825,14 @@ function NewListingPageContent() {
         setPayoutsGateOpen(true);
         toast({
           title: 'Connect payouts to publish',
-          description: 'You can still save this as a draft right now.',
+          description: 'You need to connect your payout account to receive payments before publishing. You can still save this as a draft now.',
         });
         return;
       }
 
       toast({
-        title: 'Error creating listing',
-        description: error.message || 'An error occurred while creating your listing. Please try again.',
+        title: 'Couldn\'t create listing',
+        description: error.message || 'Something went wrong while saving your listing. Please try again. If it keeps happening, contact support.',
         variant: 'destructive',
       });
     } finally {
@@ -2901,7 +2896,7 @@ function NewListingPageContent() {
     if (!user) {
       toast({
         title: 'Sign in required',
-        description: 'You must be signed in to save a draft.',
+        description: 'You need to sign in to save a draft. Please sign in and try again.',
         variant: 'destructive',
       });
       return false;
@@ -2910,8 +2905,8 @@ function NewListingPageContent() {
     // Whitetail-only hard gate (required even for draft creation)
     if (formData.category === 'whitetail_breeder' && !sellerAttestationAccepted) {
       toast({
-        title: 'Seller attestation required',
-        description: 'Please accept the seller attestation before saving a whitetail breeder listing draft.',
+        title: 'Certification required',
+        description: 'Please check the box to certify your permit information before saving a whitetail breeder draft.',
         variant: 'destructive',
       });
       return false;
@@ -3049,8 +3044,8 @@ function NewListingPageContent() {
     } catch (error: any) {
       console.error('Error saving draft:', error);
       toast({
-        title: 'Failed to save draft',
-        description: error.message || 'An error occurred while saving your draft.',
+        title: 'Couldn\'t save draft',
+        description: error.message || 'Something went wrong while saving your draft. Please try again. If it keeps happening, contact support.',
         variant: 'destructive',
       });
       return false;

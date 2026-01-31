@@ -159,7 +159,7 @@ function EditListingPageContent() {
         if (!listing) {
           toast({
             title: 'Listing not found',
-            description: 'The listing you are trying to edit does not exist.',
+            description: 'We couldn\'t find this listing. It may have been removed or the link may be wrong.',
             variant: 'destructive',
           });
           router.push('/seller/listings');
@@ -169,8 +169,8 @@ function EditListingPageContent() {
         // Verify ownership
         if (user && listing.sellerId !== user.uid) {
           toast({
-            title: 'Unauthorized',
-            description: 'You can only edit your own listings.',
+            title: 'You can\'t edit this listing',
+            description: 'You can only edit listings that you created. Please sign in with the account that owns this listing.',
             variant: 'destructive',
           });
           router.push('/seller/listings');
@@ -921,19 +921,7 @@ function EditListingPageContent() {
                           placeholder="0"
                           value={formData.bestOffer.autoAcceptPrice}
                           onChange={(e) => {
-                            const autoAccept = parseFloat(e.target.value) || 0;
-                            const minPrice = parseFloat(formData.bestOffer.minPrice) || 0;
-                            
-                            // Only allow setting auto-accept if it's >= minimum offer
-                            if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
-                              toast({
-                                title: 'Invalid auto-accept price',
-                                description: `Auto-accept must be at least $${minPrice.toLocaleString()} (your minimum offer)`,
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            
+                            // Always update so user can type (e.g. "2000") without being blocked on intermediate values ("2", "20", "200")
                             setFormData({
                               ...formData,
                               bestOffer: { ...formData.bestOffer, autoAcceptPrice: e.target.value },
@@ -947,7 +935,7 @@ function EditListingPageContent() {
                           if (minPrice > 0 && autoAccept > 0 && autoAccept < minPrice) {
                             return (
                               <p className="text-xs text-destructive font-medium">
-                                Must be ≥ ${minPrice.toLocaleString()} (minimum offer)
+                                Auto-accept price must be at least ${minPrice.toLocaleString()} (same as or higher than your minimum offer).
                               </p>
                             );
                           }
@@ -1169,7 +1157,7 @@ function EditListingPageContent() {
                   disabled={!listingId || uploadingImages.size > 0 || formData.images.length >= 10}
                   onClick={() => {
                     if (!listingId) {
-                      toast({ title: 'Error', description: 'Missing listing ID for upload.', variant: 'destructive' });
+                      toast({ title: 'Upload not ready', description: 'Please save your listing first, then you can add photos.', variant: 'destructive' });
                       return;
                     }
                     if (uploadingImages.size > 0) return;
@@ -1193,11 +1181,11 @@ function EditListingPageContent() {
                     e.currentTarget.value = '';
 
                     if (!listingId) {
-                      toast({ title: 'Error', description: 'Missing listing ID for upload.', variant: 'destructive' });
+                      toast({ title: 'Upload not ready', description: 'Please save your listing first, then you can add photos.', variant: 'destructive' });
                       return;
                     }
                     if (!user?.uid) {
-                      toast({ title: 'Sign in required', description: 'Please sign in to upload photos.', variant: 'destructive' });
+                      toast({ title: 'Sign in required', description: 'You need to sign in to add photos. Please sign in and try again.', variant: 'destructive' });
                       return;
                     }
 
@@ -1315,8 +1303,8 @@ function EditListingPageContent() {
         if (!formData.category) return false;
         if (formData.category !== 'whitetail_breeder' && isAnimalCategory(formData.category as any) && !sellerAnimalAttestationAccepted) {
           toast({
-            title: 'Seller acknowledgment required',
-            description: 'Please accept the seller acknowledgment for animal listings.',
+            title: 'Acknowledgment required',
+            description: 'Please check the box to confirm you\'ve read and accept the seller acknowledgment for this animal listing.',
             variant: 'destructive',
           });
           return false;
@@ -1612,7 +1600,7 @@ function EditListingPageContent() {
           if (!expl) {
             toast({
               title: 'Explanation required',
-              description: 'For 30–60 day delivery, please provide a delivery status explanation.',
+              description: 'For 30–60 day delivery, please add a short explanation so buyers know the current status of the delivery.',
               variant: 'destructive',
             });
             return false;
@@ -1818,8 +1806,8 @@ function EditListingPageContent() {
   const handleSave = async () => {
     if (!user?.uid) {
       toast({
-        title: 'Authentication required',
-        description: 'You must be signed in to save changes.',
+        title: 'Sign in required',
+        description: 'You need to sign in to save changes. Please sign in and try again.',
         variant: 'destructive',
       });
       return;
@@ -1879,8 +1867,8 @@ function EditListingPageContent() {
     });
     if (initialSignature && currentSignature === initialSignature) {
       toast({
-        title: 'No changes yet',
-        description: 'Make at least one change before saving.',
+        title: 'No changes to save',
+        description: 'Please make at least one change to your listing before saving.',
         variant: 'destructive',
       });
       return;
@@ -1997,8 +1985,8 @@ function EditListingPageContent() {
     } catch (err: any) {
       console.error('Error saving listing:', err);
       toast({
-        title: 'Error saving changes',
-        description: err.message || 'Failed to save changes. Please try again.',
+        title: 'Couldn\'t save changes',
+        description: err.message || 'Something went wrong while saving. Please try again. If it keeps happening, contact support.',
         variant: 'destructive',
       });
     } finally {
@@ -2025,8 +2013,8 @@ function EditListingPageContent() {
       !sellerAnimalAttestationAccepted
     ) {
       toast({
-        title: 'Seller acknowledgment required',
-        description: 'Please accept the seller acknowledgment before publishing an animal listing.',
+        title: 'Acknowledgment required',
+        description: 'Please check the box to confirm you\'ve read and accept the seller acknowledgment before publishing this animal listing.',
         variant: 'destructive',
       });
       return;
@@ -2115,8 +2103,8 @@ function EditListingPageContent() {
       }
 
       toast({
-        title: listingData?.status === 'draft' ? 'Error publishing listing' : 'Error updating listing',
-        description: err.message || 'Failed to update listing. Please try again.',
+        title: listingData?.status === 'draft' ? 'Couldn\'t publish listing' : 'Couldn\'t save changes',
+        description: err.message || 'Something went wrong. Please try again. If it keeps happening, contact support.',
         variant: 'destructive',
       });
     } finally {

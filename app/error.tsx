@@ -58,8 +58,8 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         setTimeout(() => setCopied(false), 2000);
       }).catch(() => {
         toast({
-          title: 'Failed to copy',
-          description: 'Could not copy error details',
+          title: 'Copy failed',
+          description: 'We couldn\'t copy the error details. Try selecting and copying the text manually.',
           variant: 'destructive',
         });
       });
@@ -75,7 +75,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           </div>
           <CardTitle className="text-2xl">Something went wrong</CardTitle>
           <CardDescription className="mt-2">
-            We encountered an unexpected error. Please try again, or contact support if the problem persists.
+            We ran into an unexpected problem. Try again, or go back and try a different action. If the problem keeps happening, please contact support.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
