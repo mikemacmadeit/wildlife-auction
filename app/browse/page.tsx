@@ -934,7 +934,7 @@ export default function BrowsePage() {
         className="fixed top-20 left-0 right-0 z-40 md:sticky md:top-0 bg-background/95 backdrop-blur-sm border-b border-border/50"
       >
         <div className="container mx-auto px-3 py-2 md:px-4 md:py-4">
-          <div className="rounded-xl md:rounded-2xl border border-background/20 bg-foreground/92 text-background shadow-sm backdrop-blur-md p-2 md:p-4">
+          <div className="rounded-xl md:rounded-2xl border border-border bg-card text-foreground shadow-sm backdrop-blur-md p-2 md:p-4 dark:border-background/20 dark:bg-foreground/92 dark:text-background">
             <div className="flex flex-col gap-2 md:gap-3">
               {/* Row 1: Mobile = search full width; Desktop = search + Clear */}
               <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-between">
@@ -942,7 +942,7 @@ export default function BrowsePage() {
                 <div className="w-full min-w-0 md:flex-1 md:max-w-2xl">
                   <div className="md:hidden w-full">
                     <div className="relative w-full">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground dark:text-white/70" />
                       <Input
                         type="text"
                         placeholder="Search"
@@ -950,8 +950,10 @@ export default function BrowsePage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className={cn(
                           'w-full pl-9 pr-10 min-h-[44px] text-sm rounded-full',
-                          'bg-white/15 border-white/25 text-white placeholder:text-white/60 caret-white',
-                          'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:border-white/40'
+                          'bg-background text-foreground border-border placeholder:text-muted-foreground caret-foreground',
+                          'focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring/40',
+                          'dark:bg-white/15 dark:border-white/25 dark:text-white dark:placeholder:text-white/60 dark:caret-white',
+                          'dark:focus-visible:ring-white/40 dark:focus-visible:border-white/40'
                         )}
                       />
                       <Button
@@ -960,7 +962,7 @@ export default function BrowsePage() {
                         size="icon"
                         onClick={quickSaveSearchMobile}
                         disabled={savingSearch}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-white/90 hover:bg-white/20 hover:text-white"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-foreground hover:bg-muted dark:text-white/90 dark:hover:bg-white/20 dark:hover:text-white"
                         aria-label="Save search"
                       >
                         <Heart className="h-4 w-4" />
@@ -979,15 +981,13 @@ export default function BrowsePage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className={cn(
                           'pl-11 min-h-[52px] text-base md:text-sm rounded-xl',
-                          // Force readable input text regardless of the header's inverted theme.
                           'bg-background text-foreground caret-foreground',
                           'border-border/70 placeholder:text-muted-foreground',
                           'focus-visible:ring-ring/40 focus-visible:ring-2'
                         )}
                       />
                     </div>
-                    {/* Night mode toggle (quick access next to search) */}
-                    <ThemeToggle className="border border-background/30 text-background hover:bg-background/10 rounded-xl" />
+                    <ThemeToggle className="border border-border text-foreground hover:bg-muted rounded-xl dark:border-background/30 dark:text-background dark:hover:bg-background/10" />
                   </div>
                 </div>
 
@@ -1006,7 +1006,7 @@ export default function BrowsePage() {
                     variant="outline"
                     onClick={clearFilters}
                     disabled={activeFilterCount === 0}
-                    className="h-9 px-3 md:min-h-[48px] md:px-4 text-xs md:text-base font-semibold rounded-full border-background/30 text-background hover:bg-background/10 flex-shrink-0"
+                    className="h-9 px-3 md:min-h-[48px] md:px-4 text-xs md:text-base font-semibold rounded-full border-border text-foreground hover:bg-muted flex-shrink-0 dark:border-background/30 dark:text-background dark:hover:bg-background/10"
                   >
                     <X className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                     Clear
@@ -1021,7 +1021,7 @@ export default function BrowsePage() {
                   onValueChange={(value) => setSelectedType(value as ListingType | 'all')}
                   className="w-full md:w-auto"
                 >
-                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-background/10 rounded-xl p-1 border border-background/20 h-auto">
+                  <TabsList className="w-full md:w-auto grid grid-cols-4 bg-muted/50 rounded-xl p-1 border border-border h-auto dark:bg-background/10 dark:border-background/20">
                     <TabsTrigger value="all" className="rounded-lg font-semibold min-w-0 text-base py-2">
                       All
                     </TabsTrigger>
@@ -1118,7 +1118,7 @@ export default function BrowsePage() {
                     }}
                     onFiltersChange={handleFilterChange}
                     listingStates={listingStates}
-                    className="flex-shrink-0 h-8 px-2.5 rounded-full text-xs font-semibold gap-1.5 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                    className="flex-shrink-0 h-8 px-2.5 rounded-full text-xs font-semibold gap-1.5 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25"
                   />
 
                   <DropdownMenu>
@@ -1127,8 +1127,8 @@ export default function BrowsePage() {
                         type="button"
                         variant="outline"
                         className={cn(
-                          'h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25',
-                          listingStatus !== 'active' && 'bg-white/25 border-white/40'
+                          'h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25',
+                          listingStatus !== 'active' && 'dark:bg-white/25 dark:border-white/40'
                         )}
                       >
                         {listingStatus === 'active' ? 'Active' : listingStatus === 'completed' ? 'Completed' : 'Sold'}
@@ -1145,10 +1145,10 @@ export default function BrowsePage() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         type="button"
-                        variant={filters.location?.state ? 'default' : 'outline'}
-                        className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
-                      >
-                        Item Location
+                    variant={filters.location?.state ? 'default' : 'outline'}
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25"
+                  >
+                    Item Location
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" sideOffset={8} className="w-64 max-h-[360px] overflow-y-auto">
@@ -1173,8 +1173,8 @@ export default function BrowsePage() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         type="button"
-                        variant="outline"
-                        className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                    variant="outline"
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25"
                       >
                         {getSortChipLabel(sortBy, listingStatus)}
                       </Button>
@@ -1202,8 +1202,8 @@ export default function BrowsePage() {
                         type="button"
                         variant="outline"
                         className={cn(
-                          'h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25',
-                          selectedType !== 'all' && 'bg-white/25 border-white/40'
+                          'h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25',
+                          selectedType !== 'all' && 'dark:bg-white/25 dark:border-white/40'
                         )}
                       >
                         {selectedType === 'all'
@@ -1226,7 +1226,7 @@ export default function BrowsePage() {
                   <Button
                     type="button"
                     variant={filters.minPrice !== undefined || filters.maxPrice !== undefined ? 'default' : 'outline'}
-                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25"
                     onClick={() => setPriceDialogOpen(true)}
                   >
                     Price
@@ -1240,7 +1240,7 @@ export default function BrowsePage() {
                         <Button
                           type="button"
                           variant={(filters.healthStatus && filters.healthStatus.length > 0) ? 'default' : 'outline'}
-                          className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                          className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25"
                         >
                           Condition
                         </Button>
@@ -1268,8 +1268,8 @@ export default function BrowsePage() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         type="button"
-                        variant="outline"
-                        className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25"
+                    variant="outline"
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25"
                       >
                         {viewMode === 'list' ? 'List' : 'Gallery'}
                       </Button>
@@ -1285,7 +1285,7 @@ export default function BrowsePage() {
                     variant="outline"
                     onClick={clearFilters}
                     disabled={activeFilterCount === 0}
-                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-white/15 border-white/30 text-white hover:bg-white/25 disabled:opacity-50"
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25 disabled:opacity-50"
                   >
                     <X className="h-3.5 w-3.5 mr-1.5" />
                     Clear

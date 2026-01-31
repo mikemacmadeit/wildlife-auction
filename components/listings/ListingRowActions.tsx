@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Edit, Pause, TrendingUp, Copy, MoreVertical, Trash2, Send } from 'lucide-react';
+import { Edit, Pause, TrendingUp, Copy, MoreVertical, Trash2, Send, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -43,6 +43,12 @@ const ListingRowActions = memo(function ListingRowActions({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" sideOffset={8} className="w-52">
+        <DropdownMenuItem asChild>
+          <Link href={`/listing/${listingId}`} className="flex items-center gap-2 font-semibold">
+            <Eye className="h-4 w-4" />
+            View listing
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/seller/listings/${listingId}/edit`} className="flex items-center gap-2 font-semibold">
             <Edit className="h-4 w-4" />

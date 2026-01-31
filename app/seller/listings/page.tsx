@@ -23,6 +23,8 @@ import {
   Gavel,
   MapPin,
   Calendar,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ListingRowActions } from '@/components/listings/ListingRowActions';
@@ -185,10 +187,10 @@ const ListingRow = memo(({
       <div className="flex items-center gap-4">
         <Link
           href={`/listing/${listing.id}`}
-          className="h-30 w-44 sm:h-34 sm:w-52 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative block"
+          className="h-32 w-48 sm:h-36 sm:w-56 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative block"
         >
           {getPrimaryListingImageUrl(listing) ? (
-            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" sizes="192px" />
+            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" sizes="224px" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
               <Package className="h-10 w-10 opacity-40" />
@@ -280,7 +282,7 @@ const ListingRow = memo(({
 ));
 ListingRow.displayName = 'ListingRow';
 
-// Memoized Mobile Listing Card — horizontal layout with medium-large image
+// Memoized Mobile Listing Card — vertical card: image on top (aspect ratio), then content
 const MobileListingCard = memo(({ 
   listing, 
   effectiveStatus,
@@ -302,57 +304,56 @@ const MobileListingCard = memo(({
 }) => (
   <div
     key={listing.id}
-    className="rounded-xl border border-border/60 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/30"
+    className="rounded-xl border border-border/60 bg-card overflow-hidden transition-colors hover:bg-muted/30"
   >
-    <div className="flex gap-4 min-w-0">
-      <Link
-        href={`/listing/${listing.id}`}
-        className="h-40 w-56 sm:h-44 sm:w-64 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative block"
-      >
+    <Link href={`/listing/${listing.id}`} className="block w-full">
+      <div className="relative w-full aspect-[4/3] bg-muted">
         {getPrimaryListingImageUrl(listing) ? (
           <Image
             src={getPrimaryListingImageUrl(listing) as string}
             alt=""
             fill
             className="object-cover"
-            sizes="224px"
+            sizes="(max-width: 768px) 100vw, 400px"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-            <Package className="h-12 w-12 opacity-40" />
+            <Package className="h-10 w-10 opacity-40" />
           </div>
         )}
-      </Link>
-      <div className="flex-1 min-w-0 flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-2 min-w-0">
-          <Link
-            href={`/listing/${listing.id}`}
-            className="font-semibold text-sm text-foreground hover:text-primary line-clamp-2 min-w-0"
-          >
-            {listing.title}
-          </Link>
-          <div className="shrink-0">
-            <ListingRowActions
-              listingId={listing.id}
-              status={effectiveStatus}
-              onPromote={() => onPublish(listing)}
-              onResubmit={() => onResubmit(listing)}
-              resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
-              onDuplicate={() => onDuplicate(listing)}
-              onPause={() => onPause(listing)}
-              onDelete={() => onDelete(listing)}
-            />
-          </div>
+      </div>
+    </Link>
+    <div className="p-3 flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <Link
+          href={`/listing/${listing.id}`}
+          className="font-semibold text-sm text-foreground hover:text-primary line-clamp-2 min-w-0 flex-1"
+        >
+          {listing.title}
+        </Link>
+        <div className="shrink-0">
+          <ListingRowActions
+            listingId={listing.id}
+            status={effectiveStatus}
+            onPromote={() => onPublish(listing)}
+            onResubmit={() => onResubmit(listing)}
+            resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
+            onDuplicate={() => onDuplicate(listing)}
+            onPause={() => onPause(listing)}
+            onDelete={() => onDelete(listing)}
+          />
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {getTypeBadge(listing.type)}
-          {getStatusBadge({
-            status: effectiveStatus,
-            type: listing.type,
-            ended: isAuctionEnded(listing),
-          })}
-        </div>
-        <div className="text-base font-bold text-foreground tabular-nums">
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {getTypeBadge(listing.type)}
+        {getStatusBadge({
+          status: effectiveStatus,
+          type: listing.type,
+          ended: isAuctionEnded(listing),
+        })}
+      </div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-base font-bold text-foreground tabular-nums">
           {listing.type === 'auction'
             ? listing.currentBid
               ? `$${listing.currentBid.toLocaleString()}`
@@ -360,35 +361,125 @@ const MobileListingCard = memo(({
             : listing.price
             ? `$${listing.price.toLocaleString()}`
             : 'Contact'}
-        </div>
-        <div className="text-xs text-muted-foreground truncate">
+        </span>
+        <span className="text-xs text-muted-foreground shrink-0">
           {listing.location?.city || '—'}, {listing.location?.state || '—'}
-          {listing.endsAt && (
-            <> · {effectiveStatus === 'active' ? formatTimeRemaining(listing.endsAt) : 'Ended'}</>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{listing.metrics.views} views</span>
-          {listing.type === 'auction' && (
-            <>
-              <span>{listing.metrics.favorites} watchers</span>
-              <span>{listing.metrics.bidCount} bids</span>
-            </>
-          )}
-        </div>
+        </span>
       </div>
-    </div>
-    <div className="mt-3 pt-3 flex gap-2 border-t border-border/40">
-      <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
-        <Link href={`/listing/${listing.id}`}>View</Link>
-      </Button>
-      <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
-        <Link href={`/seller/listings/${listing.id}/edit`}>Edit</Link>
-      </Button>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span>{listing.metrics.views} views</span>
+        {listing.type === 'auction' && (
+          <>
+            <span>{listing.metrics.favorites} watchers</span>
+            <span>{listing.metrics.bidCount} bids</span>
+          </>
+        )}
+        {listing.endsAt && (
+          <span className="ml-auto">
+            {effectiveStatus === 'active' ? `Ends ${formatTimeRemaining(listing.endsAt)}` : 'Ended'}
+          </span>
+        )}
+      </div>
+      <div className="flex gap-2 pt-1">
+        <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
+          <Link href={`/listing/${listing.id}`}>View</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
+          <Link href={`/seller/listings/${listing.id}/edit`}>Edit</Link>
+        </Button>
+      </div>
     </div>
   </div>
 ));
 MobileListingCard.displayName = 'MobileListingCard';
+
+// Compact list row for list view (mobile and optionally desktop)
+const ListingListRow = memo(({
+  listing,
+  effectiveStatus,
+  onPublish,
+  onResubmit,
+  canResubmit,
+  onDuplicate,
+  onPause,
+  onDelete,
+}: {
+  listing: Listing;
+  effectiveStatus: ListingStatus;
+  onPublish: (listing: Listing) => void;
+  onResubmit: (listing: Listing) => void;
+  canResubmit: (listing: Listing) => boolean;
+  onDuplicate: (listing: Listing) => void;
+  onPause: (listing: Listing) => void;
+  onDelete: (listing: Listing) => void;
+}) => (
+  <div
+    key={listing.id}
+    className="flex items-center gap-4 rounded-xl border border-border/60 bg-card p-4 sm:p-5 transition-colors hover:bg-muted/30"
+  >
+    <Link
+      href={`/listing/${listing.id}`}
+      className="h-24 w-32 sm:h-28 sm:w-40 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative block"
+    >
+      {getPrimaryListingImageUrl(listing) ? (
+        <Image
+          src={getPrimaryListingImageUrl(listing) as string}
+          alt=""
+          fill
+          className="object-cover"
+          sizes="160px"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+          <Package className="h-6 w-6 opacity-40" />
+        </div>
+      )}
+    </Link>
+    <div className="flex-1 min-w-0 flex flex-col gap-2 sm:gap-2.5">
+      <Link
+        href={`/listing/${listing.id}`}
+        className="font-semibold text-sm sm:text-base text-foreground hover:text-primary line-clamp-2 leading-snug"
+      >
+        {listing.title}
+      </Link>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {getTypeBadge(listing.type)}
+        {getStatusBadge({
+          status: effectiveStatus,
+          type: listing.type,
+          ended: isAuctionEnded(listing),
+        })}
+      </div>
+      <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-4 gap-0.5 text-sm">
+        <span className="font-bold text-foreground tabular-nums">
+          {listing.type === 'auction'
+            ? listing.currentBid
+              ? `$${listing.currentBid.toLocaleString()}`
+              : 'No bids'
+            : listing.price
+            ? `$${listing.price.toLocaleString()}`
+            : 'Contact'}
+        </span>
+        <span className="text-muted-foreground truncate">
+          {listing.location?.city || '—'}, {listing.location?.state || '—'}
+        </span>
+      </div>
+    </div>
+    <div className="flex-shrink-0">
+      <ListingRowActions
+        listingId={listing.id}
+        status={effectiveStatus}
+        onPromote={() => onPublish(listing)}
+        onResubmit={() => onResubmit(listing)}
+        resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
+        onDuplicate={() => onDuplicate(listing)}
+        onPause={() => onPause(listing)}
+        onDelete={() => onDelete(listing)}
+      />
+    </div>
+  </div>
+));
+ListingListRow.displayName = 'ListingListRow';
 
 function SellerListingsPageContent() {
   const { user } = useAuth();
@@ -399,6 +490,7 @@ function SellerListingsPageContent() {
   const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ListingType | 'all'>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'gallery' | 'list'>('gallery');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -830,6 +922,39 @@ function SellerListingsPageContent() {
                 </Button>
               </div>
             )}
+
+            {/* Gallery / List view toggle */}
+            <div className="flex items-center gap-2 border-t border-border/40 mt-2 pt-3">
+              <span className="text-sm font-semibold text-muted-foreground">View:</span>
+              <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('gallery')}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                    viewMode === 'gallery'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-foreground hover:bg-muted/60'
+                  )}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Gallery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                    viewMode === 'list'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-foreground hover:bg-muted/60'
+                  )}
+                >
+                  <List className="h-4 w-4" />
+                  List
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -865,77 +990,99 @@ function SellerListingsPageContent() {
         {!loading && !error && filteredListings.length > 0 && (
           <Card className="rounded-xl border-0 bg-transparent md:border md:border-border/60 md:bg-muted/30 md:dark:bg-muted/20">
             <CardContent className="p-0">
-              {/* Desktop Table */}
-              <div className="hidden md:block overflow-hidden">
-                <table className="w-full table-fixed">
-                  <colgroup>
-                    <col className="w-[34%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[11%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[10%]" />
-                  </colgroup>
-                  <thead>
-                    <tr className="border-b-2 border-border/50 bg-background/50">
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Listing
-                      </th>
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Type
-                      </th>
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Price/Bid
-                      </th>
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Location
-                      </th>
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Status
-                      </th>
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Metrics
-                      </th>
-                      <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-              <tbody>
-                {filteredListings.map((listing) => (
-                  <ListingRow
-                    key={listing.id}
-                    listing={listing}
-                    effectiveStatus={getEffectiveListingStatus(listing)}
-                    onPublish={handlePublish}
-                    onResubmit={handleResubmit}
-                    canResubmit={canResubmit}
-                    onDuplicate={handleDuplicate}
-                    onPause={handlePause}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </tbody>
-                </table>
-              </div>
+              {/* Gallery view: cards in grid (mobile = single column, desktop = multi-column) */}
+              {viewMode === 'gallery' && (
+                <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredListings.map((listing) => (
+                    <MobileListingCard
+                      key={listing.id}
+                      listing={listing}
+                      effectiveStatus={getEffectiveListingStatus(listing)}
+                      onPublish={handlePublish}
+                      onResubmit={handleResubmit}
+                      canResubmit={canResubmit}
+                      onDuplicate={handleDuplicate}
+                      onPause={handlePause}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              )}
 
-              {/* Mobile Card View */}
-              <div className="md:hidden p-2 sm:p-0 space-y-3">
-                {filteredListings.map((listing) => (
-                  <MobileListingCard 
-                    key={listing.id} 
-                    listing={listing}
-                    effectiveStatus={getEffectiveListingStatus(listing)}
-                    onPublish={handlePublish}
-                    onResubmit={handleResubmit}
-                    canResubmit={canResubmit}
-                    onDuplicate={handleDuplicate}
-                    onPause={handlePause}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+              {/* List view: desktop = table, mobile = compact rows */}
+              {viewMode === 'list' && (
+                <>
+                  <div className="hidden md:block overflow-hidden">
+                    <table className="w-full table-fixed">
+                      <colgroup>
+                        <col className="w-[34%]" />
+                        <col className="w-[9%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[10%]" />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b-2 border-border/50 bg-background/50">
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Listing
+                          </th>
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Type
+                          </th>
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Price/Bid
+                          </th>
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Location
+                          </th>
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Status
+                          </th>
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Metrics
+                          </th>
+                          <th className="h-16 px-4 text-left align-middle font-bold text-sm uppercase tracking-wide text-muted-foreground">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredListings.map((listing) => (
+                          <ListingRow
+                            key={listing.id}
+                            listing={listing}
+                            effectiveStatus={getEffectiveListingStatus(listing)}
+                            onPublish={handlePublish}
+                            onResubmit={handleResubmit}
+                            canResubmit={canResubmit}
+                            onDuplicate={handleDuplicate}
+                            onPause={handlePause}
+                            onDelete={handleDelete}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="md:hidden p-3 space-y-3">
+                    {filteredListings.map((listing) => (
+                      <ListingListRow
+                        key={listing.id}
+                        listing={listing}
+                        effectiveStatus={getEffectiveListingStatus(listing)}
+                        onPublish={handlePublish}
+                        onResubmit={handleResubmit}
+                        canResubmit={canResubmit}
+                        onDuplicate={handleDuplicate}
+                        onPause={handlePause}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

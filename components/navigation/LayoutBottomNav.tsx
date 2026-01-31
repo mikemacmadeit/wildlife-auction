@@ -49,12 +49,10 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
         className={cn(
           'w-full max-w-[calc(100%-0.25rem)] h-16 rounded-full',
           'backdrop-blur-lg',
-          'border-2 border-[hsl(90_12%_38%)]',
-          'shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.15),0_4px_16px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.05)]',
-          'dark:shadow-[0_-4px_32px_-4px_rgba(0,0,0,0.5),0_4px_20px_rgba(0,0,0,0.3)]',
+          'bg-[hsl(90_12%_45%)] border-2 border-[hsl(90_12%_38%)]',
+          'shadow-[0_-4px_32px_-4px_rgba(0,0,0,0.5),0_4px_20px_rgba(0,0,0,0.3)]',
           'grid grid-cols-5 relative overflow-hidden'
         )}
-        style={{ backgroundColor: 'hsl(90 12% 45%)' }}
       >
         {items.map((item) => {
           const Icon = item.icon;
@@ -70,7 +68,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
                 'relative flex flex-col items-center justify-center gap-1 transition-colors',
                 'hover:bg-black/10 active:bg-black/15',
                 'min-h-[52px] min-w-[44px] touch-manipulation',
-                active ? 'text-white' : 'text-[hsl(40_30%_93%)]/85'
+                active ? 'text-white' : 'text-white dark:text-[hsl(40_30%_93%)]/85'
               )}
             >
               {/* Sliding bubble pill – dark green overlay behind selected tab */}
@@ -85,7 +83,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
                 <Icon
                   className={cn(
                     'h-5 w-5',
-                    active ? 'text-white' : 'text-[hsl(40_30%_93%)]/85'
+                    active ? 'text-white' : 'text-white dark:text-[hsl(40_30%_93%)]/85'
                   )}
                 />
                 {item.badge != null && item.badge > 0 && (
@@ -100,7 +98,7 @@ export function LayoutBottomNav({ items }: { items: LayoutBottomNavItem[] }) {
               <span
                 className={cn(
                   'relative z-10 text-[10px] font-semibold',
-                  active ? 'text-white' : 'text-[hsl(40_30%_93%)]/85'
+                  active ? 'text-white' : 'text-white dark:text-[hsl(40_30%_93%)]/85'
                 )}
               >
                 {displayLabel}

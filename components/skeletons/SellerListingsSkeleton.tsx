@@ -5,9 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 /**
- * Skeleton that mirrors the exact layout of the seller listings page.
- * Same container, header, filter card, table (desktop) and cards (mobile)
- * so content loads in the same positions — no flash / layout shift.
+ * Skeleton that mirrors the seller listings page (gallery/list view).
+ * Same container, header, filter card, and gallery grid so content loads in place.
  */
 export function SellerListingsSkeleton({ className }: { className?: string }) {
   return (
@@ -36,101 +35,42 @@ export function SellerListingsSkeleton({ className }: { className?: string }) {
                 ))}
               </div>
             </div>
+            <div className="flex items-center gap-2 border-t border-border/40 mt-2 pt-3">
+              <Skeleton className="h-4 w-8 rounded" />
+              <Skeleton className="h-9 w-[180px] rounded-lg" />
+            </div>
           </CardContent>
         </Card>
 
-        {/* Table (desktop) — same table structure, col widths, row heights as real page */}
+        {/* Gallery grid (default view) */}
         <Card className="rounded-xl border-0 bg-transparent md:border md:border-border/60 md:bg-muted/30 md:dark:bg-muted/20">
           <CardContent className="p-0">
-            <div className="hidden md:block overflow-hidden">
-              <table className="w-full table-fixed">
-                <colgroup>
-                  <col className="w-[34%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[10%]" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b-2 border-border/50 bg-background/50">
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-16 rounded" />
-                    </th>
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-10 rounded" />
-                    </th>
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-16 rounded" />
-                    </th>
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-14 rounded" />
-                    </th>
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-12 rounded" />
-                    </th>
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-14 rounded" />
-                    </th>
-                    <th className="h-16 px-4 text-left align-middle">
-                      <Skeleton className="h-4 w-14 rounded" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <tr key={i} className="border-b border-border/30">
-                      <td className="p-4 align-middle">
-                        <div className="flex items-center gap-4">
-                          <Skeleton className="h-30 w-44 sm:h-34 sm:w-52 rounded-xl shrink-0" />
-                          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                            <Skeleton className="h-4 w-full max-w-[180px] rounded" />
-                            <Skeleton className="h-3 w-24 rounded" />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 align-middle">
-                        <Skeleton className="h-5 w-16 rounded" />
-                      </td>
-                      <td className="p-4 align-middle">
-                        <Skeleton className="h-6 w-14 rounded" />
-                      </td>
-                      <td className="p-3 align-middle">
-                        <Skeleton className="h-4 w-20 rounded" />
-                      </td>
-                      <td className="p-3 align-middle">
-                        <Skeleton className="h-6 w-20 rounded-full" />
-                      </td>
-                      <td className="p-3 align-middle">
-                        <Skeleton className="h-4 w-12 rounded" />
-                      </td>
-                      <td className="p-3 align-middle">
-                        <Skeleton className="h-9 w-20 rounded-md" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Mobile — horizontal card with image left, content right */}
-            <div className="md:hidden p-2 sm:p-0 space-y-3">
-              {[1, 2, 3].map((i) => (
+            {/* Gallery-style grid (default view) */}
+            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-border/60 bg-card p-3 sm:p-4"
+                  className="rounded-xl border border-border/60 bg-card overflow-hidden"
                 >
-                  <div className="flex gap-4 min-w-0">
-                    <Skeleton className="h-40 w-56 sm:h-44 sm:w-64 rounded-xl shrink-0" />
-                    <div className="flex-1 min-w-0 flex flex-col gap-2">
-                      <Skeleton className="h-4 w-full max-w-[160px] rounded" />
-                      <Skeleton className="h-5 w-20 rounded-full" />
-                      <Skeleton className="h-4 w-16 rounded" />
+                  <Skeleton className="w-full aspect-[4/3] rounded-none" />
+                  <div className="p-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Skeleton className="h-4 flex-1 max-w-[180px] rounded" />
+                      <Skeleton className="h-8 w-8 rounded-md shrink-0" />
                     </div>
-                  </div>
-                  <div className="mt-3 pt-3 flex gap-2">
-                    <Skeleton className="h-9 flex-1 rounded-md" />
-                    <Skeleton className="h-9 flex-1 rounded-md" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <Skeleton className="h-5 w-14 rounded" />
+                      <Skeleton className="h-3 w-20 rounded" />
+                    </div>
+                    <Skeleton className="h-3 w-24 rounded" />
+                    <div className="flex gap-2 pt-1">
+                      <Skeleton className="h-9 flex-1 rounded-md" />
+                      <Skeleton className="h-9 flex-1 rounded-md" />
+                    </div>
                   </div>
                 </div>
               ))}
