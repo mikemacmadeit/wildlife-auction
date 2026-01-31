@@ -74,8 +74,8 @@ export function AddressMapConfirm({
         marker.addListener('dragend', () => {
           const pos = marker.getPosition();
           if (pos) {
-            const newLat = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
-            const newLng = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+            const newLat: number = typeof pos.lat === 'function' ? pos.lat() : Number(pos.lat);
+            const newLng: number = typeof pos.lng === 'function' ? pos.lng() : Number(pos.lng);
             setCurrentLat(newLat);
             setCurrentLng(newLng);
             reverseGeocode(newLat, newLng);
@@ -113,7 +113,7 @@ export function AddressMapConfirm({
       </div>
       <div
         ref={mapContainerRef}
-        className="h-64 w-full rounded-md border bg-muted"
+        className="min-h-[200px] h-64 w-full rounded-md border bg-muted touch-none"
         aria-hidden
       />
       {geocoding && (
@@ -126,12 +126,12 @@ export function AddressMapConfirm({
         <span className="text-muted-foreground">{currentAddress || formattedAddress}</span>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
         <Button
           type="button"
           onClick={handleConfirm}
           disabled={!mapReady}
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto min-h-[48px] touch-manipulation"
         >
           Confirm address
         </Button>
