@@ -132,16 +132,15 @@ const baseHandler: Handler = async () => {
           const listingId = d.id;
           const orderInfo = paidByListing.get(listingId);
           if (orderInfo) {
-            const update: Record<string, unknown> = {
+            batch.update(d.ref, {
               status: 'sold',
               endedReason: 'sold',
               endedAt: orderInfo.soldAt,
               soldAt: orderInfo.soldAt,
               updatedAt: nowTs,
               updatedBy: 'system',
-            };
-            if (typeof orderInfo.soldPriceCents === 'number') update.soldPriceCents = orderInfo.soldPriceCents;
-            batch.update(d.ref, update);
+              ...(typeof orderInfo.soldPriceCents === 'number' ? { soldPriceCents: orderInfo.soldPriceCents } : {}),
+            });
             sold += 1;
           } else {
             batch.update(d.ref, {
