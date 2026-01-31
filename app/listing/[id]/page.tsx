@@ -114,10 +114,13 @@ export default async function ListingDetailPage({
     notFound();
   }
 
+  // Serialize listing to plain data for client component (convert Dates to ISO strings)
+  const serializedListing = JSON.parse(JSON.stringify(listing));
+
   return (
     <div id="listing-page">
       <ListingShell listing={listing} />
-      <ListingDetailInteractiveClient listingId={id} initialListing={listing} />
+      <ListingDetailInteractiveClient listingId={id} initialListing={serializedListing} />
     </div>
   );
 }

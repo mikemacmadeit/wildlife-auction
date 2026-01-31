@@ -67,7 +67,6 @@ import { EnhancedSellerProfile } from '@/components/listing/EnhancedSellerProfil
 import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { OfferPanel } from '@/components/offers/OfferPanel';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
@@ -2484,9 +2483,6 @@ export default function ListingDetailClient() {
       />
 
       <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNav />
 
       {/* eBay-style bid modal is handled inline in the auction CTA block above */}
     </div>

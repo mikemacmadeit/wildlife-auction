@@ -962,7 +962,7 @@ export default function HomePage() {
               </div>
               {/* Lighter green (primary) for "Ag", beige for "change". */}
               <div className="dark">
-                <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-8xl font-extrabold tracking-tight font-barletta-inline text-[hsl(37,27%,70%)] whitespace-nowrap">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-extrabold tracking-tight font-barletta-inline text-[hsl(37,27%,70%)] whitespace-nowrap">
                   <BrandLogoText className="text-inherit" />
                 </h1>
               </div>

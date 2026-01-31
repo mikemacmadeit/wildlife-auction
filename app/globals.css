@@ -561,4 +561,11 @@
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
   }
+
+  /* Listing page: on mobile hide the server shell so only the interactive client shows (one back bar, one content; avoids duplicated top) */
+  @media (max-width: 768px) {
+    [data-listing-server-shell] {
+      display: none !important;
+    }
+  }
 }

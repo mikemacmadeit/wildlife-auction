@@ -67,7 +67,6 @@ import { EnhancedSellerProfile } from '@/components/listing/EnhancedSellerProfil
 import { ComplianceBadges } from '@/components/compliance/TrustBadges';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { OfferPanel } from '@/components/offers/OfferPanel';
-import { BottomNav } from '@/components/navigation/BottomNav';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { subscribeToListing } from '@/lib/firebase/listings';
@@ -1186,11 +1185,11 @@ export default function ListingDetailInteractiveClient({
                         </div>
                       </div>
                     ) : listing!.type === 'fixed' && buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
-                      <div className="mb-4 rounded-lg border bg-muted/30 p-3 space-y-1">
+                      <div className="mb-5 sm:mb-4 rounded-lg border bg-muted/30 p-3 sm:p-4 space-y-1.5">
                         <p className="text-sm font-semibold text-foreground">
                           Quantity: {buyNowAvailability.available}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Group lot — all {buyNowAvailability.available} are sold together for the listed price. Quantity is for your information only; individual selection is not available.
                         </p>
                       </div>
@@ -1241,7 +1240,7 @@ export default function ListingDetailInteractiveClient({
               )}
 
               {/* Best Offer (Mobile) */}
-              {!isSold ? <OfferPanel listing={listing!} /> : null}
+              {!isSold ? <div className="mt-5"><OfferPanel listing={listing!} /></div> : null}
 
               {/* Bid History - For Auctions (Mobile Only, Below Bidding Section) */}
               {listing!.type === 'auction' && (
@@ -1865,11 +1864,11 @@ export default function ListingDetailInteractiveClient({
                               </div>
                             </div>
                           ) : buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
-                            <div className="mb-4 rounded-lg border bg-muted/30 p-3 space-y-1">
+                            <div className="mb-4 rounded-lg border bg-muted/30 p-3 sm:p-4 space-y-1.5">
                               <p className="text-sm font-semibold text-foreground">
                                 Quantity: {buyNowAvailability.available}
                               </p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-sm text-muted-foreground leading-relaxed">
                                 Group lot — all {buyNowAvailability.available} are sold together for the listed price. Quantity is for your information only; individual selection is not available.
                               </p>
                             </div>
@@ -1918,7 +1917,7 @@ export default function ListingDetailInteractiveClient({
                       )}
 
                       {/* Best Offer (Desktop sidebar) */}
-                      {!isSold ? <OfferPanel listing={listing!} /> : null}
+                      {!isSold ? <div className="mt-5"><OfferPanel listing={listing!} /></div> : null}
 
                   {/* Watch Button - Secondary Action */}
                   <Button
@@ -2492,9 +2491,6 @@ export default function ListingDetailInteractiveClient({
       />
 
       <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNav />
 
       {/* eBay-style bid modal is handled inline in the auction CTA block above */}
     </div>
