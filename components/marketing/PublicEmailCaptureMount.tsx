@@ -14,6 +14,10 @@ const BLOCKED_PREFIXES = ['/dashboard', '/seller', '/app', '/login', '/register'
 export function PublicEmailCaptureMount() {
   const pathname = usePathname() || '/';
 
+  // Temporarily disabled for testing
+  return null;
+
+  /* Original logic - uncomment to re-enable
   for (const prefix of BLOCKED_PREFIXES) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
       return null;
@@ -21,5 +25,6 @@ export function PublicEmailCaptureMount() {
   }
 
   return <EmailCapturePopup source="popup" />;
+  */
 }
 
