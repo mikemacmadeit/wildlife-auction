@@ -438,9 +438,8 @@ function NewListingPageContent() {
           listingData.price = parseFloat(parsePriceString(formData.price || '0') || '0');
         } else if (formData.type === 'auction') {
           listingData.startingBid = parseFloat(parsePriceString(formData.startingBid || '0') || '0');
-          if (formData.reservePrice) {
-            listingData.reservePrice = parseFloat(parsePriceString(formData.reservePrice));
-          }
+          const reserveNum = parseFloat(parsePriceString(formData.reservePrice || '0') || '0');
+          if (reserveNum > 0) listingData.reservePrice = reserveNum;
         }
 
         await updateListing(user.uid, listingId, listingData);
@@ -2752,9 +2751,8 @@ function NewListingPageContent() {
         }
       } else if (formData.type === 'auction') {
         listingData.startingBid = parseFloat(parsePriceString(formData.startingBid || '0') || '0');
-        if (formData.reservePrice) {
-          listingData.reservePrice = parseFloat(parsePriceString(formData.reservePrice));
-        }
+        const reserveNum = parseFloat(parsePriceString(formData.reservePrice || '0') || '0');
+        if (reserveNum > 0) listingData.reservePrice = reserveNum;
       }
 
       // Use existing draft listing ID if available, otherwise create new
@@ -3018,9 +3016,8 @@ function NewListingPageContent() {
         listingData.price = parseFloat(parsePriceString(formData.price || '0') || '0');
       } else if (formData.type === 'auction') {
         listingData.startingBid = parseFloat(parsePriceString(formData.startingBid || '0') || '0');
-        if (formData.reservePrice) {
-          listingData.reservePrice = parseFloat(parsePriceString(formData.reservePrice));
-        }
+        const reserveNum = parseFloat(parsePriceString(formData.reservePrice || '0') || '0');
+        if (reserveNum > 0) listingData.reservePrice = reserveNum;
       }
 
       let draftId = listingId;

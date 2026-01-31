@@ -964,13 +964,25 @@ function EditListingPageContent() {
                           type="number"
                           min={1}
                           max={168}
-                          value={String(formData.bestOffer.offerExpiryHours)}
-                          onChange={(e) =>
+                          value={formData.bestOffer.offerExpiryHours > 0 ? String(formData.bestOffer.offerExpiryHours) : ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const numValue = value === '' ? 0 : Number(value);
                             setFormData({
                               ...formData,
-                              bestOffer: { ...formData.bestOffer, offerExpiryHours: Number(e.target.value || 48) },
-                            })
-                          }
+                              bestOffer: { ...formData.bestOffer, offerExpiryHours: numValue },
+                            });
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            const numValue = Number(value);
+                            if (!value || isNaN(numValue) || numValue < 1) {
+                              setFormData({
+                                ...formData,
+                                bestOffer: { ...formData.bestOffer, offerExpiryHours: 48 },
+                              });
+                            }
+                          }}
                           className="min-h-[44px]"
                         />
                         <div className="text-xs text-muted-foreground">Default: 48 hours</div>

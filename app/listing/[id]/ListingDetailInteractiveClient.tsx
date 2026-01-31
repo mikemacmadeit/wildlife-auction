@@ -201,6 +201,13 @@ export default function ListingDetailInteractiveClient({
 
   // Determine winner client-side for UX (server is authoritative at checkout).
   // This enables the "Complete Purchase" CTA after finalization flips listing.status -> 'expired'.
+  // Hide server-rendered shell when client has content to avoid duplicate top sections (Back bar + title area)
+  useEffect(() => {
+    if (!listing) return;
+    const shell = document.querySelector('[data-listing-server-shell]');
+    if (shell && shell instanceof HTMLElement) shell.style.display = 'none';
+  }, [listing]);
+
   useEffect(() => {
     if (!listing || listing.type !== 'auction') {
       setIsWinningBidder(false);
