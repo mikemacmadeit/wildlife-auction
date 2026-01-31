@@ -31,7 +31,8 @@ import { ListingRowActions } from '@/components/listings/ListingRowActions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { listSellerListings, unpublishListing, deleteListing, publishListing, resubmitListing, duplicateListing } from '@/lib/firebase/listings';
+import { listSellerListings, unpublishListing, deleteListing, publishListing, resubmitListing, duplicateListing, reconcileListingSold } from '@/lib/firebase/listings';
+import { getOrdersForUser } from '@/lib/firebase/orders';
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
@@ -69,6 +70,10 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
     active: {
       label: 'Active',
       className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40',
+    },
+    ended: {
+      label: 'Ended',
+      className: 'bg-slate-500/10 text-slate-700 border-slate-500/30 dark:bg-slate-500/20 dark:text-slate-300 dark:border-slate-500/40',
     },
     expired: {
       label: type === 'auction' && ended ? 'Ended' : 'Expired',
@@ -168,7 +173,10 @@ const ListingRow = memo(({
   canResubmit,
   onDuplicate,
   onPause, 
-  onDelete 
+  onDelete,
+  onReconcileSold,
+  actionLoading,
+  orderId,
 }: { 
   listing: Listing;
   effectiveStatus: ListingStatus;
@@ -178,6 +186,10 @@ const ListingRow = memo(({
   onDuplicate: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
+  onReconcileSold?: (listing: Listing) => void;
+  actionLoading?: string | null;
+  /** When sold, order ID for "Manage sale" link */
+  orderId?: string;
 }) => (
   <tr
     key={listing.id}
@@ -269,12 +281,15 @@ const ListingRow = memo(({
         <ListingRowActions
           listingId={listing.id}
           status={effectiveStatus}
+          orderId={orderId}
           onPromote={() => onPublish(listing)}
           onResubmit={() => onResubmit(listing)}
           resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
           onDuplicate={() => onDuplicate(listing)}
           onPause={() => onPause(listing)}
           onDelete={() => onDelete(listing)}
+          onReconcileSold={onReconcileSold ? () => onReconcileSold(listing) : undefined}
+          reconcilingSold={actionLoading === listing.id}
         />
       </div>
     </td>
@@ -291,7 +306,10 @@ const MobileListingCard = memo(({
   canResubmit,
   onDuplicate,
   onPause, 
-  onDelete 
+  onDelete,
+  onReconcileSold,
+  actionLoading,
+  orderId,
 }: { 
   listing: Listing;
   effectiveStatus: ListingStatus;
@@ -301,6 +319,9 @@ const MobileListingCard = memo(({
   onDuplicate: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
+  onReconcileSold?: (listing: Listing) => void;
+  actionLoading?: string | null;
+  orderId?: string;
 }) => (
   <div
     key={listing.id}
@@ -335,12 +356,15 @@ const MobileListingCard = memo(({
           <ListingRowActions
             listingId={listing.id}
             status={effectiveStatus}
+            orderId={orderId}
             onPromote={() => onPublish(listing)}
             onResubmit={() => onResubmit(listing)}
             resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
             onDuplicate={() => onDuplicate(listing)}
             onPause={() => onPause(listing)}
             onDelete={() => onDelete(listing)}
+            onReconcileSold={onReconcileSold ? () => onReconcileSold(listing) : undefined}
+            reconcilingSold={actionLoading === listing.id}
           />
         </div>
       </div>
@@ -381,12 +405,25 @@ const MobileListingCard = memo(({
         )}
       </div>
       <div className="flex gap-2 pt-1">
-        <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
-          <Link href={`/listing/${listing.id}`}>View</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
-          <Link href={`/seller/listings/${listing.id}/edit`}>Edit</Link>
-        </Button>
+        {effectiveStatus === 'sold' && orderId ? (
+          <>
+            <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
+              <Link href={`/seller/orders/${orderId}`}>Manage sale</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm">
+              <Link href={`/listing/${listing.id}`}>View</Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
+              <Link href={`/listing/${listing.id}`}>View</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
+              <Link href={`/seller/listings/${listing.id}/edit`}>Edit</Link>
+            </Button>
+          </>
+        )}
       </div>
     </div>
   </div>
@@ -403,6 +440,9 @@ const ListingListRow = memo(({
   onDuplicate,
   onPause,
   onDelete,
+  onReconcileSold,
+  actionLoading,
+  orderId,
 }: {
   listing: Listing;
   effectiveStatus: ListingStatus;
@@ -412,6 +452,9 @@ const ListingListRow = memo(({
   onDuplicate: (listing: Listing) => void;
   onPause: (listing: Listing) => void;
   onDelete: (listing: Listing) => void;
+  onReconcileSold?: (listing: Listing) => void;
+  actionLoading?: string | null;
+  orderId?: string;
 }) => (
   <div
     key={listing.id}
@@ -469,12 +512,15 @@ const ListingListRow = memo(({
       <ListingRowActions
         listingId={listing.id}
         status={effectiveStatus}
+        orderId={orderId}
         onPromote={() => onPublish(listing)}
         onResubmit={() => onResubmit(listing)}
         resubmitDisabled={effectiveStatus === 'removed' ? !canResubmit(listing) : undefined}
         onDuplicate={() => onDuplicate(listing)}
         onPause={() => onPause(listing)}
         onDelete={() => onDelete(listing)}
+        onReconcileSold={onReconcileSold ? () => onReconcileSold(listing) : undefined}
+        reconcilingSold={actionLoading === listing.id}
       />
     </div>
   </div>
@@ -492,6 +538,9 @@ function SellerListingsPageContent() {
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'gallery' | 'list'>('gallery');
   const [listings, setListings] = useState<Listing[]>([]);
+  const [soldListingIdsFromOrders, setSoldListingIdsFromOrders] = useState<Set<string>>(new Set());
+  /** listingId → orderId for sold listings so seller can open "Manage sale" */
+  const [soldListingToOrderId, setSoldListingToOrderId] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -501,32 +550,97 @@ function SellerListingsPageContent() {
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Fetch listings from Firestore
+  // Helper: effective status for a listing, including "sold" when an order exists (webhook may not have updated listing doc)
+  const getEffectiveStatusForListing = useCallback(
+    (listing: Listing, nowMs: number = Date.now()): ListingStatus => {
+      if (soldListingIdsFromOrders.has(listing.id)) return 'sold';
+      return getEffectiveListingStatus(listing, nowMs);
+    },
+    [soldListingIdsFromOrders]
+  );
+
+  // Fetch listings and sold-by-order listing IDs (fallback when webhook didn't mark listing sold)
   useEffect(() => {
-    async function fetchListings() {
-      if (!user?.uid) return;
+    if (!user?.uid) return;
+    let cancelled = false;
+
+    async function fetchListingsAndSoldIds() {
       try {
         setLoading(true);
         setError(null);
-        // Fetch all statuses so we can derive "ended" (expired) auctions reliably client-side
-        // even when Firestore status is still 'active'.
-        const data = await listSellerListings(user.uid);
+        const [data, sellerOrders] = await Promise.all([
+          listSellerListings(user!.uid),
+          getOrdersForUser(user!.uid, 'seller'),
+        ]);
+        if (cancelled) return;
         setListings(data);
+
+        // Any order that has been paid and not refunded/cancelled counts as sold for this listing
+        const soldOrderStatuses = [
+          'paid_held',
+          'paid', // legacy
+          'in_transit',
+          'delivered',
+          'buyer_confirmed',
+          'accepted', // legacy
+          'ready_to_release',
+          'disputed',
+          'completed',
+        ];
+        const soldIds = new Set<string>();
+        const listingToOrder: Record<string, string> = {};
+        sellerOrders.forEach((o) => {
+          const lid = String(o.listingId ?? '').trim();
+          if (lid && (soldOrderStatuses as string[]).includes(o.status ?? '')) {
+            soldIds.add(lid);
+            if (!listingToOrder[lid]) listingToOrder[lid] = o.id;
+          }
+        });
+        setSoldListingIdsFromOrders(soldIds);
+        setSoldListingToOrderId(listingToOrder);
+
+        // Reconcile: (1) listings with a paid order but doc not marked sold, or (2) ended/expired listings not sold
+        // (2) catches auctions like Caleb Williams where the order's listingId may not have been in our set yet
+        const nowMs = Date.now();
+        const toReconcile = data.filter((l) => {
+          if (l.status === 'sold' || l.soldAt) return false;
+          if (soldIds.has(l.id)) return true;
+          const effective = getEffectiveListingStatus(l, nowMs);
+          return effective === 'ended' || effective === 'expired';
+        });
+        if (toReconcile.length > 0 && user) {
+          try {
+            await Promise.all(
+              toReconcile.map((l) =>
+                reconcileListingSold(l.id).catch(() => {})
+              )
+            );
+            const fresh = await listSellerListings(user.uid);
+            if (!cancelled) setListings(fresh);
+          } catch {
+            // Non-fatal: UI still shows Sold via soldIds; reconciliation is best-effort
+          }
+        }
       } catch (err) {
-        console.error('Error fetching listings:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load listings');
+        if (!cancelled) {
+          console.error('Error fetching listings:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load listings');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    fetchListings();
+    fetchListingsAndSoldIds();
+    return () => {
+      cancelled = true;
+    };
   }, [user?.uid]);
 
   const filteredListings = useMemo(() => {
     const query = debouncedSearchQuery.toLowerCase();
     const nowMs = Date.now();
     return listings.filter((listing) => {
-      const effectiveStatus = getEffectiveListingStatus(listing, nowMs);
+      const effectiveStatus = getEffectiveStatusForListing(listing, nowMs);
       const matchesSearch = !query || listing.title.toLowerCase().includes(query);
       const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
       const matchesType = typeFilter === 'all' || listing.type === typeFilter;
@@ -535,7 +649,7 @@ function SellerListingsPageContent() {
 
       return matchesSearch && matchesStatus && matchesType && matchesLocation;
     });
-  }, [listings, debouncedSearchQuery, statusFilter, typeFilter, locationFilter]);
+  }, [listings, debouncedSearchQuery, statusFilter, typeFilter, locationFilter, getEffectiveStatusForListing]);
 
   const handleStatusChange = useCallback((value: string) => {
     setStatusFilter(value as ListingStatus | 'all');
@@ -560,11 +674,11 @@ function SellerListingsPageContent() {
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: listings.length };
     listings.forEach((l) => {
-      const s = getEffectiveListingStatus(l, nowMs);
+      const s = getEffectiveStatusForListing(l, nowMs);
       counts[s] = (counts[s] ?? 0) + 1;
     });
     return counts;
-  }, [listings]);
+  }, [listings, getEffectiveStatusForListing]);
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: listings.length };
     listings.forEach((l) => {
@@ -596,12 +710,27 @@ function SellerListingsPageContent() {
     setLocationFilter('all');
   }, []);
 
-  // Refresh listings after actions
+  // Refresh listings (and sold-order map) after actions so "Manage sale" is available
   const refreshListings = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const data = await listSellerListings(user.uid);
+      const [data, sellerOrders] = await Promise.all([
+        listSellerListings(user.uid),
+        getOrdersForUser(user.uid, 'seller'),
+      ]);
       setListings(data);
+      const soldOrderStatuses = ['paid_held', 'paid', 'in_transit', 'delivered', 'buyer_confirmed', 'accepted', 'ready_to_release', 'disputed', 'completed'];
+      const soldIds = new Set<string>();
+      const listingToOrder: Record<string, string> = {};
+      sellerOrders.forEach((o) => {
+        const lid = String(o.listingId ?? '').trim();
+        if (lid && (soldOrderStatuses as string[]).includes(o.status ?? '')) {
+          soldIds.add(lid);
+          if (!listingToOrder[lid]) listingToOrder[lid] = o.id;
+        }
+      });
+      setSoldListingIdsFromOrders(soldIds);
+      setSoldListingToOrderId(listingToOrder);
     } catch (err) {
       console.error('Error refreshing listings:', err);
     }
@@ -670,6 +799,30 @@ function SellerListingsPageContent() {
       setActionLoading(null);
     }
   }, [user?.uid, selectedListing, toast, refreshListings]);
+
+  const handleReconcileSold = useCallback(
+    async (listing: Listing) => {
+      if (!user?.uid) return;
+      try {
+        setActionLoading(listing.id);
+        await reconcileListingSold(listing.id);
+        toast({
+          title: 'Listing marked as sold',
+          description: `${listing.title} is now shown as Sold.`,
+        });
+        await refreshListings();
+      } catch (err: any) {
+        toast({
+          title: 'Could not mark as sold',
+          description: err?.message ?? 'No paid order found for this listing, or the listing is already sold.',
+          variant: 'destructive',
+        });
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [user?.uid, toast, refreshListings]
+  );
 
   const handlePublish = useCallback(
     async (listing: Listing) => {
@@ -997,13 +1150,16 @@ function SellerListingsPageContent() {
                     <MobileListingCard
                       key={listing.id}
                       listing={listing}
-                      effectiveStatus={getEffectiveListingStatus(listing)}
+                      effectiveStatus={getEffectiveStatusForListing(listing)}
                       onPublish={handlePublish}
                       onResubmit={handleResubmit}
                       canResubmit={canResubmit}
                       onDuplicate={handleDuplicate}
                       onPause={handlePause}
                       onDelete={handleDelete}
+                      onReconcileSold={handleReconcileSold}
+                      actionLoading={actionLoading}
+                      orderId={soldListingToOrderId[listing.id]}
                     />
                   ))}
                 </div>
@@ -1053,13 +1209,16 @@ function SellerListingsPageContent() {
                           <ListingRow
                             key={listing.id}
                             listing={listing}
-                            effectiveStatus={getEffectiveListingStatus(listing)}
+                            effectiveStatus={getEffectiveStatusForListing(listing)}
                             onPublish={handlePublish}
                             onResubmit={handleResubmit}
                             canResubmit={canResubmit}
                             onDuplicate={handleDuplicate}
                             onPause={handlePause}
                             onDelete={handleDelete}
+                            onReconcileSold={handleReconcileSold}
+                            actionLoading={actionLoading}
+                            orderId={soldListingToOrderId[listing.id]}
                           />
                         ))}
                       </tbody>
@@ -1071,13 +1230,16 @@ function SellerListingsPageContent() {
                       <ListingListRow
                         key={listing.id}
                         listing={listing}
-                        effectiveStatus={getEffectiveListingStatus(listing)}
+                        effectiveStatus={getEffectiveStatusForListing(listing)}
                         onPublish={handlePublish}
                         onResubmit={handleResubmit}
                         canResubmit={canResubmit}
                         onDuplicate={handleDuplicate}
                         onPause={handlePause}
                         onDelete={handleDelete}
+                        onReconcileSold={handleReconcileSold}
+                        actionLoading={actionLoading}
+                        orderId={soldListingToOrderId[listing.id]}
                       />
                     ))}
                   </div>

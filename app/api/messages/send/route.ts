@@ -257,81 +257,78 @@ export async function POST(request: Request) {
       flagged: newViolationCount >= 3 || threadData.flagged || false,
     });
 
-    // Emit canonical notification event for recipient (fan-out handled by processors)
-    try {
-      const listingRef = db.collection('listings').doc(listingId);
-      const listingDoc = await listingRef.get();
-      const listingData = listingDoc.exists ? listingDoc.data() : null;
-      const listingTitle = listingData?.title || 'a listing';
+    // Payload for message notification (used for both emit and in-app doc)
+    const listingRef = db.collection('listings').doc(listingId);
+    const listingDoc = await listingRef.get();
+    const listingData = listingDoc.exists ? listingDoc.data() : null;
+    const listingTitle = listingData?.title || 'a listing';
 
+    const messagePayload = {
+      type: 'Message.Received' as const,
+      threadId,
+      listingId,
+      listingTitle,
+      listingUrl: `${getSiteUrl()}/listing/${listingId}`,
+      threadUrl:
+        recipientId === threadData.sellerId
+          ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
+          : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
+      senderRole: (senderId === threadData.buyerId ? 'buyer' : 'seller') as 'buyer' | 'seller',
+      preview: previewText,
+    };
+
+    // Emit canonical notification event for recipient (email/push fan-out)
+    let emitEventId: string | null = null;
+    try {
       const emitRes = await emitAndProcessEventForUser({
         type: 'Message.Received',
         actorId: senderId,
         entityType: 'message_thread',
         entityId: threadId,
         targetUserId: recipientId,
-        payload: {
-          type: 'Message.Received',
-          threadId,
-          listingId,
-          listingTitle,
-          listingUrl: `${getSiteUrl()}/listing/${listingId}`,
-          threadUrl:
-            recipientId === threadData.sellerId
-              ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
-              : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
-          senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
-          preview: previewText,
-        },
+        payload: messagePayload,
         optionalHash: `msg:${messageRef.id}`,
       });
-
-      // Immediately create/merge the in-app notification doc so the recipient sees it right away,
-      // even if the scheduled event processor is delayed/unavailable.
       if (emitRes?.ok && typeof emitRes.eventId === 'string') {
-        const notif = buildInAppNotification({
-          eventId: emitRes.eventId,
-          eventType: 'Message.Received',
-          category: 'messages',
-          userId: recipientId,
-          actorId: senderId,
-          entityType: 'message_thread',
-          entityId: threadId,
-          payload: {
-            type: 'Message.Received',
-            threadId,
-            listingId,
-            listingTitle,
-            listingUrl: `${getSiteUrl()}/listing/${listingId}`,
-            threadUrl:
-              recipientId === threadData.sellerId
-                ? `${getSiteUrl()}/seller/messages?threadId=${threadId}`
-                : `${getSiteUrl()}/dashboard/messages?threadId=${threadId}`,
-            senderRole: senderId === threadData.buyerId ? 'buyer' : 'seller',
-            preview: previewText,
-          },
-        });
-        await db
-          .collection('users')
-          .doc(recipientId)
-          .collection('notifications')
-          .doc(notif.id)
-          .set(notif as any, { merge: true });
-
-        // Best-effort: send the queued email job immediately so message emails don't depend on schedulers.
-        // Keep this bounded so messaging stays responsive.
-        try {
-          await Promise.race([
-            tryDispatchEmailJobNow({ db: db as any, jobId: emitRes.eventId, waitForJob: true }),
-            new Promise((resolve) => setTimeout(resolve, 3000)), // Increased timeout to allow job creation
-          ]);
-        } catch {
-          // ignore
-        }
+        emitEventId = emitRes.eventId;
       }
-    } catch (notifError) {
-      // Don't fail message send if notification fails
-      console.error('Error emitting message_received notification event:', notifError);
+    } catch (emitErr) {
+      console.error('Error emitting message_received event:', emitErr);
+    }
+
+    // Always create/update the in-app notification so the bell and badge work reliably,
+    // even if event emission failed. Use stable doc id per thread (msg_thread:threadId).
+    try {
+      const notif = buildInAppNotification({
+        eventId: emitEventId ?? `msg:${messageRef.id}`,
+        eventType: 'Message.Received',
+        category: 'messages',
+        userId: recipientId,
+        actorId: senderId,
+        entityType: 'message_thread',
+        entityId: threadId,
+        payload: messagePayload,
+      });
+      await db
+        .collection('users')
+        .doc(recipientId)
+        .collection('notifications')
+        .doc(notif.id)
+        .set(notif as any, { merge: true });
+    } catch (notifWriteErr) {
+      console.error('Error writing message in-app notification:', notifWriteErr);
+    }
+
+    // Best-effort: send the queued email job immediately so message emails don't depend on schedulers.
+    if (emitEventId) {
+      try {
+        await Promise.race([
+          tryDispatchEmailJobNow({ db: db as any, jobId: emitEventId, waitForJob: true }),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      } catch {
+        // ignore
+      }
     }
 
     return json({

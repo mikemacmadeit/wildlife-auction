@@ -131,7 +131,7 @@ export default function OrdersPage() {
     [user]
   );
 
-  const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
+  const loadOrders = useCallback(async (opts?: { silent?: boolean }): Promise<OrderWithListing[] | void> => {
     if (!user) {
       if (!opts?.silent) setLoading(false);
       return;
@@ -198,12 +198,16 @@ export default function OrdersPage() {
       );
 
       setOrders(ordersWithListings);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:loadOrders',message:'loadOrders completed',data:{ordersLength:ordersWithListings.length,orderIds:ordersWithListings.slice(0,5).map((o:OrderWithListing)=>o.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5,H2'})}).catch(()=>{});
+      // #endregion
 
       // Best-effort: backfill snapshots for legacy orders so future loads are fast.
       // NOTE: We intentionally do this AFTER setting UI state so it never blocks page load.
       if (missingSnapshotOrderIds.length > 0) {
         void enrichSnapshotsBestEffort(missingSnapshotOrderIds);
       }
+      return ordersWithListings;
     } catch (err) {
       console.error('Error fetching orders:', err);
       setError(err instanceof Error ? err.message : 'Failed to load orders');
@@ -309,6 +313,9 @@ export default function OrdersPage() {
           // Track this session so we can poll for the corresponding Firestore order.
           const listingIdFromMeta =
             (session as any)?.metadata?.listingId ? String((session as any).metadata.listingId) : null;
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:setPendingCheckout',message:'pendingCheckout set after verify-session',data:{sessionIdPrefix:sessionId.slice(0,18),isProcessing,listingId:listingIdFromMeta||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion
           setPendingCheckout({
             sessionId,
             listingId: listingIdFromMeta,
@@ -482,7 +489,7 @@ export default function OrdersPage() {
         reconcileAttemptedRef.current[sessionId] = true;
         try {
           const token = await user.getIdToken();
-          await fetch('/api/stripe/checkout/reconcile-session', {
+          const reconcileRes = await fetch('/api/stripe/checkout/reconcile-session', {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
@@ -490,29 +497,71 @@ export default function OrdersPage() {
             },
             body: JSON.stringify({ session_id: sessionId }),
           });
-        } catch {
+          const reconcileData = await reconcileRes.json().catch(() => ({}));
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:reconcileResponse',message:'reconcile-session response',data:{ok:reconcileData?.ok,reason:reconcileData?.reason||null,orderId:reconcileData?.orderId||null,orderStatus:reconcileData?.orderStatus||null,status:reconcileRes.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'})}).catch(()=>{});
+          // #endregion
+        } catch (e) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:reconcileCatch',message:'reconcile-session threw',data:{err:String((e as Error)?.message||'')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+          // #endregion
           // Non-blocking: polling continues; user can still see the “finalizing” row.
         }
+        // Give Firestore a moment to make the order visible after reconcile (avoids "order not found" on first tick).
+        await new Promise((r) => setTimeout(r, 800));
+        if (cancelled) return;
       }
 
       try {
         const order = await getOrderByCheckoutSessionId(sessionId);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:getOrderByCheckoutSessionId',message:'getOrderByCheckoutSessionId result',data:{found:!!order?.id,orderId:order?.id||null,orderStatus:order?.status||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H3'})}).catch(()=>{});
+        // #endregion
         if (cancelled) return;
         if (order?.id) {
-          // Found it. Refresh list and highlight the new order.
-          await loadOrders({ silent: true });
-          setHighlightOrderId(order.id);
-          setPendingCheckout(null);
-          setPendingCheckoutListingTitle(null);
-          try {
-            sessionStorage.removeItem('we:pending-checkout:v1');
-          } catch {
-            // ignore
+          // My Purchases now includes pending/awaiting_* from checkout (getOrdersForUser), so order appears immediately.
+          // Clear the card when the order is in the list (any status).
+          // #region agent log
+          const hiddenStatuses = ['pending', 'awaiting_bank_transfer', 'awaiting_wire', 'cancelled'];
+          const wasHidden = hiddenStatuses.includes(order.status ?? '');
+          if (wasHidden) fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:orderFoundHidden',message:'order found, was hidden status (now shown in list)',data:{orderId:order.id,orderStatus:order.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion
+          let list = await loadOrders({ silent: true });
+          if (!Array.isArray(list) || !list.some((o: OrderWithListing) => o.id === order.id)) {
+            await new Promise((r) => setTimeout(r, 1500));
+            list = await loadOrders({ silent: true });
           }
-          try {
-            window.setTimeout(() => setHighlightOrderId(null), 12_000);
-          } catch {
-            // ignore
+          if (cancelled) return;
+          if (Array.isArray(list) && list.some((o: OrderWithListing) => o.id === order.id)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:clearPending',message:'clearing pendingCheckout because order in list',data:{orderId:order.id,orderStatus:order.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+            // #endregion
+            setHighlightOrderId(order.id);
+            setPendingCheckout(null);
+            setPendingCheckoutListingTitle(null);
+            try {
+              sessionStorage.removeItem('we:pending-checkout:v1');
+            } catch {
+              // ignore
+            }
+            // If buyer chose "Set delivery address" in congrats modal, take them to order detail (set-address modal opens there)
+            try {
+              const raw = sessionStorage.getItem('we:congrats-set-address:v1');
+              if (raw) {
+                const parsed = JSON.parse(raw) as { sessionId?: string; ts?: number };
+                if (parsed?.sessionId === sessionId && typeof parsed?.ts === 'number' && Date.now() - parsed.ts < 120_000) {
+                  sessionStorage.removeItem('we:congrats-set-address:v1');
+                  router.push(`/dashboard/orders/${order.id}`);
+                }
+              }
+            } catch {
+              // ignore
+            }
+            try {
+              window.setTimeout(() => setHighlightOrderId(null), 12_000);
+            } catch {
+              // ignore
+            }
           }
           return;
         }
@@ -527,6 +576,9 @@ export default function OrdersPage() {
     const handle = window.setInterval(() => {
       if (Date.now() - startedAt > maxMs) {
         window.clearInterval(handle);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:90sTimeout',message:'clearing pendingCheckout after 90s timeout',data:{sessionIdPrefix:sessionId.slice(0,18)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
         // Stop polling and clear the pending row after the time budget.
         setPendingCheckout(null);
         setPendingCheckoutListingTitle(null);
@@ -547,7 +599,7 @@ export default function OrdersPage() {
       cancelled = true;
       window.clearInterval(handle);
     };
-  }, [loadOrders, pendingCheckout, user?.uid]);
+  }, [loadOrders, pendingCheckout, user?.uid, router]);
 
   const handleConfirmReceipt = async (orderId: string) => {
     if (!user) return;
@@ -953,7 +1005,7 @@ export default function OrdersPage() {
                   You’ve purchased <span className="font-semibold text-primary">{pendingCheckoutListingTitle || 'your item'}</span>.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Your payment is confirmed and your purchase appears in <strong>My Purchases</strong> below. The seller will contact you about next steps—delivery, pickup, or transfer paperwork.
+                  Your payment is confirmed. <strong>Next step:</strong> set your delivery address so the seller can propose a delivery date. Your purchase appears in <strong>My Purchases</strong> below.
                 </p>
                 <p className="text-xs text-muted-foreground">
                   You can track progress and message the seller from your order at any time.
@@ -967,11 +1019,22 @@ export default function OrdersPage() {
               onClick={() => {
                 setShowCongratsModal(false);
                 scrollToTop();
+                // If we have a pending checkout session, store intent to open order for set-address when order appears
+                if (pendingCheckout?.sessionId) {
+                  try {
+                    sessionStorage.setItem(
+                      'we:congrats-set-address:v1',
+                      JSON.stringify({ sessionId: pendingCheckout.sessionId, ts: Date.now() })
+                    );
+                  } catch {
+                    // ignore
+                  }
+                }
               }}
               className="w-full font-semibold"
               size="lg"
             >
-              View my purchase
+              Set delivery address
             </Button>
           </div>
         </DialogContent>

@@ -69,6 +69,7 @@ export default function MessagesPage() {
   const isNavigatingAwayRef = useRef<boolean>(false);
   const subscriptionCallbackThrottleRef = useRef<number | null>(null);
   const deepLinkFetchAttemptedRef = useRef<string | null>(null);
+  const lastPopulatedThreadIdRef = useRef<string | null>(null);
 
   // Track pathname changes and detect navigation away
   useEffect(() => {
@@ -133,6 +134,7 @@ export default function MessagesPage() {
       setListing(null);
       setThreadIdFromUrlFallback(null);
       deepLinkFetchAttemptedRef.current = null;
+      lastPopulatedThreadIdRef.current = null;
     }
   }, [pathname]);
 
@@ -434,10 +436,13 @@ export default function MessagesPage() {
   }, [authLoading, user, listingIdParam, sellerIdParam, initializeThread, threadIdParam]); // Use ref for comparison to prevent effect loop
 
   // When selecting a thread from inbox, populate the thread/listing/name for the thread view.
+  // Guard: avoid re-running markThreadAsRead and listing/profile fetches when threads array
+  // reference changes (e.g. subscription updates) but selection is unchanged – prevents glitching.
   useEffect(() => {
     if (!user?.uid) return;
     if (listingIdParam && sellerIdParam) return; // handled by initializeThread flow
     if (!selectedThreadId) {
+      lastPopulatedThreadIdRef.current = null;
       setThread(null);
       setListing(null);
       return;
@@ -452,6 +457,13 @@ export default function MessagesPage() {
       }
       return;
     }
+
+    // Already populated for this selection (e.g. subscription just updated threads ref): only sync thread if reference changed
+    if (lastPopulatedThreadIdRef.current === selectedThreadId) {
+      if (thread !== t) setThread(t);
+      return;
+    }
+    lastPopulatedThreadIdRef.current = selectedThreadId;
 
     // Set thread directly without clearing first – avoids glitch when opening from inbox
     setThread(t);
@@ -483,7 +495,7 @@ export default function MessagesPage() {
       const otherProfile = otherRes.status === 'fulfilled' ? otherRes.value : null;
       setOtherPartyAvatar(otherProfile?.photoURL || undefined);
     }).catch(() => {});
-  }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, user?.uid]);
+  }, [listingIdParam, metaByThreadId, sellerIdParam, selectedThreadId, threads, thread, user?.uid]);
 
   // Notification deep-link: threadId in URL but thread not in subscription yet (race or limit).
   // Fetch thread by ID so the conversation shows without needing to wait for / rely on subscription.
@@ -502,6 +514,7 @@ export default function MessagesPage() {
       try {
         const t = await getThreadById(threadIdParam, user.uid);
         if (!t) return;
+        lastPopulatedThreadIdRef.current = threadIdParam;
         setThread(t);
         setSelectedThreadId(threadIdParam);
         setThreads((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev]));

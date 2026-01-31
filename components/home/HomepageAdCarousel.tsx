@@ -41,7 +41,7 @@ export function HomepageAdCarousel() {
       className="py-1.5 sm:py-3 md:py-6 border-b border-border/50 bg-card/30 overflow-x-hidden"
       aria-label="Partner ads"
     >
-      <div className="container mx-auto px-3 sm:px-4 w-full max-w-full min-w-0">
+      <div className="container mx-auto px-3 sm:px-4 w-full max-w-full md:max-w-2xl min-w-0">
         <Carousel
           setApi={setApi}
           opts={{
@@ -63,7 +63,7 @@ export function HomepageAdCarousel() {
                   className="block relative w-full min-w-0 overflow-hidden bg-muted rounded-lg
                     aspect-[2.5/1] max-h-[130px] min-h-[100px]
                     sm:aspect-[2.2/1] sm:max-h-[180px] sm:min-h-0
-                    md:aspect-[2.5/1] md:max-h-[280px] md:min-h-0
+                    md:aspect-[2.5/1] md:max-h-[160px] md:min-h-0
                     focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   aria-label={`${slide.alt} — opens in new tab`}
                 >

@@ -174,6 +174,13 @@ export async function finalizeAuctionIfNeeded(params: {
         throw new FinalizeError('NOT_ENDED', 'Auction has not ended yet');
       }
 
+      // If listing is already sold (winner paid, webhook ran), do not overwrite with expired
+      if (listing?.status === 'sold' || listing?.soldAt) {
+        outDoc = resultSnap.exists ? (resultSnap.data() as AuctionResultDoc) : null;
+        didFinalize = false;
+        return;
+      }
+
       if (resultSnap.exists) {
         const existing = resultSnap.data() as any;
         const finalizedAt = tsOrNull(existing?.finalizedAt);

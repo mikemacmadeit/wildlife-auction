@@ -158,24 +158,26 @@ export async function POST(request: Request) {
       await handleCheckoutSessionCompleted(adminDb, session as Stripe.Checkout.Session, requestId);
     }
 
-    // Fetch created order ID (if created)
+    // Fetch created/updated order ID and status (for client and debugging)
     const created = await adminDb
       .collection('orders')
       .where('stripeCheckoutSessionId', '==', sessionId)
       .limit(1)
       .get();
     const orderId = created.empty ? undefined : created.docs[0].id;
+    const orderStatus = created.empty ? undefined : String((created.docs[0].data() as any)?.status || '');
 
     logInfo('Reconcile completed', {
       requestId,
       route: '/api/stripe/checkout/reconcile-session',
       sessionId,
       orderId,
+      orderStatus: orderStatus || undefined,
       existingStatus: existingStatus || undefined,
       skipped: isTerminal ? true : false,
     });
 
-    return json({ ok: true, idempotent: isTerminal, orderId: orderId || null });
+    return json({ ok: true, idempotent: isTerminal, orderId: orderId || null, orderStatus: orderStatus || null });
   } catch (e: any) {
     logError('Reconcile failed', e, {
       requestId,

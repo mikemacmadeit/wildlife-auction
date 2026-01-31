@@ -36,6 +36,7 @@ import { signOutUser } from '@/lib/firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { BRAND_DISPLAY_NAME } from '@/lib/brand';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
+import { NotificationsBell } from '@/components/navigation/NotificationsBell';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -218,6 +219,13 @@ export function Navbar() {
           <div className="flex items-center gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0 min-w-0 justify-end">
             {/* Theme Toggle */}
             <ThemeToggle />
+
+            {/* Desktop: Notification bell (signed-in only) */}
+            {user?.uid && (
+              <div className="hidden md:block flex-shrink-0">
+                <NotificationsBell userId={user.uid} className="h-9 w-9 lg:h-10 lg:w-10" />
+              </div>
+            )}
 
             {/* Desktop Actions - User Menu */}
             <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">

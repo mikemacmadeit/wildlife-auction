@@ -446,11 +446,7 @@ export default function NotificationsPage() {
   );
 
   if (authLoading || loading) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <DashboardContentSkeleton className="min-h-[360px]" />
-      </div>
-    );
+    return <DashboardContentSkeleton className="min-h-[360px]" />;
   }
 
   if (!user) {

@@ -847,6 +847,24 @@ export async function addListingImageServer(listingId: string, url: string): Pro
 }
 
 /**
+ * Reconcile listing with a paid order: if the listing has a paid order but the document
+ * is not marked sold, updates the listing to status 'sold' (so it shows as Sold everywhere).
+ * Call when webhook may not have updated the listing (e.g. auction flow, race).
+ */
+export async function reconcileListingSold(listingId: string): Promise<{ success: boolean; alreadySold?: boolean }> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Authentication required');
+  const token = await user.getIdToken();
+  const res = await fetch(`/api/listings/${listingId}/reconcile-sold`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'Reconcile failed');
+  return { success: true, alreadySold: data?.alreadySold };
+}
+
+/**
  * Unpublish/Pause a listing (change status from active to draft)
  */
 export const unpublishListing = async (uid: string, listingId: string): Promise<void> => {

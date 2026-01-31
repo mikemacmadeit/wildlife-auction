@@ -391,11 +391,7 @@ export default function WatchlistPage() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <DashboardContentSkeleton className="min-h-[400px]" />
-      </div>
-    );
+    return <DashboardContentSkeleton className="min-h-[400px]" />;
   }
 
   if (!user) {

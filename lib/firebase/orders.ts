@@ -422,19 +422,19 @@ export async function markOrderAsPaid(
   });
 }
 
-/** Statuses that mean "awaiting payment" – must not appear in buyer "My purchases" until payment completes. */
+/** Statuses that mean "awaiting payment" – excluded from buyer list unless from a real checkout (has session id). */
 const AWAITING_PAYMENT_STATUSES = ['pending', 'awaiting_bank_transfer', 'awaiting_wire'] as const;
 
-/** Buyer "My purchases" only shows real purchases: exclude awaiting payment and cancelled (abandoned checkouts). */
-const BUYER_HIDDEN_STATUSES = [...AWAITING_PAYMENT_STATUSES, 'cancelled'] as const;
+/** Buyer "My purchases": exclude cancelled. Show pending/awaiting_* only when from checkout (stripeCheckoutSessionId). */
+const BUYER_HIDDEN_STATUSES = ['cancelled'] as const;
 
 /**
  * Get orders for a user (as buyer or seller)
  * CRITICAL: Normalizes data on read to prevent int32 serialization errors
  *
- * For buyers: only returns orders that are real purchases. Excludes pending / awaiting_bank_transfer /
- * awaiting_wire (abandoned or in-progress checkouts) and cancelled (e.g. abandoned checkouts that were
- * cleaned up), so "My purchases" never shows those.
+ * For buyers: returns real purchases and in-progress checkouts. Includes pending / awaiting_bank_transfer /
+ * awaiting_wire when the order has stripeCheckoutSessionId (from checkout), so "My Purchases" shows
+ * "Payment processing" until payment confirms. Excludes cancelled and abandoned checkouts (no session id).
  */
 export async function getOrdersForUser(
   userId: string,
@@ -462,7 +462,14 @@ export async function getOrdersForUser(
   });
 
   if (role === 'buyer') {
-    return orders.filter((o) => !(BUYER_HIDDEN_STATUSES as readonly string[]).includes(o.status ?? ''));
+    return orders.filter((o) => {
+      if ((BUYER_HIDDEN_STATUSES as readonly string[]).includes(o.status ?? '')) return false;
+      // Include pending/awaiting_* only when from checkout (has session id) so "My Purchases" shows "Payment processing".
+      const status = o.status ?? '';
+      const fromCheckout = Boolean((o as any).stripeCheckoutSessionId);
+      if (AWAITING_PAYMENT_STATUSES.includes(status as any) && !fromCheckout) return false;
+      return true;
+    });
   }
   return orders;
 }
