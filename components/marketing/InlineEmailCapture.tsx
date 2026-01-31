@@ -69,15 +69,15 @@ export function InlineEmailCapture(props: {
   return (
     <div
       className={cn(
-        'rounded-2xl border bg-gradient-to-br from-card via-card to-card/90 p-5 md:p-6',
-        'shadow-xl shadow-primary/5 border-border/60',
+        'rounded-xl sm:rounded-2xl border bg-gradient-to-br from-card via-card to-card/90 p-4 sm:p-5 md:p-6',
+        'shadow-xl shadow-primary/5 border-border/60 w-full min-w-0',
         className
       )}
     >
-      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
+      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between min-w-0">
+        <div className="space-y-1.5 min-w-0 flex-1">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
               {success ? <Sparkles className="h-5 w-5 text-primary" /> : <Mail className="h-5 w-5 text-primary" />}
             </div>
             <div className="space-y-0.5">
@@ -97,16 +97,16 @@ export function InlineEmailCapture(props: {
         </div>
 
         {success ? null : (
-          <div className="w-full md:max-w-sm space-y-2">
-            <div className="flex gap-2">
+          <div className="w-full md:max-w-sm space-y-2 min-w-0">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@domain.com"
-                className="min-h-[44px]"
+                className="min-h-[44px] w-full min-w-0"
                 disabled={loading}
               />
-              <Button onClick={submit} disabled={loading} className="min-h-[44px] px-5 font-semibold">
+              <Button onClick={submit} disabled={loading} className="min-h-[44px] px-5 font-semibold w-full sm:w-auto shrink-0">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Subscribe'}
               </Button>
             </div>

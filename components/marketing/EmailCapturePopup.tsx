@@ -203,24 +203,24 @@ export function EmailCapturePopup(props: { source?: string }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[460px] p-0 overflow-hidden border-border/60 shadow-2xl">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[460px] h-[90vh] max-h-[90vh] p-0 overflow-hidden border-border/60 shadow-2xl sm:w-full flex flex-col">
         {/* Soft header band for visual polish */}
-        <div className="relative px-6 sm:px-7 pt-6 sm:pt-7 pb-5 border-b bg-gradient-to-b from-primary/10 via-background to-background">
-          <div className="absolute inset-0 pointer-events-none">
+        <div className="relative px-4 sm:px-7 pt-4 sm:pt-7 pb-4 sm:pb-5 border-b bg-gradient-to-b from-primary/10 via-background to-background">
+          <div className="absolute inset-0 pointer-events-none rounded-t-lg overflow-hidden">
             <div className="absolute -top-24 -right-24 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
             <div className="absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
           </div>
 
           <DialogHeader className="text-left relative">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 h-10 w-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-                <Mail className="h-5 w-5 text-primary" />
+              <div className="mt-0.5 h-9 w-9 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+                <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-              <div className="min-w-0">
-                <DialogTitle className="text-xl sm:text-[22px] leading-tight font-extrabold tracking-tight">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-lg sm:text-[22px] leading-tight font-extrabold tracking-tight break-words">
                   Get listings before they hit the feed
                 </DialogTitle>
-                <DialogDescription className="mt-1 text-sm leading-relaxed">
+                <DialogDescription className="mt-1 text-xs sm:text-sm leading-relaxed break-words">
                   Weekly drops, new ranch inventory, and market insights. <span className="font-semibold">Texas-only.</span>
                 </DialogDescription>
               </div>
@@ -228,7 +228,7 @@ export function EmailCapturePopup(props: { source?: string }) {
           </DialogHeader>
         </div>
 
-        <div className="p-6 sm:p-7">
+        <div className="p-4 sm:p-7 overflow-y-auto min-h-0 flex-1">
           {success ? (
             <div className="mt-5 space-y-3">
               <div className="flex items-center gap-2">
@@ -259,8 +259,8 @@ export function EmailCapturePopup(props: { source?: string }) {
                 <Label htmlFor="we-email" className="text-sm font-semibold">
                   Email
                 </Label>
-                <div className="rounded-2xl border bg-muted/20 p-2">
-                  <div className="flex flex-col sm:flex-row gap-2">
+                <div className="rounded-xl sm:rounded-2xl border bg-muted/20 p-2">
+                  <div className="flex flex-col gap-2">
                   <Input
                     id="we-email"
                     type="email"
@@ -279,12 +279,12 @@ export function EmailCapturePopup(props: { source?: string }) {
                       }
                     }}
                     className={[
-                      'min-h-[48px] text-base bg-background',
+                      'min-h-[44px] sm:min-h-[48px] text-base bg-background w-full',
                       error ? 'border-destructive focus-visible:ring-destructive' : '',
                     ].join(' ')}
                   />
                   <Button
-                    className="min-h-[48px] sm:min-w-[132px] font-semibold"
+                    className="min-h-[44px] sm:min-h-[48px] w-full sm:min-w-[132px] font-semibold"
                     onClick={submit}
                     disabled={submitting}
                   >
@@ -302,14 +302,14 @@ export function EmailCapturePopup(props: { source?: string }) {
                 {error && <p className="text-sm text-destructive">{error}</p>}
               </div>
 
-              <div className="rounded-xl border bg-muted/30 p-3.5">
-                <p className="text-xs text-muted-foreground">
+              <div className="rounded-lg sm:rounded-xl border bg-muted/30 p-3 sm:p-3.5">
+                <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed break-words">
                   No spam. Just the best auctions, breeder inventory, and ranch deals—delivered weekly.
                 </p>
               </div>
 
               <div className="pt-2 border-t">
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-[10px] sm:text-[11px] leading-relaxed text-muted-foreground break-words">
                   By subscribing, you agree to receive emails from Agchange. Unsubscribe anytime.{' '}
                   <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
                     Privacy
