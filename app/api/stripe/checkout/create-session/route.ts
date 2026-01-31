@@ -27,6 +27,7 @@ import { getCategoryRequirements, isTexasOnlyCategory } from '@/lib/compliance/r
 import { coerceDurationDays, computeEndAt, toMillisSafe } from '@/lib/listings/duration';
 import { isGroupLotQuantityMode } from '@/lib/types';
 import { BUILD_INFO } from '@/lib/build-info';
+import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -544,7 +545,6 @@ export async function POST(request: Request) {
     let sellerPayoutsEnabled = sellerData.payoutsEnabled ?? false;
     let sellerDetailsSubmitted = sellerData.stripeDetailsSubmitted ?? false;
     let sellerOnboardingStatus = sellerData.stripeOnboardingStatus || 'not_started';
-    
     const sellerTier = getEffectiveSubscriptionTier(sellerData as any);
     const sellerTierWeight = getTierWeight(sellerTier);
 
@@ -685,6 +685,28 @@ export async function POST(request: Request) {
         sellerStripeAccountId: String(sellerStripeAccountId),
         error: accErr?.message,
       });
+      // Stripe code account_invalid = key has no access / Connect revoked / wrong project — always show actionable message.
+      // Clear seller's cached Stripe state so their dashboard shows "Connect payments" and they create a new Connect account.
+      if (accErr?.code === 'account_invalid') {
+        sellerRef.update({
+          stripeAccountId: null,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          stripeDetailsSubmitted: false,
+          stripeOnboardingStatus: 'reconnect_required',
+          updatedAt: Timestamp.now(),
+          updatedBy: 'system',
+        }).catch((e) => logWarn('Failed to clear seller Stripe cache on account_invalid', { sellerId: listingData.sellerId, error: String(e) }));
+        return NextResponse.json(
+          {
+            error:
+              "The seller's payment account is no longer linked. This can happen if Stripe keys were changed, Stripe revoked access, or the account was created under a different Stripe project. Ask the seller to reconnect payments in Settings → Payments.",
+            code: 'SELLER_ACCOUNT_DISCONNECTED',
+            details: { stripeCode: accErr?.code },
+          },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         {
           error: invalid
@@ -859,6 +881,10 @@ export async function POST(request: Request) {
     } catch (stripeError: any) {
       const msg = String(stripeError?.message || '');
       const lower = msg.toLowerCase();
+      const destinationRelated =
+        lower.includes('no such destination') ||
+        lower.includes('invalid destination') ||
+        /destination.*invalid|account.*cannot be used|cannot use.*destination/i.test(msg);
       if (lower.includes('rejected') || lower.includes('account has been rejected') || lower.includes('cannot create new')) {
         return NextResponse.json(
           {
@@ -872,10 +898,6 @@ export async function POST(request: Request) {
         );
       }
       // Stripe can throw "No such destination" at session create even if accounts.retrieve passed (e.g. restricted account).
-      const destinationRelated =
-        lower.includes('no such destination') ||
-        lower.includes('invalid destination') ||
-        /destination.*invalid|account.*cannot be used|cannot use.*destination/i.test(msg);
       if (destinationRelated) {
         logWarn('Checkout create-session: Stripe destination error when creating session', {
           route: '/api/stripe/checkout/create-session',
@@ -896,7 +918,6 @@ export async function POST(request: Request) {
 
     // Persist idempotency record (expires after 2 minutes to allow cleanup)
     try {
-      const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
       await idempotencyRef.set(sanitizeFirestorePayload({
         stripeSessionId: session.id,
         listingId,
@@ -916,7 +937,6 @@ export async function POST(request: Request) {
 
     if (offerId && offerRef) {
       try {
-        const { sanitizeFirestorePayload } = require('@/lib/firebase/sanitizeFirestore');
         await offerRef.set(sanitizeFirestorePayload({ checkoutSessionId: session.id, updatedAt: Timestamp.now() }), { merge: true });
         await createAuditLog(db, {
           actorUid: buyerId,

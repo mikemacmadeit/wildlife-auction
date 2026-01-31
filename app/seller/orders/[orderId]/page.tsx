@@ -28,12 +28,14 @@ import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { NextActionBanner } from '@/components/orders/NextActionBanner';
+import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { getNextRequiredAction } from '@/lib/orders/progress';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { ORDER_COPY } from '@/lib/orders/copy';
 import { formatDate } from '@/lib/utils';
 import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 
@@ -77,6 +79,7 @@ export default function SellerOrderDetailPage() {
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
+  const [trackingProcessing, setTrackingProcessing] = useState<'start' | 'stop' | 'delivered' | null>(null);
 
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
@@ -221,15 +224,8 @@ export default function SellerOrderDetailPage() {
 
             {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && order.delivery?.buyerAddress && (
               <>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm">Propose delivery date</div>
-                    <div className="text-xs text-muted-foreground">Propose delivery windows. Buyer will confirm a date that works.</div>
-                  </div>
-                  <Button variant="default" size="lg" className="w-full shrink-0 sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30 justify-center" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Propose delivery
-                  </Button>
+                <div className="text-sm text-muted-foreground">
+                  Propose delivery windows using the action above. Buyer will confirm a date that works.
                 </div>
                 <Separator />
               </>
@@ -237,8 +233,8 @@ export default function SellerOrderDetailPage() {
 
             {txStatus === 'DELIVERY_PROPOSED' && (
               <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                <div className="font-semibold text-blue-900 dark:text-blue-100">Waiting on buyer</div>
-                <div className="text-xs mt-1">Buyer must agree to a delivery window. You will be notified.</div>
+                <div className="font-semibold text-blue-900 dark:text-blue-100">{ORDER_COPY.chooseDeliveryDate.waitingForBuyer}</div>
+                <div className="text-xs mt-1">{ORDER_COPY.chooseDeliveryDate.waitingForBuyerDescription}</div>
               </div>
             )}
 
@@ -453,15 +449,61 @@ export default function SellerOrderDetailPage() {
           );
         })()}
 
-        {/* Next Action Banner */}
-        <NextActionBanner
+        {/* Next Action Banner — hidden when Next Step Card already shows the same action to avoid duplicates */}
+        {!getNextRequiredAction(order, 'seller') && (
+          <NextActionBanner
+            order={order}
+            role="seller"
+            onAction={() => {
+              const txStatus = getEffectiveTransactionStatus(order);
+              if (txStatus === 'FULFILLMENT_REQUIRED') setScheduleDeliveryOpen(true);
+              else if (txStatus === 'DELIVERY_SCHEDULED') setMarkOutForDeliveryOpen(true);
+              else if (txStatus === 'OUT_FOR_DELIVERY') setMarkDeliveredOpen(true);
+            }}
+          />
+        )}
+
+        {/* Live delivery tracking (seller: Start delivery / Stop tracking / Mark delivered) */}
+        <DeliveryTrackingCard
           order={order}
           role="seller"
-          onAction={() => {
-            const txStatus = getEffectiveTransactionStatus(order);
-            if (txStatus === 'FULFILLMENT_REQUIRED') setScheduleDeliveryOpen(true);
-            else if (txStatus === 'DELIVERY_SCHEDULED') setMarkOutForDeliveryOpen(true);
-            else if (txStatus === 'OUT_FOR_DELIVERY') setMarkDeliveredOpen(true);
+          currentUserUid={user?.uid ?? null}
+          processing={trackingProcessing}
+          onStartTracking={async () => {
+            setTrackingProcessing('start');
+            try {
+              await postAuthJson(`/api/orders/${order.id}/start-delivery-tracking`);
+              toast({ title: 'Live tracking started', description: 'Buyer can now see your location on the map.' });
+              await loadOrder();
+            } catch (e: any) {
+              toast({ title: 'Error', description: e?.message || 'Failed to start tracking', variant: 'destructive' });
+            } finally {
+              setTrackingProcessing(null);
+            }
+          }}
+          onStopTracking={async () => {
+            setTrackingProcessing('stop');
+            try {
+              await postAuthJson(`/api/orders/${order.id}/stop-delivery-tracking`, { mode: 'STOP_ONLY' });
+              toast({ title: 'Tracking stopped', description: 'Buyer will no longer see live location.' });
+              await loadOrder();
+            } catch (e: any) {
+              toast({ title: 'Error', description: e?.message || 'Failed to stop tracking', variant: 'destructive' });
+            } finally {
+              setTrackingProcessing(null);
+            }
+          }}
+          onMarkDelivered={async () => {
+            setTrackingProcessing('delivered');
+            try {
+              await postAuthJson(`/api/orders/${order.id}/stop-delivery-tracking`, { mode: 'DELIVERED' });
+              toast({ title: 'Marked as delivered', description: 'Buyer can confirm receipt on their order page.' });
+              await loadOrder();
+            } catch (e: any) {
+              toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
+            } finally {
+              setTrackingProcessing(null);
+            }
           }}
         />
 
@@ -483,7 +525,7 @@ export default function SellerOrderDetailPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Delivery</CardTitle>
               <CardDescription>
-                Propose a delivery window; the buyer agrees. Only the buyer confirms receipt to complete the transaction.
+                Propose delivery times; the buyer chooses one. Only the buyer confirms receipt to complete the transaction.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">

@@ -107,15 +107,25 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
     case 'Order.DeliveryScheduled': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryScheduled' }>;
       if (p.eta) return `Delivery scheduled for "${p.listingTitle}". ETA: ${new Date(p.eta).toLocaleString()}. ${p.orderUrl}`;
-      return `Seller proposed delivery windows for "${p.listingTitle}". Agree to one: ${p.orderUrl}`;
+      return `The seller offered delivery times for "${p.listingTitle}". Choose your date: ${p.orderUrl}`;
     }
     case 'Order.DeliveryAgreed': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAgreed' }>;
-      return `Buyer agreed to delivery window for "${p.listingTitle}". ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
+      return `Buyer chose a delivery date for "${p.listingTitle}". ${new Date(p.windowStart).toLocaleString()}. ${p.orderUrl}`;
     }
     case 'Order.DeliveryAddressSet': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAddressSet' }>;
       return `Buyer set delivery address for "${p.listingTitle}". Propose a delivery date: ${p.orderUrl}`;
+    }
+    case 'Order.DeliveryTrackingStarted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryTrackingStarted' }>;
+      return `Your seller started delivery for "${p.listingTitle}". Track it: ${p.orderUrl}`;
+    }
+    case 'Order.DeliveryTrackingStopped': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryTrackingStopped' }>;
+      return p.delivered
+        ? `Delivery completed for "${p.listingTitle}". Confirm receipt: ${p.orderUrl}`
+        : `Live tracking ended for "${p.listingTitle}". ${p.orderUrl}`;
     }
     case 'Order.PickupReady': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.PickupReady' }>;
@@ -373,6 +383,30 @@ function buildEmailJobPayload(params: {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAddressSet' }>;
       return {
         template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryTrackingStarted': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryTrackingStarted' }>;
+      return {
+        template: 'order_in_transit',
+        templatePayload: {
+          buyerName: recipientName,
+          orderId: p.orderId,
+          listingTitle: p.listingTitle,
+          orderUrl: p.orderUrl,
+        },
+      };
+    }
+    case 'Order.DeliveryTrackingStopped': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryTrackingStopped' }>;
+      return {
+        template: p.delivered ? 'order_delivered' : 'order_in_transit',
         templatePayload: {
           buyerName: recipientName,
           orderId: p.orderId,

@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
 import { createUserDocument, getUserProfile } from '@/lib/firebase/users';
+import { saveAddress, setCheckoutDeliveryAddress } from '@/lib/firebase/addresses';
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { 
@@ -59,6 +60,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     businessName: '',
     location: {
+      address: '',
       city: '',
       state: 'TX',
       zip: '',
@@ -212,12 +214,47 @@ export default function RegisterPage() {
 
       // Create user document in Firestore (bootstrap is skipped while regKey is set)
       if (userCredential.user) {
+        const uid = userCredential.user.uid;
         await createUserDocument(userCredential.user, {
           fullName: formData.fullName,
           businessName: formData.businessName || undefined,
           phone: formData.phone,
-          location: formData.location,
+          location: {
+            address: formData.location.address,
+            city: formData.location.city,
+            state: formData.location.state,
+            zip: formData.location.zip,
+          },
         });
+
+        // Save first address into the shared address system (default for profile + checkout)
+        const { address, city, state, zip } = formData.location;
+        if (city.trim() && state.trim() && zip.trim()) {
+          try {
+            const formattedAddress = [address, city, `${state} ${zip}`].filter(Boolean).join(', ');
+            const saved = await saveAddress(
+              uid,
+              {
+                label: 'Home',
+                isDefault: true,
+                formattedAddress: formattedAddress || `${city}, ${state} ${zip}`,
+                line1: address.trim() || city.trim(),
+                city: city.trim(),
+                state: state.trim(),
+                postalCode: zip.trim(),
+                country: 'US',
+                lat: 0,
+                lng: 0,
+                provider: 'manual',
+                placeId: '',
+              },
+              { makeDefault: true }
+            );
+            await setCheckoutDeliveryAddress(uid, saved.id);
+          } catch {
+            // Non-blocking: profile location is already set; user can add address in Account
+          }
+        }
 
         try {
           if (typeof window !== 'undefined') sessionStorage.removeItem(regKey);
@@ -607,12 +644,33 @@ export default function RegisterPage() {
 
                 <Separator />
 
-                {/* Location Section */}
+                {/* Location Section - saved as first address (default) for profile + checkout */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
                     Location
                   </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Used as your default address for profile and checkout. You can add or edit addresses later in Account.
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="address" className="text-sm font-semibold">
+                      Street address <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="address"
+                      type="text"
+                      value={formData.location.address}
+                      onChange={(e) => {
+                        setFormData({
+                          ...formData,
+                          location: { ...formData.location, address: e.target.value },
+                        });
+                      }}
+                      className="min-h-[48px] text-base bg-background"
+                      placeholder="123 Ranch Road"
+                    />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="city" className="text-sm font-semibold">

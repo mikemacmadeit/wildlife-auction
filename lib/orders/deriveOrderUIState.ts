@@ -76,10 +76,10 @@ export function deriveOrderUIState(order: Order): {
   if (txStatus === 'DELIVERY_PROPOSED') {
     return {
       statusKey: 'in_transit',
-      currentStepLabel: 'Delivery proposed',
-      waitingOn: 'Waiting on you to agree to a window',
+      currentStepLabel: 'Choose delivery date',
+      waitingOn: 'Pick one of the seller’s proposed times',
       needsAction: true,
-      primaryAction: { kind: 'agree_delivery', label: 'Agree to window' },
+      primaryAction: { kind: 'agree_delivery', label: 'Choose date' },
     };
   }
   if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {

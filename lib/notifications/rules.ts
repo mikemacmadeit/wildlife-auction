@@ -260,6 +260,42 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
         allowDuringQuietHours: true,
       };
+    case 'Order.DeliveryScheduled':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
+    case 'Order.DeliveryAgreed':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
+    case 'Order.DeliveryTrackingStarted':
+      return {
+        category: 'orders',
+        urgency: 'normal',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 5,
+        rateLimitPerUser: { email: { perHour: 4, perDay: 10 } },
+        allowDuringQuietHours: true,
+      };
+    case 'Order.DeliveryTrackingStopped':
+      return {
+        category: 'orders',
+        urgency: 'low',
+        channels: ['inApp'],
+        dedupeWindowMs: 1000 * 60 * 10,
+        rateLimitPerUser: {},
+        allowDuringQuietHours: true,
+      };
     case 'Payout.Released':
       return {
         category: 'orders',
@@ -394,6 +430,11 @@ export function decideChannels(params: {
         if (params.eventType === 'Order.Accepted') return cats.orders.confirmed;
         if (params.eventType === 'Order.DeliveryConfirmed') return cats.orders.deliveryConfirmed;
         if (params.eventType === 'Order.DeliveryCheckIn') return cats.orders.deliveryCheckIn;
+        if (params.eventType === 'Order.DeliveryScheduled') return cats.orders.confirmed;
+        if (params.eventType === 'Order.DeliveryAgreed') return cats.orders.confirmed;
+        if (params.eventType === 'Order.DeliveryAddressSet') return cats.orders.confirmed;
+        if (params.eventType === 'Order.DeliveryTrackingStarted') return cats.orders.confirmed;
+        if (params.eventType === 'Order.DeliveryTrackingStopped') return cats.orders.confirmed;
         if (params.eventType === 'Payout.Released') return cats.orders.payoutReleased;
         return true;
       }

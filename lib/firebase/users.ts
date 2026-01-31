@@ -66,6 +66,7 @@ export const createUserDocument = async (
     businessName?: string;
     phone?: string;
     location?: {
+      address?: string;
       city: string;
       state: string;
       zip: string;
@@ -101,10 +102,11 @@ export const createUserDocument = async (
       subscriptionTier: 'standard',
       profile: {
         fullName: additionalData?.fullName || displayName || '',
-        location: additionalData?.location || {
-          city: '',
-          state: '',
-          zip: '',
+        location: {
+          address: additionalData?.location?.address ?? '',
+          city: additionalData?.location?.city ?? '',
+          state: additionalData?.location?.state ?? '',
+          zip: additionalData?.location?.zip ?? '',
         },
         preferences: {
           verification: true,

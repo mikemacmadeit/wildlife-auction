@@ -181,11 +181,25 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
   provider.setCustomParameters({
     prompt: 'select_account',
   });
-  
+
+  // #region agent log
+  const apiKey = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_API_KEY : '';
+  const authDomain = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN : '';
+  const keyMask = apiKey ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}` : 'missing';
+  if (typeof fetch !== 'undefined') {
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'auth.ts:signInWithGoogle:entry', message: 'Google sign-in attempt', data: { authDomain, apiKeyMask: keyMask }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1_key_identity' }) }).catch(() => {});
+  }
+  // #endregion
+
   try {
     // Try popup first (better UX)
     return await signInWithPopup(auth, provider);
   } catch (error: any) {
+    // #region agent log
+    if (typeof fetch !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'auth.ts:signInWithGoogle:catch', message: 'Google sign-in error', data: { code: error?.code, message: (error?.message || '').slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2_error_detail' }) }).catch(() => {});
+    }
+    // #endregion
     console.error('Google sign-in popup error:', error);
     
     // If popup fails for any reason (blocked, unauthorized domain, illegal URL, etc.), fall back to redirect

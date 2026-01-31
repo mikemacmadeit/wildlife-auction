@@ -96,22 +96,26 @@ export function computePublicSellerTrustFromUser(params: {
   return {
     userId,
     badgeIds,
-    tpwdBreederPermit: permit
+    ...(permit
       ? {
-          status: permit.status,
-          ...(permit.expiresAt ? { expiresAt: permit.expiresAt } : {}),
+          tpwdBreederPermit: {
+            status: permit.status,
+            ...(permit.expiresAt ? { expiresAt: permit.expiresAt } : {}),
+          },
         }
-      : undefined,
-    stripe: params.stripe
+      : {}),
+    ...(params.stripe
       ? {
-          onboardingStatus: stripeOnboarding,
-          payoutsEnabled,
-          chargesEnabled,
-          detailsSubmitted,
-          hasPendingRequirements,
-          updatedAt: new Date(),
+          stripe: {
+            onboardingStatus: stripeOnboarding,
+            payoutsEnabled,
+            chargesEnabled,
+            detailsSubmitted,
+            hasPendingRequirements,
+            updatedAt: new Date(),
+          },
         }
-      : undefined,
+      : {}),
     updatedAt: new Date(),
   };
 }

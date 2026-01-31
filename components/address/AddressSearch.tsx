@@ -234,7 +234,7 @@ export function AddressSearch({
           <li
             key={p.place_id}
             role="option"
-            className="cursor-pointer px-3 py-2.5 text-sm hover:bg-accent focus:bg-accent outline-none"
+            className="cursor-pointer px-3 py-3 min-h-[48px] text-sm hover:bg-accent focus:bg-accent outline-none touch-manipulation flex flex-col justify-center"
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();

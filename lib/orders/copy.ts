@@ -44,6 +44,7 @@ export const ORDER_COPY = {
   // Next actions
   actions: {
     scheduleDelivery: 'Schedule Delivery',
+    chooseDeliveryDate: 'Choose date',
     markOutForDelivery: 'Mark Out for Delivery',
     markDelivered: 'Mark Delivered',
     setPickupInfo: 'Set Pickup Info',
@@ -53,6 +54,16 @@ export const ORDER_COPY = {
     confirmCompliance: 'Confirm Compliance',
     openDispute: 'Open Dispute',
     viewDetails: 'View Details',
+  },
+
+  // Delivery date step (buyer chooses from seller’s proposed times)
+  chooseDeliveryDate: {
+    title: 'Choose your delivery date',
+    description: 'The seller offered these delivery times. Pick one that works for you.',
+    sellerProposed: 'Seller offered these times:',
+    chooseThisDate: 'Choose this date',
+    waitingForBuyer: 'Waiting for buyer to choose a date',
+    waitingForBuyerDescription: 'Buyer will pick one of the times you proposed. You’ll be notified.',
   },
 
   // Descriptions
@@ -106,5 +117,7 @@ export function getStatusLabel(txStatus: string): string {
     SELLER_NONCOMPLIANT: 'Seller non-compliant',
   };
 
-  return statusMap[txStatus] || txStatus.replaceAll('_', ' ');
+  if (statusMap[txStatus]) return statusMap[txStatus];
+  if (txStatus === 'DELIVERY_PROPOSED') return 'Choose delivery date';
+  return txStatus.replaceAll('_', ' ');
 }

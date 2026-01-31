@@ -123,6 +123,14 @@ export interface OrderDoc {
     visibility?: any;
     meta?: any;
   }>;
+  /** Live delivery tracking (Uber-style). Only latest location in RTDB; metadata here. */
+  deliveryTracking?: {
+    enabled: boolean;
+    driverUid: string | null;
+    startedAt: Timestamp | null;
+    endedAt: Timestamp | null;
+    lastLocationAt: Timestamp | null;
+  };
 }
 
 /**
@@ -269,6 +277,16 @@ function toOrder(docId: string, data: OrderDoc): Order {
       };
     })() : undefined,
     deliveryAddress: (data as any).deliveryAddress ?? undefined,
+    deliveryTracking: (data as any).deliveryTracking ? (() => {
+      const dt = (data as any).deliveryTracking;
+      return {
+        enabled: !!dt.enabled,
+        driverUid: dt.driverUid ?? null,
+        startedAt: dt.startedAt ? toDateSafe(dt.startedAt) : null,
+        endedAt: dt.endedAt ? toDateSafe(dt.endedAt) : null,
+        lastLocationAt: dt.lastLocationAt ? toDateSafe(dt.lastLocationAt) : null,
+      };
+    })() : undefined,
     pickup: (data as any).pickup ? (() => {
       const p = (data as any).pickup;
       const mapWindow = (w: any) => ({

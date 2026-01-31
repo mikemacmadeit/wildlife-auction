@@ -595,6 +595,55 @@ export default function DashboardLayout({
             </div>
           )}
         </nav>
+
+        {/* User Account Section - Bottom of Sidebar */}
+        <div className="mt-auto border-t border-border/50 dark:border-white/10 p-4">
+          {!sidebarCollapsed ? (
+            <div className="space-y-2">
+              <Link
+                href="/dashboard/account"
+                className="flex items-center gap-3 pl-0 pr-3 py-2 rounded-lg hover:bg-background/50 transition-colors group"
+              >
+                <User className="h-5 w-5 text-muted-foreground group-hover:text-foreground ml-3" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-foreground truncate">
+                    {user?.displayName || user?.email?.split('@')[0] || 'Account'}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {user?.email || 'View Profile'}
+                  </div>
+                </div>
+              </Link>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 pl-0 pr-3 py-2 h-auto ml-0"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-5 w-5 text-muted-foreground ml-3" />
+                <span className="text-sm font-semibold">Sign out</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href="/dashboard/account"
+                className="p-2 rounded-lg hover:bg-background/50 transition-colors"
+                title={user?.displayName || user?.email || 'Account'}
+              >
+                <User className="h-5 w-5 text-muted-foreground" />
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={handleSignOut}
+                title="Sign out"
+              >
+                <LogOut className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* Mobile Header */}

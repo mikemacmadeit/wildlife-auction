@@ -32,10 +32,12 @@ import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { NextActionBanner } from '@/components/orders/NextActionBanner';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
+import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
+import { ORDER_COPY } from '@/lib/orders/copy';
 import { formatDate, isValidNonEpochDate } from '@/lib/utils';
 import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
 
@@ -341,6 +343,16 @@ export default function BuyerOrderDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Live delivery tracking (buyer: map + last updated) */}
+        <DeliveryTrackingCard
+          order={order}
+          role="buyer"
+          currentUserUid={user?.uid ?? null}
+          onStartTracking={async () => {}}
+          onStopTracking={async () => {}}
+          onMarkDelivered={async () => {}}
+        />
+
         <Dialog
           open={checkin}
           onOpenChange={(open) => {
@@ -415,7 +427,7 @@ export default function BuyerOrderDetailPage() {
                 const el = document.getElementById('confirm-receipt-section');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               } else if (st === 'DELIVERY_PROPOSED') {
-                const el = document.getElementById('agree-delivery');
+                const el = document.getElementById('choose-delivery-date');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }
             }}
@@ -519,13 +531,16 @@ export default function BuyerOrderDetailPage() {
                     </>
                   )}
                   {txStatus === 'DELIVERY_PROPOSED' && order.delivery?.windows?.length && (
-                    <div id="agree-delivery">
-                      <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-2">
-                        <div><strong>Seller proposed:</strong> Pick one window that works for you.</div>
-                        {(order.delivery as any)?.notes && <div><strong>Notes:</strong> {(order.delivery as any).notes}</div>}
-                      </div>
+                    <div id="choose-delivery-date" className="scroll-mt-24">
                       <div className="space-y-2">
-                        <div className="font-semibold text-sm">Agree to delivery window</div>
+                        <div className="font-semibold text-sm">{ORDER_COPY.chooseDeliveryDate.title}</div>
+                        <p className="text-xs text-muted-foreground">{ORDER_COPY.chooseDeliveryDate.description}</p>
+                        {(order.delivery as any)?.notes && (
+                          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                            <strong>Notes from seller:</strong> {(order.delivery as any).notes}
+                          </div>
+                        )}
+                        <div className="text-xs font-medium text-muted-foreground mt-1">{ORDER_COPY.chooseDeliveryDate.sellerProposed}</div>
                         <div className="space-y-2">
                           {order.delivery.windows.map((w: any, idx: number) => {
                             const start = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
@@ -533,24 +548,25 @@ export default function BuyerOrderDetailPage() {
                             return (
                               <Button
                                 key={idx}
-                                variant="outline"
-                                className="w-full justify-start"
+                                variant="default"
+                                className="w-full justify-between sm:justify-start"
                                 disabled={processing !== null}
                                 onClick={async () => {
                                   try {
                                     setProcessing('confirm');
                                     await postAuthJson(`/api/orders/${order.id}/fulfillment/agree-delivery`, { agreedWindowIndex: idx });
-                                    toast({ title: 'Success', description: 'Delivery window agreed. Seller will haul within this timeframe.' });
+                                    toast({ title: 'Date chosen', description: 'Seller will deliver within this timeframe.' });
                                     const refreshed = await getOrderById(order.id);
                                     if (refreshed) setOrder(refreshed);
                                   } catch (e: any) {
-                                    toast({ title: 'Error', description: e?.message || 'Failed to agree', variant: 'destructive' });
+                                    toast({ title: 'Error', description: e?.message || 'Failed to save', variant: 'destructive' });
                                   } finally {
                                     setProcessing(null);
                                   }
                                 }}
                               >
-                                {start.toLocaleString()} – {end.toLocaleString()}
+                                <span>{start.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })} – {end.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                {processing !== null ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <span className="text-xs opacity-90">{ORDER_COPY.chooseDeliveryDate.chooseThisDate}</span>}
                               </Button>
                             );
                           })}

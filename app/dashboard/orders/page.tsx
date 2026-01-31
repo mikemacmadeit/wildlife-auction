@@ -1016,19 +1016,42 @@ export default function OrdersPage() {
           <div className="flex flex-col gap-2 pt-2">
             <Button
               data-congrats-view-purchase
-              onClick={() => {
+              onClick={async () => {
+                const sessionId = pendingCheckout?.sessionId;
                 setShowCongratsModal(false);
                 scrollToTop();
-                // If we have a pending checkout session, store intent to open order for set-address when order appears
-                if (pendingCheckout?.sessionId) {
-                  try {
-                    sessionStorage.setItem(
-                      'we:congrats-set-address:v1',
-                      JSON.stringify({ sessionId: pendingCheckout.sessionId, ts: Date.now() })
-                    );
-                  } catch {
-                    // ignore
+                if (!sessionId) return;
+                try {
+                  sessionStorage.setItem(
+                    'we:congrats-set-address:v1',
+                    JSON.stringify({ sessionId, ts: Date.now() })
+                  );
+                } catch {
+                  // ignore
+                }
+                // Try to open the order immediately (order may already exist from webhook/reconcile)
+                try {
+                  let order = await getOrderByCheckoutSessionId(sessionId);
+                  if (order?.id) {
+                    router.push(`/dashboard/orders/${order.id}`);
+                    return;
                   }
+                  // Order not ready yet; retry once after a short delay
+                  await new Promise((r) => setTimeout(r, 2000));
+                  order = await getOrderByCheckoutSessionId(sessionId);
+                  if (order?.id) {
+                    router.push(`/dashboard/orders/${order.id}`);
+                  } else {
+                    toast({
+                      title: 'Order still finalizing',
+                      description: 'Your order will appear below in a moment. Click it to set your delivery address.',
+                    });
+                  }
+                } catch {
+                  toast({
+                    title: 'Order still finalizing',
+                    description: 'Your order will appear below in a moment. Click it to set your delivery address.',
+                  });
                 }
               }}
               className="w-full font-semibold"

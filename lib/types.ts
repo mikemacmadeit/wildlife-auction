@@ -918,6 +918,18 @@ export interface Order {
   deliveryAddress?: DeliveryAddressSnapshot;
 
   /**
+   * Live delivery tracking (Uber-style). Only latest location stored; no breadcrumb history.
+   * When enabled, seller/driver writes to RTDB liveLocations/{orderId}; buyer reads.
+   */
+  deliveryTracking?: {
+    enabled: boolean;
+    driverUid: string | null;
+    startedAt: Date | null;
+    endedAt: Date | null;
+    lastLocationAt: Date | null;
+  };
+
+  /**
    * Dispute/issue tracking
    */
   issues?: {

@@ -151,7 +151,7 @@ export async function POST(
         event: {
           id: `DELIVERY_AGREED:${orderId}`,
           type: 'ORDER_PLACED',
-          label: 'Buyer agreed to delivery window',
+          label: 'Buyer chose delivery date',
           actor: 'buyer',
           visibility: 'seller',
           timestamp: Timestamp.fromDate(now),
@@ -205,7 +205,7 @@ export async function POST(
       orderId,
       transactionStatus: 'DELIVERY_SCHEDULED',
       agreedWindow: { start: start.toISOString(), end: end.toISOString() },
-      message: 'Delivery window agreed. Seller will haul within this timeframe.',
+      message: 'Delivery date chosen. Seller will deliver within this timeframe.',
     });
   } catch (error: any) {
     console.error('Error agreeing to delivery:', error);

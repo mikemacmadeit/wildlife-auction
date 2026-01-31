@@ -29,6 +29,9 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
 
 **Important:** After creating `.env.local`, restart your development server for the changes to take effect.
 
+**Google Sign-In 403 / "The requested action is invalid"?**  
+If Google sign-in fails with `API_KEY_HTTP_REFERRER_BLOCKED` or "Requests from referer ... are blocked", your API key’s HTTP referrer restrictions are blocking the Firebase Auth domain. Add the Firebase auth domain and localhost to the key’s allowed referrers in [Google Cloud Console → Credentials → your API key](https://console.cloud.google.com/apis/credentials). Step-by-step: [docs/GOOGLE_SIGNIN_API_KEY_REFERRER_FIX.md](docs/GOOGLE_SIGNIN_API_KEY_REFERRER_FIX.md).
+
 ## What's Configured
 
 ✅ Firebase App initialized

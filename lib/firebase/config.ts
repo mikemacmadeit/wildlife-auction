@@ -3,6 +3,7 @@ import { getAnalytics, Analytics, isSupported } from 'firebase/analytics';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore, setLogLevel } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getDatabase, Database } from 'firebase/database';
 
 // Firebase configuration - MUST use environment variables (no hardcoded secrets!)
 // All values must be set via environment variables for security
@@ -44,6 +45,8 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  // Realtime Database (optional) — used for live delivery tracking
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.trim() || undefined,
 };
 
 // Validate required config values
@@ -65,6 +68,7 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
+let rtdb: Database | null = null;
 let analytics: Analytics | null = null;
 
 if (typeof window !== 'undefined') {
@@ -77,6 +81,13 @@ if (typeof window !== 'undefined') {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+  if (firebaseConfig.databaseURL) {
+    try {
+      rtdb = getDatabase(app);
+    } catch (e) {
+      console.warn('Firebase Realtime Database init failed:', e);
+    }
+  }
 
   // Dev diagnostics: if auth/project/bucket are mismatched, you'll see rules "permission-denied" even after deploy.
   // Don't rely on NODE_ENV (some environments set it to non-standard values); just log on localhost.
@@ -132,4 +143,4 @@ if (typeof window !== 'undefined') {
   // For server-side operations, use Firebase Admin SDK
 }
 
-export { app, auth, db, storage, analytics };
+export { app, auth, db, storage, rtdb, analytics };

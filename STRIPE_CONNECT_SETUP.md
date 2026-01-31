@@ -79,6 +79,22 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 **Important**: Webhook secrets are different for test and live modes!
 
+### If checkout fails with "seller's payment account is no longer linked"
+
+Stripe returns `account_invalid` ("The provided key does not have access to account ... or application access may have been revoked") when the **current** `STRIPE_SECRET_KEY` cannot access the seller's Connect account. Common causes:
+
+- **You changed keys:** Rotated `STRIPE_SECRET_KEY`, switched Stripe project or `.env`, or copied the app to a new machine with a new key. Connect account IDs are tied to the key that created them.
+- **Stripe revoked access:** Stripe can revoke a Connect application or account access (e.g. compliance, platform review). You don't have to change anything for this to happen.
+- **Different Stripe project:** The seller connected while the app was using a different Stripe project (e.g. another env or deployment); now the app uses a key that never had that account.
+- **Test vs live:** The Connect account ID in Firestore was created in live mode but you're using a test key (or vice versa). Account IDs don't cross test/live.
+
+**Verify:** In [Stripe Dashboard](https://dashboard.stripe.com) → **Connect** → **Accounts**, confirm you're in the same Stripe account that owns your `STRIPE_SECRET_KEY`. See if the seller's Connect account (e.g. `acct_1Sp9s7LL9MMK7frT`) appears there. If it doesn't, that account belongs to another Stripe project or was revoked.
+
+**Fix:** Have the seller **reconnect payments**: Account/Settings → **Payments** → disconnect and connect again. That creates a new Connect account under your current key and checkout will work again. No need to change any keys if you didn't intend to.
+
+**Why does one user (e.g. super admin) work but another says "payout ready" and checkout fails?**  
+"Payout ready" in the app is **cached** in Firestore from when the seller completed onboarding (or when we last refreshed from Stripe). Stripe can later revoke or restrict access to **that specific Connect account** (e.g. platform under review, or that connected account flagged) without updating our cache. We only discover it at checkout when Stripe returns `account_invalid`. So the other user didn't "get disconnected" in the app — Stripe no longer allows the platform to use that Connect account. When checkout fails with SELLER_ACCOUNT_DISCONNECTED, we now clear that seller's cached Stripe state so their dashboard shows "Connect payments" and they can create a new Connect account.
+
 ---
 
 ## Local Development

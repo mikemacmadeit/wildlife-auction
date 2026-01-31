@@ -275,6 +275,61 @@ export function buildInAppNotification(params: {
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
+    case 'Order.DeliveryScheduled': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryScheduled' }>;
+      const isProposed = !!p.proposedWindows?.length;
+      return {
+        ...base,
+        type: 'order_delivery_scheduled',
+        title: isProposed ? 'Choose your delivery date' : 'Delivery scheduled',
+        body: isProposed
+          ? `The seller offered delivery times for "${p.listingTitle}". Pick one that works for you.`
+          : p.eta
+            ? `Delivery scheduled for "${p.listingTitle}". ETA: ${new Date(p.eta).toLocaleString()}.`
+            : `Delivery scheduled for "${p.listingTitle}".`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: isProposed ? 'Choose date' : 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.DeliveryAgreed': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryAgreed' }>;
+      return {
+        ...base,
+        type: 'order_delivery_agreed',
+        title: 'Buyer chose a delivery date',
+        body: `Buyer chose a delivery time for "${p.listingTitle}". You can mark out for delivery when you’re on the way.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.DeliveryTrackingStarted': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryTrackingStarted' }>;
+      return {
+        ...base,
+        type: 'order_delivery_tracking_started',
+        title: 'Live tracking started',
+        body: `Your seller started delivery for "${p.listingTitle}". Track it in the app.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'Track delivery',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.DeliveryTrackingStopped': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.DeliveryTrackingStopped' }>;
+      return {
+        ...base,
+        type: 'order_delivery_tracking_stopped',
+        title: p.delivered ? 'Delivery completed' : 'Tracking ended',
+        body: p.delivered
+          ? `Delivery completed for "${p.listingTitle}". Confirm receipt when ready.`
+          : `Live tracking ended for "${p.listingTitle}".`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
     case 'Payout.Released': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Payout.Released' }>;
       return {

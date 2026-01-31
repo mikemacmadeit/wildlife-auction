@@ -210,7 +210,7 @@ export async function POST(
         event: {
           id: useWindows ? `DELIVERY_PROPOSED:${orderId}` : `DELIVERY_SCHEDULED:${orderId}`,
           type: 'SELLER_PREPARING',
-          label: useWindows ? 'Seller proposed delivery windows' : 'Seller scheduled delivery',
+          label: useWindows ? 'Seller proposed delivery times' : 'Seller scheduled delivery',
           actor: 'seller',
           visibility: 'buyer',
           timestamp: Timestamp.fromDate(now),
@@ -239,7 +239,7 @@ export async function POST(
           listingTitle,
           orderUrl: `${getSiteUrl()}/dashboard/orders/${orderId}`,
           ...(useWindows
-            ? { proposedWindows: windowsWithDates, message: 'Seller proposed delivery windows. Please agree to one.' }
+            ? { proposedWindows: windowsWithDates, message: 'Seller offered delivery times. Choose one that works for you.' }
             : { eta: (deliveryPayload as any).eta?.toISOString?.() }),
         },
         optionalHash: `delivery_${useWindows ? 'proposed' : 'scheduled'}:${now.toISOString()}`,

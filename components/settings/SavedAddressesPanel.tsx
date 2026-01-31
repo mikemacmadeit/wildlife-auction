@@ -55,9 +55,39 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
     }
     setLoading(true);
     try {
-      const list = await getAddresses(userId);
+      let list = await getAddresses(userId);
+      // If user has addresses but none is default, set the first as default
+      if (list.length > 0 && !list.some((a) => a.isDefault)) {
+        try {
+          const first = list[0];
+          await saveAddress(
+            userId,
+            {
+              label: first.label,
+              isDefault: true,
+              formattedAddress: first.formattedAddress,
+              line1: first.line1,
+              line2: first.line2,
+              city: first.city,
+              state: first.state,
+              postalCode: first.postalCode,
+              country: first.country,
+              lat: first.lat,
+              lng: first.lng,
+              provider: first.provider,
+              placeId: first.placeId,
+              notes: first.notes,
+              gateCode: first.gateCode,
+            },
+            { addressId: first.id, makeDefault: true }
+          );
+          list = await getAddresses(userId);
+        } catch {
+          // Keep existing list if fix fails
+        }
+      }
       setAddresses(list);
-      const defaultAddr = list.find((a) => a.isDefault) ?? null;
+      const defaultAddr = list.find((a) => a.isDefault) ?? list[0] ?? null;
       onDefaultAddressChangeRef.current?.(defaultAddr);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -149,7 +179,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
               <p className="text-xs text-muted-foreground mb-4">
                 Add an address to use for your profile and at checkout.
               </p>
-              <Button onClick={() => setPickerOpen(true)} className="gap-2">
+              <Button onClick={() => setPickerOpen(true)} className="gap-2 min-h-[48px] touch-manipulation">
                 <Plus className="h-4 w-4" />
                 Add address
               </Button>
@@ -178,7 +208,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                       {!addr.isDefault && (
                         <Button
                           type="button"
@@ -186,7 +216,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
                           size="sm"
                           disabled={saving}
                           onClick={() => handleSetDefault(addr)}
-                          className="gap-1"
+                          className="gap-1 min-h-[44px] touch-manipulation"
                           title="Set as default"
                         >
                           <Star className="h-3.5 w-3.5" />
@@ -198,7 +228,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
                         variant="outline"
                         size="sm"
                         onClick={() => setEditAddress(addr)}
-                        className="gap-1"
+                        className="gap-1 min-h-[44px] touch-manipulation"
                         title="Edit address"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -208,7 +238,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 min-h-[44px] touch-manipulation"
                         onClick={() => setDeleteTarget(addr)}
                         title="Delete address"
                       >
@@ -223,7 +253,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
           )}
 
           {!loading && addresses.length > 0 && (
-            <Button variant="outline" onClick={() => setPickerOpen(true)} className="w-full sm:w-auto gap-2">
+            <Button variant="outline" onClick={() => setPickerOpen(true)} className="w-full sm:w-auto gap-2 min-h-[48px] touch-manipulation">
               <Plus className="h-4 w-4" />
               Add address
             </Button>
@@ -254,7 +284,7 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
       )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-sm:w-[calc(100%-1.5rem)] max-sm:max-h-[90dvh] max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this address?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -266,12 +296,14 @@ export function SavedAddressesPanel({ userId, onDefaultAddressChange }: SavedAdd
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            <AlertDialogCancel disabled={deleting} className="min-h-[48px] touch-manipulation w-full sm:w-auto m-0">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="min-h-[48px] touch-manipulation w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90 m-0"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
@@ -355,12 +387,12 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-md max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle>Edit address</DialogTitle>
           <DialogDescription>Update the details for this saved address.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-2">
+        <div className="grid gap-4 py-2 overflow-y-auto">
           <div className="grid gap-2">
             <Label htmlFor="edit-label">Label</Label>
             <Input
@@ -368,6 +400,7 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Home, Ranch, etc."
+              className="min-h-[48px]"
             />
           </div>
           <div className="grid gap-2">
@@ -377,6 +410,7 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
               value={line1}
               onChange={(e) => setLine1(e.target.value)}
               placeholder="123 Main St"
+              className="min-h-[48px]"
             />
           </div>
           <div className="grid gap-2">
@@ -386,9 +420,10 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
               value={line2}
               onChange={(e) => setLine2(e.target.value)}
               placeholder="Unit 4"
+              className="min-h-[48px]"
             />
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="grid gap-2">
               <Label htmlFor="edit-city">City *</Label>
               <Input
@@ -396,6 +431,7 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="City"
+                className="min-h-[48px]"
               />
             </div>
             <div className="grid gap-2">
@@ -406,6 +442,7 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
                 onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="TX"
                 maxLength={2}
+                className="min-h-[48px]"
               />
             </div>
             <div className="grid gap-2">
@@ -415,6 +452,7 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
                 value={postalCode}
                 onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="12345"
+                className="min-h-[48px]"
               />
             </div>
           </div>
@@ -425,6 +463,7 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Gate code, special instructions"
+              className="min-h-[48px]"
             />
           </div>
           <div className="grid gap-2">
@@ -434,14 +473,15 @@ function EditAddressDialog({ address, open, onOpenChange, userId, onSaved, onErr
               value={gateCode}
               onChange={(e) => setGateCode(e.target.value)}
               placeholder="1234"
+              className="min-h-[48px]"
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+          <Button type="button" variant="outline" className="w-full sm:w-auto min-h-[48px] touch-manipulation" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleSave} disabled={!valid || saving}>
+          <Button type="button" onClick={handleSave} disabled={!valid || saving} className="w-full sm:w-auto min-h-[48px] touch-manipulation">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Save changes
           </Button>

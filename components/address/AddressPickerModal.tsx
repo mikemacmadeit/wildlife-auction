@@ -288,11 +288,11 @@ export function AddressPickerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        overlayClassName="max-sm:top-16 max-sm:bottom-16 max-sm:left-0 max-sm:right-0"
-        className="flex flex-col w-[calc(100%-1.5rem)] max-w-lg sm:max-w-xl mx-auto pl-5 pr-11 sm:pl-6 sm:pr-6 pt-4 pb-4 sm:pt-6 sm:pb-6 gap-3 sm:gap-4 max-sm:max-h-[calc(100dvh-8rem)] sm:max-h-[90vh] overflow-hidden rounded-xl"
+        overlayClassName="max-sm:top-0 max-sm:bottom-0 max-sm:left-0 max-sm:right-0"
+        className="flex flex-col w-[calc(100%-1rem)] max-w-lg sm:max-w-xl mx-auto pl-5 pr-11 sm:pl-6 sm:pr-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-6 sm:pb-6 gap-3 sm:gap-4 overflow-hidden rounded-xl max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:right-0 max-sm:w-full max-sm:max-h-[92dvh] max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:translate-x-0 max-sm:translate-y-0 sm:max-h-[90vh]"
       >
         <DialogHeader className="flex-shrink-0 space-y-1.5 text-left">
-          <DialogTitle className="text-base sm:text-lg pr-6">Set delivery address</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg pr-8">Set delivery address</DialogTitle>
           <DialogDescription className="text-left text-xs sm:text-sm">
             {manualOnly
               ? 'Manual entry only. Enable Maps + Places on your API key (NEXT_PUBLIC_GOOGLE_MAPS_KEY or NEXT_PUBLIC_FIREBASE_API_KEY) and restart to use address search and map (HEB-style).'
@@ -300,7 +300,7 @@ export function AddressPickerModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 overscroll-contain">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 overscroll-contain touch-pan-y">
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</p>
           )}
@@ -320,7 +320,7 @@ export function AddressPickerModal({
                         <Button
                           type="button"
                           variant={selectedAddressId === a.id ? 'secondary' : 'outline'}
-                          className="w-full justify-start text-left h-auto py-3 px-3"
+                          className="w-full justify-start text-left h-auto min-h-[48px] py-3 px-3 touch-manipulation"
                           disabled={saving}
                           onClick={() => handleUseSaved(a)}
                         >
@@ -352,7 +352,7 @@ export function AddressPickerModal({
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full min-h-[48px] touch-manipulation"
                 onClick={() => setAddingNew(true)}
                 disabled={saving}
               >
@@ -373,7 +373,7 @@ export function AddressPickerModal({
                     value={newAddressLabel}
                     onChange={(e) => setNewAddressLabel(e.target.value)}
                     placeholder="Home, Ranch, Office…"
-                    className="mt-1 w-full min-w-0"
+                    className="mt-1 w-full min-w-0 min-h-[48px]"
                   />
                 </div>
                 <div>
@@ -382,7 +382,7 @@ export function AddressPickerModal({
                     value={manualForm.line1}
                     onChange={(e) => setManualForm((f) => ({ ...f, line1: e.target.value }))}
                     placeholder="123 Main St"
-                    className="mt-1 w-full min-w-0"
+                    className="mt-1 w-full min-w-0 min-h-[48px]"
                   />
                 </div>
                 <div>
@@ -391,7 +391,7 @@ export function AddressPickerModal({
                     value={manualForm.line2}
                     onChange={(e) => setManualForm((f) => ({ ...f, line2: e.target.value }))}
                     placeholder="Unit 4"
-                    className="mt-1 w-full min-w-0"
+                    className="mt-1 w-full min-w-0 min-h-[48px]"
                   />
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-3 sm:gap-x-2">
@@ -401,7 +401,7 @@ export function AddressPickerModal({
                       value={manualForm.city}
                       onChange={(e) => setManualForm((f) => ({ ...f, city: e.target.value }))}
                       placeholder="City"
-                      className="mt-1 w-full min-w-0"
+                      className="mt-1 w-full min-w-0 min-h-[48px]"
                     />
                   </div>
                   <div className="w-16 shrink-0">
@@ -410,7 +410,7 @@ export function AddressPickerModal({
                       value={manualForm.state}
                       onChange={(e) => setManualForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
                       placeholder="TX"
-                      className="mt-1 w-full"
+                      className="mt-1 w-full min-h-[48px]"
                     />
                   </div>
                   <div className="w-24 shrink-0">
@@ -419,7 +419,7 @@ export function AddressPickerModal({
                       value={manualForm.zip}
                       onChange={(e) => setManualForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
                       placeholder="12345"
-                      className="mt-1 w-full"
+                      className="mt-1 w-full min-h-[48px]"
                     />
                   </div>
                 </div>
@@ -429,14 +429,14 @@ export function AddressPickerModal({
                     value={manualForm.deliveryInstructions}
                     onChange={(e) => setManualForm((f) => ({ ...f, deliveryInstructions: e.target.value }))}
                     placeholder="Gate code, gate left open, etc."
-                    className="mt-1 w-full min-w-0"
+                    className="mt-1 w-full min-w-0 min-h-[48px]"
                   />
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto min-h-[48px] touch-manipulation"
                   disabled={locationLoading || saving}
                   onClick={useMyLocation}
                 >
@@ -449,13 +449,14 @@ export function AddressPickerModal({
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="ghost" onClick={handleBackToList}>
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:flex-wrap">
+                <Button type="button" variant="ghost" className="min-h-[48px] touch-manipulation w-full sm:w-auto" onClick={handleBackToList}>
                   Back to list
                 </Button>
                 <Button
                   type="button"
                   disabled={!manualValid || saving}
+                  className="min-h-[48px] touch-manipulation w-full sm:w-auto"
                   onClick={handleManualSubmit}
                 >
                   {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -470,7 +471,7 @@ export function AddressPickerModal({
                 placeholder="Search for an address…"
                 disabled={saving}
               />
-              <Button type="button" variant="ghost" onClick={handleBackToList}>
+              <Button type="button" variant="ghost" className="min-h-[48px] touch-manipulation w-full sm:w-auto" onClick={handleBackToList}>
                 Back to list
               </Button>
             </div>
@@ -482,7 +483,7 @@ export function AddressPickerModal({
                   value={newAddressLabel}
                   onChange={(e) => setNewAddressLabel(e.target.value)}
                   placeholder="Home, Ranch, Office…"
-                  className="mt-1 w-full min-w-0"
+                  className="mt-1 w-full min-w-0 min-h-[48px]"
                 />
               </div>
               <AddressMapConfirm
@@ -491,7 +492,7 @@ export function AddressPickerModal({
                 formattedAddress={searchResult.formattedAddress}
                 onConfirm={handleMapConfirm}
                 secondaryAction={
-                  <Button type="button" variant="ghost" onClick={handleBackToSearch}>
+                  <Button type="button" variant="ghost" className="min-h-[48px] touch-manipulation w-full sm:w-auto" onClick={handleBackToSearch}>
                     Back to search
                   </Button>
                 }

@@ -16,8 +16,8 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { isValidNonEpochDate } from '@/lib/utils';
 import type { Order } from '@/lib/types';
-import { getEffectiveTransactionStatus } from '@/lib/orders/status';
-import { requiresSellerAction, requiresBuyerAction } from '@/lib/orders/status';
+import { getEffectiveTransactionStatus, requiresSellerAction, requiresBuyerAction } from '@/lib/orders/status';
+import { ORDER_COPY } from '@/lib/orders/copy';
 
 export type NextActionRole = 'buyer' | 'seller';
 
@@ -117,10 +117,10 @@ export function NextActionBanner({
       }
       if (txStatus === 'DELIVERY_PROPOSED') {
         return {
-          title: 'Action required: Agree to delivery window',
-          description: 'Seller proposed delivery windows. Agree to one that works for you.',
+          title: `Action required: ${ORDER_COPY.chooseDeliveryDate.title}`,
+          description: ORDER_COPY.chooseDeliveryDate.description,
           urgency: 'normal',
-          ctaLabel: 'Agree to Window',
+          ctaLabel: ORDER_COPY.actions.chooseDeliveryDate,
           icon: <CheckCircle2 className="h-5 w-5" />,
         };
       }

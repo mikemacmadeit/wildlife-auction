@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "liveLocations": {
+      "$orderId": {
+        ".read": "auth != null && root.child('trackingAccess').child($orderId).child('enabled').val() === true && (auth.uid === root.child('trackingAccess').child($orderId).child('buyerUid').val() || auth.uid === root.child('trackingAccess').child($orderId).child('sellerUid').val() || auth.uid === root.child('trackingAccess').child($orderId).child('driverUid').val())",
+        ".write": "auth != null && root.child('trackingAccess').child($orderId).child('enabled').val() === true && auth.uid === root.child('trackingAccess').child($orderId).child('driverUid').val()"
+      }
+    },
+    "trackingAccess": {
+      "$orderId": {
+        ".read": "auth != null && (auth.uid === data.child('buyerUid').val() || auth.uid === data.child('sellerUid').val() || auth.uid === data.child('driverUid').val())",
+        ".write": "false"
+      }
+    }
+  }
+}

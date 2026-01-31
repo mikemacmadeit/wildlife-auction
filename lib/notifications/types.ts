@@ -38,6 +38,8 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.DeliveryScheduled', // Seller proposed/scheduled delivery (SELLER_TRANSPORT)
   'Order.DeliveryAgreed', // Buyer agreed to delivery window (SELLER_TRANSPORT)
   'Order.DeliveryAddressSet', // Buyer set delivery address; seller can now propose date (SELLER_TRANSPORT)
+  'Order.DeliveryTrackingStarted', // Seller started live delivery tracking (buyer can watch map)
+  'Order.DeliveryTrackingStopped', // Seller stopped tracking or marked delivered
   'Order.PickupReady', // Seller set pickup info (BUYER_TRANSPORT)
   'Order.PickupWindowSelected', // Buyer selected pickup window (BUYER_TRANSPORT)
   'Order.PickupWindowAgreed', // Seller agreed to pickup window (BUYER_TRANSPORT)
@@ -284,6 +286,21 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       orderUrl: string;
+    }
+  | {
+      type: 'Order.DeliveryTrackingStarted';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+    }
+  | {
+      type: 'Order.DeliveryTrackingStopped';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      orderUrl: string;
+      delivered?: boolean;
     }
   | {
       type: 'Order.PickupReady';

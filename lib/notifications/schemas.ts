@@ -172,6 +172,21 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     orderUrl: urlSchema,
   }),
   z.object({
+    type: z.literal('Order.DeliveryTrackingStarted'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    orderUrl: urlSchema,
+  }),
+  z.object({
+    type: z.literal('Order.DeliveryTrackingStopped'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    orderUrl: urlSchema,
+    delivered: z.boolean().optional(),
+  }),
+  z.object({
     type: z.literal('Payout.Released'),
     orderId: baseString,
     listingId: baseString,

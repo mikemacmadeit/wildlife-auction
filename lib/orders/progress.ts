@@ -124,17 +124,17 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
       isCurrent: txStatus === 'FULFILLMENT_REQUIRED' && hasBuyerAddress && !deliveryProposed,
       isBlocked: txStatus === 'AWAITING_TRANSFER_COMPLIANCE' || (txStatus === 'FULFILLMENT_REQUIRED' && !hasBuyerAddress),
       ownerRole: 'seller',
-      helpText: 'Propose delivery windows. Buyer confirms a date that works.',
+      helpText: 'Propose delivery times. Buyer will choose one that works.',
     });
 
     milestones.push({
       key: 'agree_delivery',
-      label: 'Buyer agrees to delivery',
+      label: 'Choose delivery date',
       isComplete: deliveryScheduled,
       isCurrent: txStatus === 'DELIVERY_PROPOSED' && !deliveryScheduled,
       isBlocked: false,
       ownerRole: 'buyer',
-      helpText: 'Agree to a proposed delivery window.',
+      helpText: 'Pick one of the seller’s proposed delivery times.',
     });
 
     milestones.push({
@@ -280,10 +280,10 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
     if (txStatus === 'DELIVERY_PROPOSED') {
       return {
-        title: 'Agree to delivery window',
-        description: 'Seller proposed delivery windows. Agree to one that works for you.',
-        ctaLabel: 'Agree to window',
-        ctaAction: `/dashboard/orders/${order.id}#agree-delivery`,
+        title: ORDER_COPY.chooseDeliveryDate.title,
+        description: ORDER_COPY.chooseDeliveryDate.description,
+        ctaLabel: ORDER_COPY.actions.chooseDeliveryDate,
+        ctaAction: `/dashboard/orders/${order.id}#choose-delivery-date`,
         severity: 'warning',
         ownerRole: 'buyer',
       };
@@ -336,7 +336,7 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
       }
       return {
         title: 'Propose delivery date',
-        description: 'Propose delivery windows. Buyer will confirm a date that works.',
+        description: 'Propose delivery times. Buyer will choose one that works.',
         ctaLabel: ORDER_COPY.actions.scheduleDelivery,
         ctaAction: `/seller/orders/${order.id}#schedule-delivery`,
         severity: 'warning',
@@ -346,9 +346,9 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
     if (txStatus === 'DELIVERY_PROPOSED') {
       return {
-        title: 'Waiting on buyer',
-        description: 'Buyer must agree to a delivery window. You will be notified.',
-        ctaLabel: 'View Details',
+        title: ORDER_COPY.chooseDeliveryDate.waitingForBuyer,
+        description: ORDER_COPY.chooseDeliveryDate.waitingForBuyerDescription,
+        ctaLabel: 'View order',
         ctaAction: `/seller/orders/${order.id}`,
         severity: 'info',
         ownerRole: 'buyer',

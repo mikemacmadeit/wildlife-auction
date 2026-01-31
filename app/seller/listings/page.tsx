@@ -47,6 +47,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 
 // Helper functions outside component to prevent recreation on every render
@@ -547,6 +549,9 @@ function SellerListingsPageContent() {
   // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [publishAckModalOpen, setPublishAckModalOpen] = useState(false);
+  const [publishAckModalChecked, setPublishAckModalChecked] = useState(false);
+  const [listingToPublish, setListingToPublish] = useState<Listing | null>(null);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -824,49 +829,55 @@ function SellerListingsPageContent() {
     [user?.uid, toast, refreshListings]
   );
 
-  const handlePublish = useCallback(
-    async (listing: Listing) => {
-      if (!user?.uid) return;
-      if (listing.status !== 'draft') {
-        toast({
-          title: 'Publish not available',
-          description: `This listing is ${listing.status}.`,
-          variant: 'destructive',
-        });
-        return;
+  const handlePublish = useCallback((listing: Listing) => {
+    if (!user?.uid) return;
+    if (listing.status !== 'draft') {
+      toast({
+        title: 'Publish not available',
+        description: `This listing is ${listing.status}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    setListingToPublish(listing);
+    setPublishAckModalChecked(false);
+    setPublishAckModalOpen(true);
+  }, [user?.uid, toast]);
+
+  const confirmPublish = useCallback(async () => {
+    if (!user?.uid || !listingToPublish) return;
+    try {
+      setActionLoading(listingToPublish.id);
+      const result = await publishListing(user.uid, listingToPublish.id);
+
+      setPublishAckModalOpen(false);
+      setListingToPublish(null);
+      setPublishAckModalChecked(false);
+
+      if (statusFilter === 'draft') {
+        setStatusFilter('all');
       }
 
-      try {
-        setActionLoading(listing.id);
-        const result = await publishListing(user.uid, listing.id);
+      toast({
+        title: result?.pendingReview ? 'Submitted for review' : 'Listing published',
+        description: result?.pendingReview
+          ? result?.pendingReason === 'admin_approval'
+            ? 'Your listing is pending admin approval.'
+            : 'Your listing is pending compliance review.'
+          : 'Your listing is now live.',
+      });
 
-        // If they were filtering to Draft only, switch to All so they can see the new status.
-        if (statusFilter === 'draft') {
-          setStatusFilter('all');
-        }
-
-        toast({
-          title: result?.pendingReview ? 'Submitted for review' : 'Listing published',
-          description: result?.pendingReview
-            ? result?.pendingReason === 'admin_approval'
-              ? 'Your listing is pending admin approval.'
-              : 'Your listing is pending compliance review.'
-            : 'Your listing is now live.',
-        });
-
-        await refreshListings();
-      } catch (err: any) {
-        toast({
-          title: 'Error publishing listing',
-          description: err?.message || 'Failed to publish listing. Please try again.',
-          variant: 'destructive',
-        });
-      } finally {
-        setActionLoading(null);
-      }
-    },
-    [user?.uid, toast, refreshListings, statusFilter]
-  );
+      await refreshListings();
+    } catch (err: any) {
+      toast({
+        title: 'Error publishing listing',
+        description: err?.message || 'Failed to publish listing. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }, [user?.uid, listingToPublish, toast, refreshListings, statusFilter]);
 
   const canResubmit = useCallback(
     (listing: Listing) => {
@@ -1287,6 +1298,127 @@ function SellerListingsPageContent() {
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Permanently
                   </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Publish: Seller acknowledgment / terms of service */}
+        <Dialog
+          open={publishAckModalOpen}
+          onOpenChange={(open) => {
+            setPublishAckModalOpen(open);
+            if (!open) {
+              setListingToPublish(null);
+              setPublishAckModalChecked(false);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Seller acknowledgment</DialogTitle>
+              <DialogDescription>
+                You must accept this acknowledgment to publish an animal listing.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 overflow-y-auto flex-1 px-1">
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-3 md:p-4">
+                <div className="flex items-start gap-2 md:gap-3">
+                  <Checkbox
+                    id="seller-ack-publish-listings"
+                    className="mt-1 min-h-[20px] min-w-[20px]"
+                    checked={publishAckModalChecked}
+                    onCheckedChange={(checked) => setPublishAckModalChecked(Boolean(checked))}
+                  />
+                  <Label htmlFor="seller-ack-publish-listings" className="cursor-pointer leading-relaxed text-sm">
+                    <div className="space-y-2">
+                      <div>
+                        I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
+                        Agchange does not take custody of animals.
+                      </div>
+                      {listingToPublish?.category === 'sporting_working_dogs' && (
+                        <div className="mt-2 pt-2 border-t border-border/40">
+                          <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                          <div className="text-xs md:text-sm space-y-1">
+                            <div>• I have accurately disclosed identification details (if applicable).</div>
+                            <div>• I have disclosed any known health issues and represented the dog honestly.</div>
+                            <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                          </div>
+                        </div>
+                      )}
+                      {listingToPublish?.category === 'wildlife_exotics' && (
+                        <div className="mt-2 pt-2 border-t border-border/40">
+                          <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                          <div className="text-xs md:text-sm space-y-1">
+                            <div>• I confirm that animals are properly identified/tagged as required by TAHC regulations.</div>
+                            <div>• I acknowledge health disclosure requirements for registered livestock.</div>
+                            <div>• I confirm that transfer is Texas-only unless otherwise permitted by regulations.</div>
+                          </div>
+                        </div>
+                      )}
+                      {listingToPublish?.category === 'cattle_livestock' && (
+                        <div className="mt-2 pt-2 border-t border-border/40">
+                          <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                          <div className="text-xs md:text-sm space-y-1">
+                            <div>• I confirm that animals have proper ear tags/brand identification as required.</div>
+                            <div>• I acknowledge health disclosure requirements for cattle.</div>
+                          </div>
+                        </div>
+                      )}
+                      {listingToPublish?.category === 'farm_animals' && (
+                        <div className="mt-2 pt-2 border-t border-border/40">
+                          <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                          <div className="text-xs md:text-sm space-y-1">
+                            <div>• I confirm that animals are properly identified (ear tags, tattoos, or other as required).</div>
+                            <div>• I acknowledge health disclosure requirements for farm animals.</div>
+                          </div>
+                        </div>
+                      )}
+                      {listingToPublish?.category === 'horse_equestrian' && (
+                        <div className="mt-2 pt-2 border-t border-border/40">
+                          <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                          <div className="text-xs md:text-sm space-y-1">
+                            <div>• I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).</div>
+                            <div>• I have disclosed any known health issues and represented the horse honestly.</div>
+                            <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                            <div>• I disclose any liens/encumbrances (or confirm there are none).</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Label>
+                </div>
+              </div>
+              <div className="text-xs md:text-sm text-muted-foreground px-1">
+                After you publish, your listing will be submitted for review and approval.
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0 flex-shrink-0">
+              <Button
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={() => {
+                  setPublishAckModalOpen(false);
+                  setListingToPublish(null);
+                  setPublishAckModalChecked(false);
+                }}
+                disabled={actionLoading === listingToPublish?.id}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="min-h-[44px]"
+                disabled={!publishAckModalChecked || actionLoading === listingToPublish?.id}
+                onClick={() => confirmPublish()}
+              >
+                {actionLoading === listingToPublish?.id ? (
+                  <>
+                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2" />
+                    Publishing...
+                  </>
+                ) : (
+                  'Publish'
                 )}
               </Button>
             </DialogFooter>

@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getDatabase } from 'firebase-admin/database';
 import fs from 'fs';
 import path from 'path';
 import { createPrivateKey } from 'crypto';
@@ -200,15 +201,34 @@ export function getAdminApp(): App {
     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ||
     (projectId ? `${projectId}.firebasestorage.app` : undefined);
 
+  // Realtime Database URL for live delivery tracking (optional)
+  const databaseURL =
+    process.env.FIREBASE_DATABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.trim() ||
+    (projectId ? `https://${projectId}-default-rtdb.firebaseio.com` : undefined);
+
   // If not configured, fall back to ADC (may work on some platforms). Prefer explicit credentials in prod.
   // storageBucket is required for getStorage().bucket() (e.g. wire/checkout Bill of Sale generation).
   adminApp = serviceAccount
     ? initializeApp({
         credential: cert(serviceAccount as any),
         ...(storageBucket && { storageBucket }),
+        ...(databaseURL && { databaseURL }),
       })
-    : initializeApp();
+    : initializeApp({ ...(databaseURL && { databaseURL }) });
   return adminApp;
+}
+
+/**
+ * Get Firebase Admin Realtime Database. Used by start/stop delivery tracking API routes.
+ * Returns null if databaseURL was not set (delivery tracking disabled).
+ */
+export function getAdminDatabase(): ReturnType<typeof getDatabase> | null {
+  try {
+    return getDatabase(getAdminApp());
+  } catch {
+    return null;
+  }
 }
 
 export function getAdminAuth() {
