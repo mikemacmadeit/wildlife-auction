@@ -25,6 +25,7 @@ import {
   ListingAttributes,
   WildlifeAttributes,
   CattleAttributes,
+  FarmAnimalAttributes,
   EquipmentAttributes,
   WhitetailBreederAttributes,
   SportingWorkingDogAttributes,
@@ -81,6 +82,7 @@ function categoryRequiresQuantity(category: ListingCategory | ''): boolean {
     category === 'whitetail_breeder' ||
     category === 'wildlife_exotics' ||
     category === 'cattle_livestock' ||
+    category === 'farm_animals' ||
     category === 'horse_equestrian' ||
     category === 'sporting_working_dogs' ||
     category === 'hunting_outfitter_assets' ||
@@ -142,7 +144,7 @@ function NewListingPageContent() {
       offerExpiryHours: number;
     };
     // Union (not intersection): attributes vary by category.
-    attributes: Partial<WildlifeAttributes | CattleAttributes | SportingWorkingDogAttributes | EquipmentAttributes | WhitetailBreederAttributes>;
+    attributes: Partial<WildlifeAttributes | CattleAttributes | FarmAnimalAttributes | SportingWorkingDogAttributes | EquipmentAttributes | WhitetailBreederAttributes>;
   }>({
     category: '',
     type: '',
@@ -981,9 +983,74 @@ function NewListingPageContent() {
                     />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="text-base font-bold leading-tight">Cattle &amp; Livestock</h3>
+                    <h3 className="text-base font-bold leading-tight">Cattle</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
-                      Cattle, bulls, cows, heifers, and registered livestock
+                      Bulls, cows, heifers, and steers
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              role="button"
+              tabIndex={0}
+              aria-pressed={formData.category === 'farm_animals'}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFormData({
+                    ...formData,
+                    category: 'farm_animals',
+                    location: { ...formData.location, state: 'TX' },
+                    attributes: { ...formData.attributes, quantity: 1 },
+                  });
+                }
+              }}
+              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                formData.category === 'farm_animals'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
+              }`}
+              onClick={() => {
+                setFormData({
+                  ...formData,
+                  category: 'farm_animals',
+                  location: { ...formData.location, state: 'TX' },
+                  attributes: { ...formData.attributes, quantity: 1 },
+                });
+              }}
+            >
+              <CardContent className="p-4">
+                {formData.category === 'farm_animals' && (
+                  <div className="absolute top-3 right-3">
+                    <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                  <div className="flex-shrink-0">
+                    <div
+                      className="w-12 h-12"
+                      style={{
+                        WebkitMaskImage: `url('/images/Bull Icon.png')`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url('/images/Bull Icon.png')`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        backgroundColor: 'hsl(var(--primary))',
+                        opacity: 0.9,
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-base font-bold leading-tight">Farm Animals</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      Goats, sheep, pigs, alpacas, and other farm animals
                     </p>
                   </div>
                 </div>
@@ -1261,7 +1328,6 @@ function NewListingPageContent() {
                 const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
                 if (!attrs.breed?.trim()) errs.push('Breed');
                 if (isSingle && !attrs.sex) errs.push('Sex');
-                if ((attrs as any).registered !== true && (attrs as any).registered !== false) errs.push('Registered');
                 if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
                 const hasAge =
                   typeof (attrs as any).age === 'number'
@@ -1269,6 +1335,16 @@ function NewListingPageContent() {
                     : !!String((attrs as any).age || '').trim();
                 const hasWeight = !!String(attrs.weightRange || '').trim();
                 if (!hasAge && !hasWeight) errs.push('Age or Weight Range');
+                return errs;
+              }
+              if (formData.category === 'farm_animals') {
+                const attrs = formData.attributes as Partial<FarmAnimalAttributes>;
+                const errs: string[] = [];
+                const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
+                if (!attrs.speciesId?.trim()) errs.push('Species');
+                if (!attrs.breed?.trim()) errs.push('Breed');
+                if (isSingle && !attrs.sex) errs.push('Sex');
+                if (!attrs.quantity || attrs.quantity < 1) errs.push('Quantity (must be at least 1)');
                 return errs;
               }
               if (formData.category === 'horse_equestrian') {
@@ -1419,15 +1495,32 @@ function NewListingPageContent() {
           const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
           if (!attrs.breed?.trim()) errors.push('Breed');
           if (isSingle && !attrs.sex) errors.push('Sex');
-          if ((attrs as any).registered !== true && (attrs as any).registered !== false) errors.push('Registered');
           if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity by sex (total must be at least 1)');
-          // Disclosures are now handled in the final seller acknowledgment step, not in step validation
           const hasAge =
             typeof (attrs as any).age === 'number'
               ? Number.isFinite((attrs as any).age)
               : !!String((attrs as any).age || '').trim();
           const hasWeight = !!String(attrs.weightRange || '').trim();
           if (!hasAge && !hasWeight) errors.push('Age or Weight Range');
+          if (errors.length) {
+            const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
+            toast({
+              title: 'More information needed',
+              description: `To continue, please fill in: ${list}.`,
+              variant: 'destructive',
+            });
+            return false;
+          }
+          return true;
+        }
+        if (formData.category === 'farm_animals') {
+          const attrs = formData.attributes as Partial<FarmAnimalAttributes>;
+          const errors: string[] = [];
+          const isSingle = isSingleAnimalListing((attrs as any).quantityMode, (attrs as any).quantity);
+          if (!attrs.speciesId?.trim()) errors.push('Species');
+          if (!attrs.breed?.trim()) errors.push('Breed');
+          if (isSingle && !attrs.sex) errors.push('Sex');
+          if (!attrs.quantity || attrs.quantity < 1) errors.push('Quantity (must be at least 1)');
           if (errors.length) {
             const list = errors.length > 1 ? errors.slice(0, -1).join(', ') + ', and ' + errors[errors.length - 1] : errors[0];
             toast({
@@ -1899,7 +1992,7 @@ function NewListingPageContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="state" className="text-base font-semibold">State</Label>
-              {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) ? (
+              {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock', 'farm_animals'].includes(formData.category) ? (
                 <>
                   <Input
                     id="state"
@@ -2670,6 +2763,9 @@ function NewListingPageContent() {
         } else if (formData.category === 'cattle_livestock') {
           normalizedAttributes.identificationDisclosure = true;
           normalizedAttributes.healthDisclosure = true;
+        } else if (formData.category === 'farm_animals') {
+          normalizedAttributes.identificationDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
         } else if (formData.category === 'horse_equestrian') {
           // Horse disclosures are nested in a disclosures object
           normalizedAttributes.disclosures = {
@@ -2950,6 +3046,9 @@ function NewListingPageContent() {
           normalizedAttributes.healthDisclosure = true;
           normalizedAttributes.transportDisclosure = true;
         } else if (formData.category === 'cattle_livestock') {
+          normalizedAttributes.identificationDisclosure = true;
+          normalizedAttributes.healthDisclosure = true;
+        } else if (formData.category === 'farm_animals') {
           normalizedAttributes.identificationDisclosure = true;
           normalizedAttributes.healthDisclosure = true;
         } else if (formData.category === 'horse_equestrian') {
@@ -3268,7 +3367,16 @@ function NewListingPageContent() {
                         <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
                         <div className="text-xs md:text-sm space-y-1">
                           <div>• I confirm that animals have proper ear tags/brand identification as required.</div>
-                          <div>• I acknowledge health disclosure requirements for livestock.</div>
+                          <div>• I acknowledge health disclosure requirements for cattle.</div>
+                        </div>
+                      </div>
+                    )}
+                    {formData.category === 'farm_animals' && (
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="font-medium mb-1.5 text-xs md:text-sm">Required disclosures:</div>
+                        <div className="text-xs md:text-sm space-y-1">
+                          <div>• I confirm that animals are properly identified (ear tags, tattoos, or other as required).</div>
+                          <div>• I acknowledge health disclosure requirements for farm animals.</div>
                         </div>
                       </div>
                     )}
@@ -3327,6 +3435,9 @@ function NewListingPageContent() {
                 } else if (category === 'cattle_livestock') {
                   updatedAttributes.identificationDisclosure = true;
                   updatedAttributes.healthDisclosure = true;
+                } else if (category === 'farm_animals') {
+                  updatedAttributes.identificationDisclosure = true;
+                  updatedAttributes.healthDisclosure = true;
                 } else if (category === 'horse_equestrian') {
                   updatedAttributes.disclosures = {
                     ...(updatedAttributes.disclosures || {}),
@@ -3337,7 +3448,7 @@ function NewListingPageContent() {
                   };
                 }
 
-                if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'horse_equestrian') {
+                if (category === 'sporting_working_dogs' || category === 'wildlife_exotics' || category === 'cattle_livestock' || category === 'farm_animals' || category === 'horse_equestrian') {
                   setFormData({ ...formData, attributes: updatedAttributes });
                 }
 

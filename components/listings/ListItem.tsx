@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, CheckCircle2, Gavel, Tag, Clock, Heart } from 'lucide-react';
 import { format } from 'date-fns';
-import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, HorseAttributes, isGroupLotQuantityMode } from '@/lib/types';
+import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, FarmAnimalAttributes, HorseAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -116,6 +116,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     const qtyLabel = (() => {
       if (isGroupLot || !quantity || quantity < 1) return null;
       if (listing.category === 'cattle_livestock') return `${quantity} head`;
+      if (listing.category === 'farm_animals') return `${quantity} animal${quantity === 1 ? '' : 's'}`;
       if (listing.category === 'sporting_working_dogs') return `${quantity} dog${quantity === 1 ? '' : 's'}`;
       if (listing.category === 'horse_equestrian') return `${quantity} horse${quantity === 1 ? '' : 's'}`;
       if (listing.category === 'whitetail_breeder' || listing.category === 'wildlife_exotics') return `${quantity} animal${quantity === 1 ? '' : 's'}`;
@@ -165,6 +166,18 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
         sexRaw ? titleCase(sexRaw) : null;
 
       const parts = [breed || null, sexLabel, ageLabel, qtyLabel].filter(Boolean) as string[];
+      return parts.length ? parts : null;
+    }
+
+    // Farm animals: species + breed + sex (and age/weight if present)
+    if (listing.category === 'farm_animals') {
+      const fa = attrs as FarmAnimalAttributes;
+      const speciesLabel = fa.speciesId ? titleCase(String(fa.speciesId).replace(/_/g, ' ')) : null;
+      const breedLabel = fa.breed ? String(fa.breed).trim() : null;
+      const sexRaw = fa.sex ? String(fa.sex).trim() : '';
+      const sexLabel = sexRaw === 'male' ? 'Male' : sexRaw === 'female' ? 'Female' : sexRaw === 'unknown' ? null : titleCase(sexRaw);
+      const ageLabel = formatAge(fa.age) || (fa.weightRange ? String(fa.weightRange).trim() : null);
+      const parts = [speciesLabel, breedLabel, sexLabel, ageLabel, qtyLabel].filter(Boolean) as string[];
       return parts.length ? parts : null;
     }
 

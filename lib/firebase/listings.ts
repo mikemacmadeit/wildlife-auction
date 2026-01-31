@@ -241,6 +241,16 @@ function migrateAttributes(doc: ListingDoc & { id: string }): ListingAttributes 
       healthDisclosure: true,
       healthNotes: oldMetadata?.healthStatus ? String(oldMetadata.healthStatus) : undefined,
     } as ListingAttributes;
+  } else if (mappedCategory === 'farm_animals') {
+    return {
+      speciesId: String(oldMetadata?.speciesId || 'goat'),
+      breed: String(oldMetadata?.breed || ''),
+      sex: 'unknown',
+      quantity: Number(oldMetadata?.quantity || 1),
+      identificationDisclosure: true,
+      healthDisclosure: true,
+      healthNotes: oldMetadata?.healthStatus ? String(oldMetadata.healthStatus) : undefined,
+    } as ListingAttributes;
   } else {
     // ranch_equipment
     return {

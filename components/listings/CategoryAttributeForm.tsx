@@ -10,6 +10,7 @@ import {
   ListingCategory,
   WildlifeAttributes,
   CattleAttributes,
+  FarmAnimalAttributes,
   EquipmentAttributes,
   WhitetailBreederAttributes,
   HorseAttributes,
@@ -27,6 +28,7 @@ import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CATTLE_BREED_OPTIONS } from '@/lib/taxonomy/cattle-breeds';
+import { FARM_ANIMAL_SPECIES_OPTIONS } from '@/lib/taxonomy/farm-animal-species';
 import { DOG_BREED_OPTIONS } from '@/lib/taxonomy/dog-breeds';
 import { getEquipmentMakeOptions, getEquipmentModelSuggestions } from '@/lib/taxonomy/equipment-makes';
 import { EXOTIC_SPECIES_OPTIONS } from '@/lib/taxonomy/exotic-species';
@@ -34,6 +36,7 @@ import { EXOTIC_SPECIES_OPTIONS } from '@/lib/taxonomy/exotic-species';
 type ListingAttributes =
   | WildlifeAttributes
   | CattleAttributes
+  | FarmAnimalAttributes
   | EquipmentAttributes
   | WhitetailBreederAttributes
   | HorseAttributes
@@ -70,6 +73,7 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
       category === 'whitetail_breeder' ||
       category === 'wildlife_exotics' ||
       category === 'cattle_livestock' ||
+      category === 'farm_animals' ||
       category === 'horse_equestrian' ||
       category === 'sporting_working_dogs' ||
       category === 'hunting_outfitter_assets' ||
@@ -171,14 +175,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </Alert>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Species <span className="text-destructive">*</span>
-          </Label>
-          <Input value="Horse" disabled className="min-h-[48px] text-base bg-muted" />
-          <p className="text-xs text-muted-foreground">Species is fixed as Horse for this category.</p>
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
             value={normalizeQuantityMode((attributes as Partial<HorseAttributes>).quantityMode, (attributes as Partial<HorseAttributes>).quantity)}
@@ -217,6 +213,14 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               </Label>
             </div>
           </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">
+            Species <span className="text-destructive">*</span>
+          </Label>
+          <Input value="Horse" disabled className="min-h-[48px] text-base bg-muted" />
+          <p className="text-xs text-muted-foreground">Species is fixed as Horse for this category.</p>
         </div>
 
         {normalizeQuantityMode((attributes as Partial<HorseAttributes>).quantityMode, (attributes as Partial<HorseAttributes>).quantity) === 'single' && (
@@ -439,6 +443,45 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </Alert>
 
         <div className="space-y-2">
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
+          <RadioGroup
+            value={normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<WhitetailBreederAttributes>;
+              const sex = a.sex ?? 'unknown';
+              if (v === 'single') {
+                onChange({ ...a, quantityMode: 'single', quantity: 1, quantityMale: sex === 'male' ? 1 : 0, quantityFemale: sex === 'female' ? 1 : 0 } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
+            className="flex flex-col gap-2"
+          >
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="single" id="whitetail-qty-single" className="mt-0.5" />
+              <Label htmlFor="whitetail-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="fixed_group" id="whitetail-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="whitetail-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="whitetail-qty-lot" className="mt-0.5" />
+              <Label htmlFor="whitetail-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="whitetail-species" className="text-base font-semibold">
             Species <span className="text-destructive">*</span>
           </Label>
@@ -602,45 +645,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
           </>
         )}
 
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">How is this listing sold?</Label>
-          <RadioGroup
-            value={normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity)}
-            onValueChange={(v: QuantityModeNew) => {
-              const a = attributes as Partial<WhitetailBreederAttributes>;
-              const sex = a.sex ?? 'unknown';
-              if (v === 'single') {
-                onChange({ ...a, quantityMode: 'single', quantity: 1, quantityMale: sex === 'male' ? 1 : 0, quantityFemale: sex === 'female' ? 1 : 0 } as Partial<ListingAttributes>);
-              } else {
-                updateAttribute('quantityMode', v);
-              }
-            }}
-            className="flex flex-col gap-2"
-          >
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="single" id="whitetail-qty-single" className="mt-0.5" />
-              <Label htmlFor="whitetail-qty-single" className="cursor-pointer flex-1">
-                <div className="font-medium">Single Animal</div>
-                <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
-              </Label>
-            </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="whitetail-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="whitetail-qty-fixed" className="cursor-pointer flex-1">
-                <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
-              </Label>
-            </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="group_lot" id="whitetail-qty-lot" className="mt-0.5" />
-              <Label htmlFor="whitetail-qty-lot" className="cursor-pointer flex-1">
-                <div className="font-medium">Group Lot</div>
-                <div className="text-sm text-muted-foreground">All animals sold together for one total price. Quantity is for display only; buyers purchase the whole lot.</div>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-
         {normalizeQuantityMode((attributes as Partial<WhitetailBreederAttributes>).quantityMode, (attributes as Partial<WhitetailBreederAttributes>).quantity) !== 'single' && (
           <div className="space-y-2">
             <Label className="text-base font-semibold">
@@ -774,22 +778,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         </Alert>
 
         <div className="space-y-2">
-          <Label htmlFor="species-id" className="text-base font-semibold">
-            Species <span className="text-destructive">*</span>
-          </Label>
-          <SearchableSelect
-            value={(attributes as Partial<WildlifeAttributes>).speciesId || null}
-            onChange={(value) => updateAttribute('speciesId', value)}
-            options={EXOTIC_SPECIES_OPTIONS}
-            placeholder="Select species…"
-            searchPlaceholder="Search species…"
-          />
-          <p className="text-xs text-muted-foreground">
-            Note: Whitetail deer must be listed under "Whitetail Breeder" category.
-          </p>
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
             value={normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity)}
@@ -826,6 +814,22 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               </Label>
             </div>
           </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="species-id" className="text-base font-semibold">
+            Species <span className="text-destructive">*</span>
+          </Label>
+          <SearchableSelect
+            value={(attributes as Partial<WildlifeAttributes>).speciesId || null}
+            onChange={(value) => updateAttribute('speciesId', value)}
+            options={EXOTIC_SPECIES_OPTIONS}
+            placeholder="Select species…"
+            searchPlaceholder="Search species…"
+          />
+          <p className="text-xs text-muted-foreground">
+            Note: Whitetail deer must be listed under "Whitetail Breeder" category.
+          </p>
         </div>
 
         {normalizeQuantityMode((attributes as Partial<WildlifeAttributes>).quantityMode, (attributes as Partial<WildlifeAttributes>).quantity) === 'single' && (
@@ -981,40 +985,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="breed" className="text-base font-semibold">
-            Breed <span className="text-destructive">*</span>
-          </Label>
-          <SearchableSelect
-            value={(attributes as any)?.breed || null}
-            onChange={(v) => updateAttribute('breed', v)}
-            options={CATTLE_BREED_OPTIONS}
-            placeholder="Select breed…"
-            searchPlaceholder="Search breeds…"
-            buttonClassName={cn(
-              hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
-            )}
-          />
-          {String((attributes as any)?.breed || '') === 'other' ? (
-            <div className="mt-2 space-y-2">
-              <Label htmlFor="cattle-breed-other" className="text-sm font-semibold">
-                Breed (Other) <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="cattle-breed-other"
-                placeholder="Type the breed"
-                value={(attributes as any)?.breedOther || ''}
-                onChange={(e) => updateAttribute('breedOther', e.target.value)}
-                className={cn(
-                  'min-h-[48px] text-base',
-                  hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
-                )}
-              />
-            </div>
-          ) : null}
-          {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-base font-semibold">How is this listing sold?</Label>
           <RadioGroup
             value={normalizeQuantityMode((attributes as Partial<CattleAttributes>).quantityMode, (attributes as Partial<CattleAttributes>).quantity)}
@@ -1060,6 +1030,88 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               </Label>
             </div>
           </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="breed" className="text-base font-semibold">
+            Breed <span className="text-destructive">*</span>
+          </Label>
+          <SearchableSelect
+            value={(attributes as any)?.breed || null}
+            onChange={(v) => updateAttribute('breed', v)}
+            options={CATTLE_BREED_OPTIONS}
+            placeholder="Select breed…"
+            searchPlaceholder="Search breeds…"
+            buttonClassName={cn(
+              hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+            )}
+          />
+          {String((attributes as any)?.breed || '') === 'other' ? (
+            <div className="mt-2 space-y-2">
+              <Label htmlFor="cattle-breed-other" className="text-sm font-semibold">
+                Breed (Other) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cattle-breed-other"
+                placeholder="Type the breed"
+                value={(attributes as any)?.breedOther || ''}
+                onChange={(e) => updateAttribute('breedOther', e.target.value)}
+                className={cn(
+                  'min-h-[48px] text-base',
+                  hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : ''
+                )}
+              />
+            </div>
+          ) : null}
+          {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="cattle-registered" className="text-base font-semibold">
+            Registered <span className="text-destructive">*</span>
+          </Label>
+          <div className={cn('flex items-center gap-2 rounded-lg border p-3 bg-background/40 min-h-[44px]', hasError('Registered') ? 'border-destructive border-2' : 'border-border/60')}>
+            <Checkbox
+              id="cattle-registered"
+              checked={Boolean((attributes as Partial<CattleAttributes>).registered)}
+              onCheckedChange={(v) => updateAttribute('registered', Boolean(v))}
+            />
+            <Label htmlFor="cattle-registered" className="cursor-pointer flex-1 text-sm">
+              Is this animal registered with a breed association?
+            </Label>
+          </div>
+        </div>
+
+        {Boolean((attributes as Partial<CattleAttributes>).registered) ? (
+          <div className="space-y-2">
+            <Label htmlFor="cattle-reg-number" className="text-base font-semibold">
+              Registration Number <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="cattle-reg-number"
+              placeholder="Registration number"
+              value={(attributes as Partial<CattleAttributes>).registrationNumber || ''}
+              onChange={(e) => updateAttribute('registrationNumber', e.target.value)}
+              className={cn('min-h-[48px] text-base', hasError('Registration Number') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+            />
+            {hasError('Registration Number') ? <p className="text-sm text-destructive">Registration number is required when registered.</p> : null}
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <Label htmlFor="preg-checked" className="text-base font-semibold">
+            Pregnancy
+          </Label>
+          <div className="flex items-center gap-2 rounded-lg border border-border/60 p-3 bg-background/40 min-h-[44px]">
+            <Checkbox
+              id="preg-checked"
+              checked={(attributes as Partial<CattleAttributes>).pregChecked || false}
+              onCheckedChange={(checked) => updateAttribute('pregChecked', checked)}
+            />
+            <Label htmlFor="preg-checked" className="cursor-pointer flex-1 text-sm">
+              This animal has been pregnancy checked
+            </Label>
+          </div>
         </div>
 
         {normalizeQuantityMode((attributes as Partial<CattleAttributes>).quantityMode, (attributes as Partial<CattleAttributes>).quantity) !== 'single' && (
@@ -1182,39 +1234,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
         )}
 
         <div className="space-y-2">
-          <div className={cn('flex items-start space-x-3 min-h-[44px]', hasError('Registered') && 'rounded-lg border-2 border-destructive p-3')}>
-            <Checkbox
-              id="registered"
-              checked={(attributes as Partial<CattleAttributes>).registered || false}
-              onCheckedChange={(checked) => updateAttribute('registered', checked)}
-              className={hasError('Registered') ? 'border-destructive' : ''}
-            />
-            <Label htmlFor="registered" className="cursor-pointer flex-1">
-              <div className="font-medium mb-1">
-                Registered <span className="text-destructive">*</span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                This animal has official registration papers
-              </div>
-            </Label>
-          </div>
-          {hasError('Registered') ? <p className="text-sm text-destructive">Please confirm registered yes/no</p> : null}
-        </div>
-
-        {(attributes as Partial<CattleAttributes>).registered && (
-          <div className="space-y-2">
-            <Label htmlFor="registration-number" className="text-base font-semibold">Registration Number (Optional)</Label>
-            <Input
-              id="registration-number"
-              placeholder="Registration number"
-              value={(attributes as Partial<CattleAttributes>).registrationNumber || ''}
-              onChange={(e) => updateAttribute('registrationNumber', e.target.value)}
-              className="min-h-[48px] text-base"
-            />
-          </div>
-        )}
-
-        <div className="space-y-2">
           <Label htmlFor="weight-range" className="text-base font-semibold">Weight Range (Optional)</Label>
           <Input
             id="weight-range"
@@ -1223,22 +1242,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             onChange={(e) => updateAttribute('weightRange', e.target.value)}
             className="min-h-[48px] text-base"
           />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-start space-x-3 min-h-[44px]">
-            <Checkbox
-              id="preg-checked"
-              checked={(attributes as Partial<CattleAttributes>).pregChecked || false}
-              onCheckedChange={(checked) => updateAttribute('pregChecked', checked)}
-            />
-            <Label htmlFor="preg-checked" className="cursor-pointer flex-1">
-              <div className="font-medium mb-1">Pregnancy Checked</div>
-              <div className="text-sm text-muted-foreground">
-                This animal has been pregnancy checked
-              </div>
-            </Label>
-          </div>
         </div>
 
         <div className="space-y-2">
@@ -1257,6 +1260,160 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
     );
   }
 
+  if (category === 'farm_animals') {
+    const fa = attributes as Partial<FarmAnimalAttributes>;
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">How is this listing sold?</Label>
+          <RadioGroup
+            value={normalizeQuantityMode(fa.quantityMode, fa.quantity)}
+            onValueChange={(v: QuantityModeNew) => {
+              const a = attributes as Partial<FarmAnimalAttributes>;
+              if (v === 'single') {
+                onChange({ ...a, quantityMode: 'single', quantity: 1 } as Partial<ListingAttributes>);
+              } else {
+                updateAttribute('quantityMode', v);
+              }
+            }}
+            className="flex flex-col gap-2"
+          >
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="single" id="farm-qty-single" className="mt-0.5" />
+              <Label htmlFor="farm-qty-single" className="cursor-pointer flex-1">
+                <div className="font-medium">Single Animal</div>
+                <div className="text-sm text-muted-foreground">One animal, one price.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="fixed_group" id="farm-qty-fixed" className="mt-0.5" />
+              <Label htmlFor="farm-qty-fixed" className="cursor-pointer flex-1">
+                <div className="font-medium">Fixed Group</div>
+                <div className="text-sm text-muted-foreground">Multiple animals, per-unit price × quantity.</div>
+              </Label>
+            </div>
+            <div className="flex items-start space-x-3 rounded-lg border p-3">
+              <RadioGroupItem value="group_lot" id="farm-qty-lot" className="mt-0.5" />
+              <Label htmlFor="farm-qty-lot" className="cursor-pointer flex-1">
+                <div className="font-medium">Group Lot</div>
+                <div className="text-sm text-muted-foreground">All animals sold together for one total price.</div>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">
+            Species <span className="text-destructive">*</span>
+          </Label>
+          <SearchableSelect
+            value={fa.speciesId || null}
+            onChange={(v) => updateAttribute('speciesId', v)}
+            options={FARM_ANIMAL_SPECIES_OPTIONS}
+            placeholder="Select species…"
+            searchPlaceholder="Search…"
+            buttonClassName={cn(hasError('Species') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+          />
+          {hasError('Species') ? <p className="text-sm text-destructive">Species is required</p> : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="farm-breed" className="text-base font-semibold">
+            Breed <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="farm-breed"
+            placeholder="e.g. Boer, Dorper, Yorkshire"
+            value={fa.breed || ''}
+            onChange={(e) => updateAttribute('breed', e.target.value)}
+            className={cn('min-h-[48px] text-base', hasError('Breed') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+          />
+          {hasError('Breed') ? <p className="text-sm text-destructive">Breed is required</p> : null}
+        </div>
+
+        {(fa.quantity ?? 0) >= 1 && normalizeQuantityMode(fa.quantityMode, fa.quantity) === 'single' && (
+          <div className="space-y-2">
+            <Label htmlFor="farm-sex" className="text-base font-semibold">
+              Sex <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={fa.sex || 'unknown'}
+              onValueChange={(value) => updateAttribute('sex', value)}
+            >
+              <SelectTrigger id="farm-sex" className={cn('min-h-[48px]', hasError('Sex') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="unknown">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasError('Sex') ? <p className="text-sm text-destructive">Sex is required</p> : null}
+          </div>
+        )}
+
+        {(fa.quantity ?? 0) >= 1 && normalizeQuantityMode(fa.quantityMode, fa.quantity) !== 'single' && (
+          <div className="space-y-2">
+            <Label htmlFor="farm-quantity" className="text-base font-semibold">
+              Quantity <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="farm-quantity"
+              type="number"
+              min={1}
+              value={fa.quantity ?? ''}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                updateAttribute('quantity', Number.isFinite(v) && v >= 1 ? v : 1);
+              }}
+              className={cn('min-h-[48px] text-base', hasError('Quantity (must be at least 1)') ? 'border-destructive border-2 ring-2 ring-destructive/25 ring-offset-2 ring-offset-background' : '')}
+            />
+            {hasError('Quantity (must be at least 1)') ? <p className="text-sm text-destructive">Quantity must be at least 1</p> : null}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="farm-age" className="text-base font-semibold">Age (optional)</Label>
+            <Input
+              id="farm-age"
+              type="text"
+              inputMode="decimal"
+              placeholder="e.g. 2 years"
+              value={typeof fa.age === 'number' && Number.isFinite(fa.age) ? String(fa.age) : (fa.age as string) ?? ''}
+              onChange={(e) => updateAttribute('age', e.target.value)}
+              className="min-h-[48px] text-base"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="farm-weight" className="text-base font-semibold">Weight range (optional)</Label>
+            <Input
+              id="farm-weight"
+              placeholder="e.g. 80–100 lbs"
+              value={fa.weightRange || ''}
+              onChange={(e) => updateAttribute('weightRange', e.target.value)}
+              className="min-h-[48px] text-base"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="farm-health-notes" className="text-base font-semibold">Health Notes (Optional)</Label>
+          <Textarea
+            id="farm-health-notes"
+            placeholder="Any health information or notes"
+            value={fa.healthNotes || ''}
+            onChange={(e) => updateAttribute('healthNotes', e.target.value)}
+            className="min-h-[100px] text-base"
+          />
+        </div>
+
+        {/* Disclosures are collected in the seller acknowledgment step at publish */}
+      </div>
+    );
+  }
+
   if (category === 'sporting_working_dogs') {
     return (
       <div className="space-y-4">
@@ -1266,14 +1423,6 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
             <strong>Sporting &amp; Working Dogs:</strong> Texas-only transfers apply on this platform. Provide accurate details and required disclosures.
           </AlertDescription>
         </Alert>
-
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">
-            Species <span className="text-destructive">*</span>
-          </Label>
-          <Input value="Dog" disabled className="min-h-[48px] text-base bg-muted" />
-          <p className="text-xs text-muted-foreground">Species is fixed as Dog for this category.</p>
-        </div>
 
         <div className="space-y-2">
           <Label className="text-base font-semibold">How is this listing sold?</Label>
@@ -1312,6 +1461,14 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
               </Label>
             </div>
           </RadioGroup>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">
+            Species <span className="text-destructive">*</span>
+          </Label>
+          <Input value="Dog" disabled className="min-h-[48px] text-base bg-muted" />
+          <p className="text-xs text-muted-foreground">Species is fixed as Dog for this category.</p>
         </div>
 
         {normalizeQuantityMode((attributes as Partial<SportingWorkingDogAttributes>).quantityMode, (attributes as Partial<SportingWorkingDogAttributes>).quantity) === 'single' && (

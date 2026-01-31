@@ -7,6 +7,7 @@ export type ListingCategory =
   | 'wildlife_exotics' 
   | 'horse_equestrian'
   | 'cattle_livestock' 
+  | 'farm_animals'
   | 'ranch_equipment'
   | 'ranch_vehicles'
   | 'hunting_outfitter_assets'
@@ -165,6 +166,21 @@ export interface CattleAttributes {
   healthNotes?: string; // Optional
 }
 
+/** Farm animals (goats, sheep, pigs, etc.) – separate from cattle. */
+export interface FarmAnimalAttributes {
+  speciesId: string; // 'goat' | 'sheep' | 'pig' | 'other_farm' (controlled list)
+  breed: string;
+  breedOther?: string;
+  sex: 'male' | 'female' | 'unknown';
+  age?: number | string;
+  weightRange?: string;
+  quantity: number;
+  quantityMode?: 'single' | 'fixed_group' | 'group_lot' | 'group' | 'individual';
+  identificationDisclosure: boolean;
+  healthDisclosure: boolean;
+  healthNotes?: string;
+}
+
 export interface HorseAttributes {
   speciesId: 'horse';
   sex: 'stallion' | 'mare' | 'gelding' | 'unknown';
@@ -291,6 +307,7 @@ export type ListingAttributes =
   | WhitetailBreederAttributes
   | WildlifeAttributes
   | CattleAttributes
+  | FarmAnimalAttributes
   | HorseAttributes
   | SportingWorkingDogAttributes
   | EquipmentAttributes;

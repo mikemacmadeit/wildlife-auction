@@ -181,17 +181,24 @@ const ListingRow = memo(({
     key={listing.id}
     className="border-b border-border/30 hover:bg-background/50 group"
   >
-    <td className="p-5 align-middle">
-      <div className="flex items-start gap-4">
-        <div className="h-24 w-32 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative">
+    <td className="p-4 align-middle">
+      <div className="flex items-center gap-4">
+        <Link
+          href={`/listing/${listing.id}`}
+          className="h-30 w-44 sm:h-34 sm:w-52 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative block"
+        >
           {getPrimaryListingImageUrl(listing) ? (
-            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
-          ) : null}
-        </div>
-        <div className="flex flex-col gap-2 min-w-0 flex-1">
+            <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" sizes="192px" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+              <Package className="h-10 w-10 opacity-40" />
+            </div>
+          )}
+        </Link>
+        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
           <Link
             href={`/listing/${listing.id}`}
-            className="font-semibold text-lg text-foreground hover:text-primary group-hover:underline truncate"
+            className="font-semibold text-base sm:text-lg text-foreground hover:text-primary group-hover:underline line-clamp-2 leading-snug"
           >
             {listing.title}
           </Link>
@@ -273,7 +280,7 @@ const ListingRow = memo(({
 ));
 ListingRow.displayName = 'ListingRow';
 
-// Memoized Mobile Listing Card — compact, card styling (gradient/shadow)
+// Memoized Mobile Listing Card — horizontal layout with medium-large image
 const MobileListingCard = memo(({ 
   listing, 
   effectiveStatus,
@@ -295,14 +302,27 @@ const MobileListingCard = memo(({
 }) => (
   <div
     key={listing.id}
-    className="rounded-xl border border-primary bg-muted/30 dark:bg-muted/20 p-3 sm:p-4 transition-colors hover:bg-muted/40 dark:hover:bg-muted/30"
+    className="rounded-xl border border-border/60 bg-card p-3 sm:p-4 transition-colors hover:bg-muted/30"
   >
-    <div className="flex gap-3 min-w-0">
-      <div className="h-16 w-20 sm:h-20 sm:w-24 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+    <div className="flex gap-4 min-w-0">
+      <Link
+        href={`/listing/${listing.id}`}
+        className="h-40 w-56 sm:h-44 sm:w-64 rounded-xl overflow-hidden bg-muted flex-shrink-0 relative block"
+      >
         {getPrimaryListingImageUrl(listing) ? (
-          <Image src={getPrimaryListingImageUrl(listing) as string} alt="" fill className="object-cover" />
-        ) : null}
-      </div>
+          <Image
+            src={getPrimaryListingImageUrl(listing) as string}
+            alt=""
+            fill
+            className="object-cover"
+            sizes="224px"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+            <Package className="h-12 w-12 opacity-40" />
+          </div>
+        )}
+      </Link>
       <div className="flex-1 min-w-0 flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2 min-w-0">
           <Link
@@ -324,52 +344,46 @@ const MobileListingCard = memo(({
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {getTypeBadge(listing.type)}
-            {getStatusBadge({
-              status: effectiveStatus,
-              type: listing.type,
-              ended: isAuctionEnded(listing),
-            })}
-          </div>
-          <div className="text-right font-semibold text-foreground tabular-nums">
-            {listing.type === 'auction'
-              ? listing.currentBid
-                ? `$${listing.currentBid.toLocaleString()}`
-                : 'No bids'
-              : listing.price
-              ? `$${listing.price.toLocaleString()}`
-              : 'Contact'}
-          </div>
-          <div className="text-muted-foreground truncate">
-            {listing.location?.city || '—'}, {listing.location?.state || '—'}
-          </div>
-          <div className="text-right text-muted-foreground">
-            {listing.endsAt
-              ? effectiveStatus === 'active'
-                ? `Ends ${formatTimeRemaining(listing.endsAt)}`
-                : 'Ended'
-              : '—'}
-          </div>
-          <div className="col-span-2 flex items-center gap-2 text-muted-foreground pt-0.5 border-t border-border/40">
-            <span>{listing.metrics.views} views</span>
-            {listing.type === 'auction' && (
-              <>
-                <span>{listing.metrics.favorites} watchers</span>
-                <span>{listing.metrics.bidCount} bids</span>
-              </>
-            )}
-          </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {getTypeBadge(listing.type)}
+          {getStatusBadge({
+            status: effectiveStatus,
+            type: listing.type,
+            ended: isAuctionEnded(listing),
+          })}
+        </div>
+        <div className="text-base font-bold text-foreground tabular-nums">
+          {listing.type === 'auction'
+            ? listing.currentBid
+              ? `$${listing.currentBid.toLocaleString()}`
+              : 'No bids'
+            : listing.price
+            ? `$${listing.price.toLocaleString()}`
+            : 'Contact'}
+        </div>
+        <div className="text-xs text-muted-foreground truncate">
+          {listing.location?.city || '—'}, {listing.location?.state || '—'}
+          {listing.endsAt && (
+            <> · {effectiveStatus === 'active' ? formatTimeRemaining(listing.endsAt) : 'Ended'}</>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{listing.metrics.views} views</span>
+          {listing.type === 'auction' && (
+            <>
+              <span>{listing.metrics.favorites} watchers</span>
+              <span>{listing.metrics.bidCount} bids</span>
+            </>
+          )}
         </div>
       </div>
     </div>
-    <div className="mt-3 pt-3 flex gap-2">
-      <Button variant="default" size="sm" asChild className="min-h-8 flex-1">
-        <Link href={`/listing/${listing.id}`}>View listing</Link>
+    <div className="mt-3 pt-3 flex gap-2 border-t border-border/40">
+      <Button variant="default" size="sm" asChild className="min-h-9 flex-1 text-sm">
+        <Link href={`/listing/${listing.id}`}>View</Link>
       </Button>
-      <Button variant="outline" size="sm" asChild className="min-h-8 flex-1 border-primary text-primary hover:bg-primary/10 hover:text-primary">
-        <Link href={`/seller/listings/${listing.id}/edit`}>Edit listing</Link>
+      <Button variant="outline" size="sm" asChild className="min-h-9 flex-1 text-sm border-primary text-primary hover:bg-primary/10 hover:text-primary">
+        <Link href={`/seller/listings/${listing.id}/edit`}>Edit</Link>
       </Button>
     </div>
   </div>

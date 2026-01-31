@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import {
   BROWSE_CATEGORIES_FOR_DISPLAY,
   BROWSE_EQUIPMENT_CONDITION_OPTIONS,
+  BROWSE_FARM_SPECIES,
   BROWSE_QUANTITY_OPTIONS,
   BROWSE_SPECIES,
   BROWSE_STATES,
@@ -39,10 +40,11 @@ export function BrowseFiltersSidebar(props: {
   }, [value.maxPrice, value.minPrice]);
 
   const speciesOptions = useMemo(() => {
+    const base = value.category === 'farm_animals' ? BROWSE_FARM_SPECIES : BROWSE_SPECIES;
     const q = speciesQuery.trim().toLowerCase();
-    if (!q) return BROWSE_SPECIES;
-    return BROWSE_SPECIES.filter((s) => s.label.toLowerCase().includes(q) || s.value.toLowerCase().includes(q));
-  }, [speciesQuery]);
+    if (!q) return base;
+    return base.filter((s) => s.label.toLowerCase().includes(q) || s.value.toLowerCase().includes(q));
+  }, [speciesQuery, value.category]);
 
   const activeCount = useMemo(() => {
     let count = 0;

@@ -89,6 +89,17 @@ function migrateAttributes(docData: Record<string, unknown> & { id: string }): L
       healthNotes: oldMetadata?.healthStatus != null ? String(oldMetadata.healthStatus) : undefined,
     } as ListingAttributes;
   }
+  if (mappedCategory === 'farm_animals') {
+    return {
+      speciesId: String(oldMetadata?.speciesId || 'goat'),
+      breed: String(oldMetadata?.breed || ''),
+      sex: 'unknown',
+      quantity: Number(oldMetadata?.quantity || 1),
+      identificationDisclosure: true,
+      healthDisclosure: true,
+      healthNotes: oldMetadata?.healthStatus != null ? String(oldMetadata.healthStatus) : undefined,
+    } as ListingAttributes;
+  }
   return {
     equipmentType: 'other',
     condition: 'good',

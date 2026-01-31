@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
+import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, FarmAnimalAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 import { DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 
 interface KeyFactsPanelProps {
@@ -104,6 +104,26 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       icon: Package,
       label: 'Quantity',
       value: `${(listing.attributes as CattleAttributes).quantity} ${(listing.attributes as CattleAttributes).quantity === 1 ? 'head' : 'head'}`,
+    },
+    listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).speciesId && {
+      icon: Package,
+      label: 'Species',
+      value: String((listing.attributes as FarmAnimalAttributes).speciesId).replace(/_/g, ' '),
+    },
+    listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).breed && {
+      icon: Package,
+      label: 'Breed',
+      value: (listing.attributes as FarmAnimalAttributes).breed,
+    },
+    listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).sex && {
+      icon: Package,
+      label: 'Sex',
+      value: (listing.attributes as FarmAnimalAttributes).sex === 'male' ? 'Male' : (listing.attributes as FarmAnimalAttributes).sex === 'female' ? 'Female' : 'Unknown',
+    },
+    listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).quantity && {
+      icon: Package,
+      label: 'Quantity',
+      value: `${(listing.attributes as FarmAnimalAttributes).quantity} ${(listing.attributes as FarmAnimalAttributes).quantity === 1 ? 'animal' : 'animals'}`,
     },
     listing.attributes && (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') && (listing.attributes as EquipmentAttributes).equipmentType && {
       icon: Package,

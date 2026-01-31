@@ -84,7 +84,7 @@ export function getPayoutHoldRequirements(category: ListingCategory, attributes:
     };
   }
 
-  if (category === 'cattle_livestock' || category === 'horse_equestrian') {
+  if (category === 'cattle_livestock' || category === 'farm_animals' || category === 'horse_equestrian') {
     // CVI hold is for horses only. Cattle/livestock do not require CVI by default in this policy.
     if (category === 'horse_equestrian') {
       return {

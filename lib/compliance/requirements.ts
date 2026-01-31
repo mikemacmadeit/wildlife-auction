@@ -59,6 +59,16 @@ export const CATEGORY_REQUIREMENTS: Record<ListingCategory, CategoryComplianceRe
     requireBillOfSaleAtCheckout: false,
     requireHealthDocsOptionalOrRequired: 'optional',
   },
+  farm_animals: {
+    category: 'farm_animals',
+    isAnimal: true,
+    texasOnly: true,
+    requiredDisclosures: ['identificationDisclosure', 'healthDisclosure'],
+    requiredOrderDocuments: [],
+    supportedOrderDocuments: ['TAHC_CVI', 'HEALTH_CERTIFICATE', 'BILL_OF_SALE', 'DELIVERY_PROOF', 'OTHER'],
+    requireBillOfSaleAtCheckout: false,
+    requireHealthDocsOptionalOrRequired: 'optional',
+  },
   horse_equestrian: {
     category: 'horse_equestrian',
     isAnimal: true,

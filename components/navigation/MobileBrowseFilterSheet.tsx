@@ -31,6 +31,7 @@ import {
   BROWSE_TYPES as types,
   BROWSE_STATES as states,
   BROWSE_EQUIPMENT_CONDITION_OPTIONS as equipmentConditionOptions,
+  BROWSE_FARM_SPECIES,
   BROWSE_SPECIES as species,
   BROWSE_QUANTITY_OPTIONS as quantityOptions,
   DELIVERY_TIMEFRAME_OPTIONS as deliveryTimeframeOptions,
@@ -80,7 +81,9 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingState
   const showSpeciesFilter =
     !localFilters.category ||
     localFilters.category === 'wildlife_exotics' ||
-    localFilters.category === 'whitetail_breeder';
+    localFilters.category === 'whitetail_breeder' ||
+    localFilters.category === 'farm_animals';
+  const speciesOptions = localFilters.category === 'farm_animals' ? BROWSE_FARM_SPECIES : species;
   const showConditionFilter =
     localFilters.category === 'ranch_equipment' ||
     localFilters.category === 'ranch_vehicles' ||
@@ -271,7 +274,7 @@ export function MobileBrowseFilterSheet({ filters, onFiltersChange, listingState
               <SearchableMultiSelect
                 values={localFilters.species || []}
                 onChange={(vals) => setLocalFilters((p) => ({ ...p, species: vals.length ? vals : undefined }))}
-                options={species}
+                options={speciesOptions}
                 placeholder="Select species…"
                 searchPlaceholder="Search species…"
                 buttonClassName="min-h-[44px]"

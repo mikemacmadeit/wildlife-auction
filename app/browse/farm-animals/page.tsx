@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Beef } from 'lucide-react';
+import { Search, Rabbit } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,11 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ListingCard } from '@/components/listings/ListingCard';
-import { FeaturedListingCard } from '@/components/listings/FeaturedListingCard';
 import { ListItem } from '@/components/listings/ListItem';
 import { SkeletonListingGrid } from '@/components/skeletons/SkeletonCard';
-import { FilterDialog } from '@/components/navigation/FilterDialog';
-import { Badge } from '@/components/ui/badge';
 import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from '@/lib/firebase/listings';
 import { FilterState, ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
@@ -29,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
 type ViewMode = 'card' | 'list';
 
-export default function CattleLivestockBrowsePage() {
+export default function FarmAnimalsBrowsePage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -53,42 +50,26 @@ export default function CattleLivestockBrowsePage() {
     }
   }, []);
 
-  const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('browse-view-mode', mode);
-    }
-  };
-
   const getBrowseFilters = useCallback((): BrowseFilters => {
     const browseFilters: BrowseFilters = {
       status: 'active',
-      category: 'cattle_livestock', // Always filter by this category
+      category: 'farm_animals',
     };
-    
     if (selectedType !== 'all') {
       browseFilters.type = selectedType;
     }
-    
     return browseFilters;
   }, [selectedType]);
 
   const getSortOption = useCallback((): BrowseSort => {
     switch (sortBy) {
-      case 'newest':
-        return 'newest';
-      case 'oldest':
-        return 'oldest';
-      case 'price-low':
-        return 'priceAsc';
-      case 'price-high':
-        return 'priceDesc';
-      case 'ending-soon':
-        return 'endingSoon';
-      case 'featured':
-        return 'newest'; // Featured not supported in BrowseSort, default to newest
-      default:
-        return 'newest';
+      case 'newest': return 'newest';
+      case 'oldest': return 'oldest';
+      case 'price-low': return 'priceAsc';
+      case 'price-high': return 'priceDesc';
+      case 'ending-soon': return 'endingSoon';
+      case 'featured': return 'newest';
+      default: return 'newest';
     }
   }, [sortBy]);
 
@@ -101,20 +82,17 @@ export default function CattleLivestockBrowsePage() {
       } else {
         setLoadingMore(true);
       }
-
       const result = await queryListingsForBrowse({
         limit: 20,
         cursor: reset ? undefined : nextCursor || undefined,
         filters: getBrowseFilters(),
         sort: getSortOption(),
       });
-
       if (reset) {
         setListings(result.items);
       } else {
         setListings((prev) => [...prev, ...result.items]);
       }
-
       setNextCursor(result.nextCursor || null);
       setHasMore(result.hasMore);
       setError(null);
@@ -138,19 +116,20 @@ export default function CattleLivestockBrowsePage() {
 
   const filteredListings = useMemo(() => {
     let result = listings;
-
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
       result = result.filter((listing) => {
         const titleMatch = listing.title.toLowerCase().includes(query);
         const descMatch = listing.description.toLowerCase().includes(query);
-        const breedMatch = listing.attributes && 'breed' in listing.attributes 
+        const breedMatch = listing.attributes && 'breed' in listing.attributes
           ? (listing.attributes as any).breed?.toLowerCase().includes(query)
           : false;
-        return titleMatch || descMatch || breedMatch;
+        const speciesMatch = listing.attributes && 'speciesId' in listing.attributes
+          ? (listing.attributes as any).speciesId?.toLowerCase().includes(query)
+          : false;
+        return titleMatch || descMatch || breedMatch || speciesMatch;
       });
     }
-
     return result;
   }, [listings, debouncedSearchQuery]);
 
@@ -167,20 +146,18 @@ export default function CattleLivestockBrowsePage() {
   return (
     <div className="min-h-screen bg-background pb-bottom-nav-safe md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8">
-        {/* Header */}
-          <div className="mb-6 md:mb-8">
+        <div className="mb-6 md:mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <Beef className="h-8 w-8 text-primary" />
+            <Rabbit className="h-8 w-8 text-primary" />
             <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
-              Cattle
+              Farm Animals
             </h1>
           </div>
           <p className="text-base md:text-lg text-muted-foreground">
-            Browse cattle, bulls, cows, heifers, steers, and registered cattle
+            Browse goats, sheep, pigs, alpacas, and other farm animals
           </p>
         </div>
 
-        {/* Filters and Search */}
         <Card className="mb-6 border-2">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
@@ -188,7 +165,7 @@ export default function CattleLivestockBrowsePage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search by breed, title, or description..."
+                  placeholder="Search by species, breed, title, or description..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -222,7 +199,6 @@ export default function CattleLivestockBrowsePage() {
           </CardContent>
         </Card>
 
-        {/* Results */}
         {error && (
           <Card className="mb-6 border-destructive">
             <CardContent className="pt-6">
@@ -234,10 +210,10 @@ export default function CattleLivestockBrowsePage() {
         {filteredListings.length === 0 && !loading ? (
           <Card>
             <CardContent className="pt-12 pb-12 text-center">
-              <Beef className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <Rabbit className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">No listings found</h3>
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? 'Try adjusting your search query.' : 'No cattle listings available at this time.'}
+                {searchQuery ? 'Try adjusting your search query.' : 'No farm animal listings available at this time.'}
               </p>
             </CardContent>
           </Card>
@@ -248,7 +224,7 @@ export default function CattleLivestockBrowsePage() {
             </div>
             <div className={cn(
               'grid gap-6',
-              viewMode === 'card' 
+              viewMode === 'card'
                 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                 : 'grid-cols-1'
             )}>

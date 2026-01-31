@@ -1,10 +1,12 @@
 import type { ListingCategory, ListingType } from '@/lib/types';
 import { EXOTIC_SPECIES_OPTIONS } from '@/lib/taxonomy/exotic-species';
+import { FARM_ANIMAL_SPECIES_OPTIONS } from '@/lib/taxonomy/farm-animal-species';
 
 export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
   { value: 'wildlife_exotics', label: 'Registered & Specialty Livestock' },
-  { value: 'cattle_livestock', label: 'Cattle & Livestock' },
+  { value: 'cattle_livestock', label: 'Cattle' },
+  { value: 'farm_animals', label: 'Farm Animals' },
   { value: 'horse_equestrian', label: 'Horse & Equestrian' },
   { value: 'sporting_working_dogs', label: 'Sporting & Working Dogs' },
   { value: 'hunting_outfitter_assets', label: 'Hunting & Outfitter Assets' },
@@ -45,6 +47,9 @@ export const BROWSE_SPECIES: { value: string; label: string }[] = [
   // Wildlife & exotics (source-of-truth: `EXOTIC_SPECIES` in `lib/types.ts`)
   ...EXOTIC_SPECIES_OPTIONS,
 ];
+
+/** Species options when category is farm_animals (for browse filter). */
+export const BROWSE_FARM_SPECIES: { value: string; label: string }[] = FARM_ANIMAL_SPECIES_OPTIONS;
 
 export const BROWSE_STATES: { value: string; label: string }[] = [
   // Full US state list for better filtering + saved searches.

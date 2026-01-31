@@ -619,7 +619,8 @@ export default function AdminListingsPage() {
                             >
                               {listing.category === 'whitetail_breeder' && 'Whitetail Breeder'}
                               {listing.category === 'wildlife_exotics' && 'Wildlife & Exotics'}
-                              {listing.category === 'cattle_livestock' && 'Cattle & Livestock'}
+                              {listing.category === 'cattle_livestock' && 'Cattle'}
+                              {listing.category === 'farm_animals' && 'Farm Animals'}
                               {listing.category === 'ranch_equipment' && 'Ranch Equipment & Attachments'}
                               {listing.category === 'ranch_vehicles' && 'Ranch Vehicles & Trailers'}
                               {listing.category === 'horse_equestrian' && 'Horse & Equestrian'}

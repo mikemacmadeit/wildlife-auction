@@ -1306,7 +1306,8 @@ export default function HomePage() {
             {[
               { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-8 h-8 icon-primary-color mask-icon-whitetail-breeder" /> },
               { href: '/browse?category=wildlife_exotics', label: 'Registered & Specialty Livestock', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
-              { href: '/browse?category=cattle_livestock', label: 'Cattle & Livestock', icon: <div className="w-8 h-8 icon-primary-color mask-icon-bull" /> },
+              { href: '/browse?category=cattle_livestock', label: 'Cattle', icon: <div className="w-8 h-8 icon-primary-color mask-icon-bull" /> },
+              { href: '/browse?category=farm_animals', label: 'Farm Animals', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
               {
                 href: '/browse?category=horse_equestrian',
                 label: 'Horse & Equestrian',
@@ -1348,7 +1349,7 @@ export default function HomePage() {
 
           {/* Desktop/tablet: 3 animal categories on one line */}
           <div className="hidden md:flex md:justify-center">
-            <div className="grid grid-cols-3 gap-6 max-w-4xl w-full">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl w-full">
             {/* Whitetail Breeder - First priority */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -1395,7 +1396,7 @@ export default function HomePage() {
               </Link>
             </motion.div>
 
-            {/* Cattle & Livestock */}
+            {/* Cattle */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1407,9 +1408,32 @@ export default function HomePage() {
                     <div className="flex items-center gap-4 md:flex-col md:text-center">
                       <div className="w-16 h-16 icon-primary-color mask-icon-bull flex-shrink-0" />
                       <div className="min-w-0 flex-1 space-y-1">
-                        <h3 className="text-lg font-bold leading-tight">Cattle &amp; Livestock</h3>
+                        <h3 className="text-lg font-bold leading-tight">Cattle</h3>
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          Cattle, bulls, cows, heifers, and registered livestock
+                          Bulls, cows, heifers, and steers
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
+            {/* Farm Animals */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+            >
+              <Link href="/browse?category=farm_animals">
+                <Card className="h-full border-2 hover:border-primary/50 transition-all cursor-pointer group">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 md:flex-col md:text-center">
+                      <div className="w-16 h-16 icon-primary-color mask-icon-fallow flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-lg font-bold leading-tight">Farm Animals</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          Goats, sheep, pigs, alpacas, and other farm animals
                         </p>
                       </div>
                     </div>

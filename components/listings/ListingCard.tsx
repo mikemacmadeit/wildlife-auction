@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
-import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes, isGroupLotQuantityMode } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, FarmAnimalAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -117,6 +117,16 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
         attrs.breed && `Breed: ${attrs.breed}`,
         attrs.sex && `Sex: ${attrs.sex}`,
         attrs.registered && 'Registered',
+      ].filter(Boolean).slice(0, 2);
+    }
+
+    if (listing.category === 'farm_animals') {
+      const attrs = listing.attributes as FarmAnimalAttributes;
+      const speciesLabel = attrs.speciesId ? String(attrs.speciesId).replace(/_/g, ' ') : null;
+      return [
+        speciesLabel && `Species: ${speciesLabel}`,
+        attrs.breed && `Breed: ${attrs.breed}`,
+        attrs.sex && `Sex: ${attrs.sex}`,
       ].filter(Boolean).slice(0, 2);
     }
     

@@ -533,9 +533,39 @@ function EditListingPageContent() {
                       />
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
-                      <h3 className="text-base font-bold leading-tight">Cattle &amp; Livestock</h3>
+                      <h3 className="text-base font-bold leading-tight">Cattle</h3>
                       <p className="text-xs text-muted-foreground line-clamp-2">
-                        Cattle, bulls, cows, heifers, and registered livestock
+                        Bulls, cows, heifers, and steers
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all border-2 ${
+                  formData.category === 'farm_animals'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                } ${isActiveAuctionWithBids ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (isActiveAuctionWithBids) return;
+                  setFormData({
+                    ...formData,
+                    category: 'farm_animals',
+                    location: { ...formData.location, state: 'TX' }
+                  });
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 icon-primary-color mask-icon-fallow" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-base font-bold leading-tight">Farm Animals</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Goats, sheep, pigs, alpacas, and other farm animals
                       </p>
                     </div>
                   </div>
@@ -1034,14 +1064,14 @@ function EditListingPageContent() {
                     location: { ...formData.location, state: e.target.value },
                   })
                 }
-                disabled={['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) || isActiveAuctionWithBids}
+                disabled={['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock', 'farm_animals'].includes(formData.category) || isActiveAuctionWithBids}
                 className={cn(
                   "min-h-[48px] text-base bg-background",
                   publishMissingFields.includes('location.state') ? 'ring-2 ring-destructive border-destructive' : null,
                   isActiveAuctionWithBids ? 'opacity-60 cursor-not-allowed' : ''
                 )}
               />
-              {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock'].includes(formData.category) && (
+              {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock', 'farm_animals'].includes(formData.category) && (
                 <p className="text-xs text-muted-foreground">
                   State is locked to TX for animal listings
                 </p>

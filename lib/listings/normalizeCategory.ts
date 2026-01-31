@@ -21,6 +21,7 @@ export function normalizeCategory(raw: unknown): ListingCategory {
   if (s === 'whitetail_breeder') return 'whitetail_breeder';
   if (s === 'wildlife_exotics') return 'wildlife_exotics';
   if (s === 'cattle_livestock') return 'cattle_livestock';
+  if (s === 'farm_animals') return 'farm_animals';
   if (s === 'ranch_equipment') return 'ranch_equipment';
   if (s === 'horse_equestrian') return 'horse_equestrian';
   if (s === 'ranch_vehicles') return 'ranch_vehicles';
@@ -31,6 +32,7 @@ export function normalizeCategory(raw: unknown): ListingCategory {
   if (s === 'wildlife') return 'wildlife_exotics';
   if (s === 'horses') return 'horse_equestrian';
   if (s === 'cattle') return 'cattle_livestock';
+  if (s === 'livestock') return 'farm_animals';
   if (s === 'equipment') return 'ranch_equipment';
 
   // Legacy "unknown buckets" observed in older UI mocks. Keep explicit mapping to avoid breaking reads,
