@@ -9,9 +9,9 @@ import {
   type CarouselApi,
 } from '@/components/ui/carousel';
 const AD_SLIDES = [
-  { src: '/ADS/Heavy%20rack%201280.jpg', alt: 'Heavy Rack' },
-  { src: '/ADS/Kleensite%201280.jpg', alt: 'Kleensite' },
-  { src: '/ADS/Sanstone%201280.jpg', alt: 'Sanstone' },
+  { src: '/ADS/Heavy%20rack%201280.jpg', alt: 'Heavy Rack Outfitters', href: 'https://heavyrackoutfitters.com/' },
+  { src: '/ADS/Kleensite%201280.jpg', alt: 'Kleensite', href: 'https://kleensite.com/' },
+  { src: '/ADS/Sanstone%201280.jpg', alt: 'Sandstone Mountain Ranch', href: 'https://sandstonemountainranch.com/' },
 ] as const;
 
 const AUTOPLAY_INTERVAL_MS = 5000;
@@ -56,11 +56,16 @@ export function HomepageAdCarousel() {
           <CarouselContent className="-ml-0">
             {AD_SLIDES.map((slide, index) => (
               <CarouselItem key={index} className="basis-full pl-0 min-w-0">
-                <div
-                  className="relative w-full min-w-0 overflow-hidden bg-muted rounded-lg
+                <a
+                  href={slide.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block relative w-full min-w-0 overflow-hidden bg-muted rounded-lg
                     aspect-[2.5/1] max-h-[130px] min-h-[100px]
                     sm:aspect-[2.2/1] sm:max-h-[180px] sm:min-h-0
-                    md:aspect-[2.5/1] md:max-h-[280px] md:min-h-0"
+                    md:aspect-[2.5/1] md:max-h-[280px] md:min-h-0
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-label={`${slide.alt} — opens in new tab`}
                 >
                   <Image
                     src={slide.src}
@@ -71,7 +76,7 @@ export function HomepageAdCarousel() {
                     unoptimized
                     priority={index === 0}
                   />
-                </div>
+                </a>
               </CarouselItem>
             ))}
           </CarouselContent>
