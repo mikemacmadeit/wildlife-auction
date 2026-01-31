@@ -1300,9 +1300,9 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          {/* Mobile-only: 3 animal categories. Compact stacked layout so long labels fit. */}
+          {/* Mobile-only: 2 per row. Compact stacked layout so long labels fit. */}
           <div className="flex justify-center md:hidden">
-            <div className="grid grid-cols-3 gap-2 w-full max-w-2xl">
+            <div className="grid grid-cols-2 gap-2 w-full max-w-2xl">
             {[
               { href: '/browse?category=whitetail_breeder', label: 'Whitetail Breeder', icon: <div className="w-8 h-8 icon-primary-color mask-icon-whitetail-breeder" /> },
               { href: '/browse?category=wildlife_exotics', label: 'Specialty Livestock', icon: <div className="w-8 h-8 icon-primary-color mask-icon-fallow" /> },
