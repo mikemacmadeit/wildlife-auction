@@ -80,10 +80,10 @@ export function Navbar() {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-sm"
+      className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-sm overflow-visible"
     >
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] h-20 items-center gap-4">
+      <div className="container mx-auto px-4 md:px-6 overflow-visible">
+        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] h-20 items-center gap-4 overflow-visible">
           {/* Logo Section - Left side */}
           <Link href="/" className="flex items-center gap-2 md:gap-3 group flex-shrink-0 min-w-0 z-10" aria-label={BRAND_DISPLAY_NAME}>
             <div className="relative flex-shrink-0">
@@ -216,9 +216,11 @@ export function Navbar() {
           </nav>
 
           {/* Right Side Actions */}
-          <div className="flex items-center gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0 min-w-0 justify-end">
+          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 flex-shrink-0 min-w-0 justify-end overflow-visible">
             {/* Theme Toggle */}
-            <ThemeToggle />
+            <div className="flex-shrink-0">
+              <ThemeToggle />
+            </div>
 
             {/* Desktop: Notification bell (signed-in only) */}
             {user?.uid && (
@@ -228,7 +230,7 @@ export function Navbar() {
             )}
 
             {/* Desktop Actions - User Menu */}
-            <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
+            <div className="hidden md:flex items-center gap-2 lg:gap-3 flex-shrink-0">
               <Button
                 asChild
                 size="default"
@@ -266,7 +268,7 @@ export function Navbar() {
                             <ChevronDown className="h-3 w-3 opacity-50 flex-shrink-0" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuContent align="end" sideOffset={8} className="w-56">
                   {user ? (
                     <>
                       <DropdownMenuLabel className="font-normal">
@@ -332,18 +334,19 @@ export function Navbar() {
 
             {/* Mobile: when signed in show account icon (Account settings, Sign out); when signed out show hamburger for nav + Sign in/Up */}
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="md:hidden min-w-[40px] min-h-[40px] rounded-lg flex-shrink-0"
-                    aria-label="Account menu"
-                  >
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+              <div className="md:hidden flex-shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="min-w-[40px] min-h-[40px] rounded-lg flex-shrink-0"
+                      aria-label="Account menu"
+                    >
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={8} className="w-56">
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard/account" className="flex items-center gap-2 cursor-pointer">
                       <Settings className="h-4 w-4" />
@@ -360,6 +363,7 @@ export function Navbar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </div>
             ) : (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>

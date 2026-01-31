@@ -29,6 +29,8 @@ const scheduleDeliverySchema = z.object({
   eta: z.string().datetime().optional(),
   /** Proposed delivery windows (hauling). Buyer agrees to one → DELIVERY_PROPOSED. */
   windows: z.array(windowSchema).min(1, 'At least one delivery window required').optional(),
+  /** Optional notes from seller (e.g. hauling info, special instructions). */
+  notes: z.string().max(2000).optional(),
   transporter: z
     .object({
       name: z.string().optional(),
@@ -86,10 +88,16 @@ export async function POST(
     const body = await request.json();
     const validation = scheduleDeliverySchema.safeParse(body);
     if (!validation.success) {
-      return json({ error: 'Invalid request data', details: validation.error.flatten() }, { status: 400 });
+      const firstIssue = validation.error.issues[0];
+      const message = firstIssue?.message ? `${firstIssue.message}` : 'Invalid request data';
+      return json({
+        error: 'Invalid request data',
+        message,
+        details: validation.error.flatten(),
+      }, { status: 400 });
     }
 
-    const { eta, windows, transporter } = validation.data;
+    const { eta, windows, notes, transporter } = validation.data;
     const useWindows = Array.isArray(windows) && windows.length > 0;
 
     if (!useWindows && !eta) {
@@ -169,6 +177,7 @@ export async function POST(
         ...(orderData.delivery || {}),
         windows: windowsWithDates,
         proposedAt: now,
+        ...(notes ? { notes } : {}),
         ...(transporter ? { transporter } : {}),
       };
     } else {

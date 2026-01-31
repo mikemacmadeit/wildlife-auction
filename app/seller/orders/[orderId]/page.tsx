@@ -73,12 +73,7 @@ export default function SellerOrderDetailPage() {
   const [processing, setProcessing] = useState<'preparing' | 'in_transit' | 'delivered' | null>(null);
   const [scheduleDeliveryOpen, setScheduleDeliveryOpen] = useState(false);
   const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
-  const [haulerName, setHaulerName] = useState('');
-  const [haulerPhone, setHaulerPhone] = useState('');
-  const [haulerPlate, setHaulerPlate] = useState('');
-  const [haulerMake, setHaulerMake] = useState('');
-  const [haulerModel, setHaulerModel] = useState('');
-  const [haulerColor, setHaulerColor] = useState('');
+  const [deliveryProposalNotes, setDeliveryProposalNotes] = useState('');
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
@@ -206,9 +201,9 @@ export default function SellerOrderDetailPage() {
                     })}
                   </div>
                 )}
-                {order.delivery?.transporter?.name && <div><strong>Hauler:</strong> {order.delivery.transporter.name}</div>}
-                {order.delivery?.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
-                {order.delivery?.transporter?.plate && <div><strong>License plate / truck:</strong> {order.delivery.transporter.plate}</div>}
+                {(order.delivery as any)?.notes && (
+                  <div className="pt-1 border-t border-border/50 mt-1"><strong>Notes:</strong> {(order.delivery as any).notes}</div>
+                )}
               </div>
             )}
 
@@ -226,12 +221,12 @@ export default function SellerOrderDetailPage() {
 
             {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && order.delivery?.buyerAddress && (
               <>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="font-semibold text-sm">Propose delivery date</div>
                     <div className="text-xs text-muted-foreground">Propose delivery windows. Buyer will confirm a date that works.</div>
                   </div>
-                  <Button variant="default" size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
+                  <Button variant="default" size="lg" className="w-full shrink-0 sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30 justify-center" disabled={processing !== null} onClick={() => setScheduleDeliveryOpen(true)}>
                     <Calendar className="h-4 w-4 mr-2" />
                     Propose delivery
                   </Button>
@@ -249,15 +244,15 @@ export default function SellerOrderDetailPage() {
 
             {txStatus === 'DELIVERY_SCHEDULED' && (
               <>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="font-semibold text-sm">Mark Out for Delivery</div>
                     <div className="text-xs text-muted-foreground">Confirm the order is on the way to the buyer.</div>
                   </div>
                   <Button
                     variant="default"
                     size="lg"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30"
+                    className="w-full shrink-0 sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30 justify-center"
                     disabled={processing !== null}
                     onClick={() => setMarkOutForDeliveryOpen(true)}
                   >
@@ -612,7 +607,7 @@ export default function SellerOrderDetailPage() {
           <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden w-[calc(100vw-2rem)] sm:w-full max-w-2xl p-3 sm:p-4 md:p-6">
             <DialogHeader className="shrink-0 pb-2 pr-8">
               <DialogTitle className="text-base sm:text-lg">Propose delivery</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm mt-0.5">Propose when you can deliver (hauling). Add one or more windows. Buyer will agree to one.</DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm mt-0.5">Add one or more date/time windows. Buyer will agree to one.</DialogDescription>
             </DialogHeader>
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 -mx-1 px-1">
               <div>
@@ -650,32 +645,15 @@ export default function SellerOrderDetailPage() {
                   </Button>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">Hauler / truck (optional)</div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                <div className="min-w-0">
-                  <Label className="text-xs">Name</Label>
-                  <Input value={haulerName} onChange={(e) => setHaulerName(e.target.value)} placeholder="e.g. John Smith" className="w-full" />
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">Phone</Label>
-                  <Input value={haulerPhone} onChange={(e) => setHaulerPhone(e.target.value)} placeholder="Phone" className="w-full" />
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">License plate / truck</Label>
-                  <Input value={haulerPlate} onChange={(e) => setHaulerPlate(e.target.value)} placeholder="Optional" className="w-full" />
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">Make</Label>
-                  <Input value={haulerMake} onChange={(e) => setHaulerMake(e.target.value)} placeholder="e.g. Ford" className="w-full" />
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">Model</Label>
-                  <Input value={haulerModel} onChange={(e) => setHaulerModel(e.target.value)} placeholder="e.g. F-150" className="w-full" />
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">Color</Label>
-                  <Input value={haulerColor} onChange={(e) => setHaulerColor(e.target.value)} placeholder="e.g. White" className="w-full" />
-                </div>
+              <div>
+                <Label className="text-sm">Notes (optional)</Label>
+                <Textarea
+                  value={deliveryProposalNotes}
+                  onChange={(e) => setDeliveryProposalNotes(e.target.value)}
+                  placeholder="Any details for the buyer (e.g. hauling info, special instructions)"
+                  className="mt-1 min-h-[80px] resize-y"
+                  rows={3}
+                />
               </div>
             </div>
             <DialogFooter className="shrink-0 pt-3 border-t mt-2">
@@ -685,29 +663,15 @@ export default function SellerOrderDetailPage() {
                 onClick={async () => {
                   try {
                     setProcessing('delivered');
-                    const body: any = {
+                    const body = {
                       windows: deliveryWindows.filter(w => w.start && w.end).map(w => ({ start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() })),
+                      ...(deliveryProposalNotes.trim() ? { notes: deliveryProposalNotes.trim() } : {}),
                     };
-                    if (haulerName || haulerPhone || haulerPlate || haulerMake || haulerModel || haulerColor) {
-                      body.transporter = {
-                        ...(haulerName ? { name: haulerName } : {}),
-                        ...(haulerPhone ? { phone: haulerPhone } : {}),
-                        ...(haulerPlate ? { plate: haulerPlate } : {}),
-                        ...(haulerMake ? { make: haulerMake } : {}),
-                        ...(haulerModel ? { model: haulerModel } : {}),
-                        ...(haulerColor ? { color: haulerColor } : {}),
-                      };
-                    }
                     await postAuthJson(`/api/orders/${order.id}/fulfillment/schedule-delivery`, body);
                     toast({ title: 'Success', description: 'Delivery windows proposed. Buyer will agree to one.' });
                     setScheduleDeliveryOpen(false);
                     setDeliveryWindows([{ start: '', end: '' }]);
-                    setHaulerName('');
-                    setHaulerPhone('');
-                    setHaulerPlate('');
-                    setHaulerMake('');
-                    setHaulerModel('');
-                    setHaulerColor('');
+                    setDeliveryProposalNotes('');
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                   } catch (e: any) {

@@ -49,6 +49,7 @@ import { getOrdersForUser } from '@/lib/firebase/orders';
 import { PublicSellerTrust, UserProfile } from '@/lib/types';
 import { setCurrentUserAvatarUrl, uploadUserAvatar } from '@/lib/firebase/profile-media';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { SavedAddressesPanel } from '@/components/settings/SavedAddressesPanel';
 import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
 import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/AvatarCropDialog';
 import { auth } from '@/lib/firebase/config';
@@ -930,78 +931,23 @@ export default function AccountPage() {
               </CardContent>
             </Card>
 
-            {/* Location Information */}
-            <Card className="border-2 border-border/50 bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <MapPin className="h-5 w-5" />
-                  Location
-                </CardTitle>
-                <CardDescription>
-                  Your location helps buyers find nearby listings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="text-sm font-semibold">
-                    Street Address (Optional)
-                  </Label>
-                  <Input
-                    id="address"
-                    value={formData.location.address}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      location: { ...formData.location, address: e.target.value }
-                    })}
-                    disabled={!isEditing}
-                    className="min-h-[48px] text-base bg-background"
-                    placeholder="1234 Ranch Road"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="city" className="text-sm font-semibold">City</Label>
-                    <Input
-                      id="city"
-                      value={formData.location.city}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        location: { ...formData.location, city: e.target.value }
-                      })}
-                      disabled={!isEditing}
-                      className="min-h-[48px] text-base bg-background"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="state" className="text-sm font-semibold">State</Label>
-                    <Input
-                      id="state"
-                      value={formData.location.state}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        location: { ...formData.location, state: e.target.value }
-                      })}
-                      disabled={!isEditing}
-                      maxLength={2}
-                      className="min-h-[48px] text-base bg-background uppercase"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="zip" className="text-sm font-semibold">ZIP Code</Label>
-                    <Input
-                      id="zip"
-                      value={formData.location.zip}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        location: { ...formData.location, zip: e.target.value }
-                      })}
-                      disabled={!isEditing}
-                      className="min-h-[48px] text-base bg-background"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Locations - saved addresses only; default syncs to profile location */}
+            {user && (
+              <SavedAddressesPanel
+                userId={user.uid}
+                onDefaultAddressChange={(addr) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    location: {
+                      address: addr?.line1 ?? '',
+                      city: addr?.city ?? '',
+                      state: addr?.state ?? '',
+                      zip: addr?.postalCode ?? '',
+                    },
+                  }));
+                }}
+              />
+            )}
           </TabsContent>
 
           {/* Security Tab */}

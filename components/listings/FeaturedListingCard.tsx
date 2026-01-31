@@ -8,6 +8,7 @@ import { MapPin, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Listing, isGroupLotQuantityMode } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
+import { getDeliveryTimeframeLabel } from '@/components/browse/filters/constants';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
@@ -257,7 +258,8 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
             <div className="hidden sm:block">
               <TrustBadges
                 verified={listing.trust.verified}
-                transport={listing.trust.transportReady}
+                transport={!!(listing.trust.transportReady || listing.trust.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
+                deliveryWindowLabel={getDeliveryTimeframeLabel((listing as any).deliveryDetails?.deliveryTimeframe)}
                 size="sm"
                 className="flex-wrap gap-2"
               />

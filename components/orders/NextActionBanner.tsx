@@ -217,9 +217,9 @@ export function NextActionBanner({
   // Full banner version
   return (
     <div className={cn('rounded-lg border p-4 space-y-3', urgencyStyle, className)}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5">{icon}</div>
-        <div className="flex-1 space-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="mt-0.5 shrink-0">{icon}</div>
+        <div className="min-w-0 flex-1 space-y-1">
           <div className="font-semibold text-base">{title}</div>
           <div className="text-sm opacity-90">{description}</div>
           <div className="flex items-center gap-3 flex-wrap mt-2">
@@ -247,7 +247,7 @@ export function NextActionBanner({
           </div>
         </div>
         {onAction && (
-          <Button variant="default" onClick={onAction} className="shrink-0">
+          <Button variant="default" onClick={onAction} className="w-full shrink-0 sm:w-auto">
             {ctaLabel}
           </Button>
         )}

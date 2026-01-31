@@ -268,10 +268,16 @@ If rules break the app:
 
 ### Error: "Missing or insufficient permissions"
 
-**Cause:** Rules too restrictive or user not authenticated
+**Cause:** Rules too restrictive, rules not deployed, or user not authenticated.
 
-**Fix:**
-- Verify user is authenticated (`request.auth != null`)
+**Common case – Set delivery address (HEB-style):** The set-delivery flow (saved addresses, Google Places Autocomplete, map with draggable pin) reads/writes `users/{uid}/addresses` and `users/{uid}/checkout`. Ensure your `firestore.rules` includes the blocks for those paths (they are in the repo) and deploy. See [HEB Delivery Address Implementation](docs/HEB_DELIVERY_ADDRESS_IMPLEMENTATION.md).
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+**Other fixes:**
+- Verify user is authenticated (`request.auth != null`); have the user sign out and sign back in
 - Check Rules Playground to see which rule is failing
 - Verify `sellerId` matches `auth.uid` for listing operations
 

@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
-import { BROWSE_SPECIES } from '@/components/browse/filters/constants';
+import { BROWSE_SPECIES, getDeliveryTimeframeLabel } from '@/components/browse/filters/constants';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
@@ -564,7 +564,8 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                 <div className="pt-1">
                   <TrustBadges
                     verified={listing.trust?.verified || false}
-                    transport={listing.trust?.transportReady || false}
+                    transport={!!(listing.trust?.transportReady || listing.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
+                    deliveryWindowLabel={getDeliveryTimeframeLabel((listing as any).deliveryDetails?.deliveryTimeframe)}
                     size="sm"
                     className="flex-wrap gap-2"
                   />

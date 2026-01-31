@@ -4,7 +4,7 @@ import { FARM_ANIMAL_SPECIES_OPTIONS } from '@/lib/taxonomy/farm-animal-species'
 
 export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'whitetail_breeder', label: 'Whitetail Breeder' },
-  { value: 'wildlife_exotics', label: 'Registered & Specialty Livestock' },
+  { value: 'wildlife_exotics', label: 'Specialty Livestock' },
   { value: 'cattle_livestock', label: 'Cattle' },
   { value: 'farm_animals', label: 'Farm Animals' },
   { value: 'horse_equestrian', label: 'Horse & Equestrian' },
@@ -143,3 +143,8 @@ export const DELIVERY_TIMEFRAME_OPTIONS: { value: string; label: string }[] = [
   { value: '30_60', label: '30-60 days' },
 ];
 
+/** Resolve delivery timeframe value (from listing) to display label for badges. */
+export function getDeliveryTimeframeLabel(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  return DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === value.trim())?.label;
+}

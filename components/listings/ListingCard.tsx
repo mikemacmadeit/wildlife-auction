@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
+import { getDeliveryTimeframeLabel } from '@/components/browse/filters/constants';
 import { MOTION } from '@/lib/motion';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { useRouter } from 'next/navigation';
@@ -392,7 +393,8 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
           <div className="hidden sm:block">
             <TrustBadges
               verified={listing.trust?.verified || false}
-              transport={listing.trust?.transportReady || false}
+              transport={!!(listing.trust?.transportReady || listing.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
+              deliveryWindowLabel={getDeliveryTimeframeLabel((listing as any).deliveryDetails?.deliveryTimeframe)}
               size="sm"
               className="flex-wrap gap-1.5"
             />

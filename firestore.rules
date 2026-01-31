@@ -410,6 +410,21 @@ service cloud.firestore {
     }
 
     // ============================================
+    // SET DELIVERY ADDRESS (HEB-style)
+    // ============================================
+    // High-end flow: saved addresses, Google Places Autocomplete, map with draggable pin,
+    // reverse geocoding. Used on listing page (before Buy Now) and order page (after payment).
+    // See docs/HEB_DELIVERY_ADDRESS_IMPLEMENTATION.md
+    match /users/{userId}/addresses/{addressId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Checkout current selection (deliveryAddressId for next order; snapshot to order on payment)
+    match /users/{userId}/checkout/{docId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
     // SAVED SELLERS (FOLLOW SYSTEM) — SERVER-AUTHORED
     // ============================================
     // Following + followers docs are written by server code to keep:

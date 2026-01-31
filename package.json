@@ -24,6 +24,7 @@
     "deploy:clear-cache": "node scripts/trigger-netlify-deploy-clear-cache.mjs"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
     "@hookform/resolvers": "^3.9.0",
     "@netlify/functions": "^2.4.0",
     "@netlify/plugin-nextjs": "^5.15.1",

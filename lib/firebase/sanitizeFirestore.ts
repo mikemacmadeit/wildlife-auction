@@ -77,6 +77,11 @@ export function sanitizeFirestorePayload(input: any): any {
     }
   }
 
+  // JavaScript Date → Firestore Timestamp (so Dates aren't mangled by object branch)
+  if (typeof input === 'object' && input instanceof Date && Number.isFinite(input.getTime())) {
+    return Timestamp.fromDate(input);
+  }
+
   // Timestamp-like object
   const normalized = normalizeTimestampLike(input);
   if (normalized instanceof Timestamp) return normalized;

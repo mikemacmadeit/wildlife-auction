@@ -658,6 +658,52 @@ export async function handleCheckoutSessionCompleted(
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
 
+    // Snapshot selected delivery address from users/{uid}/checkout/current if set (HEB-style flow)
+    const checkoutRef = db.collection('users').doc(buyerId).collection('checkout').doc('current');
+    const checkoutSnap = await checkoutRef.get();
+    const deliveryAddressId = checkoutSnap.exists ? (checkoutSnap.data() as Record<string, unknown>)?.deliveryAddressId : null;
+    if (deliveryAddressId && typeof deliveryAddressId === 'string') {
+      const addrRef = db.collection('users').doc(buyerId).collection('addresses').doc(deliveryAddressId);
+      const addrSnap = await addrRef.get();
+      if (addrSnap.exists) {
+        const addr = addrSnap.data() as Record<string, unknown>;
+        (orderData as Record<string, unknown>).deliveryAddress = {
+          label: addr.label,
+          isDefault: addr.isDefault,
+          formattedAddress: addr.formattedAddress,
+          line1: addr.line1,
+          line2: addr.line2,
+          city: addr.city,
+          state: addr.state,
+          postalCode: addr.postalCode,
+          country: addr.country ?? 'US',
+          lat: Number(addr.lat) || 0,
+          lng: Number(addr.lng) || 0,
+          provider: 'google',
+          placeId: addr.placeId ?? '',
+          notes: addr.notes,
+          gateCode: addr.gateCode,
+          savedAddressId: deliveryAddressId,
+        };
+        if (!(orderData as Record<string, unknown>).delivery) {
+          (orderData as Record<string, unknown>).delivery = {};
+        }
+        const delivery = (orderData as Record<string, unknown>).delivery as Record<string, unknown>;
+        delivery.buyerAddress = {
+          line1: addr.line1,
+          line2: addr.line2,
+          city: addr.city,
+          state: addr.state,
+          zip: addr.postalCode ?? addr.zip ?? '',
+          deliveryInstructions: addr.notes,
+          lat: typeof addr.lat === 'number' ? addr.lat : undefined,
+          lng: typeof addr.lng === 'number' ? addr.lng : undefined,
+          pinLabel: addr.label !== 'Address' ? addr.label : undefined,
+        };
+        delivery.buyerAddressSetAt = now;
+      }
+    }
+
     // When creating a new order (no pre-created order), reserve inventory for multi-quantity in the same transaction.
     const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
     const liveQuantityTotal =

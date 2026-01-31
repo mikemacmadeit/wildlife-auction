@@ -268,6 +268,7 @@ function toOrder(docId: string, data: OrderDoc): Order {
         proposedAt: d.proposedAt ? toDateSafe(d.proposedAt) : undefined,
       };
     })() : undefined,
+    deliveryAddress: (data as any).deliveryAddress ?? undefined,
     pickup: (data as any).pickup ? (() => {
       const p = (data as any).pickup;
       const mapWindow = (w: any) => ({

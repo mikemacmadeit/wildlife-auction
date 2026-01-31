@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2, MapPin, Package, User } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
@@ -38,6 +37,11 @@ import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { formatDate, isValidNonEpochDate } from '@/lib/utils';
+import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
+
+const useAddressPicker =
+  typeof process !== 'undefined' &&
+  !!(process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() || process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim());
 
 async function postAuthJson(path: string, body?: any): Promise<any> {
   const { auth } = await import('@/lib/firebase/config');
@@ -73,19 +77,8 @@ export default function BuyerOrderDetailPage() {
   const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'set_address' | 'location' | null>(null);
+  const [processing, setProcessing] = useState<'confirm' | 'dispute' | null>(null);
   const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
-  const [deliveryAddressForm, setDeliveryAddressForm] = useState({
-    line1: '',
-    line2: '',
-    city: '',
-    state: '',
-    zip: '',
-    deliveryInstructions: '',
-    lat: undefined as number | undefined,
-    lng: undefined as number | undefined,
-    pinLabel: '',
-  });
 
   const loadOrder = useCallback(async (cancelledRef?: { current: boolean }) => {
     // Allow calling without cancelledRef for manual reloads
@@ -491,8 +484,7 @@ export default function BuyerOrderDetailPage() {
                       ) : order.delivery?.eta && isValidNonEpochDate(new Date(order.delivery.eta)) ? (
                         <div><strong>Scheduled ETA:</strong> {formatDate(new Date(order.delivery.eta))}</div>
                       ) : null}
-                      {order.delivery?.transporter?.name && <div><strong>Transporter:</strong> {order.delivery.transporter.name}</div>}
-                      {order.delivery?.transporter?.phone && <div><strong>Phone:</strong> {order.delivery.transporter.phone}</div>}
+                      {(order.delivery as any)?.notes && <div><strong>Notes:</strong> {(order.delivery as any).notes}</div>}
                     </div>
                   )}
                   {(txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
@@ -530,7 +522,7 @@ export default function BuyerOrderDetailPage() {
                     <div id="agree-delivery">
                       <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-2">
                         <div><strong>Seller proposed:</strong> Pick one window that works for you.</div>
-                        {order.delivery.transporter?.name && <div><strong>Hauler:</strong> {order.delivery.transporter.name}</div>}
+                        {(order.delivery as any)?.notes && <div><strong>Notes:</strong> {(order.delivery as any).notes}</div>}
                       </div>
                       <div className="space-y-2">
                         <div className="font-semibold text-sm">Agree to delivery window</div>
@@ -673,151 +665,23 @@ export default function BuyerOrderDetailPage() {
 
         <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
 
-        {/* Set delivery address modal — once saved, "Set delivery address" shows complete on the timeline and address appears in the footer below */}
-        <Dialog open={setAddressModalOpen} onOpenChange={setSetAddressModalOpen}>
-          <DialogContent
-            overlayClassName="max-sm:top-16 max-sm:bottom-16 max-sm:left-0 max-sm:right-0"
-            className="flex flex-col w-[calc(100%-1.5rem)] max-w-lg sm:max-w-xl mx-auto pl-5 pr-11 sm:pl-6 sm:pr-6 pt-4 pb-4 sm:pt-6 sm:pb-6 gap-3 sm:gap-4 max-sm:max-h-[calc(100dvh-8rem)] sm:max-h-[90vh]"
-          >
-            <DialogHeader className="flex-shrink-0 space-y-1.5 text-left">
-              <DialogTitle className="text-base sm:text-lg pr-6">Set delivery address</DialogTitle>
-              <DialogDescription className="text-left text-xs sm:text-sm">
-                Add your delivery address or drop a pin. The seller will use it to propose a delivery date.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-1 px-3 min-w-0">
-              <div className="min-w-0">
-                <label className="font-medium text-foreground text-sm">Street address *</label>
-                <Input
-                  value={deliveryAddressForm.line1}
-                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line1: e.target.value }))}
-                  placeholder="123 Main St"
-                  className="mt-1 w-full min-w-0"
-                />
-              </div>
-              <div className="min-w-0">
-                <label className="font-medium text-foreground text-sm">Apt, suite, etc. (optional)</label>
-                <Input
-                  value={deliveryAddressForm.line2}
-                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, line2: e.target.value }))}
-                  placeholder="Unit 4"
-                  className="mt-1 w-full min-w-0"
-                />
-              </div>
-              {/* City, State, ZIP on one row — compact and familiar */}
-              <div className="flex flex-wrap gap-x-3 gap-y-3 sm:gap-x-2 sm:gap-y-0">
-                <div className="flex-1 min-w-0 sm:min-w-[120px]">
-                  <label className="font-medium text-foreground text-sm">City *</label>
-                  <Input
-                    value={deliveryAddressForm.city}
-                    onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, city: e.target.value }))}
-                    placeholder="City"
-                    className="mt-1 w-full min-w-0"
-                  />
-                </div>
-                <div className="w-16 shrink-0">
-                  <label className="font-medium text-foreground text-sm">State *</label>
-                  <Input
-                    value={deliveryAddressForm.state}
-                    onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))}
-                    placeholder="TX"
-                    className="mt-1 w-full"
-                  />
-                </div>
-                <div className="w-24 shrink-0">
-                  <label className="font-medium text-foreground text-sm">ZIP *</label>
-                  <Input
-                    value={deliveryAddressForm.zip}
-                    onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                    placeholder="12345"
-                    className="mt-1 w-full"
-                  />
-                </div>
-              </div>
-              <div className="min-w-0">
-                <label className="font-medium text-foreground text-sm">Delivery instructions (optional)</label>
-                <Input
-                  value={deliveryAddressForm.deliveryInstructions}
-                  onChange={(e) => setDeliveryAddressForm((f) => ({ ...f, deliveryInstructions: e.target.value }))}
-                  placeholder="Gate code, gate left open, etc."
-                  className="mt-1 w-full min-w-0"
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 min-w-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full sm:w-auto shrink-0"
-                  disabled={processing === 'set_address' || processing === 'location'}
-                  onClick={() => {
-                    if (!navigator.geolocation) {
-                      toast({ title: 'Not supported', description: 'Location is not available in this browser.', variant: 'destructive' });
-                      return;
-                    }
-                    setProcessing('location');
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        setDeliveryAddressForm((f) => ({ ...f, lat: pos.coords.latitude, lng: pos.coords.longitude, pinLabel: 'My location' }));
-                        toast({ title: 'Location captured', description: 'Pin set to your current location. Seller will see this on a map.' });
-                        setProcessing(null);
-                      },
-                      () => {
-                        toast({ title: 'Could not get location', description: 'Check permissions or enter address manually.', variant: 'destructive' });
-                        setProcessing(null);
-                      },
-                      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-                    );
-                  }}
-                >
-                  {processing === 'location' ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <MapPin className="h-4 w-4 shrink-0" />}
-                  <span className="ml-2 truncate">Use my location (add pin for seller)</span>
-                </Button>
-                {(deliveryAddressForm.lat != null && deliveryAddressForm.lng != null) && (
-                  <span className="text-xs text-muted-foreground truncate min-w-0">
-                    Pin set: {deliveryAddressForm.pinLabel || `${deliveryAddressForm.lat.toFixed(4)}, ${deliveryAddressForm.lng.toFixed(4)}`}
-                  </span>
-                )}
-              </div>
-            </div>
-            <DialogFooter className="flex-shrink-0 border-t pt-4 gap-2 sm:gap-2">
-              <Button variant="outline" onClick={() => setSetAddressModalOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-              <Button
-                className="w-full sm:w-auto"
-                disabled={!deliveryAddressForm.line1.trim() || !deliveryAddressForm.city.trim() || !deliveryAddressForm.state.trim() || !deliveryAddressForm.zip.trim() || processing === 'set_address' || processing === 'location'}
-                onClick={async () => {
-                  try {
-                    setProcessing('set_address');
-                    const payload = {
-                      line1: String(deliveryAddressForm.line1 ?? '').trim(),
-                      city: String(deliveryAddressForm.city ?? '').trim(),
-                      state: String(deliveryAddressForm.state ?? '').trim(),
-                      zip: String(deliveryAddressForm.zip ?? '').trim(),
-                    } as Record<string, unknown>;
-                    if (deliveryAddressForm.line2?.trim()) payload.line2 = deliveryAddressForm.line2.trim();
-                    if (deliveryAddressForm.deliveryInstructions?.trim()) payload.deliveryInstructions = deliveryAddressForm.deliveryInstructions.trim();
-                    if (typeof deliveryAddressForm.lat === 'number' && typeof deliveryAddressForm.lng === 'number') {
-                      payload.lat = deliveryAddressForm.lat;
-                      payload.lng = deliveryAddressForm.lng;
-                    }
-                    if (deliveryAddressForm.pinLabel?.trim()) payload.pinLabel = deliveryAddressForm.pinLabel.trim();
-                    await postAuthJson(`/api/orders/${order.id}/set-delivery-address`, payload);
-                    toast({ title: 'Address saved', description: 'The seller will use it to propose a delivery date.' });
-                    const refreshed = await getOrderById(order.id);
-                    if (refreshed) setOrder(refreshed);
-                    setSetAddressModalOpen(false);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to save address', variant: 'destructive' });
-                  } finally {
-                    setProcessing(null);
-                  }
-                }}
-              >
-                {processing === 'set_address' ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…</> : 'Set address'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Set delivery address: single HEB-style modal (saved addresses + Places/map when key set, or manual form when not) */}
+        {user?.uid && order && (
+          <AddressPickerModal
+            open={setAddressModalOpen}
+            onOpenChange={setSetAddressModalOpen}
+            orderId={order.id}
+            userId={user.uid}
+            manualOnly={!useAddressPicker}
+            onSetDeliveryAddress={async (ordId, payload: SetDeliveryAddressPayload) => {
+              await postAuthJson(`/api/orders/${ordId}/set-delivery-address`, payload);
+              toast({ title: 'Address saved', description: 'The seller will use it to propose a delivery date.' });
+              const refreshed = await getOrderById(ordId);
+              if (refreshed) setOrder(refreshed);
+            }}
+            onSuccess={() => setSetAddressModalOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

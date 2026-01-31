@@ -320,7 +320,7 @@ export default function TrustPage() {
               </div>
 
               <div className="p-4 border rounded-lg">
-                <h4 className="font-semibold mb-2">Registered & Specialty Livestock Listings</h4>
+                <h4 className="font-semibold mb-2">Specialty Livestock Listings</h4>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-2">
                   <li>Seller creates listing with species and TAHC disclosures</li>
                   <li>Standard species: Auto-approved (goes <Badge variant="outline">Active</Badge>)</li>

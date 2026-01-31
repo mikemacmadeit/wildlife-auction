@@ -95,7 +95,7 @@ import {
 import { getEligiblePaymentMethods } from '@/lib/payments/gating';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
-import { DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { DELIVERY_TIMEFRAME_OPTIONS, getDeliveryTimeframeLabel } from '@/components/browse/filters/constants';
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -2181,7 +2181,8 @@ export default function ListingDetailClient() {
                     <div className="flex flex-wrap items-center gap-2">
                       <TrustBadges
                         verified={listing!.trust?.verified || false}
-                        transport={listing!.trust?.transportReady || false}
+                        transport={!!(listing!.trust?.transportReady || listing!.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
+                        deliveryWindowLabel={getDeliveryTimeframeLabel((listing as any).deliveryDetails?.deliveryTimeframe)}
                         size="sm"
                         showTooltips={true}
                         showIcons={true}

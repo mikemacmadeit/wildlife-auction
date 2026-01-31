@@ -36,11 +36,26 @@ import { RequireAuth } from '@/components/auth/RequireAuth';
 import { SellerContentSkeleton } from '@/components/skeletons/SellerContentSkeleton';
 import { CategoryAttributeForm } from '@/components/listings/CategoryAttributeForm';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { ImageGallery } from '@/components/listing/ImageGallery';
+import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
+import { Separator } from '@/components/ui/separator';
+
+function parsePriceString(value: string): string {
+  return value.replace(/[^\d.]/g, '');
+}
 
 function EditListingPageContent() {
   const router = useRouter();
@@ -145,6 +160,8 @@ function EditListingPageContent() {
   const [requestedStepId, setRequestedStepId] = useState<string | null>(null);
   const publishFocusFieldRef = useRef<string | null>(null);
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
+  const [sellerAckModalOpen, setSellerAckModalOpen] = useState(false);
+  const [sellerAckModalChecked, setSellerAckModalChecked] = useState(false);
   const imagesInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load existing listing data from Firestore
@@ -415,7 +432,7 @@ function EditListingPageContent() {
                       />
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
-                      <h3 className="text-base font-bold leading-tight">Registered &amp; Specialty Livestock</h3>
+                      <h3 className="text-base font-bold leading-tight">Specialty Livestock</h3>
                       <p className="text-xs text-muted-foreground line-clamp-2">
                         Axis deer, blackbuck, fallow deer, and other registered ranch species
                       </p>
@@ -736,7 +753,10 @@ function EditListingPageContent() {
               id="title"
               placeholder="e.g., Trophy Whitetail Buck"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, title: e.target.value });
+                setPublishMissingFields((prev) => prev.filter((f) => f !== 'title'));
+              }}
               disabled={isActiveAuctionWithBids}
               className={cn(
                 "min-h-[48px] text-base bg-background",
@@ -757,7 +777,10 @@ function EditListingPageContent() {
               id="description"
               placeholder="Provide detailed information about your listing..."
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, description: e.target.value });
+                setPublishMissingFields((prev) => prev.filter((f) => f !== 'description'));
+              }}
               className={cn(
                 "min-h-[120px] text-base bg-background",
                 publishMissingFields.includes('description') ? 'ring-2 ring-destructive border-destructive' : null
@@ -803,7 +826,10 @@ function EditListingPageContent() {
                       type="number"
                       placeholder="0.00"
                       value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, price: e.target.value });
+                        setPublishMissingFields((prev) => prev.filter((f) => f !== 'price'));
+                      }}
                       disabled={isActiveListing}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
@@ -822,7 +848,10 @@ function EditListingPageContent() {
                       type="number"
                       placeholder="0.00"
                       value={formData.startingBid}
-                      onChange={(e) => setFormData({ ...formData, startingBid: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, startingBid: e.target.value });
+                        setPublishMissingFields((prev) => prev.filter((f) => f !== 'startingBid'));
+                      }}
                       disabled={isActiveListing}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
@@ -839,7 +868,10 @@ function EditListingPageContent() {
                       type="number"
                       placeholder="0.00"
                       value={formData.reservePrice}
-                      onChange={(e) => setFormData({ ...formData, reservePrice: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, reservePrice: e.target.value });
+                        setPublishMissingFields((prev) => prev.filter((f) => f !== 'reservePrice'));
+                      }}
                       disabled={isActiveListing}
                       className={cn(
                         "min-h-[48px] text-base bg-background",
@@ -858,7 +890,10 @@ function EditListingPageContent() {
                       value={String(formData.durationDays)}
                       onValueChange={(v) => {
                         const n = Number(v);
-                        if (isValidDurationDays(n)) setFormData({ ...formData, durationDays: n });
+                        if (isValidDurationDays(n)) {
+                          setFormData({ ...formData, durationDays: n });
+                          setPublishMissingFields((prev) => prev.filter((f) => f !== 'durationDays'));
+                        }
                       }}
                       disabled={listingData?.status === 'active'}
                     >
@@ -1038,12 +1073,13 @@ function EditListingPageContent() {
                 id="city"
                 placeholder="City"
                 value={formData.location.city}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFormData({
                     ...formData,
                     location: { ...formData.location, city: e.target.value },
-                  })
-                }
+                  });
+                  setPublishMissingFields((prev) => prev.filter((f) => f !== 'location.city'));
+                }}
                 disabled={isActiveAuctionWithBids}
                 className={cn(
                   "min-h-[48px] text-base bg-background",
@@ -1058,12 +1094,13 @@ function EditListingPageContent() {
                 id="state"
                 placeholder="TX"
                 value={formData.location.state}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFormData({
                     ...formData,
                     location: { ...formData.location, state: e.target.value },
-                  })
-                }
+                  });
+                  setPublishMissingFields((prev) => prev.filter((f) => f !== 'location.state'));
+                }}
                 disabled={['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock', 'farm_animals'].includes(formData.category) || isActiveAuctionWithBids}
                 className={cn(
                   "min-h-[48px] text-base bg-background",
@@ -1243,6 +1280,7 @@ function EditListingPageContent() {
                           ...prev,
                           images: (prev.images || []).map((v) => (v === key ? res.url : v)).slice(0, 10),
                         }));
+                        setPublishMissingFields((prev) => prev.filter((f) => f !== 'photos'));
                       } catch (err: any) {
                         // Remove placeholder on failure
                         setFormData((prev) => ({
@@ -1293,36 +1331,6 @@ function EditListingPageContent() {
             attributes={formData.attributes}
             onChange={(attrs) => setFormData({ ...formData, attributes: attrs })}
           />
-
-          {formData.category &&
-            isAnimalCategory(formData.category as any) &&
-            formData.category !== 'whitetail_breeder' && (
-              <div
-                className={`space-y-3 p-4 border rounded-lg ${
-                  !sellerAnimalAttestationAccepted ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'
-                }`}
-              >
-                <Label className="text-base font-semibold">
-                  Seller acknowledgment <span className="text-destructive">*</span>
-                </Label>
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="seller-animal-attestation-edit"
-                    checked={sellerAnimalAttestationAccepted}
-                    onCheckedChange={(checked) => setSellerAnimalAttestationAccepted(checked === true)}
-                  />
-                  <Label htmlFor="seller-animal-attestation-edit" className="cursor-pointer flex-1">
-                    <div className="font-medium">
-                      I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
-                      Agchange does not take custody of animals.
-                    </div>
-                  </Label>
-                </div>
-                {!sellerAnimalAttestationAccepted ? (
-                  <p className="text-sm text-destructive">You must accept this acknowledgment to publish an animal listing.</p>
-                ) : null}
-              </div>
-            )}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
@@ -1331,14 +1339,7 @@ function EditListingPageContent() {
       ),
       validate: () => {
         if (!formData.category) return false;
-        if (formData.category !== 'whitetail_breeder' && isAnimalCategory(formData.category as any) && !sellerAnimalAttestationAccepted) {
-          toast({
-            title: 'Acknowledgment required',
-            description: 'Please check the box to confirm you\'ve read and accept the seller acknowledgment for this animal listing.',
-            variant: 'destructive',
-          });
-          return false;
-        }
+        // Seller acknowledgment is requested at publish time (modal), not in this step.
         if (formData.category === 'whitetail_breeder') {
           const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
           return !!(
@@ -1645,109 +1646,236 @@ function EditListingPageContent() {
       description: 'Review your changes before saving',
       content: (
         <div className="space-y-6">
-          <Card className="border-2 border-border/50 bg-card">
-            <CardHeader>
-              <CardTitle className="text-xl font-extrabold">Listing Summary</CardTitle>
-              <CardDescription>Review all changes before saving</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-muted-foreground font-medium mb-1">Type</div>
-                  <div className="font-semibold text-foreground capitalize">{formData.type}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground font-medium mb-1">Category</div>
-                  <div className="font-semibold text-foreground capitalize">{formData.category}</div>
-                </div>
+          <Alert className="bg-muted/40 border-border/60">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              This is a <strong>preview</strong> of what buyers will see. If anything looks off, hit <strong>Back</strong> and edit it before saving.
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <ImageGallery images={formData.images} title={formData.title || 'Listing'} />
+              <div className="text-xs text-muted-foreground">
+                {formData.images.length} photo{formData.images.length === 1 ? '' : 's'} will appear on the listing.
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground font-medium mb-1">Title</div>
-                <div className="font-semibold text-foreground">{formData.title}</div>
-              </div>
-              {formData.description && (
-                <div>
-                  <div className="text-sm text-muted-foreground font-medium mb-1">Description</div>
-                  <div className="text-sm whitespace-pre-line text-foreground">{formData.description}</div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-muted-foreground font-medium mb-1">Location</div>
-                  <div className="font-semibold text-foreground">
-                    {formData.location.city}, {formData.location.state}
+            </div>
+
+            <Card className="border-2 border-border/50">
+              <CardContent className="p-5 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold leading-tight">
+                        {formData.title || 'Untitled listing'}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {formData.type && (
+                          <Badge variant="secondary" className="capitalize">
+                            {formData.type}
+                          </Badge>
+                        )}
+                        {formData.category && (
+                          <Badge variant="outline" className="capitalize">
+                            {String(formData.category).replaceAll('_', ' ')}
+                          </Badge>
+                        )}
+                        {formData.verification && <Badge>Verification</Badge>}
+                        <Badge variant="outline">Seller arranges delivery</Badge>
+                        {formData.protectedTransactionEnabled && (
+                          <Badge variant="outline">
+                            Protected ({formData.protectedTransactionDays ?? '—'} days)
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-muted-foreground">
+                    {formData.location.city ? `${formData.location.city}, ` : ''}
+                    {formData.location.state || '—'}
+                    {formData.location.zip ? ` • ${formData.location.zip}` : ''}
                   </div>
                 </div>
-                <div>
-                  <div className="text-sm text-muted-foreground font-medium mb-1">Price/Bid</div>
-                  <div className="font-semibold text-foreground">
-                    {formData.type === 'auction'
-                      ? formData.startingBid
-                        ? `Starting: $${parseFloat(formData.startingBid).toLocaleString()}`
-                        : 'No starting bid set'
-                      : formData.price
-                      ? `$${parseFloat(formData.price).toLocaleString()}`
-                      : 'No price set'}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground font-medium mb-1">Photos</div>
-                <div className="font-semibold text-foreground">{formData.images.length} photo(s)</div>
-                {formData.images.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                    {formData.images.slice(0, 4).map((img, idx) => {
-                      const isUrl = img.startsWith('/') || img.startsWith('http');
-                      return (
-                        <div key={idx} className="relative w-full aspect-square rounded-md overflow-hidden border border-border/50">
-                          {isUrl ? (
-                            <Image
-                              src={img}
-                              alt={`Preview ${idx + 1}`}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 25vw, 100px"
-                              unoptimized={img.startsWith('http')}
-                            />
-                          ) : (
-                            <img 
-                              src={img} 
-                              alt={`Preview ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Pricing</div>
+                  {formData.type === 'auction' ? (
+                    <div className="space-y-1">
+                      <div className="text-lg font-bold">
+                        Starting bid: ${Number(parseFloat(parsePriceString(formData.startingBid || '0') || '0') || 0).toLocaleString()}
+                      </div>
+                      {formData.reservePrice ? (
+                        <div className="text-sm">
+                          Reserve price: <span className="font-semibold">${Number(parseFloat(parsePriceString(formData.reservePrice) || '0') || 0).toLocaleString()}</span>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Reserve price: none</div>
+                      )}
+                      <div className="text-sm">
+                        Duration: <span className="font-semibold">{formData.durationDays} day{formData.durationDays === 1 ? '' : 's'}</span>
+                        <span className="text-muted-foreground"> (starts when live)</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-lg font-bold">
+                        ${Number(parseFloat(parsePriceString(formData.price || '0') || '0') || 0).toLocaleString()}
+                      </div>
+                      {formData.type === 'fixed' && (
+                        <div className="text-sm">
+                          Best Offer:{' '}
+                          <span className="font-semibold">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span>
+                          {formData.bestOffer.enabled && (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              • min {formData.bestOffer.minPrice ? `$${Number(parseFloat(parsePriceString(formData.bestOffer.minPrice) || '0') || 0).toLocaleString()}` : '—'}
+                              {' '}
+                              • auto-accept {formData.bestOffer.autoAcceptPrice ? `$${Number(parseFloat(parsePriceString(formData.bestOffer.autoAcceptPrice) || '0') || 0).toLocaleString()}` : '—'}
+                            </span>
                           )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {formData.category === 'whitetail_breeder' && (
+                  <>
+                    <Separator />
+                    <div className="space-y-1 text-sm">
+                      <div className="text-sm text-muted-foreground">Whitetail breeder attestation</div>
+                      <div className="font-semibold">
+                        {sellerAnimalAttestationAccepted ? 'Accepted' : 'Not accepted'}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="border-2 border-border/50">
+            <CardContent className="p-5 space-y-2">
+              <div className="text-sm font-semibold">Description</div>
+              <div className="text-sm whitespace-pre-line text-muted-foreground">
+                {formData.description || '—'}
+              </div>
+            </CardContent>
+          </Card>
+
+          <KeyFactsPanel
+            listing={{
+              id: listingId || 'preview',
+              title: formData.title || 'Listing',
+              description: formData.description || '',
+              type: (formData.type || 'fixed') as any,
+              category: (formData.category || 'wildlife_exotics') as any,
+              status: 'draft' as any,
+              price: formData.type !== 'auction' ? Number(parseFloat(parsePriceString(formData.price || '0') || '0') || 0) : undefined,
+              startingBid: formData.type === 'auction' ? Number(parseFloat(parsePriceString(formData.startingBid || '0') || '0') || 0) : undefined,
+              reservePrice: formData.type === 'auction' && formData.reservePrice ? Number(parseFloat(parsePriceString(formData.reservePrice) || '0') || 0) : undefined,
+              images: formData.images || [],
+              location: formData.location,
+              sellerId: user?.uid || 'preview',
+              trust: {
+                verified: !!formData.verification,
+                insuranceAvailable: false,
+                transportReady: true,
+                sellerOffersDelivery: true,
+              },
+              attributes: (formData.attributes || {}) as any,
+              durationDays: formData.durationDays,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              createdBy: user?.uid || 'preview',
+              updatedBy: user?.uid || 'preview',
+              metrics: { views: 0, favorites: 0, bidCount: 0 },
+            } as any}
+          />
+
+          <Card className="border-2 border-border/50">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-sm font-semibold">All listing details (review)</div>
+                  <div className="text-xs text-muted-foreground">
+                    This section shows every field that will be saved.
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basics</div>
+                  <div className="mt-2 space-y-1">
+                    <div><span className="text-muted-foreground">Type:</span> <span className="font-medium capitalize">{formData.type || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Category:</span> <span className="font-medium capitalize">{String(formData.category || '—').replaceAll('_', ' ')}</span></div>
+                    <div><span className="text-muted-foreground">Title:</span> <span className="font-medium">{formData.title || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Location:</span> <span className="font-medium">{formData.location.city || '—'}, {formData.location.state || '—'} {formData.location.zip ? `(${formData.location.zip})` : ''}</span></div>
+                  </div>
+                </div>
+
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Options</div>
+                  <div className="mt-2 space-y-1">
+                    <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
+                    <div><span className="text-muted-foreground">Transportation:</span> <span className="font-medium">Seller arranges delivery</span></div>
+                    {(() => {
+                      const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
+                      const tf = (dd.deliveryTimeframe ?? '').trim();
+                      const hasAny = (dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined) || tf || (dd.deliveryStatusExplanation ?? '').trim() || (dd.deliveryNotes ?? '').trim();
+                      const timeframeLabel = tf ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === tf)?.label ?? tf) : '';
+                      return hasAny ? (
+                        <div className="mt-2 space-y-1 pt-1 border-t border-border/60">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery details</div>
+                          {dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined && <div><span className="text-muted-foreground">Max radius:</span> <span className="font-medium">{dd.maxDeliveryRadiusMiles} miles</span></div>}
+                          {timeframeLabel && <div><span className="text-muted-foreground">Timeframe:</span> <span className="font-medium">{timeframeLabel}</span></div>}
+                          {(dd.deliveryStatusExplanation ?? '').trim() && <div><span className="text-muted-foreground">Delivery status:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryStatusExplanation ?? '').trim()}</span></div>}
+                          {(dd.deliveryNotes ?? '').trim() && <div><span className="text-muted-foreground">Notes:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryNotes ?? '').trim()}</span></div>}
+                        </div>
+                      ) : null;
+                    })()}
+                    <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
+                    {formData.type === 'fixed' && (
+                      <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-background p-3">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Specifications (all fields)</div>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  {Object.entries(formData.attributes || {})
+                    .filter(([, v]) => v !== undefined && v !== null && String(v).trim?.() !== '')
+                    .map(([k, v]) => {
+                      const label = k
+                        .replaceAll('_', ' ')
+                        .replace(/([a-z])([A-Z])/g, '$1 $2')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                      const isObject = typeof v === 'object';
+                      return (
+                        <div key={k} className="rounded-md border bg-muted/30 p-2">
+                          <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+                          <div className="mt-1 font-medium break-words">
+                            {isObject ? (
+                              <pre className="text-xs whitespace-pre-wrap leading-relaxed">{JSON.stringify(v, null, 2)}</pre>
+                            ) : (
+                              String(v)
+                            )}
+                          </div>
                         </div>
                       );
                     })}
-                    {formData.images.length > 4 && (
-                      <div className="w-full aspect-square rounded-md border border-border/50 bg-muted/50 flex items-center justify-center">
-                        <span className="text-xs font-semibold text-muted-foreground">+{formData.images.length - 4}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {Object.keys(formData.attributes || {}).length === 0 && (
+                    <div className="text-sm text-muted-foreground">—</div>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
-                {formData.verification && (
-                  <Badge variant="secondary" className="font-semibold">Verification</Badge>
-                )}
-                <Badge variant="secondary" className="font-semibold">Seller arranges delivery</Badge>
-              </div>
-              {(() => {
-                const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
-                const tf = (dd.deliveryTimeframe ?? '').trim();
-                const hasAny = (dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined) || tf || (dd.deliveryStatusExplanation ?? '').trim() || (dd.deliveryNotes ?? '').trim();
-                const timeframeLabel = tf ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === tf)?.label ?? tf) : '';
-                return hasAny ? (
-                  <div className="pt-3 border-t border-border/50 space-y-1.5">
-                    <div className="text-sm text-muted-foreground font-medium">Delivery details</div>
-                    {dd.maxDeliveryRadiusMiles !== '' && dd.maxDeliveryRadiusMiles !== undefined && <div className="text-sm"><span className="text-muted-foreground">Max radius:</span> <span className="font-medium">{dd.maxDeliveryRadiusMiles} miles</span></div>}
-                    {timeframeLabel && <div className="text-sm"><span className="text-muted-foreground">Timeframe:</span> <span className="font-medium">{timeframeLabel}</span></div>}
-                    {(dd.deliveryStatusExplanation ?? '').trim() && <div className="text-sm"><span className="text-muted-foreground">Delivery status:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryStatusExplanation ?? '').trim()}</span></div>}
-                    {(dd.deliveryNotes ?? '').trim() && <div className="text-sm"><span className="text-muted-foreground">Notes:</span> <span className="font-medium whitespace-pre-wrap">{(dd.deliveryNotes ?? '').trim()}</span></div>}
-                  </div>
-                ) : null;
-              })()}
             </CardContent>
           </Card>
         </div>
@@ -2042,11 +2170,8 @@ function EditListingPageContent() {
       formData.category !== 'whitetail_breeder' &&
       !sellerAnimalAttestationAccepted
     ) {
-      toast({
-        title: 'Acknowledgment required',
-        description: 'Please check the box to confirm you\'ve read and accept the seller acknowledgment before publishing this animal listing.',
-        variant: 'destructive',
-      });
+      setSellerAckModalChecked(false);
+      setSellerAckModalOpen(true);
       return;
     }
 
@@ -2294,6 +2419,48 @@ function EditListingPageContent() {
             />
           </CardContent>
         </Card>
+
+        {/* Seller acknowledgment at publish time (not in a step) */}
+        <Dialog open={sellerAckModalOpen} onOpenChange={setSellerAckModalOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Seller acknowledgment</DialogTitle>
+              <DialogDescription>
+                You must accept this acknowledgment to publish an animal listing.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 md:p-4">
+              <div className="flex items-start gap-2 md:gap-3">
+                <Checkbox
+                  id="seller-animal-ack-modal-edit"
+                  className="mt-1 min-h-[20px] min-w-[20px]"
+                  checked={sellerAckModalChecked}
+                  onCheckedChange={(checked) => setSellerAckModalChecked(Boolean(checked))}
+                />
+                <Label htmlFor="seller-animal-ack-modal-edit" className="cursor-pointer leading-relaxed text-sm">
+                  I acknowledge I am solely responsible for all representations, permits/records, and legal compliance for this animal listing, and that
+                  Agchange does not take custody of animals.
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSellerAckModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!sellerAckModalChecked}
+                onClick={() => {
+                  setSellerAnimalAttestationAccepted(true);
+                  setSellerAckModalOpen(false);
+                  setSellerAckModalChecked(false);
+                  handleComplete({});
+                }}
+              >
+                Publish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

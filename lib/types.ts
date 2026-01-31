@@ -721,6 +721,41 @@ export interface OrderSellerSnapshot {
 }
 
 // ============================================
+// SAVED ADDRESSES & CHECKOUT (users/{uid}/addresses, users/{uid}/checkout)
+// ============================================
+export interface SavedAddress {
+  id: string;
+  label: string;
+  isDefault: boolean;
+  formattedAddress: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  lat: number;
+  lng: number;
+  provider: 'google' | 'manual';
+  placeId: string;
+  notes?: string;
+  gateCode?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Immutable copy of delivery address at purchase time (order doc). */
+export interface DeliveryAddressSnapshot extends Omit<SavedAddress, 'id' | 'createdAt' | 'updatedAt'> {
+  /** Optional: id of saved address at time of snapshot (for reference only). */
+  savedAddressId?: string;
+}
+
+export interface CheckoutCurrent {
+  deliveryAddressId: string | null;
+  updatedAt: Date;
+}
+
+// ============================================
 // ORDER TIMELINE (SERVER-AUTHORED)
 // ============================================
 export type OrderTimelineActor = 'system' | 'buyer' | 'seller' | 'admin' | 'tpwd' | 'facility';
@@ -878,7 +913,10 @@ export interface Order {
     deliveredAt?: Date;
     buyerConfirmedAt?: Date;
   };
-  
+
+  /** Immutable snapshot of delivery address at order creation (future edits to saved address do not affect this). */
+  deliveryAddress?: DeliveryAddressSnapshot;
+
   /**
    * Dispute/issue tracking
    */

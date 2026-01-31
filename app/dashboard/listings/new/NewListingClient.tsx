@@ -796,7 +796,7 @@ function NewListingPageContent() {
                     />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="text-base font-bold leading-tight">Registered &amp; Specialty Livestock</h3>
+                    <h3 className="text-base font-bold leading-tight">Specialty Livestock</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Axis deer, blackbuck, fallow deer, and other registered ranch species
                     </p>

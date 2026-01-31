@@ -95,7 +95,12 @@ import {
 import { getEligiblePaymentMethods } from '@/lib/payments/gating';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { AnimalRiskAcknowledgmentDialog } from '@/components/legal/AnimalRiskAcknowledgmentDialog';
-import { DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { DELIVERY_TIMEFRAME_OPTIONS, getDeliveryTimeframeLabel } from '@/components/browse/filters/constants';
+import { AddressPickerModal } from '@/components/address/AddressPickerModal';
+
+const useAddressPicker =
+  typeof process !== 'undefined' &&
+  !!(process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() || process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim());
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -147,6 +152,7 @@ export default function ListingDetailInteractiveClient({
   const [isWinningBidder, setIsWinningBidder] = useState(false);
   const [winningBidAmount, setWinningBidAmount] = useState<number | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ amountUsd: number } | null>(null);
   const [buyQuantity, setBuyQuantity] = useState<number>(1);
   const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
@@ -1202,34 +1208,45 @@ export default function ListingDetailInteractiveClient({
                       </div>
                     ) : null}
                     {listing!.type === 'fixed' && (
-                      <Button 
-                        size="lg" 
-                        onClick={handleBuyNow}
-                        disabled={
-                          isPlacingBid ||
-                          checkoutInFlight ||
-                          listing!.status !== 'active' ||
-                          !!(listing as any).offerReservedByOfferId ||
-                          !buyNowAvailability.allowBuyNow
-                        }
-                        className="w-full min-h-[52px] text-base font-bold shadow-lg"
-                      >
-                        {isPlacingBid ? (
-                          <>
-                            <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingCart className="mr-2 h-5 w-5" />
-                            {(listing as any).offerReservedByOfferId
-                              ? 'Reserved'
-                              : buyQuantity > 1
-                              ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
-                              : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
-                          </>
+                      <>
+                        <Button 
+                          size="lg" 
+                          onClick={handleBuyNow}
+                          disabled={
+                            isPlacingBid ||
+                            checkoutInFlight ||
+                            listing!.status !== 'active' ||
+                            !!(listing as any).offerReservedByOfferId ||
+                            !buyNowAvailability.allowBuyNow
+                          }
+                          className="w-full min-h-[52px] text-base font-bold shadow-lg"
+                        >
+                          {isPlacingBid ? (
+                            <>
+                              <div className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="mr-2 h-5 w-5" />
+                              {(listing as any).offerReservedByOfferId
+                                ? 'Reserved'
+                                : buyQuantity > 1
+                                ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
+                                : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
+                            </>
+                          )}
+                        </Button>
+                        {useAddressPicker && user?.uid && (
+                          <button
+                            type="button"
+                            onClick={() => setAddressPickerOpen(true)}
+                            className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                          >
+                            Set delivery address
+                          </button>
                         )}
-                      </Button>
+                      </>
                     )}
                     {listing!.type === 'classified' && (
                       <Button 
@@ -1908,6 +1925,15 @@ export default function ListingDetailInteractiveClient({
                             </>
                           )}
                         </Button>
+                        {useAddressPicker && user?.uid && (
+                          <button
+                            type="button"
+                            onClick={() => setAddressPickerOpen(true)}
+                            className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                          >
+                            Set delivery address
+                          </button>
+                        )}
                         </div>
                       )}
 
@@ -2196,7 +2222,8 @@ export default function ListingDetailInteractiveClient({
                     <div className="flex flex-wrap items-center gap-2">
                       <TrustBadges
                         verified={listing!.trust?.verified || false}
-                        transport={listing!.trust?.transportReady || false}
+                        transport={!!(listing!.trust?.transportReady || listing!.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
+                        deliveryWindowLabel={getDeliveryTimeframeLabel((listing as any).deliveryDetails?.deliveryTimeframe)}
                         size="sm"
                         showTooltips={true}
                         showIcons={true}
@@ -2498,6 +2525,14 @@ export default function ListingDetailInteractiveClient({
       />
 
       <WireInstructionsDialog open={wireDialogOpen} onOpenChange={setWireDialogOpen} data={wireData} />
+
+      {useAddressPicker && user?.uid && (
+        <AddressPickerModal
+          open={addressPickerOpen}
+          onOpenChange={setAddressPickerOpen}
+          userId={user.uid}
+        />
+      )}
 
       {/* eBay-style bid modal is handled inline in the auction CTA block above */}
     </div>
