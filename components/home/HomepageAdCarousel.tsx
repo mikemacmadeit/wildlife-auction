@@ -38,7 +38,7 @@ export function HomepageAdCarousel() {
 
   return (
     <section
-      className="py-3 sm:py-4 md:py-6 border-b border-border/50 bg-card/30 overflow-x-hidden"
+      className="py-1.5 sm:py-3 md:py-6 border-b border-border/50 bg-card/30 overflow-x-hidden"
       aria-label="Partner ads"
     >
       <div className="container mx-auto px-3 sm:px-4 w-full max-w-full min-w-0">
@@ -58,15 +58,15 @@ export function HomepageAdCarousel() {
               <CarouselItem key={index} className="basis-full pl-0 min-w-0">
                 <div
                   className="relative w-full min-w-0 overflow-hidden bg-muted rounded-lg
-                    min-h-[120px] max-h-[165px] aspect-[2/1]
-                    sm:min-h-[140px] sm:max-h-[200px] sm:aspect-[2.2/1]
-                    md:min-h-0 md:max-h-[280px] md:aspect-[2.5/1]"
+                    aspect-[2.5/1] max-h-[130px] min-h-[100px]
+                    sm:aspect-[2.2/1] sm:max-h-[180px] sm:min-h-0
+                    md:aspect-[2.5/1] md:max-h-[280px] md:min-h-0"
                 >
                   <Image
                     src={slide.src}
                     alt={slide.alt}
                     fill
-                    className="object-cover object-center"
+                    className="object-contain object-center sm:object-contain md:object-cover"
                     sizes="(max-width: 640px) 100vw, (max-width: 1280px) 100vw, 1280px"
                     unoptimized
                     priority={index === 0}
