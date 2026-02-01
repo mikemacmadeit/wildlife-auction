@@ -72,7 +72,7 @@ import { cn } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, isGroupLotQuantityMode } from '@/lib/types';
-import { formatQuantityBySex, getQuantityUnitLabel } from '@/lib/listings/quantityBySex';
+import { formatQuantityBySex, getQuantityUnitLabel, getAvailableBySex } from '@/lib/listings/quantityBySex';
 import { useAuth } from '@/hooks/use-auth';
 import { placeBidServer } from '@/lib/api/bids';
 import {
@@ -157,6 +157,8 @@ export default function ListingDetailInteractiveClient({
   const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<{ amountUsd: number } | null>(null);
   const [buyQuantity, setBuyQuantity] = useState<number>(1);
+  const [buyQuantityMale, setBuyQuantityMale] = useState<number>(0);
+  const [buyQuantityFemale, setBuyQuantityFemale] = useState<number>(0);
   const [checkoutErrorOpen, setCheckoutErrorOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<{
     attemptedMethod: PaymentMethodChoice;
@@ -278,15 +280,20 @@ export default function ListingDetailInteractiveClient({
       const unit = Number(listing.price || 0) || 0;
       const isGroup = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
       if (isGroup) return unit; // group lot: listing price is for the entire lot
-      const q = Number.isFinite(buyQuantity) ? Math.max(1, Math.floor(buyQuantity)) : 1;
+      const hasQtyBySex = getAvailableBySex(listing.attributes as any) !== null;
+      const mode = (listing as any)?.attributes?.quantityMode;
+      const isFixedGroup = mode === 'fixed_group' || mode === 'individual';
+      const useQtyBySex = hasQtyBySex && isFixedGroup && !isGroup;
+      const qtyBySex = useQtyBySex ? Math.max(0, Math.floor(buyQuantityMale) + Math.floor(buyQuantityFemale)) : 0;
+      const q = qtyBySex > 0 ? qtyBySex : (Number.isFinite(buyQuantity) ? Math.max(1, Math.floor(buyQuantity)) : 1);
       return unit * q;
     }
     if (listing.type === 'auction') return Number(winningBidAmount || listing.currentBid || listing.startingBid || 0) || 0;
     return 0;
-  }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity]);
+  }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity, buyQuantityMale, buyQuantityFemale]);
 
   const buyNowAvailability = useMemo(() => {
-    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false, allowBuyNow: true, availableLabel: '1 available' };
+    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, canChooseQuantityBySex: false, isGroupListing: false, allowBuyNow: true, availableLabel: '1 available', availableMale: 0, availableFemale: 0 };
     const attrsQty = Number((listing as any)?.attributes?.quantity ?? 1) || 1;
     const total =
       typeof (listing as any)?.quantityTotal === 'number' && Number.isFinite((listing as any).quantityTotal)
@@ -297,25 +304,44 @@ export default function ListingDetailInteractiveClient({
         ? Math.max(0, Math.floor((listing as any).quantityAvailable))
         : total;
     const isGroupListing = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
-    const canChooseQuantity = listing.type === 'fixed' && available > 1 && !isGroupListing;
+    const mode = (listing as any)?.attributes?.quantityMode;
+    const isFixedGroup = mode === 'fixed_group' || mode === 'individual';
+    const availableBySex = getAvailableBySex(listing.attributes as any);
+    const canChooseQuantityBySex = listing.type === 'fixed' && isFixedGroup && !isGroupListing && availableBySex !== null && (availableBySex.male > 0 || availableBySex.female > 0);
+    const canChooseQuantity = listing.type === 'fixed' && available > 1 && !isGroupListing && !canChooseQuantityBySex;
     const allowBuyNow = available > 0 || (listing.status === 'active' && total > 0);
-    // For fixed_group with quantity-by-sex, show breakdown (e.g. "5 bulls, 10 heifers available")
     const qtyDisplay = formatQuantityBySex(listing.category as string, listing.attributes as any);
     const availableLabel = qtyDisplay.hasBreakdown && qtyDisplay.breakdown
       ? `${qtyDisplay.breakdown} available`
       : `${available} available`;
-    return { total, available, canChooseQuantity, isGroupListing, allowBuyNow, availableLabel };
+    return { total, available, canChooseQuantity, canChooseQuantityBySex, isGroupListing, allowBuyNow, availableLabel, availableMale: availableBySex?.male ?? 0, availableFemale: availableBySex?.female ?? 0 };
   }, [listing]);
 
-  // Keep quantity selection valid when listing loads/updates. For group listings, always use full quantity.
+  const qtyBySexInitializedRef = useRef<string | null>(null);
+  // Keep quantity selection valid when listing loads/updates.
   useEffect(() => {
     const max = buyNowAvailability.available || 1;
+    if (buyNowAvailability.canChooseQuantityBySex) {
+      const listingId = listing?.id ?? '';
+      const am = buyNowAvailability.availableMale;
+      const af = buyNowAvailability.availableFemale;
+      if (qtyBySexInitializedRef.current !== listingId) {
+        qtyBySexInitializedRef.current = listingId;
+        setBuyQuantityMale(am > 0 ? 1 : 0);
+        setBuyQuantityFemale(af > 0 && am === 0 ? 1 : 0);
+      } else {
+        setBuyQuantityMale((prev) => Math.min(Math.max(0, prev), am));
+        setBuyQuantityFemale((prev) => Math.min(Math.max(0, prev), af));
+      }
+      return;
+    }
+    qtyBySexInitializedRef.current = null;
     setBuyQuantity((prev) => {
       if (buyNowAvailability.isGroupListing) return Math.max(1, max);
       const next = Number.isFinite(prev) ? Math.max(1, Math.floor(prev)) : 1;
       return Math.min(next, Math.max(1, max));
     });
-  }, [buyNowAvailability.available, buyNowAvailability.isGroupListing]);
+  }, [buyNowAvailability.available, buyNowAvailability.availableMale, buyNowAvailability.availableFemale, buyNowAvailability.canChooseQuantityBySex, buyNowAvailability.isGroupListing]);
 
   // Debug: log Buy Now disabling state once per fixed listing load (runtime evidence for unclickable Buy Now).
   const buyNowDebugLogged = useRef<string | null>(null);
@@ -828,11 +854,14 @@ export default function ListingDetailInteractiveClient({
 
       setIsPlacingBid(true);
       // Group lot: entire lot is one price; always send quantity 1 so Stripe total = listing price (not price × count).
+      // Quantity-by-sex: buyer selects male + female; total quantity = sum.
       const qty =
         listing.type === 'fixed'
           ? buyNowAvailability.isGroupListing
             ? 1
-            : Math.max(1, Math.min(buyQuantity, buyNowAvailability.available || 1))
+            : buyNowAvailability.canChooseQuantityBySex
+              ? Math.max(0, Math.floor(buyQuantityMale) + Math.floor(buyQuantityFemale))
+              : Math.max(1, Math.min(buyQuantity, buyNowAvailability.available || 1))
           : 1;
 
       // Client-side eligibility guard for nicer UX (server also enforces).
@@ -844,9 +873,14 @@ export default function ListingDetailInteractiveClient({
         );
       }
       const { createCheckoutSession } = await import('@/lib/stripe/api');
-      const { url } = await createCheckoutSession(listing.id, undefined, method, qty, {
+      const opts: { buyerAcksAnimalRisk?: boolean; quantityMale?: number; quantityFemale?: number } = {
         buyerAcksAnimalRisk: isAnimalListing ? animalRiskAcked : undefined,
-      });
+      };
+      if (buyNowAvailability.canChooseQuantityBySex && qty > 0) {
+        opts.quantityMale = Math.min(Math.floor(buyQuantityMale), buyNowAvailability.availableMale);
+        opts.quantityFemale = Math.min(Math.floor(buyQuantityFemale), buyNowAvailability.availableFemale);
+      }
+      const { url } = await createCheckoutSession(listing.id, undefined, method, qty, opts);
       window.location.href = url;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
@@ -1182,7 +1216,54 @@ export default function ListingDetailInteractiveClient({
               {!isSold && listing!.type !== 'auction' && (
                 <Card className="border-2">
                   <CardContent className="pt-6">
-                    {listing!.type === 'fixed' && buyNowAvailability.canChooseQuantity ? (
+                    {listing!.type === 'fixed' && buyNowAvailability.canChooseQuantityBySex ? (
+                      <div className="mb-4 space-y-3">
+                        <Label className="text-sm font-semibold">Select quantity by sex</Label>
+                        <div className="flex flex-wrap items-center gap-4">
+                          {buyNowAvailability.availableMale > 0 && (
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor="qty-male-mobile" className="text-xs text-muted-foreground whitespace-nowrap">Males</Label>
+                              <Input
+                                id="qty-male-mobile"
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={buyNowAvailability.availableMale}
+                                value={buyQuantityMale}
+                                onChange={(e) => {
+                                  const n = Number(e.target.value);
+                                  if (!Number.isFinite(n)) return;
+                                  setBuyQuantityMale(Math.max(0, Math.min(Math.floor(n), buyNowAvailability.availableMale)));
+                                }}
+                                className="w-20"
+                              />
+                              <span className="text-xs text-muted-foreground">of {buyNowAvailability.availableMale}</span>
+                            </div>
+                          )}
+                          {buyNowAvailability.availableFemale > 0 && (
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor="qty-female-mobile" className="text-xs text-muted-foreground whitespace-nowrap">Females</Label>
+                              <Input
+                                id="qty-female-mobile"
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={buyNowAvailability.availableFemale}
+                                value={buyQuantityFemale}
+                                onChange={(e) => {
+                                  const n = Number(e.target.value);
+                                  if (!Number.isFinite(n)) return;
+                                  setBuyQuantityFemale(Math.max(0, Math.min(Math.floor(n), buyNowAvailability.availableFemale)));
+                                }}
+                                className="w-20"
+                              />
+                              <span className="text-xs text-muted-foreground">of {buyNowAvailability.availableFemale}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{buyNowAvailability.availableLabel}</div>
+                      </div>
+                    ) : listing!.type === 'fixed' && buyNowAvailability.canChooseQuantity ? (
                       <div className="mb-4 space-y-2">
                         <Label className="text-sm font-semibold">Quantity</Label>
                         <div className="flex items-center gap-3">
@@ -1224,7 +1305,8 @@ export default function ListingDetailInteractiveClient({
                             checkoutInFlight ||
                             listing!.status !== 'active' ||
                             !!(listing as any).offerReservedByOfferId ||
-                            !buyNowAvailability.allowBuyNow
+                            !buyNowAvailability.allowBuyNow ||
+                            (buyNowAvailability.canChooseQuantityBySex && buyQuantityMale + buyQuantityFemale < 1)
                           }
                           className="w-full min-h-[52px] text-base font-bold shadow-lg"
                         >
@@ -1238,6 +1320,10 @@ export default function ListingDetailInteractiveClient({
                               <ShoppingCart className="mr-2 h-5 w-5" />
                               {(listing as any).offerReservedByOfferId
                                 ? 'Reserved'
+                                : buyNowAvailability.canChooseQuantityBySex
+                                ? buyQuantityMale + buyQuantityFemale > 0
+                                  ? `Buy ${buyQuantityMale + buyQuantityFemale} (${buyQuantityMale}m, ${buyQuantityFemale}f) — $${checkoutAmountUsd.toLocaleString()}`
+                                  : 'Select quantity'
                                 : buyQuantity > 1
                                 ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
                                 : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
@@ -1882,7 +1968,54 @@ export default function ListingDetailInteractiveClient({
 
                       {!isSold && listing!.type === 'fixed' && (
                         <div className="space-y-3">
-                          {buyNowAvailability.canChooseQuantity ? (
+                          {buyNowAvailability.canChooseQuantityBySex ? (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold">Select quantity by sex</Label>
+                              <div className="flex flex-wrap items-center gap-4">
+                                {buyNowAvailability.availableMale > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <Label htmlFor="qty-male-desktop" className="text-xs text-muted-foreground whitespace-nowrap">Males</Label>
+                                    <Input
+                                      id="qty-male-desktop"
+                                      type="number"
+                                      inputMode="numeric"
+                                      min={0}
+                                      max={buyNowAvailability.availableMale}
+                                      value={buyQuantityMale}
+                                      onChange={(e) => {
+                                        const n = Number(e.target.value);
+                                        if (!Number.isFinite(n)) return;
+                                        setBuyQuantityMale(Math.max(0, Math.min(Math.floor(n), buyNowAvailability.availableMale)));
+                                      }}
+                                      className="w-20"
+                                    />
+                                    <span className="text-xs text-muted-foreground">of {buyNowAvailability.availableMale}</span>
+                                  </div>
+                                )}
+                                {buyNowAvailability.availableFemale > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <Label htmlFor="qty-female-desktop" className="text-xs text-muted-foreground whitespace-nowrap">Females</Label>
+                                    <Input
+                                      id="qty-female-desktop"
+                                      type="number"
+                                      inputMode="numeric"
+                                      min={0}
+                                      max={buyNowAvailability.availableFemale}
+                                      value={buyQuantityFemale}
+                                      onChange={(e) => {
+                                        const n = Number(e.target.value);
+                                        if (!Number.isFinite(n)) return;
+                                        setBuyQuantityFemale(Math.max(0, Math.min(Math.floor(n), buyNowAvailability.availableFemale)));
+                                      }}
+                                      className="w-20"
+                                    />
+                                    <span className="text-xs text-muted-foreground">of {buyNowAvailability.availableFemale}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{buyNowAvailability.availableLabel}</div>
+                            </div>
+                          ) : buyNowAvailability.canChooseQuantity ? (
                             <div className="space-y-2">
                               <Label className="text-sm font-semibold">Quantity</Label>
                               <div className="flex items-center gap-3">
@@ -1922,7 +2055,8 @@ export default function ListingDetailInteractiveClient({
                             checkoutInFlight ||
                             listing!.status !== 'active' ||
                             !!(listing as any).offerReservedByOfferId ||
-                            !buyNowAvailability.allowBuyNow
+                            !buyNowAvailability.allowBuyNow ||
+                            (buyNowAvailability.canChooseQuantityBySex && buyQuantityMale + buyQuantityFemale < 1)
                           }
                           className="w-full min-h-[52px] sm:min-h-[60px] text-base sm:text-lg font-bold shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >
@@ -1936,6 +2070,10 @@ export default function ListingDetailInteractiveClient({
                               <ShoppingCart className="mr-2 h-5 w-5" />
                               {(listing as any).offerReservedByOfferId
                                 ? 'Reserved'
+                                : buyNowAvailability.canChooseQuantityBySex
+                                ? buyQuantityMale + buyQuantityFemale > 0
+                                  ? `Buy ${buyQuantityMale + buyQuantityFemale} (${buyQuantityMale}m, ${buyQuantityFemale}f) — $${checkoutAmountUsd.toLocaleString()}`
+                                  : 'Select quantity'
                                 : buyQuantity > 1
                                 ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
                                 : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}

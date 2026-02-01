@@ -17,6 +17,11 @@ export const createCheckoutSessionSchema = z.object({
    */
   quantity: z.number().int().positive().max(100).optional(),
   /**
+   * Quantity by sex for fixed_group listings (quantityMale + quantityFemale = quantity).
+   */
+  quantityMale: z.number().int().min(0).max(100).optional(),
+  quantityFemale: z.number().int().min(0).max(100).optional(),
+  /**
    * Payment method selection step.
    * - card: Credit/Debit via Stripe Checkout
    * - ach_debit: US bank account (ACH) via Stripe Checkout

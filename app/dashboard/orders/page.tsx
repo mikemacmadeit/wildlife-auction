@@ -316,9 +316,6 @@ export default function OrdersPage() {
           // Track this session so we can poll for the corresponding Firestore order.
           const listingIdFromMeta =
             (session as any)?.metadata?.listingId ? String((session as any).metadata.listingId) : null;
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:setPendingCheckout',message:'pendingCheckout set after verify-session',data:{sessionIdPrefix:sessionId.slice(0,18),isProcessing,listingId:listingIdFromMeta||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-          // #endregion
           setPendingCheckout({
             sessionId,
             listingId: listingIdFromMeta,
@@ -481,11 +478,14 @@ export default function OrdersPage() {
     void hydrateListingTitle();
 
     const startedAt = Date.now();
-    const maxMs = 90_000;
-    const intervalMs = 3000; // Poll every 3s so failed reconcile retries sooner
+    const maxMs = 120_000; // 2 min — give webhook + reconcile more time
+    const intervalMs = 5000; // Poll every 5s — stays under rate limit
     const sessionId = pendingCheckout.sessionId;
+    const rateLimitedUntilRef = { current: 0 };
 
     async function tick() {
+      if (Date.now() < rateLimitedUntilRef.current) return;
+
       // If the webhook pipeline is delayed/misconfigured, attempt a safe, authenticated reconcile once.
       // IMPORTANT: do this even if the order already exists, because create-session pre-creates an order skeleton.
       if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
@@ -500,17 +500,17 @@ export default function OrdersPage() {
             body: JSON.stringify({ session_id: sessionId }),
           });
           const reconcileData = await reconcileRes.json().catch(() => ({}));
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:reconcileResponse',message:'reconcile-session response',data:{ok:reconcileData?.ok,reason:reconcileData?.reason||null,orderId:reconcileData?.orderId||null,orderStatus:reconcileData?.orderStatus||null,status:reconcileRes.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'})}).catch(()=>{});
-          // #endregion
-          // Only mark as attempted when reconcile succeeded — allows retry on failure
+
+          if (reconcileRes.status === 429) {
+            const retrySec = Math.min(60, Math.ceil(Number(reconcileData?.retryAfter) || 60));
+            rateLimitedUntilRef.current = Date.now() + retrySec * 1000;
+            return;
+          }
+
           if (reconcileData?.ok === true) {
             reconcileAttemptedRef.current[sessionId] = true;
           }
-        } catch (e) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:reconcileCatch',message:'reconcile-session threw',data:{err:String((e as Error)?.message||'')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-          // #endregion
+        } catch {
           // Non-blocking: polling continues; user can still see the “finalizing” row.
         }
         // Give Firestore a moment to make the order visible after reconcile (avoids "order not found" on first tick).
@@ -520,18 +520,8 @@ export default function OrdersPage() {
 
       try {
         const order = await getOrderByCheckoutSessionId(sessionId);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:getOrderByCheckoutSessionId',message:'getOrderByCheckoutSessionId result',data:{found:!!order?.id,orderId:order?.id||null,orderStatus:order?.status||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H3'})}).catch(()=>{});
-        // #endregion
         if (cancelled) return;
         if (order?.id) {
-          // My Purchases now includes pending/awaiting_* from checkout (getOrdersForUser), so order appears immediately.
-          // Clear the card when the order is in the list (any status).
-          // #region agent log
-          const hiddenStatuses = ['pending', 'awaiting_bank_transfer', 'awaiting_wire', 'cancelled'];
-          const wasHidden = hiddenStatuses.includes(order.status ?? '');
-          if (wasHidden) fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:orderFoundHidden',message:'order found, was hidden status (now shown in list)',data:{orderId:order.id,orderStatus:order.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-          // #endregion
           let list = await loadOrders({ silent: true });
           if (!Array.isArray(list) || !list.some((o: OrderWithListing) => o.id === order.id)) {
             await new Promise((r) => setTimeout(r, 1500));
@@ -539,9 +529,6 @@ export default function OrdersPage() {
           }
           if (cancelled) return;
           if (Array.isArray(list) && list.some((o: OrderWithListing) => o.id === order.id)) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:clearPending',message:'clearing pendingCheckout because order in list',data:{orderId:order.id,orderStatus:order.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-            // #endregion
             setHighlightOrderId(order.id);
             setPendingCheckout(null);
             setPendingCheckoutListingTitle(null);
@@ -579,20 +566,42 @@ export default function OrdersPage() {
       await loadOrders({ silent: true });
     }
 
-    const handle = window.setInterval(() => {
+    const handle = window.setInterval(async () => {
       if (Date.now() - startedAt > maxMs) {
         window.clearInterval(handle);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:90sTimeout',message:'clearing pendingCheckout after 90s timeout',data:{sessionIdPrefix:sessionId.slice(0,18)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
-        // Stop polling and clear the pending row after the time budget.
+        // One final reconcile attempt before clearing
+        if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
+          try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/stripe/checkout/reconcile-session', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+              body: JSON.stringify({ session_id: sessionId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (data?.ok === true) {
+              reconcileAttemptedRef.current[sessionId] = true;
+              await loadOrders({ silent: true });
+              const order = await getOrderByCheckoutSessionId(sessionId);
+              if (order?.id) {
+                setHighlightOrderId(order.id);
+                setPendingCheckout(null);
+                setPendingCheckoutListingTitle(null);
+                try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch {}
+                return;
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
         setPendingCheckout(null);
         setPendingCheckoutListingTitle(null);
-        try {
-          sessionStorage.removeItem('we:pending-checkout:v1');
-        } catch {
-          // ignore
-        }
+        try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch {}
+        toast({
+          title: 'Still processing',
+          description: 'If your payment completed, the order may take a few minutes to appear. Refresh the page or check your email for confirmation.',
+        });
         return;
       }
       void tick();

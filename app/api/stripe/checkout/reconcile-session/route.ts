@@ -90,16 +90,6 @@ export async function POST(request: Request) {
   }
   const callerUid = decoded.uid as string;
 
-  // Rate limiting (post-auth) - avoid shared-IP false positives.
-  const rlKey = `reconcile:user:${callerUid}`;
-  const rl = await checkRateLimitByKey(rlKey, RATE_LIMITS.checkout);
-  if (!rl.allowed) {
-    return json(
-      { error: rl.error || 'Too many requests. Please try again later.', retryAfter: rl.retryAfter },
-      { status: rl.status ?? 429, headers: { 'Retry-After': String(rl.retryAfter) } }
-    );
-  }
-
   // Parse body
   let raw: any;
   try {
@@ -116,6 +106,16 @@ export async function POST(request: Request) {
   }
 
   const sessionId = parsed.data.session_id;
+
+  // Rate limiting (post-auth) - key by user+session so each checkout gets its own budget; allow retries.
+  const rlKey = `reconcile:user:${callerUid}:session:${sessionId}`;
+  const rl = await checkRateLimitByKey(rlKey, RATE_LIMITS.reconcile);
+  if (!rl.allowed) {
+    return json(
+      { error: rl.error || 'Too many requests. Please try again later.', retryAfter: rl.retryAfter },
+      { status: rl.status ?? 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+    );
+  }
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['payment_intent'] });

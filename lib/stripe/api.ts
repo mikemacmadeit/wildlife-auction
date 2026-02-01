@@ -281,7 +281,7 @@ export async function createCheckoutSession(
   offerId?: string,
   paymentMethod?: 'card' | 'ach_debit' | 'wire',
   quantity?: number,
-  opts?: { buyerAcksAnimalRisk?: boolean }
+  opts?: { buyerAcksAnimalRisk?: boolean; quantityMale?: number; quantityFemale?: number }
 ): Promise<{ url: string; sessionId: string }> {
   const user = auth.currentUser;
   if (!user) {
@@ -311,6 +311,8 @@ export async function createCheckoutSession(
       ...(paymentMethod ? { paymentMethod } : {}),
       ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
       ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
+      ...(typeof opts?.quantityMale === 'number' ? { quantityMale: opts.quantityMale } : {}),
+      ...(typeof opts?.quantityFemale === 'number' ? { quantityFemale: opts.quantityFemale } : {}),
     }),
   });
 
@@ -327,6 +329,8 @@ export async function createCheckoutSession(
           ...(paymentMethod ? { paymentMethod } : {}),
           ...(typeof quantity === 'number' && Number.isFinite(quantity) ? { quantity } : {}),
           ...(opts?.buyerAcksAnimalRisk === true ? { buyerAcksAnimalRisk: true } : {}),
+          ...(typeof opts?.quantityMale === 'number' ? { quantityMale: opts.quantityMale } : {}),
+          ...(typeof opts?.quantityFemale === 'number' ? { quantityFemale: opts.quantityFemale } : {}),
         }),
       });
     }

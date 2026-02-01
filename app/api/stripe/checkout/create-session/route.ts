@@ -154,7 +154,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { listingId, offerId, quantity: quantityRaw, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
+    const { listingId, offerId, quantity: quantityRaw, quantityMale: quantityMaleRaw, quantityFemale: quantityFemaleRaw, paymentMethod: paymentMethodRaw, buyerAcksAnimalRisk } = validation.data as any;
 
     // Back-compat: clients may still send "ach" (older UI); normalize to "ach_debit".
     const normalizedPaymentMethod =
@@ -162,6 +162,8 @@ export async function POST(request: Request) {
     const paymentMethod = normalizedPaymentMethod as 'card' | 'ach_debit' | 'wire';
     const requestedQuantity =
       typeof quantityRaw === 'number' && Number.isFinite(quantityRaw) ? Math.max(1, Math.floor(quantityRaw)) : 1;
+    const requestedQuantityMale = typeof quantityMaleRaw === 'number' && Number.isFinite(quantityMaleRaw) ? Math.max(0, Math.floor(quantityMaleRaw)) : undefined;
+    const requestedQuantityFemale = typeof quantityFemaleRaw === 'number' && Number.isFinite(quantityFemaleRaw) ? Math.max(0, Math.floor(quantityFemaleRaw)) : undefined;
 
     // Rate limiting (post-auth, keyed per user+listing) to prevent shared-IP false positives.
     // This avoids scenarios where a legitimate first checkout attempt gets blocked by other users behind the same IP.
@@ -458,18 +460,37 @@ export async function POST(request: Request) {
 
     // Multi-quantity support:
     // - For offers: use offer.quantity (if present, otherwise default to 1)
-    // - For fixed listings without offers: use requestedQuantity
+    // - For fixed listings without offers: use requestedQuantity or (quantityMale + quantityFemale) for fixed_group by-sex
     // - For auctions: always 1
     const offerQuantity = offerData && typeof offerData.quantity === 'number' && offerData.quantity >= 1 ? Math.floor(offerData.quantity) : 1;
     const isMultiQuantityEligible = listingData.type === 'fixed' && !offerId;
-    const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+    const attrs = (listingData as any)?.attributes ?? {};
+    const attrsQty = Number(attrs?.quantity ?? 1) || 1;
+    const attrsMale = Math.max(0, Math.floor(attrs?.quantityMale ?? 0));
+    const attrsFemale = Math.max(0, Math.floor(attrs?.quantityFemale ?? 0));
+    const hasQuantityBySex = attrsMale > 0 || attrsFemale > 0;
     const quantityTotal =
       typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
         ? Math.max(1, Math.floor((listingData as any).quantityTotal))
         : Math.max(1, Math.floor(attrsQty));
-    const quantityRequested = offerId ? offerQuantity : (isMultiQuantityEligible ? Math.min(requestedQuantity, 100) : 1);
+    let quantityRequested: number;
+    if (offerId) {
+      quantityRequested = offerQuantity;
+    } else if (isMultiQuantityEligible && hasQuantityBySex && (requestedQuantityMale !== undefined || requestedQuantityFemale !== undefined)) {
+      const male = requestedQuantityMale ?? 0;
+      const female = requestedQuantityFemale ?? 0;
+      if (male > attrsMale || female > attrsFemale) {
+        return NextResponse.json({ error: 'Requested quantity exceeds availability for this sex.', code: 'QUANTITY_EXCEEDS_AVAILABLE' }, { status: 400 });
+      }
+      quantityRequested = Math.min(male + female, 100);
+      if (quantityRequested < 1) {
+        return NextResponse.json({ error: 'Select at least one animal to purchase.', code: 'QUANTITY_REQUIRED' }, { status: 400 });
+      }
+    } else {
+      quantityRequested = isMultiQuantityEligible ? Math.min(requestedQuantity, 100) : 1;
+    }
 
-    if (!isMultiQuantityEligible && requestedQuantity !== 1) {
+    if (!isMultiQuantityEligible && requestedQuantity !== 1 && !(hasQuantityBySex && requestedQuantityMale !== undefined)) {
       return NextResponse.json({ error: 'Quantity is only supported for Buy Now listings', code: 'QUANTITY_NOT_SUPPORTED' }, { status: 400 });
     }
 

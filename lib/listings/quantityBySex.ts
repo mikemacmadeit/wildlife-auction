@@ -94,6 +94,18 @@ export function formatQuantityBySex(
 }
 
 /**
+ * Get available counts by sex for fixed_group listings (for quantity selector max values).
+ * Returns { male: N, female: N } or null when no breakdown.
+ */
+export function getAvailableBySex(attrs: ListingAttributes | undefined | null): { male: number; female: number } | null {
+  if (!attrs) return null;
+  const male = Math.max(0, Math.floor((attrs as any).quantityMale ?? 0));
+  const female = Math.max(0, Math.floor((attrs as any).quantityFemale ?? 0));
+  if (male === 0 && female === 0) return null;
+  return { male, female };
+}
+
+/**
  * Unit label for category (head, animals, horses, dogs, deer)
  */
 export function getQuantityUnitLabel(category: string, total: number): string {
