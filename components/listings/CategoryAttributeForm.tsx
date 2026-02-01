@@ -56,14 +56,29 @@ interface CategoryAttributeFormProps {
   attributes: Partial<ListingAttributes>;
   onChange: (attributes: Partial<ListingAttributes>) => void;
   errors?: string[];
+  /** When 'auction', fixed_group is disabled — auctions allow only single or group_lot. */
+  listingType?: 'auction' | 'fixed';
 }
 
-export function CategoryAttributeForm({ category, attributes, onChange, errors = [] }: CategoryAttributeFormProps) {
+export function CategoryAttributeForm({ category, attributes, onChange, errors = [], listingType = 'fixed' }: CategoryAttributeFormProps) {
   const updateAttribute = (key: string, value: any) => {
     onChange({ ...attributes, [key]: value });
   };
   
   const hasError = (fieldName: string) => errors.includes(fieldName);
+
+  const isAuction = listingType === 'auction';
+  const disableFixedGroup = isAuction;
+
+  // Auctions: only single or group_lot allowed. If fixed_group is selected, switch to group_lot.
+  useEffect(() => {
+    if (!disableFixedGroup) return;
+    const mode = normalizeQuantityMode((attributes as any)?.quantityMode, (attributes as any)?.quantity);
+    if (mode === 'fixed_group') {
+      updateAttribute('quantityMode', 'group_lot');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingType]);
 
   // IMPORTANT: Some required fields (like Quantity) visually default to 1, but were not being written into state
   // until the user interacted. This caused validation failures with no obvious missing input.
@@ -198,11 +213,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="horse-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="horse-qty-fixed" className="cursor-pointer flex-1">
+            <div className={cn('flex items-start space-x-3 rounded-lg border p-3', disableFixedGroup && 'opacity-60')}>
+              <RadioGroupItem value="fixed_group" id="horse-qty-fixed" className="mt-0.5" disabled={disableFixedGroup} />
+              <Label htmlFor="horse-qty-fixed" className={cn('cursor-pointer flex-1', disableFixedGroup && 'cursor-not-allowed')}>
                 <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+                <div className="text-sm text-muted-foreground">{disableFixedGroup ? 'Not available for auctions. Use Single or Group Lot.' : 'Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.'}</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -464,11 +479,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="whitetail-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="whitetail-qty-fixed" className="cursor-pointer flex-1">
+            <div className={cn('flex items-start space-x-3 rounded-lg border p-3', disableFixedGroup && 'opacity-60')}>
+              <RadioGroupItem value="fixed_group" id="whitetail-qty-fixed" className="mt-0.5" disabled={disableFixedGroup} />
+              <Label htmlFor="whitetail-qty-fixed" className={cn('cursor-pointer flex-1', disableFixedGroup && 'cursor-not-allowed')}>
                 <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+                <div className="text-sm text-muted-foreground">{disableFixedGroup ? 'Not available for auctions. Use Single or Group Lot.' : 'Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.'}</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -799,11 +814,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="wildlife-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="wildlife-qty-fixed" className="cursor-pointer flex-1">
+            <div className={cn('flex items-start space-x-3 rounded-lg border p-3', disableFixedGroup && 'opacity-60')}>
+              <RadioGroupItem value="fixed_group" id="wildlife-qty-fixed" className="mt-0.5" disabled={disableFixedGroup} />
+              <Label htmlFor="wildlife-qty-fixed" className={cn('cursor-pointer flex-1', disableFixedGroup && 'cursor-not-allowed')}>
                 <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.</div>
+                <div className="text-sm text-muted-foreground">{disableFixedGroup ? 'Not available for auctions. Use Single or Group Lot.' : 'Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, cohorts.'}</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -1015,11 +1030,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="cattle-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="cattle-qty-fixed" className="cursor-pointer flex-1">
+            <div className={cn('flex items-start space-x-3 rounded-lg border p-3', disableFixedGroup && 'opacity-60')}>
+              <RadioGroupItem value="fixed_group" id="cattle-qty-fixed" className="mt-0.5" disabled={disableFixedGroup} />
+              <Label htmlFor="cattle-qty-fixed" className={cn('cursor-pointer flex-1', disableFixedGroup && 'cursor-not-allowed')}>
                 <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, heifers, yearlings.</div>
+                <div className="text-sm text-muted-foreground">{disableFixedGroup ? 'Not available for auctions. Use Single or Group Lot.' : 'Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for pens, heifers, yearlings.'}</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -1285,11 +1300,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 <div className="text-sm text-muted-foreground">One animal, one price.</div>
               </Label>
             </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="farm-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="farm-qty-fixed" className="cursor-pointer flex-1">
+            <div className={cn('flex items-start space-x-3 rounded-lg border p-3', disableFixedGroup && 'opacity-60')}>
+              <RadioGroupItem value="fixed_group" id="farm-qty-fixed" className="mt-0.5" disabled={disableFixedGroup} />
+              <Label htmlFor="farm-qty-fixed" className={cn('cursor-pointer flex-1', disableFixedGroup && 'cursor-not-allowed')}>
                 <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, per-unit price × quantity.</div>
+                <div className="text-sm text-muted-foreground">{disableFixedGroup ? 'Not available for auctions. Use Single or Group Lot.' : 'Multiple animals, per-unit price × quantity.'}</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -1446,11 +1461,11 @@ export function CategoryAttributeForm({ category, attributes, onChange, errors =
                 <div className="text-sm text-muted-foreground">One animal, one price. Clear, obvious, zero ambiguity.</div>
               </Label>
             </div>
-            <div className="flex items-start space-x-3 rounded-lg border p-3">
-              <RadioGroupItem value="fixed_group" id="dog-qty-fixed" className="mt-0.5" />
-              <Label htmlFor="dog-qty-fixed" className="cursor-pointer flex-1">
+            <div className={cn('flex items-start space-x-3 rounded-lg border p-3', disableFixedGroup && 'opacity-60')}>
+              <RadioGroupItem value="fixed_group" id="dog-qty-fixed" className="mt-0.5" disabled={disableFixedGroup} />
+              <Label htmlFor="dog-qty-fixed" className={cn('cursor-pointer flex-1', disableFixedGroup && 'cursor-not-allowed')}>
                 <div className="font-medium">Fixed Group</div>
-                <div className="text-sm text-muted-foreground">Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for litters, cohorts.</div>
+                <div className="text-sm text-muted-foreground">{disableFixedGroup ? 'Not available for auctions. Use Single or Group Lot.' : 'Multiple animals, each priced the same (e.g. $/head × quantity selected). Good for litters, cohorts.'}</div>
               </Label>
             </div>
             <div className="flex items-start space-x-3 rounded-lg border p-3">

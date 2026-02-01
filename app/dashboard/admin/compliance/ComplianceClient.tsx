@@ -74,6 +74,9 @@ type SellerPermit = {
   reviewedAt?: string | null; // ISO
   reviewedBy?: string | null;
   updatedAt?: string | null;
+  sellerDisplayName?: string | null;
+  sellerEmail?: string | null;
+  sellerCreatedAt?: string | null; // ISO
 };
 
 type HoldRow = {
@@ -1097,29 +1100,39 @@ export default function ComplianceClient() {
                 <Card key={p.sellerId} className="border-2">
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <div className="font-semibold">Seller</div>
-                          <Link href={`/dashboard/admin/users/${p.sellerId}`} className="font-mono text-xs text-primary hover:underline">
+                          <div className="font-semibold">
+                            {p.sellerDisplayName ? `${p.sellerDisplayName}` : 'Seller'}
+                          </div>
+                          <Link href={`/dashboard/admin/users/${p.sellerId}`} className="font-mono text-xs text-primary hover:underline truncate">
                             {p.sellerId}
                           </Link>
-                          <Badge variant="outline" className="capitalize">
+                          <Badge variant="outline" className="capitalize shrink-0">
                             {p.status === 'pending' ? 'Pending review' : p.status}
                           </Badge>
                         </div>
+                        {p.sellerEmail ? (
+                          <div className="text-sm text-muted-foreground truncate" title={p.sellerEmail}>
+                            {p.sellerEmail}
+                          </div>
+                        ) : null}
                         {p.permitNumber ? (
                           <div className="text-sm text-muted-foreground">
                             Permit #: <span className="font-mono">{p.permitNumber}</span>
                           </div>
                         ) : null}
-                        {p.uploadedAt ? (
-                          <div className="text-xs text-muted-foreground">
-                            Submitted: {new Date(p.uploadedAt).toLocaleString()}
-                          </div>
-                        ) : null}
+                        <div className="flex flex-wrap gap-x-4 gap-y-0 text-xs text-muted-foreground">
+                          {p.uploadedAt ? (
+                            <span>Submitted: {new Date(p.uploadedAt).toLocaleString()}</span>
+                          ) : null}
+                          {p.sellerCreatedAt ? (
+                            <span>Joined: {new Date(p.sellerCreatedAt).toLocaleDateString()}</span>
+                          ) : null}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <Button
                           variant="outline"
                           disabled={!p.documentUrl}
@@ -1151,11 +1164,40 @@ export default function ComplianceClient() {
 
               {selectedPermit ? (
                 <div className="space-y-4">
-                  <div className="text-sm">
-                    Seller:{' '}
-                    <Link href={`/dashboard/admin/users/${selectedPermit.sellerId}`} className="font-mono text-primary hover:underline">
-                      {selectedPermit.sellerId}
-                    </Link>
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                    <div className="font-semibold">Seller information</div>
+                    <div className="grid gap-1 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Name: </span>
+                        {selectedPermit.sellerDisplayName || '—'}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Email: </span>
+                        {selectedPermit.sellerEmail ? (
+                          <a href={`mailto:${selectedPermit.sellerEmail}`} className="text-primary hover:underline">{selectedPermit.sellerEmail}</a>
+                        ) : (
+                          '—'
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">User ID: </span>
+                        <Link href={`/dashboard/admin/users/${selectedPermit.sellerId}`} className="font-mono text-primary hover:underline">
+                          {selectedPermit.sellerId}
+                        </Link>
+                      </div>
+                      {selectedPermit.sellerCreatedAt ? (
+                        <div>
+                          <span className="text-muted-foreground">Joined: </span>
+                          {new Date(selectedPermit.sellerCreatedAt).toLocaleDateString()}
+                        </div>
+                      ) : null}
+                      {selectedPermit.permitNumber ? (
+                        <div>
+                          <span className="text-muted-foreground">Permit #: </span>
+                          <span className="font-mono">{selectedPermit.permitNumber}</span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
                   {selectedPermit.documentUrl ? (
@@ -1283,17 +1325,24 @@ export default function ComplianceClient() {
                       <Card key={p.sellerId} className="border border-primary/20 bg-primary/5">
                         <CardContent className="p-4">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1">
+                            <div className="space-y-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <div className="font-semibold">Seller</div>
-                                <Link href={`/dashboard/admin/users/${p.sellerId}`} className="font-mono text-xs text-primary hover:underline">
+                                <div className="font-semibold">
+                                  {p.sellerDisplayName || 'Seller'}
+                                </div>
+                                <Link href={`/dashboard/admin/users/${p.sellerId}`} className="font-mono text-xs text-primary hover:underline truncate">
                                   {p.sellerId}
                                 </Link>
-                                <Badge variant="default" className="bg-primary">
+                                <Badge variant="default" className="bg-primary shrink-0">
                                   <CheckCircle className="h-3 w-3 mr-1" />
                                   Verified
                                 </Badge>
                               </div>
+                              {p.sellerEmail && (
+                                <div className="text-sm text-muted-foreground truncate" title={p.sellerEmail}>
+                                  {p.sellerEmail}
+                                </div>
+                              )}
                               {p.permitNumber && (
                                 <div className="text-sm text-muted-foreground">
                                   Permit #: <span className="font-mono">{p.permitNumber}</span>

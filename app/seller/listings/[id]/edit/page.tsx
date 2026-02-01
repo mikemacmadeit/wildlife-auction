@@ -50,6 +50,10 @@ import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION, HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { LegalDocsModal } from '@/components/legal/LegalDocsModal';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
+import { getUserProfile } from '@/lib/firebase/users';
+import { getIdToken } from '@/lib/firebase/auth-helper';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { Separator } from '@/components/ui/separator';
@@ -163,6 +167,8 @@ function EditListingPageContent() {
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
   const [sellerAckModalOpen, setSellerAckModalOpen] = useState(false);
   const [sellerAckModalChecked, setSellerAckModalChecked] = useState(false);
+  const [legalTermsModalOpen, setLegalTermsModalOpen] = useState(false);
+  const skipTermsCheckRef = useRef(false);
   const imagesInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load existing listing data from Firestore
@@ -1335,6 +1341,7 @@ function EditListingPageContent() {
             category={formData.category}
             attributes={formData.attributes}
             onChange={(attrs) => setFormData({ ...formData, attributes: attrs })}
+            listingType={formData.type === 'auction' ? 'auction' : 'fixed'}
           />
         </div>
       ) : (
@@ -2181,6 +2188,17 @@ function EditListingPageContent() {
       return;
     }
 
+    // Terms gate: if not accepted, show modal. On agree, we record acceptance and immediately run publish.
+    if (!skipTermsCheckRef.current) {
+      const p = await getUserProfile(user.uid).catch(() => null);
+      const accepted = p?.legal?.tos?.version === LEGAL_VERSIONS.tos.version;
+      if (!accepted) {
+        setLegalTermsModalOpen(true);
+        return;
+      }
+    }
+    skipTermsCheckRef.current = false;
+
     if (
       listingData?.status === 'draft' &&
       formData.category &&
@@ -2479,6 +2497,44 @@ function EditListingPageContent() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <LegalDocsModal
+          open={legalTermsModalOpen}
+          onOpenChange={setLegalTermsModalOpen}
+          initialTab="tos"
+          agreeAction={{
+            buttonText: 'I Agree & Publish',
+            onConfirm: async () => {
+              if (!user?.uid) return;
+              try {
+                const token = await getIdToken(user, true);
+                const res = await fetch('/api/legal/accept', {
+                  method: 'POST',
+                  headers: {
+                    'content-type': 'application/json',
+                    authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.ok) {
+                  throw new Error(data?.message || data?.error || 'Failed to record acceptance');
+                }
+                setLegalTermsModalOpen(false);
+                skipTermsCheckRef.current = true;
+                void handleComplete({});
+              } catch (e: any) {
+                toast({
+                  title: "Couldn't record acceptance",
+                  description: e?.message || 'Please try again.',
+                  variant: 'destructive',
+                });
+              }
+            },
+          }}
+        />
       </div>
     </div>
   );

@@ -51,10 +51,30 @@ export async function GET(request: Request) {
     snap = await qFallback.get();
   }
 
+  const sellerIds = snap.docs.map((d) => String(d.data()?.sellerId || d.id));
+  const sellerProfiles: Record<string, { displayName?: string; email?: string; createdAt?: string }> = {};
+
+  for (const sid of sellerIds) {
+    try {
+      const userSnap = await admin.ctx.db.collection('users').doc(sid).get();
+      const userData = userSnap.exists ? (userSnap.data() as any) : null;
+      const authUser = await admin.ctx.auth.getUser(sid).catch(() => null);
+      sellerProfiles[sid] = {
+        displayName: userData?.displayName || userData?.profile?.fullName || userData?.profile?.businessName || authUser?.displayName || undefined,
+        email: userData?.email || authUser?.email || undefined,
+        createdAt: userData?.createdAt?.toDate?.()?.toISOString?.() || (userData?.createdAt instanceof Date ? userData.createdAt.toISOString() : undefined),
+      };
+    } catch {
+      sellerProfiles[sid] = {};
+    }
+  }
+
   const items = snap.docs.map((d) => {
     const data = d.data() as any;
+    const sid = String(data?.sellerId || d.id);
+    const profile = sellerProfiles[sid] || {};
     return {
-      sellerId: String(data?.sellerId || d.id),
+      sellerId: sid,
       status: String(data?.status || ''),
       permitNumber: data?.permitNumber || null,
       documentUrl: data?.documentUrl || null,
@@ -65,6 +85,9 @@ export async function GET(request: Request) {
       reviewedAt: toIso(data?.reviewedAt),
       reviewedBy: data?.reviewedBy || null,
       updatedAt: toIso(data?.updatedAt),
+      sellerDisplayName: profile.displayName || null,
+      sellerEmail: profile.email || null,
+      sellerCreatedAt: profile.createdAt || null,
     };
   });
 

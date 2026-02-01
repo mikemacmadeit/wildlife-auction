@@ -85,7 +85,9 @@ export default function OrdersPage() {
   const [pendingCheckoutListingTitle, setPendingCheckoutListingTitle] = useState<string | null>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
   const [showCongratsModal, setShowCongratsModal] = useState(false);
+  const [checkStatusLoading, setCheckStatusLoading] = useState(false);
   const reconcileAttemptedRef = useRef<Record<string, boolean>>({});
+  const tickRunnerRef = useRef<{ run: () => Promise<void>; sessionId: string } | null>(null);
 
   // eBay-style controls (client-side filtering; avoids extra Firestore reads)
   const [searchText, setSearchText] = useState('');
@@ -480,14 +482,13 @@ export default function OrdersPage() {
 
     const startedAt = Date.now();
     const maxMs = 90_000;
-    const intervalMs = 5000;
+    const intervalMs = 3000; // Poll every 3s so failed reconcile retries sooner
     const sessionId = pendingCheckout.sessionId;
 
     async function tick() {
       // If the webhook pipeline is delayed/misconfigured, attempt a safe, authenticated reconcile once.
       // IMPORTANT: do this even if the order already exists, because create-session pre-creates an order skeleton.
       if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
-        reconcileAttemptedRef.current[sessionId] = true;
         try {
           const token = await user.getIdToken();
           const reconcileRes = await fetch('/api/stripe/checkout/reconcile-session', {
@@ -502,6 +503,10 @@ export default function OrdersPage() {
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:reconcileResponse',message:'reconcile-session response',data:{ok:reconcileData?.ok,reason:reconcileData?.reason||null,orderId:reconcileData?.orderId||null,orderStatus:reconcileData?.orderStatus||null,status:reconcileRes.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'})}).catch(()=>{});
           // #endregion
+          // Only mark as attempted when reconcile succeeded — allows retry on failure
+          if (reconcileData?.ok === true) {
+            reconcileAttemptedRef.current[sessionId] = true;
+          }
         } catch (e) {
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:reconcileCatch',message:'reconcile-session threw',data:{err:String((e as Error)?.message||'')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
@@ -545,14 +550,14 @@ export default function OrdersPage() {
             } catch {
               // ignore
             }
-            // If buyer chose "Set delivery address" in congrats modal, take them to order detail (set-address modal opens there)
+            // If buyer chose "Set delivery address" in congrats modal, take them to order detail with set-address modal
             try {
               const raw = sessionStorage.getItem('we:congrats-set-address:v1');
               if (raw) {
                 const parsed = JSON.parse(raw) as { sessionId?: string; ts?: number };
                 if (parsed?.sessionId === sessionId && typeof parsed?.ts === 'number' && Date.now() - parsed.ts < 120_000) {
                   sessionStorage.removeItem('we:congrats-set-address:v1');
-                  router.push(`/dashboard/orders/${order.id}`);
+                  router.push(`/dashboard/orders/${order.id}?setAddress=1`);
                 }
               }
             } catch {
@@ -593,14 +598,30 @@ export default function OrdersPage() {
       void tick();
     }, intervalMs);
 
+    // Expose tick for manual "Check status" button
+    tickRunnerRef.current = { run: tick, sessionId };
     // Run once immediately.
     void tick();
 
     return () => {
       cancelled = true;
+      tickRunnerRef.current = null;
       window.clearInterval(handle);
     };
   }, [loadOrders, pendingCheckout, user?.uid, router]);
+
+  const handleCheckStatus = useCallback(async () => {
+    const runner = tickRunnerRef.current;
+    const sid = pendingCheckout?.sessionId;
+    if (!runner || !sid || runner.sessionId !== sid) return;
+    delete reconcileAttemptedRef.current[sid];
+    setCheckStatusLoading(true);
+    try {
+      await runner.run();
+    } finally {
+      setCheckStatusLoading(false);
+    }
+  }, [pendingCheckout?.sessionId]);
 
   const handleConfirmReceipt = async (orderId: string) => {
     if (!user) return;
@@ -1034,24 +1055,26 @@ export default function OrdersPage() {
                 try {
                   let order = await getOrderByCheckoutSessionId(sessionId);
                   if (order?.id) {
-                    router.push(`/dashboard/orders/${order.id}`);
+                    router.push(`/dashboard/orders/${order.id}?setAddress=1`);
                     return;
                   }
-                  // Order not ready yet; retry once after a short delay
-                  await new Promise((r) => setTimeout(r, 2000));
-                  order = await getOrderByCheckoutSessionId(sessionId);
-                  if (order?.id) {
-                    router.push(`/dashboard/orders/${order.id}`);
-                  } else {
-                    toast({
-                      title: 'Order still finalizing',
-                      description: 'Your order will appear below in a moment. Click it to set your delivery address.',
-                    });
+                  // Order not ready yet; retry a few times (webhook can take several seconds)
+                  for (let attempt = 0; attempt < 4; attempt++) {
+                    await new Promise((r) => setTimeout(r, 2000));
+                    order = await getOrderByCheckoutSessionId(sessionId);
+                    if (order?.id) {
+                      router.push(`/dashboard/orders/${order.id}?setAddress=1`);
+                      return;
+                    }
                   }
+                  toast({
+                    title: 'Order still finalizing',
+                    description: 'Your order will appear below in a moment. Click it, then "Set address" to add your delivery address.',
+                  });
                 } catch {
                   toast({
                     title: 'Order still finalizing',
-                    description: 'Your order will appear below in a moment. Click it to set your delivery address.',
+                    description: 'Your order will appear below in a moment. Click it, then "Set address" to add your delivery address.',
                   });
                 }
               }}
@@ -1286,6 +1309,22 @@ export default function OrdersPage() {
               <div className="text-xs text-muted-foreground">
                 Session: <span className="font-mono">{pendingCheckout.sessionId.slice(0, 18)}…</span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={checkStatusLoading}
+                onClick={handleCheckStatus}
+                className="w-full sm:w-auto"
+              >
+                {checkStatusLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Checking…
+                  </>
+                ) : (
+                  'Check status'
+                )}
+              </Button>
             </CardContent>
           </Card>
         ) : null}

@@ -49,6 +49,9 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
 import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION, HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { LegalDocsModal } from '@/components/legal/LegalDocsModal';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
+import { getIdToken } from '@/lib/firebase/auth-helper';
 import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
 // Seller Tiers model: no listing limits.
 
@@ -111,6 +114,8 @@ function NewListingPageContent() {
   const [sellerAnimalAckModalChecked, setSellerAnimalAckModalChecked] = useState(false);
   const pendingPublishPayloadRef = useRef<Record<string, unknown> | null>(null);
   const [publishAfterAnimalAck, setPublishAfterAnimalAck] = useState(false);
+  const [legalTermsModalOpen, setLegalTermsModalOpen] = useState(false);
+  const skipTermsCheckRef = useRef(false);
   const [tourRequestedStep, setTourRequestedStep] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     category: ListingCategory | '';
@@ -187,7 +192,7 @@ function NewListingPageContent() {
   const [listingId, setListingId] = useState<string | null>(null); // Store draft listing ID for image uploads
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [tpwdPermit, setTpwdPermit] = useState<null | {
-    status: 'pending' | 'verified' | 'rejected';
+    status: 'pending' | 'verified' | 'approved' | 'rejected';
     rejectionReason?: string | null;
     expiresAt?: string | null;
     uploadedAt?: string | null;
@@ -556,28 +561,27 @@ function NewListingPageContent() {
         const hasPermitBadge = badgeIds.includes('tpwd_breeder_permit_verified');
         const permitInfo = data?.tpwdBreederPermit;
         
-        // If we have the badge, but don't have permit data from sellerPermits, infer it from trust doc
-        if (hasPermitBadge && permitInfo) {
+        // If we have the badge, infer permit from trust doc (or allow selection when badge exists)
+        if (hasPermitBadge) {
           const currentPermit = tpwdPermit;
-          // Only update if we don't already have permit data or if status is different
-          if (!currentPermit || currentPermit.status !== 'verified') {
-            const expiresAt = permitInfo?.expiresAt?.toDate 
-              ? permitInfo.expiresAt.toDate().toISOString() 
-              : (permitInfo?.expiresAt instanceof Date ? permitInfo.expiresAt.toISOString() : null);
-            
-            const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
-            
-            if (!isExpired) {
-              setTpwdPermit({
-                status: 'verified',
-                rejectionReason: null,
-                expiresAt,
-                uploadedAt: null,
-                reviewedAt: permitInfo?.verifiedAt?.toDate 
-                  ? permitInfo.verifiedAt.toDate().toISOString() 
-                  : (permitInfo?.verifiedAt instanceof Date ? permitInfo.verifiedAt.toISOString() : null),
-              });
-            }
+          const statusFromTrust = (permitInfo?.status === 'verified' || permitInfo?.status === 'approved' ? permitInfo.status : 'verified') as 'verified' | 'approved';
+          const expiresAt = permitInfo?.expiresAt?.toDate 
+            ? permitInfo.expiresAt.toDate().toISOString() 
+            : (permitInfo?.expiresAt instanceof Date ? permitInfo.expiresAt.toISOString() : null);
+          const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+          
+          // Only update if we don't already have valid permit data
+          const currentOk = currentPermit && (currentPermit.status === 'verified' || currentPermit.status === 'approved') && !(currentPermit.expiresAt && new Date(currentPermit.expiresAt).getTime() < Date.now());
+          if (!currentOk && !isExpired) {
+            setTpwdPermit({
+              status: statusFromTrust,
+              rejectionReason: null,
+              expiresAt,
+              uploadedAt: null,
+              reviewedAt: permitInfo?.verifiedAt?.toDate 
+                ? permitInfo.verifiedAt.toDate().toISOString() 
+                : (permitInfo?.verifiedAt instanceof Date ? permitInfo.verifiedAt.toISOString() : null),
+            });
           }
         }
       },
@@ -598,12 +602,13 @@ function NewListingPageContent() {
 
   const whitetailPermitStatus = tpwdPermit?.status || null;
   
-  // Check if permit is verified AND not expired
+  // Check if permit is verified/approved AND not expired
   const isPermitExpired = tpwdPermit?.expiresAt 
     ? new Date(tpwdPermit.expiresAt).getTime() < Date.now()
     : false;
   
-  const canSelectWhitetail = whitetailPermitStatus === 'verified' && !isPermitExpired;
+  // Allow verified or approved TPWD permits (approved used in some flows)
+  const canSelectWhitetail = (whitetailPermitStatus === 'verified' || whitetailPermitStatus === 'approved') && !isPermitExpired;
   
   const numberFromInput = (raw: string): number | null => {
     const s = String(raw || '').trim();
@@ -1304,6 +1309,7 @@ function NewListingPageContent() {
             category={formData.category}
             attributes={formData.attributes}
             onChange={(attrs) => setFormData({ ...formData, attributes: attrs })}
+            listingType={formData.type === 'auction' ? 'auction' : 'fixed'}
             errors={(() => {
               if (formData.category === 'whitetail_breeder') {
                 const attrs = formData.attributes as Partial<WhitetailBreederAttributes>;
@@ -2653,7 +2659,6 @@ function NewListingPageContent() {
     submittingRef.current = true;
     // Check if user is authenticated - if not, save form data and show auth prompt modal
     if (!user) {
-      // Save form data to sessionStorage so we can restore it after authentication
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('listingFormData', JSON.stringify(formData));
       }
@@ -2661,6 +2666,18 @@ function NewListingPageContent() {
       submittingRef.current = false;
       return;
     }
+
+    // Terms gate: if not accepted, show modal. On agree, we record acceptance and immediately run publish.
+    if (!skipTermsCheckRef.current) {
+      const p = await getUserProfile(user.uid).catch(() => null);
+      const accepted = p?.legal?.tos?.version === LEGAL_VERSIONS.tos.version;
+      if (!accepted) {
+        setLegalTermsModalOpen(true);
+        submittingRef.current = false;
+        return;
+      }
+    }
+    skipTermsCheckRef.current = false;
 
     const requiresSellerAnimalAck =
       formData.category &&
@@ -2950,7 +2967,6 @@ function NewListingPageContent() {
   // Check if user just returned from authentication and restore form data
   useEffect(() => {
     if (user && typeof window !== 'undefined') {
-      // Check if we have form data in sessionStorage to restore
       const savedFormData = sessionStorage.getItem('listingFormData');
       if (savedFormData) {
         try {
@@ -3459,6 +3475,44 @@ function NewListingPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LegalDocsModal
+        open={legalTermsModalOpen}
+        onOpenChange={setLegalTermsModalOpen}
+        initialTab="tos"
+        agreeAction={{
+          buttonText: 'I Agree & Publish',
+          onConfirm: async () => {
+            if (!user) return;
+            try {
+              const token = await getIdToken(user, true);
+              const res = await fetch('/api/legal/accept', {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                  authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data?.ok) {
+                throw new Error(data?.message || data?.error || 'Failed to record acceptance');
+              }
+              setLegalTermsModalOpen(false);
+              skipTermsCheckRef.current = true;
+              void handleComplete({});
+            } catch (e: any) {
+              toast({
+                title: 'Couldn\'t record acceptance',
+                description: e?.message || 'Please try again.',
+                variant: 'destructive',
+              });
+            }
+          },
+        }}
+      />
 
       <Dialog
         open={showPendingApprovalModal}

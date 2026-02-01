@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Listing, WildlifeAttributes, WhitetailBreederAttributes, CattleAttributes, FarmAnimalAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 import { DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { formatQuantityBySex, getQuantityUnitLabel } from '@/lib/listings/quantityBySex';
 
 interface KeyFactsPanelProps {
   listing: Listing;
@@ -68,16 +69,16 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       label: 'Sex',
       value: (listing.attributes as WildlifeAttributes).sex === 'male' ? 'Male' : (listing.attributes as WildlifeAttributes).sex === 'female' ? 'Female' : 'Unknown',
     },
-    listing.attributes && listing.category === 'wildlife_exotics' && (listing.attributes as WildlifeAttributes).quantity && {
-      icon: Package,
-      label: 'Quantity',
-      value: `${(listing.attributes as WildlifeAttributes).quantity} ${(listing.attributes as WildlifeAttributes).quantity === 1 ? 'item' : 'items'}`,
-    },
-    listing.attributes && listing.category === 'whitetail_breeder' && (listing.attributes as WhitetailBreederAttributes).quantity && {
-      icon: Package,
-      label: 'Quantity',
-      value: `${(listing.attributes as WhitetailBreederAttributes).quantity} ${(listing.attributes as WhitetailBreederAttributes).quantity === 1 ? 'deer' : 'deer'}`,
-    },
+    listing.attributes && listing.category === 'wildlife_exotics' && ((listing.attributes as WildlifeAttributes).quantity || (listing.attributes as WildlifeAttributes).quantityMale !== undefined || (listing.attributes as WildlifeAttributes).quantityFemale !== undefined) && (() => {
+      const { breakdown, total, hasBreakdown } = formatQuantityBySex('wildlife_exotics', listing.attributes as WildlifeAttributes);
+      const unit = getQuantityUnitLabel('wildlife_exotics', total);
+      return { icon: Package, label: 'Quantity', value: hasBreakdown && breakdown ? `${breakdown} (${total} ${unit})` : `${total} ${unit}` };
+    })(),
+    listing.attributes && listing.category === 'whitetail_breeder' && ((listing.attributes as WhitetailBreederAttributes).quantity || (listing.attributes as WhitetailBreederAttributes).quantityMale !== undefined || (listing.attributes as WhitetailBreederAttributes).quantityFemale !== undefined) && (() => {
+      const { breakdown, total, hasBreakdown } = formatQuantityBySex('whitetail_breeder', listing.attributes as WhitetailBreederAttributes);
+      const unit = getQuantityUnitLabel('whitetail_breeder', total);
+      return { icon: Package, label: 'Quantity', value: hasBreakdown && breakdown ? `${breakdown} (${total} ${unit})` : `${total} ${unit}` };
+    })(),
     listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).breed && {
       icon: Package,
       label: 'Breed',
@@ -100,11 +101,11 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         ? { variant: 'default' as const, label: 'Certified', color: 'bg-primary/20 text-primary border-primary/40' }
         : undefined,
     },
-    listing.attributes && listing.category === 'cattle_livestock' && (listing.attributes as CattleAttributes).quantity && {
-      icon: Package,
-      label: 'Quantity',
-      value: `${(listing.attributes as CattleAttributes).quantity} ${(listing.attributes as CattleAttributes).quantity === 1 ? 'head' : 'head'}`,
-    },
+    listing.attributes && listing.category === 'cattle_livestock' && ((listing.attributes as CattleAttributes).quantity || (listing.attributes as CattleAttributes).quantityBull !== undefined || (listing.attributes as CattleAttributes).quantityCow !== undefined || (listing.attributes as CattleAttributes).quantityHeifer !== undefined || (listing.attributes as CattleAttributes).quantitySteer !== undefined) && (() => {
+      const { breakdown, total, hasBreakdown } = formatQuantityBySex('cattle_livestock', listing.attributes as CattleAttributes);
+      const unit = getQuantityUnitLabel('cattle_livestock', total);
+      return { icon: Package, label: 'Quantity', value: hasBreakdown && breakdown ? `${breakdown} (${total} head)` : `${total} head` };
+    })(),
     listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).speciesId && {
       icon: Package,
       label: 'Species',
@@ -120,11 +121,11 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
       label: 'Sex',
       value: (listing.attributes as FarmAnimalAttributes).sex === 'male' ? 'Male' : (listing.attributes as FarmAnimalAttributes).sex === 'female' ? 'Female' : 'Unknown',
     },
-    listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).quantity && {
-      icon: Package,
-      label: 'Quantity',
-      value: `${(listing.attributes as FarmAnimalAttributes).quantity} ${(listing.attributes as FarmAnimalAttributes).quantity === 1 ? 'animal' : 'animals'}`,
-    },
+    listing.attributes && listing.category === 'farm_animals' && (listing.attributes as FarmAnimalAttributes).quantity && (() => {
+      const { breakdown, total, hasBreakdown } = formatQuantityBySex('farm_animals', listing.attributes as FarmAnimalAttributes);
+      const unit = getQuantityUnitLabel('farm_animals', total);
+      return { icon: Package, label: 'Quantity', value: hasBreakdown && breakdown ? `${breakdown} (${total} ${unit})` : `${total} ${unit}` };
+    })(),
     listing.attributes && (listing.category === 'ranch_equipment' || listing.category === 'ranch_vehicles') && (listing.attributes as EquipmentAttributes).equipmentType && {
       icon: Package,
       label: listing.category === 'ranch_vehicles' ? 'Vehicle type' : 'Equipment type',
@@ -197,11 +198,11 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         (listing.attributes as SportingWorkingDogAttributes).sex === 'male' ? 'Male' :
         (listing.attributes as SportingWorkingDogAttributes).sex === 'female' ? 'Female' : 'Unknown',
     },
-    listing.attributes && listing.category === 'sporting_working_dogs' && (listing.attributes as SportingWorkingDogAttributes).quantity && {
-      icon: Package,
-      label: 'Quantity',
-      value: `${(listing.attributes as SportingWorkingDogAttributes).quantity} ${(listing.attributes as SportingWorkingDogAttributes).quantity === 1 ? 'dog' : 'dogs'}`,
-    },
+    listing.attributes && listing.category === 'sporting_working_dogs' && ((listing.attributes as SportingWorkingDogAttributes).quantity || (listing.attributes as SportingWorkingDogAttributes).quantityMale !== undefined || (listing.attributes as SportingWorkingDogAttributes).quantityFemale !== undefined) && (() => {
+      const { breakdown, total, hasBreakdown } = formatQuantityBySex('sporting_working_dogs', listing.attributes as SportingWorkingDogAttributes);
+      const unit = getQuantityUnitLabel('sporting_working_dogs', total);
+      return { icon: Package, label: 'Quantity', value: hasBreakdown && breakdown ? `${breakdown} (${total} ${unit})` : `${total} ${unit}` };
+    })(),
     // Horse / Equestrian
     listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).sex && {
       icon: Package,
@@ -212,11 +213,11 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         (listing.attributes as HorseAttributes).sex === 'gelding' ? 'Gelding' : 'Unknown',
       detail: formatAge((listing.attributes as HorseAttributes).age),
     },
-    listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).quantity && {
-      icon: Package,
-      label: 'Quantity',
-      value: `${(listing.attributes as HorseAttributes).quantity} ${(listing.attributes as HorseAttributes).quantity === 1 ? 'horse' : 'horses'}`,
-    },
+    listing.attributes && listing.category === 'horse_equestrian' && ((listing.attributes as HorseAttributes).quantity || (listing.attributes as HorseAttributes).quantityMale !== undefined || (listing.attributes as HorseAttributes).quantityFemale !== undefined) && (() => {
+      const { breakdown, total, hasBreakdown } = formatQuantityBySex('horse_equestrian', listing.attributes as HorseAttributes);
+      const unit = getQuantityUnitLabel('horse_equestrian', total);
+      return { icon: Package, label: 'Quantity', value: hasBreakdown && breakdown ? `${breakdown} (${total} ${unit})` : `${total} ${unit}` };
+    })(),
     listing.attributes && listing.category === 'horse_equestrian' && (listing.attributes as HorseAttributes).registered !== undefined && {
       icon: FileText,
       label: 'Registered',

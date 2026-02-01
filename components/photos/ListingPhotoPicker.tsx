@@ -637,13 +637,13 @@ function SelectedTile(props: {
           </Button>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-1">
             <Button
               type="button"
               size="icon"
               variant="outline"
-              className="min-h-[40px] min-w-[40px]"
+              className="min-h-[40px] min-w-[40px] shrink-0"
               onClick={props.onMoveLeft}
               disabled={idx === 0}
               aria-label="Move photo left"
@@ -654,7 +654,7 @@ function SelectedTile(props: {
               type="button"
               size="icon"
               variant="outline"
-              className="min-h-[40px] min-w-[40px]"
+              className="min-h-[40px] min-w-[40px] shrink-0"
               onClick={props.onMoveRight}
               disabled={idx === total - 1}
               aria-label="Move photo right"
@@ -663,27 +663,27 @@ function SelectedTile(props: {
             </Button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial sm:justify-end">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="min-h-[40px] font-semibold"
+              className="min-h-[40px] font-semibold shrink-0"
               onClick={props.onEditCrop}
               title="Adjust how this photo is cropped on listing cards"
             >
-              <Crop className="h-4 w-4 mr-2" />
-              Crop
+              <Crop className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Crop</span>
             </Button>
             <Button
               type="button"
               size="sm"
               variant={props.isCover ? 'secondary' : 'outline'}
-              className="min-h-[40px] font-semibold"
+              className="min-h-[40px] font-semibold shrink-0"
               onClick={props.onSetCover}
               disabled={props.isCover}
             >
-              {props.isCover ? 'Cover' : 'Set cover'}
+              <span className="truncate">{props.isCover ? 'Cover' : 'Set cover'}</span>
             </Button>
           </div>
         </div>

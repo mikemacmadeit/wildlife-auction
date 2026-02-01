@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Heart, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
-import { Listing, WildlifeAttributes, CattleAttributes, FarmAnimalAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes, isGroupLotQuantityMode } from '@/lib/types';
+import { Listing, WildlifeAttributes, CattleAttributes, FarmAnimalAttributes, EquipmentAttributes, HorseAttributes, SportingWorkingDogAttributes } from '@/lib/types';
 import { getSoldSummary } from '@/lib/listings/sold';
 import { TrustBadges } from '@/components/trust/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { CountdownTimer } from '@/components/auction/CountdownTimer';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { cn } from '@/lib/utils';
 import { getDeliveryTimeframeLabel } from '@/components/browse/filters/constants';
+import { formatQuantityBySex, getQuantityUnitLabel } from '@/lib/listings/quantityBySex';
 import { MOTION } from '@/lib/motion';
 import { SellerTierBadge } from '@/components/seller/SellerTierBadge';
 import { useRouter } from 'next/navigation';
@@ -98,36 +99,43 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
     listing.currentBidderId === user.uid
   );
 
-  // Get key attributes to display on card. Group lots: no Qty/per-unit line (list price only).
-  const isGroupLot = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
+  // Get key attributes to display on card. Quantity shown for all modes including group lots and auctions.
   const getKeyAttributes = () => {
     if (!listing.attributes) return null;
     
     if (listing.category === 'wildlife_exotics') {
       const attrs = listing.attributes as WildlifeAttributes;
+      const qtyDisplay = formatQuantityBySex('wildlife_exotics', attrs);
+      const qtyStr = qtyDisplay.total > 0 ? (qtyDisplay.hasBreakdown ? qtyDisplay.breakdown : `${qtyDisplay.total} ${getQuantityUnitLabel('wildlife_exotics', qtyDisplay.total)}`) : null;
       return [
         attrs.speciesId && `Species: ${attrs.speciesId}`,
         attrs.sex && `Sex: ${attrs.sex}`,
-        !isGroupLot && attrs.quantity && `Qty: ${attrs.quantity}`,
+        qtyStr,
       ].filter(Boolean).slice(0, 2);
     }
     
     if (listing.category === 'cattle_livestock') {
       const attrs = listing.attributes as CattleAttributes;
+      const qtyDisplay = formatQuantityBySex('cattle_livestock', attrs);
+      const qtyStr = qtyDisplay.total > 0 ? (qtyDisplay.hasBreakdown ? qtyDisplay.breakdown : `${qtyDisplay.total} head`) : null;
       return [
         attrs.breed && `Breed: ${attrs.breed}`,
         attrs.sex && `Sex: ${attrs.sex}`,
         attrs.registered && 'Registered',
+        qtyStr,
       ].filter(Boolean).slice(0, 2);
     }
 
     if (listing.category === 'farm_animals') {
       const attrs = listing.attributes as FarmAnimalAttributes;
       const speciesLabel = attrs.speciesId ? String(attrs.speciesId).replace(/_/g, ' ') : null;
+      const qty = typeof attrs.quantity === 'number' && attrs.quantity >= 1 ? attrs.quantity : null;
+      const qtyStr = qty ? `${qty} animal${qty === 1 ? '' : 's'}` : null;
       return [
         speciesLabel && `Species: ${speciesLabel}`,
         attrs.breed && `Breed: ${attrs.breed}`,
         attrs.sex && `Sex: ${attrs.sex}`,
+        qtyStr,
       ].filter(Boolean).slice(0, 2);
     }
     
@@ -156,19 +164,24 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
         attrs.sex === 'mare' ? 'Mare' :
         attrs.sex === 'gelding' ? 'Gelding' :
         attrs.sex ? String(attrs.sex) : null;
+      const qtyDisplay = formatQuantityBySex('horse_equestrian', attrs);
+      const qtyStr = qtyDisplay.total > 0 ? (qtyDisplay.hasBreakdown ? qtyDisplay.breakdown : `${qtyDisplay.total} horse${qtyDisplay.total === 1 ? '' : 's'}`) : null;
       return [
         sex && `Sex: ${sex}`,
         attrs.registered ? 'Registered' : null,
         attrs.age !== undefined && attrs.age !== null ? `Age: ${String(attrs.age)}` : null,
+        qtyStr,
       ].filter(Boolean).slice(0, 2);
     }
 
     if (listing.category === 'sporting_working_dogs') {
       const attrs = listing.attributes as SportingWorkingDogAttributes;
+      const qtyDisplay = formatQuantityBySex('sporting_working_dogs', attrs);
+      const qtyStr = qtyDisplay.total > 0 ? (qtyDisplay.hasBreakdown ? qtyDisplay.breakdown : `${qtyDisplay.total} dog${qtyDisplay.total === 1 ? '' : 's'}`) : null;
       return [
         attrs.breed ? `Breed: ${attrs.breed}` : null,
         attrs.sex ? `Sex: ${attrs.sex}` : null,
-        !isGroupLot && attrs.quantity ? `Qty: ${attrs.quantity}` : null,
+        qtyStr,
       ].filter(Boolean).slice(0, 2);
     }
     

@@ -50,12 +50,14 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }, [user, loading, router, pathname, stripeReturnWaitDone]);
 
   // Enforce latest Terms acceptance for continued use (dashboard + other gated pages).
+  // Skip redirect for listing create/edit pages - they show terms modal at publish-time for a smooth flow.
   useEffect(() => {
     let cancelled = false;
     async function enforceLegalGate() {
       if (!user) return;
-      // Don't gate the acceptance page itself, or we'd loop.
       if (pathname?.startsWith('/legal/accept')) return;
+      if (pathname === '/dashboard/listings/new') return;
+      if (pathname?.match(/^\/seller\/listings\/[^/]+\/edit$/)) return;
 
       const p = await getUserProfile(user.uid).catch(() => null);
       if (!p) return;

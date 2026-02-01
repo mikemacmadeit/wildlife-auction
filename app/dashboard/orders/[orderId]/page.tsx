@@ -130,6 +130,25 @@ export default function BuyerOrderDetailPage() {
     return () => unsub();
   }, [orderId, user?.uid]);
 
+  const setAddressParamHandledRef = useRef(false);
+  // When arriving with ?setAddress=1 (e.g. from congrats modal "Set delivery address"), open the modal once order is ready
+  useEffect(() => {
+    if (!order || setAddressParamHandledRef.current) return;
+    const wantSetAddress = searchParams?.get('setAddress') === '1';
+    if (!wantSetAddress) return;
+    const status = getEffectiveTransactionStatus(order);
+    const canSet = ['FULFILLMENT_REQUIRED', 'AWAITING_TRANSFER_COMPLIANCE'].includes(status);
+    const needsAddress = !order.delivery?.buyerAddress;
+    if (canSet && needsAddress) {
+      setAddressParamHandledRef.current = true;
+      setSetAddressModalOpen(true);
+      // Remove param from URL so refresh doesn't reopen
+      const url = new URL(window.location.href);
+      url.searchParams.delete('setAddress');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
+  }, [order, searchParams]);
+
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
 

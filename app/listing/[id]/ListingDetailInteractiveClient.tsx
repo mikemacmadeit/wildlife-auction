@@ -72,6 +72,7 @@ import { cn } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, isGroupLotQuantityMode } from '@/lib/types';
+import { formatQuantityBySex, getQuantityUnitLabel } from '@/lib/listings/quantityBySex';
 import { useAuth } from '@/hooks/use-auth';
 import { placeBidServer } from '@/lib/api/bids';
 import {
@@ -285,7 +286,7 @@ export default function ListingDetailInteractiveClient({
   }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity]);
 
   const buyNowAvailability = useMemo(() => {
-    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false, allowBuyNow: true };
+    if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false, allowBuyNow: true, availableLabel: '1 available' };
     const attrsQty = Number((listing as any)?.attributes?.quantity ?? 1) || 1;
     const total =
       typeof (listing as any)?.quantityTotal === 'number' && Number.isFinite((listing as any).quantityTotal)
@@ -297,9 +298,13 @@ export default function ListingDetailInteractiveClient({
         : total;
     const isGroupListing = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
     const canChooseQuantity = listing.type === 'fixed' && available > 1 && !isGroupListing;
-    // Allow Buy Now when we have stock, or when listing is active and total > 0 (server enforces actual availability)
     const allowBuyNow = available > 0 || (listing.status === 'active' && total > 0);
-    return { total, available, canChooseQuantity, isGroupListing, allowBuyNow };
+    // For fixed_group with quantity-by-sex, show breakdown (e.g. "5 bulls, 10 heifers available")
+    const qtyDisplay = formatQuantityBySex(listing.category as string, listing.attributes as any);
+    const availableLabel = qtyDisplay.hasBreakdown && qtyDisplay.breakdown
+      ? `${qtyDisplay.breakdown} available`
+      : `${available} available`;
+    return { total, available, canChooseQuantity, isGroupListing, allowBuyNow, availableLabel };
   }, [listing]);
 
   // Keep quantity selection valid when listing loads/updates. For group listings, always use full quantity.
@@ -1195,14 +1200,14 @@ export default function ListingDetailInteractiveClient({
                             className="w-28"
                           />
                           <div className="text-xs text-muted-foreground">
-                            {buyNowAvailability.available} available
+                            {buyNowAvailability.availableLabel}
                           </div>
                         </div>
                       </div>
                     ) : listing!.type === 'fixed' && buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
                       <div className="mb-5 sm:mb-4 rounded-lg border bg-muted/30 p-3 sm:p-4 space-y-1.5">
                         <p className="text-sm font-semibold text-foreground">
-                          Quantity: {buyNowAvailability.available}
+                          Quantity: {buyNowAvailability.availableLabel}
                         </p>
                         <p className="text-sm text-muted-foreground leading-relaxed">
                           Group lot — all {buyNowAvailability.available} are sold together for the listed price. Quantity is for your information only; individual selection is not available.
@@ -1322,12 +1327,16 @@ export default function ListingDetailInteractiveClient({
                           </div>
                         </div>
                       ) : null}
-                      {(listing!.attributes as WildlifeAttributes).quantity && (
-                        <div>
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Quantity</div>
-                          <div className="text-base font-semibold">{(listing!.attributes as WildlifeAttributes).quantity}</div>
-                        </div>
-                      )}
+                      {((listing!.attributes as WildlifeAttributes).quantity || (listing!.attributes as WildlifeAttributes).quantityMale !== undefined || (listing!.attributes as WildlifeAttributes).quantityFemale !== undefined) && (() => {
+                        const { breakdown, total, hasBreakdown } = formatQuantityBySex('wildlife_exotics', listing!.attributes);
+                        const unit = getQuantityUnitLabel('wildlife_exotics', total);
+                        return (
+                          <div key="qty">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Quantity</div>
+                            <div className="text-base font-semibold">{hasBreakdown && breakdown ? `${breakdown} (${total} ${unit})` : `${total} ${unit}`}</div>
+                          </div>
+                        );
+                      })()}
                       {(listing!.attributes as WildlifeAttributes).locationType && (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Location Type</div>
@@ -1388,12 +1397,15 @@ export default function ListingDetailInteractiveClient({
                           <div className="text-base font-semibold">{(listing!.attributes as CattleAttributes).pregChecked ? 'Yes' : 'No'}</div>
                         </div>
                       )}
-                      {(listing!.attributes as CattleAttributes).quantity && (
-                        <div>
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Quantity</div>
-                          <div className="text-base font-semibold">{(listing!.attributes as CattleAttributes).quantity} head</div>
-                        </div>
-                      )}
+                      {((listing!.attributes as CattleAttributes).quantity || (listing!.attributes as CattleAttributes).quantityBull !== undefined || (listing!.attributes as CattleAttributes).quantityCow !== undefined || (listing!.attributes as CattleAttributes).quantityHeifer !== undefined || (listing!.attributes as CattleAttributes).quantitySteer !== undefined) && (() => {
+                        const { breakdown, total, hasBreakdown } = formatQuantityBySex('cattle_livestock', listing!.attributes);
+                        return (
+                          <div key="qty">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Quantity</div>
+                            <div className="text-base font-semibold">{hasBreakdown && breakdown ? `${breakdown} (${total} head)` : `${total} head`}</div>
+                          </div>
+                        );
+                      })()}
                       {(listing!.attributes as CattleAttributes).healthNotes && (
                         <div className="sm:col-span-2">
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Health Notes</div>
@@ -1888,14 +1900,14 @@ export default function ListingDetailInteractiveClient({
                                   className="w-32"
                                 />
                                 <div className="text-xs text-muted-foreground">
-                                  {buyNowAvailability.available} available
+                                  {buyNowAvailability.availableLabel}
                                 </div>
                               </div>
                             </div>
                           ) : buyNowAvailability.isGroupListing && buyNowAvailability.available >= 1 ? (
                             <div className="mb-4 rounded-lg border bg-muted/30 p-3 sm:p-4 space-y-1.5">
                               <p className="text-sm font-semibold text-foreground">
-                                Quantity: {buyNowAvailability.available}
+                                Quantity: {buyNowAvailability.availableLabel}
                               </p>
                               <p className="text-sm text-muted-foreground leading-relaxed">
                                 Group lot — all {buyNowAvailability.available} are sold together for the listed price. Quantity is for your information only; individual selection is not available.

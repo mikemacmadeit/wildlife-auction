@@ -153,3 +153,21 @@ export async function emitEventToUsers<TType extends NotificationEventType>(
   return results;
 }
 
+/**
+ * Emit + immediately process an event for multiple users (creates in-app notification + queues emails).
+ * Use for admin notifications that must be delivered without waiting for the scheduled processor.
+ */
+export async function emitAndProcessEventToUsers<TType extends NotificationEventType>(
+  params: Omit<EmitEventParams<TType>, 'targetUserId'> & { targetUserIds: string[] }
+): Promise<(EmitEventResult & { processed?: boolean; processError?: string })[]> {
+  const results: (EmitEventResult & { processed?: boolean; processError?: string })[] = [];
+  for (const uid of params.targetUserIds) {
+    const res = await emitAndProcessEventForUser({
+      ...(params as any),
+      targetUserId: uid,
+    });
+    results.push(res);
+  }
+  return results;
+}
+
