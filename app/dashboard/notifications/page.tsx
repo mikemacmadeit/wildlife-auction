@@ -103,6 +103,22 @@ function listingIdFromUrl(url: string): string | null {
   }
 }
 
+/** Convert deepLinkUrl to app path so we always navigate within current origin (fixes localhost in prod). */
+function toAppPath(url: string): string {
+  const raw = String(url || '').trim();
+  if (!raw) return '/dashboard/notifications';
+  if (raw.startsWith('/')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const u = new URL(raw);
+      return `${u.pathname}${u.search}${u.hash}` || '/dashboard/notifications';
+    } catch {
+      return '/dashboard/notifications';
+    }
+  }
+  return '/dashboard/notifications';
+}
+
 function listingIdFor(n: UserNotification): string | null {
   const meta = n.metadata || {};
   const metaListingId = typeof (meta as any)?.listingId === 'string' ? String((meta as any).listingId) : null;
@@ -574,7 +590,8 @@ export default function NotificationsPage() {
                     const tag = tagForNotification(n);
                     const s = styleForNotification(n);
                     const Icon = s.Icon || AlertTriangle;
-                    const href = n.deepLinkUrl || '';
+                    const href = toAppPath(n.deepLinkUrl || '');
+                    const hasLink = (n.deepLinkUrl || '').trim().length > 0;
                     const label = n.linkLabel || 'Open';
                     const ago = timeAgo(n);
                     const listingId = listingIdFor(n);
@@ -607,7 +624,7 @@ export default function NotificationsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          {href ? (
+                          {hasLink ? (
                             <Link
                               href={href}
                               onClick={() => void markClicked(n.id)}

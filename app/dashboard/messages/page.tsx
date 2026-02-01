@@ -41,9 +41,9 @@ export default function MessagesPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const listingIdParam = searchParams?.get('listingId') || null;
-  const sellerIdParam = searchParams?.get('sellerId') || null;
-  const threadIdFromParams = searchParams?.get('threadId') || null;
+  const listingIdParam = (searchParams && searchParams.get('listingId')) || null;
+  const sellerIdParam = (searchParams && searchParams.get('sellerId')) || null;
+  const threadIdFromParams = (searchParams && searchParams.get('threadId')) || null;
   const [threadIdFromUrlFallback, setThreadIdFromUrlFallback] = useState<string | null>(null);
   const threadIdParam = threadIdFromParams || threadIdFromUrlFallback;
 
@@ -73,20 +73,21 @@ export default function MessagesPage() {
   const lastPopulatedThreadIdRef = useRef<string | null>(null);
 
   // Track pathname changes and detect navigation away
+  const safePathname = pathname ?? '';
   useEffect(() => {
-    pathnameRef.current = pathname;
+    pathnameRef.current = safePathname;
     // If pathname changes away from messages, mark as navigating away
-    if (pathname !== '/dashboard/messages') {
+    if (safePathname !== '/dashboard/messages') {
       isNavigatingAwayRef.current = true;
     } else {
       isNavigatingAwayRef.current = false;
     }
-  }, [pathname]);
+  }, [safePathname]);
 
   // Show whole page from top (navbar visible): pin layout to viewport + hide outer scrollbar
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
-    const isMessages = pathname === '/dashboard/messages';
+    const isMessages = safePathname === '/dashboard/messages';
     if (!isMessages) return;
 
     const prevRestoration = window.history.scrollRestoration;
@@ -116,7 +117,7 @@ export default function MessagesPage() {
       html.style.overflow = prevHtml;
       body.style.overflow = prevBody;
     };
-  }, [pathname]);
+  }, [safePathname]);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -124,12 +125,12 @@ export default function MessagesPage() {
   }, [selectedThreadId]);
   
   useEffect(() => {
-    pathnameRef.current = pathname;
-  }, [pathname]);
+    pathnameRef.current = safePathname;
+  }, [safePathname]);
 
   // Reset state when navigating away from messages page
   useEffect(() => {
-    if (typeof window !== 'undefined' && pathname && pathname !== '/dashboard/messages') {
+    if (typeof window !== 'undefined' && safePathname && safePathname !== '/dashboard/messages') {
       setSelectedThreadId(null);
       setThread(null);
       setListing(null);
@@ -137,11 +138,11 @@ export default function MessagesPage() {
       deepLinkFetchAttemptedRef.current = null;
       lastPopulatedThreadIdRef.current = null;
     }
-  }, [pathname]);
+  }, [safePathname]);
 
   // Notification deep-link: searchParams can lag on client-side nav. Fallback to window.location.search.
   useEffect(() => {
-    if (typeof window === 'undefined' || pathname !== '/dashboard/messages') return;
+    if (typeof window === 'undefined' || safePathname !== '/dashboard/messages') return;
     if (threadIdFromParams) {
       setThreadIdFromUrlFallback(null);
       return;
@@ -149,7 +150,7 @@ export default function MessagesPage() {
     const q = new URLSearchParams(window.location.search);
     const tid = q.get('threadId')?.trim() || null;
     setThreadIdFromUrlFallback(tid);
-  }, [pathname, threadIdFromParams]);
+  }, [safePathname, threadIdFromParams]);
 
   // Emergency escape: keyboard shortcut to leave messages
   useEffect(() => {
@@ -218,45 +219,51 @@ export default function MessagesPage() {
     const unsub = subscribeToAllUserThreads(
       user.uid,
       (data) => {
-        // Throttle subscription callbacks to prevent excessive re-renders
-        if (subscriptionCallbackThrottleRef.current) {
-          return;
-        }
-        subscriptionCallbackThrottleRef.current = window.setTimeout(() => {
-          subscriptionCallbackThrottleRef.current = null;
-        }, 100); // Throttle to max once per 100ms
-        
-        // Check if we're navigating away or not on messages page
-        const currentPathname = typeof window !== 'undefined' ? window.location.pathname : pathnameRef.current;
-        const isOnMessagesPage = currentPathname === '/dashboard/messages';
-        
-        // Skip all processing if navigating away or not on messages page
-        if (isNavigatingAwayRef.current || !isOnMessagesPage) {
-          return;
-        }
-        
-        setThreads(data);
-        setLoading(false);
-        // Clear optimistic reads for threads that are now confirmed as read (unreadCount = 0)
-        setOptimisticReadThreads((prev) => {
-          const next = new Set(prev);
-          data.forEach((t) => {
-            const isBuyer = user.uid === t.buyerId;
-            const unread = isBuyer
-              ? (typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0)
-              : (typeof (t as any).sellerUnreadCount === 'number' ? (t as any).sellerUnreadCount : 0);
-            if (unread === 0) {
-              next.delete(t.id);
-            }
+        try {
+          // Throttle subscription callbacks to prevent excessive re-renders
+          if (subscriptionCallbackThrottleRef.current) {
+            return;
+          }
+          subscriptionCallbackThrottleRef.current = window.setTimeout(() => {
+            subscriptionCallbackThrottleRef.current = null;
+          }, 100); // Throttle to max once per 100ms
+          
+          // Check if we're navigating away or not on messages page
+          const currentPathname = typeof window !== 'undefined' ? window.location.pathname : pathnameRef.current;
+          const isOnMessagesPage = currentPathname === '/dashboard/messages';
+          
+          // Skip all processing if navigating away or not on messages page
+          if (isNavigatingAwayRef.current || !isOnMessagesPage) {
+            return;
+          }
+          
+          const safeData = Array.isArray(data) ? data : [];
+          setThreads(safeData);
+          setLoading(false);
+          // Clear optimistic reads for threads that are now confirmed as read (unreadCount = 0)
+          setOptimisticReadThreads((prev) => {
+            const next = new Set(prev);
+            safeData.forEach((t) => {
+              if (!t?.id) return;
+              const isBuyer = user.uid === t.buyerId;
+              const unread = isBuyer
+                ? (typeof (t as any).buyerUnreadCount === 'number' ? (t as any).buyerUnreadCount : 0)
+                : (typeof (t as any).sellerUnreadCount === 'number' ? (t as any).sellerUnreadCount : 0);
+              if (unread === 0) {
+                next.delete(t.id);
+              }
+            });
+            return next;
           });
-          return next;
-        });
-        // Don't auto-select on mobile - let user choose
-        // Only auto-select on desktop if nothing is selected AND we're still on the messages page
-        // (use refs to avoid stale closure and pathname check to prevent redirects when navigating away)
-        const currentSelectedId = selectedThreadIdRef.current;
-        if (!currentSelectedId && data[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024 && isOnMessagesPage) {
-          setSelectedThreadId(data[0].id);
+          // Don't auto-select on mobile - let user choose
+          const currentSelectedId = selectedThreadIdRef.current;
+          if (!currentSelectedId && safeData[0]?.id && typeof window !== 'undefined' && window.innerWidth >= 1024 && isOnMessagesPage) {
+            setSelectedThreadId(safeData[0].id);
+          }
+        } catch (err) {
+          console.error('[dashboard/messages] subscription callback error', err);
+          setLoading(false);
+          setThreads([]);
         }
       },
       {
