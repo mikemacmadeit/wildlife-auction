@@ -3,10 +3,11 @@ import { getEffectiveTransactionStatus } from './status';
 
 export type PurchasesStatusKey =
   | 'processing'
-  | 'held'
+  | 'action_needed'   // Set address, choose delivery date
+  | 'preparing'       // Waiting on seller to propose/ship
   | 'awaiting_permit'
-  | 'in_transit'
-  | 'delivered'
+  | 'scheduled'       // Delivery scheduled or out for delivery
+  | 'delivered'       // Seller marked delivered; buyer confirms receipt
   | 'completed'
   | 'disputed';
 
@@ -75,7 +76,7 @@ export function deriveOrderUIState(order: Order): {
   }
   if (txStatus === 'DELIVERY_PROPOSED') {
     return {
-      statusKey: 'in_transit',
+      statusKey: 'action_needed',
       currentStepLabel: 'Choose delivery date',
       waitingOn: 'Pick one of the seller’s proposed times',
       needsAction: true,
@@ -84,7 +85,7 @@ export function deriveOrderUIState(order: Order): {
   }
   if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {
     return {
-      statusKey: 'in_transit',
+      statusKey: 'scheduled',
       currentStepLabel: txStatus === 'OUT_FOR_DELIVERY' ? 'Out for delivery' : 'Delivery scheduled',
       waitingOn: 'Waiting on delivery',
       needsAction: false,
@@ -122,12 +123,22 @@ export function deriveOrderUIState(order: Order): {
     }
   }
 
-  // FULFILLMENT_REQUIRED - seller must start fulfillment
+  // FULFILLMENT_REQUIRED - seller must start; buyer may need to set address first
   if (txStatus === 'FULFILLMENT_REQUIRED') {
+    const hasBuyerAddress = !!((order.delivery as any)?.buyerAddress?.line1);
+    if (!hasBuyerAddress) {
+      return {
+        statusKey: 'action_needed',
+        currentStepLabel: 'Set delivery address',
+        waitingOn: 'Set your address so the seller can propose a delivery date',
+        needsAction: true,
+        primaryAction: { kind: 'view_details', label: 'Set address' },
+      };
+    }
     return {
-      statusKey: 'held', // Maps to "Fulfillment in progress" badge
-      currentStepLabel: 'Payment received',
-      waitingOn: 'Waiting on seller to begin preparing',
+      statusKey: 'preparing',
+      currentStepLabel: 'Preparing',
+      waitingOn: 'Waiting on seller to propose delivery',
       needsAction: false,
       primaryAction: { kind: 'view_details', label: 'View details' },
     };

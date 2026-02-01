@@ -27,9 +27,19 @@ test('deriveOrderUIState: delivered -> confirm receipt', () => {
   assert.equal(s.primaryAction.kind, 'confirm_receipt');
 });
 
-test('deriveOrderUIState: paid_held -> waiting on seller delivery', () => {
+test('deriveOrderUIState: paid_held no address -> action needed', () => {
   const s = deriveOrderUIState(baseOrder({ status: 'paid_held' }));
-  assert.equal(s.statusKey, 'held');
+  assert.equal(s.statusKey, 'action_needed');
+  assert.equal(s.needsAction, true);
+  assert.equal(s.currentStepLabel, 'Set delivery address');
+});
+
+test('deriveOrderUIState: paid_held with address -> preparing', () => {
+  const s = deriveOrderUIState(baseOrder({
+    status: 'paid_held',
+    delivery: { buyerAddress: { line1: '123 Main St', city: 'Austin', state: 'TX', zip: '78701' } },
+  } as any));
+  assert.equal(s.statusKey, 'preparing');
   assert.equal(s.needsAction, false);
   assert.equal(s.primaryAction.kind, 'view_details');
 });
@@ -40,15 +50,27 @@ test('deriveOrderUIState: transfer permit required and not approved -> awaiting 
   assert.equal(s.primaryAction.kind, 'complete_transfer');
 });
 
+test('deriveOrderUIState: transactionStatus DELIVERY_PROPOSED -> action needed', () => {
+  const s = deriveOrderUIState(baseOrder({ transactionStatus: 'DELIVERY_PROPOSED', status: 'paid_held' }));
+  assert.equal(s.statusKey, 'action_needed');
+  assert.equal(s.primaryAction.kind, 'agree_delivery');
+});
+
+test('deriveOrderUIState: transactionStatus DELIVERY_SCHEDULED -> scheduled', () => {
+  const s = deriveOrderUIState(baseOrder({ transactionStatus: 'DELIVERY_SCHEDULED', status: 'paid_held' }));
+  assert.equal(s.statusKey, 'scheduled');
+  assert.equal(s.currentStepLabel, 'Delivery scheduled');
+});
+
 test('deriveOrderUIState: disputed overrides other statuses', () => {
   const s = deriveOrderUIState(baseOrder({ status: 'disputed', transferPermitRequired: true, transferPermitStatus: 'none' }));
   assert.equal(s.statusKey, 'disputed');
   assert.equal(s.primaryAction.kind, 'view_details');
 });
 
-test('deriveOrderUIState: completed with transfer -> payment released label', () => {
+test('deriveOrderUIState: completed -> transaction complete label', () => {
   const s = deriveOrderUIState(baseOrder({ status: 'completed', stripeTransferId: 'tr_123' }));
   assert.equal(s.statusKey, 'completed');
-  assert.equal(s.currentStepLabel, 'Payment released');
+  assert.equal(s.currentStepLabel, 'Transaction complete');
 });
 

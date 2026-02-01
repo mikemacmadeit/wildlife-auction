@@ -411,6 +411,26 @@ export default function OrdersPage() {
     }
   }, [authLoading, loadOrders]);
 
+  // Clear Finalizing immediately when order is already in list (pre-created order from create-session).
+  // This prevents "stuck in Finalizing" when the order exists and loadOrders has returned it.
+  useEffect(() => {
+    if (!pendingCheckout?.sessionId || !orders.length) return;
+    const match = orders.find(
+      (o) => typeof (o as any).stripeCheckoutSessionId === 'string' && (o as any).stripeCheckoutSessionId === pendingCheckout.sessionId
+    );
+    if (match?.id) {
+      setHighlightOrderId(match.id);
+      setPendingCheckout(null);
+      setPendingCheckoutListingTitle(null);
+      try {
+        sessionStorage.removeItem('we:pending-checkout:v1');
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => setHighlightOrderId(null), 12_000);
+    }
+  }, [orders, pendingCheckout?.sessionId]);
+
   // Fail-safe: if an order exists but is still pending (common when create-session pre-created the order
   // and webhook delivery was delayed), attempt a one-time reconcile using the stored checkout session id.
   useEffect(() => {
@@ -484,9 +504,10 @@ export default function OrdersPage() {
     async function tick() {
       if (Date.now() < rateLimitedUntilRef.current) return;
 
-      // If the webhook pipeline is delayed/misconfigured, attempt a safe, authenticated reconcile once.
-      // IMPORTANT: do this even if the order already exists, because create-session pre-creates an order skeleton.
-      if (!reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
+      // Check for order first — pre-created order appears in Firestore before redirect.
+      // Only run reconcile if order not found (webhook may be delayed).
+      let order = await getOrderByCheckoutSessionId(sessionId).catch(() => null);
+      if (!order?.id && !reconcileAttemptedRef.current[sessionId] && user?.getIdToken) {
         try {
           const token = await user.getIdToken();
           const reconcileRes = await fetch('/api/stripe/checkout/reconcile-session', {
@@ -514,21 +535,22 @@ export default function OrdersPage() {
         // Give Firestore a moment to make the order visible after reconcile (avoids "order not found" on first tick).
         await new Promise((r) => setTimeout(r, 800));
         if (cancelled) return;
+        order = await getOrderByCheckoutSessionId(sessionId).catch(() => null);
       }
 
-      try {
-        const order = await getOrderByCheckoutSessionId(sessionId);
-        if (cancelled) return;
-        if (order?.id) {
+      if (cancelled) return;
+      const orderId = order?.id;
+      if (orderId) {
+        try {
           let list = await loadOrders({ silent: true });
-          if (!Array.isArray(list) || !list.some((o: OrderWithListing) => o.id === order.id)) {
+          if (!Array.isArray(list) || !list.some((o: OrderWithListing) => o.id === orderId)) {
             await new Promise((r) => setTimeout(r, 1500));
             list = await loadOrders({ silent: true });
           }
           if (cancelled) return;
-          const inList = Array.isArray(list) && list.some((o: OrderWithListing) => o.id === order.id);
+          const inList = Array.isArray(list) && list.some((o: OrderWithListing) => o.id === orderId);
           if (inList) {
-            setHighlightOrderId(order.id);
+            setHighlightOrderId(orderId);
             setPendingCheckout(null);
             setPendingCheckoutListingTitle(null);
             try {
@@ -543,7 +565,7 @@ export default function OrdersPage() {
                 const parsed = JSON.parse(raw) as { sessionId?: string; ts?: number };
                 if (parsed?.sessionId === sessionId && typeof parsed?.ts === 'number' && Date.now() - parsed.ts < 120_000) {
                   sessionStorage.removeItem('we:congrats-set-address:v1');
-                  router.push(`/dashboard/orders/${order.id}?setAddress=1`);
+                  router.push(`/dashboard/orders/${orderId}?setAddress=1`);
                 }
               }
             } catch {
@@ -556,9 +578,9 @@ export default function OrdersPage() {
             }
           }
           return;
+        } catch {
+          // If loadOrders or state updates fail, keep polling
         }
-      } catch {
-        // If query fails, keep polling
       }
 
       // IMPORTANT: do not flip the whole page into a loading spinner during background polling.
@@ -917,9 +939,10 @@ export default function OrdersPage() {
   const statusCounts = (() => {
     const counts: Record<string, number> = {
       all: orders.length,
-      held: 0,
+      action_needed: 0,
+      preparing: 0,
       awaiting_permit: 0,
-      in_transit: 0,
+      scheduled: 0,
       delivered: 0,
       completed: 0,
       disputed: 0,
@@ -934,24 +957,27 @@ export default function OrdersPage() {
 
   const statusChipDefs: Array<{ key: PurchasesStatusKey | 'all'; label: string }> = [
     { key: 'all', label: 'All' },
-    { key: 'held', label: 'Fulfillment in progress' }, // Changed from "Held" - seller already paid
+    { key: 'action_needed', label: 'Action needed' },
+    { key: 'preparing', label: 'Preparing' },
     { key: 'awaiting_permit', label: 'Awaiting permit' },
-    { key: 'in_transit', label: 'In transit' },
-    { key: 'delivered', label: 'Delivered' },
+    { key: 'scheduled', label: 'Scheduled' },
+    { key: 'delivered', label: 'Confirm receipt' },
     { key: 'completed', label: 'Completed' },
     { key: 'disputed', label: 'Disputed' },
   ];
 
   const getUIStatusBadge = (statusKey: PurchasesStatusKey) => {
     switch (statusKey) {
-      case 'held':
-        return <Badge className="bg-blue-500 text-white">Fulfillment in progress</Badge>;
+      case 'action_needed':
+        return <Badge className="bg-amber-600 text-white">Action needed</Badge>;
+      case 'preparing':
+        return <Badge className="bg-blue-500 text-white">Preparing</Badge>;
       case 'awaiting_permit':
         return <Badge className="bg-purple-600 text-white">Awaiting permit</Badge>;
-      case 'in_transit':
-        return <Badge className="bg-blue-500 text-white">In transit</Badge>;
+      case 'scheduled':
+        return <Badge className="bg-blue-500 text-white">Scheduled</Badge>;
       case 'delivered':
-        return <Badge className="bg-blue-700 text-white">Delivered</Badge>;
+        return <Badge className="bg-blue-700 text-white">Confirm receipt</Badge>;
       case 'completed':
         return <Badge className="bg-emerald-600 text-white">Completed</Badge>;
       case 'disputed':
@@ -978,7 +1004,7 @@ export default function OrdersPage() {
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-xs">
-                {badge.label === 'Action needed' ? 'Action required from you' : 'Seller paid immediately. Waiting for seller action.'}
+                {badge.label === 'Action needed' ? 'Action required from you' : 'Waiting for seller to fulfill the order.'}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -988,7 +1014,7 @@ export default function OrdersPage() {
     }
     // Fallback for legacy usage
     const badge = getUIStatusBadge(statusKey);
-    if (statusKey !== 'held') return badge;
+    if (statusKey !== 'preparing') return badge;
 
     return (
       <TooltipProvider>
@@ -999,7 +1025,7 @@ export default function OrdersPage() {
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
-            Seller was paid immediately upon successful payment. Waiting on fulfillment (delivery/pickup) to complete.
+            Waiting for seller to propose a delivery date.
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
