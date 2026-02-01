@@ -1,3 +1,5 @@
+# Publish directory: leave unset in Netlify UI so @netlify/plugin-nextjs controls it.
+# If you see Netlify's default "Page not found" 404, clear Publish directory in Site settings > Build & deploy.
 [build]
 command = "node scripts/netlify-write-firebase-service-account.mjs && node scripts/write-build-info.mjs && (npx tsx scripts/checkKBUpdates.ts 2>&1 || true) && npx next build"
 
