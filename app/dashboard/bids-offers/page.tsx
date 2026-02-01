@@ -37,6 +37,7 @@ import {
   XCircle,
   X,
 } from 'lucide-react';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { getMyBids, placeBidServer, type MyBidRow } from '@/lib/api/bids';
 import { getMyOffers, getSellerOffers } from '@/lib/offers/api';
 import { createCheckoutSession, createWireIntent } from '@/lib/stripe/api';
@@ -266,7 +267,7 @@ export default function BidsOffersPage() {
         });
       }
     } catch (e: any) {
-      toast({ title: 'Failed to load', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to load', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -1471,7 +1472,7 @@ export default function BidsOffersPage() {
                     setRaiseDialogOpen(false);
                     await load();
                   } catch (e: any) {
-                    toast({ title: 'Couldn’t update bid', description: e?.message || 'Please try again.', variant: 'destructive' });
+                    toast({ title: 'Couldn’t update bid', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
                   } finally {
                     setRaising(false);
                   }

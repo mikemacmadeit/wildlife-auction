@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Handshake, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { getMyOffers } from '@/lib/offers/api';
 import { subscribeToUnreadCountByTypes, markNotificationsAsReadByTypes } from '@/lib/firebase/notifications';
 import type { NotificationType } from '@/lib/types';
@@ -61,7 +62,7 @@ export default function MyOffersPage() {
       const res = await getMyOffers({ status: tab, limit: 100 });
       setOffers((res?.offers || []) as OfferRow[]);
     } catch (e: any) {
-      toast({ title: 'Failed to load offers', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to load offers', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

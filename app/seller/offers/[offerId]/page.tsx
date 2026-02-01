@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, ArrowLeft, CheckCircle2, XCircle, Handshake, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { getOffer, acceptOffer, counterOffer, declineOffer } from '@/lib/offers/api';
 import { OfferAcceptedSuccessModal } from '@/components/offers/OfferAcceptedSuccessModal';
 
@@ -60,7 +61,7 @@ export default function SellerOfferDetailPage() {
       const res = await getOffer(offerId);
       setOffer(res?.offer as OfferDTO);
     } catch (e: any) {
-      toast({ title: 'Failed to load offer', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to load offer', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       setOffer(null);
     } finally {
       setLoading(false);
@@ -83,7 +84,7 @@ export default function SellerOfferDetailPage() {
       await load();
       setAcceptSuccessOpen(true);
     } catch (e: any) {
-      toast({ title: 'Accept failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Accept failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -97,7 +98,7 @@ export default function SellerOfferDetailPage() {
       toast({ title: 'Declined', description: 'Offer declined.' });
       await load();
     } catch (e: any) {
-      toast({ title: 'Decline failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Decline failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -118,7 +119,7 @@ export default function SellerOfferDetailPage() {
       setCounterAmount('');
       await load();
     } catch (e: any) {
-      toast({ title: 'Counter failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Counter failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }

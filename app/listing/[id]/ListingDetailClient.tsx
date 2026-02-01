@@ -69,6 +69,7 @@ import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { OfferPanel } from '@/components/offers/OfferPanel';
 import { Share2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { getListingById, subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, WildlifeAttributes, CattleAttributes, EquipmentAttributes, isGroupLotQuantityMode } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -757,7 +758,7 @@ export default function ListingDetailClient() {
       console.error('Error creating checkout session:', error);
       toast({
         title: 'Checkout Failed',
-        description: error.message || 'Failed to start checkout. Please try again.',
+        description: formatUserFacingError(error, 'Failed to start checkout. Please try again.'),
         variant: 'destructive',
       });
       setIsPlacingBid(false);
@@ -821,7 +822,7 @@ export default function ListingDetailClient() {
       window.location.href = url;
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
-      const msg = error?.message ? String(error.message) : 'Checkout could not be started.';
+      const msg = formatUserFacingError(error, 'Checkout could not be started.');
       setCheckoutError({
         attemptedMethod: method,
         message: msg,
@@ -938,15 +939,14 @@ export default function ListingDetailClient() {
                     </Badge>
                   ) : null}
                   {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
-                    <Badge
-                      variant="success"
-                      className="font-medium gap-1"
-                      title="Protected Transaction: Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. Optional dispute window after delivery; evidence required for disputes."
-                    >
-                      <Shield className="h-3 w-3" />
-                      Protected {listing!.protectedTransactionDays} Days
+                    <Badge variant="outline" className="font-medium">
+                      Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window
                     </Badge>
-                  ) : null}
+                  ) : (
+                    <Badge variant="outline" className="font-medium text-muted-foreground">
+                      Final sale upon delivery
+                    </Badge>
+                  )}
                 </div>
 
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight break-words">
@@ -1616,15 +1616,18 @@ export default function ListingDetailClient() {
 
                       {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
                         <div className="flex items-start gap-2">
-                          <Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                           <div className="min-w-0">
-                            <div className="font-semibold">Protected Transaction</div>
+                            <div className="font-semibold">Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window</div>
                             <div className="text-xs text-muted-foreground">
-                              Verified listing window ({listing!.protectedTransactionDays} days). Dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
+                              Claims require proof. No automatic refunds. AgChange does not hold funds or delay payout.
                             </div>
                           </div>
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          Final sale upon delivery confirmation.
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
@@ -1995,15 +1998,18 @@ export default function ListingDetailClient() {
 
                         {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
                           <div className="flex items-start gap-2">
-                            <Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                             <div className="min-w-0">
-                              <div className="font-semibold">Protected Transaction</div>
+                              <div className="font-semibold">Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window</div>
                               <div className="text-xs text-muted-foreground">
-                                Verified listing window ({listing!.protectedTransactionDays} days). Dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
+                                Claims require proof. No automatic refunds. AgChange does not hold funds or delay payout.
                               </div>
                             </div>
                           </div>
-                        ) : null}
+                        ) : (
+                          <div className="text-xs text-muted-foreground">
+                            Final sale upon delivery confirmation.
+                          </div>
+                        )}
                       </div>
                     </>
                   ) : null}
@@ -2126,7 +2132,7 @@ export default function ListingDetailClient() {
                       {listing!.transportOption === 'SELLER_TRANSPORT' ? (
                         <>
                           <p className="font-semibold text-foreground">Seller arranges delivery</p>
-                          <p className="text-muted-foreground">Seller will deliver; buyer and seller coordinate after purchase.</p>
+                          <p className="text-muted-foreground">The seller will coordinate delivery with you after purchase. You confirm receipt to complete the transaction.</p>
                           {listing!.deliveryDetails && (listing!.deliveryDetails.maxDeliveryRadiusMiles != null || listing!.deliveryDetails.deliveryTimeframe || listing!.deliveryDetails.deliveryNotes || listing!.deliveryDetails.deliveryStatusExplanation) && (
                             <dl className="grid gap-1.5 pt-1 border-t border-border/60 mt-2">
                               {listing!.deliveryDetails.maxDeliveryRadiusMiles != null ? (
@@ -2161,11 +2167,11 @@ export default function ListingDetailClient() {
                         </>
                       ) : listing!.transportOption === 'BUYER_TRANSPORT' ? (
                         <>
-                          <p className="font-semibold text-foreground">Buyer arranges pickup or transport</p>
-                          <p className="text-muted-foreground">Buyer is responsible for pickup or arranging transport; coordinate with seller after purchase.</p>
+                          <p className="font-semibold text-foreground">Pickup or transport</p>
+                          <p className="text-muted-foreground">Coordinate pickup or transport with the seller after purchase.</p>
                         </>
                       ) : (
-                        <p className="text-muted-foreground">Buyer and seller arrange logistics directly after purchase.</p>
+                        <p className="text-muted-foreground">You and the seller coordinate delivery after purchase.</p>
                       )}
                     </div>
                   </div>
@@ -2193,15 +2199,14 @@ export default function ListingDetailClient() {
                         </Badge>
                       )}
                       {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
-                        <Badge
-                          variant="success"
-                          className="text-xs font-medium gap-1"
-                          title="Protected Transaction: Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. Optional dispute window after delivery; evidence required for disputes."
-                        >
-                          <Shield className="h-3 w-3" />
-                          Protected {listing!.protectedTransactionDays} Days
+                        <Badge variant="outline" className="text-xs font-medium">
+                          Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window
                         </Badge>
-                      ) : null}
+                      ) : (
+                        <Badge variant="outline" className="text-xs font-medium text-muted-foreground">
+                          Final sale upon delivery
+                        </Badge>
+                      )}
                     </div>
                   </div>
 

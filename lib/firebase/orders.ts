@@ -82,6 +82,7 @@ export interface OrderDoc {
   protectionStartAt?: Timestamp;
   protectionEndsAt?: Timestamp;
   buyerAcceptedAt?: Timestamp;
+  buyerConfirmedAt?: Timestamp;
   disputeOpenedAt?: Timestamp;
   disputeReasonV2?: 'death' | 'serious_illness' | 'injury' | 'escape' | 'wrong_animal';
   disputeStatus?: 'none' | 'open' | 'needs_evidence' | 'under_review' | 'resolved_refund' | 'resolved_partial_refund' | 'resolved_release' | 'cancelled';
@@ -91,7 +92,7 @@ export interface OrderDoc {
     uploadedAt: Timestamp;
   }>;
   payoutHoldReason?: 'none' | 'protection_window' | 'dispute_open';
-  protectedTransactionDaysSnapshot?: 7 | 14 | null;
+  protectedTransactionDaysSnapshot?: 3 | 7 | 14 | null;
   protectedTermsVersion?: string;
 
   // Bill of Sale / Written Transfer (attestation timestamps; server-authored)
@@ -236,6 +237,7 @@ function toOrder(docId: string, data: OrderDoc): Order {
     protectionStartAt: data.protectionStartAt ? toDateSafe(data.protectionStartAt) : undefined,
     protectionEndsAt: data.protectionEndsAt ? toDateSafe(data.protectionEndsAt) : undefined,
     buyerAcceptedAt: data.buyerAcceptedAt ? toDateSafe(data.buyerAcceptedAt) : undefined,
+    buyerConfirmedAt: data.buyerConfirmedAt ? toDateSafe(data.buyerConfirmedAt) : undefined,
     disputeOpenedAt: data.disputeOpenedAt ? toDateSafe(data.disputeOpenedAt) : undefined,
     disputeReasonV2: data.disputeReasonV2,
     disputeStatus: data.disputeStatus,

@@ -37,6 +37,7 @@ import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { ORDER_COPY } from '@/lib/orders/copy';
 import { formatDate } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 
 async function postAuthJson(path: string, body?: any): Promise<any> {
@@ -95,7 +96,7 @@ export default function SellerOrderDetailPage() {
       setListing(l || null);
       setBillOfSaleDocs(bos);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load order');
+      setError(formatUserFacingError(e, 'Failed to load order'));
     } finally {
       setLoading(false);
     }
@@ -476,7 +477,7 @@ export default function SellerOrderDetailPage() {
               toast({ title: 'Live tracking started', description: 'Buyer can now see your location on the map.' });
               await loadOrder();
             } catch (e: any) {
-              toast({ title: 'Error', description: e?.message || 'Failed to start tracking', variant: 'destructive' });
+              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to start tracking'), variant: 'destructive' });
             } finally {
               setTrackingProcessing(null);
             }
@@ -488,7 +489,7 @@ export default function SellerOrderDetailPage() {
               toast({ title: 'Tracking stopped', description: 'Buyer will no longer see live location.' });
               await loadOrder();
             } catch (e: any) {
-              toast({ title: 'Error', description: e?.message || 'Failed to stop tracking', variant: 'destructive' });
+              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to stop tracking'), variant: 'destructive' });
             } finally {
               setTrackingProcessing(null);
             }
@@ -500,7 +501,7 @@ export default function SellerOrderDetailPage() {
               toast({ title: 'Marked as delivered', description: 'Buyer can confirm receipt on their order page.' });
               await loadOrder();
             } catch (e: any) {
-              toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
+              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark delivered'), variant: 'destructive' });
             } finally {
               setTrackingProcessing(null);
             }
@@ -615,7 +616,7 @@ export default function SellerOrderDetailPage() {
                       const refreshed = await getOrderById(order.id);
                       if (refreshed) setOrder(refreshed);
                     } catch (e: any) {
-                      toast({ title: 'Error', description: e?.message || 'Failed to confirm', variant: 'destructive' });
+                      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm'), variant: 'destructive' });
                     }
                   }}
                 >
@@ -750,7 +751,7 @@ export default function SellerOrderDetailPage() {
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to mark out for delivery', variant: 'destructive' });
+                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark out for delivery'), variant: 'destructive' });
                   } finally {
                     setProcessing(null);
                   }
@@ -789,6 +790,7 @@ export default function SellerOrderDetailPage() {
                     documentType="DELIVERY_PROOF"
                     onUploadComplete={() => setHasDeliveryProof(true)}
                     required
+                    uploadTrigger
                   />
                 )}
               </div>
@@ -810,7 +812,7 @@ export default function SellerOrderDetailPage() {
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to mark delivered', variant: 'destructive' });
+                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark delivered'), variant: 'destructive' });
                   } finally {
                     setProcessing(null);
                   }

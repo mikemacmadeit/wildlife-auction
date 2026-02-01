@@ -43,6 +43,7 @@ import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile } from '@/lib/types';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -135,7 +136,7 @@ function NewListingPageContent() {
       deliveryNotes: string;
     };
     protectedTransactionEnabled: boolean;
-    protectedTransactionDays: 7 | 14 | null;
+    protectedTransactionDays: 3 | 7 | 14 | null;
     bestOffer: {
       enabled: boolean;
       minPrice: string;
@@ -639,7 +640,7 @@ function NewListingPageContent() {
               </AlertDescription>
             </Alert>
           ) : null}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 gap-4 max-w-5xl mx-auto">
             <Card
               role="button"
               tabIndex={canSelectWhitetail ? 0 : -1}
@@ -1244,7 +1245,7 @@ function NewListingPageContent() {
       title: 'Listing Type',
       description: 'Choose how you want to sell',
       content: (
-        <div className="space-y-6">
+        <div className="space-y-10">
           {validationAttempted.type && !formData.type ? (
             <Alert className="bg-destructive/10 border-destructive/20">
               <AlertCircle className="h-4 w-4 text-destructive" />
@@ -1253,9 +1254,10 @@ function NewListingPageContent() {
               </AlertDescription>
             </Alert>
           ) : null}
-          <div className="space-y-3">
-            <Label className="text-base font-semibold">Listing Type</Label>
+          <div className="space-y-6">
+            <Label className="text-xl font-semibold">Listing Type</Label>
             <RadioGroup
+              className="space-y-4"
               value={formData.type}
               onValueChange={(value) => {
                 // Clear conflicting pricing fields when switching types
@@ -1274,11 +1276,11 @@ function NewListingPageContent() {
                 { value: 'auction', label: 'Auction', desc: 'Bidders compete, highest bid wins' },
                 { value: 'fixed', label: 'Fixed Price', desc: 'Set a price, buyer pays immediately' },
               ].map((option) => (
-                <div key={option.value} className="flex items-start space-x-3 min-h-[44px]">
-                  <RadioGroupItem value={option.value} id={option.value} className="mt-1" />
-                  <Label htmlFor={option.value} className="cursor-pointer flex-1">
-                    <div className="font-medium">{option.label}</div>
-                    <div className="text-sm text-muted-foreground">{option.desc}</div>
+                <div key={option.value} className="flex items-start space-x-5 min-h-[88px] py-5 px-5 rounded-xl border-2 border-border bg-muted/20 hover:bg-muted/40 transition-colors">
+                  <RadioGroupItem value={option.value} id={option.value} className="mt-2 shrink-0 size-6" />
+                  <Label htmlFor={option.value} className="cursor-pointer flex-1 py-2">
+                    <div className="text-lg font-semibold">{option.label}</div>
+                    <div className="text-base text-muted-foreground mt-1">{option.desc}</div>
                   </Label>
                 </div>
               ))}
@@ -1993,20 +1995,12 @@ function NewListingPageContent() {
             <div className="space-y-2">
               <Label htmlFor="state" className="text-base font-semibold">State</Label>
               {['whitetail_breeder', 'wildlife_exotics', 'cattle_livestock', 'farm_animals'].includes(formData.category) ? (
-                <>
-                  <Input
-                    id="state"
-                    value="TX"
-                    disabled
-                    className="min-h-[48px] text-base bg-muted"
-                  />
-                  <Alert className="bg-blue-50 border-blue-200">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-800 text-xs">
-                      Animal listings must be located in Texas (TX) per compliance requirements.
-                    </AlertDescription>
-                  </Alert>
-                </>
+                <Input
+                  id="state"
+                  value="TX"
+                  disabled
+                  className="min-h-[48px] text-base bg-muted"
+                />
               ) : (
                 <Input
                   id="state"
@@ -2031,22 +2025,6 @@ function NewListingPageContent() {
               ) : null}
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="zip" className="text-base font-semibold">ZIP Code (Optional)</Label>
-            <Input
-              id="zip"
-              placeholder="12345"
-              value={formData.location.zip}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  location: { ...formData.location, zip: e.target.value },
-                })
-              }
-              className="min-h-[48px] text-base"
-            />
-          </div>
         </div>
       ),
       validate: () => {
@@ -2059,7 +2037,6 @@ function NewListingPageContent() {
 
         const durationOk = isValidDurationDays(formData.durationDays);
 
-        // Note: ZIP remains optional.
         return titleOk && descOk && cityOk && stateOk && priceOk && durationOk;
       },
     },
@@ -2117,29 +2094,10 @@ function NewListingPageContent() {
     },
     {
       id: 'verification',
-      title: 'Verification & Transportation',
-      description: 'Optional: Add verification and set transportation',
+      title: 'Protected Transaction (Optional)',
+      description: 'Post-delivery review window — opt-in only',
       content: (
         <div className="space-y-6">
-          <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="verification"
-                checked={formData.verification}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, verification: checked as boolean })
-                }
-              />
-              <Label htmlFor="verification" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Professional Verification ($100)</div>
-                <div className="text-sm text-muted-foreground">
-                  Admin review for marketplace workflow completeness. Builds buyer trust.
-                </div>
-              </Label>
-            </div>
-          </Card>
-
-          {/* Protected Transaction */}
           <Card className="p-4 border-2">
             <div className="space-y-4">
               <div className="flex items-start space-x-3 min-h-[44px]">
@@ -2156,54 +2114,71 @@ function NewListingPageContent() {
                   }}
                 />
                 <Label htmlFor="protected" className="cursor-pointer flex-1">
-                  <div className="font-medium mb-1">Protected Transaction</div>
+                  <div className="font-medium mb-1">Offer a post-delivery review window</div>
                   <div className="text-sm text-muted-foreground">
-                    Verified listing window: optional dispute window after delivery. Agchange does not hold funds or condition payouts on delivery.
+                    Allows buyers to report verified delivery-related issues within a short window after delivery confirmation. Claims require proof and are reviewed. No automatic refunds.
                   </div>
                 </Label>
               </div>
               {formData.protectedTransactionEnabled && (
-                <div className="pl-7 space-y-2">
-                  <div className="text-sm font-medium">Protection window</div>
-                  <RadioGroup
-                    value={formData.protectedTransactionDays === 7 ? '7' : formData.protectedTransactionDays === 14 ? '14' : '7'}
-                    onValueChange={(v) =>
-                      setFormData({
-                        ...formData,
-                        protectedTransactionDays: v === '14' ? 14 : 7,
-                      })
-                    }
-                    className="flex gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="7" id="protect-7" />
-                      <Label htmlFor="protect-7" className="cursor-pointer font-normal">7 days</Label>
+                <div className="pl-7 space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Protection window</div>
+                    <RadioGroup
+                      value={formData.protectedTransactionDays === 3 ? '3' : '7'}
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          protectedTransactionDays: v === '3' ? 3 : 7,
+                        })
+                      }
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="3" id="protect-3" />
+                        <Label htmlFor="protect-3" className="cursor-pointer font-normal">3 days</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="7" id="protect-7" />
+                        <Label htmlFor="protect-7" className="cursor-pointer font-normal">7 days</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-3 text-sm text-muted-foreground">
+                    <div>
+                      <div className="font-medium text-foreground mb-1">What buyers may report</div>
+                      <ul className="list-disc list-inside space-y-0.5 pl-1">
+                        <li>Illness or injury present at delivery or occurring immediately around delivery</li>
+                        <li>The animal not matching the listing description</li>
+                      </ul>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="14" id="protect-14" />
-                      <Label htmlFor="protect-14" className="cursor-pointer font-normal">14 days</Label>
+                    <div>
+                      <div className="font-medium text-foreground mb-1">What is required</div>
+                      <p>Documentation or proof (for example, dated veterinary records for illness or death)</p>
                     </div>
-                  </RadioGroup>
+                    <div>
+                      <div className="font-medium text-foreground mb-1">How claims work</div>
+                      <ul className="list-disc list-inside space-y-0.5 pl-1">
+                        <li>Claims must be submitted within the selected window</li>
+                        <li>Claims are reviewed; outcomes are not automatic</li>
+                        <li>If a claim is upheld (seller at fault), the seller is expected to refund or otherwise resolve the issue</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground mb-1">Platform role</div>
+                      <p>AgChange does not hold funds, delay payouts, or provide guarantees</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </Card>
-
-          {/* Transportation — seller always arranges delivery */}
-          <Card className="p-4 border-2">
-            <div className="space-y-2">
-              <h3 className="font-semibold text-base">Delivery</h3>
-              <p className="text-sm text-muted-foreground">
-                You are responsible for scheduling delivery. You’ll propose a delivery window; the buyer agrees to that date. You coordinate until you agree. The buyer confirms receipt to complete the transaction. Agchange does not arrange transport.
-              </p>
-              <p className="text-xs text-muted-foreground pt-1">
-                Seller arranges delivery · Buyer confirms receipt
-              </p>
-            </div>
-          </Card>
+          <p className="text-sm text-muted-foreground">
+            Listings without a post-delivery review window are final upon delivery confirmation.
+          </p>
         </div>
       ),
-      validate: () => true, // Verification and transportation options are optional
+      validate: () => true, // Optional
     },
     {
       id: 'transportation',
@@ -2211,18 +2186,29 @@ function NewListingPageContent() {
       description: 'Delivery timeframe & details (required)',
       content: (
         <div className="space-y-6">
+          <Card className="p-4 border-2">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base">Delivery</h3>
+              <p className="text-sm text-muted-foreground">
+                You schedule delivery: propose a window, the buyer agrees, and you coordinate until you're aligned. The buyer confirms receipt to complete the transaction.</p>
+              <p className="text-xs text-muted-foreground pt-1">
+                You arrange delivery · Buyer confirms receipt
+              </p>
+            </div>
+          </Card>
+
           <p className="text-sm text-muted-foreground">
-            Buyers see this when you offer delivery. It helps them decide before buying and sets clear expectations.
+            The details below are shown to buyers and help set expectations before they purchase.
           </p>
 
           <Card className="p-4 border-2">
             <div className="space-y-4">
               <div>
                 <Label htmlFor="maxDeliveryRadiusMiles" className="font-medium">
-                  Maximum delivery radius (miles)
+                  Maximum delivery radius (miles) <span className="text-destructive">*</span>
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  How far you’re willing to deliver from your location. Leave blank if you prefer to discuss per buyer.
+                  How far you’re willing to deliver from your location.
                 </p>
                 <Input
                   id="maxDeliveryRadiusMiles"
@@ -2333,6 +2319,16 @@ function NewListingPageContent() {
       ),
       validate: () => {
         const dd = formData.deliveryDetails ?? {};
+        // Maximum delivery radius is required
+        const maxMiles = dd.maxDeliveryRadiusMiles;
+        if (maxMiles === '' || maxMiles === undefined || Number(maxMiles) < 1) {
+          toast({
+            title: 'Delivery radius required',
+            description: 'Please enter how far you’re willing to deliver (at least 1 mile).',
+            variant: 'destructive',
+          });
+          return false;
+        }
         // Delivery timeframe is required
         if (!(dd.deliveryTimeframe ?? '').trim()) {
           toast({
@@ -2400,7 +2396,6 @@ function NewListingPageContent() {
                             {String(formData.category).replaceAll('_', ' ')}
                           </Badge>
                         )}
-                        {formData.verification && <Badge>Verification</Badge>}
                         <Badge variant="outline">Seller arranges delivery</Badge>
                         {formData.protectedTransactionEnabled && (
                           <Badge variant="outline">
@@ -2502,6 +2497,8 @@ function NewListingPageContent() {
               images: formData.images || [],
               location: formData.location,
               sellerId: user?.uid || 'preview',
+              transportOption: 'SELLER_TRANSPORT',
+              deliveryDetails: formData.deliveryDetails ?? undefined,
               trust: {
                 verified: !!formData.verification,
                 insuranceAvailable: false,
@@ -2544,10 +2541,6 @@ function NewListingPageContent() {
                 <div className="rounded-md border bg-muted/30 p-3">
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Options</div>
                   <div className="mt-2 space-y-1">
-                    <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
-                    <div><span className="text-muted-foreground">Transportation:</span> <span className="font-medium">
-                      Seller arranges delivery
-                    </span></div>
                     {(() => {
                       const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
                       const tf = (dd.deliveryTimeframe ?? '').trim();
@@ -2928,7 +2921,7 @@ function NewListingPageContent() {
 
       toast({
         title: 'Couldn\'t create listing',
-        description: error.message || 'Something went wrong while saving your listing. Please try again. If it keeps happening, contact support.',
+        description: formatUserFacingError(error, 'Something went wrong while saving your listing. Please try again. If it keeps happening, contact support.'),
         variant: 'destructive',
       });
     } finally {
@@ -3144,7 +3137,7 @@ function NewListingPageContent() {
       console.error('Error saving draft:', error);
       toast({
         title: 'Couldn\'t save draft',
-        description: error.message || 'Something went wrong while saving your draft. Please try again. If it keeps happening, contact support.',
+        description: formatUserFacingError(error, 'Something went wrong while saving your draft. Please try again. If it keeps happening, contact support.'),
         variant: 'destructive',
       });
       return false;
@@ -3348,7 +3341,7 @@ function NewListingPageContent() {
                         <div className="text-xs md:text-sm space-y-1">
                           <div>• I have accurately disclosed identification details (if applicable).</div>
                           <div>• I have disclosed any known health issues and represented the dog honestly.</div>
-                          <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                          <div>• I understand transfers are Texas-only on this platform.</div>
                         </div>
                       </div>
                     )}
@@ -3386,7 +3379,7 @@ function NewListingPageContent() {
                         <div className="text-xs md:text-sm space-y-1">
                           <div>• I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).</div>
                           <div>• I have disclosed any known health issues and represented the horse honestly.</div>
-                          <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                          <div>• I understand transfers are Texas-only on this platform.</div>
                           <div>• I disclose any liens/encumbrances (or confirm there are none).</div>
                         </div>
                       </div>

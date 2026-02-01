@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -153,7 +154,7 @@ export default function AdminSupportPage() {
       if (!res.ok || body?.ok !== true) throw new Error(body?.error || body?.message || 'Failed to load tickets');
       setTickets(Array.isArray(body?.tickets) ? body.tickets : []);
     } catch (e: any) {
-      toast({ title: 'Support inbox error', description: e?.message || 'Failed to load.', variant: 'destructive' });
+      toast({ title: 'Support inbox error', description: formatUserFacingError(e, 'Failed to load.'), variant: 'destructive' });
       setTickets([]);
     } finally {
       setLoading(false);
@@ -182,7 +183,7 @@ export default function AdminSupportPage() {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }, 100);
       } catch (e: any) {
-        toast({ title: 'Failed to load ticket', description: e?.message || 'Please try again.', variant: 'destructive' });
+        toast({ title: 'Failed to load ticket', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       } finally {
         setLoadingDetail(false);
       }
@@ -219,7 +220,7 @@ export default function AdminSupportPage() {
           await loadTicketDetail(ticketId);
         }
       } catch (e: any) {
-        toast({ title: 'Update failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+        toast({ title: 'Update failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       } finally {
         setActingId(null);
       }
@@ -244,7 +245,7 @@ export default function AdminSupportPage() {
         await loadTicketDetail(activeTicketId);
         await load();
       } catch (e: any) {
-        toast({ title: 'Update failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+        toast({ title: 'Update failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       } finally {
         setUpdatingTicket(false);
       }
@@ -281,7 +282,7 @@ export default function AdminSupportPage() {
       await loadTicketDetail(activeTicketId);
       await load();
     } catch (e: any) {
-      toast({ title: 'Send failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Send failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setSending(false);
     }

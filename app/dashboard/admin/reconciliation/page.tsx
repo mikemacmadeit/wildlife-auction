@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { runReconciliation } from '@/lib/stripe/api';
 import { formatDate } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import Link from 'next/link';
 
 interface ReconciliationIssue {
@@ -94,7 +95,7 @@ export default function ReconciliationPage() {
       console.error('Error running reconciliation:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to run reconciliation',
+        description: formatUserFacingError(error, 'Failed to run reconciliation'),
         variant: 'destructive',
       });
     } finally {

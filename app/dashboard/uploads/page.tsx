@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Trash2, RotateCcw, Loader2, ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { cn } from '@/lib/utils';
 
@@ -88,7 +89,7 @@ export default function UploadsLibraryPage() {
               } catch (err: any) {
                 toast({
                   title: 'Upload failed',
-                  description: err?.message || 'Failed to upload photo.',
+                  description: formatUserFacingError(err, 'Failed to upload photo.'),
                   variant: 'destructive',
                 });
               } finally {
@@ -240,7 +241,7 @@ function UploadsGrid(props: {
                     await props.onDelete?.(p.photoId);
                     toast({ title: 'Moved to trash', description: 'Photo removed from active uploads.' });
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to delete.', variant: 'destructive' });
+                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to delete.'), variant: 'destructive' });
                   }
                 }}
               >

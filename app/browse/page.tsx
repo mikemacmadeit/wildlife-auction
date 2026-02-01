@@ -36,6 +36,7 @@ import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { useToast } from '@/hooks/use-toast';
 import { useMinLoading } from '@/hooks/use-min-loading';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { useAuth } from '@/hooks/use-auth';
 import { getSavedSearch } from '@/lib/firebase/savedSearches';
 import { BrowseFiltersSidebar } from '@/components/browse/BrowseFiltersSidebar';
@@ -412,7 +413,7 @@ export default function BrowsePage() {
       setSavedSearchConfirmPush(false);
       setSavedSearchConfirmOpen(true);
     } catch (e: any) {
-      toast({ title: 'Save failed', description: e?.message || 'Could not save this search.', variant: 'destructive' });
+      toast({ title: 'Save failed', description: formatUserFacingError(e, 'Could not save this search.'), variant: 'destructive' });
     } finally {
       setSavingSearch(false);
     }
@@ -438,7 +439,7 @@ export default function BrowsePage() {
       setSaveSearchDialogOpen(false);
       void id;
     } catch (e: any) {
-      toast({ title: 'Save failed', description: e?.message || 'Could not save this search.', variant: 'destructive' });
+      toast({ title: 'Save failed', description: formatUserFacingError(e, 'Could not save this search.'), variant: 'destructive' });
     } finally {
       setSavingSearch(false);
     }
@@ -541,7 +542,7 @@ export default function BrowsePage() {
       }
     } catch (err) {
       console.error('Error fetching listings:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load listings';
+      const errorMessage = formatUserFacingError(err, 'Failed to load listings');
       setError(errorMessage);
       toast({
         title: 'Failed to load listings',
@@ -588,7 +589,7 @@ export default function BrowsePage() {
       console.error('Error loading more listings:', err);
       toast({
         title: 'Failed to load more listings',
-        description: err instanceof Error ? err.message : 'Please try again',
+        description: formatUserFacingError(err, 'Please try again'),
         variant: 'destructive',
       });
     } finally {
@@ -1786,7 +1787,7 @@ export default function BrowsePage() {
                   });
                   toast({ title: 'Saved', description: 'Search saved and alerts updated.' });
                 } catch (e: any) {
-                  toast({ title: 'Update failed', description: e?.message || 'Could not update alerts.', variant: 'destructive' });
+                  toast({ title: 'Update failed', description: formatUserFacingError(e, 'Could not update alerts.'), variant: 'destructive' });
                 } finally {
                   setSavingSearch(false);
                   setSavedSearchConfirmOpen(false);

@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { collection, query, where, getDocs, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Order, OrderStatus } from '@/lib/types';
@@ -227,7 +228,7 @@ export default function AdminPayoutsPage() {
       console.error('Error processing refund:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to process refund. Please try again.',
+        description: formatUserFacingError(error, 'Failed to process refund. Please try again.'),
         variant: 'destructive',
       });
     } finally {

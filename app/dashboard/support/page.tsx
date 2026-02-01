@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Button } from '@/components/ui/button';
@@ -65,7 +66,7 @@ export default function SupportPage() {
       if (!res.ok || body?.ok !== true) throw new Error(body?.error || body?.message || 'Failed to load tickets');
       setTickets(Array.isArray(body?.tickets) ? body.tickets : []);
     } catch (e: any) {
-      toast({ title: 'Could not load tickets', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Could not load tickets', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       setTickets([]);
     } finally {
       setTicketsLoading(false);
@@ -112,7 +113,7 @@ export default function SupportPage() {
       setTab('my');
       await loadTickets();
     } catch (e: any) {
-      toast({ title: 'Could not create ticket', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Could not create ticket', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setCreating(false);
     }

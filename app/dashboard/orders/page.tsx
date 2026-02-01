@@ -21,6 +21,7 @@ import { deriveOrderUIState, type PurchasesStatusKey } from '@/lib/orders/derive
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { getNextRequiredAction, getUXBadge } from '@/lib/orders/progress';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import {
   Dialog,
   DialogContent,
@@ -210,7 +211,7 @@ export default function OrdersPage() {
       return ordersWithListings;
     } catch (err) {
       console.error('Error fetching orders:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load orders');
+      setError(formatUserFacingError(err, 'Failed to load orders'));
     } finally {
       if (!opts?.silent) setLoading(false);
     }
@@ -616,7 +617,7 @@ export default function OrdersPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to confirm receipt',
+        description: formatUserFacingError(error, 'Failed to confirm receipt'),
         variant: 'destructive',
       });
     } finally {
@@ -648,7 +649,7 @@ export default function OrdersPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to open dispute',
+        description: formatUserFacingError(error, 'Failed to open dispute'),
         variant: 'destructive',
       });
     } finally {

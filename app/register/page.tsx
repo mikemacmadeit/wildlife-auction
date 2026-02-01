@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { signUp, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
+import { getRegisterErrorMessage, getGoogleSignInErrorMessage } from '@/lib/firebase/auth-error-messages';
 import { createUserDocument, getUserProfile } from '@/lib/firebase/users';
 import { saveAddress, setCheckoutDeliveryAddress } from '@/lib/firebase/addresses';
 import { getIdToken } from '@/lib/firebase/auth-helper';
@@ -117,14 +118,7 @@ export default function RegisterPage() {
       })
       .catch((error: any) => {
         console.error('Error during Google redirect result:', error);
-        let errorMessage = 'An error occurred during Google sign-up. Please try again.';
-        if (error.code === 'auth/unauthorized-domain') {
-          errorMessage = 'Google sign-up is not enabled for this domain. Please contact support.';
-        } else if (error.code === 'auth/operation-not-allowed') {
-          errorMessage = 'Google sign-up is not enabled for this project. Please contact support.';
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
+        const errorMessage = getGoogleSignInErrorMessage(error?.code);
         toast({
           title: 'Google sign-up failed',
           description: errorMessage,
@@ -293,17 +287,7 @@ export default function RegisterPage() {
       } catch {
         /* ignore */
       }
-      let errorMessage = 'An error occurred while creating your account. Please try again.';
-      
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'An account with this email already exists. Please sign in instead.';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please choose a stronger password.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address. Please check and try again.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      const errorMessage = getRegisterErrorMessage(error?.code);
 
       toast({
         title: 'Registration failed',
@@ -362,22 +346,7 @@ export default function RegisterPage() {
         return; // Page will reload after redirect
       }
 
-      let errorMessage = 'An error occurred while signing in with Google. Please try again.';
-      
-      if (error.code === 'auth/popup-closed-by-user') {
-        errorMessage = 'Sign-in popup was closed. Please try again.';
-      } else if (error.code === 'auth/popup-blocked') {
-        errorMessage = 'Popup was blocked. Using redirect instead...';
-        // Will automatically fall back to redirect in signInWithGoogle
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        errorMessage = 'Only one popup request is allowed at a time.';
-      } else if (error.code === 'auth/unauthorized-domain') {
-        errorMessage = 'This domain is not authorized. Please contact support.';
-      } else if (error.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Google sign-in is not enabled. Please contact support.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      const errorMessage = getGoogleSignInErrorMessage(error?.code);
 
       toast({
         title: 'Google sign-up failed',

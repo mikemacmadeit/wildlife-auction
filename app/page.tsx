@@ -18,6 +18,7 @@ import { listActiveListings, listEndingSoonAuctions, listMostWatchedListings, ge
 import { db } from '@/lib/firebase/config';
 import type { Listing, SavedSellerDoc } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Spinner } from '@/components/ui/spinner';
@@ -217,7 +218,7 @@ export default function HomePage() {
         if (dataRes.status === 'rejected') {
           const err = dataRes.reason;
           console.error('Error fetching listings:', err);
-          setError(err instanceof Error ? err.message : 'Failed to load listings');
+          setError(formatUserFacingError(err, 'Failed to load listings'));
         } else {
           // Non-blocking: log secondary section failures but keep page usable.
           if (mwRes.status === 'rejected') console.warn('Most watched unavailable:', mwRes.reason);
@@ -225,7 +226,7 @@ export default function HomePage() {
         }
       } catch (err) {
         console.error('Error fetching listings:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load listings');
+        setError(formatUserFacingError(err, 'Failed to load listings'));
       } finally {
         setLoading(false);
       }

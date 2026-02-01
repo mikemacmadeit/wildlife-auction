@@ -24,6 +24,7 @@ import { queryListingsForBrowse, BrowseCursor, BrowseFilters, BrowseSort } from 
 import { FilterState, ListingType, Listing } from '@/lib/types';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { useToast } from '@/hooks/use-toast';
 
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'ending-soon' | 'featured';
@@ -120,10 +121,11 @@ export default function RanchEquipmentBrowsePage() {
       setError(null);
     } catch (err: any) {
       console.error('Error fetching listings:', err);
-      setError(err.message || 'Failed to load listings');
+      const msg = formatUserFacingError(err, 'Failed to load listings');
+      setError(msg);
       toast({
         title: 'Error',
-        description: err.message || 'Failed to load listings',
+        description: msg,
         variant: 'destructive',
       });
     } finally {

@@ -8,7 +8,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,6 +64,7 @@ export function DocumentUpload({
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(existingDocumentStatus || null);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const handleUploadRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   useEffect(() => {
     // Keep in sync if parent refetches a newer status (e.g. admin verified/rejected)
@@ -108,15 +109,16 @@ export function DocumentUpload({
   };
 
   const handleUpload = async () => {
-    console.log('handleUpload called', { file: file?.name, user: user?.uid, entityType, entityId });
-    
     if (!file || !user) {
-      console.error('Missing file or user:', { file: !!file, user: !!user });
       setError('Please select a file and ensure you are logged in.');
+      toast({
+        title: 'Upload',
+        description: 'Please select a file first, then tap Upload. Make sure you’re signed in.',
+        variant: 'destructive',
+      });
       return;
     }
 
-    console.log('Starting upload process...');
     setUploading(true);
     setError(null);
 
@@ -190,13 +192,27 @@ export function DocumentUpload({
         description: 'Your document has been uploaded and saved successfully.',
       });
     } catch (err: any) {
-      console.error('Upload error:', err);
-      setError(err.message || 'Failed to upload document. Please try again.');
+      const message = err?.message || 'Failed to upload document. Please try again.';
+      setError(message);
+      toast({
+        title: 'Upload failed',
+        description: message,
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
       setUploadProgress(0);
     }
   };
+
+  handleUploadRef.current = handleUpload;
+
+  // When uploadTrigger is true, start upload as soon as a file is selected (better for mobile; no second tap).
+  useEffect(() => {
+    if (uploadTrigger && file && user && !uploading) {
+      handleUploadRef.current();
+    }
+  }, [uploadTrigger, file, user, uploading]);
 
   const handleRemove = () => {
     setFile(null);
@@ -441,36 +457,38 @@ export function DocumentUpload({
       {/* Upload UI - Show when no document uploaded or when replacing */}
       {(!uploadedUrl || file) && (
         <div className="space-y-3">
-          <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/30 hover:bg-muted/50 transition-colors">
-            <div className="flex flex-col items-center justify-center space-y-4">
+          <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/30 hover:bg-muted/50 transition-colors relative">
+            {/* Invisible file input over the whole area so mobile taps open picker natively */}
+            <label htmlFor={`file-upload-${documentType}`} className="absolute inset-0 cursor-pointer z-10 rounded-lg" aria-label="Choose file to upload" />
+            <Input
+              id={`file-upload-${documentType}`}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              onChange={handleFileSelect}
+              disabled={uploading}
+              className="sr-only"
+            />
+            <div className="flex flex-col items-center justify-center space-y-4 relative z-0 pointer-events-none">
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div className="text-center space-y-2">
-                <Label htmlFor={`file-upload-${documentType}`} className="text-base font-semibold cursor-pointer text-foreground">
-                  Click to select file or drag and drop
-                </Label>
+                <p className="text-base font-semibold text-foreground">
+                  Tap to select file or drag and drop
+                </p>
                 <p className="text-sm text-muted-foreground">
                   PDF, JPG, PNG, or WEBP (max 10MB)
                 </p>
               </div>
-              <Input
-                id={`file-upload-${documentType}`}
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                onChange={handleFileSelect}
-                disabled={uploading}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => document.getElementById(`file-upload-${documentType}`)?.click()}
-                disabled={uploading}
-                className="min-h-[48px]"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Choose File
-              </Button>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => document.getElementById(`file-upload-${documentType}`)?.click()}
+              disabled={uploading}
+              className="relative z-20 min-h-[48px] mt-4 pointer-events-auto"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Choose File
+            </Button>
           </div>
 
           {file && (
@@ -485,6 +503,7 @@ export function DocumentUpload({
                     </span>
                   </div>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={handleRemove}
@@ -495,7 +514,12 @@ export function DocumentUpload({
                 </div>
               </div>
               <Button
-                onClick={handleUpload}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleUpload();
+                }}
                 disabled={uploading}
                 className="min-h-[48px]"
               >

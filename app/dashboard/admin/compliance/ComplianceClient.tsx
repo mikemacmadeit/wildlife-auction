@@ -55,6 +55,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { ComplianceDocument } from '@/lib/types';
 import { getPermitExpirationStatus } from '@/lib/compliance/validation';
 import { subscribeToUnreadCountByType, markNotificationsAsReadByType } from '@/lib/firebase/notifications';
@@ -377,7 +378,7 @@ export default function ComplianceClient() {
       setBreederPermits([]);
       toast({
         title: 'Error loading permits',
-        description: error instanceof Error ? error.message : 'Failed to load breeder permits',
+        description: formatUserFacingError(error, 'Failed to load breeder permits'),
         variant: 'destructive',
       });
     }
@@ -438,7 +439,7 @@ export default function ComplianceClient() {
       toast({ title: 'Approved', description: `Payout approval set for ${orderId}` });
       await loadComplianceHolds();
     } catch (e: any) {
-      toast({ title: 'Approve failed', description: e?.message || 'Unable to approve payout', variant: 'destructive' });
+      toast({ title: 'Approve failed', description: formatUserFacingError(e, 'Unable to approve payout'), variant: 'destructive' });
     } finally {
       setApprovingHold((m) => ({ ...m, [orderId]: false }));
     }
@@ -606,7 +607,7 @@ export default function ComplianceClient() {
       console.error('Error verifying document:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to verify document.',
+        description: formatUserFacingError(error, 'Failed to verify document.'),
         variant: 'destructive',
       });
     } finally {
@@ -1210,7 +1211,7 @@ export default function ComplianceClient() {
                         setPermitDialogOpen(false);
                         await loadBreederPermits();
                       } catch (e: any) {
-                        toast({ title: 'Error', description: e?.message || 'Failed to reject permit', variant: 'destructive' });
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to reject permit'), variant: 'destructive' });
                       } finally {
                         setProcessingId(null);
                       }
@@ -1244,7 +1245,7 @@ export default function ComplianceClient() {
                         // Reload both pending and approved permits to reflect the change
                         await Promise.all([loadBreederPermits(), loadApprovedPermits()]);
                       } catch (e: any) {
-                        toast({ title: 'Error', description: e?.message || 'Failed to approve permit', variant: 'destructive' });
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to approve permit'), variant: 'destructive' });
                       } finally {
                         setProcessingId(null);
                       }

@@ -69,16 +69,28 @@ export const signOutUser = async (): Promise<void> => {
 };
 
 /**
- * Send password reset email
+ * Send password reset email.
+ * Uses the current window origin when in browser so the reset link always redirects to the site the user is on.
  */
 export const resetPassword = async (email: string): Promise<void> => {
-  // Ensure Firebase sends users back to our app after completing the reset flow.
-  // Note: your domain (including localhost for dev) must be allowed in Firebase Auth settings.
+  const siteUrl =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : getSiteUrl();
   const actionCodeSettings = {
-    url: `${getSiteUrl()}/login?reset=1`,
+    url: `${siteUrl}/login?reset=1`,
     handleCodeInApp: false,
   };
-  return await sendPasswordResetEmail(auth, email, actionCodeSettings);
+  try {
+    await sendPasswordResetEmail(auth, email, actionCodeSettings);
+  } catch (e: any) {
+    const code = String(e?.code || '');
+    if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+      await sendPasswordResetEmail(auth, email);
+      return;
+    }
+    throw e;
+  }
 };
 
 /**

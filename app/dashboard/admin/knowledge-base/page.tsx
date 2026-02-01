@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,7 +94,7 @@ export default function AdminKnowledgeBasePage() {
       if (!res.ok || body?.ok !== true) throw new Error(body?.error || body?.message || 'Failed to load articles');
       setArticles(Array.isArray(body?.articles) ? body.articles : []);
     } catch (e: any) {
-      toast({ title: 'Failed to load articles', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to load articles', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       setArticles([]);
     } finally {
       setLoading(false);
@@ -184,7 +185,7 @@ export default function AdminKnowledgeBasePage() {
       setEditDialogOpen(false);
       await loadArticles();
     } catch (e: any) {
-      toast({ title: 'Failed to save', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to save', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -210,7 +211,7 @@ export default function AdminKnowledgeBasePage() {
       setSelectedArticle(null);
       await loadArticles();
     } catch (e: any) {
-      toast({ title: 'Failed to delete', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to delete', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setDeleting(false);
     }

@@ -113,7 +113,7 @@ export interface CreateListingInput {
   attributes: ListingAttributes; // Category-specific structured attributes
   // Protected Transaction fields
   protectedTransactionEnabled?: boolean;
-  protectedTransactionDays?: 7 | 14 | null;
+  protectedTransactionDays?: 3 | 7 | 14 | null;
   protectedTermsVersion?: string;
 
   // Whitetail-only seller attestation (top-level)
@@ -381,7 +381,7 @@ export function toListing(doc: ListingDoc & { id: string }): Listing {
     // Protected Transaction fields
     protectedTransactionEnabled: doc.protectedTransactionEnabled,
     protectedTransactionDays: doc.protectedTransactionDays,
-    protectedTransactionBadge: doc.protectedTransactionDays === 7 ? 'PROTECTED_7' : doc.protectedTransactionDays === 14 ? 'PROTECTED_14' : null,
+    protectedTransactionBadge: doc.protectedTransactionDays === 3 ? 'PROTECTED_3' : doc.protectedTransactionDays === 7 ? 'PROTECTED_7' : doc.protectedTransactionDays === 14 ? 'PROTECTED_14' : null,
     protectedTermsVersion: doc.protectedTermsVersion,
     protectedEnabledAt: timestampToDate(doc.protectedEnabledAt),
 

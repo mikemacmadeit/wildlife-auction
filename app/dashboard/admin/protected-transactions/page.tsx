@@ -11,6 +11,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Button } from '@/components/ui/button';
@@ -167,7 +168,7 @@ export default function AdminProtectedTransactionsPage() {
       console.error('Error loading orders:', error);
       toast({
         title: 'Error loading orders',
-        description: error.message || 'Failed to load orders',
+        description: formatUserFacingError(error, 'Failed to load orders'),
         variant: 'destructive',
       });
     } finally {
@@ -258,7 +259,7 @@ export default function AdminProtectedTransactionsPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to resolve dispute',
+        description: formatUserFacingError(error, 'Failed to resolve dispute'),
         variant: 'destructive',
       });
     } finally {

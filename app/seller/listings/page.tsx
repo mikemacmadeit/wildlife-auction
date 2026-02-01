@@ -27,6 +27,7 @@ import {
   List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { ListingRowActions } from '@/components/listings/ListingRowActions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/hooks/use-auth';
@@ -629,7 +630,7 @@ function SellerListingsPageContent() {
       } catch (err) {
         if (!cancelled) {
           console.error('Error fetching listings:', err);
-          setError(err instanceof Error ? err.message : 'Failed to load listings');
+          setError(formatUserFacingError(err, 'Failed to load listings'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -765,7 +766,7 @@ function SellerListingsPageContent() {
     } catch (err: any) {
       toast({
         title: 'Error pausing listing',
-        description: err.message || 'Failed to pause listing. Please try again.',
+        description: formatUserFacingError(err, 'Failed to pause listing. Please try again.'),
         variant: 'destructive',
       });
     } finally {
@@ -797,7 +798,7 @@ function SellerListingsPageContent() {
     } catch (err: any) {
       toast({
         title: 'Error deleting listing',
-        description: err.message || 'Failed to delete listing. Please try again.',
+        description: formatUserFacingError(err, 'Failed to delete listing. Please try again.'),
         variant: 'destructive',
       });
     } finally {
@@ -819,7 +820,7 @@ function SellerListingsPageContent() {
       } catch (err: any) {
         toast({
           title: 'Could not mark as sold',
-          description: err?.message ?? 'No paid order found for this listing, or the listing is already sold.',
+          description: formatUserFacingError(err, 'No paid order found for this listing, or the listing is already sold.'),
           variant: 'destructive',
         });
       } finally {
@@ -871,7 +872,7 @@ function SellerListingsPageContent() {
     } catch (err: any) {
       toast({
         title: 'Error publishing listing',
-        description: err?.message || 'Failed to publish listing. Please try again.',
+        description: formatUserFacingError(err, 'Failed to publish listing. Please try again.'),
         variant: 'destructive',
       });
     } finally {
@@ -912,7 +913,7 @@ function SellerListingsPageContent() {
           description:
             e?.code === 'MUST_EDIT_BEFORE_RESUBMIT'
               ? 'Edit and save the listing first, then resubmit.'
-              : e?.message || 'Failed to resubmit listing.',
+              : formatUserFacingError(e, 'Failed to resubmit listing.'),
           variant: 'destructive',
         });
       } finally {
@@ -937,7 +938,7 @@ function SellerListingsPageContent() {
       } catch (e: any) {
         toast({
           title: 'Error duplicating listing',
-          description: e?.message || 'Failed to duplicate listing. Please try again.',
+          description: formatUserFacingError(e, 'Failed to duplicate listing. Please try again.'),
           variant: 'destructive',
         });
       } finally {
@@ -1343,7 +1344,7 @@ function SellerListingsPageContent() {
                           <div className="text-xs md:text-sm space-y-1">
                             <div>• I have accurately disclosed identification details (if applicable).</div>
                             <div>• I have disclosed any known health issues and represented the dog honestly.</div>
-                            <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                            <div>• I understand transfers are Texas-only on this platform.</div>
                           </div>
                         </div>
                       )}
@@ -1381,7 +1382,7 @@ function SellerListingsPageContent() {
                           <div className="text-xs md:text-sm space-y-1">
                             <div>• I have accurately disclosed identifying information (microchip/brand/tattoo/markings/registration).</div>
                             <div>• I have disclosed any known health issues and represented the horse honestly.</div>
-                            <div>• I understand transfers are Texas-only on this platform and transport is my responsibility.</div>
+                            <div>• I understand transfers are Texas-only on this platform.</div>
                             <div>• I disclose any liens/encumbrances (or confirm there are none).</div>
                           </div>
                         </div>

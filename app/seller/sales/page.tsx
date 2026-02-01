@@ -27,6 +27,7 @@ import {
   Info,
 } from 'lucide-react';
 import type { Listing, Order } from '@/lib/types';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { getOrdersForUser, filterSellerRelevantOrders } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocument } from '@/lib/firebase/firestore';
@@ -168,7 +169,7 @@ export default function SellerSalesPage() {
         }))
       );
     } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || 'Failed to load sales', variant: 'destructive' });
+      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to load sales'), variant: 'destructive' });
       setOrders([]);
     } finally {
       setLoading(false);

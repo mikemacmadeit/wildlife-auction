@@ -25,6 +25,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { SellerOverviewSkeleton } from '@/components/skeletons/SellerOverviewSkeleton';
 import { CreateListingGateButton } from '@/components/listings/CreateListingGate';
 import { useAuth } from '@/hooks/use-auth';
@@ -257,7 +258,7 @@ export default function SellerOverviewPage() {
         }
       } catch (err: any) {
         if (cancelled) return;
-        setError(err?.message || 'Failed to load seller data');
+        setError(formatUserFacingError(err, 'Failed to load seller data'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -871,7 +872,7 @@ export default function SellerOverviewPage() {
                             } catch (e: any) {
                               toast({
                                 title: 'Could not send verification email',
-                                description: e?.message || 'Please try again.',
+                                description: formatUserFacingError(e, 'Please try again.'),
                                 variant: 'destructive',
                               });
                             }
@@ -928,7 +929,7 @@ export default function SellerOverviewPage() {
                               } catch (e: any) {
                                 toast({
                                   title: 'Could not connect Stripe',
-                                  description: e?.message || 'Please try again.',
+                                  description: formatUserFacingError(e, 'Please try again.'),
                                   variant: 'destructive',
                                 });
                               } finally {

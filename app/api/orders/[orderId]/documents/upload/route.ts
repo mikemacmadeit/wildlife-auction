@@ -34,8 +34,14 @@ function json(body: any, init?: { status?: number }) {
 
 export async function POST(
   request: Request,
-  { params }: { params: { orderId: string } }
+  ctx: { params: Promise<{ orderId: string }> | { orderId: string } }
 ) {
+  const params = typeof (ctx.params as any)?.then === 'function' ? await (ctx.params as Promise<{ orderId: string }>) : (ctx.params as { orderId: string });
+  const orderId = params?.orderId;
+  if (!orderId) {
+    return json({ error: 'Order ID required' }, { status: 400 });
+  }
+
   try {
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
@@ -56,8 +62,6 @@ export async function POST(
     const token = authHeader.split('Bearer ')[1];
     const decodedToken = await auth.verifyIdToken(token);
     const userId = decodedToken.uid;
-
-    const orderId = params.orderId;
 
     // Verify ownership (buyer or seller)
     const orderRef = db.collection('orders').doc(orderId);

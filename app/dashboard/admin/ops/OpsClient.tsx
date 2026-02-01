@@ -60,6 +60,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDistanceToNow } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { Order } from '@/lib/types';
 import { getAdminOrders } from '@/lib/stripe/api';
 import { getListingById } from '@/lib/firebase/listings';
@@ -204,7 +205,7 @@ export default function OpsClient() {
       console.error('Error loading orders:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load orders',
+        description: formatUserFacingError(error, 'Failed to load orders'),
         variant: 'destructive',
       });
     } finally {
@@ -339,7 +340,7 @@ export default function OpsClient() {
       console.error('Error marking paid:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to mark order paid',
+        description: formatUserFacingError(error, 'Failed to mark order paid'),
         variant: 'destructive',
       });
     } finally {
@@ -375,7 +376,7 @@ export default function OpsClient() {
       console.error('Error processing refund:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to process refund',
+        description: formatUserFacingError(error, 'Failed to process refund'),
         variant: 'destructive',
       });
     } finally {
@@ -420,7 +421,7 @@ export default function OpsClient() {
       console.error('Error resolving dispute:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to resolve dispute',
+        description: formatUserFacingError(error, 'Failed to resolve dispute'),
         variant: 'destructive',
       });
     } finally {
@@ -465,7 +466,7 @@ export default function OpsClient() {
       console.error('Error confirming delivery:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to confirm delivery',
+        description: formatUserFacingError(error, 'Failed to confirm delivery'),
         variant: 'destructive',
       });
     } finally {
@@ -500,7 +501,7 @@ export default function OpsClient() {
         await adminSetOrderHold(order.id, true, bulkHoldReason, bulkHoldNotes || undefined);
         results.push({ orderId: order.id, success: true });
       } catch (error: any) {
-        results.push({ orderId: order.id, success: false, error: error.message || 'Unknown error' });
+        results.push({ orderId: order.id, success: false, error: formatUserFacingError(error, 'Unknown error') });
       }
     }
 
@@ -545,7 +546,7 @@ export default function OpsClient() {
         await adminSetOrderHold(order.id, false, bulkHoldReason, bulkHoldNotes || undefined);
         results.push({ orderId: order.id, success: true });
       } catch (error: any) {
-        results.push({ orderId: order.id, success: false, error: error.message || 'Unknown error' });
+        results.push({ orderId: order.id, success: false, error: formatUserFacingError(error, 'Unknown error') });
       }
     }
 
@@ -994,7 +995,7 @@ export default function OpsClient() {
                   setFreezeReason('');
                   await loadOrders();
                 } catch (e: any) {
-                  toast({ title: 'Error', description: e?.message || 'Failed to freeze seller', variant: 'destructive' });
+                  toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to freeze seller'), variant: 'destructive' });
                 } finally {
                   setProcessingOrderId(null);
                 }
@@ -1071,7 +1072,7 @@ export default function OpsClient() {
                   setReminderRole(null);
                   setReminderMessage('');
                 } catch (e: any) {
-                  toast({ title: 'Error', description: e?.message || 'Failed to send reminder', variant: 'destructive' });
+                  toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to send reminder'), variant: 'destructive' });
                 } finally {
                   setProcessingOrderId(null);
                 }
@@ -1165,7 +1166,7 @@ export default function OpsClient() {
                           }
                           return { orderId, success: true };
                         } catch (error: any) {
-                          return { orderId, success: false, error: error.message || 'Unknown error' };
+                          return { orderId, success: false, error: formatUserFacingError(error, 'Unknown error') };
                         }
                       })
                     );
@@ -1185,7 +1186,7 @@ export default function OpsClient() {
                   setBulkReminderMessage('');
                   setSelectedOrderIds(new Set());
                 } catch (e: any) {
-                  toast({ title: 'Error', description: e?.message || 'Failed to send bulk reminders', variant: 'destructive' });
+                  toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to send bulk reminders'), variant: 'destructive' });
                 } finally {
                   setProcessingOrderId(null);
                 }
@@ -1694,7 +1695,7 @@ export default function OpsClient() {
                                 }
                                 toast({ title: 'Success', description: 'Compliance reminder sent to buyer.' });
                               } catch (e: any) {
-                                toast({ title: 'Error', description: e?.message || 'Failed to send reminder', variant: 'destructive' });
+                                toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to send reminder'), variant: 'destructive' });
                               } finally {
                                 setProcessingOrderId(null);
                               }
@@ -1726,7 +1727,7 @@ export default function OpsClient() {
                                 }
                                 toast({ title: 'Success', description: 'Compliance reminder sent to seller.' });
                               } catch (e: any) {
-                                toast({ title: 'Error', description: e?.message || 'Failed to send reminder', variant: 'destructive' });
+                                toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to send reminder'), variant: 'destructive' });
                               } finally {
                                 setProcessingOrderId(null);
                               }
@@ -1802,7 +1803,7 @@ export default function OpsClient() {
                         window.URL.revokeObjectURL(url);
                         toast({ title: 'Success', description: 'Dispute packet downloaded.' });
                       } catch (e: any) {
-                        toast({ title: 'Error', description: e?.message || 'Failed to export dispute packet', variant: 'destructive' });
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to export dispute packet'), variant: 'destructive' });
                       } finally {
                         setProcessingOrderId(null);
                       }

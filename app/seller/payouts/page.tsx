@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile, type Order, type OrderStatus } from '@/lib/types';
@@ -579,7 +580,7 @@ export default function SellerPayoutsPage() {
                             console.error('Error checking account status:', error);
                             toast({
                               title: 'Error',
-                              description: error.message || 'Failed to check account status. Please try again.',
+                              description: formatUserFacingError(error, 'Failed to check account status. Please try again.'),
                               variant: 'destructive',
                             });
                           } finally {
@@ -662,7 +663,7 @@ export default function SellerPayoutsPage() {
                             } catch (error: any) {
                               toast({
                                 title: 'Error',
-                                description: error.message || 'Failed to create onboarding link.',
+                                description: formatUserFacingError(error, 'Failed to create onboarding link.'),
                                 variant: 'destructive',
                               });
                             } finally {

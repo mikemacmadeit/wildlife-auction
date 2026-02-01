@@ -21,6 +21,8 @@ import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton'
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2, MapPin, Package, User } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
@@ -39,6 +41,7 @@ import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { ORDER_COPY } from '@/lib/orders/copy';
 import { formatDate, isValidNonEpochDate } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
 
 const useAddressPicker =
@@ -81,6 +84,8 @@ export default function BuyerOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'confirm' | 'dispute' | null>(null);
   const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
+  const [confirmReceivedChecked, setConfirmReceivedChecked] = useState(false);
+  const [checkinDialogConfirmReceived, setCheckinDialogConfirmReceived] = useState(false);
 
   const loadOrder = useCallback(async (cancelledRef?: { current: boolean }) => {
     // Allow calling without cancelledRef for manual reloads
@@ -100,7 +105,7 @@ export default function BuyerOrderDetailPage() {
       setListing(l || null);
       setBillOfSaleDocs(bos);
     } catch (e: any) {
-      if (!cancelledRef?.current) setError(e?.message || 'Failed to load order');
+      if (!cancelledRef?.current) setError(formatUserFacingError(e, 'Failed to load order'));
     } finally {
       if (!cancelledRef?.current) setLoading(false);
     }
@@ -356,21 +361,35 @@ export default function BuyerOrderDetailPage() {
         <Dialog
           open={checkin}
           onOpenChange={(open) => {
-            if (!open) router.replace(`/dashboard/orders/${order.id}`);
+            if (!open) {
+              router.replace(`/dashboard/orders/${order.id}`);
+              setCheckinDialogConfirmReceived(false);
+            }
           }}
         >
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Delivery check-in</DialogTitle>
               <DialogDescription>
-                If delivery arrived, mark it delivered (confirm receipt). If something isn’t right, report an issue so we can review. Payments are processed by Stripe; we do not hold or release payouts.
+                If delivery arrived, confirm receipt to complete the transaction. If something isn’t right, report an issue so we can review.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-primary mt-0.5" />
-              <div className="text-sm text-muted-foreground">
-                Seller was paid immediately upon successful payment. Confirm receipt to complete the transaction.
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="checkin-confirm-received"
+                  checked={checkinDialogConfirmReceived}
+                  onCheckedChange={(c) => setCheckinDialogConfirmReceived(!!c)}
+                />
+                <Label htmlFor="checkin-confirm-received" className="cursor-pointer text-sm font-medium leading-tight">
+                  I confirm the animal was received.
+                </Label>
               </div>
+              {!order.protectedTransactionDaysSnapshot && (
+                <p className="text-xs text-muted-foreground">
+                  This listing does not include a post-delivery review window. Confirming delivery makes the sale final.
+                </p>
+              )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
@@ -388,20 +407,20 @@ export default function BuyerOrderDetailPage() {
                 I have an issue
               </Button>
               <Button
-                disabled={!canConfirmReceipt || processing !== null}
+                disabled={!canConfirmReceipt || !checkinDialogConfirmReceived || processing !== null}
                 onClick={async () => {
                   try {
                     setProcessing('confirm');
                     await confirmReceipt(order.id);
                     toast({
                       title: 'Receipt confirmed',
-                      description: 'Transaction complete. Seller was paid immediately upon successful payment.',
+                      description: order.protectedTransactionDaysSnapshot ? 'Delivery confirmed. Your post-delivery review window is now active.' : 'This sale is final.',
                     });
                     const refreshed = await getOrderById(order.id);
                     if (refreshed) setOrder(refreshed);
                     router.replace(`/dashboard/orders/${order.id}`);
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || 'Failed to confirm receipt', variant: 'destructive' });
+                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
                   } finally {
                     setProcessing(null);
                   }
@@ -501,23 +520,36 @@ export default function BuyerOrderDetailPage() {
                   )}
                   {(txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
                     <>
-                      <div id="confirm-receipt-section" className="flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                          <div className="font-semibold text-sm">Confirm Receipt</div>
-                          <div className="text-xs text-muted-foreground">Confirm you received the order to complete the transaction. Only you can complete it—the seller does not mark delivery.</div>
+                      <div id="confirm-receipt-section" className="space-y-3">
+                        <div className="font-semibold text-sm">Confirm Receipt</div>
+                        <p className="text-xs text-muted-foreground">Only you can complete the transaction—the seller does not mark delivery.</p>
+                        <div className="flex items-start space-x-3">
+                          <Checkbox
+                            id="confirm-received"
+                            checked={confirmReceivedChecked}
+                            onCheckedChange={(c) => setConfirmReceivedChecked(!!c)}
+                          />
+                          <Label htmlFor="confirm-received" className="cursor-pointer text-sm font-medium leading-tight">
+                            I confirm the animal was received.
+                          </Label>
                         </div>
+                        {!order.protectedTransactionDaysSnapshot && (
+                          <p className="text-xs text-muted-foreground">
+                            This listing does not include a post-delivery review window. Confirming delivery makes the sale final.
+                          </p>
+                        )}
                         <Button
                           variant="default"
-                          disabled={!canConfirmReceipt || processing !== null}
+                          disabled={!canConfirmReceipt || !confirmReceivedChecked || processing !== null}
                           onClick={async () => {
                             try {
                               setProcessing('confirm');
                               await confirmReceipt(order.id);
-                              toast({ title: 'Receipt confirmed', description: 'Transaction complete. Seller was paid immediately upon successful payment.' });
+                              toast({ title: 'Receipt confirmed', description: order.protectedTransactionDaysSnapshot ? 'Delivery confirmed. Your post-delivery review window is now active.' : 'This sale is final.' });
                               const refreshed = await getOrderById(order.id);
                               if (refreshed) setOrder(refreshed);
                             } catch (e: any) {
-                              toast({ title: 'Error', description: e?.message || 'Failed to confirm receipt', variant: 'destructive' });
+                              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
                             } finally {
                               setProcessing(null);
                             }
@@ -559,7 +591,7 @@ export default function BuyerOrderDetailPage() {
                                     const refreshed = await getOrderById(order.id);
                                     if (refreshed) setOrder(refreshed);
                                   } catch (e: any) {
-                                    toast({ title: 'Error', description: e?.message || 'Failed to save', variant: 'destructive' });
+                                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to save'), variant: 'destructive' });
                                   } finally {
                                     setProcessing(null);
                                   }
@@ -576,32 +608,91 @@ export default function BuyerOrderDetailPage() {
                     </div>
                   )}
               <Separator />
-              <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
-                <div>
-                  <div className="font-semibold text-sm">Report an issue</div>
-                  <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
+              {txStatus === 'COMPLETED' ? (
+                order.protectedTransactionDaysSnapshot && (order.buyerConfirmedAt ?? order.buyerAcceptedAt ?? order.acceptedAt) ? (() => {
+                  const confirmedAt = order.buyerConfirmedAt ?? order.buyerAcceptedAt ?? order.acceptedAt;
+                  const windowEnd = new Date(confirmedAt!.getTime() + order.protectedTransactionDaysSnapshot! * 24 * 60 * 60 * 1000);
+                  const withinWindow = Date.now() < windowEnd.getTime();
+                  const hoursLeft = (windowEnd.getTime() - Date.now()) / (1000 * 60 * 60);
+                  const daysLeft = Math.floor(hoursLeft / 24);
+                  const hrs = Math.floor(hoursLeft % 24);
+                  const endsInLabel = daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} ${hrs}h` : `${Math.max(0, Math.floor(hoursLeft))} hours`;
+                  return withinWindow ? (
+                    <div id="report-issue" className="space-y-3 scroll-mt-24">
+                      <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <span className="font-semibold">Delivery confirmed</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Post-delivery review window active — ends in {endsInLabel}
+                      </div>
+                      <Button
+                        variant="outline"
+                        disabled={processing !== null}
+                        onClick={async () => {
+                          try {
+                            setProcessing('dispute');
+                            await disputeOrder(order.id, 'Delivery-related issue', 'Report a delivery-related issue');
+                            toast({ title: 'Issue reported', description: 'We’ll review and follow up. Claims require proof.' });
+                            const refreshed = await getOrderById(order.id);
+                            if (refreshed) setOrder(refreshed);
+                          } catch (e: any) {
+                            toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to report issue'), variant: 'destructive' });
+                          } finally {
+                            setProcessing(null);
+                          }
+                        }}
+                      >
+                        {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                        Report a delivery-related issue
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 scroll-mt-24">
+                      <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <span className="font-semibold">Delivery confirmed</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">This sale is final.</p>
+                    </div>
+                  );
+                })() : (
+                  <div className="space-y-1 scroll-mt-24">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" />
+                      <span className="font-semibold">Delivery confirmed</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">This sale is final.</p>
+                  </div>
+                )
+              ) : (
+                <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
+                  <div>
+                    <div className="font-semibold text-sm">Report an issue</div>
+                    <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={!canDispute || processing !== null}
+                    onClick={async () => {
+                      try {
+                        setProcessing('dispute');
+                        await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
+                        toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
+                        const refreshed = await getOrderById(order.id);
+                        if (refreshed) setOrder(refreshed);
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to report issue'), variant: 'destructive' });
+                      } finally {
+                        setProcessing(null);
+                      }
+                    }}
+                  >
+                    {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Report an issue
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  disabled={!canDispute || processing !== null}
-                  onClick={async () => {
-                    try {
-                      setProcessing('dispute');
-                      await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
-                      toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
-                      const refreshed = await getOrderById(order.id);
-                      if (refreshed) setOrder(refreshed);
-                    } catch (e: any) {
-                      toast({ title: 'Error', description: e?.message || 'Failed to report issue', variant: 'destructive' });
-                    } finally {
-                      setProcessing(null);
-                    }
-                  }}
-                >
-                  {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Report an issue
-                </Button>
-              </div>
+              )}
             </div>
           }
         />
@@ -653,7 +744,7 @@ export default function BuyerOrderDetailPage() {
                       if (refreshed) setOrder(refreshed);
                       toast({ title: 'Confirmed', description: 'Buyer signature confirmation recorded.' });
                     } catch (e: any) {
-                      toast({ title: 'Error', description: e?.message || 'Failed to confirm', variant: 'destructive' });
+                      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm'), variant: 'destructive' });
                     }
                   }}
                 >

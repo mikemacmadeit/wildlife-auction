@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,12 +11,18 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { signIn, resetPassword, signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase/auth';
+import {
+  getSignInErrorMessage,
+  getPasswordResetErrorMessage,
+  getGoogleSignInErrorMessage,
+} from '@/lib/firebase/auth-error-messages';
 import { createUserDocument } from '@/lib/firebase/users';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +44,17 @@ export default function LoginPage() {
     password: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Show success message when user lands after completing password reset
+  useEffect(() => {
+    if (searchParams?.get('reset') === '1') {
+      toast({
+        title: 'Password updated',
+        description: 'You can sign in with your new password.',
+      });
+      router.replace('/login', { scroll: false });
+    }
+  }, [searchParams, router, toast]);
 
   // Handle Google redirect result on page load
   useEffect(() => {
@@ -64,14 +81,7 @@ export default function LoginPage() {
       })
       .catch((error: any) => {
         console.error('Error during Google redirect result:', error);
-        let errorMessage = 'An error occurred during Google sign-in. Please try again.';
-        if (error.code === 'auth/unauthorized-domain') {
-          errorMessage = 'Google sign-in is not enabled for this domain. Please contact support.';
-        } else if (error.code === 'auth/operation-not-allowed') {
-          errorMessage = 'Google sign-in is not enabled for this project. Please contact support.';
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
+        const errorMessage = getGoogleSignInErrorMessage(error?.code);
         toast({
           title: 'Google sign-in failed',
           description: errorMessage,
@@ -114,21 +124,7 @@ export default function LoginPage() {
       });
       router.push(getRedirectPath());
     } catch (error: any) {
-      let errorMessage = 'An error occurred while signing in. Please try again.';
-      
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email address.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password. Please try again.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = 'This account has been disabled.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many failed attempts. Please try again later.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      const errorMessage = getSignInErrorMessage(error?.code);
 
       toast({
         title: 'Sign in failed',
@@ -165,29 +161,24 @@ export default function LoginPage() {
       await resetPassword(formData.email);
       toast({
         title: 'Password reset email sent',
-        // Avoid account enumeration: do not confirm whether the email exists.
-        description: 'If an account exists for this email, you’ll receive reset instructions shortly.',
+        description:
+          'If an account exists for this email, you’ll receive reset instructions shortly. Check your spam folder if you don’t see it in a few minutes.',
       });
     } catch (error: any) {
-      let errorMessage = 'Failed to send password reset email.';
+      const code = error?.code;
       // Avoid account enumeration: treat user-not-found as success UX.
-      if (error.code === 'auth/user-not-found') {
+      if (code === 'auth/user-not-found') {
         toast({
           title: 'Password reset email sent',
-          description: 'If an account exists for this email, you’ll receive reset instructions shortly.',
+          description:
+            'If an account exists for this email, you’ll receive reset instructions shortly. Check your spam folder if you don’t see it.',
         });
         return;
       }
-      if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      } else if (error.code === 'auth/unauthorized-domain') {
-        errorMessage = 'This domain is not authorized for password reset. Check Firebase Auth settings.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      const errorMessage = getPasswordResetErrorMessage(code);
 
       toast({
-        title: 'Error',
+        title: 'Couldn’t send reset email',
         description: errorMessage,
         variant: 'destructive',
       });
@@ -219,23 +210,7 @@ export default function LoginPage() {
         return; // Page will reload after redirect
       }
 
-      let errorMessage = 'An error occurred while signing in with Google. Please try again.';
-      
-      if (error.code === 'auth/popup-closed-by-user') {
-        errorMessage = 'Sign-in popup was closed. Please try again.';
-      } else if (error.code === 'auth/popup-blocked') {
-        errorMessage = 'Popup was blocked. Using redirect instead...';
-        // Will automatically fall back to redirect in signInWithGoogle
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        errorMessage = 'Only one popup request is allowed at a time.';
-      } else if (error.code === 'auth/unauthorized-domain') {
-        errorMessage = 'This domain is not authorized. Please contact support.';
-      } else if (error.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Google sign-in is not enabled. Please contact support.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
+      const errorMessage = getGoogleSignInErrorMessage(error?.code);
       toast({
         title: 'Google sign-in failed',
         description: errorMessage,
@@ -323,15 +298,24 @@ export default function LoginPage() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  disabled={isLoading || isResettingPassword}
-                  className="text-sm text-primary hover:underline font-medium"
-                >
-                  {isResettingPassword ? 'Sending...' : 'Forgot password?'}
-                </button>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={isLoading || isResettingPassword}
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    {isResettingPassword ? 'Sending...' : 'Forgot password?'}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Didn’t get the email? Check spam or{' '}
+                  <Link href="/contact" className="text-primary hover:underline">
+                    contact support
+                  </Link>
+                  .
+                </p>
               </div>
 
               <Button

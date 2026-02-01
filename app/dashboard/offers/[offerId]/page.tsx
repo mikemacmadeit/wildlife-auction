@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Handshake, Clock, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { acceptOffer, counterOffer, declineOffer, getOffer, withdrawOffer } from '@/lib/offers/api';
 import { createCheckoutSession } from '@/lib/stripe/api';
 import { OfferAcceptedSuccessModal } from '@/components/offers/OfferAcceptedSuccessModal';
@@ -49,7 +50,7 @@ export default function BuyerOfferDetailPage() {
       const res = await getOffer(String(offerId));
       setOffer(res?.offer || null);
     } catch (e: any) {
-      toast({ title: 'Failed to load offer', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Failed to load offer', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       setOffer(null);
     } finally {
       setLoading(false);
@@ -84,7 +85,7 @@ export default function BuyerOfferDetailPage() {
       await load();
       setAcceptSuccessOpen(true);
     } catch (e: any) {
-      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -98,7 +99,7 @@ export default function BuyerOfferDetailPage() {
       toast({ title: 'Offer declined' });
       await load();
     } catch (e: any) {
-      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -112,7 +113,7 @@ export default function BuyerOfferDetailPage() {
       toast({ title: 'Offer withdrawn' });
       await load();
     } catch (e: any) {
-      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -132,7 +133,7 @@ export default function BuyerOfferDetailPage() {
       setCounterOpen(false);
       await load();
     } catch (e: any) {
-      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -146,7 +147,7 @@ export default function BuyerOfferDetailPage() {
       // Use the listing page flow to present the acknowledgment and start checkout safely.
       router.push(`/listing/${offer.listingId}`);
     } catch (e: any) {
-      toast({ title: 'Checkout failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Checkout failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     }
   };
 

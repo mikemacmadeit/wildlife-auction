@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { getListingsByIds, subscribeToListing } from '@/lib/firebase/listings';
 import { Listing, ListingStatus, ListingType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -254,7 +255,7 @@ export default function WatchlistPage() {
         });
       } catch (err) {
         console.error('Error fetching watchlist listings:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load watchlist');
+        setError(formatUserFacingError(err, 'Failed to load watchlist'));
       } finally {
         setLoading(false);
       }

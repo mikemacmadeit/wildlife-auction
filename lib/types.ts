@@ -573,8 +573,8 @@ export interface Listing {
   
   // Protected Transaction (Seller-selected protection)
   protectedTransactionEnabled?: boolean;
-  protectedTransactionDays?: 7 | 14 | null;
-  protectedTransactionBadge?: 'PROTECTED_7' | 'PROTECTED_14' | null;
+  protectedTransactionDays?: 3 | 7 | 14 | null;
+  protectedTransactionBadge?: 'PROTECTED_3' | 'PROTECTED_7' | 'PROTECTED_14' | null;
   protectedTermsVersion?: string; // e.g., "v1"
   protectedEnabledAt?: Date; // When seller enabled protection
   
@@ -975,7 +975,7 @@ export interface Order {
   adminPayoutApproval?: boolean;
   adminPayoutApprovalBy?: string;
   adminPayoutApprovalAt?: Date;
-  protectedTransactionDaysSnapshot?: 7 | 14 | null; // Snapshot of listing protection days at purchase
+  protectedTransactionDaysSnapshot?: 3 | 7 | 14 | null; // Snapshot of listing protection days at purchase
   protectedTermsVersion?: string; // Snapshot of terms version at purchase
   
   // Compliance fields for orders

@@ -31,6 +31,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { getIdToken } from '@/lib/firebase/auth-helper';
 import { auth } from '@/lib/firebase/config';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 
 const PLATFORM_FEE_PERCENT = 10;
 
@@ -151,10 +152,11 @@ export default function AdminRevenuePage() {
       setRevenueData(data);
     } catch (err: any) {
       console.error('Error fetching revenue data:', err);
-      setError(err.message || 'Failed to load revenue data');
+      const msg = formatUserFacingError(err, 'Failed to load revenue data');
+      setError(msg);
       toast({
         title: 'Error',
-        description: err.message || 'Failed to load revenue data',
+        description: msg,
         variant: 'destructive',
       });
     } finally {

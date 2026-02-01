@@ -243,26 +243,13 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         return markings ? `Markings: ${markings}` : undefined;
       })(),
     },
-    // Transport: seller delivery only
-    (listing.transportOption === 'SELLER_TRANSPORT' || listing.transportOption === 'BUYER_TRANSPORT' || !listing.transportOption) && {
+    // Transport: only show when buyer arranges (seller delivery is platform default, not stated)
+    listing.transportOption === 'BUYER_TRANSPORT' && {
       icon: Truck,
       label: 'Transport',
-      value: 'Seller arranges delivery',
-      detail: 'Seller delivers; you coordinate after purchase.',
-      badge: { variant: 'outline' as const, label: 'Seller delivery', color: '' },
-    },
-    listing.trust?.transportReady && !listing.transportOption && {
-      icon: Truck,
-      label: 'Transport',
-      value: 'Ready',
-      badge: { variant: 'outline' as const, label: 'Coordinated', color: '' },
-    },
-    listing.trust?.sellerOffersDelivery && !listing.transportOption && {
-      icon: Truck,
-      label: 'Delivery',
-      value: 'Seller offers delivery',
-      detail: 'Buyer & seller coordinate directly (platform does not arrange transport).',
-      badge: { variant: 'outline' as const, label: 'Seller-provided', color: '' },
+      value: 'Pickup or transport',
+      detail: 'Coordinate with the seller after purchase.',
+      badge: { variant: 'outline' as const, label: 'Buyer arranges', color: '' },
     },
     // Seller delivery details (radius, timeframe, notes) when set on the listing
     listing.deliveryDetails && (listing.deliveryDetails.maxDeliveryRadiusMiles != null || (listing.deliveryDetails.deliveryTimeframe || '').trim() || (listing.deliveryDetails.deliveryNotes || '').trim() || (listing.deliveryDetails.deliveryStatusExplanation || '').trim()) && {
@@ -273,7 +260,7 @@ export function KeyFactsPanel({ listing, className }: KeyFactsPanelProps) {
         (listing.deliveryDetails.deliveryTimeframe || '').trim()
           ? (DELIVERY_TIMEFRAME_OPTIONS.find((o) => o.value === listing.deliveryDetails!.deliveryTimeframe)?.label ?? (listing.deliveryDetails.deliveryTimeframe ?? '').replace(/_/g, '–'))
           : null,
-      ].filter(Boolean).join(' · ') || 'Seller arranges delivery',
+      ].filter(Boolean).join(' · ') || 'Provided',
       detail: [listing.deliveryDetails.deliveryStatusExplanation, listing.deliveryDetails.deliveryNotes].filter(Boolean).join(' — ') || undefined,
       badge: { variant: 'outline' as const, label: 'From listing', color: '' },
     },

@@ -19,6 +19,7 @@ import { MessageThread, Listing } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { DashboardContentSkeleton } from '@/components/skeletons/DashboardContentSkeleton';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -820,7 +821,7 @@ export default function MessagesPage() {
                                       } catch (e: any) {
                                         toast({
                                           title: 'Error',
-                                          description: e?.message || 'Failed to mark thread as read',
+                                          description: formatUserFacingError(e, 'Failed to mark thread as read'),
                                           variant: 'destructive',
                                         });
                                       }
@@ -834,7 +835,7 @@ export default function MessagesPage() {
                                       try {
                                         await setThreadArchived(item.id, !item.archived);
                                       } catch (e: any) {
-                                        toast({ title: 'Error', description: e?.message || 'Failed to update thread', variant: 'destructive' });
+                                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to update thread'), variant: 'destructive' });
                                       }
                                     }}
                                   >
@@ -1069,7 +1070,7 @@ export default function MessagesPage() {
                                     } catch (e: any) {
                                       toast({
                                         title: 'Error',
-                                        description: e?.message || 'Failed to mark thread as read',
+                                        description: formatUserFacingError(e, 'Failed to mark thread as read'),
                                         variant: 'destructive',
                                       });
                                     }
@@ -1083,7 +1084,7 @@ export default function MessagesPage() {
                                     try {
                                       await setThreadArchived(item.id, !item.archived);
                                     } catch (e: any) {
-                                      toast({ title: 'Error', description: e?.message || 'Failed to update thread', variant: 'destructive' });
+                                      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to update thread'), variant: 'destructive' });
                                     }
                                   }}
                                 >

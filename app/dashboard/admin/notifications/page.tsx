@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ShieldAlert, Rocket, RefreshCw, PlayCircle, Mail, ChevronDown } from 'lucide-react';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { listEmailEvents } from '@/lib/email';
 import { NOTIFICATION_EVENT_TYPES } from '@/lib/notifications/types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -98,7 +99,7 @@ export default function AdminNotificationsPage() {
       setDlqPush(Array.isArray(dlqPushJson.items) ? dlqPushJson.items : []);
       setEmailStatus(emailStatusJson?.ok ? emailStatusJson : null);
     } catch (e: any) {
-      toast({ title: 'Load failed', description: e?.message || 'Failed to load admin data.', variant: 'destructive' });
+      toast({ title: 'Load failed', description: formatUserFacingError(e, 'Failed to load admin data.'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -116,7 +117,7 @@ export default function AdminNotificationsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
-        toast({ title: 'Run failed', description: data?.error || 'Failed to run processors.', variant: 'destructive' });
+        toast({ title: 'Run failed', description: formatUserFacingError(data?.error != null ? { message: data.error } : null, 'Failed to run processors.'), variant: 'destructive' });
         return;
       }
       toast({
@@ -125,7 +126,7 @@ export default function AdminNotificationsPage() {
       });
       await load();
     } catch (e: any) {
-      toast({ title: 'Run failed', description: e?.message || 'Failed to run processors.', variant: 'destructive' });
+      toast({ title: 'Run failed', description: formatUserFacingError(e, 'Failed to run processors.'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -153,7 +154,7 @@ export default function AdminNotificationsPage() {
     try {
       payloadObj = JSON.parse(payloadText);
     } catch (e: any) {
-      toast({ title: 'Invalid JSON', description: e?.message || 'Fix payload JSON first.', variant: 'destructive' });
+      toast({ title: 'Invalid JSON', description: formatUserFacingError(e, 'Fix payload JSON first.'), variant: 'destructive' });
       return;
     }
 
@@ -174,7 +175,7 @@ export default function AdminNotificationsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
-        toast({ title: 'Emit failed', description: data?.error || 'Failed to emit event.', variant: 'destructive' });
+        toast({ title: 'Emit failed', description: formatUserFacingError(data?.error != null ? { message: data.error } : null, 'Failed to emit event.'), variant: 'destructive' });
         return;
       }
       toast({
@@ -183,7 +184,7 @@ export default function AdminNotificationsPage() {
       });
       await load();
     } catch (e: any) {
-      toast({ title: 'Emit failed', description: e?.message || 'Failed to emit event.', variant: 'destructive' });
+      toast({ title: 'Emit failed', description: formatUserFacingError(e, 'Failed to emit event.'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -214,7 +215,7 @@ export default function AdminNotificationsPage() {
       toast({ title: 'Test email sent', description: `${data.provider} → ${data.to} (${data.template})` });
       await load();
     } catch (e: any) {
-      const msg = e?.message || 'Send failed.';
+      const msg = formatUserFacingError(e, 'Send failed.');
       setQuickResult({ ok: false, message: msg });
       toast({ title: 'Test email failed', description: msg, variant: 'destructive' });
     } finally {
@@ -245,13 +246,13 @@ export default function AdminNotificationsPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) {
-          toast({ title: 'Action failed', description: data?.error || 'Failed to update dead letter.', variant: 'destructive' });
+          toast({ title: 'Action failed', description: formatUserFacingError(data?.error != null ? { message: data.error } : null, 'Failed to update dead letter.'), variant: 'destructive' });
           return;
         }
         toast({ title: 'Updated', description: `${params.action} queued for ${params.kind}:${params.id}` });
         await load();
       } catch (e: any) {
-        toast({ title: 'Action failed', description: e?.message || 'Failed to update dead letter.', variant: 'destructive' });
+        toast({ title: 'Action failed', description: formatUserFacingError(e, 'Failed to update dead letter.'), variant: 'destructive' });
       } finally {
         setLoading(false);
       }

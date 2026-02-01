@@ -27,6 +27,7 @@ import {
   WhitetailBreederAttributes,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { formatDateTimeLocal, parseDateTimeLocal } from '@/lib/datetime/datetimeLocal';
 import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
 import { useAuth } from '@/hooks/use-auth';
@@ -101,7 +102,7 @@ function EditListingPageContent() {
       deliveryNotes: string;
     };
     protectedTransactionEnabled: boolean;
-    protectedTransactionDays: 7 | 14 | null;
+    protectedTransactionDays: 3 | 7 | 14 | null;
     bestOffer: {
       enabled: boolean;
       minPrice: string;
@@ -289,7 +290,7 @@ function EditListingPageContent() {
         console.error('Error fetching listing:', err);
         toast({
           title: 'Error loading listing',
-          description: err.message || 'Failed to load listing. Please try again.',
+          description: formatUserFacingError(err, 'Failed to load listing. Please try again.'),
           variant: 'destructive',
         });
         router.push('/seller/listings');
@@ -351,7 +352,7 @@ function EditListingPageContent() {
 
           <div className="space-y-3">
             <Label className="text-base font-semibold">Category</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'whitetail_breeder'
@@ -1289,7 +1290,7 @@ function EditListingPageContent() {
                         }));
                         toast({
                           title: 'Upload failed',
-                          description: err?.message || 'Could not upload photo. Please try again.',
+                          description: formatUserFacingError(err, 'Could not upload photo. Please try again.'),
                           variant: 'destructive',
                         });
                       } finally {
@@ -1428,49 +1429,10 @@ function EditListingPageContent() {
     },
     {
       id: 'verification',
-      title: 'Verification & Add-ons',
-      description: 'Update verification and protection options',
+      title: 'Protected Transaction (Optional)',
+      description: 'Post-delivery review window — opt-in only',
       content: (
         <div className="space-y-6">
-          <Card className="p-4">
-            <div className="flex items-start space-x-3 min-h-[44px]">
-              <Checkbox
-                id="verification"
-                checked={formData.verification}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, verification: checked as boolean })
-                }
-                disabled={isActiveAuctionWithBids}
-              />
-              <Label htmlFor="verification" className="cursor-pointer flex-1">
-                <div className="font-medium mb-1">Professional Verification ($100)</div>
-                <div className="text-sm text-muted-foreground">
-                  Admin review for marketplace workflow completeness. Builds buyer trust.
-                </div>
-              </Label>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="text-sm text-muted-foreground">
-              Note: Buyer protection is available via <strong>Protected Transaction</strong> when enabled.
-            </div>
-          </Card>
-
-          {/* Delivery — seller always arranges */}
-          <Card className="p-4 border-2">
-            <div className="space-y-2">
-              <h3 className="font-semibold text-base">Delivery</h3>
-              <p className="text-sm text-muted-foreground">
-                You are responsible for scheduling delivery. You’ll propose a delivery window; the buyer agrees to that date. You coordinate until you agree. The buyer confirms receipt to complete the transaction. Agchange does not arrange transport.
-              </p>
-              <p className="text-xs text-muted-foreground pt-1">
-                Seller arranges delivery · Buyer confirms receipt
-              </p>
-            </div>
-          </Card>
-
-          {/* Protected Transaction */}
           <Card className="p-4 border-2">
             <div className="space-y-4">
               <div className="flex items-start space-x-3 min-h-[44px]">
@@ -1486,42 +1448,69 @@ function EditListingPageContent() {
                   }
                 />
                 <Label htmlFor="protected-transaction" className="cursor-pointer flex-1">
-                  <div className="font-medium mb-1">Protected Transaction</div>
+                  <div className="font-medium mb-1">Offer a post-delivery review window</div>
                   <div className="text-sm text-muted-foreground">
-                    Enable buyer protection period. Buyer can request refund/dispute within selected days after delivery.
+                    Allows buyers to report verified delivery-related issues within a short window after delivery confirmation. Claims require proof and are reviewed. No automatic refunds.
                   </div>
                 </Label>
               </div>
               {formData.protectedTransactionEnabled && (
-                <div className="ml-7 space-y-2">
-                  <Label htmlFor="protected-days" className="text-sm font-semibold">Protection Period</Label>
-                  <Select
-                    value={formData.protectedTransactionDays?.toString() || '7'}
-                    onValueChange={(value) =>
-                      setFormData({ 
-                        ...formData, 
-                        protectedTransactionDays: parseInt(value) as 7 | 14 
-                      })
-                    }
-                  >
-                    <SelectTrigger id="protected-days" className="min-h-[48px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">7 days</SelectItem>
-                      <SelectItem value="14">14 days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Buyer can request refund or dispute within {formData.protectedTransactionDays} days after delivery confirmation.
-                  </p>
+                <div className="ml-7 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="protected-days" className="text-sm font-semibold">Protection window</Label>
+                    <Select
+                      value={formData.protectedTransactionDays === 3 ? '3' : '7'}
+                      onValueChange={(value) =>
+                        setFormData({ 
+                          ...formData, 
+                          protectedTransactionDays: parseInt(value) as 3 | 7 
+                        })
+                      }
+                    >
+                      <SelectTrigger id="protected-days" className="min-h-[48px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3 days</SelectItem>
+                        <SelectItem value="7">7 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-3 text-sm text-muted-foreground">
+                    <div>
+                      <div className="font-medium text-foreground mb-1">What buyers may report</div>
+                      <ul className="list-disc list-inside space-y-0.5 pl-1">
+                        <li>Illness or injury present at delivery or occurring immediately around delivery</li>
+                        <li>The animal not matching the listing description</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground mb-1">What is required</div>
+                      <p>Documentation or proof (for example, dated veterinary records for illness or death)</p>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground mb-1">How claims work</div>
+                      <ul className="list-disc list-inside space-y-0.5 pl-1">
+                        <li>Claims must be submitted within the selected window</li>
+                        <li>Claims are reviewed; outcomes are not automatic</li>
+                        <li>If a claim is upheld (seller at fault), the seller is expected to refund or otherwise resolve the issue</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground mb-1">Platform role</div>
+                      <p>AgChange does not hold funds, delay payouts, or provide guarantees</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </Card>
+          <p className="text-sm text-muted-foreground">
+            Listings without a post-delivery review window are final upon delivery confirmation.
+          </p>
         </div>
       ),
-      validate: () => true, // Verification options are optional
+      validate: () => true, // Optional
     },
     {
       id: 'transportation',
@@ -1529,17 +1518,28 @@ function EditListingPageContent() {
       description: 'Delivery radius, timeframe & notes',
       content: (
         <div className="space-y-6">
+          <Card className="p-4 border-2">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base">Delivery</h3>
+              <p className="text-sm text-muted-foreground">
+                You schedule delivery: propose a window, the buyer agrees, and you coordinate until you're aligned. The buyer confirms receipt to complete the transaction.</p>
+              <p className="text-xs text-muted-foreground pt-1">
+                You arrange delivery · Buyer confirms receipt
+              </p>
+            </div>
+          </Card>
+
           <p className="text-sm text-muted-foreground">
-            Buyers see this when you offer delivery. It helps them decide before buying and sets clear expectations.
+            The details below are shown to buyers and help set expectations before they purchase.
           </p>
           <Card className="p-4 border-2">
             <div className="space-y-4">
               <div>
                 <Label htmlFor="edit-maxDeliveryRadiusMiles" className="font-medium">
-                  Maximum delivery radius (miles)
+                  Maximum delivery radius (miles) <span className="text-destructive">*</span>
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  How far you’re willing to deliver from your location. Leave blank if you prefer to discuss per buyer.
+                  How far you’re willing to deliver from your location.
                 </p>
                 <Input
                   id="edit-maxDeliveryRadiusMiles"
@@ -1558,7 +1558,7 @@ function EditListingPageContent() {
               </div>
               <div>
                 <Label htmlFor="edit-deliveryTimeframe" className="font-medium">
-                  Delivery timeframe
+                  Delivery timeframe <span className="text-destructive">*</span>
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   When you plan to deliver. Buyers can filter by this on the browse page.
@@ -1626,6 +1626,23 @@ function EditListingPageContent() {
       ),
       validate: () => {
         const dd = formData.deliveryDetails ?? {};
+        const maxMiles = dd.maxDeliveryRadiusMiles;
+        if (maxMiles === '' || maxMiles === undefined || Number(maxMiles) < 1) {
+          toast({
+            title: 'Delivery radius required',
+            description: 'Please enter how far you’re willing to deliver (at least 1 mile).',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        if (!(dd.deliveryTimeframe ?? '').trim()) {
+          toast({
+            title: 'Delivery timeframe required',
+            description: 'Please select when you plan to deliver so buyers know what to expect.',
+            variant: 'destructive',
+          });
+          return false;
+        }
         if ((dd.deliveryTimeframe ?? '') === '30_60') {
           const expl = (dd.deliveryStatusExplanation ?? '').trim();
           if (!expl) {
@@ -1680,7 +1697,6 @@ function EditListingPageContent() {
                             {String(formData.category).replaceAll('_', ' ')}
                           </Badge>
                         )}
-                        {formData.verification && <Badge>Verification</Badge>}
                         <Badge variant="outline">Seller arranges delivery</Badge>
                         {formData.protectedTransactionEnabled && (
                           <Badge variant="outline">
@@ -1821,8 +1837,6 @@ function EditListingPageContent() {
                 <div className="rounded-md border bg-muted/30 p-3">
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Options</div>
                   <div className="mt-2 space-y-1">
-                    <div><span className="text-muted-foreground">Verification:</span> <span className="font-medium">{formData.verification ? 'Yes' : 'No'}</span></div>
-                    <div><span className="text-muted-foreground">Transportation:</span> <span className="font-medium">Seller arranges delivery</span></div>
                     {(() => {
                       const dd = formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '' as number | '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' };
                       const tf = (dd.deliveryTimeframe ?? '').trim();
@@ -2144,7 +2158,7 @@ function EditListingPageContent() {
       console.error('Error saving listing:', err);
       toast({
         title: 'Couldn\'t save changes',
-        description: err.message || 'Something went wrong while saving. Please try again. If it keeps happening, contact support.',
+        description: formatUserFacingError(err, 'Something went wrong while saving. Please try again. If it keeps happening, contact support.'),
         variant: 'destructive',
       });
     } finally {
@@ -2259,7 +2273,7 @@ function EditListingPageContent() {
 
       toast({
         title: listingData?.status === 'draft' ? 'Couldn\'t publish listing' : 'Couldn\'t save changes',
-        description: err.message || 'Something went wrong. Please try again. If it keeps happening, contact support.',
+        description: formatUserFacingError(err, 'Something went wrong. Please try again. If it keeps happening, contact support.'),
         variant: 'destructive',
       });
     } finally {

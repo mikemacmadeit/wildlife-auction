@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw, Crop, Loader2 } from 'lucide-react';
+import { Upload, Star, ArrowLeft, ArrowRight, X, Trash2, RotateCcw, Crop, Loader2, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { listUserPhotos, restoreUserPhoto, softDeleteUserPhoto, uploadUserPhoto, type UserPhotoDoc } from '@/lib/firebase/photos';
 import { useToast } from '@/hooks/use-toast';
 import { PhotoCropDialog, type FocalPoint, type PhotoCropResult } from '@/components/photos/PhotoCropDialog';
@@ -197,7 +198,7 @@ export function ListingPhotoPicker(props: {
       await refresh();
       toast({ title: 'Uploaded', description: 'Photos uploaded to your library.' });
     } catch (err: any) {
-      toast({ title: 'Upload failed', description: err?.message || 'Failed to upload.', variant: 'destructive' });
+      toast({ title: 'Upload failed', description: formatUserFacingError(err, 'Failed to upload.'), variant: 'destructive' });
     } finally {
       setUploading(false);
       setUploadPct(0);
@@ -244,15 +245,15 @@ export function ListingPhotoPicker(props: {
             <div className="flex items-center gap-2">
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="min-h-[40px] font-semibold"
+                size="default"
+                className="min-h-[44px] font-semibold"
                 onClick={() => {
                   setManageOpen(true);
                   void refreshManage();
                 }}
                 disabled={uploading}
               >
+                <FolderOpen className="h-4 w-4 mr-2" />
                 Manage uploads
               </Button>
             </div>
@@ -499,7 +500,7 @@ function ManageUploadsGrid(props: {
                       await props.onRestore?.(p.photoId);
                       toast({ title: 'Restored', description: 'Photo restored.' });
                     } catch (err: any) {
-                      toast({ title: 'Error', description: err?.message || 'Failed to restore.', variant: 'destructive' });
+                      toast({ title: 'Error', description: formatUserFacingError(err, 'Failed to restore.'), variant: 'destructive' });
                     }
                   }}
                 >
@@ -521,7 +522,7 @@ function ManageUploadsGrid(props: {
                       await props.onDelete?.(p.photoId);
                       toast({ title: 'Moved to trash', description: 'Photo removed from active uploads.' });
                     } catch (err: any) {
-                      toast({ title: 'Error', description: err?.message || 'Failed to delete.', variant: 'destructive' });
+                      toast({ title: 'Error', description: formatUserFacingError(err, 'Failed to delete.'), variant: 'destructive' });
                     }
                   }}
                 >

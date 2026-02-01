@@ -55,6 +55,8 @@ import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/Av
 import { auth } from '@/lib/firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
+import { getPasswordUpdateErrorMessage, getPasswordResetErrorMessage } from '@/lib/firebase/auth-error-messages';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
 import { computePublicSellerTrustFromUser } from '@/lib/seller/badges';
 import { HelpChat } from '@/components/help/HelpChat';
@@ -251,7 +253,7 @@ export default function AccountPage() {
             : 'If you just verified, wait a moment and refresh again.',
         });
       } catch (e: any) {
-        toast({ title: 'Could not refresh account', description: e?.message || 'Please try again.', variant: 'destructive' });
+        toast({ title: 'Could not refresh account', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,9 +277,10 @@ export default function AccountPage() {
           description: 'Check your inbox for a link to set a password.',
         });
       } catch (e: any) {
+        const description = getPasswordResetErrorMessage(e?.code);
         toast({
           title: 'Couldn’t send reset email',
-          description: e?.message || 'Please try again.',
+          description,
           variant: 'destructive',
         });
       }
@@ -319,22 +322,8 @@ export default function AccountPage() {
 
       toast({ title: 'Password updated', description: 'Your password has been changed successfully.' });
     } catch (e: any) {
-      const code = String(e?.code || '');
-      const msg = String(e?.message || '');
-
-      if (code.includes('auth/wrong-password')) {
-        toast({ title: 'Wrong password', description: 'Your current password is incorrect.', variant: 'destructive' });
-      } else if (code.includes('auth/too-many-requests')) {
-        toast({ title: 'Too many attempts', description: 'Please wait a bit and try again.', variant: 'destructive' });
-      } else if (code.includes('auth/requires-recent-login')) {
-        toast({
-          title: 'Please re-authenticate',
-          description: 'For security, please sign out and sign back in, then try again.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({ title: 'Update failed', description: msg || 'Could not update password.', variant: 'destructive' });
-      }
+      const description = getPasswordUpdateErrorMessage(e?.code);
+      toast({ title: 'Update failed', description, variant: 'destructive' });
     } finally {
       setPwSaving(false);
     }
@@ -405,7 +394,7 @@ export default function AccountPage() {
             console.warn('Failed to update listing snapshots:', result);
             toast({
               title: 'Profile saved',
-              description: result?.error || 'Could not update listings. Please refresh the page or try again.',
+              description: formatUserFacingError(result?.error, 'Could not update listings. Please refresh the page or try again.'),
               variant: 'destructive',
             });
           }
@@ -429,7 +418,7 @@ export default function AccountPage() {
       console.error('Error saving profile:', err);
       toast({
         title: 'Error saving profile',
-        description: err instanceof Error ? err.message : 'Failed to save your profile.',
+        description: formatUserFacingError(err, 'Failed to save your profile.'),
         variant: 'destructive',
       });
     } finally {
@@ -524,7 +513,7 @@ export default function AccountPage() {
       console.error('Avatar upload failed', e);
       toast({
         title: 'Upload failed',
-        description: e?.message || 'Could not upload your photo. Please try again.',
+        description: formatUserFacingError(e, 'Could not upload your photo. Please try again.'),
         variant: 'destructive',
       });
     } finally {
@@ -611,7 +600,7 @@ export default function AccountPage() {
                       } catch (e: any) {
                         toast({
                           title: 'Could not send verification email',
-                          description: e?.message || 'Please try again.',
+                          description: formatUserFacingError(e, 'Please try again.'),
                           variant: 'destructive',
                         });
                       }
@@ -1041,7 +1030,8 @@ export default function AccountPage() {
                             await resetPassword(user.email);
                             toast({ title: 'Reset email sent', description: 'Check your inbox for a secure reset link.' });
                           } catch (e: any) {
-                            toast({ title: 'Couldn’t send reset email', description: e?.message || 'Please try again.', variant: 'destructive' });
+                            const description = getPasswordResetErrorMessage(e?.code);
+                            toast({ title: 'Couldn’t send reset email', description, variant: 'destructive' });
                           }
                         }}
                         disabled={pwSaving}

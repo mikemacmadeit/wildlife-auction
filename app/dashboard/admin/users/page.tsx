@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { Loader2, MoreHorizontal, Search, ShieldAlert, Copy, UserX, UserCheck, KeyRound, ExternalLink, RefreshCw } from 'lucide-react';
 
 type AdminUserRow = {
@@ -290,7 +291,7 @@ export default function AdminUsersPage() {
       setRows(Array.isArray(data.users) ? data.users : []);
       setNextCursor(null);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load users');
+      setError(formatUserFacingError(e, 'Failed to load users'));
       setRows([]);
     } finally {
       setLoading(false);
@@ -366,7 +367,7 @@ export default function AdminUsersPage() {
       toast({ title: disabled ? 'User disabled' : 'User enabled', description: row.email || row.uid });
       await load();
     } catch (e: any) {
-      toast({ title: 'Failed', description: e?.message || 'Could not update user', variant: 'destructive' });
+      toast({ title: 'Failed', description: formatUserFacingError(e, 'Could not update user'), variant: 'destructive' });
     }
   }, [authHeader, load, toast, user]);
 
@@ -419,7 +420,7 @@ export default function AdminUsersPage() {
         void safeCopy(link);
       }
     } catch (e: any) {
-      toast({ title: 'Failed', description: e?.message || 'Could not generate reset link', variant: 'destructive' });
+      toast({ title: 'Failed', description: formatUserFacingError(e, 'Could not generate reset link'), variant: 'destructive' });
     }
   }, [authHeader, toast, user]);
 
@@ -588,7 +589,7 @@ export default function AdminUsersPage() {
                       setCursorStack([]);
                       void load({ query: query });
                     } catch (e: any) {
-                      toast({ title: 'Backfill failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+                      toast({ title: 'Backfill failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
                     }
                   }}
                 >

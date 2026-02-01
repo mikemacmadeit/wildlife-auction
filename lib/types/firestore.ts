@@ -138,7 +138,7 @@ export interface ListingDoc {
   
   // Protected Transaction (Seller-selected protection)
   protectedTransactionEnabled?: boolean;
-  protectedTransactionDays?: 7 | 14 | null;
+  protectedTransactionDays?: 3 | 7 | 14 | null;
   protectedTermsVersion?: string; // e.g., "v1"
   protectedEnabledAt?: Timestamp; // When seller enabled protection
   

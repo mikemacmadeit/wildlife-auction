@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Loader2, ArrowLeft, ShieldAlert, UserX, UserCheck, Ban, Clock, RefreshCw, KeyRound, LogOut, MessageSquareOff, BadgeAlert, Copy, ExternalLink, FileText, History } from 'lucide-react';
 import { getEffectiveSubscriptionTier, getTierLabel, type SubscriptionTier } from '@/lib/pricing/subscriptions';
+import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 
 type Dossier = {
@@ -106,7 +107,7 @@ export default function AdminUserDossierPage() {
       const currentTier = getEffectiveSubscriptionTier(jsonData?.userDoc || null);
       setTierOverride(currentTier);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load dossier');
+      setError(formatUserFacingError(e, 'Failed to load dossier'));
       setData(null);
     } finally {
       setLoading(false);
@@ -191,7 +192,7 @@ export default function AdminUserDossierPage() {
       setConfirmOpen(false);
       await load();
     } catch (e: any) {
-      toast({ title: 'Action failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Action failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
     } finally {
       setConfirmBusy(false);
     }
@@ -447,7 +448,7 @@ export default function AdminUserDossierPage() {
                           toast({ title: 'Note added' });
                           await load();
                         } catch (e: any) {
-                          toast({ title: 'Failed', description: e?.message || 'Could not add note', variant: 'destructive' });
+                          toast({ title: 'Failed', description: formatUserFacingError(e, 'Could not add note'), variant: 'destructive' });
                         } finally {
                           setNoteSaving(false);
                         }
@@ -776,7 +777,7 @@ export default function AdminUserDossierPage() {
                           toast({ title: 'Link created', description: 'No link returned.', variant: 'destructive' });
                         }
                       } catch (e: any) {
-                        toast({ title: 'Failed', description: e?.message || 'Could not generate reset link', variant: 'destructive' });
+                        toast({ title: 'Failed', description: formatUserFacingError(e, 'Could not generate reset link'), variant: 'destructive' });
                       }
                     }}
                   >
