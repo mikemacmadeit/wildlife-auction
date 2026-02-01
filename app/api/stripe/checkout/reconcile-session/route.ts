@@ -155,10 +155,40 @@ export async function POST(request: Request) {
       existingStatus === 'cancelled';
 
     if (!isTerminal) {
-      await handleCheckoutSessionCompleted(adminDb, session as Stripe.Checkout.Session, requestId);
+      try {
+        await handleCheckoutSessionCompleted(adminDb, session as Stripe.Checkout.Session, requestId);
+      } catch (handlerErr: any) {
+        logError('Reconcile handler threw (webhook may have won race)', handlerErr, {
+          requestId,
+          route: '/api/stripe/checkout/reconcile-session',
+          sessionId,
+        });
+        // Check if order was created by webhook — if so, treat as success
+        const fallback = await adminDb
+          .collection('orders')
+          .where('stripeCheckoutSessionId', '==', sessionId)
+          .limit(1)
+          .get();
+        if (!fallback.empty) {
+          const doc = fallback.docs[0];
+          logInfo('Reconcile recovered: order exists from webhook', {
+            requestId,
+            route: '/api/stripe/checkout/reconcile-session',
+            sessionId,
+            orderId: doc.id,
+          });
+          return json({
+            ok: true,
+            idempotent: false,
+            orderId: doc.id,
+            orderStatus: String((doc.data() as any)?.status || ''),
+          });
+        }
+        throw handlerErr;
+      }
     }
 
-    // Fetch created/updated order ID and status (for client and debugging)
+    // Fetch created/updated order ID and status
     const created = await adminDb
       .collection('orders')
       .where('stripeCheckoutSessionId', '==', sessionId)

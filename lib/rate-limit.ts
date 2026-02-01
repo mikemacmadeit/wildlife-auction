@@ -101,8 +101,8 @@ export const RATE_LIMITS = {
   admin: { windowMs: 60 * 1000, maxRequests: 10, requireRedisInProd: true }, // 10 requests per minute
   // Checkout (restrict abuse but allow legitimate retries; 5 was too strict → 429 on retries)
   checkout: { windowMs: 60 * 1000, maxRequests: 12, requireRedisInProd: true }, // 12 requests per minute per user+listing
-  // Reconcile-session: user returning from Stripe needs retries; poll every 5s = 12/min. Key by user+sessionId.
-  reconcile: { windowMs: 60 * 1000, maxRequests: 24, requireRedisInProd: true }, // 24/min per user+session (allows 2/min per session with multiple tabs)
+  // Reconcile-session: user returning from Stripe needs retries. No requireRedisInProd — allow in-memory fallback so purchases complete even if Redis misbehaves.
+  reconcile: { windowMs: 60 * 1000, maxRequests: 30, requireRedisInProd: false },
   // Messaging (restrict writes/abuse)
   messages: { windowMs: 60 * 1000, maxRequests: 20, requireRedisInProd: true }, // 20 requests per minute
   // Support/contact form (restrict spam/abuse)

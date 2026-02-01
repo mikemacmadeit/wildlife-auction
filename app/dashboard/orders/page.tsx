@@ -1789,10 +1789,10 @@ export default function OrdersPage() {
 
         {/* Dispute Dialog */}
         <Dialog open={!!disputeDialogOpen} onOpenChange={(open) => !open && setDisputeDialogOpen(null)}>
-          <DialogContent>
+          <DialogContent aria-describedby="dispute-desc">
             <DialogHeader>
               <DialogTitle>Open Dispute</DialogTitle>
-              <DialogDescription>
+              <DialogDescription id="dispute-desc">
                 Report a problem with this order. Admin will review and resolve the dispute.
               </DialogDescription>
             </DialogHeader>
