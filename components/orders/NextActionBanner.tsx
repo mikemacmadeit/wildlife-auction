@@ -70,9 +70,9 @@ export function NextActionBanner({
           }
           return {
             title: 'Action required: Propose delivery date',
-            description: 'Propose delivery windows. Buyer will confirm a date that works.',
+            description: 'Offer one or more date and time windows for delivery. The buyer will pick one that works, then you coordinate the handoff.',
             urgency: (isSlaOverdue ? 'overdue' : isSlaUrgent ? 'urgent' : 'normal') as 'overdue' | 'urgent' | 'normal',
-            ctaLabel: 'Propose Delivery',
+            ctaLabel: 'Propose delivery date',
             icon: <Truck className="h-5 w-5" />,
           };
         } else {

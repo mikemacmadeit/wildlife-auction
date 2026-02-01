@@ -122,21 +122,22 @@ export async function saveAddress(
 
 /**
  * Set the selected delivery address for checkout (users/{uid}/checkout/current).
+ * When listingId is provided (e.g. from listing page before purchase), it is stored so the webhook
+ * only applies this address to orders for that listing — prevents stale addresses from old sessions.
  */
 export async function setCheckoutDeliveryAddress(
   uid: string,
-  addressId: string | null
+  addressId: string | null,
+  listingId?: string
 ): Promise<void> {
   const firestore = getDb();
   const ref = doc(firestore, 'users', uid, 'checkout', 'current');
-  await setDoc(
-    ref,
-    {
-      deliveryAddressId: addressId,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const payload: Record<string, unknown> = {
+    deliveryAddressId: addressId,
+    updatedAt: serverTimestamp(),
+  };
+  if (listingId) payload.listingId = listingId;
+  await setDoc(ref, payload, { merge: true });
 }
 
 /**

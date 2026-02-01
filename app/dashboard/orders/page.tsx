@@ -86,6 +86,8 @@ export default function OrdersPage() {
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
   const [showCongratsModal, setShowCongratsModal] = useState(false);
   const [congratsSetAddressLoading, setCongratsSetAddressLoading] = useState(false);
+  // Preserve orderId/sessionId for congrats modal after pendingCheckout is cleared (so "Set address" works)
+  const [congratsOrderInfo, setCongratsOrderInfo] = useState<{ orderId: string; sessionId: string } | null>(null);
   const [checkStatusLoading, setCheckStatusLoading] = useState(false);
   const reconcileAttemptedRef = useRef<Record<string, boolean>>({});
   const tickRunnerRef = useRef<{ run: () => Promise<void>; sessionId: string } | null>(null);
@@ -420,6 +422,7 @@ export default function OrdersPage() {
     );
     if (match?.id) {
       setHighlightOrderId(match.id);
+      setCongratsOrderInfo({ orderId: match.id, sessionId: pendingCheckout.sessionId });
       setPendingCheckout(null);
       setPendingCheckoutListingTitle(null);
       try {
@@ -551,6 +554,7 @@ export default function OrdersPage() {
           const inList = Array.isArray(list) && list.some((o: OrderWithListing) => o.id === orderId);
           if (inList) {
             setHighlightOrderId(orderId);
+            setCongratsOrderInfo({ orderId, sessionId });
             setPendingCheckout(null);
             setPendingCheckoutListingTitle(null);
             try {
@@ -606,6 +610,7 @@ export default function OrdersPage() {
               const order = await getOrderByCheckoutSessionId(sessionId);
               if (order?.id) {
                 setHighlightOrderId(order.id);
+                setCongratsOrderInfo({ orderId: order.id, sessionId });
                 setPendingCheckout(null);
                 setPendingCheckoutListingTitle(null);
                 try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch {}
@@ -1035,7 +1040,13 @@ export default function OrdersPage() {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       {/* Post-purchase congratulations modal */}
-      <Dialog open={showCongratsModal} onOpenChange={setShowCongratsModal}>
+      <Dialog
+        open={showCongratsModal}
+        onOpenChange={(open) => {
+          setShowCongratsModal(open);
+          if (!open) setCongratsOrderInfo(null);
+        }}
+      >
         <DialogContent
           className="sm:max-w-md border-2 border-primary/20 bg-card shadow-xl"
           aria-describedby="congrats-desc"
@@ -1073,7 +1084,14 @@ export default function OrdersPage() {
             <Button
               data-congrats-view-purchase
               onClick={async () => {
-                const sessionId = pendingCheckout?.sessionId;
+                const sessionId = congratsOrderInfo?.sessionId ?? pendingCheckout?.sessionId;
+                const orderIdFromInfo = congratsOrderInfo?.orderId;
+                if (orderIdFromInfo) {
+                  setShowCongratsModal(false);
+                  setCongratsOrderInfo(null);
+                  router.push(`/dashboard/orders/${orderIdFromInfo}?setAddress=1`);
+                  return;
+                }
                 if (!sessionId) return;
                 setCongratsSetAddressLoading(true);
                 try {
@@ -1089,6 +1107,7 @@ export default function OrdersPage() {
                   }
                   if (order?.id) {
                     setShowCongratsModal(false);
+                    setCongratsOrderInfo(null);
                     sessionStorage.removeItem('we:congrats-set-address:v1');
                     router.push(`/dashboard/orders/${order.id}?setAddress=1`);
                     return;

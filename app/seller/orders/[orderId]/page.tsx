@@ -225,8 +225,8 @@ export default function SellerOrderDetailPage() {
 
             {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && order.delivery?.buyerAddress && (
               <>
-                <div className="text-sm text-muted-foreground">
-                  Propose delivery windows using the action above. Buyer will confirm a date that works.
+                <div className="text-sm text-foreground/90">
+                  Use the <strong>Propose delivery date</strong> button above to offer date and time windows. The buyer will pick one, then you coordinate the delivery.
                 </div>
                 <Separator />
               </>
@@ -392,7 +392,7 @@ export default function SellerOrderDetailPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="font-semibold text-base mb-1">{nextAction.title}</div>
-                    <div className="text-sm text-muted-foreground">{nextAction.description}</div>
+                    <div className="text-sm text-foreground/90">{nextAction.description}</div>
                     {nextAction.dueAt && (
                       <div className="text-xs text-muted-foreground mt-2">
                         Due: {formatDate(nextAction.dueAt)}
@@ -525,8 +525,8 @@ export default function SellerOrderDetailPage() {
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Delivery</CardTitle>
-              <CardDescription>
-                Propose delivery times; the buyer chooses one. Only the buyer confirms receipt to complete the transaction.
+              <CardDescription className="text-foreground/85">
+                You propose date and time windows; the buyer picks one that works. Only the buyer confirms receipt to complete the transaction.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -649,8 +649,8 @@ export default function SellerOrderDetailPage() {
         <Dialog open={scheduleDeliveryOpen} onOpenChange={setScheduleDeliveryOpen}>
           <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden w-[calc(100vw-2rem)] sm:w-full max-w-2xl p-3 sm:p-4 md:p-6">
             <DialogHeader className="shrink-0 pb-2 pr-8">
-              <DialogTitle className="text-base sm:text-lg">Propose delivery</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm mt-0.5">Add one or more date/time windows. Buyer will agree to one.</DialogDescription>
+              <DialogTitle className="text-base sm:text-lg">Propose delivery date</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm mt-0.5 text-foreground/90">Offer one or more date and time windows. The buyer will pick one that works.</DialogDescription>
             </DialogHeader>
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 -mx-1 px-1">
               <div>
@@ -725,7 +725,7 @@ export default function SellerOrderDetailPage() {
                 }}
               >
                 {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Propose delivery
+                Propose delivery date
               </Button>
             </DialogFooter>
           </DialogContent>

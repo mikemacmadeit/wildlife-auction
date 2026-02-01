@@ -46,6 +46,8 @@ export interface AddressPickerModalProps {
   onSuccess?: () => void;
   /** When true, skip Google Places + map; show saved addresses + manual form only (same modal look). */
   manualOnly?: boolean;
+  /** When set (e.g. from listing page before checkout), stored in checkout/current so webhook only applies address to this listing. */
+  listingId?: string;
 }
 
 function savedToPayload(a: SavedAddress): SetDeliveryAddressPayload {
@@ -70,6 +72,7 @@ export function AddressPickerModal({
   onSetDeliveryAddress,
   onSuccess,
   manualOnly = false,
+  listingId,
 }: AddressPickerModalProps) {
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -113,7 +116,7 @@ export function AddressPickerModal({
     setSaving(true);
     setError(null);
     try {
-      await setCheckoutDeliveryAddress(userId, address.id);
+      await setCheckoutDeliveryAddress(userId, address.id, listingId);
       if (orderId && onSetDeliveryAddress) {
         await onSetDeliveryAddress(orderId, savedToPayload(address));
       }
@@ -160,7 +163,7 @@ export function AddressPickerModal({
       const saved = await saveAddress(userId, newAddress, {
         makeDefault: addresses.length === 0,
       });
-      await setCheckoutDeliveryAddress(userId, saved.id);
+      await setCheckoutDeliveryAddress(userId, saved.id, listingId);
       if (orderId && onSetDeliveryAddress) {
         await onSetDeliveryAddress(orderId, {
           line1: saved.line1,
@@ -222,7 +225,7 @@ export function AddressPickerModal({
       const saved = await saveAddress(userId, newAddress, {
         makeDefault: addresses.length === 0,
       });
-      await setCheckoutDeliveryAddress(userId, saved.id);
+      await setCheckoutDeliveryAddress(userId, saved.id, listingId);
       if (orderId && onSetDeliveryAddress) {
         await onSetDeliveryAddress(orderId, {
           line1: saved.line1,

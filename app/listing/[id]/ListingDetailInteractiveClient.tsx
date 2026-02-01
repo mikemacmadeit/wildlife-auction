@@ -2688,6 +2688,7 @@ export default function ListingDetailInteractiveClient({
           open={addressPickerOpen}
           onOpenChange={setAddressPickerOpen}
           userId={user.uid}
+          listingId={listingId}
         />
       )}
 

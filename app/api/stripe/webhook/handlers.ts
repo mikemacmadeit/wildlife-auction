@@ -658,11 +658,16 @@ export async function handleCheckoutSessionCompleted(
       sellerPayoutAmount: sellerAmount / 100, // Immutable snapshot (matches sellerAmount)
     };
 
-    // Snapshot selected delivery address from users/{uid}/checkout/current if set (HEB-style flow)
+    // Snapshot selected delivery address from users/{uid}/checkout/current if set (HEB-style flow).
+    // Only use when listingId matches — prevents stale addresses from previous sessions being applied.
     const checkoutRef = db.collection('users').doc(buyerId).collection('checkout').doc('current');
     const checkoutSnap = await checkoutRef.get();
-    const deliveryAddressId = checkoutSnap.exists ? (checkoutSnap.data() as Record<string, unknown>)?.deliveryAddressId : null;
-    if (deliveryAddressId && typeof deliveryAddressId === 'string') {
+    const checkoutData = checkoutSnap.exists ? (checkoutSnap.data() as Record<string, unknown>) : null;
+    const deliveryAddressId = checkoutData?.deliveryAddressId;
+    const checkoutListingId = checkoutData?.listingId;
+    // Require explicit listingId match; if no listingId in checkout (legacy), don't use — avoids stale address.
+    const listingIdMatches = checkoutListingId && String(checkoutListingId) === listingId;
+    if (deliveryAddressId && typeof deliveryAddressId === 'string' && listingIdMatches) {
       const addrRef = db.collection('users').doc(buyerId).collection('addresses').doc(deliveryAddressId);
       const addrSnap = await addrRef.get();
       if (addrSnap.exists) {

@@ -336,8 +336,8 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
       }
       return {
         title: 'Propose delivery date',
-        description: 'Propose delivery times. Buyer will choose one that works.',
-        ctaLabel: ORDER_COPY.actions.scheduleDelivery,
+        description: 'Offer one or more date and time windows for delivery. The buyer will pick one that works, then you coordinate the handoff.',
+        ctaLabel: 'Propose delivery date',
         ctaAction: `/seller/orders/${order.id}#schedule-delivery`,
         severity: 'warning',
         dueAt: isValidNonEpochDate(order.fulfillmentSlaDeadlineAt) ? order.fulfillmentSlaDeadlineAt : undefined,
