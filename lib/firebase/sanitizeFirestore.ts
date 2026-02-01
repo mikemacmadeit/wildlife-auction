@@ -98,6 +98,7 @@ export function sanitizeFirestorePayload(input: any): any {
 
     const out: any = {};
     for (const [k, v] of Object.entries(input)) {
+      if (v === undefined) continue; // Firestore rejects undefined; omit field
       out[k] = sanitizeFirestorePayload(v);
     }
     return out;

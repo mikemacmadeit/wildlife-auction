@@ -85,6 +85,7 @@ export default function OrdersPage() {
   const [pendingCheckoutListingTitle, setPendingCheckoutListingTitle] = useState<string | null>(null);
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
   const [showCongratsModal, setShowCongratsModal] = useState(false);
+  const [congratsSetAddressLoading, setCongratsSetAddressLoading] = useState(false);
   const [checkStatusLoading, setCheckStatusLoading] = useState(false);
   const reconcileAttemptedRef = useRef<Record<string, boolean>>({});
   const tickRunnerRef = useRef<{ run: () => Promise<void>; sessionId: string } | null>(null);
@@ -201,9 +202,6 @@ export default function OrdersPage() {
       );
 
       setOrders(ordersWithListings);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/dashboard/orders/page.tsx:loadOrders',message:'loadOrders completed',data:{ordersLength:ordersWithListings.length,orderIds:ordersWithListings.slice(0,5).map((o:OrderWithListing)=>o.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5,H2'})}).catch(()=>{});
-      // #endregion
 
       // Best-effort: backfill snapshots for legacy orders so future loads are fast.
       // NOTE: We intentionally do this AFTER setting UI state so it never blocks page load.
@@ -528,7 +526,8 @@ export default function OrdersPage() {
             list = await loadOrders({ silent: true });
           }
           if (cancelled) return;
-          if (Array.isArray(list) && list.some((o: OrderWithListing) => o.id === order.id)) {
+          const inList = Array.isArray(list) && list.some((o: OrderWithListing) => o.id === order.id);
+          if (inList) {
             setHighlightOrderId(order.id);
             setPendingCheckout(null);
             setPendingCheckoutListingTitle(null);
@@ -559,7 +558,7 @@ export default function OrdersPage() {
           return;
         }
       } catch {
-        // If this query fails (rules/transient), still keep polling loadOrders; it may show up anyway.
+        // If query fails, keep polling
       }
 
       // IMPORTANT: do not flip the whole page into a loading spinner during background polling.
@@ -1049,48 +1048,50 @@ export default function OrdersPage() {
               data-congrats-view-purchase
               onClick={async () => {
                 const sessionId = pendingCheckout?.sessionId;
-                setShowCongratsModal(false);
-                scrollToTop();
                 if (!sessionId) return;
+                setCongratsSetAddressLoading(true);
                 try {
                   sessionStorage.setItem(
                     'we:congrats-set-address:v1',
                     JSON.stringify({ sessionId, ts: Date.now() })
                   );
-                } catch {
-                  // ignore
-                }
-                // Try to open the order immediately (order may already exist from webhook/reconcile)
-                try {
+                  // Poll for order (up to ~30s); keep modal open with loading state
                   let order = await getOrderByCheckoutSessionId(sessionId);
+                  for (let attempt = 0; !order?.id && attempt < 15; attempt++) {
+                    await new Promise((r) => setTimeout(r, 2000));
+                    order = await getOrderByCheckoutSessionId(sessionId);
+                  }
                   if (order?.id) {
+                    setShowCongratsModal(false);
+                    sessionStorage.removeItem('we:congrats-set-address:v1');
                     router.push(`/dashboard/orders/${order.id}?setAddress=1`);
                     return;
                   }
-                  // Order not ready yet; retry a few times (webhook can take several seconds)
-                  for (let attempt = 0; attempt < 4; attempt++) {
-                    await new Promise((r) => setTimeout(r, 2000));
-                    order = await getOrderByCheckoutSessionId(sessionId);
-                    if (order?.id) {
-                      router.push(`/dashboard/orders/${order.id}?setAddress=1`);
-                      return;
-                    }
-                  }
+                  setCongratsSetAddressLoading(false);
                   toast({
-                    title: 'Order still finalizing',
-                    description: 'Your order will appear below in a moment. Click it, then "Set address" to add your delivery address.',
+                    title: 'Taking longer than usual',
+                    description: 'Your order will appear below shortly. Click it, then "Set address" to add your delivery address.',
                   });
                 } catch {
+                  setCongratsSetAddressLoading(false);
                   toast({
                     title: 'Order still finalizing',
                     description: 'Your order will appear below in a moment. Click it, then "Set address" to add your delivery address.',
                   });
                 }
               }}
+              disabled={congratsSetAddressLoading}
               className="w-full font-semibold"
               size="lg"
             >
-              Set delivery address
+              {congratsSetAddressLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Preparing order…
+                </>
+              ) : (
+                'Set delivery address'
+              )}
             </Button>
           </div>
         </DialogContent>
