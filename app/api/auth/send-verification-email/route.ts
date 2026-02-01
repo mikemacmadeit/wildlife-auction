@@ -9,7 +9,7 @@ import { getAdminAuth } from '@/lib/firebase/admin';
 import { getSiteUrl } from '@/lib/site-url';
 import { renderEmail } from '@/lib/email';
 import { sendEmailHtml } from '@/lib/email/sender';
-import { getEmailProvider, FROM_EMAIL } from '@/lib/email/config';
+import { getEmailProvider, FROM_EMAIL, isEmailEnabled } from '@/lib/email/config';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -19,6 +19,16 @@ function json(body: any, init?: { status?: number }) {
 }
 
 export async function POST(request: Request) {
+  // #region agent log
+  const _log = (msg: string, data: Record<string, unknown>) => {
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ location: 'send-verification-email/route.ts', message: msg, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: data.hypothesisId ?? 'H1' }),
+    }).catch(() => {});
+  };
+  // #endregion
+
   let auth: ReturnType<typeof getAdminAuth>;
   try {
     auth = getAdminAuth();
@@ -40,9 +50,24 @@ export async function POST(request: Request) {
   const uid = decoded?.uid as string | undefined;
   if (!uid) return json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
+  const emailEnabled = isEmailEnabled();
+  // #region agent log
+  _log('API entry', { uid, emailEnabled, hypothesisId: 'H1' });
+  // #endregion
+
+  if (!emailEnabled) {
+    return json(
+      { ok: false, error: 'Verification email service not configured', code: 'EMAIL_NOT_CONFIGURED' },
+      { status: 503 }
+    );
+  }
+
   try {
     const userRecord = await auth.getUser(uid);
     const email = userRecord.email;
+    // #region agent log
+    _log('getUser result', { uid, emailVerified: userRecord.emailVerified, hasEmail: !!email, hypothesisId: 'H1' });
+    // #endregion
     if (!email) return json({ ok: false, error: 'No email on account' }, { status: 400 });
 
     if (userRecord.emailVerified === true) {
@@ -70,23 +95,31 @@ export async function POST(request: Request) {
     });
 
     const sent = await sendEmailHtml(email, rendered.subject, rendered.html);
+    // #region agent log
+    _log('sendEmailHtml result', { success: sent.success, error: sent.error ?? null, hypothesisId: 'H1' });
+    // #endregion
     if (!sent.success) {
       const provider = getEmailProvider();
+      const isNotConfigured = sent.error?.toLowerCase().includes('not configured') ?? false;
       return json(
         {
           ok: false,
-          error: 'Failed to send email',
-          message: sent.error || 'Send failed',
+          error: sent.error || 'Failed to send email',
+          code: isNotConfigured ? 'EMAIL_NOT_CONFIGURED' : undefined,
           provider,
           from: FROM_EMAIL,
         },
-        { status: 500 }
+        { status: isNotConfigured ? 503 : 500 }
       );
     }
 
     return json({ ok: true, sent: true });
   } catch (e: any) {
-    return json({ ok: false, error: 'Failed to send verification email', message: e?.message || String(e) }, { status: 500 });
+    console.error('[send-verification-email]', e?.message || e);
+    return json(
+      { ok: false, error: 'Failed to send verification email', message: 'Please try again or use the fallback.' },
+      { status: 500 }
+    );
   }
 }
 

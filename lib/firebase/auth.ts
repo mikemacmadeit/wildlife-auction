@@ -17,6 +17,7 @@ import {
 } from 'firebase/auth';
 import { auth } from './config';
 import { getSiteUrl } from '@/lib/site-url';
+import { getVerificationEmailErrorMessage } from './auth-error-messages';
 
 /**
  * Create a new user account with email and password
@@ -117,45 +118,96 @@ export const updateUserProfile = async (
   return await updateProfile(auth.currentUser, updates);
 };
 
+const VERIFICATION_EMAIL_FETCH_TIMEOUT_MS = 15000;
+
 /**
  * Re-send the verification email to the currently signed-in user.
+ * Uses app API first (branded email), then Firebase sendEmailVerification as fallback.
+ * @returns { alreadyVerified: true } if the user is already verified (no email sent).
  */
-export const resendVerificationEmail = async (): Promise<void> => {
+export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boolean } | void> => {
   if (!auth.currentUser) {
     throw new Error('No user is currently signed in');
   }
 
-  // Preferred: send a branded verification email via our server (Admin SDK generates the verification link).
+  // #region agent log
+  const _log = (msg: string, data: Record<string, unknown>) => {
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ location: 'auth.ts resendVerificationEmail', message: msg, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: (data as any).hypothesisId ?? 'H2' }),
+    }).catch(() => {});
+  };
+  _log('resendVerificationEmail start', { uid: auth.currentUser.uid, hypothesisId: 'H2' });
+  // #endregion
+
+  let apiErrorMessage: string | null = null;
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await auth.currentUser.getIdToken(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), VERIFICATION_EMAIL_FETCH_TIMEOUT_MS);
     const res = await fetch('/api/auth/send-verification-email', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${token}`,
       },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data?.ok) return;
-  } catch {
-    // ignore and fall back below
+    // #region agent log
+    _log('API response', { resOk: res.ok, status: res.status, dataOk: data?.ok, alreadyVerified: data?.alreadyVerified, error: data?.error ?? null, hypothesisId: 'H2' });
+    // #endregion
+    if (res.ok && data?.ok) {
+      if (data?.alreadyVerified === true) return { alreadyVerified: true };
+      return;
+    }
+    apiErrorMessage =
+      (data?.error || data?.message || (res.status === 503 ? 'Verification email service is temporarily unavailable.' : '')) || null;
+  } catch (e: any) {
+    // #region agent log
+    _log('API catch', { name: e?.name, message: e?.message, hypothesisId: 'H2' });
+    // #endregion
+    if (e?.name === 'AbortError') {
+      apiErrorMessage = 'Request timed out. Trying fallback…';
+    } else {
+      apiErrorMessage = 'Could not reach the server.';
+    }
   }
 
-  // Fallback: Firebase-managed email (default template)
+  // #region agent log
+  _log('Firebase fallback attempt', { apiErrorMessage, hypothesisId: 'H2' });
+  // #endregion
+
+  // Fallback: Firebase-managed email (default template). Use current origin in browser so redirect works after verification.
+  const baseUrl =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : getSiteUrl();
   const actionCodeSettings = {
-    url: `${getSiteUrl()}/dashboard/account?verified=1`,
+    url: `${baseUrl}/dashboard/account?verified=1`,
     handleCodeInApp: false,
   };
   try {
     await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
+    // #region agent log
+    _log('Firebase fallback success', { hypothesisId: 'H2' });
+    // #endregion
   } catch (e: any) {
-    // If the continue URL/domain isn't authorized in Firebase Auth settings,
-    // fall back to Firebase default behavior (still sends the email).
+    // #region agent log
+    _log('Firebase fallback error', { code: e?.code, message: e?.message, hypothesisId: 'H2' });
+    // #endregion
     const code = String(e?.code || '');
     if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
-      await sendEmailVerification(auth.currentUser);
-      return;
+      try {
+        await sendEmailVerification(auth.currentUser);
+        return;
+      } catch (e2: any) {
+        throw new Error(apiErrorMessage || getVerificationEmailErrorMessage(code || e2?.message));
+      }
     }
-    throw e;
+    const msg = apiErrorMessage || getVerificationEmailErrorMessage(code || e?.message);
+    throw new Error(msg);
   }
 };
 
@@ -185,6 +237,51 @@ export const getCurrentUser = (): User | null => {
 };
 
 /**
+ * Temporarily override window.open so the next popup (e.g. Google OAuth) opens centered
+ * in the current browser window. Restore the original after the async fn completes.
+ */
+function withCenteredPopup<T>(fn: () => Promise<T>): Promise<T> {
+  if (typeof window === 'undefined') return fn();
+  const originalOpen = window.open;
+  window.open = function (
+    url?: string | URL,
+    target?: string,
+    features?: string
+  ): Window | null {
+    if (typeof features === 'string' && features.length > 0) {
+      const parsed: Record<string, string> = {};
+      features.split(',').forEach((part) => {
+        const eq = part.indexOf('=');
+        if (eq > 0) {
+          const k = part.slice(0, eq).trim().toLowerCase();
+          const v = part.slice(eq + 1).trim();
+          if (k && v) parsed[k] = v;
+        }
+      });
+      const width = Math.min(Number(parsed.width) || 500, window.screen?.availWidth ?? 500);
+      const height = Math.min(Number(parsed.height) || 600, window.screen?.availHeight ?? 600);
+      const screenX = window.screenX ?? window.screenLeft ?? 0;
+      const screenY = window.screenY ?? window.screenTop ?? 0;
+      const outerW = window.outerWidth ?? width;
+      const outerH = window.outerHeight ?? height;
+      const left = Math.max(0, Math.round(screenX + (outerW - width) / 2));
+      const top = Math.max(0, Math.round(screenY + (outerH - height) / 2));
+      parsed.left = String(left);
+      parsed.top = String(top);
+      parsed.width = String(width);
+      parsed.height = String(height);
+      features = Object.entries(parsed)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(',');
+    }
+    return originalOpen.call(window, url, target, features);
+  };
+  return fn().finally(() => {
+    window.open = originalOpen;
+  });
+}
+
+/**
  * Sign in with Google using popup
  * Falls back to redirect if popup is blocked
  */
@@ -204,8 +301,8 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
   // #endregion
 
   try {
-    // Try popup first (better UX)
-    return await signInWithPopup(auth, provider);
+    // Try popup first (better UX); center it in the current window
+    return await withCenteredPopup(() => signInWithPopup(auth, provider));
   } catch (error: any) {
     // #region agent log
     if (typeof fetch !== 'undefined') {

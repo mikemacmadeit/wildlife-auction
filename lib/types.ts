@@ -312,48 +312,69 @@ export type ListingAttributes =
   | SportingWorkingDogAttributes
   | EquipmentAttributes;
 
-// Exotic species controlled list
+// Exotic species controlled list (specialty livestock). Display order is alphabetical by label in exotic-species.ts.
 export const EXOTIC_SPECIES = [
-  'axis',
-  'fallow',
-  'blackbuck',
-  'aoudad',
-  'nilgai',
-  'scimitar_horned_oryx',
   'addax',
-  'greater_kudu',
-  'red_stag',
-  'sika',
-  // Additional common exotics (TX ranch market)
-  'elk',
-  'red_deer', // non-stag phrasing
-  'sambar',
-  'rusa',
-  'muntjac',
-  'mouflon',
-  'dama_gazelle',
-  'dorcas_gazelle',
-  'springbok',
-  'impala',
-  'waterbuck',
-  'eland',
-  'bongo',
-  'nyala',
-  'lesser_kudu',
-  'gemsbok',
-  'zebra',
-  'wildebeest',
-  'black_wildebeest',
-  'blesbok',
-  'hartebeest',
-  'oryx',
-  'sitatunga',
+  'american_bison',
+  'ankole_watusi',
+  'arabian_gazelle',
+  'arabian_oryx',
+  'arabian_tahr',
+  'aoudad',
+  'axis',
   'barasingha',
-  'chital', // synonym for axis; kept for UX
+  'beisa_oryx',
+  'black_wildebeest',
+  'blackbuck',
+  'blesbok',
+  'blue_wildebeest',
+  'bongo',
+  'bontebok',
+  'bushbuck',
+  'cape_buffalo',
+  'corsican_sheep',
+  'dama_gazelle',
+  'elds_deer',
+  'eland',
+  'elk',
+  'emu',
+  'fallow',
+  'four_horned_ram',
+  'fringe_eared_oryx',
+  'gemsbok',
+  'grants_gazelle',
+  'hartebeest',
+  'himalayan_tahr',
   'ibex',
+  'impala',
+  'kangaroo',
+  'greater_kudu',
+  'lesser_kudu',
+  'lechwe',
   'markhor',
-  'tahr',
-  'other_exotic' // Requires admin review
+  'mouflon',
+  'muntjac',
+  'nilgai',
+  'nyala',
+  'ostrich',
+  'painted_desert_sheep',
+  'pere_davids_deer',
+  'plains_zebra',
+  'red_deer',
+  'red_sheep',
+  'roan_antelope',
+  'rusa',
+  'sable_antelope',
+  'scimitar_horned_oryx',
+  'sika',
+  'sitatunga',
+  'springbok',
+  'texas_longhorn',
+  'thomsons_gazelle',
+  'urial',
+  'water_buffalo',
+  'waterbuck',
+  'other_exotic',
 ] as const;
 
 export type ExoticSpecies = typeof EXOTIC_SPECIES[number];
@@ -1086,6 +1107,8 @@ export interface UserProfile {
   photoURL?: string;
   phoneNumber?: string;
   emailVerified: boolean;
+  /** Set when user completes email verification flow (e.g. lands on account?verified=1). Used by seller checklist so "verify email" reflects actual link click, not just Auth flag (e.g. Google users). */
+  emailVerificationCompletedAt?: Date;
   role?: UserRole; // User role: 'user' (default), 'admin', 'super_admin'
   superAdmin?: boolean; // Legacy super admin flag (deprecated - use role instead)
   profileComplete?: boolean; // Flag to track if profile completion modal was shown/completed

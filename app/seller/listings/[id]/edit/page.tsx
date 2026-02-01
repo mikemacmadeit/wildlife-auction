@@ -49,7 +49,7 @@ import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
-import { HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION, HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { Separator } from '@/components/ui/separator';
@@ -517,6 +517,7 @@ function EditListingPageContent() {
               </Card>
               )}
 
+              {!HIDE_CATTLE_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'cattle_livestock'
@@ -559,7 +560,9 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
+              {!HIDE_FARM_ANIMALS_AS_OPTION && (
               <Card
                 className={`cursor-pointer transition-all border-2 ${
                   formData.category === 'farm_animals'
@@ -589,6 +592,7 @@ function EditListingPageContent() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {!HIDE_HUNTING_OUTFITTER_AS_OPTION && (
               <Card

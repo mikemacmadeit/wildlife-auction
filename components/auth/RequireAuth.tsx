@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
@@ -10,20 +10,44 @@ interface RequireAuthProps {
   children: React.ReactNode;
 }
 
+const STRIPE_RETURN_DELAY_MS = 3000;
+
 /**
  * Client-side route protection component
- * Redirects to /login if user is not authenticated
+ * Redirects to /login if user is not authenticated.
+ * When returning from Stripe (onboarding=complete), waits briefly for Firebase persistence to restore so user is not sent to login.
  */
 export function RequireAuth({ children }: RequireAuthProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [stripeReturnWaitDone, setStripeReturnWaitDone] = useState(false);
+
+  // When returning from Stripe Connect onboarding, give Firebase Auth time to restore from persistence before redirecting to login.
+  const isStripeReturn = pathname?.includes('/seller/payouts') && searchParams?.get('onboarding') === 'complete';
+  useEffect(() => {
+    if (!isStripeReturn) {
+      setStripeReturnWaitDone(true);
+      return;
+    }
+    const t = setTimeout(() => setStripeReturnWaitDone(true), STRIPE_RETURN_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [isStripeReturn]);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && stripeReturnWaitDone) {
+      try {
+        const fullPath = pathname + (typeof window !== 'undefined' && window.location?.search ? window.location.search : '');
+        if (fullPath && fullPath !== '/login') {
+          sessionStorage.setItem('redirectAfterLogin', fullPath);
+        }
+      } catch {
+        /* ignore */
+      }
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname, stripeReturnWaitDone]);
 
   // Enforce latest Terms acceptance for continued use (dashboard + other gated pages).
   useEffect(() => {
@@ -60,12 +84,15 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }
 
   if (!user) {
-    // Show redirecting state instead of null to prevent blank page
+    // When returning from Stripe onboarding, show "Completing sign-in" during the wait so we don't confuse the user
+    const isStripeReturnWaiting = isStripeReturn && !stripeReturnWaitDone;
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Redirecting to login...</p>
+          <p className="text-muted-foreground">
+            {isStripeReturnWaiting ? 'Completing sign-in...' : 'Redirecting to login...'}
+          </p>
         </div>
       </div>
     );

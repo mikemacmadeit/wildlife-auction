@@ -96,9 +96,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create account link for onboarding
-    const baseUrl = getSiteUrl();
-    // Defensive: if this resolves to localhost in production, Stripe may reject it (and it won't work for real sellers).
+    // Create account link for onboarding — use client's origin when provided so Stripe redirects back to the same origin (avoids sign-out when www vs non-www or different base URL).
+    const serverBaseUrl = getSiteUrl();
+    let baseUrl = serverBaseUrl;
+    try {
+      const body = await request.json().catch(() => ({}));
+      const clientOrigin = typeof body?.returnBaseUrl === 'string' && body.returnBaseUrl.trim() ? body.returnBaseUrl.trim().replace(/\/$/, '') : null;
+      if (clientOrigin && clientOrigin.startsWith('http')) {
+        const serverHost = new URL(serverBaseUrl).hostname;
+        const clientHost = new URL(clientOrigin).hostname;
+        if (clientHost === serverHost || clientHost.endsWith('.' + serverHost) || serverHost.endsWith('.' + clientHost)) {
+          baseUrl = clientOrigin;
+        }
+      }
+    } catch {
+      // ignore; use server baseUrl
+    }
     if (baseUrl.includes('localhost') && process.env.NODE_ENV === 'production') {
       return json(
         {

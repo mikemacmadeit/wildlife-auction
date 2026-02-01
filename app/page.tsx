@@ -31,6 +31,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
 import { toast as globalToast } from '@/hooks/use-toast';
 import { getUserProfile } from '@/lib/firebase/users';
+import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION } from '@/components/browse/filters/constants';
 
 function toDateSafe(v: any): Date | null {
   if (!v) return null;
@@ -1333,7 +1334,11 @@ export default function HomePage() {
               { href: '/browse?category=hunting_outfitter_assets', label: 'Hunting Assets', icon: <div className="w-8 h-8 icon-primary-color mask-icon-hunting-blind" /> },
               { href: '/browse?category=ranch_equipment', label: 'Ranch Equipment', icon: <div className="w-8 h-8 icon-primary-color mask-icon-tractor" /> },
               { href: '/browse?category=ranch_vehicles', label: 'Vehicles & Trailers', icon: <div className="w-8 h-8 icon-primary-color mask-icon-top-drive" /> },
-            ].filter((c) => !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.href || ''))).map((c) => (
+            ].filter((c) => {
+              if (c.href?.includes('cattle_livestock') && HIDE_CATTLE_AS_OPTION) return false;
+              if (c.href?.includes('farm_animals') && HIDE_FARM_ANIMALS_AS_OPTION) return false;
+              return !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.href || ''));
+            }).map((c) => (
               <Link key={c.href} href={c.href} className="group">
                 <Card className="border-2 border-border/60 hover:border-primary/40 transition-colors h-full">
                   <CardContent className="p-2 flex flex-col items-center text-center gap-1.5 min-h-0">
@@ -1397,7 +1402,7 @@ export default function HomePage() {
               </Link>
             </motion.div>
 
-            {/* Cattle */}
+            {!HIDE_CATTLE_AS_OPTION && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1419,8 +1424,9 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
 
-            {/* Farm Animals */}
+            {!HIDE_FARM_ANIMALS_AS_OPTION && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1442,6 +1448,7 @@ export default function HomePage() {
                 </Card>
               </Link>
             </motion.div>
+            )}
 
             {/* Ranch Equipment & Attachments — hidden until re-enabled (category not deleted, filter at render) */}
             {!['ranch_equipment'].some((x) => /ranch_equipment/i.test(x)) && (

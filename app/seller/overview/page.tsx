@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,7 @@ import {
   Loader2,
   X,
   Bell,
+  Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
@@ -32,12 +34,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { listSellerListings } from '@/lib/firebase/listings';
 import { getOrdersForUser, filterSellerRelevantOrders } from '@/lib/firebase/orders';
 import { Listing, Order, UserProfile } from '@/lib/types';
-import { getUserProfile, isProfileComplete } from '@/lib/firebase/users';
+import { getUserProfile, isProfileComplete, updateUserProfile } from '@/lib/firebase/users';
 import { getEffectiveListingStatus } from '@/lib/listings/effectiveStatus';
 import { PayoutReadinessCard } from '@/components/seller/PayoutReadinessCard';
 import { BreederPermitCard } from '@/components/seller/BreederPermitCard';
 import { useToast } from '@/hooks/use-toast';
-import { reloadCurrentUser, resendVerificationEmail } from '@/lib/firebase/auth';
+import { resendVerificationEmail } from '@/lib/firebase/auth';
 import { createStripeAccount, createAccountLink } from '@/lib/stripe/api';
 import type { SellerDashboardData } from '@/lib/seller/getSellerDashboardData';
 import { NotificationSettingsDialog } from '@/components/settings/NotificationSettingsDialog';
@@ -165,7 +167,8 @@ interface SellerActivity {
 
 export default function SellerOverviewPage() {
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const pathname = usePathname();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const uid = user?.uid || null;
   const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -177,6 +180,7 @@ export default function SellerOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectingStripe, setConnectingStripe] = useState(false);
+  const [sendingVerificationEmail, setSendingVerificationEmail] = useState(false);
 
   const breederPermitDismissKey = (sellerId: string) => `we:ui:dismissed:breeder_permit_overview:v1:${sellerId}`;
   const payoutReadinessDismissKey = (sellerId: string) => `we:ui:dismissed:payout_readiness_overview:v1:${sellerId}`;
@@ -275,6 +279,30 @@ export default function SellerOverviewPage() {
       cancelled = true;
     };
   }, [uid, authLoading]);
+
+  // When tab gains focus, refresh auth + profile so verification status updates without manual refresh.
+  useEffect(() => {
+    if (!uid) return;
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshUser()
+          .then(() => getUserProfile(uid))
+          .then(setUserProfile)
+          .catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [uid, refreshUser]);
+
+  // When this page is shown (e.g. after navigating from account where user verified), refetch so checklist and top reminder reflect verified.
+  useEffect(() => {
+    if (!uid || pathname !== '/seller/overview') return;
+    refreshUser()
+      .then(() => getUserProfile(uid))
+      .then(setUserProfile)
+      .catch(() => {});
+  }, [pathname, uid, refreshUser]);
 
   // Seller command-center aggregation (server-side; read-only). This complements the client reads above.
   useEffect(() => {
@@ -412,7 +440,12 @@ export default function SellerOverviewPage() {
 
   const setupChecklist = useMemo(() => {
     const profileOk = !!userProfile && isProfileComplete(userProfile);
-    const emailOk = user?.emailVerified === true;
+    // Only show "verify email" complete when user actually completed our flow (landed on ?verified=1).
+    // Fallback: email/password users who verified before we added emailVerificationCompletedAt.
+    const isPasswordUser = user?.providerData?.some((p) => p?.providerId === 'password') ?? false;
+    const emailOk =
+      !!userProfile?.emailVerificationCompletedAt ||
+      (user?.emailVerified === true && isPasswordUser);
     const payoutsOk =
       !!userProfile &&
       userProfile.stripeOnboardingStatus === 'complete' &&
@@ -425,7 +458,7 @@ export default function SellerOverviewPage() {
     const isComplete = done === total;
 
     return { profileOk, emailOk, payoutsOk, done, total, isComplete };
-  }, [user?.emailVerified, userProfile]);
+  }, [user?.emailVerified, user?.providerData, userProfile, userProfile?.emailVerificationCompletedAt]);
 
   // Generate alerts from real data
   const alerts = useMemo((): SellerAlert[] => {
@@ -659,7 +692,7 @@ export default function SellerOverviewPage() {
           </div>
         </div>
 
-        {/* KPI Snapshot (always first) */}
+        {/* KPI Snapshot */}
         {/* Mobile: show KPIs as 2 rows of 2. Desktop unchanged. */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 lg:gap-6" data-tour="seller-stats">
           {stats.map((stat) => {
@@ -829,27 +862,11 @@ export default function SellerOverviewPage() {
 
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className={cn('rounded-lg border-2 p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-foreground">1) Profile</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Full name, phone number, and location.
-                          </p>
-                        </div>
-                        {profileOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
-                      </div>
-                      <div className="mt-3">
-                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[40px] font-semibold">
-                          <Link href="/dashboard/account">{profileOk ? 'View Profile' : 'Complete Profile'}</Link>
-                        </Button>
-                      </div>
-                    </div>
-
+                    {/* 1) Verify Email — matches top-of-page card and profile-completion flow */}
                     <div className={cn('rounded-lg border-2 p-4', emailOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-bold text-foreground">2) Verify Email</p>
+                          <p className="text-sm font-bold text-foreground">1) Verify Email</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Required before publishing and checkout actions.
                           </p>
@@ -860,31 +877,84 @@ export default function SellerOverviewPage() {
                         <Button
                           variant={emailOk ? 'outline' : 'default'}
                           className="w-full min-h-[40px] font-semibold"
+                          disabled={sendingVerificationEmail}
                           onClick={async () => {
-                            try {
-                              if (emailOk) {
-                                await reloadCurrentUser();
+                            if (emailOk) {
+                              try {
+                                await refreshUser();
+                                const profile = uid ? await getUserProfile(uid) : null;
+                                setUserProfile(profile);
                                 toast({ title: 'Account refreshed', description: 'Your verification status has been refreshed.' });
-                                return;
+                              } catch (e: any) {
+                                toast({ title: 'Refresh failed', description: formatUserFacingError(e, 'Please try again.'), variant: 'destructive' });
                               }
-                              await resendVerificationEmail();
-                              toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                              return;
+                            }
+                            setSendingVerificationEmail(true);
+                            try {
+                              const result = await resendVerificationEmail();
+                              if (result?.alreadyVerified) {
+                                // Sync Firestore so checklist shows complete (needed for OAuth and so UI matches API).
+                                if (uid) {
+                                  await updateUserProfile(uid, {
+                                    emailVerified: true,
+                                    emailVerificationCompletedAt: new Date(),
+                                  } as any);
+                                }
+                                await refreshUser();
+                                const profile = uid ? await getUserProfile(uid) : null;
+                                setUserProfile(profile);
+                                toast({ title: 'Already verified', description: 'Your email is already verified. Status updated.' });
+                              } else {
+                                toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
+                              }
                             } catch (e: any) {
                               toast({
                                 title: 'Could not send verification email',
-                                description: formatUserFacingError(e, 'Please try again.'),
+                                description: formatUserFacingError(
+                                  e,
+                                  'If you already verified, click "Refresh Status"; otherwise try again in a moment.'
+                                ),
                                 variant: 'destructive',
                               });
+                            } finally {
+                              setSendingVerificationEmail(false);
                             }
                           }}
                         >
-                          {emailOk ? 'Refresh Status' : 'Resend Verification Email'}
+                          {sendingVerificationEmail ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending…
+                            </>
+                          ) : emailOk ? (
+                            'Refresh Status'
+                          ) : (
+                            'Send Verification Email'
+                          )}
                         </Button>
                         {!emailOk && (
                           <p className="text-xs text-muted-foreground">
-                            Tip: after you click the link in your email, come back here and press “Refresh Status”.
+                            Tip: after you click the link in your email, come back here and press &quot;Refresh Status&quot;.
                           </p>
                         )}
+                      </div>
+                    </div>
+
+                    <div className={cn('rounded-lg border-2 p-4', profileOk ? 'border-primary/25 bg-primary/5' : 'border-border/50 bg-background/40')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">2) Profile</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Full name, phone number, and location.
+                          </p>
+                        </div>
+                        {profileOk ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                      <div className="mt-3">
+                        <Button asChild variant={profileOk ? 'outline' : 'default'} className="w-full min-h-[40px] font-semibold">
+                          <Link href="/dashboard/account">{profileOk ? 'View Profile' : 'Complete Profile'}</Link>
+                        </Button>
                       </div>
                     </div>
 
@@ -920,7 +990,6 @@ export default function SellerOverviewPage() {
                               }
                               try {
                                 setConnectingStripe(true);
-                                // Ensure seller has a Connect account, then send them directly to Stripe onboarding.
                                 if (!userProfile?.stripeAccountId) {
                                   await createStripeAccount();
                                 }

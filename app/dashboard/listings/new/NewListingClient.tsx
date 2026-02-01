@@ -48,7 +48,7 @@ import { formatDateTimeLocal, isFutureDateTimeLocalString, parseDateTimeLocal } 
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { isAnimalCategory } from '@/lib/compliance/requirements';
-import { HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
+import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION, HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 import { ALLOWED_DURATION_DAYS, isValidDurationDays } from '@/lib/listings/duration';
 // Seller Tiers model: no listing limits.
 
@@ -923,6 +923,7 @@ function NewListingPageContent() {
             </Card>
             )}
 
+            {!HIDE_CATTLE_AS_OPTION && (
             <Card
               role="button"
               tabIndex={0}
@@ -992,7 +993,9 @@ function NewListingPageContent() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
+            {!HIDE_FARM_ANIMALS_AS_OPTION && (
             <Card
               role="button"
               tabIndex={0}
@@ -1057,6 +1060,7 @@ function NewListingPageContent() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             {!HIDE_HUNTING_OUTFITTER_AS_OPTION && (
             <Card

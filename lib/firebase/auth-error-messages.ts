@@ -48,11 +48,30 @@ const REGISTER_MESSAGES: Record<string, string> = {
   'auth/unauthorized-domain': 'Registration is not available for this site. Please contact support.',
 };
 
+const VERIFICATION_EMAIL_MESSAGES: Record<string, string> = {
+  'auth/too-many-requests':
+    'Too many verification emails sent. Please wait a few minutes, or click "I verified — refresh" if you already verified.',
+  'auth/network-request-failed': 'Connection problem. Check your internet and try again.',
+  'auth/unauthorized-continue-uri': "Verification link couldn't be set for this site. Please contact support.",
+  'auth/unauthorized-domain': "Verification isn't available for this domain. Please contact support.",
+};
+
 const DEFAULT_SIGN_IN = 'Sign-in failed. Please try again.';
 const DEFAULT_PASSWORD_RESET = 'We couldn’t send a reset email. Please try again or contact support.';
 const DEFAULT_GOOGLE = 'Google sign-in failed. Please try again.';
 const DEFAULT_PASSWORD_UPDATE = 'Could not update password. Please try again.';
 const DEFAULT_REGISTER = 'We couldn’t create your account. Please try again.';
+
+const DEFAULT_VERIFICATION_EMAIL =
+  "Couldn't send the verification email. If you already verified, click \"I verified — refresh\"; otherwise try again in a moment.";
+
+/**
+ * Get a user-friendly message for verification email errors (resend).
+ */
+export function getVerificationEmailErrorMessage(code: string | undefined): string {
+  if (!code || !code.startsWith('auth/')) return DEFAULT_VERIFICATION_EMAIL;
+  return VERIFICATION_EMAIL_MESSAGES[code] ?? DEFAULT_VERIFICATION_EMAIL;
+}
 
 /**
  * Get a user-friendly message for sign-in errors (email/password).

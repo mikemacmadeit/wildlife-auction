@@ -60,6 +60,13 @@ export default function SellerPayoutsPage() {
   const [isOpeningStripeDashboard, setIsOpeningStripeDashboard] = useState(false);
   const [payoutRows, setPayoutRows] = useState<PayoutRow[]>([]);
   const [loadingPayouts, setLoadingPayouts] = useState(false);
+  /** When returning from Stripe with ?onboarding=complete, we may get status from API before Firestore read; use it so UI shows "connected" immediately */
+  const [stripeStatusFromReturn, setStripeStatusFromReturn] = useState<{
+    payoutsEnabled: boolean;
+    detailsSubmitted?: boolean;
+    onboardingStatus?: string;
+  } | null>(null);
+  const [onboardingReturnProcessed, setOnboardingReturnProcessed] = useState(false);
 
   const loadUserProfile = useCallback(async () => {
     if (!user) return;
@@ -79,33 +86,73 @@ export default function SellerPayoutsPage() {
     }
   }, [toast, user]);
 
-  // Check for onboarding completion
+  // Check for onboarding completion when returning from Stripe
   useEffect(() => {
     const onboardingComplete = searchParams?.get('onboarding');
-    if (onboardingComplete === 'complete' && user) {
-      // Check Stripe account status and update Firestore
-      const checkStatus = async () => {
-        try {
-          await checkStripeAccountStatus();
-          toast({
-            title: 'Onboarding Complete!',
-            description: 'Your Stripe account is now set up. You can receive payouts.',
-          });
-          // Refresh profile to get updated status
-          await loadUserProfile();
-        } catch (error: any) {
-          console.error('Error checking account status:', error);
-          // Still refresh profile in case status was updated
-          await loadUserProfile();
-          toast({
-            title: 'Onboarding Complete',
-            description: 'Please refresh the page to see your updated status.',
+    if (onboardingComplete !== 'complete' || !user || onboardingReturnProcessed) return;
+
+    let cancelled = false;
+    const processReturn = async () => {
+      try {
+        // First check: sync from Stripe and update Firestore
+        let result = await checkStripeAccountStatus();
+        if (cancelled) return;
+
+        // Use API response so UI shows "connected" immediately (Stripe can lag before Firestore read)
+        setStripeStatusFromReturn({
+          payoutsEnabled: result.status.payoutsEnabled,
+          detailsSubmitted: result.status.detailsSubmitted,
+          onboardingStatus: result.status.onboardingStatus,
+        });
+
+        // Stripe sometimes returns details_submitted but payouts_enabled not yet true; retry once after a short delay
+        if (result.status.detailsSubmitted && !result.status.payoutsEnabled) {
+          await new Promise((r) => setTimeout(r, 2500));
+          if (cancelled) return;
+          result = await checkStripeAccountStatus();
+          if (cancelled) return;
+          setStripeStatusFromReturn({
+            payoutsEnabled: result.status.payoutsEnabled,
+            detailsSubmitted: result.status.detailsSubmitted,
+            onboardingStatus: result.status.onboardingStatus,
           });
         }
-      };
-      checkStatus();
-    }
-  }, [searchParams, toast, user, loadUserProfile]);
+
+        await loadUserProfile();
+        if (cancelled) return;
+
+        setOnboardingReturnProcessed(true);
+        router.replace('/seller/payouts', { scroll: false });
+
+        if (result.status.payoutsEnabled) {
+          toast({
+            title: 'Payouts enabled',
+            description: 'Your Stripe account is set up. You can receive payouts.',
+          });
+        } else if (result.status.detailsSubmitted) {
+          toast({
+            title: 'Onboarding complete',
+            description: 'Verification may take a moment. If payouts don’t show as enabled, use "Refresh Status" or try again shortly.',
+          });
+        }
+      } catch (error: any) {
+        if (cancelled) return;
+        console.error('Error checking account status:', error);
+        await loadUserProfile();
+        setOnboardingReturnProcessed(true);
+        router.replace('/seller/payouts', { scroll: false });
+        toast({
+          title: 'Onboarding complete',
+          description: 'Refresh the page to see your payout status.',
+        });
+      }
+    };
+
+    processReturn();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams?.get('onboarding'), user, onboardingReturnProcessed, router, toast, loadUserProfile]);
 
   // Load user profile
   useEffect(() => {
@@ -195,8 +242,10 @@ export default function SellerPayoutsPage() {
     return userProfile.stripeOnboardingStatus || 'not_started';
   };
 
-  const isPayoutsEnabled = userProfile?.payoutsEnabled === true;
-  const onboardingStatus = getOnboardingStatus();
+  const isPayoutsEnabled =
+    userProfile?.payoutsEnabled === true || stripeStatusFromReturn?.payoutsEnabled === true;
+  const onboardingStatus =
+    stripeStatusFromReturn?.onboardingStatus ?? getOnboardingStatus();
 
   const availablePayouts = useMemo(() => payoutRows.filter((p) => p.status === 'available'), [payoutRows]);
   const pendingPayouts = useMemo(() => payoutRows.filter((p) => p.status === 'pending'), [payoutRows]);

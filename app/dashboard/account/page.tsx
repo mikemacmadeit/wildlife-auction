@@ -54,7 +54,7 @@ import { NotificationSettingsDialog } from '@/components/settings/NotificationSe
 import { AvatarCropDialog, type AvatarCropResult } from '@/components/profile/AvatarCropDialog';
 import { auth } from '@/lib/firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
-import { reloadCurrentUser, resendVerificationEmail, resetPassword } from '@/lib/firebase/auth';
+import { reloadCurrentUser, resetPassword } from '@/lib/firebase/auth';
 import { getPasswordUpdateErrorMessage, getPasswordResetErrorMessage } from '@/lib/firebase/auth-error-messages';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { SellerTrustBadges } from '@/components/seller/SellerTrustBadges';
@@ -78,7 +78,7 @@ const ACCOUNT_HELP_QUICK_ACTIONS = [
 
 export default function AccountPage() {
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -244,8 +244,15 @@ export default function AccountPage() {
     (async () => {
       try {
         await reloadCurrentUser();
-        // Best-effort: sync Firestore for dashboard gating and server checks.
-        await updateUserProfile(user.uid, { emailVerified: auth.currentUser?.emailVerified === true } as any);
+        // Sync Firestore and set "completed our verification flow" so seller checklist only shows verified after they clicked the link.
+        await updateUserProfile(user.uid, {
+          emailVerified: auth.currentUser?.emailVerified === true,
+          emailVerificationCompletedAt: new Date(),
+        } as any);
+        // Update app state so UX reflects verified without a full refresh.
+        await refreshUser();
+        const profile = await getUserProfile(user.uid);
+        setUserProfile(profile);
         toast({
           title: auth.currentUser?.emailVerified ? 'Email verified' : 'Verification pending',
           description: auth.currentUser?.emailVerified
@@ -259,10 +266,53 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user?.uid, authLoading]);
 
+  // When tab gains focus, refresh auth + profile so verification status updates without manual refresh.
+  useEffect(() => {
+    if (!user?.uid) return;
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshUser().then(() => getUserProfile(user.uid)).then(setUserProfile).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [user?.uid, refreshUser]);
+
   const hasPasswordProvider = useMemo(() => {
     const providers = user?.providerData || [];
     return providers.some((p) => p?.providerId === 'password');
   }, [user?.providerData]);
+
+  // Same logic as seller checklist: verified if Firestore has completed flow or Auth says verified (email/password).
+  const emailVerifiedForUI = useMemo(
+    () =>
+      !!userProfile?.emailVerificationCompletedAt ||
+      (user?.emailVerified === true && hasPasswordProvider),
+    [userProfile?.emailVerificationCompletedAt, user?.emailVerified, hasPasswordProvider]
+  );
+
+  // #region agent log
+  useEffect(() => {
+    if (!user) return;
+    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'account/page.tsx emailVerifiedForUI',
+        message: 'verified state',
+        data: {
+          emailVerificationCompletedAt: !!userProfile?.emailVerificationCompletedAt,
+          userEmailVerified: user?.emailVerified === true,
+          hasPasswordProvider,
+          emailVerifiedForUI,
+          hypothesisId: 'H3',
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+      }),
+    }).catch(() => {});
+  }, [user?.uid, user?.emailVerified, userProfile?.emailVerificationCompletedAt, hasPasswordProvider, emailVerifiedForUI]);
+  // #endregion
 
   const handleUpdatePassword = async () => {
     if (!user) return;
@@ -570,49 +620,6 @@ export default function AccountPage() {
             </p>
           </div>
         </motion.div>
-
-        {/* Email verification status (hide once verified) */}
-        {!user?.emailVerified ? (
-          <Card className={cn('border-2', 'border-border/50 bg-card')}>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <div className="font-bold">Email verification</div>
-                    <Badge variant="destructive" className="font-semibold">
-                      Not verified
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Please verify your email to unlock messaging, publishing, and checkout.
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    variant="default"
-                    className="min-h-[40px] font-semibold"
-                    onClick={async () => {
-                      try {
-                        await resendVerificationEmail();
-                        toast({ title: 'Verification email sent', description: 'Check your inbox (and spam folder).' });
-                      } catch (e: any) {
-                        toast({
-                          title: 'Could not send verification email',
-                          description: formatUserFacingError(e, 'Please try again.'),
-                          variant: 'destructive',
-                        });
-                      }
-                    }}
-                  >
-                    Resend Verification Email
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
 
         {/* Stats Cards - Quick Overview */}
         <motion.div

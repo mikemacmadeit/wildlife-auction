@@ -14,11 +14,6 @@ export const BROWSE_CATEGORIES: { value: ListingCategory; label: string }[] = [
   { value: 'ranch_vehicles', label: 'Ranch Vehicles & Trailers' },
 ];
 
-/** Categories to show in Browse by Category / filters (only whitetail, wildlife/exotics, cattle for now). */
-export const BROWSE_CATEGORIES_FOR_DISPLAY = BROWSE_CATEGORIES.filter(
-  (c) => !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.value || ''))
-);
-
 /** When true, Sporting & Working Dogs is hidden from new/edit listing category choosers (can be re-enabled later). */
 export const HIDE_SPORTING_WORKING_DOGS_AS_OPTION = true;
 
@@ -33,6 +28,19 @@ export const HIDE_RANCH_EQUIPMENT_AS_OPTION = true;
 
 /** When true, Ranch Vehicles & Trailers is hidden from new/edit listing category choosers (can be re-enabled later). */
 export const HIDE_RANCH_VEHICLES_AS_OPTION = true;
+
+/** When true, Cattle is hidden from browse filters and new/edit listing category choosers (launch: whitetail + specialty livestock only). */
+export const HIDE_CATTLE_AS_OPTION = true;
+
+/** When true, Farm Animals is hidden from browse filters and new/edit listing category choosers (launch: whitetail + specialty livestock only). */
+export const HIDE_FARM_ANIMALS_AS_OPTION = true;
+
+/** Categories to show in Browse by Category / filters. Excludes hidden categories. */
+export const BROWSE_CATEGORIES_FOR_DISPLAY = BROWSE_CATEGORIES.filter((c) => {
+  if (c.value === 'cattle_livestock' && HIDE_CATTLE_AS_OPTION) return false;
+  if (c.value === 'farm_animals' && HIDE_FARM_ANIMALS_AS_OPTION) return false;
+  return !/dog|horse|equestrian|ranch_equipment|ranch_vehicles|hunting_outfitter/i.test((c.label || '') + (c.value || ''));
+});
 
 export const BROWSE_TYPES: { value: ListingType; label: string }[] = [
   { value: 'auction', label: 'Auction' },

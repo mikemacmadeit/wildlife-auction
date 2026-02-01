@@ -178,6 +178,11 @@ export async function createAccountLink(): Promise<{ url: string }> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify(
+      typeof window !== 'undefined' && window.location?.origin
+        ? { returnBaseUrl: window.location.origin }
+        : {}
+    ),
   });
 
   if (!response.ok) {

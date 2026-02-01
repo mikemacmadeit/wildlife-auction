@@ -1389,7 +1389,7 @@ export function getVerifyEmailEmail(data: VerifyEmailEmailData): { subject: stri
       <a href="${data.dashboardUrl}" style="color:#7F8A73; text-decoration:none; font-weight:700;">Open dashboard</a>
     </div>
     <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
-      If you didn’t create this account, you can ignore this email.
+      Didn't get this email or link expired? You can request a new one from your account or seller overview until your email is verified. If you didn't create this account, you can ignore this email.
     </div>
   `;
 

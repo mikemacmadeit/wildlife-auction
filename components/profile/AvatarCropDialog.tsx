@@ -123,14 +123,19 @@ export function AvatarCropDialog(props: {
       }}
     >
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
-        <DialogHeader className="shrink-0 space-y-1">
+        <DialogHeader className="shrink-0 space-y-1 pb-2">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
-          {/* Crop area: flexible so dialog + buttons fit in viewport without scroll */}
-          <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center">
+          {/* Crop area: fixed max height so zoom + buttons always visible below */}
+          <div
+            className={cn(
+              'shrink-0 flex items-center justify-center overflow-hidden',
+              'min-h-[200px] max-h-[min(380px,calc(90vh-280px))]'
+            )}
+          >
             <div
               className={cn(
                 'relative w-full overflow-hidden rounded-lg border bg-black/80 aspect-square max-h-full'
@@ -168,7 +173,7 @@ export function AvatarCropDialog(props: {
             </Button>
           </div>
 
-          <div className="shrink-0 flex items-center justify-end gap-2 pt-2 border-t">
+          <div className="shrink-0 flex items-center justify-end gap-2 pt-2 border-t border-border">
             <Button
               type="button"
               variant="ghost"
