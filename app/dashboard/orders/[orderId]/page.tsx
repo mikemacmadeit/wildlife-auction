@@ -386,10 +386,10 @@ export default function BuyerOrderDetailPage() {
             }
           }}
         >
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg" aria-describedby="checkin-desc">
             <DialogHeader>
               <DialogTitle>Delivery check-in</DialogTitle>
-              <DialogDescription>
+              <DialogDescription id="checkin-desc">
                 If delivery arrived, confirm receipt to complete the transaction. If something isn’t right, report an issue so we can review.
               </DialogDescription>
             </DialogHeader>

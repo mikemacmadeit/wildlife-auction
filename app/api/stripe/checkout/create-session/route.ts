@@ -937,6 +937,36 @@ export async function POST(request: Request) {
       throw stripeError;
     }
 
+    // Pre-create order skeleton so it appears in My Purchases immediately when user returns from Stripe.
+    // Webhook will update to paid and add full order data.
+    try {
+      const orderRef = db.collection('orders').doc();
+      await orderRef.set(
+        sanitizeFirestorePayload({
+          stripeCheckoutSessionId: session.id,
+          listingId,
+          buyerId,
+          sellerId: listingData.sellerId,
+          amount: purchaseAmount,
+          platformFee: platformFee / 100,
+          sellerAmount: sellerAmount / 100,
+          status: 'pending',
+          listingTitle: String((listingData as any)?.title || 'Listing'),
+          ...(offerId ? { offerId: String(offerId) } : {}),
+          quantity: quantityRequested,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        })
+      );
+    } catch (orderErr) {
+      logWarn('Failed to pre-create order skeleton (webhook will create)', {
+        route: '/api/stripe/checkout/create-session',
+        sessionId: session.id,
+        listingId,
+        error: String(orderErr),
+      });
+    }
+
     // Persist idempotency record (expires after 2 minutes to allow cleanup)
     try {
       await idempotencyRef.set(sanitizeFirestorePayload({
