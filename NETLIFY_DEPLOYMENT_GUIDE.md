@@ -104,6 +104,23 @@ git push origin main
 
 ## Troubleshooting
 
+### "Page not found" (Netlify's default 404)
+
+If you see **Netlify's** 404 page (the one that says "visit Netlify's page not found support guide"), your requests are **not** reaching the Next.js app. Fix it like this:
+
+1. **Let the Next.js plugin control the publish directory**
+   - Netlify Dashboard → **Site settings** → **Build & deploy** → **Build** → **Publish directory**
+   - **Clear the value** (leave it empty) so `@netlify/plugin-nextjs` sets it. Do **not** set it to `.next` manually.
+   - Save, then **Deploys** → **Trigger deploy** → **Clear cache and deploy site**.
+
+2. **Confirm the build succeeded**
+   - **Deploys** → open the latest deploy → check the build log.
+   - If the build failed (e.g. missing env, script error), fix that first; a failed build can leave the site showing 404.
+
+3. **Note which URL 404s**
+   - If only one path 404s (e.g. `/help/foo`), that route may not exist in the app.
+   - If every path (including `/`) 404s, the publish directory or build output is wrong (step 1 and 2).
+
 ### Build Fails?
 
 **Check:**
