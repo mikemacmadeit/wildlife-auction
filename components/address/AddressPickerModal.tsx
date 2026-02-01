@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, MapPin, Plus, Check } from 'lucide-react';
 import { getAddresses, saveAddress, setCheckoutDeliveryAddress, getCheckoutDeliveryAddress } from '@/lib/firebase/addresses';
+import { getUserProfile } from '@/lib/firebase/users';
 import type { SavedAddress } from '@/lib/types';
 import { AddressSearch } from './AddressSearch';
 import { AddressMapConfirm } from './AddressMapConfirm';
@@ -84,6 +85,14 @@ export function AddressPickerModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [profileLocation, setProfileLocation] = useState<{
+    line1: string;
+    city: string;
+    state: string;
+    zip: string;
+    formattedAddress: string;
+  } | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   const permissionErrorHint =
     'Try signing out and back in. If you manage this project, deploy Firestore rules: firebase deploy --only firestore:rules';
@@ -92,13 +101,35 @@ export function AddressPickerModal({
     if (!userId) return;
     setLoading(true);
     setError(null);
+    setProfileLocation(null);
     try {
-      const [list, checkout] = await Promise.all([
+      const [list, checkout, profile] = await Promise.all([
         getAddresses(userId),
         getCheckoutDeliveryAddress(userId),
+        getUserProfile(userId).catch(() => null),
       ]);
       setAddresses(list);
       setSelectedAddressId(checkout?.deliveryAddressId ?? null);
+      const loc = profile?.profile?.location;
+      if (
+        list.length === 0 &&
+        loc &&
+        (loc.address || loc.city) &&
+        loc.state &&
+        loc.zip
+      ) {
+        const line1 = (loc.address || '').trim() || (loc.city || '').trim() || 'Address';
+        const city = (loc.city || '').trim();
+        const state = (loc.state || '').trim();
+        const zip = (loc.zip || '').trim();
+        setProfileLocation({
+          line1,
+          city,
+          state,
+          zip,
+          formattedAddress: [line1, city, `${state} ${zip}`.trim()].filter(Boolean).join(', '),
+        });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const isPermission = msg.toLowerCase().includes('missing or insufficient permissions');
@@ -196,6 +227,51 @@ export function AddressPickerModal({
     setSearchResult(null);
     setManualForm(initialManualForm);
     setNewAddressLabel('');
+    setShowManualEntry(false);
+  };
+
+  const handleUseProfileLocation = async () => {
+    if (!profileLocation) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const newAddress: Omit<SavedAddress, 'id' | 'createdAt' | 'updatedAt'> = {
+        label: 'Profile location',
+        isDefault: true,
+        formattedAddress: profileLocation.formattedAddress,
+        line1: profileLocation.line1,
+        city: profileLocation.city,
+        state: profileLocation.state,
+        postalCode: profileLocation.zip,
+        country: 'US',
+        lat: 0,
+        lng: 0,
+        provider: 'manual',
+        placeId: '',
+      };
+      const saved = await saveAddress(userId, newAddress, { makeDefault: true });
+      await setCheckoutDeliveryAddress(userId, saved.id, listingId);
+      if (orderId && onSetDeliveryAddress) {
+        await onSetDeliveryAddress(orderId, {
+          line1: saved.line1,
+          line2: saved.line2,
+          city: saved.city,
+          state: saved.state,
+          zip: saved.postalCode,
+          deliveryInstructions: saved.notes,
+          lat: saved.lat,
+          lng: saved.lng,
+        });
+      }
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const isPermission = msg.toLowerCase().includes('missing or insufficient permissions');
+      setError(isPermission ? `Couldn't save. ${permissionErrorHint}` : msg || 'Failed to set address');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleManualSubmit = async () => {
@@ -314,8 +390,32 @@ export function AddressPickerModal({
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : addresses.length > 0 ? (
+              ) : addresses.length > 0 || profileLocation ? (
                 <div className="space-y-2">
+                  {profileLocation && addresses.length === 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">From your profile</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start text-left h-auto min-h-[48px] py-3 px-3 touch-manipulation"
+                        disabled={saving}
+                        onClick={handleUseProfileLocation}
+                      >
+                        <MapPin className="h-4 w-4 shrink-0 mr-2 text-muted-foreground" />
+                        <span className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
+                          <span className="font-medium">Use profile location</span>
+                          <span className="text-xs text-muted-foreground truncate w-full">
+                            {profileLocation.formattedAddress}
+                          </span>
+                        </span>
+                        {saving && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">Or add a new address below.</p>
+                    </div>
+                  )}
+                  {addresses.length > 0 && (
+                    <>
                   <p className="text-sm font-medium text-muted-foreground">Saved addresses</p>
                   <ul className="space-y-2">
                     {addresses.map((a) => (
@@ -347,6 +447,8 @@ export function AddressPickerModal({
                       </li>
                     ))}
                   </ul>
+                    </>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No saved addresses yet.</p>
@@ -474,6 +576,57 @@ export function AddressPickerModal({
                 placeholder="Search for an address…"
                 disabled={saving}
               />
+              <p className="text-xs text-muted-foreground">
+                Or{' '}
+                <button
+                  type="button"
+                  className="text-primary underline font-medium hover:no-underline"
+                  onClick={() => setShowManualEntry(true)}
+                >
+                  enter address manually
+                </button>
+              </p>
+              {showManualEntry ? (
+                <div className="space-y-3 pt-2 border-t">
+                  <p className="text-sm font-medium text-foreground">Enter address manually</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-medium text-foreground text-sm">Name (e.g. Home, Ranch)</label>
+                      <Input value={newAddressLabel} onChange={(e) => setNewAddressLabel(e.target.value)} placeholder="Home, Ranch, Office…" className="mt-1 w-full min-w-0 min-h-[48px]" />
+                    </div>
+                    <div>
+                      <label className="font-medium text-foreground text-sm">Street address *</label>
+                      <Input value={manualForm.line1} onChange={(e) => setManualForm((f) => ({ ...f, line1: e.target.value }))} placeholder="123 Main St" className="mt-1 w-full min-w-0 min-h-[48px]" />
+                    </div>
+                    <div>
+                      <label className="font-medium text-foreground text-sm">Apt, suite, etc. (optional)</label>
+                      <Input value={manualForm.line2} onChange={(e) => setManualForm((f) => ({ ...f, line2: e.target.value }))} placeholder="Unit 4" className="mt-1 w-full min-w-0 min-h-[48px]" />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-3 sm:gap-x-2">
+                      <div className="flex-1 min-w-0 sm:min-w-[120px]">
+                        <label className="font-medium text-foreground text-sm">City *</label>
+                        <Input value={manualForm.city} onChange={(e) => setManualForm((f) => ({ ...f, city: e.target.value }))} placeholder="City" className="mt-1 w-full min-w-0 min-h-[48px]" />
+                      </div>
+                      <div className="w-16 shrink-0">
+                        <label className="font-medium text-foreground text-sm">State *</label>
+                        <Input value={manualForm.state} onChange={(e) => setManualForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="TX" className="mt-1 w-full min-h-[48px]" />
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <label className="font-medium text-foreground text-sm">ZIP *</label>
+                        <Input value={manualForm.zip} onChange={(e) => setManualForm((f) => ({ ...f, zip: e.target.value.replace(/\D/g, '').slice(0, 10) }))} placeholder="12345" className="mt-1 w-full min-h-[48px]" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-medium text-foreground text-sm">Delivery instructions (optional)</label>
+                      <Input value={manualForm.deliveryInstructions} onChange={(e) => setManualForm((f) => ({ ...f, deliveryInstructions: e.target.value }))} placeholder="Gate code, etc." className="mt-1 w-full min-w-0 min-h-[48px]" />
+                    </div>
+                    <Button type="button" disabled={!manualValid || saving} className="min-h-[48px] w-full sm:w-auto" onClick={handleManualSubmit}>
+                      {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      Save and use address
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <Button type="button" variant="ghost" className="min-h-[48px] touch-manipulation w-full sm:w-auto" onClick={handleBackToList}>
                 Back to list
               </Button>

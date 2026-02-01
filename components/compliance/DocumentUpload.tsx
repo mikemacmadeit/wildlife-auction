@@ -73,17 +73,14 @@ export function DocumentUpload({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    console.log('File selected:', selectedFile?.name, selectedFile?.type, selectedFile?.size);
-    
-    if (!selectedFile) {
-      console.log('No file selected');
-      return;
-    }
+    // Reset input so same file can be re-selected (helps mobile) and avoids iOS quirks
+    e.target.value = '';
+    if (!selectedFile) return;
 
-    // Validate file type
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(selectedFile.type)) {
-      console.error('Invalid file type:', selectedFile.type);
+    // Validate file type — accept all images (incl. HEIC from iOS) and PDF
+    const isImage = selectedFile.type.startsWith('image/');
+    const isPdf = selectedFile.type === 'application/pdf';
+    if (!isImage && !isPdf) {
       setError('Invalid file type. Please upload a PDF or image file.');
       return;
     }
@@ -95,7 +92,6 @@ export function DocumentUpload({
       return;
     }
 
-    console.log('✅ File validated, setting file state');
     setFile(selectedFile);
     setError(null);
     setUploadedUrl(null);
@@ -458,15 +454,15 @@ export function DocumentUpload({
       {(!uploadedUrl || file) && (
         <div className="space-y-3">
           <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/30 hover:bg-muted/50 transition-colors relative">
-            {/* Invisible file input over the whole area so mobile taps open picker natively */}
-            <label htmlFor={`file-upload-${documentType}`} className="absolute inset-0 cursor-pointer z-10 rounded-lg" aria-label="Choose file to upload" />
-            <Input
+            {/* File input: use opacity-0 overlay (not sr-only) — iOS Safari often doesn't fire onChange on fully hidden inputs */}
+            <input
               id={`file-upload-${documentType}`}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              accept="image/*,.pdf,application/pdf"
               onChange={handleFileSelect}
               disabled={uploading}
-              className="sr-only"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 rounded-lg"
+              aria-label="Choose file to upload"
             />
             <div className="flex flex-col items-center justify-center space-y-4 relative z-0 pointer-events-none">
               <Upload className="h-10 w-10 text-muted-foreground" />
@@ -482,7 +478,10 @@ export function DocumentUpload({
             <Button
               type="button"
               variant="outline"
-              onClick={() => document.getElementById(`file-upload-${documentType}`)?.click()}
+              onClick={() => {
+                const el = document.getElementById(`file-upload-${documentType}`) as HTMLInputElement | null;
+                if (el) { el.value = ''; el.click(); }
+              }}
               disabled={uploading}
               className="relative z-20 min-h-[48px] mt-4 pointer-events-auto"
             >

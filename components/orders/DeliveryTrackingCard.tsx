@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Loader2, MapPin, Truck, AlertTriangle } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
@@ -14,13 +16,17 @@ import { getDatabase } from '@/lib/firebase/rtdb';
 
 const STALE_SECONDS = 60;
 
+/** Triggers browser location prompt; returns true if granted. Uses low-accuracy for faster initial response on mobile. */
 function requestLocationPermission(): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(false);
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       () => resolve(true),
-      (err) => resolve(err.code === 1 ? false : false),
-      { timeout: 8000, maximumAge: 0 }
+      (err) => {
+        // code 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+        resolve(false);
+      },
+      { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 }
     );
   });
 }
@@ -55,7 +61,26 @@ export function DeliveryTrackingCard({
     (tracking?.driverUid === currentUserUid || order.sellerId === currentUserUid);
 
   const [locationDenied, setLocationDenied] = useState(false);
+  const [permissionRequesting, setPermissionRequesting] = useState(false);
   const rtdbAvailable = !!getDatabase();
+
+  const requestPermissionAndStart = useCallback(async () => {
+    setPermissionRequesting(true);
+    setLocationDenied(false);
+    try {
+      const granted = await requestLocationPermission();
+      if (granted) {
+        setLocationDenied(false);
+        await onStartTracking();
+      } else {
+        setLocationDenied(true);
+      }
+    } catch {
+      setLocationDenied(true);
+    } finally {
+      setPermissionRequesting(false);
+    }
+  }, [onStartTracking]);
 
   const canStartTracking =
     role === 'seller' &&
@@ -93,7 +118,7 @@ export function DeliveryTrackingCard({
 
   return (
     <Card className="border-border/60">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-6">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
             <Truck className="h-4 w-4" />
@@ -113,7 +138,7 @@ export function DeliveryTrackingCard({
             : 'Share your location with the buyer while delivering. Works while this screen is open.'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
         {role === 'buyer' && (
           <>
             {enabled && (
@@ -157,65 +182,82 @@ export function DeliveryTrackingCard({
         {role === 'seller' && (
           <>
             {locationDenied && (
-              <div className="text-sm text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800 flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold">Location permission required</div>
-                  <div className="text-xs mt-1 text-amber-800 dark:text-amber-200">
-                    To share live tracking, allow location access. You can still mark delivered without tracking.
+              <div className="text-sm text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold">Location permission required</div>
+                    <div className="text-xs mt-1 text-amber-800 dark:text-amber-200">
+                      Tap the button below to allow location access. If you previously denied, enable it in your browser or device Settings.
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => setLocationDenied(false)}
-                  >
-                    Retry permission
-                  </Button>
                 </div>
-              </div>
-            )}
-
-            {canStartTracking && !locationDenied && (
-              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   variant="default"
                   size="lg"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                  disabled={!!processing}
-                  onClick={async () => {
-                    const granted = await requestLocationPermission();
-                    if (!granted) {
-                      setLocationDenied(true);
-                      return;
-                    }
-                    try {
-                      await onStartTracking();
-                    } catch {
-                      // caller toasts
-                    }
-                  }}
+                  className="w-full sm:w-auto min-h-[44px] touch-manipulation bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  disabled={!!processing || permissionRequesting}
+                  onClick={requestPermissionAndStart}
                 >
-                  {processing === 'start' ? (
+                  {permissionRequesting || processing === 'start' ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
                     <MapPin className="h-4 w-4 mr-2" />
                   )}
-                  Start delivery
+                  Allow location & start tracking
                 </Button>
               </div>
             )}
 
-            {enabled && isSellerDriver && (
-              <>
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Live tracking ON</p>
+            {canStartTracking && !locationDenied && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5 min-w-0">
+                    <Label htmlFor="live-tracking-toggle" className="text-sm font-medium">Live tracking</Label>
+                    <p className="text-xs text-muted-foreground">Share your location with the buyer while delivering</p>
+                  </div>
+                  <Switch
+                    id="live-tracking-toggle"
+                    checked={false}
+                    disabled={!!processing || permissionRequesting}
+                    onCheckedChange={async (checked) => {
+                      if (checked) await requestPermissionAndStart();
+                    }}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Tracking works while you keep this screen open.
+                  Turn on to start — you&apos;ll be prompted to allow location access.
                 </p>
-                <div className="flex flex-wrap gap-2">
+              </div>
+            )}
+
+            {enabled && isSellerDriver && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="live-tracking-toggle-on" className="text-sm font-medium">Live tracking</Label>
+                    <p className="text-xs text-muted-foreground">Tracking works while you keep this screen open</p>
+                  </div>
+                  <Switch
+                    id="live-tracking-toggle-on"
+                    checked={true}
+                    disabled={!!processing}
+                    onCheckedChange={async (checked) => {
+                      if (!checked) {
+                        try {
+                          await onStopTracking();
+                        } catch {
+                          // caller toasts
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
+                    className="min-h-[44px] touch-manipulation w-full sm:w-auto"
                     disabled={!!processing}
                     onClick={async () => {
                       try {
@@ -231,7 +273,7 @@ export function DeliveryTrackingCard({
                   <Button
                     variant="default"
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="min-h-[44px] touch-manipulation w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"
                     disabled={!!processing}
                     onClick={async () => {
                       try {
@@ -245,7 +287,7 @@ export function DeliveryTrackingCard({
                     Mark delivered
                   </Button>
                 </div>
-              </>
+              </div>
             )}
           </>
         )}

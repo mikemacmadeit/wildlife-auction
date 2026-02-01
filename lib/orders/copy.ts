@@ -44,7 +44,7 @@ export const ORDER_COPY = {
   // Next actions
   actions: {
     scheduleDelivery: 'Schedule Delivery',
-    chooseDeliveryDate: 'Choose date',
+    chooseDeliveryDate: 'Accept date',
     markOutForDelivery: 'Mark Out for Delivery',
     markDelivered: 'Mark Delivered',
     setPickupInfo: 'Set Pickup Info',
@@ -58,11 +58,11 @@ export const ORDER_COPY = {
 
   // Delivery date step (buyer chooses from seller’s proposed times)
   chooseDeliveryDate: {
-    title: 'Choose your delivery date',
+    title: 'Accept your delivery date',
     description: 'The seller offered these delivery times. Pick one that works for you.',
     sellerProposed: 'Seller offered these times:',
-    chooseThisDate: 'Choose this date',
-    waitingForBuyer: 'Waiting for buyer to choose a date',
+    chooseThisDate: 'Accept this date',
+    waitingForBuyer: 'Waiting for buyer to accept a date',
     waitingForBuyerDescription: 'Buyer will pick one of the times you proposed. You’ll be notified.',
   },
 
@@ -118,6 +118,6 @@ export function getStatusLabel(txStatus: string): string {
   };
 
   if (statusMap[txStatus]) return statusMap[txStatus];
-  if (txStatus === 'DELIVERY_PROPOSED') return 'Choose delivery date';
+  if (txStatus === 'DELIVERY_PROPOSED') return 'Accept delivery date';
   return txStatus.replaceAll('_', ' ');
 }

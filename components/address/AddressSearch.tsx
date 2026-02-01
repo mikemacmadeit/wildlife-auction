@@ -142,18 +142,8 @@ export function AddressSearch({
   }, []);
 
   const selectPlace = useCallback((placeId: string) => {
-    // #region agent log
-    const hasPs = !!placesServiceRef.current;
-    const selecting = selectingRef.current;
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AddressSearch.tsx:selectPlace',message:'selectPlace called',data:{placeId,hasPs,selecting},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     const ps = placesServiceRef.current;
-    if (!ps || selectingRef.current) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AddressSearch.tsx:selectPlace',message:'selectPlace early return',data:{reason:!ps?'no ps':'selectingRef true'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
-      return;
-    }
+    if (!ps || selectingRef.current) return;
     selectingRef.current = true;
     if (blurTimerRef.current) {
       clearTimeout(blurTimerRef.current);
@@ -167,9 +157,6 @@ export function AddressSearch({
         fields: ['place_id', 'formatted_address', 'address_components', 'geometry'],
       },
       (place, status) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AddressSearch.tsx:getDetails callback',message:'getDetails callback',data:{status:String(status),hasPlace:!!place},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         selectingRef.current = false;
         setLoading(false);
         setOpen(false);
@@ -182,9 +169,6 @@ export function AddressSearch({
             address_components: place.address_components,
             geometry: place.geometry,
           });
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AddressSearch.tsx:getDetails OK',message:'calling setQuery and onSelect',data:{formattedAddress:parsed.formattedAddress?.slice(0,50)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-          // #endregion
           setQuery(parsed.formattedAddress);
           onSelectRef.current(parsed);
         } else {
@@ -195,9 +179,6 @@ export function AddressSearch({
   }, []);
 
   const onBlur = useCallback(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AddressSearch.tsx:onBlur',message:'input blur',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-    // #endregion
     if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
     if (selectingRef.current) return;
     // Close dropdown after delay so user can click a suggestion (blur fires before mousedown)
@@ -234,6 +215,7 @@ export function AddressSearch({
           <li
             key={p.place_id}
             role="option"
+            aria-selected="false"
             className="cursor-pointer px-3 py-3 min-h-[48px] text-sm hover:bg-accent focus:bg-accent outline-none touch-manipulation flex flex-col justify-center"
             onMouseDown={(e) => {
               e.preventDefault();

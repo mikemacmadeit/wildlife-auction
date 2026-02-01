@@ -51,11 +51,14 @@ export interface UXBadge {
 }
 
 /**
- * Get all milestones for an order (transport-aware)
+ * Get all milestones for an order (transport-aware).
+ * Role affects labels for the "out for delivery" step: when scheduled but not yet started,
+ * seller sees "Start delivery" and buyer sees "Waiting for delivery".
  */
-export function getOrderMilestones(order: Order): OrderMilestone[] {
+export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): OrderMilestone[] {
   const txStatus = getEffectiveTransactionStatus(order);
   const transportOption = order.transportOption || 'SELLER_TRANSPORT';
+  const viewerRole: 'buyer' | 'seller' = role === 'seller' ? 'seller' : 'buyer';
   const milestones: OrderMilestone[] = [];
 
   // Payment milestone (always first, system-owned)
@@ -129,7 +132,7 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
 
     milestones.push({
       key: 'agree_delivery',
-      label: 'Choose delivery date',
+      label: 'Accept delivery date',
       isComplete: deliveryScheduled,
       isCurrent: txStatus === 'DELIVERY_PROPOSED' && !deliveryScheduled,
       isBlocked: false,
@@ -137,11 +140,17 @@ export function getOrderMilestones(order: Order): OrderMilestone[] {
       helpText: 'Pick one of the seller’s proposed delivery times.',
     });
 
+    // When DELIVERY_SCHEDULED: seller must start (live tracking or mark out); buyer waits.
+    // Use role-aware label: "Start delivery" (seller) vs "Waiting for delivery" (buyer).
+    const outStepCurrent = txStatus === 'DELIVERY_SCHEDULED' && !outForDelivery;
+    const outStepLabel =
+      outForDelivery ? 'Out for delivery' : outStepCurrent && viewerRole === 'seller' ? 'Start delivery' : outStepCurrent ? 'Waiting for delivery' : 'Out for delivery';
+
     milestones.push({
       key: 'out_for_delivery',
-      label: 'Out for delivery',
+      label: outStepLabel,
       isComplete: outForDelivery,
-      isCurrent: txStatus === 'DELIVERY_SCHEDULED' && !outForDelivery,
+      isCurrent: outStepCurrent,
       isBlocked: false,
       ownerRole: 'seller',
       completedAt: isValidNonEpochDate(order.inTransitAt) ? order.inTransitAt : undefined,

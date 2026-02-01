@@ -36,7 +36,7 @@ import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { ORDER_COPY } from '@/lib/orders/copy';
-import { formatDate } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
 
@@ -158,59 +158,8 @@ export default function SellerOrderDetailPage() {
           </Badge>
         </div>
 
-        {/* Seller delivery panel only */}
+        {/* Seller delivery panel — address and scheduled appear under their timeline steps (Order Progress above) */}
         <>
-            {/* Buyer delivery address — seller uses this to schedule delivery */}
-            {order.delivery?.buyerAddress && (
-              <div className="text-sm bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1 mb-3">
-                <div className="font-semibold text-foreground flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  Delivery address (from buyer)
-                </div>
-                <div className="text-foreground font-mono text-xs leading-relaxed">
-                  {[order.delivery.buyerAddress.line1, order.delivery.buyerAddress.line2, [order.delivery.buyerAddress.city, order.delivery.buyerAddress.state, order.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
-                </div>
-                {order.delivery.buyerAddress.deliveryInstructions && (
-                  <div className="text-muted-foreground text-xs pt-1">Instructions: {order.delivery.buyerAddress.deliveryInstructions}</div>
-                )}
-                {(order.delivery.buyerAddress.lat != null && order.delivery.buyerAddress.lng != null) && (
-                  <a
-                    href={`https://www.google.com/maps?q=${order.delivery.buyerAddress.lat},${order.delivery.buyerAddress.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
-                  >
-                    <MapPin className="h-3 w-3" />
-                    {order.delivery.buyerAddress.pinLabel || 'View pin on map'}
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* Delivery Info Display — windows, ETA, hauler */}
-            {(order.delivery?.windows?.length || order.delivery?.agreedWindow || order.delivery?.eta) && (
-              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1 mb-3">
-                {order.delivery?.agreedWindow && (
-                  <div><strong>Agreed window:</strong> {new Date(order.delivery.agreedWindow.start).toLocaleString()} – {new Date(order.delivery.agreedWindow.end).toLocaleString()}</div>
-                )}
-                {!order.delivery?.agreedWindow && order.delivery?.eta && (
-                  <div><strong>Scheduled ETA:</strong> {new Date(order.delivery.eta).toLocaleString()}</div>
-                )}
-                {!order.delivery?.agreedWindow && !order.delivery?.eta && order.delivery?.windows?.length && (
-                  <div><strong>Proposed windows:</strong>{' '}
-                    {order.delivery.windows.map((w: any, i: number) => {
-                      const s = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
-                      const e = w?.end?.toDate ? w.end.toDate() : new Date(w?.end);
-                      return <span key={i}>{i ? '; ' : ''}{s.toLocaleString()} – {e.toLocaleString()}</span>;
-                    })}
-                  </div>
-                )}
-                {(order.delivery as any)?.notes && (
-                  <div className="pt-1 border-t border-border/50 mt-1"><strong>Notes:</strong> {(order.delivery as any).notes}</div>
-                )}
-              </div>
-            )}
-
             {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && !order.delivery?.buyerAddress && (
               <div className="text-sm text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 mb-3">
                 <div className="font-semibold flex items-center gap-2">
@@ -225,7 +174,7 @@ export default function SellerOrderDetailPage() {
 
             {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && order.delivery?.buyerAddress && (
               <>
-                <div className="text-sm text-foreground/90">
+                <div className="text-sm text-foreground/90 leading-relaxed">
                   Use the <strong>Propose delivery date</strong> button above to offer date and time windows. The buyer will pick one, then you coordinate the delivery.
                 </div>
                 <Separator />
@@ -388,11 +337,11 @@ export default function SellerOrderDetailPage() {
           
           return (
             <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
+              <CardContent className="pt-4 sm:pt-6 px-4 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div className="min-w-0 flex-1">
                     <div className="font-semibold text-base mb-1">{nextAction.title}</div>
-                    <div className="text-sm text-foreground/90">{nextAction.description}</div>
+                    <div className="text-sm text-foreground/90 leading-relaxed">{nextAction.description}</div>
                     {nextAction.dueAt && (
                       <div className="text-xs text-muted-foreground mt-2">
                         Due: {formatDate(nextAction.dueAt)}
@@ -406,7 +355,8 @@ export default function SellerOrderDetailPage() {
                   </div>
                   <Button
                     size="lg"
-                    className={
+                    className={cn(
+                      'w-full sm:w-auto shrink-0',
                       nextAction.severity === 'danger'
                         ? 'font-semibold'
                         : nextAction.ctaAction.includes('schedule-delivery') ||
@@ -414,7 +364,7 @@ export default function SellerOrderDetailPage() {
                             nextAction.ctaAction.includes('mark-delivered')
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30'
                           : 'shadow-warm ring-2 ring-primary/25 font-semibold'
-                    }
+                    )}
                     variant={
                       nextAction.severity === 'danger'
                         ? 'destructive'
@@ -464,50 +414,6 @@ export default function SellerOrderDetailPage() {
           />
         )}
 
-        {/* Live delivery tracking (seller: Start delivery / Stop tracking / Mark delivered) */}
-        <DeliveryTrackingCard
-          order={order}
-          role="seller"
-          currentUserUid={user?.uid ?? null}
-          processing={trackingProcessing}
-          onStartTracking={async () => {
-            setTrackingProcessing('start');
-            try {
-              await postAuthJson(`/api/orders/${order.id}/start-delivery-tracking`);
-              toast({ title: 'Live tracking started', description: 'Buyer can now see your location on the map.' });
-              await loadOrder();
-            } catch (e: any) {
-              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to start tracking'), variant: 'destructive' });
-            } finally {
-              setTrackingProcessing(null);
-            }
-          }}
-          onStopTracking={async () => {
-            setTrackingProcessing('stop');
-            try {
-              await postAuthJson(`/api/orders/${order.id}/stop-delivery-tracking`, { mode: 'STOP_ONLY' });
-              toast({ title: 'Tracking stopped', description: 'Buyer will no longer see live location.' });
-              await loadOrder();
-            } catch (e: any) {
-              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to stop tracking'), variant: 'destructive' });
-            } finally {
-              setTrackingProcessing(null);
-            }
-          }}
-          onMarkDelivered={async () => {
-            setTrackingProcessing('delivered');
-            try {
-              await postAuthJson(`/api/orders/${order.id}/stop-delivery-tracking`, { mode: 'DELIVERED' });
-              toast({ title: 'Marked as delivered', description: 'Buyer can confirm receipt on their order page.' });
-              await loadOrder();
-            } catch (e: any) {
-              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark delivered'), variant: 'destructive' });
-            } finally {
-              setTrackingProcessing(null);
-            }
-          }}
-        />
-
         {/* Compliance Transfer Panel (for regulated whitetail deals) */}
         <ComplianceTransferPanel
           order={order}
@@ -518,18 +424,100 @@ export default function SellerOrderDetailPage() {
           }}
         />
 
-        {/* Order Progress — single canonical timeline */}
-        <OrderMilestoneTimeline order={order} role="seller" />
+        {/* Order Progress — timeline with step-specific info under each milestone */}
+        <OrderMilestoneTimeline
+          order={order}
+          role="seller"
+          renderMilestoneDetail={(milestone, o) => {
+            if (milestone.key === 'set_delivery_address' && milestone.isComplete && o.delivery?.buyerAddress) {
+              return (
+                <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:p-4 text-sm">
+                  <div className="font-medium text-foreground/90 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary shrink-0" />
+                    Delivery address
+                  </div>
+                  <div className="mt-0.5 text-muted-foreground text-xs font-mono break-words">
+                    {[o.delivery.buyerAddress.line1, o.delivery.buyerAddress.line2, [o.delivery.buyerAddress.city, o.delivery.buyerAddress.state, o.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                    {o.delivery.buyerAddress.deliveryInstructions && ` · ${o.delivery.buyerAddress.deliveryInstructions}`}
+                  </div>
+                  {(o.delivery.buyerAddress.lat != null && o.delivery.buyerAddress.lng != null) && (
+                    <a href={`https://www.google.com/maps?q=${o.delivery.buyerAddress.lat},${o.delivery.buyerAddress.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline mt-1 inline-block">View on map</a>
+                  )}
+                </div>
+              );
+            }
+            if (milestone.key === 'agree_delivery' && milestone.isComplete && (o.delivery?.agreedWindow || o.delivery?.eta)) {
+              const agreedWindow = o.delivery?.agreedWindow;
+              const eta = o.delivery?.eta;
+              return (
+                <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground break-words">
+                  <strong className="text-foreground/80">Scheduled:</strong>{' '}
+                  {agreedWindow ? `${formatDate(agreedWindow.start)} – ${formatDate(agreedWindow.end)}` : eta ? formatDate(new Date(eta)) : ''}
+                  {(o.delivery as any)?.notes && <> · <strong>Notes:</strong> {(o.delivery as any).notes}</>}
+                </div>
+              );
+            }
+            if (milestone.key === 'out_for_delivery' && (milestone.isCurrent || milestone.isComplete)) {
+              return (
+                <div className="mt-3">
+                  <DeliveryTrackingCard
+                    order={o}
+                    role="seller"
+                    currentUserUid={user?.uid ?? null}
+                    processing={trackingProcessing}
+                    onStartTracking={async () => {
+                      setTrackingProcessing('start');
+                      try {
+                        await postAuthJson(`/api/orders/${o.id}/start-delivery-tracking`);
+                        toast({ title: 'Live tracking started', description: 'Buyer can now see your location on the map.' });
+                        await loadOrder();
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to start tracking'), variant: 'destructive' });
+                      } finally {
+                        setTrackingProcessing(null);
+                      }
+                    }}
+                    onStopTracking={async () => {
+                      setTrackingProcessing('stop');
+                      try {
+                        await postAuthJson(`/api/orders/${o.id}/stop-delivery-tracking`, { mode: 'STOP_ONLY' });
+                        toast({ title: 'Tracking stopped', description: 'Buyer will no longer see live location.' });
+                        await loadOrder();
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to stop tracking'), variant: 'destructive' });
+                      } finally {
+                        setTrackingProcessing(null);
+                      }
+                    }}
+                    onMarkDelivered={async () => {
+                      setTrackingProcessing('delivered');
+                      try {
+                        await postAuthJson(`/api/orders/${o.id}/stop-delivery-tracking`, { mode: 'DELIVERED' });
+                        toast({ title: 'Marked as delivered', description: 'Buyer can confirm receipt on their order page.' });
+                        await loadOrder();
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark delivered'), variant: 'destructive' });
+                      } finally {
+                        setTrackingProcessing(null);
+                      }
+                    }}
+                  />
+                </div>
+              );
+            }
+            return null;
+          }}
+        />
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="border-border/60">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
               <CardTitle className="text-base">Delivery</CardTitle>
-              <CardDescription className="text-foreground/85">
+              <CardDescription className="text-foreground/85 text-sm leading-relaxed">
                 You propose date and time windows; the buyer picks one that works. Only the buyer confirms receipt to complete the transaction.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
               <FulfillmentPanel />
             </CardContent>
           </Card>

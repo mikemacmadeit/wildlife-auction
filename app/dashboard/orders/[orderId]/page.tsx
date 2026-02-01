@@ -24,14 +24,13 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, AlertTriangle, ArrowLeft, CheckCircle2, MapPin, Package, User } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Camera, CheckCircle2, MapPin, Package, User } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
-import { NextActionBanner } from '@/components/orders/NextActionBanner';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
@@ -39,7 +38,7 @@ import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
-import { ORDER_COPY } from '@/lib/orders/copy';
+import { ORDER_COPY, getStatusLabel } from '@/lib/orders/copy';
 import { formatDate, isValidNonEpochDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
@@ -86,6 +85,27 @@ export default function BuyerOrderDetailPage() {
   const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
   const [confirmReceivedChecked, setConfirmReceivedChecked] = useState(false);
   const [checkinDialogConfirmReceived, setCheckinDialogConfirmReceived] = useState(false);
+  const [sendPhotosPromptOpen, setSendPhotosPromptOpen] = useState(false);
+  const [sendPhotosModalOpen, setSendPhotosModalOpen] = useState(false);
+
+  const SEND_PHOTOS_PROMPT_KEY = 'we:send-photos-prompted:v1';
+
+  const handleConfirmReceiptSuccess = useCallback((ordId: string, fromCheckin?: boolean) => {
+    toast({
+      title: 'Receipt confirmed',
+      description: order?.protectedTransactionDaysSnapshot ? 'Delivery confirmed. Your post-delivery review window is now active.' : 'This sale is final.',
+    });
+    getOrderById(ordId).then((o) => { if (o) setOrder(o); });
+    if (fromCheckin) {
+      setCheckinDialogConfirmReceived(false);
+      router.replace(`/dashboard/orders/${ordId}`);
+    }
+    try {
+      if (!localStorage.getItem(`${SEND_PHOTOS_PROMPT_KEY}:${ordId}`)) {
+        setSendPhotosPromptOpen(true);
+      }
+    } catch { /* ignore */ }
+  }, [toast, router, order?.protectedTransactionDaysSnapshot]);
 
   const loadOrder = useCallback(async (cancelledRef?: { current: boolean }) => {
     // Allow calling without cancelledRef for manual reloads
@@ -348,8 +368,8 @@ export default function BuyerOrderDetailPage() {
                     Total ${order.amount.toLocaleString()}
                   </Badge>
                 ) : null}
-                <Badge variant="outline" className="font-semibold text-xs capitalize">
-                  {String(order.status || '').replaceAll('_', ' ')}
+                <Badge variant="outline" className="font-semibold text-xs">
+                  {getStatusLabel(txStatus ?? '')}
                 </Badge>
                 {trustState ? (
                   <Badge variant="secondary" className="font-semibold text-xs capitalize">
@@ -366,16 +386,6 @@ export default function BuyerOrderDetailPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Live delivery tracking (buyer: map + last updated) */}
-        <DeliveryTrackingCard
-          order={order}
-          role="buyer"
-          currentUserUid={user?.uid ?? null}
-          onStartTracking={async () => {}}
-          onStopTracking={async () => {}}
-          onMarkDelivered={async () => {}}
-        />
 
         <Dialog
           open={checkin}
@@ -431,13 +441,7 @@ export default function BuyerOrderDetailPage() {
                   try {
                     setProcessing('confirm');
                     await confirmReceipt(order.id);
-                    toast({
-                      title: 'Receipt confirmed',
-                      description: order.protectedTransactionDaysSnapshot ? 'Delivery confirmed. Your post-delivery review window is now active.' : 'This sale is final.',
-                    });
-                    const refreshed = await getOrderById(order.id);
-                    if (refreshed) setOrder(refreshed);
-                    router.replace(`/dashboard/orders/${order.id}`);
+                    handleConfirmReceiptSuccess(order.id, true);
                   } catch (e: any) {
                     toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
                   } finally {
@@ -452,25 +456,85 @@ export default function BuyerOrderDetailPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Next Action Banner — hidden when only action is "Set delivery address" (that reminder lives in Order Progress footer to avoid duplicate) */}
-        {!(txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress) && (
-          <NextActionBanner
-            order={order}
-            role="buyer"
-            onAction={() => {
-              const st = getEffectiveTransactionStatus(order);
-              if (st === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress) {
-                setSetAddressModalOpen(true);
-              } else if (st === 'DELIVERED_PENDING_CONFIRMATION') {
-                const el = document.getElementById('confirm-receipt-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              } else if (st === 'DELIVERY_PROPOSED') {
-                const el = document.getElementById('choose-delivery-date');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }}
-          />
-        )}
+        {/* Post-confirm receipt: prompt to send photos (shown once per order) */}
+        <Dialog
+          open={sendPhotosPromptOpen}
+          onOpenChange={(open) => {
+            setSendPhotosPromptOpen(open);
+            if (!open && order?.id) {
+              try { localStorage.setItem(`${SEND_PHOTOS_PROMPT_KEY}:${order.id}`, '1'); } catch { /* ignore */ }
+            }
+          }}
+        >
+          <DialogContent className="max-w-md" aria-describedby="send-photos-prompt-desc">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                Receipt confirmed
+              </DialogTitle>
+              <DialogDescription id="send-photos-prompt-desc">
+                Would you like to add photos of the delivery? Optional — helps document the transaction.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSendPhotosPromptOpen(false);
+                  if (order?.id) {
+                    try { localStorage.setItem(`${SEND_PHOTOS_PROMPT_KEY}:${order.id}`, '1'); } catch { /* ignore */ }
+                  }
+                }}
+              >
+                Skip
+              </Button>
+              <Button
+                onClick={() => {
+                  setSendPhotosPromptOpen(false);
+                  if (order?.id) {
+                    try { localStorage.setItem(`${SEND_PHOTOS_PROMPT_KEY}:${order.id}`, '1'); } catch { /* ignore */ }
+                  }
+                  setSendPhotosModalOpen(true);
+                }}
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Add photos
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Send photos modal — DocumentUpload for OTHER (receipt photos) */}
+        <Dialog open={sendPhotosModalOpen} onOpenChange={setSendPhotosModalOpen}>
+          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add photos of delivery</DialogTitle>
+              <DialogDescription>
+                Optional photos of the animal or item at delivery. These help document the transaction.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 overflow-y-auto py-2">
+              {order && (
+                <DocumentUpload
+                  entityType="order"
+                  entityId={order.id}
+                  documentType="OTHER"
+                  onUploadComplete={() => {
+                    toast({ title: 'Photos added', description: 'Your photos have been uploaded.' });
+                    setSendPhotosModalOpen(false);
+                  }}
+                  required={false}
+                  uploadTrigger
+                />
+              )}
+            </div>
+            <DialogFooter className="border-t pt-3">
+              <Button variant="outline" onClick={() => setSendPhotosModalOpen(false)}>
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Compliance Transfer Panel (for regulated whitetail deals) */}
         <ComplianceTransferPanel
@@ -482,237 +546,211 @@ export default function BuyerOrderDetailPage() {
           }}
         />
 
-        {/* Order Progress — timeline + scheduled window, actions, report issue */}
+        {/* Order Progress — unified timeline with step-specific info under each milestone */}
         <OrderMilestoneTimeline
           order={order}
           role="buyer"
-          footer={
-            <div id="fulfillment-section" className="space-y-3">
-                  {/* Set delivery address — single reminder in Order Progress when needed (no duplicate with banner) */}
-                  {txStatus === 'FULFILLMENT_REQUIRED' && !order.delivery?.buyerAddress && (
-                    <>
-                      <div id="set-delivery-address" className="flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                          <div className="font-semibold text-sm">Set delivery address</div>
-                          <div className="text-xs text-muted-foreground">Add your delivery address or drop a pin. The seller will use it to propose a delivery date.</div>
-                        </div>
-                        <Button
-                          variant="default"
-                          disabled={processing !== null}
-                          onClick={() => setSetAddressModalOpen(true)}
-                        >
-                          Set address
-                        </Button>
-                      </div>
-                      <Separator />
-                    </>
-                  )}
-                  {/* Delivery address — show on Order Progress once buyer has submitted it */}
-                  {order.delivery?.buyerAddress && (
-                    <div className="text-sm bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
-                      <div className="font-semibold text-green-900 dark:text-green-100">Delivery address</div>
-                      <div className="text-xs mt-1 text-green-800 dark:text-green-200 font-mono">
-                        {[order.delivery.buyerAddress.line1, order.delivery.buyerAddress.line2, [order.delivery.buyerAddress.city, order.delivery.buyerAddress.state, order.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
-                        {order.delivery.buyerAddress.deliveryInstructions && ` — ${order.delivery.buyerAddress.deliveryInstructions}`}
-                      </div>
-                      {(order.delivery.buyerAddress.lat != null && order.delivery.buyerAddress.lng != null) && (
-                        <a
-                          href={`https://www.google.com/maps?q=${order.delivery.buyerAddress.lat},${order.delivery.buyerAddress.lng}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary underline mt-1 inline-block"
-                        >
-                          View pin on map
-                        </a>
-                      )}
+          showHelpText={false}
+          renderMilestoneDetail={(milestone, o) => {
+            if (milestone.key === 'set_delivery_address') {
+              if (milestone.isComplete && o.delivery?.buyerAddress) {
+                return (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 sm:p-4 text-sm">
+                    <div className="font-medium text-foreground/90">Delivery address</div>
+                    <div className="mt-0.5 text-muted-foreground text-xs font-mono break-words">
+                      {[o.delivery.buyerAddress.line1, o.delivery.buyerAddress.line2, [o.delivery.buyerAddress.city, o.delivery.buyerAddress.state, o.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                      {o.delivery.buyerAddress.deliveryInstructions && ` · ${o.delivery.buyerAddress.deliveryInstructions}`}
                     </div>
-                  )}
-                  {(order.delivery?.agreedWindow || (order.delivery?.eta && isValidNonEpochDate(new Date(order.delivery.eta)))) && (
-                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
-                      {order.delivery?.agreedWindow ? (
-                        <div><strong>Scheduled window:</strong> {formatDate(order.delivery.agreedWindow.start)} – {formatDate(order.delivery.agreedWindow.end)}</div>
-                      ) : order.delivery?.eta && isValidNonEpochDate(new Date(order.delivery.eta)) ? (
-                        <div><strong>Scheduled ETA:</strong> {formatDate(new Date(order.delivery.eta))}</div>
-                      ) : null}
-                      {(order.delivery as any)?.notes && <div><strong>Notes:</strong> {(order.delivery as any).notes}</div>}
-                    </div>
-                  )}
-                  {(txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
-                    <>
-                      <div id="confirm-receipt-section" className="space-y-3">
-                        <div className="font-semibold text-sm">Confirm Receipt</div>
-                        <p className="text-xs text-muted-foreground">Only you can complete the transaction—the seller does not mark delivery.</p>
-                        <div className="flex items-start space-x-3">
-                          <Checkbox
-                            id="confirm-received"
-                            checked={confirmReceivedChecked}
-                            onCheckedChange={(c) => setConfirmReceivedChecked(!!c)}
-                          />
-                          <Label htmlFor="confirm-received" className="cursor-pointer text-sm font-medium leading-tight">
-                            I confirm the animal was received.
-                          </Label>
-                        </div>
-                        {!order.protectedTransactionDaysSnapshot && (
-                          <p className="text-xs text-muted-foreground">
-                            This listing does not include a post-delivery review window. Confirming delivery makes the sale final.
-                          </p>
-                        )}
-                        <Button
-                          variant="default"
-                          disabled={!canConfirmReceipt || !confirmReceivedChecked || processing !== null}
-                          onClick={async () => {
-                            try {
-                              setProcessing('confirm');
-                              await confirmReceipt(order.id);
-                              toast({ title: 'Receipt confirmed', description: order.protectedTransactionDaysSnapshot ? 'Delivery confirmed. Your post-delivery review window is now active.' : 'This sale is final.' });
-                              const refreshed = await getOrderById(order.id);
-                              if (refreshed) setOrder(refreshed);
-                            } catch (e: any) {
-                              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
-                            } finally {
-                              setProcessing(null);
-                            }
-                          }}
-                        >
-                          {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                          Confirm Receipt
-                        </Button>
+                    {(o.delivery.buyerAddress.lat != null && o.delivery.buyerAddress.lng != null) && (
+                      <a href={`https://www.google.com/maps?q=${o.delivery.buyerAddress.lat},${o.delivery.buyerAddress.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline mt-1 inline-block">View on map</a>
+                    )}
+                  </div>
+                );
+              }
+              if (milestone.isCurrent && txStatus === 'FULFILLMENT_REQUIRED' && !o.delivery?.buyerAddress) {
+                return (
+                  <div id="set-delivery-address" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
+                    <p className="text-sm text-muted-foreground leading-relaxed">Add your address or drop a pin so the seller can propose a delivery date.</p>
+                    <Button className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation" disabled={!!processing} onClick={() => setSetAddressModalOpen(true)}>
+                      Set address
+                    </Button>
+                  </div>
+                );
+              }
+            }
+            if (milestone.key === 'agree_delivery') {
+              if (milestone.isComplete && (o.delivery?.agreedWindow || (o.delivery?.eta && isValidNonEpochDate(new Date(o.delivery.eta))))) {
+                return (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground break-words">
+                    <strong className="text-foreground/80">Scheduled:</strong>{' '}
+                    {o.delivery?.agreedWindow ? `${formatDate(o.delivery.agreedWindow.start)} – ${formatDate(o.delivery.agreedWindow.end)}` : formatDate(new Date(o.delivery!.eta!))}
+                    {(o.delivery as any)?.notes && <> · <strong>Notes:</strong> {(o.delivery as any).notes}</>}
+                  </div>
+                );
+              }
+              if (milestone.isCurrent && txStatus === 'DELIVERY_PROPOSED' && o.delivery?.windows?.length) {
+                return (
+                  <div id="choose-delivery-date" className="mt-3 scroll-mt-24 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
+                    <p className="text-sm text-muted-foreground leading-relaxed">{ORDER_COPY.chooseDeliveryDate.description}</p>
+                    {(o.delivery as any)?.notes && (
+                      <div className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground/80">Notes from seller:</span> {(o.delivery as any).notes}
                       </div>
-                      <Separator />
-                    </>
-                  )}
-                  {txStatus === 'DELIVERY_PROPOSED' && order.delivery?.windows?.length && (
-                    <div id="choose-delivery-date" className="scroll-mt-24">
-                      <div className="space-y-2">
-                        <div className="font-semibold text-sm">{ORDER_COPY.chooseDeliveryDate.title}</div>
-                        <p className="text-xs text-muted-foreground">{ORDER_COPY.chooseDeliveryDate.description}</p>
-                        {(order.delivery as any)?.notes && (
-                          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                            <strong>Notes from seller:</strong> {(order.delivery as any).notes}
-                          </div>
-                        )}
-                        <div className="text-xs font-medium text-muted-foreground mt-1">{ORDER_COPY.chooseDeliveryDate.sellerProposed}</div>
-                        <div className="space-y-2">
-                          {order.delivery.windows.map((w: any, idx: number) => {
-                            const start = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
-                            const end = w?.end?.toDate ? w.end.toDate() : new Date(w?.end);
-                            return (
-                              <Button
-                                key={idx}
-                                variant="default"
-                                className="w-full justify-between sm:justify-start"
-                                disabled={processing !== null}
-                                onClick={async () => {
-                                  try {
-                                    setProcessing('confirm');
-                                    await postAuthJson(`/api/orders/${order.id}/fulfillment/agree-delivery`, { agreedWindowIndex: idx });
-                                    toast({ title: 'Date chosen', description: 'Seller will deliver within this timeframe.' });
-                                    const refreshed = await getOrderById(order.id);
-                                    if (refreshed) setOrder(refreshed);
-                                  } catch (e: any) {
-                                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to save'), variant: 'destructive' });
-                                  } finally {
-                                    setProcessing(null);
-                                  }
-                                }}
-                              >
-                                <span>{start.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })} – {end.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
-                                {processing !== null ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <span className="text-xs opacity-90">{ORDER_COPY.chooseDeliveryDate.chooseThisDate}</span>}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <Separator />
+                    )}
+                    <div className="mt-4 space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Available times</p>
+                      {o.delivery.windows.map((w: any, idx: number) => {
+                        const start = w?.start?.toDate ? w.start.toDate() : new Date(w?.start);
+                        const end = w?.end?.toDate ? w.end.toDate() : new Date(w?.end);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            disabled={!!processing}
+                            className="flex w-full flex-col items-stretch gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/30 disabled:opacity-60 disabled:pointer-events-none sm:flex-row sm:items-center sm:justify-between sm:gap-4 min-h-[56px] touch-manipulation"
+                            onClick={async () => {
+                              try {
+                                setProcessing('confirm');
+                                await postAuthJson(`/api/orders/${o.id}/fulfillment/agree-delivery`, { agreedWindowIndex: idx });
+                                toast({ title: 'Date chosen', description: 'Seller will deliver within this timeframe.' });
+                                const refreshed = await getOrderById(o.id);
+                                if (refreshed) setOrder(refreshed);
+                              } catch (e: any) {
+                                toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to save'), variant: 'destructive' });
+                              } finally {
+                                setProcessing(null);
+                              }
+                            }}
+                          >
+                            <div className="min-w-0">
+                              <div className="font-medium text-foreground">{start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                              <div className="text-sm text-muted-foreground mt-0.5">{start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} – {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</div>
+                            </div>
+                            <div className="shrink-0">
+                              {processing ? (
+                                <span className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Choosing…</span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{ORDER_COPY.chooseDeliveryDate.chooseThisDate}</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-              <Separator />
-              {txStatus === 'COMPLETED' ? (
-                order.protectedTransactionDaysSnapshot && (order.buyerConfirmedAt ?? order.buyerAcceptedAt ?? order.acceptedAt) ? (() => {
-                  const confirmedAt = order.buyerConfirmedAt ?? order.buyerAcceptedAt ?? order.acceptedAt;
-                  const windowEnd = new Date(confirmedAt!.getTime() + order.protectedTransactionDaysSnapshot! * 24 * 60 * 60 * 1000);
+                  </div>
+                );
+              }
+            }
+            if (milestone.key === 'out_for_delivery') {
+              if (milestone.isCurrent && txStatus === 'DELIVERY_SCHEDULED') {
+                return (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                    The seller will start delivery during the scheduled window. You can confirm receipt once it arrives.
+                  </div>
+                );
+              }
+              if ((milestone.isCurrent || milestone.isComplete) && txStatus === 'OUT_FOR_DELIVERY') {
+                return (
+                  <div className="mt-3">
+                    <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
+                  </div>
+                );
+              }
+            }
+            if (milestone.key === 'confirm_receipt') {
+              if (milestone.isCurrent && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY')) {
+                return (
+                  <div id="confirm-receipt-section" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
+                    <p className="text-sm text-muted-foreground leading-relaxed">Only you can complete the transaction. The seller does not mark delivery.</p>
+                    <div className="mt-3 flex items-start gap-3 min-h-[44px]">
+                      <Checkbox id="confirm-received" checked={confirmReceivedChecked} onCheckedChange={(c) => setConfirmReceivedChecked(!!c)} className="mt-0.5 shrink-0" />
+                      <Label htmlFor="confirm-received" className="cursor-pointer text-sm font-medium leading-tight flex-1 py-2 touch-manipulation">I confirm the animal was received.</Label>
+                    </div>
+                    {!o.protectedTransactionDaysSnapshot && <p className="text-xs text-muted-foreground mt-2">Confirming makes the sale final.</p>}
+                    <Button className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation" disabled={!canConfirmReceipt || !confirmReceivedChecked || !!processing} onClick={async () => {
+                      try {
+                        setProcessing('confirm');
+                        await confirmReceipt(o.id);
+                        handleConfirmReceiptSuccess(o.id);
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm receipt'), variant: 'destructive' });
+                      } finally {
+                        setProcessing(null);
+                      }
+                    }}>
+                      {processing === 'confirm' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />} Confirm receipt
+                    </Button>
+                  </div>
+                );
+              }
+              if (milestone.isComplete && txStatus === 'COMPLETED') {
+                if (o.protectedTransactionDaysSnapshot && (o.buyerConfirmedAt ?? o.buyerAcceptedAt ?? o.acceptedAt)) {
+                  const confirmedAt = o.buyerConfirmedAt ?? o.buyerAcceptedAt ?? o.acceptedAt;
+                  const windowEnd = new Date(confirmedAt!.getTime() + o.protectedTransactionDaysSnapshot! * 24 * 60 * 60 * 1000);
                   const withinWindow = Date.now() < windowEnd.getTime();
                   const hoursLeft = (windowEnd.getTime() - Date.now()) / (1000 * 60 * 60);
                   const daysLeft = Math.floor(hoursLeft / 24);
                   const hrs = Math.floor(hoursLeft % 24);
                   const endsInLabel = daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} ${hrs}h` : `${Math.max(0, Math.floor(hoursLeft))} hours`;
                   return withinWindow ? (
-                    <div id="report-issue" className="space-y-3 scroll-mt-24">
-                      <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                        <CheckCircle2 className="h-5 w-5 shrink-0" />
-                        <span className="font-semibold">Delivery confirmed</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Post-delivery review window active — ends in {endsInLabel}
-                      </div>
-                      <Button
-                        variant="outline"
-                        disabled={processing !== null}
-                        onClick={async () => {
-                          try {
-                            setProcessing('dispute');
-                            await disputeOrder(order.id, 'Delivery-related issue', 'Report a delivery-related issue');
-                            toast({ title: 'Issue reported', description: 'We’ll review and follow up. Claims require proof.' });
-                            const refreshed = await getOrderById(order.id);
-                            if (refreshed) setOrder(refreshed);
-                          } catch (e: any) {
-                            toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to report issue'), variant: 'destructive' });
-                          } finally {
-                            setProcessing(null);
-                          }
-                        }}
-                      >
+                    <div id="report-issue" className="mt-3 space-y-3 scroll-mt-24">
+                      <div className="text-sm text-muted-foreground">Post-delivery review window active — ends in {endsInLabel}</div>
+                      <Button variant="outline" className="w-full sm:w-auto min-h-[44px] touch-manipulation" disabled={processing !== null} onClick={async () => {
+                        try {
+                          setProcessing('dispute');
+                          await disputeOrder(o.id, 'Delivery-related issue', 'Report a delivery-related issue');
+                          toast({ title: 'Issue reported', description: 'We’ll review and follow up. Claims require proof.' });
+                          const refreshed = await getOrderById(o.id);
+                          if (refreshed) setOrder(refreshed);
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to report issue'), variant: 'destructive' });
+                        } finally {
+                          setProcessing(null);
+                        }
+                      }}>
                         {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                         Report a delivery-related issue
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-1 scroll-mt-24">
-                      <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                        <CheckCircle2 className="h-5 w-5 shrink-0" />
-                        <span className="font-semibold">Delivery confirmed</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">This sale is final.</p>
-                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">This sale is final.</p>
                   );
-                })() : (
-                  <div className="space-y-1 scroll-mt-24">
-                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                      <CheckCircle2 className="h-5 w-5 shrink-0" />
-                      <span className="font-semibold">Delivery confirmed</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">This sale is final.</p>
-                  </div>
-                )
-              ) : (
-                <div id="report-issue" className="flex items-center justify-between gap-3 flex-wrap scroll-mt-24">
-                  <div>
-                    <div className="font-semibold text-sm">Report an issue</div>
-                    <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={!canDispute || processing !== null}
-                    onClick={async () => {
-                      try {
-                        setProcessing('dispute');
-                        await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
-                        toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
-                        const refreshed = await getOrderById(order.id);
-                        if (refreshed) setOrder(refreshed);
-                      } catch (e: any) {
-                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to report issue'), variant: 'destructive' });
-                      } finally {
-                        setProcessing(null);
-                      }
-                    }}
-                  >
-                    {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    Report an issue
-                  </Button>
+                }
+                return <p className="mt-3 text-sm text-muted-foreground">This sale is final.</p>;
+              }
+            }
+            return null;
+          }}
+          footer={
+            txStatus !== 'COMPLETED' ? (
+              <div id="report-issue" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 scroll-mt-24 pt-2">
+                <div>
+                  <div className="font-semibold text-sm">Report an issue</div>
+                  <div className="text-xs text-muted-foreground">If something isn’t right, report it for review.</div>
                 </div>
-              )}
-            </div>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto min-h-[44px] touch-manipulation shrink-0"
+                  disabled={!canDispute || processing !== null}
+                  onClick={async () => {
+                    try {
+                      setProcessing('dispute');
+                      await disputeOrder(order.id, 'Issue reported', 'Opened from order page');
+                      toast({ title: 'Issue reported', description: 'We’ll review and follow up.' });
+                      const refreshed = await getOrderById(order.id);
+                      if (refreshed) setOrder(refreshed);
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to report issue'), variant: 'destructive' });
+                    } finally {
+                      setProcessing(null);
+                    }
+                  }}
+                >
+                  {processing === 'dispute' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Report an issue
+                </Button>
+              </div>
+            ) : null
           }
         />
 

@@ -3,7 +3,7 @@ import { getEffectiveTransactionStatus } from './status';
 
 export type PurchasesStatusKey =
   | 'processing'
-  | 'action_needed'   // Set address, choose delivery date
+  | 'action_needed'   // Set address, accept delivery date
   | 'preparing'       // Waiting on seller to propose/ship
   | 'awaiting_permit'
   | 'scheduled'       // Delivery scheduled or out for delivery
@@ -77,7 +77,7 @@ export function deriveOrderUIState(order: Order): {
   if (txStatus === 'DELIVERY_PROPOSED') {
     return {
       statusKey: 'action_needed',
-      currentStepLabel: 'Choose delivery date',
+      currentStepLabel: 'Accept delivery date',
       waitingOn: 'Pick one of the seller’s proposed times',
       needsAction: true,
       primaryAction: { kind: 'agree_delivery', label: 'Choose date' },

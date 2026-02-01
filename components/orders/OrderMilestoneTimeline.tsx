@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDate, formatDistanceToNow, isValidNonEpochDate } from '@/lib/utils';
 import type { Order } from '@/lib/types';
-import { getOrderMilestones, type MilestoneOwnerRole } from '@/lib/orders/progress';
+import { getOrderMilestones, type MilestoneOwnerRole, type OrderMilestone } from '@/lib/orders/progress';
 import {
   Collapsible,
   CollapsibleContent,
@@ -29,8 +29,10 @@ export interface OrderMilestoneTimelineProps {
   role?: MilestoneTimelineRole;
   className?: string;
   showHelpText?: boolean;
-  /** Optional content below the timeline (e.g. scheduled window, actions) */
+  /** Optional content below the timeline (e.g. report issue after completion) */
   footer?: React.ReactNode;
+  /** Render step-specific info (address, scheduled time, actions) under each milestone */
+  renderMilestoneDetail?: (milestone: OrderMilestone, order: Order) => React.ReactNode;
 }
 
 const ROLE_LABELS: Record<MilestoneOwnerRole, string> = {
@@ -46,15 +48,19 @@ export function OrderMilestoneTimeline({
   className,
   showHelpText = true,
   footer,
+  renderMilestoneDetail,
 }: OrderMilestoneTimelineProps) {
-  const milestones = useMemo(() => getOrderMilestones(order), [order]);
+  const milestones = useMemo(
+    () => getOrderMilestones(order, role === 'seller' ? 'seller' : 'buyer'),
+    [order, role]
+  );
 
   return (
     <Card className={cn('border-border/60', className)}>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
         <CardTitle className="text-base">Order Progress</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
         {milestones.map((milestone, index) => {
           const isLast = index === milestones.length - 1;
           const isCurrent = milestone.isCurrent;
@@ -67,14 +73,14 @@ export function OrderMilestoneTimeline({
                 <div
                   className={cn(
                     'absolute left-[14px] top-[28px] w-px',
-                    milestone.isComplete ? 'bg-primary/30' : 'bg-border/50',
+                    milestone.isComplete ? 'bg-primary/30' : isCurrent ? 'bg-orange-400/30' : 'bg-muted-foreground/20',
                     'h-[calc(100%+0.5rem)]'
                   )}
                 />
               )}
 
               <div className="flex items-start gap-3">
-                {/* Status dot */}
+                {/* Status dot: green when complete, orange when current, muted when pending */}
                 <div className="relative z-10 shrink-0">
                   {milestone.isComplete ? (
                     <div className="h-7 w-7 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
@@ -85,18 +91,18 @@ export function OrderMilestoneTimeline({
                       <AlertTriangle className="h-4 w-4 text-destructive" />
                     </div>
                   ) : isCurrent ? (
-                    <div className="h-7 w-7 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
-                      <Clock className="h-4 w-4 text-primary animate-pulse" />
+                    <div className="h-7 w-7 rounded-full bg-orange-500/20 border-2 border-orange-500 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400 animate-pulse" />
                     </div>
                   ) : (
-                    <div className="h-7 w-7 rounded-full bg-muted border-2 border-border flex items-center justify-center">
-                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    <div className="h-7 w-7 rounded-full bg-muted/50 border-2 border-muted-foreground/25 flex items-center justify-center">
+                      <Circle className="h-4 w-4 text-muted-foreground/60" />
                     </div>
                   )}
                 </div>
 
                 {/* Milestone content */}
-                <div className={cn('flex-1 min-w-0 pb-4 rounded-lg -mx-1 px-2 py-1', isCurrent && !isBlocked && 'bg-primary/10 ring-1 ring-primary/20')}>
+                <div className={cn('flex-1 min-w-0 pb-4 rounded-lg -mx-1 px-2 py-1 overflow-hidden', isCurrent && !isBlocked && 'bg-primary/5 ring-1 ring-primary/20')}>
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -104,8 +110,9 @@ export function OrderMilestoneTimeline({
                           className={cn(
                             'font-semibold text-sm',
                             milestone.isComplete && 'text-primary',
-                            isCurrent && !isBlocked && 'text-primary',
-                            isBlocked && 'text-destructive'
+                            isCurrent && !isBlocked && !milestone.isComplete && 'text-orange-600 dark:text-orange-400',
+                            isBlocked && 'text-destructive',
+                            !milestone.isComplete && !isCurrent && !isBlocked && 'text-muted-foreground'
                           )}
                         >
                           {milestone.label}
@@ -117,7 +124,7 @@ export function OrderMilestoneTimeline({
                           </Badge>
                         )}
                         {isCurrent && (
-                          <Badge variant={isBlocked ? 'destructive' : 'default'} className="text-xs">
+                          <Badge variant={isBlocked ? 'destructive' : 'secondary'} className="text-xs">
                             {isBlocked ? 'Blocked' : 'Current'}
                           </Badge>
                         )}
@@ -144,11 +151,12 @@ export function OrderMilestoneTimeline({
                         <Collapsible>
                           <CollapsibleTrigger asChild>
                             <button
+                              type="button"
                               className={cn(
-                                'mt-2 inline-flex items-center gap-1.5 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                'mt-2 inline-flex items-center gap-1.5 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] touch-manipulation',
                                 isCurrent && !isBlocked
-                                  ? 'bg-primary text-primary-foreground px-3 py-1.5 text-xs shadow-warm ring-1 ring-primary/30 hover:bg-primary/90'
-                                  : 'text-xs text-muted-foreground hover:text-foreground'
+                                  ? 'bg-primary text-primary-foreground px-3 py-2.5 text-xs ring-1 ring-primary/30 hover:bg-primary/90'
+                                  : 'text-xs text-muted-foreground hover:text-foreground px-2 py-2'
                               )}
                             >
                               <ChevronDown className="h-3.5 w-3.5" />
@@ -169,6 +177,9 @@ export function OrderMilestoneTimeline({
                           {(milestone as any).blockedReason || 'This step is currently blocked'}
                         </div>
                       )}
+
+                      {/* Step-specific detail (address, scheduled time, action CTA, etc.) */}
+                      {renderMilestoneDetail?.(milestone, order)}
                     </div>
                   </div>
                 </div>
