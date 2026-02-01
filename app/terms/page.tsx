@@ -22,7 +22,7 @@ export default function TermsPage() {
           <Gavel className="h-7 w-7 text-primary" />
         </div>
         <h1 className="text-4xl font-bold tracking-tight">Terms of Service</h1>
-        <p className="text-sm text-muted-foreground mt-3">
+        <p className="text-sm text-foreground mt-3">
           Effective date: {EFFECTIVE_DATE} • Version: {VERSION}
         </p>
       </div>
@@ -41,7 +41,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>1) Acceptance of these Terms</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               By accessing or using Agchange (the “Services”), you agree to these Terms of Service (“Terms”).
               If you do not agree, do not use the Services.
@@ -56,7 +56,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>2) Marketplace-only status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               Agchange provides software that allows users to list items and communicate with other users. Agchange is a
               technology platform only and is not a seller, dealer, broker, agent, or auctioneer.
@@ -73,7 +73,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>3) Contract is between buyer and seller</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               Buyers and sellers contract directly with each other. Agchange is not a party to the transaction and does not become an
               owner of, or responsible for, any listed animal or good.
@@ -89,7 +89,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>4) Eligibility</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>You must be legally able to enter into a binding contract to use the Services.</p>
             <p>
               The Services are not intended for children under 13.
@@ -101,7 +101,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>5) Texas-only animal transactions</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               <strong>All animal transactions are Texas-only.</strong> Buyers and sellers must comply with applicable Texas laws and regulations.
               Agchange may apply geographic restrictions and workflow checks to support these requirements.
@@ -114,7 +114,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>6) Live Animal Transactions &amp; Assumption of Risk</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               Live animals involve inherent risks including (without limitation) stress from handling or transport, acclimation issues,
               disease exposure, injury, illness, escape, and mortality.
@@ -134,7 +134,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>7) Risk of loss transfer</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               As between buyer and seller, risk of loss, injury, illness, escape, or death transfers to the buyer upon delivery or pickup (as applicable).
               Agchange bears no responsibility before, during, or after transport.
@@ -146,7 +146,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>8) AS-IS / NO WARRANTIES</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               All listings are provided “AS-IS, WHERE-IS.” To the maximum extent permitted by law, Agchange disclaims all warranties,
               express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
@@ -161,7 +161,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>9) Transport disclaimer</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               Agchange does not arrange or provide transportation. Any pickup, delivery, shipping, hauling, or other transport is arranged
               solely between buyer, seller, and/or third-party carriers. Agchange is not responsible for transport outcomes.
@@ -173,7 +173,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>10) Seller responsibilities</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <CardContent className="space-y-4 text-sm text-foreground">
             <p className="font-semibold text-foreground">Accuracy and legality</p>
             <ul className="list-disc ml-5 space-y-1">
               <li>Sellers must provide truthful, complete, and accurate listings and documentation.</li>
@@ -185,7 +185,7 @@ export default function TermsPage() {
               <li>Whitetail deer may only be listed in the Whitetail Breeder category.</li>
               <li>Platform workflows may require permits/records to be uploaded and reviewed to publish listings or complete order compliance. Payments are processed by Stripe; Agchange does not hold or release funds.</li>
             </ul>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground">
               “Verified” indicates an admin reviewed an uploaded document for marketplace workflow completeness; it does not represent TPWD approval or
               transfer authorization.
             </p>
@@ -196,7 +196,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>11) Buyer responsibilities</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>Buyers must provide accurate account and payment information.</li>
               <li>Buyers are responsible for inspections, due diligence, and verifying permits/records.</li>
@@ -210,7 +210,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>12) Payments and platform fees</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>Payments are processed by Stripe. Agchange may collect marketplace fees.</p>
             <p>
               Agchange does not hold funds, provide escrow, or condition payouts on delivery. Sellers receive funds via Stripe when the buyer pays. Document and listing reviews are for marketplace workflow and compliance only and do not mean Agchange takes custody of any animal or good.
@@ -222,7 +222,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>13) Disputes, refunds, and chargebacks</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               We may provide dispute tools. Buyers and sellers should attempt to resolve issues promptly. Certain
               disputes or compliance failures may result in refunds, payment holds, or other actions consistent with these Terms and our policies.
@@ -237,7 +237,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>14) Prohibited items and prohibited conduct</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -256,7 +256,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>15) Content and moderation</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               You are responsible for content you post. We may review, reject, or remove content and listings at our
               discretion, including for safety, compliance workflow needs, or marketplace integrity.
@@ -268,7 +268,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>16) Indemnification (critical)</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               Sellers agree to defend, indemnify, and hold harmless Agchange and its owners, directors, officers, employees, and contractors
               from and against any claims arising out of or relating to their listings and transactions, including claims related to animal injury, illness,
@@ -284,7 +284,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>17) Limitation of liability</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               To the maximum extent permitted by law, Agchange will not be liable for indirect, incidental, special, consequential, or punitive
               damages, or any loss of profits or revenues.
@@ -300,7 +300,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>18) Arbitration &amp; class action waiver</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               You agree that disputes arising out of or relating to these Terms or the Services will be resolved by binding arbitration on an individual basis,
               and you waive the right to participate in any class action or class-wide arbitration.
@@ -317,7 +317,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>19) Governing law</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               These Terms are governed by the laws of the State of Texas, without regard to conflict of law principles.
             </p>
@@ -328,7 +328,7 @@ export default function TermsPage() {
           <CardHeader>
             <CardTitle>20) Contact</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <div className="flex items-center gap-2 text-foreground">
               <Mail className="h-4 w-4 text-primary" />
               <span className="font-semibold">support@agchange.app</span>
@@ -344,7 +344,7 @@ export default function TermsPage() {
               </Link>
               .
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground">
               Related: <Link href="/legal/marketplace-policies" className="underline underline-offset-4">Marketplace Policies</Link>,{' '}
               <Link href="/legal/seller-policy" className="underline underline-offset-4">Seller Policy</Link>,{' '}
               <Link href="/legal/buyer-acknowledgment" className="underline underline-offset-4">Buyer Acknowledgment</Link>.

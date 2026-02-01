@@ -161,7 +161,7 @@ export default function LegalAcceptPage() {
           <CardContent className="space-y-4">
             <div className="rounded-xl border bg-muted/20 p-4 space-y-2">
               <div className="text-sm font-semibold">Read and agree (no page changes)</div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-foreground">
                 Open the full Terms and policies in a scrollable modal. Agree inside the modal, then come right back here to continue.
               </div>
               <Button type="button" variant="outline" className="font-semibold" onClick={() => openDocs('tos')}>

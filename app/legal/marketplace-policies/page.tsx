@@ -41,7 +41,7 @@ export default function MarketplacePoliciesPage() {
             <CardTitle>1) Category-level disclaimers (read this first)</CardTitle>
             <CardDescription>These disclaimers apply in addition to the Terms of Service.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5 text-sm text-muted-foreground">
+          <CardContent className="space-y-5 text-sm text-foreground">
             <div className="space-y-2">
               <div className="font-semibold text-foreground">Animal categories (whitetail, registered livestock, cattle, horses, dogs)</div>
               <ul className="list-disc ml-5 space-y-1">
@@ -67,7 +67,7 @@ export default function MarketplacePoliciesPage() {
           <CardHeader>
             <CardTitle>2) Prohibited items and prohibited conduct</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -86,7 +86,7 @@ export default function MarketplacePoliciesPage() {
           <CardHeader>
             <CardTitle>3) Compliance is seller/buyer responsibility</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               Sellers and buyers are solely responsible for complying with all applicable laws (including TPWD/TAHC, USDA, and state requirements),
               including permits, records, and transfer requirements.
@@ -102,7 +102,7 @@ export default function MarketplacePoliciesPage() {
           <CardHeader>
             <CardTitle>4) Related policies</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>
                 <Link className="underline underline-offset-4" href="/legal/seller-policy">

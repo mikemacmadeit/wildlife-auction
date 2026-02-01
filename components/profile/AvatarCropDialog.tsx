@@ -122,35 +122,37 @@ export function AvatarCropDialog(props: {
         }
       }}
     >
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="shrink-0 space-y-1">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div
-            className={cn(
-              'relative w-full overflow-hidden rounded-lg border bg-black/80',
-              'aspect-square max-h-[500px]'
-            )}
-          >
-            <Cropper
-              image={imageSrc}
-              crop={crop}
-              zoom={zoom}
-              aspect={1}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
-              onMediaLoaded={(m) => setMedia(m)}
-              showGrid={true}
-              restrictPosition={true}
-            />
+        <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
+          {/* Crop area: flexible so dialog + buttons fit in viewport without scroll */}
+          <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center">
+            <div
+              className={cn(
+                'relative w-full overflow-hidden rounded-lg border bg-black/80 aspect-square max-h-full'
+              )}
+            >
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+                onMediaLoaded={(m) => setMedia(m)}
+                showGrid={true}
+                restrictPosition={true}
+              />
+            </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1">
+          <div className="shrink-0 flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <div className="text-xs font-semibold text-muted-foreground mb-2">Zoom</div>
               <Slider
                 value={[zoom]}
@@ -160,13 +162,13 @@ export function AvatarCropDialog(props: {
                 onValueChange={(v) => setZoom(v[0] ?? 1)}
               />
             </div>
-            <Button type="button" variant="outline" className="min-h-[44px] font-semibold" onClick={reset}>
+            <Button type="button" variant="outline" className="shrink-0 min-h-[44px] font-semibold" onClick={reset}>
               <RotateCcw className="h-4 w-4 mr-2" />
               Reset
             </Button>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="shrink-0 flex items-center justify-end gap-2 pt-2 border-t">
             <Button
               type="button"
               variant="ghost"

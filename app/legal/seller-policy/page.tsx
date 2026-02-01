@@ -41,7 +41,7 @@ export default function SellerPolicyPage() {
             <CardTitle>1) Seller representations (required)</CardTitle>
             <CardDescription>By listing, you represent and warrant the following to buyers and to Agchange.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>You have legal ownership, possession rights, and authority to sell the listed item/animal.</li>
               <li>Your listing is accurate and not misleading (including photos, genetics, age, training, health notes, and disclosures).</li>
@@ -56,7 +56,7 @@ export default function SellerPolicyPage() {
             <CardTitle>2) Animal-specific seller obligations</CardTitle>
             <CardDescription>Applies to whitetail, registered livestock, cattle, horses, and dogs.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>You are solely responsible for animal condition, health, permits, records, and required disclosures.</li>
               <li>You are solely responsible for any seller representations about health, genetics, temperament, and training.</li>
@@ -71,7 +71,7 @@ export default function SellerPolicyPage() {
             <CardTitle>3) Indemnification (critical)</CardTitle>
             <CardDescription>You must defend and protect the platform from claims arising from your listings and sales.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               You agree to defend, indemnify, and hold harmless Agchange and its owners, directors, officers, employees, and contractors
               from and against any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys’ fees) arising out of or
@@ -91,7 +91,7 @@ export default function SellerPolicyPage() {
           <CardHeader>
             <CardTitle>4) Required disclosures and documentation</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               The platform may require certain disclosures and documents (by category) to publish listings or complete order compliance (e.g. required document uploads). Payments are processed by Stripe; Agchange does not hold or release payouts. These are marketplace workflow requirements and do not create any warranty by Agchange.
             </p>
@@ -105,7 +105,7 @@ export default function SellerPolicyPage() {
           <CardHeader>
             <CardTitle>5) Related documents</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>
                 <Link className="underline underline-offset-4" href="/terms">

@@ -40,7 +40,7 @@ export default function BuyerAcknowledgmentPage() {
           <CardHeader>
             <CardTitle>1) Contract is between you and the seller</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               You acknowledge that any sale agreement is solely between you and the seller. Agchange is a marketplace technology provider
               and is not a party to the buyer–seller contract.
@@ -53,7 +53,7 @@ export default function BuyerAcknowledgmentPage() {
             <CardTitle>2) Live animal transactions & assumption of risk</CardTitle>
             <CardDescription>Applies to whitetail, registered livestock, cattle, horses, and dogs.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               You acknowledge that live animals involve inherent risks including, without limitation, stress from handling or transport, acclimation,
               disease exposure, injury, illness, escape, and mortality.
@@ -69,7 +69,7 @@ export default function BuyerAcknowledgmentPage() {
           <CardHeader>
             <CardTitle>3) Due diligence is your responsibility</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>You will verify the listing, seller representations, and any required permits/records.</li>
               <li>You will conduct any inspections you deem necessary (including veterinary checks where appropriate).</li>
@@ -82,7 +82,7 @@ export default function BuyerAcknowledgmentPage() {
           <CardHeader>
             <CardTitle>4) Risk of loss transfers on delivery/pickup</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-foreground">
             <p>
               You acknowledge that risk of loss, injury, illness, escape, or death transfers to you upon delivery or pickup, as between you and the seller.
               Agchange bears no responsibility before, during, or after transport.
@@ -94,7 +94,7 @@ export default function BuyerAcknowledgmentPage() {
           <CardHeader>
             <CardTitle>5) Related documents</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="text-sm text-foreground">
             <ul className="list-disc ml-5 space-y-1">
               <li>
                 <Link className="underline underline-offset-4" href="/terms">

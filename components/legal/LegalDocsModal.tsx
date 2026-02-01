@@ -14,7 +14,7 @@ function Section(props: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
       <div className="text-base font-extrabold tracking-tight">{props.title}</div>
-      <div className="text-sm text-muted-foreground space-y-2">{props.children}</div>
+      <div className="text-sm text-foreground space-y-2">{props.children}</div>
     </div>
   );
 }
@@ -78,18 +78,18 @@ export function LegalDocsModal(props: {
           </div>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as LegalDocsModalTab)} className="w-full flex flex-col flex-1 min-h-0">
-          <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as LegalDocsModalTab)} className="w-full flex flex-col flex-1 min-h-0 overflow-hidden">
+          <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full shrink-0">
             <TabsTrigger value="tos">Terms</TabsTrigger>
             <TabsTrigger value="marketplacePolicies">Marketplace</TabsTrigger>
             <TabsTrigger value="sellerPolicy">Seller</TabsTrigger>
             <TabsTrigger value="buyerAcknowledgment">Buyer</TabsTrigger>
           </TabsList>
 
-          <div className="mt-3 flex flex-col flex-1 min-h-0">
-            <ScrollArea className="flex-1 min-h-0 rounded-xl border bg-background">
-              <div className="p-5 space-y-8">
-                <TabsContent value="tos" className="mt-0 space-y-6">
+          <div className="mt-3 flex-1 min-h-0 flex flex-col overflow-hidden">
+            <TabsContent value="tos" className="mt-0 flex-1 min-h-0 overflow-hidden data-[state=inactive]:hidden flex flex-col rounded-xl border bg-background">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="p-5 space-y-6">
                   <div className="text-xs text-muted-foreground">
                     Effective {LEGAL_VERSIONS.tos.effectiveDateLabel} (version {LEGAL_VERSIONS.tos.version}). Full page:{' '}
                     <Link href="/terms" className="underline underline-offset-4">
@@ -185,9 +185,13 @@ export function LegalDocsModal(props: {
                       ]}
                     />
                   </Section>
-                </TabsContent>
+                </div>
+              </ScrollArea>
+            </TabsContent>
 
-                <TabsContent value="marketplacePolicies" className="mt-0 space-y-6">
+            <TabsContent value="marketplacePolicies" className="mt-0 flex-1 min-h-0 overflow-hidden data-[state=inactive]:hidden flex flex-col rounded-xl border bg-background">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="p-5 space-y-6">
                   <div className="text-xs text-muted-foreground">
                     Effective {LEGAL_VERSIONS.marketplacePolicies.effectiveDateLabel} (version {LEGAL_VERSIONS.marketplacePolicies.version}). Full page:{' '}
                     <Link href="/legal/marketplace-policies" className="underline underline-offset-4">
@@ -215,9 +219,13 @@ export function LegalDocsModal(props: {
                       ]}
                     />
                   </Section>
-                </TabsContent>
+                </div>
+              </ScrollArea>
+            </TabsContent>
 
-                <TabsContent value="sellerPolicy" className="mt-0 space-y-6">
+            <TabsContent value="sellerPolicy" className="mt-0 flex-1 min-h-0 overflow-hidden data-[state=inactive]:hidden flex flex-col rounded-xl border bg-background">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="p-5 space-y-6">
                   <div className="text-xs text-muted-foreground">
                     Effective {LEGAL_VERSIONS.sellerPolicy.effectiveDateLabel} (version {LEGAL_VERSIONS.sellerPolicy.version}). Full page:{' '}
                     <Link href="/legal/seller-policy" className="underline underline-offset-4">
@@ -251,9 +259,13 @@ export function LegalDocsModal(props: {
                       ]}
                     />
                   </Section>
-                </TabsContent>
+                </div>
+              </ScrollArea>
+            </TabsContent>
 
-                <TabsContent value="buyerAcknowledgment" className="mt-0 space-y-6">
+            <TabsContent value="buyerAcknowledgment" className="mt-0 flex-1 min-h-0 overflow-hidden data-[state=inactive]:hidden flex flex-col rounded-xl border bg-background">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="p-5 space-y-6">
                   <div className="text-xs text-muted-foreground">
                     Effective {LEGAL_VERSIONS.buyerAcknowledgment.effectiveDateLabel} (version {LEGAL_VERSIONS.buyerAcknowledgment.version}). Full page:{' '}
                     <Link href="/legal/buyer-acknowledgment" className="underline underline-offset-4">
@@ -271,9 +283,9 @@ export function LegalDocsModal(props: {
                       ]}
                     />
                   </Section>
-                </TabsContent>
-              </div>
-            </ScrollArea>
+                </div>
+              </ScrollArea>
+            </TabsContent>
           </div>
         </Tabs>
 

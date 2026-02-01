@@ -27,7 +27,7 @@ export function AnimalRiskAcknowledgmentDialog(props: {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-3 text-sm text-foreground">
           <ul className="list-disc ml-5 space-y-1">
             <li>Agchange is a marketplace only and does not take custody, possession, or control of animals.</li>
             <li>Health and legality representations are made solely by the seller.</li>

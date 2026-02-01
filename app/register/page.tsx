@@ -87,8 +87,12 @@ export default function RegisterPage() {
                 const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
 
                 if (!hasAcceptedTerms) {
-                  // User hasn't accepted terms - redirect to acceptance page
+                  // User hasn't accepted terms - redirect to acceptance page (same as email sign-up)
                   const nextUrl = getRedirectPath();
+                  toast({
+                    title: 'Account created',
+                    description: 'Please accept the terms to continue.',
+                  });
                   router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
                   return;
                 }
@@ -101,8 +105,12 @@ export default function RegisterPage() {
                 router.push(getRedirectPath());
               } catch (error) {
                 console.error('Error checking user profile after Google redirect:', error);
-                // If we can't check profile, redirect to terms acceptance to be safe
+                // If we can't check profile, redirect to terms acceptance to be safe (same as email)
                 const nextUrl = getRedirectPath();
+                toast({
+                  title: 'Account created',
+                  description: 'Please accept the terms to continue.',
+                });
                 router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
               }
             })
@@ -256,30 +264,13 @@ export default function RegisterPage() {
           /* ignore */
         }
 
-        // Record legal acceptance server-side (non-spoofable).
-        try {
-          const token = await getIdToken(userCredential.user, true);
-          await fetch('/api/legal/accept', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              docs: ['tos', 'marketplacePolicies', 'buyerAcknowledgment', 'sellerPolicy'],
-            }),
-          });
-        } catch {
-          // If this fails, the RequireAuth gate will force acceptance later.
-        }
-
+        // Same as Google sign-up: send user to legal/accept to accept terms, then redirect to dashboard
+        const nextUrl = getRedirectPath();
         toast({
-          title: 'Account created successfully!',
-          description: 'Welcome to Agchange! Please check your email to verify your account.',
+          title: 'Account created',
+          description: 'Please accept the terms to continue. Check your email to verify your account.',
         });
-
-        // Redirect to saved path or dashboard after successful registration
-        router.push(getRedirectPath());
+        router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
       }
     } catch (error: any) {
       try {
@@ -318,8 +309,12 @@ export default function RegisterPage() {
           const hasAcceptedTerms = profile?.legal?.tos?.version === requiredVersion;
 
           if (!hasAcceptedTerms) {
-            // User hasn't accepted terms - redirect to acceptance page
+            // User hasn't accepted terms - redirect to acceptance page (same as email sign-up)
             const nextUrl = getRedirectPath();
+            toast({
+              title: 'Account created',
+              description: 'Please accept the terms to continue.',
+            });
             router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
             setIsLoading(false);
             return;
@@ -335,8 +330,12 @@ export default function RegisterPage() {
           router.push(getRedirectPath());
         } catch (error) {
           console.error('Error checking user profile after Google sign up:', error);
-          // If we can't check profile, redirect to terms acceptance to be safe
+          // If we can't check profile, redirect to terms acceptance to be safe (same as email)
           const nextUrl = getRedirectPath();
+          toast({
+            title: 'Account created',
+            description: 'Please accept the terms to continue.',
+          });
           router.push(`/legal/accept?next=${encodeURIComponent(nextUrl)}`);
         }
       }
