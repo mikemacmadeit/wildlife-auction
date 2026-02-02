@@ -79,7 +79,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
     <div className={className}>
       <div className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3">
         <p className="text-sm font-medium text-foreground/90">Your delivery PIN</p>
-        <p className="text-xs text-muted-foreground mt-0.5">Enter this when the driver hands you their phone at delivery. Only you have this PIN.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">The seller or driver will ask for this when they arrive. Enter it on their phone to unlock the signature and photo steps — only you have this PIN.</p>
         <div className="mt-2 flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-muted-foreground" />
           <span className="font-mono text-lg font-semibold tracking-wider">{pin}</span>

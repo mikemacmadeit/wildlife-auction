@@ -529,6 +529,11 @@ export async function POST(request: Request) {
 
     if (needsReview) {
       const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
+      const attrsQtyPending = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+      const isFixedMultiQtyPending = String((listingData as any)?.type || '') === 'fixed' && attrsQtyPending > 1;
+      const inventoryInitPending = isFixedMultiQtyPending
+        ? { quantityTotal: Math.max(1, Math.floor(attrsQtyPending)), quantityAvailable: Math.max(1, Math.floor(attrsQtyPending)) }
+        : {};
       await listingRef.update({
         category: normalizedCategory,
         status: 'pending',
@@ -539,6 +544,7 @@ export async function POST(request: Request) {
         sellerTierWeightSnapshot: sellerTierWeight,
         sellerSnapshot: publicSellerSnapshot,
         ...flagUpdate,
+        ...inventoryInitPending,
       });
 
       // Generate AI summary immediately when listing goes to pending
@@ -707,6 +713,12 @@ export async function POST(request: Request) {
     // Publish listing (non-review categories)
     const now = Timestamp.now();
     const durationDays = coerceDurationDays((listingData as any)?.durationDays, 7);
+    // Initialize inventory tracking for fixed multi-quantity listings (fixed_group)
+    const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
+    const isFixedMultiQty = String((listingData as any)?.type || '') === 'fixed' && attrsQty > 1;
+    const inventoryInit = isFixedMultiQty
+      ? { quantityTotal: Math.max(1, Math.floor(attrsQty)), quantityAvailable: Math.max(1, Math.floor(attrsQty)) }
+      : {};
     // startAt/endAt are only set when the listing becomes ACTIVE (not pending review).
     const startAt = now;
     const endAtMs = computeEndAt(startAt.toMillis(), durationDays);
@@ -735,6 +747,7 @@ export async function POST(request: Request) {
       sellerTierWeightSnapshot: sellerTierWeight,
       sellerSnapshot: publicSellerSnapshot,
       ...flagUpdate,
+      ...inventoryInit,
     });
 
     logInfo('Listing published', {

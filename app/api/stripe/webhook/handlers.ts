@@ -709,7 +709,8 @@ export async function handleCheckoutSessionCompleted(
       }
     }
 
-    // When creating a new order (no pre-created order), reserve inventory for multi-quantity in the same transaction.
+    // For multi-quantity (fixed_group) listings: always decrement inventory when payment succeeds.
+    // Previously we only did this when !existingOrderData; create-session pre-creates orders, so inventory was never decremented for card checkout.
     const attrsQty = Number((listingData as any)?.attributes?.quantity ?? 1) || 1;
     const liveQuantityTotal =
       typeof (listingData as any)?.quantityTotal === 'number' && Number.isFinite((listingData as any).quantityTotal)
@@ -717,7 +718,7 @@ export async function handleCheckoutSessionCompleted(
         : Math.max(1, Math.floor(attrsQty));
     const isMultiQtyCreate = liveQuantityTotal > 1;
 
-    if (!existingOrderData && isMultiQtyCreate) {
+    if (isMultiQtyCreate) {
       const listingSnap = await listingRef.get();
       if (!listingSnap.exists) {
         logError('Listing not found when creating multi-qty order', undefined, { requestId, listingId, checkoutSessionId });
@@ -747,13 +748,22 @@ export async function handleCheckoutSessionCompleted(
         const lSnap = await tx.get(listingRef);
         if (!lSnap.exists) throw new Error('Listing not found');
         const d = lSnap.data() as any;
+        const existingRes = await tx.get(reservationRef);
+        const alreadyProcessed = existingRes.exists;
         const avail =
           typeof d?.quantityAvailable === 'number' && Number.isFinite(d.quantityAvailable)
             ? Math.max(0, Math.floor(d.quantityAvailable))
-            : (typeof d?.quantityTotal === 'number' ? Math.max(0, Math.floor(d.quantityTotal)) : 1);
-        if (avail < quantityFromMeta) throw new Error('Insufficient quantity');
+            : (typeof d?.quantityTotal === 'number' ? Math.max(0, Math.floor(d.quantityTotal)) : liveQuantityTotal);
+        if (!alreadyProcessed && avail < quantityFromMeta) throw new Error('Insufficient quantity');
         tx.set(orderRef, sanitizedOrder, { merge: true });
-        tx.set(listingRef, { quantityAvailable: avail - quantityFromMeta, updatedAt: Timestamp.fromDate(now), updatedBy: 'system' }, { merge: true });
+        if (!alreadyProcessed) {
+          tx.set(listingRef, {
+            quantityTotal: liveQuantityTotal,
+            quantityAvailable: avail - quantityFromMeta,
+            updatedAt: Timestamp.fromDate(now),
+            updatedBy: 'system',
+          }, { merge: true });
+        }
         tx.set(reservationRef, {
           id: orderRef.id,
           orderId: orderRef.id,

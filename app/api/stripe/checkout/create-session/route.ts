@@ -494,6 +494,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Quantity is only supported for Buy Now listings', code: 'QUANTITY_NOT_SUPPORTED' }, { status: 400 });
     }
 
+    // Enforce available inventory for multi-quantity fixed listings
+    if (isMultiQuantityEligible && quantityTotal > 1) {
+      const quantityAvailable =
+        typeof (listingData as any)?.quantityAvailable === 'number' && Number.isFinite((listingData as any).quantityAvailable)
+          ? Math.max(0, Math.floor((listingData as any).quantityAvailable))
+          : quantityTotal;
+      if (quantityRequested > quantityAvailable) {
+        return NextResponse.json(
+          { error: `Only ${quantityAvailable} available. Please reduce quantity.`, code: 'QUANTITY_EXCEEDS_AVAILABLE' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Group lot: listing price is for the entire lot. Otherwise per-unit * quantity.
     const isGroupLot = isGroupLotQuantityMode((listingData as any)?.attributes?.quantityMode);
     const purchaseTotalAmount = isGroupLot ? purchaseAmount : purchaseAmount * quantityRequested;

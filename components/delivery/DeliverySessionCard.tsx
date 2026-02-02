@@ -1,14 +1,13 @@
 'use client';
 
 /**
- * Seller-only: create delivery session, show driver link and QR for buyer signature.
+ * Seller-only: create delivery session, show driver link and buyer link.
  * Shown when order is DELIVERY_SCHEDULED (buyer confirmed delivery date).
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { QrCode, Copy, Check, Loader2 } from 'lucide-react';
-import QRCode from 'qrcode';
+import { Copy, Check, Loader2 } from 'lucide-react';
 
 interface DeliverySessionCardProps {
   orderId: string;
@@ -19,7 +18,6 @@ interface DeliverySessionCardProps {
 interface SessionData {
   driverLink: string;
   buyerConfirmLink: string;
-  qrValue: string;
   expiresAt?: string;
 }
 
@@ -27,7 +25,6 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<SessionData | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState('');
   const [copied, setCopied] = useState<'driver' | 'buyer' | null>(null);
   const getAuthTokenRef = useRef(getAuthToken);
   const onErrorRef = useRef(onError);
@@ -63,14 +60,8 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
       setSession({
         driverLink: data.driverLink,
         buyerConfirmLink: data.buyerConfirmLink,
-        qrValue: data.qrValue || data.buyerConfirmLink,
         expiresAt: data.expiresAt,
       });
-      if (data.qrValue || data.buyerConfirmLink) {
-        QRCode.toDataURL(data.qrValue || data.buyerConfirmLink, { width: 200, margin: 2 })
-          .then(setQrDataUrl)
-          .catch(() => {});
-      }
     } catch (e: any) {
       const msg = e?.message || 'Failed to load session';
       setSetupError(msg);
@@ -135,19 +126,6 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
           Copy Buyer Link
         </Button>
       </div>
-      {qrDataUrl && (
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white rounded border">
-            <img src={qrDataUrl} alt="Buyer signature QR" className="w-[120px] h-[120px]" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <QrCode className="h-3 w-3" />
-              Same 3 steps at handoff
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

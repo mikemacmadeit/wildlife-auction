@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, Calendar, MapPin, Clock, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, Calendar, MapPin, Clock, CheckCircle2, ClipboardList } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -30,7 +30,7 @@ import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { DeliverySessionCard } from '@/components/delivery/DeliverySessionCard';
 import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
-import { OpenDeliveryChecklistButton } from '@/components/delivery/OpenDeliveryChecklistButton';
+import { DeliveryChecklistModal } from '@/components/delivery/DeliveryChecklistModal';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
@@ -80,6 +80,7 @@ export default function SellerOrderDetailPage() {
   const [deliveryProposalNotes, setDeliveryProposalNotes] = useState('');
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
+  const [deliveryChecklistOpen, setDeliveryChecklistOpen] = useState(false);
   const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
   const [trackingProcessing, setTrackingProcessing] = useState<'start' | 'stop' | 'delivered' | null>(null);
   const loadOrder = useCallback(async () => {
@@ -369,24 +370,57 @@ export default function SellerOrderDetailPage() {
               const outTxStatus = getEffectiveTransactionStatus(o);
               const needsMarkOut = milestone.isCurrent && outTxStatus === 'DELIVERY_SCHEDULED';
               const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
+              const hasDeliveryProof = qrSignedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
+
+              // When complete, show "Complete" + delivery proof only (no instructions)
+              if (outTxStatus === 'COMPLETED') {
+                return (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm font-semibold text-primary">Complete</p>
+                    {hasDeliveryProof && (
+                      <DeliveryProofTimelineBlock
+                        signedLabel="Recipient signed for delivery"
+                        signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
+                        signatureUrl={(o.delivery as any)?.signatureUrl}
+                        deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
+                      />
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <div className="mt-3 space-y-3">
                   <p className="text-sm font-medium text-foreground/90">Delivering?</p>
                   <p className="text-xs text-muted-foreground">Open the checklist at handoff — recipient enters PIN, signs, you take a photo.</p>
                   <div className="flex flex-wrap gap-2">
                     {user && (
-                      <OpenDeliveryChecklistButton
-                        orderId={o.id}
-                        getAuthToken={async () => {
-                          const { auth } = await import('@/lib/firebase/config');
-                          const u = auth.currentUser;
-                          if (!u) throw new Error('Auth required');
-                          return u.getIdToken();
-                        }}
-                        onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
-                        variant="default"
-                        className="min-h-[44px] touch-manipulation"
-                      />
+                      <>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setDeliveryChecklistOpen(true)}
+                          className="min-h-[44px] touch-manipulation"
+                        >
+                          <ClipboardList className="h-4 w-4 mr-2" />
+                          Open delivery checklist
+                        </Button>
+                        <DeliveryChecklistModal
+                          orderId={o.id}
+                          getAuthToken={async () => {
+                            const { auth } = await import('@/lib/firebase/config');
+                            const u = auth.currentUser;
+                            if (!u) throw new Error('Auth required');
+                            return u.getIdToken();
+                          }}
+                          onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
+                          open={deliveryChecklistOpen}
+                          onOpenChange={(open) => {
+                            setDeliveryChecklistOpen(open);
+                            if (!open) void loadOrder();
+                          }}
+                        />
+                      </>
                     )}
                   </div>
                   <DeliveryTrackingCard

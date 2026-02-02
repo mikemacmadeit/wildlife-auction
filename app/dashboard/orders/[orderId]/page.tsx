@@ -649,7 +649,7 @@ export default function BuyerOrderDetailPage() {
                 return (
                   <div className="mt-3 space-y-3">
                     <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                      The seller will start delivery during the scheduled window. You can confirm receipt once it arrives.
+                      The seller or driver will deliver during the scheduled window. When they arrive, they&apos;ll hand you their phone and ask for your PIN — enter it to unlock the signature and photo steps, then sign and they&apos;ll snap a photo. That completes the delivery.
                     </div>
                     <BuyerDeliveryPin
                       orderId={o.id}
@@ -684,7 +684,7 @@ export default function BuyerOrderDetailPage() {
                       <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
                       {!order?.deliveryTracking?.enabled && (
                         <p className="text-sm text-muted-foreground">
-                          Live tracking will appear when the seller starts delivery. When the driver arrives, they&apos;ll hand you their phone to enter your PIN, sign, and complete delivery.
+                          Live tracking will appear when the seller starts delivery. When they arrive, they&apos;ll hand you their phone — enter your PIN to unlock the signature and photo steps, then sign and they&apos;ll take a photo to complete delivery.
                         </p>
                       )}
                       {qrSignedAt && (
@@ -701,9 +701,9 @@ export default function BuyerOrderDetailPage() {
                   </Collapsible>
                 );
               }
-              if (qrSignedAt && (milestone.isCurrent || milestone.isComplete) && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'COMPLETED')) {
+              if (qrSignedAt && (milestone.isCurrent || milestone.isComplete) && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY')) {
                 return (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-3">
                     <DeliveryProofTimelineBlock
                       signedLabel="You signed for delivery"
                       signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
@@ -715,6 +715,21 @@ export default function BuyerOrderDetailPage() {
               }
             }
             if (milestone.key === 'confirm_receipt') {
+              const hasDeliveryProofFromChecklist = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
+              if (hasDeliveryProofFromChecklist) {
+                return (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm font-semibold text-primary">Complete</p>
+                    <p className="text-sm text-muted-foreground">Delivery confirmed via checklist (PIN, signature, photo). No action needed.</p>
+                    <DeliveryProofTimelineBlock
+                      signedLabel="You signed for delivery"
+                      signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
+                      signatureUrl={(o.delivery as any)?.signatureUrl}
+                      deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
+                    />
+                  </div>
+                );
+              }
               if (milestone.isCurrent && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'OUT_FOR_DELIVERY')) {
                 return (
                   <div id="confirm-receipt-section" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
