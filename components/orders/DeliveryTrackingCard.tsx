@@ -16,20 +16,27 @@ import { getDatabase } from '@/lib/firebase/rtdb';
 
 const STALE_SECONDS = 60;
 
-/** Triggers browser location prompt; returns true if granted. Uses low-accuracy for faster initial response on mobile. */
+/** Triggers browser location prompt; returns true if granted. Mobile-friendly options. */
 function requestLocationPermission(): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(false);
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       () => resolve(true),
-      (err) => {
-        // code 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
-        resolve(false);
-      },
-      { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 }
+      () => resolve(false),
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60000, // Allow cached position for faster response on mobile
+        timeout: 20000,
+      }
     );
   });
 }
+
+const LOCATION_DENIED_INSTRUCTIONS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  ? 'On iPhone: Settings → Safari → Location → set to "Ask" or "Allow". Or tap the aA icon in the address bar → Website Settings → Location → Allow. Then refresh.'
+  : typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+    ? 'On Android: Tap the lock icon in the address bar → Site settings → Location → Allow. Or in Chrome: Settings → Site settings → Location. Then refresh.'
+    : 'In your browser or device Settings, allow location access for this site. Then refresh the page.';
 
 export interface DeliveryTrackingCardProps {
   order: Order;
@@ -188,7 +195,7 @@ export function DeliveryTrackingCard({
                   <div>
                     <div className="font-semibold">Location permission required</div>
                     <div className="text-xs mt-1 text-amber-800 dark:text-amber-200">
-                      Tap the button below to allow location access. If you previously denied, enable it in your browser or device Settings.
+                      {LOCATION_DENIED_INSTRUCTIONS}
                     </div>
                   </div>
                 </div>

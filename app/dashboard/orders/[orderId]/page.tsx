@@ -741,16 +741,30 @@ export default function BuyerOrderDetailPage() {
                 );
               }
               if (milestone.isComplete && txStatus === 'COMPLETED') {
-                if (o.protectedTransactionDaysSnapshot && (o.buyerConfirmedAt ?? o.buyerAcceptedAt ?? o.acceptedAt)) {
-                  const confirmedAt = o.buyerConfirmedAt ?? o.buyerAcceptedAt ?? o.acceptedAt;
-                  const windowEnd = new Date(confirmedAt!.getTime() + o.protectedTransactionDaysSnapshot! * 24 * 60 * 60 * 1000);
-                  const withinWindow = Date.now() < windowEnd.getTime();
-                  const hoursLeft = (windowEnd.getTime() - Date.now()) / (1000 * 60 * 60);
-                  const daysLeft = Math.floor(hoursLeft / 24);
-                  const hrs = Math.floor(hoursLeft % 24);
-                  const endsInLabel = daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} ${hrs}h` : `${Math.max(0, Math.floor(hoursLeft))} hours`;
-                  return withinWindow ? (
-                    <div id="report-issue" className="mt-3 space-y-3 scroll-mt-24">
+                const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
+                const hasDeliveryProof = qrSignedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
+                return (
+                  <div className="mt-3 space-y-3">
+                    {hasDeliveryProof && (
+                      <DeliveryProofTimelineBlock
+                        signedLabel="You signed for delivery"
+                        signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
+                        signatureUrl={(o.delivery as any)?.signatureUrl}
+                        deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
+                      />
+                    )}
+                    {(() => {
+                      const confirmedAt = o.buyerConfirmedAt ?? o.buyerAcceptedAt ?? o.acceptedAt;
+                      const windowEnd = o.protectedTransactionDaysSnapshot && confirmedAt
+                        ? new Date(confirmedAt.getTime() + o.protectedTransactionDaysSnapshot * 24 * 60 * 60 * 1000)
+                        : null;
+                      const withinWindow = windowEnd && Date.now() < windowEnd.getTime();
+                      const hoursLeft = windowEnd ? (windowEnd.getTime() - Date.now()) / (1000 * 60 * 60) : 0;
+                      const daysLeft = Math.floor(hoursLeft / 24);
+                      const hrs = Math.floor(hoursLeft % 24);
+                      const endsInLabel = daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} ${hrs}h` : `${Math.max(0, Math.floor(hoursLeft))} hours`;
+                      return withinWindow ? (
+                    <div id="report-issue" className="space-y-3 scroll-mt-24">
                       <div className="text-sm text-muted-foreground">Post-delivery review window active — ends in {endsInLabel}</div>
                       <Button variant="outline" className="w-full sm:w-auto min-h-[44px] touch-manipulation" disabled={processing !== null} onClick={async () => {
                         try {
@@ -772,8 +786,9 @@ export default function BuyerOrderDetailPage() {
                   ) : (
                     <p className="mt-3 text-sm text-muted-foreground">This sale is final.</p>
                   );
-                }
-                return <p className="mt-3 text-sm text-muted-foreground">This sale is final.</p>;
+                    })()}
+                  </div>
+                );
               }
             }
             return null;

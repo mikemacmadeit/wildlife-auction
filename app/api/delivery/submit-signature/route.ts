@@ -144,10 +144,13 @@ export async function POST(request: Request) {
     }
     const orderData = orderDoc.data()!;
 
-    const orderUpdate = sanitizeFirestorePayload({
-      transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' as TransactionStatus,
-      status: 'delivered',
+    const orderUpdateBase: Record<string, unknown> = {
+      transactionStatus: 'COMPLETED' as TransactionStatus,
+      status: 'buyer_confirmed',
       deliveredAt: now,
+      buyerConfirmedAt: now,
+      acceptedAt: now,
+      buyerAcceptedAt: now,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
       'delivery.sessionId': payload.sessionId,
@@ -159,7 +162,12 @@ export async function POST(request: Request) {
       'delivery.proofUploads': [
         { type: 'DELIVERY_PROOF', url: signatureUrl, uploadedAt: now },
       ],
-    });
+    };
+    if (orderData.protectedTransactionDaysSnapshot && (!orderData.protectedDisputeStatus || orderData.protectedDisputeStatus === 'none')) {
+      orderUpdateBase.status = 'ready_to_release';
+      (orderUpdateBase as any).payoutHoldReason = 'none';
+    }
+    const orderUpdate = sanitizeFirestorePayload(orderUpdateBase);
     await orderRef.update(orderUpdate);
 
     await orderRef.collection('documents').add({
@@ -222,9 +230,31 @@ export async function POST(request: Request) {
       console.error('Error emitting Order.Delivered notification:', e);
     }
 
+    try {
+      const listingDoc = await db.collection('listings').doc(orderData.listingId).get();
+      const listingTitle = (listingDoc.data() as any)?.title || 'Your order';
+      await emitAndProcessEventForUser({
+        type: 'Order.ReceiptConfirmed',
+        actorId: orderData.buyerId,
+        entityType: 'order',
+        entityId: payload.orderId,
+        targetUserId: orderData.sellerId,
+        payload: {
+          type: 'Order.ReceiptConfirmed',
+          orderId: payload.orderId,
+          listingId: orderData.listingId,
+          listingTitle,
+          orderUrl: `${getSiteUrl()}/seller/orders/${payload.orderId}`,
+        },
+        optionalHash: `qr_receipt_confirmed:${now.getTime()}`,
+      });
+    } catch (e) {
+      console.error('Error emitting Order.ReceiptConfirmed:', e);
+    }
+
     return json({
       success: true,
-      message: 'Delivery confirmed. Thank you!',
+      message: 'Delivery confirmed. Transaction complete.',
     });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {

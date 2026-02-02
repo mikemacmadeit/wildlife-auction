@@ -30,6 +30,7 @@ import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { DeliverySessionCard } from '@/components/delivery/DeliverySessionCard';
 import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
+import { OpenDeliveryChecklistButton } from '@/components/delivery/OpenDeliveryChecklistButton';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
@@ -370,8 +371,24 @@ export default function SellerOrderDetailPage() {
               const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
               return (
                 <div className="mt-3 space-y-3">
-                  <p className="text-sm font-medium text-foreground/90">Delivering yourself?</p>
-                  <p className="text-xs text-muted-foreground">Use live tracking and mark delivered when done.</p>
+                  <p className="text-sm font-medium text-foreground/90">Delivering?</p>
+                  <p className="text-xs text-muted-foreground">Open the checklist at handoff — recipient enters PIN, signs, you take a photo.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {user && (
+                      <OpenDeliveryChecklistButton
+                        orderId={o.id}
+                        getAuthToken={async () => {
+                          const { auth } = await import('@/lib/firebase/config');
+                          const u = auth.currentUser;
+                          if (!u) throw new Error('Auth required');
+                          return u.getIdToken();
+                        }}
+                        onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
+                        variant="default"
+                        className="min-h-[44px] touch-manipulation"
+                      />
+                    )}
+                  </div>
                   <DeliveryTrackingCard
                     order={o}
                     role="seller"
@@ -431,8 +448,8 @@ export default function SellerOrderDetailPage() {
                   )}
 
                   <div className="pt-2 border-t border-border/60">
-                    <p className="text-sm font-medium text-foreground/90">Not delivering yourself?</p>
-                    <p className="text-xs text-muted-foreground mb-2">Send the driver link to whoever is transporting. They open it and follow 3 steps: recipient enters their PIN (from their order page), recipient signs, then driver uploads photo of delivery.</p>
+                    <p className="text-sm font-medium text-foreground/90">Someone else delivering?</p>
+                    <p className="text-xs text-muted-foreground mb-2">Send them the driver link. Same steps at handoff.</p>
                     {user && (outTxStatus === 'DELIVERY_SCHEDULED' || outTxStatus === 'OUT_FOR_DELIVERY') && (
                       <DeliverySessionCard
                         orderId={o.id}

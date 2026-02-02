@@ -143,7 +143,7 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <QrCode className="h-3 w-3" />
-              Buyer enters their PIN on driver&apos;s phone at delivery
+              Same 3 steps at handoff
             </p>
           </div>
         </div>

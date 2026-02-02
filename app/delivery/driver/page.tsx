@@ -111,7 +111,23 @@ export default function DeliveryDriverPage() {
   const startTracking = async () => {
     if (!token || trackingLoading) return;
     setTrackingLoading(true);
+    setLocationDenied(false);
     try {
+      // Request permission first — on mobile, getCurrentPosition triggers the prompt; watchPosition may fail if never granted
+      if ('geolocation' in navigator) {
+        const granted = await new Promise<boolean>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            () => resolve(true),
+            () => resolve(false),
+            { enableHighAccuracy: false, maximumAge: 60000, timeout: 20000 }
+          );
+        });
+        if (!granted) {
+          setLocationDenied(true);
+          setTrackingLoading(false);
+          return;
+        }
+      }
       const res = await fetch('/api/delivery/start-tracking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -329,7 +345,17 @@ export default function DeliveryDriverPage() {
               </div>
             )}
             {locationDenied && (
-              <p className="text-xs text-amber-600">Location denied. You can still complete delivery below.</p>
+              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-200">Location denied</p>
+                <p className="text-xs mt-1 text-amber-700 dark:text-amber-300">
+                  {typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+                    ? 'On iPhone: Settings → Safari → Location → set to "Ask" or "Allow". Or tap the aA icon in the address bar → Website Settings → Location → Allow. Then refresh and try again.'
+                    : typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+                      ? 'On Android: Tap the lock icon in the address bar → Site settings → Location → Allow. Then refresh and try again.'
+                      : 'Allow location in your browser settings, then refresh and try again.'}
+                </p>
+                <p className="text-xs mt-1 text-muted-foreground">You can still complete delivery below without tracking.</p>
+              </div>
             )}
           </CardContent>
         </Card>
