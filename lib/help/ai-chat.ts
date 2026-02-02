@@ -151,7 +151,7 @@ export async function generateKBGroundedChatResponse(
       
       if (queryLower.includes('fee') || queryLower.includes('cost') || queryLower.includes('how much')) {
         return {
-          answer: "Seller fees: You only pay fees when your item sells (no listing fees). Platform fee is typically 5-10% of the final sale price, depending on your seller tier. Payment processing fees (Stripe) are about 2.9% + $0.30 per transaction. So if you sell an item for $1,000, you might pay $80 platform fee + $29.30 processing = $109.30 total, and receive $890.70. Buyers don't pay any fees - they just pay the listing price. All fees are transparent and shown before you publish. Want more details? Check 'Seller Fees Explained' in our help articles!",
+          answer: "Seller fees: You only pay fees when your item sells (no listing fees). Platform fee is a flat 10% of the final sale price for all sellers. Payment processing is included. So if you sell an item for $1,000, you pay a $100 platform fee and receive $900. Buyers don't pay any fees - they just pay the listing price. All fees are transparent and shown before you publish. You get paid instantly when the buyer completes checkout!",
           sources: [],
           kbAvailable: true,
         };

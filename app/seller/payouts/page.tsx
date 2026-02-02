@@ -731,7 +731,7 @@ export default function SellerPayoutsPage() {
                   )}
                   
                   <p className="pt-2 text-xs text-muted-foreground">
-                    Agchange takes a 5% platform fee on each transaction. The remaining amount is transferred directly to your bank account.
+                    Agchange takes a 10% platform fee on each sale. The remaining 90% is transferred directly to your Stripe account when the buyer pays.
                   </p>
                 </div>
               </CardContent>
@@ -744,18 +744,18 @@ export default function SellerPayoutsPage() {
           <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:pb-3 md:px-6">
               <CardTitle className="text-xs md:text-base font-bold uppercase tracking-wide text-muted-foreground leading-tight">
-                Available Balance
+                Total Paid Out
               </CardTitle>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center shrink-0">
-                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/10 border-2 border-green-500/20 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-500" />
               </div>
             </CardHeader>
             <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
               <div className="text-xl md:text-4xl font-extrabold text-foreground mb-0.5 md:mb-1">
-                {formatCurrency(totalAvailable)}
+                {formatCurrency(completedPayouts.reduce((sum, p) => sum + p.sellerAmount, 0))}
               </div>
               <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
-                Ready for payout
+                {completedPayouts.length} sale{completedPayouts.length !== 1 ? 's' : ''} completed
               </p>
             </CardContent>
           </Card>
@@ -763,10 +763,10 @@ export default function SellerPayoutsPage() {
           <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:pb-3 md:px-6">
               <CardTitle className="text-xs md:text-base font-bold uppercase tracking-wide text-muted-foreground leading-tight">
-                Pending Payouts
+                Awaiting Payment
               </CardTitle>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 border-2 border-primary/20 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-yellow-500/10 border-2 border-yellow-500/20 flex items-center justify-center shrink-0">
+                <Clock className="h-4 w-4 md:h-5 md:w-5 text-yellow-500" />
               </div>
             </CardHeader>
             <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
@@ -774,7 +774,7 @@ export default function SellerPayoutsPage() {
                 {formatCurrency(totalPending)}
               </div>
               <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
-                Awaiting buyer payment
+                {pendingPayouts.length} buyer{pendingPayouts.length !== 1 ? 's' : ''} completing checkout
               </p>
             </CardContent>
           </Card>
@@ -795,18 +795,18 @@ export default function SellerPayoutsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
                 <p className="text-sm font-semibold text-foreground mb-1">Transaction Fee</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">5%</p>
-                <p className="text-xs text-muted-foreground">Flat marketplace fee for all sellers (Seller tiers do not change fees)</p>
+                <p className="text-2xl font-extrabold text-primary mb-1">10%</p>
+                <p className="text-xs text-muted-foreground">Flat marketplace fee on all sales</p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
-                <p className="text-sm font-semibold text-foreground mb-1">Subscription</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">0%</p>
-                <p className="text-xs text-muted-foreground">Free to list (plans available)</p>
+                <p className="text-sm font-semibold text-foreground mb-1">Listing Fee</p>
+                <p className="text-2xl font-extrabold text-primary mb-1">$0</p>
+                <p className="text-xs text-muted-foreground">Free to list, only pay when you sell</p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-background/50">
-                <p className="text-sm font-semibold text-foreground mb-1">Services</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">Varies</p>
-                <p className="text-xs text-muted-foreground">Verification and transport</p>
+                <p className="text-sm font-semibold text-foreground mb-1">Payout Timing</p>
+                <p className="text-2xl font-extrabold text-primary mb-1">Instant</p>
+                <p className="text-xs text-muted-foreground">Paid when buyer completes checkout</p>
               </div>
             </div>
           </CardContent>
