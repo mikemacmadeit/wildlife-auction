@@ -15,12 +15,6 @@ import { cn } from '@/lib/utils';
 import { formatDate, formatDistanceToNow, isValidNonEpochDate } from '@/lib/utils';
 import type { Order } from '@/lib/types';
 import { getOrderMilestones, type MilestoneOwnerRole, type OrderMilestone } from '@/lib/orders/progress';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
 
 export type MilestoneTimelineRole = 'buyer' | 'seller' | 'admin';
 
@@ -28,7 +22,6 @@ export interface OrderMilestoneTimelineProps {
   order: Order;
   role?: MilestoneTimelineRole;
   className?: string;
-  showHelpText?: boolean;
   /** Optional content below the timeline (e.g. report issue after completion) */
   footer?: React.ReactNode;
   /** Render step-specific info (address, scheduled time, actions) under each milestone */
@@ -46,7 +39,6 @@ export function OrderMilestoneTimeline({
   order,
   role = 'buyer',
   className,
-  showHelpText = true,
   footer,
   renderMilestoneDetail,
 }: OrderMilestoneTimelineProps) {
@@ -145,31 +137,6 @@ export function OrderMilestoneTimeline({
                           </span>
                         )}
                       </div>
-
-                      {/* Help text — use prominent button when this is the current step */}
-                      {showHelpText && milestone.helpText && (
-                        <Collapsible>
-                          <CollapsibleTrigger asChild>
-                            <button
-                              type="button"
-                              className={cn(
-                                'mt-2 inline-flex items-center gap-1.5 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] touch-manipulation',
-                                isCurrent && !isBlocked
-                                  ? 'bg-primary text-primary-foreground px-3 py-2.5 text-xs ring-1 ring-primary/30 hover:bg-primary/90'
-                                  : 'text-xs text-muted-foreground hover:text-foreground px-2 py-2'
-                              )}
-                            >
-                              <ChevronDown className="h-3.5 w-3.5" />
-                              Learn more
-                            </button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="text-xs text-muted-foreground mt-2 pl-4 border-l-2 border-border">
-                              {milestone.helpText}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
 
                       {/* Blocked reason */}
                       {isBlocked && milestone.isBlocked && (

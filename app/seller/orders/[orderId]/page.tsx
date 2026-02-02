@@ -27,11 +27,10 @@ import { getListingById } from '@/lib/firebase/listings';
 import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
-import { NextActionBanner } from '@/components/orders/NextActionBanner';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
+import { DeliverySessionCard } from '@/components/delivery/DeliverySessionCard';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
-import { getNextRequiredAction } from '@/lib/orders/progress';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
@@ -172,42 +171,11 @@ export default function SellerOrderDetailPage() {
               </div>
             )}
 
-            {txStatus && ['FULFILLMENT_REQUIRED', 'PAID'].includes(txStatus) && order.delivery?.buyerAddress && (
-              <>
-                <div className="text-sm text-foreground/90 leading-relaxed">
-                  Use the <strong>Propose delivery date</strong> button above to offer date and time windows. The buyer will pick one, then you coordinate the delivery.
-                </div>
-                <Separator />
-              </>
-            )}
-
             {txStatus === 'DELIVERY_PROPOSED' && (
               <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
                 <div className="font-semibold text-blue-900 dark:text-blue-100">{ORDER_COPY.chooseDeliveryDate.waitingForBuyer}</div>
                 <div className="text-xs mt-1">{ORDER_COPY.chooseDeliveryDate.waitingForBuyerDescription}</div>
               </div>
-            )}
-
-            {txStatus === 'DELIVERY_SCHEDULED' && (
-              <>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm">Mark Out for Delivery</div>
-                    <div className="text-xs text-muted-foreground">Confirm the order is on the way to the buyer.</div>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="lg"
-                    className="w-full shrink-0 sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30 justify-center"
-                    disabled={processing !== null}
-                    onClick={() => setMarkOutForDeliveryOpen(true)}
-                  >
-                    <Truck className="h-4 w-4 mr-2" />
-                    Mark Out for Delivery
-                  </Button>
-                </div>
-                <Separator />
-              </>
             )}
 
             {(txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') && (
@@ -330,90 +298,6 @@ export default function SellerOrderDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Next Step Card */}
-        {(() => {
-          const nextAction = getNextRequiredAction(order, 'seller');
-          if (!nextAction) return null;
-          
-          return (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="pt-4 sm:pt-6 px-4 sm:px-6">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-base mb-1">{nextAction.title}</div>
-                    <div className="text-sm text-foreground/90 leading-relaxed">{nextAction.description}</div>
-                    {nextAction.dueAt && (
-                      <div className="text-xs text-muted-foreground mt-2">
-                        Due: {formatDate(nextAction.dueAt)}
-                      </div>
-                    )}
-                    {nextAction.blockedReason && (
-                      <div className="text-xs text-destructive mt-2 bg-destructive/10 border border-destructive/20 rounded p-2">
-                        {nextAction.blockedReason}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    size="lg"
-                    className={cn(
-                      'w-full sm:w-auto shrink-0',
-                      nextAction.severity === 'danger'
-                        ? 'font-semibold'
-                        : nextAction.ctaAction.includes('schedule-delivery') ||
-                            nextAction.ctaAction.includes('mark-out') ||
-                            nextAction.ctaAction.includes('mark-delivered')
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md ring-2 ring-emerald-500/30'
-                          : 'shadow-warm ring-2 ring-primary/25 font-semibold'
-                    )}
-                    variant={
-                      nextAction.severity === 'danger'
-                        ? 'destructive'
-                        : nextAction.ctaAction.includes('schedule-delivery') ||
-                            nextAction.ctaAction.includes('mark-out') ||
-                            nextAction.ctaAction.includes('mark-delivered')
-                          ? 'default'
-                          : nextAction.severity === 'warning'
-                            ? 'default'
-                            : 'outline'
-                    }
-                    disabled={!!nextAction.blockedReason || (nextAction.ctaAction.includes('mark-delivered') && processing === 'delivered')}
-                    onClick={async () => {
-                      if (nextAction.ctaAction.includes('schedule-delivery')) {
-                        setScheduleDeliveryOpen(true);
-                      } else if (nextAction.ctaAction.includes('mark-out')) {
-                        setMarkOutForDeliveryOpen(true);
-                      } else if (nextAction.ctaAction.includes('mark-delivered')) {
-                        setMarkDeliveredOpen(true);
-                      } else if (nextAction.ctaAction.startsWith('/')) {
-                        window.location.href = nextAction.ctaAction;
-                      }
-                    }}
-                  >
-                    {nextAction.ctaAction.includes('mark-delivered') && processing === 'delivered' ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : null}
-                    {nextAction.ctaLabel}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
-
-        {/* Next Action Banner — hidden when Next Step Card already shows the same action to avoid duplicates */}
-        {!getNextRequiredAction(order, 'seller') && (
-          <NextActionBanner
-            order={order}
-            role="seller"
-            onAction={() => {
-              const txStatus = getEffectiveTransactionStatus(order);
-              if (txStatus === 'FULFILLMENT_REQUIRED') setScheduleDeliveryOpen(true);
-              else if (txStatus === 'DELIVERY_SCHEDULED') setMarkOutForDeliveryOpen(true);
-              else if (txStatus === 'OUT_FOR_DELIVERY') setMarkDeliveredOpen(true);
-            }}
-          />
-        )}
-
         {/* Compliance Transfer Panel (for regulated whitetail deals) */}
         <ComplianceTransferPanel
           order={order}
@@ -446,6 +330,29 @@ export default function SellerOrderDetailPage() {
                 </div>
               );
             }
+            if (milestone.key === 'schedule_delivery') {
+              if (milestone.isCurrent && getEffectiveTransactionStatus(o) === 'FULFILLMENT_REQUIRED' && o.delivery?.buyerAddress) {
+                return (
+                  <div id="schedule-delivery" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
+                    <p className="text-sm text-muted-foreground leading-relaxed">Offer date and time windows. The buyer will pick one that works.</p>
+                    <Button
+                      className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                      onClick={() => setScheduleDeliveryOpen(true)}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Propose delivery date
+                    </Button>
+                  </div>
+                );
+              }
+              if (milestone.isComplete && getEffectiveTransactionStatus(o) === 'DELIVERY_PROPOSED') {
+                return (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                    {ORDER_COPY.chooseDeliveryDate.waitingForBuyer}
+                  </div>
+                );
+              }
+            }
             if (milestone.key === 'agree_delivery' && milestone.isComplete && (o.delivery?.agreedWindow || o.delivery?.eta)) {
               const agreedWindow = o.delivery?.agreedWindow;
               const eta = o.delivery?.eta;
@@ -458,8 +365,22 @@ export default function SellerOrderDetailPage() {
               );
             }
             if (milestone.key === 'out_for_delivery' && (milestone.isCurrent || milestone.isComplete)) {
+              const outTxStatus = getEffectiveTransactionStatus(o);
+              const needsMarkOut = milestone.isCurrent && outTxStatus === 'DELIVERY_SCHEDULED';
               return (
-                <div className="mt-3">
+                <div className="mt-3 space-y-3">
+                  {needsMarkOut && user && (
+                    <DeliverySessionCard
+                      orderId={o.id}
+                      getAuthToken={async () => {
+                        const { auth } = await import('@/lib/firebase/config');
+                        const u = auth.currentUser;
+                        if (!u) throw new Error('Auth required');
+                        return u.getIdToken();
+                      }}
+                      onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
+                    />
+                  )}
                   <DeliveryTrackingCard
                     order={o}
                     role="seller"
@@ -502,6 +423,36 @@ export default function SellerOrderDetailPage() {
                       }
                     }}
                   />
+                  {needsMarkOut && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+                      <span className="text-sm text-muted-foreground">Or mark out without live tracking:</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto min-h-[44px] touch-manipulation shrink-0"
+                        disabled={!!processing}
+                        onClick={() => setMarkOutForDeliveryOpen(true)}
+                      >
+                        <Truck className="h-4 w-4 mr-2" />
+                        Mark out for delivery
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            if (milestone.key === 'delivered' && milestone.isCurrent && getEffectiveTransactionStatus(o) === 'OUT_FOR_DELIVERY') {
+              return (
+                <div id="mark-delivered" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
+                  <p className="text-sm text-muted-foreground leading-relaxed">Upload a photo of the animal at delivery, then mark as delivered.</p>
+                  <Button
+                    className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    disabled={!!processing}
+                    onClick={() => setMarkDeliveredOpen(true)}
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Mark delivered
+                  </Button>
                 </div>
               );
             }

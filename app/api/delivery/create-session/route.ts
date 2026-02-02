@@ -1,0 +1,162 @@
+/**
+ * POST /api/delivery/create-session
+ *
+ * Auth required (seller only). Creates a Delivery Session for an order when
+ * buyer has confirmed delivery date (DELIVERY_SCHEDULED).
+ *
+ * Returns sessionId, driverLink, buyerConfirmLink, qrValue.
+ */
+
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { nanoid } from 'nanoid';
+import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
+import { TransactionStatus } from '@/lib/types';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { signDeliveryToken } from '@/lib/delivery/tokens';
+import { getSiteUrl } from '@/lib/site-url';
+import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
+
+const bodySchema = { orderId: { type: 'string' } };
+
+function json(body: unknown, init?: { status?: number }) {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+export async function POST(request: Request) {
+  try {
+    const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);
+    const rateLimitResult = await rateLimitCheck(request as any);
+    if (!rateLimitResult.allowed) {
+      return json(rateLimitResult.body, { status: rateLimitResult.status });
+    }
+
+    const auth = getAdminAuth();
+    const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
+
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let decodedToken: { uid: string };
+    try {
+      decodedToken = await auth.verifyIdToken(authHeader.split('Bearer ')[1]!);
+    } catch {
+      return json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const sellerUid = decodedToken.uid;
+
+    const body = await request.json().catch(() => ({}));
+    const orderId = typeof body?.orderId === 'string' ? body.orderId : null;
+    if (!orderId) {
+      return json({ error: 'orderId required' }, { status: 400 });
+    }
+
+    const orderRef = db.collection('orders').doc(orderId);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+      return json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    const orderData = orderDoc.data()!;
+    if (orderData.sellerId !== sellerUid) {
+      return json({ error: 'Only the seller can create a delivery session' }, { status: 403 });
+    }
+
+    const txStatus = orderData.transactionStatus as TransactionStatus | undefined;
+    if (txStatus !== 'DELIVERY_SCHEDULED') {
+      return json(
+        {
+          error: 'Invalid status',
+          details: `Order must be DELIVERY_SCHEDULED (buyer confirmed delivery date). Current: ${txStatus || orderData.status}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const transportOption = orderData.transportOption || 'SELLER_TRANSPORT';
+    if (transportOption !== 'SELLER_TRANSPORT') {
+      return json({ error: 'Invalid transport', details: 'SELLER_TRANSPORT only' }, { status: 400 });
+    }
+
+    // Check for existing active session
+    const existing = await db
+      .collection('deliverySessions')
+      .where('orderId', '==', orderId)
+      .where('status', '==', 'active')
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      const existingDoc = existing.docs[0]!;
+      const data = existingDoc.data();
+      const driverToken = signDeliveryToken({
+        sessionId: existingDoc.id,
+        orderId,
+        role: 'driver',
+      });
+      const buyerToken = signDeliveryToken({
+        sessionId: existingDoc.id,
+        orderId,
+        role: 'buyer',
+      });
+      const baseUrl = getSiteUrl();
+      return json({
+        success: true,
+        sessionId: existingDoc.id,
+        driverLink: `${baseUrl}/delivery/driver?token=${encodeURIComponent(driverToken)}`,
+        buyerConfirmLink: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
+        qrValue: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
+        expiresAt: (data.expiresAt as any)?.toDate?.()?.toISOString?.(),
+      });
+    }
+
+    const sessionId = nanoid(24);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+
+    const sessionData = {
+      orderId,
+      sellerUid,
+      buyerUid: orderData.buyerId || null,
+      status: 'active' as const,
+      createdAt: Timestamp.fromDate(now),
+      expiresAt: Timestamp.fromDate(expiresAt),
+      oneTimeSignature: true,
+      driver: { assignedBySeller: true },
+      tracking: { enabled: false, pingsCount: 0 },
+    };
+
+    const sanitized = sanitizeFirestorePayload(sessionData);
+    await db.collection('deliverySessions').doc(sessionId).set(sanitized);
+
+    // Store sessionId on order delivery (for reference)
+    await orderRef.update({
+      updatedAt: now,
+      'delivery.sessionId': sessionId,
+    });
+
+    const driverToken = signDeliveryToken({ sessionId, orderId, role: 'driver' });
+    const buyerToken = signDeliveryToken({ sessionId, orderId, role: 'buyer' });
+    const baseUrl = getSiteUrl();
+
+    return json({
+      success: true,
+      sessionId,
+      driverLink: `${baseUrl}/delivery/driver?token=${encodeURIComponent(driverToken)}`,
+      buyerConfirmLink: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
+      qrValue: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error: any) {
+    if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {
+      return json({ error: 'Server misconfigured', details: error.message }, { status: 503 });
+    }
+    console.error('[create-session]', error);
+    return json({ error: 'Failed to create session', message: error?.message }, { status: 500 });
+  }
+}

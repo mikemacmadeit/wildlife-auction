@@ -15,13 +15,14 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2, Eye, Trash2, ExternalLink } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2, Eye, Trash2, ExternalLink, Camera, Image } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { uploadComplianceDocument, DocumentUploadProgress, deleteComplianceDocument } from '@/lib/firebase/storage-documents';
 import { uploadDocument, deleteDocument } from '@/lib/firebase/documents';
 import { DocumentStatus, DocumentType } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface DocumentUploadProps {
   entityType: 'listing' | 'order';
@@ -65,6 +66,8 @@ export function DocumentUpload({
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const handleUploadRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Keep in sync if parent refetches a newer status (e.g. admin verified/rejected)
@@ -73,8 +76,6 @@ export function DocumentUpload({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    // Reset input so same file can be re-selected (helps mobile) and avoids iOS quirks
-    e.target.value = '';
     if (!selectedFile) return;
 
     // Validate file type — accept all images (incl. HEIC from iOS) and PDF
@@ -82,6 +83,7 @@ export function DocumentUpload({
     const isPdf = selectedFile.type === 'application/pdf';
     if (!isImage && !isPdf) {
       setError('Invalid file type. Please upload a PDF or image file.');
+      e.target.value = '';
       return;
     }
 
@@ -89,19 +91,18 @@ export function DocumentUpload({
     if (selectedFile.size > 10 * 1024 * 1024) {
       console.error('File too large:', selectedFile.size);
       setError('File size must be less than 10MB.');
+      e.target.value = '';
       return;
     }
 
     setFile(selectedFile);
     setError(null);
     setUploadedUrl(null);
-    // new file selection implies a new upload attempt
     setDocumentStatus(null);
-    
-    // Notify parent that there's a pending file
-    if (onPendingFileChange) {
-      onPendingFileChange(true);
-    }
+    if (onPendingFileChange) onPendingFileChange(true);
+
+    // Reset input after reading file — allows re-select, avoid iOS holding stale ref
+    e.target.value = '';
   };
 
   const handleUpload = async () => {
@@ -453,41 +454,56 @@ export function DocumentUpload({
       {/* Upload UI - Show when no document uploaded or when replacing */}
       {(!uploadedUrl || file) && (
         <div className="space-y-3">
-          <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/30 hover:bg-muted/50 transition-colors relative">
-            {/* File input: use opacity-0 overlay (not sr-only) — iOS Safari often doesn't fire onChange on fully hidden inputs */}
-            <input
-              id={`file-upload-${documentType}`}
-              type="file"
-              accept="image/*,.pdf,application/pdf"
-              onChange={handleFileSelect}
-              disabled={uploading}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 rounded-lg"
-              aria-label="Choose file to upload"
-            />
-            <div className="flex flex-col items-center justify-center space-y-4 relative z-0 pointer-events-none">
+          <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/30">
+            <div className="flex flex-col items-center justify-center space-y-4">
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div className="text-center space-y-2">
                 <p className="text-base font-semibold text-foreground">
-                  Tap to select file or drag and drop
+                  Add a photo or document
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  PDF, JPG, PNG, or WEBP (max 10MB)
+                  PDF, JPG, PNG, WEBP (max 10MB)
                 </p>
               </div>
+              <div className={cn('flex flex-col sm:flex-row gap-3 w-full sm:w-auto', uploading && 'pointer-events-none opacity-70')}>
+                {/* Native label+input — more reliable on iOS than programmatic click() */}
+                <input
+                  ref={cameraInputRef}
+                  id={`${documentType}-camera`}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileSelect}
+                  disabled={uploading}
+                  className="sr-only"
+                  aria-label="Take a photo"
+                />
+                <label
+                  htmlFor={`${documentType}-camera`}
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium min-h-[48px] touch-manipulation px-4 py-2 cursor-pointer transition-colors w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Camera className="mr-2 h-5 w-5" />
+                  Take Photo
+                </label>
+                <input
+                  ref={libraryInputRef}
+                  id={`${documentType}-library`}
+                  type="file"
+                  accept="image/*,image/heic,image/heif,.pdf,application/pdf"
+                  onChange={handleFileSelect}
+                  disabled={uploading}
+                  className="sr-only"
+                  aria-label="Choose from library"
+                />
+                <label
+                  htmlFor={`${documentType}-library`}
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium min-h-[48px] touch-manipulation px-4 py-2 cursor-pointer transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground w-full sm:w-auto"
+                >
+                  <Image className="mr-2 h-5 w-5" />
+                  Choose from Library
+                </label>
+              </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                const el = document.getElementById(`file-upload-${documentType}`) as HTMLInputElement | null;
-                if (el) { el.value = ''; el.click(); }
-              }}
-              disabled={uploading}
-              className="relative z-20 min-h-[48px] mt-4 pointer-events-auto"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Choose File
-            </Button>
           </div>
 
           {file && (

@@ -550,7 +550,6 @@ export default function BuyerOrderDetailPage() {
         <OrderMilestoneTimeline
           order={order}
           role="buyer"
-          showHelpText={false}
           renderMilestoneDetail={(milestone, o) => {
             if (milestone.key === 'set_delivery_address') {
               if (milestone.isComplete && o.delivery?.buyerAddress) {
