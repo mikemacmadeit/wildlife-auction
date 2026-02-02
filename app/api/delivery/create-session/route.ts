@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       const data = existingDoc.data()!;
       let pin = data.deliveryPin;
       if (!pin) {
-        pin = String(Math.floor(100000 + Math.random() * 900000));
+        pin = String(Math.floor(1000 + Math.random() * 9000));
         await existingDoc.ref.update({ deliveryPin: pin, updatedAt: Timestamp.now() });
       }
       const driverToken = signDeliveryToken({
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
     const sessionId = nanoid(24);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 72 * 60 * 60 * 1000);
-    const deliveryPin = String(Math.floor(100000 + Math.random() * 900000));
+    const deliveryPin = String(Math.floor(1000 + Math.random() * 9000));
 
     const sessionData = {
       orderId,

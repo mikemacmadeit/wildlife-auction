@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { QrCode, Copy, Check, Loader2, KeyRound } from 'lucide-react';
+import { QrCode, Copy, Check, Loader2 } from 'lucide-react';
 import QRCode from 'qrcode';
 
 interface DeliverySessionCardProps {
@@ -20,7 +20,6 @@ interface SessionData {
   driverLink: string;
   buyerConfirmLink: string;
   qrValue: string;
-  deliveryPin: string;
   expiresAt?: string;
 }
 
@@ -65,7 +64,6 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
         driverLink: data.driverLink,
         buyerConfirmLink: data.buyerConfirmLink,
         qrValue: data.qrValue || data.buyerConfirmLink,
-        deliveryPin: data.deliveryPin ?? '',
         expiresAt: data.expiresAt,
       });
       if (data.qrValue || data.buyerConfirmLink) {
@@ -127,10 +125,6 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
 
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
-      <p className="text-sm font-medium">Not delivering yourself?</p>
-      <p className="text-xs text-muted-foreground">
-        Send the driver link to whoever is transporting. They open it and follow 3 steps: confirm PIN with recipient, take photo of animals, get recipient&apos;s signature on their phone.
-      </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={copyDriver} className="min-h-[36px]">
           {copied === 'driver' ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
@@ -149,14 +143,8 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <QrCode className="h-3 w-3" />
-              QR for recipient to scan and sign
+              Buyer enters their PIN on driver&apos;s phone at delivery
             </p>
-            {session.deliveryPin && (
-              <p className="text-xs font-mono font-semibold flex items-center gap-1 text-foreground">
-                <KeyRound className="h-3 w-3" />
-                PIN: {session.deliveryPin}
-              </p>
-            )}
           </div>
         </div>
       )}

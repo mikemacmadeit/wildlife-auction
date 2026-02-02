@@ -29,6 +29,7 @@ import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
 import { DeliverySessionCard } from '@/components/delivery/DeliverySessionCard';
+import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
@@ -431,7 +432,7 @@ export default function SellerOrderDetailPage() {
 
                   <div className="pt-2 border-t border-border/60">
                     <p className="text-sm font-medium text-foreground/90">Not delivering yourself?</p>
-                    <p className="text-xs text-muted-foreground mb-2">Send the driver link to whoever is transporting. They follow 3 steps: confirm PIN, take photo, get signature on their phone.</p>
+                    <p className="text-xs text-muted-foreground mb-2">Send the driver link to whoever is transporting. They open it and follow 3 steps: recipient enters their PIN (from their order page), recipient signs, then driver uploads photo of delivery.</p>
                     {user && (outTxStatus === 'DELIVERY_SCHEDULED' || outTxStatus === 'OUT_FOR_DELIVERY') && (
                       <DeliverySessionCard
                         orderId={o.id}
@@ -446,12 +447,12 @@ export default function SellerOrderDetailPage() {
                     )}
                   </div>
                   {qrSignedAt && (
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
-                      <span className="font-medium text-primary">Recipient signed for delivery</span>
-                      <span className="text-muted-foreground">
-                        {' '}at {formatDate((o.delivery as any).confirmedAt)}
-                      </span>
-                    </div>
+                    <DeliveryProofTimelineBlock
+                      signedLabel="Recipient signed for delivery"
+                      signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
+                      signatureUrl={(o.delivery as any)?.signatureUrl}
+                      deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
+                    />
                   )}
                 </div>
               );

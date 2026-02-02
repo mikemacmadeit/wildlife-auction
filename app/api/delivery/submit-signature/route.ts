@@ -40,13 +40,14 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const token = typeof body?.token === 'string' ? body.token : null;
     const signaturePngBase64 = typeof body?.signaturePngBase64 === 'string' ? body.signaturePngBase64 : null;
-    const deliveryPin = typeof body?.deliveryPin === 'string' ? body.deliveryPin.replace(/\D/g, '').slice(0, 6) : '';
+    const deliveryPinRaw = typeof body?.deliveryPin === 'string' ? body.deliveryPin.replace(/\D/g, '') : '';
+    const deliveryPin = deliveryPinRaw.length > 4 ? deliveryPinRaw.slice(0, 6) : deliveryPinRaw.slice(0, 4);
 
     if (!token || !signaturePngBase64) {
       return json({ error: 'token and signaturePngBase64 required' }, { status: 400 });
     }
-    if (!deliveryPin || deliveryPin.length !== 6) {
-      return json({ error: 'Valid 6-digit delivery PIN required' }, { status: 400 });
+    if (!deliveryPin || (deliveryPin.length !== 4 && deliveryPin.length !== 6)) {
+      return json({ error: 'Valid 4-digit delivery PIN required' }, { status: 400 });
     }
 
     const payload = verifyDeliveryToken(token);

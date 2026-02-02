@@ -1,14 +1,13 @@
 /**
- * POST /api/delivery/buyer-link
+ * POST /api/delivery/verify-pin
  *
- * Public. Accepts a valid driver token, returns the buyer confirmation link
- * (so the driver page can display QR for the buyer).
+ * Public (driver token only). Verifies the recipient's PIN without revealing it.
+ * Returns { valid: true } on success. Driver uses this to unlock signature and photo steps.
  */
 
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAdminDb } from '@/lib/firebase/admin';
-import { verifyDeliveryToken, signDeliveryToken } from '@/lib/delivery/tokens';
-import { getSiteUrl } from '@/lib/site-url';
+import { verifyDeliveryToken } from '@/lib/delivery/tokens';
 
 function json(body: unknown, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -27,9 +26,10 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}));
     const token = typeof body?.token === 'string' ? body.token : null;
-    if (!token) {
-      return json({ error: 'token required' }, { status: 400 });
-    }
+    const pin = typeof body?.pin === 'string' ? body.pin.replace(/\D/g, '').slice(0, 4) : '';
+
+    if (!token) return json({ error: 'token required' }, { status: 400 });
+    if (!pin || pin.length !== 4) return json({ error: 'Valid 4-digit PIN required' }, { status: 400 });
 
     const payload = verifyDeliveryToken(token);
     if (!payload || payload.role !== 'driver') {
@@ -47,26 +47,18 @@ export async function POST(request: Request) {
       return json({ error: 'Session no longer active' }, { status: 400 });
     }
 
-    const buyerToken = signDeliveryToken({
-      sessionId: payload.sessionId,
-      orderId: payload.orderId,
-      role: 'buyer',
-    });
+    const sessionPin = (session.deliveryPin ?? '').toString().replace(/\D/g, '').slice(0, 4);
+    if (!sessionPin) {
+      return json({ error: 'Delivery not ready for PIN verification' }, { status: 400 });
+    }
 
-    const baseUrl = getSiteUrl();
-    const buyerConfirmLink = `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`;
-
-    return json({
-      success: true,
-      buyerConfirmLink,
-      qrValue: buyerConfirmLink,
-      // PIN is NOT returned to driver — only buyer sees it; driver shows PIN entry box
-    });
+    const valid = sessionPin === pin;
+    return json({ valid });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {
       return json({ error: 'Server misconfigured' }, { status: 503 });
     }
-    console.error('[buyer-link]', error);
-    return json({ error: 'Failed to get buyer link' }, { status: 500 });
+    console.error('[verify-pin]', error);
+    return json({ error: 'Verification failed' }, { status: 500 });
   }
 }

@@ -937,6 +937,8 @@ export interface Order {
     confirmedAt?: Date;
     confirmedMethod?: 'qr_public';
     signatureUrl?: string;
+    /** Photo of animals at delivery (from driver complete flow). */
+    deliveryPhotoUrl?: string;
   };
 
   /** Immutable snapshot of delivery address at order creation (future edits to saved address do not affect this). */

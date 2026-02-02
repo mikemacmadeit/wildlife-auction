@@ -4,10 +4,10 @@
  * Public driver page. No auth required.
  * URL: /delivery/driver?token=...
  *
- * 3-step delivery process:
- * 1. PIN — Confirm recipient knows PIN to verify they're authorized
- * 2. Photo — Take a picture of the animals being delivered
- * 3. Signature — Recipient signs on this device (seller's/driver's phone)
+ * 3-step delivery process (protects both sides):
+ * 1. PIN — Recipient (buyer) enters their PIN. Only they know it. Unlocks steps 2–3.
+ * 2. Signature — Recipient signs on this device
+ * 3. Photo — Take a picture of the animals at delivery
  */
 
 import { useEffect, useState, useRef } from 'react';
@@ -15,9 +15,11 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, AlertCircle, Loader2, KeyRound, Camera, PenLine } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Check, AlertCircle, Loader2, KeyRound, Camera } from 'lucide-react';
 import { BrandLogoText } from '@/components/navigation/BrandLogoText';
 import { SignaturePad, type SignaturePadRef } from '@/components/delivery/SignaturePad';
+import { cn } from '@/lib/utils';
 
 interface VerifyResult {
   valid: boolean;
@@ -38,14 +40,17 @@ export default function DeliveryDriverPage() {
 
   const [loading, setLoading] = useState(true);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
-  const [deliveryPin, setDeliveryPin] = useState('');
   const [tracking, setTracking] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
   const watchIdRef = useRef<number | null>(null);
 
-  // 3-step state
-  const [pinConfirmed, setPinConfirmed] = useState(false);
+  // 3-step state: Step 1 unlocks 2 and 3
+  const [pinInput, setPinInput] = useState('');
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinVerifying, setPinVerifying] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [verifiedPin, setVerifiedPin] = useState(''); // Store for submit
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [hasSignature, setHasSignature] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -67,21 +72,41 @@ export default function DeliveryDriverPage() {
       body: JSON.stringify({ token }),
     })
       .then((r) => r.json())
-      .then(async (data: VerifyResult) => {
+      .then((data: VerifyResult) => {
         setVerify(data);
-        if (data.valid && data.role === 'driver') {
-          const linkRes = await fetch('/api/delivery/buyer-link', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token }),
-          });
-          const linkData = await linkRes.json();
-          setDeliveryPin(linkData.deliveryPin ?? '');
-        }
       })
       .catch(() => setVerify({ valid: false, error: 'Verification failed' }))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const handleVerifyPin = async () => {
+    const trimmed = pinInput.replace(/\D/g, '').slice(0, 4);
+    if (trimmed.length !== 4) {
+      setPinError('Enter a 4-digit PIN');
+      return;
+    }
+    setPinVerifying(true);
+    setPinError(null);
+    try {
+      const res = await fetch('/api/delivery/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, pin: trimmed }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setPinVerified(true);
+        setVerifiedPin(trimmed);
+        setPinError(null);
+      } else {
+        setPinError('Incorrect PIN. Ask the recipient to enter their delivery PIN from their order page.');
+      }
+    } catch {
+      setPinError('Verification failed. Try again.');
+    } finally {
+      setPinVerifying(false);
+    }
+  };
 
   const startTracking = async () => {
     if (!token || trackingLoading) return;
@@ -153,14 +178,10 @@ export default function DeliveryDriverPage() {
   };
 
   const handleSubmit = async () => {
-    if (!token || !hasSignature) return;
+    if (!token || !hasSignature || !pinVerified) return;
     const base64 = signatureRef.current?.getPngBase64();
     if (!base64) {
       setError('Please sign before submitting.');
-      return;
-    }
-    if (!deliveryPin || deliveryPin.length !== 6) {
-      setError('PIN is required. Confirm with the recipient before completing.');
       return;
     }
 
@@ -170,7 +191,7 @@ export default function DeliveryDriverPage() {
       const body: Record<string, string> = {
         token,
         signaturePngBase64: base64,
-        deliveryPin: deliveryPin.replace(/\D/g, '').slice(0, 6),
+        deliveryPin: verifiedPin,
       };
       if (photoDataUrl) body.photoBase64 = photoDataUrl;
 
@@ -313,47 +334,85 @@ export default function DeliveryDriverPage() {
           </CardContent>
         </Card>
 
-        {/* 3-step process */}
+        {/* 3-step process: PIN unlocks signature and photo */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Complete delivery</CardTitle>
-            <p className="text-sm text-muted-foreground">Follow these 3 steps. Hand your phone to the recipient for step 3.</p>
+            <p className="text-sm text-muted-foreground">Step 1: Recipient enters their PIN (from their order page). Then signature and photo.</p>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Step 1: PIN */}
+            {/* Step 1: PIN entry — buyer enters; unlocks steps 2 & 3 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${pinConfirmed ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {pinConfirmed ? <Check className="h-4 w-4" /> : '1'}
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${pinVerified ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                  {pinVerified ? <Check className="h-4 w-4" /> : '1'}
                 </div>
-                <span className="font-medium">Confirm PIN</span>
+                <span className="font-medium">Recipient enters PIN</span>
               </div>
               <p className="text-sm text-muted-foreground pl-10">
-                Ask the recipient to tell you the delivery PIN. This ensures they are authorized to receive the animals.
+                Hand your phone to the recipient. They enter the 4-digit delivery PIN from their order page. This proves they are authorized to receive.
               </p>
-              {deliveryPin && (
-                <div className="pl-10 flex items-center gap-2 py-2 px-3 rounded-lg bg-muted/50 w-fit">
-                  <KeyRound className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-mono font-semibold">PIN: {deliveryPin}</span>
+              {!pinVerified ? (
+                <div className="pl-10 flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    placeholder="0000"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="font-mono text-lg w-24"
+                    aria-label="Delivery PIN"
+                  />
+                  <Button onClick={handleVerifyPin} disabled={pinInput.length !== 4 || pinVerifying} className="min-h-[44px]">
+                    {pinVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
+                    Verify PIN
+                  </Button>
                 </div>
+              ) : (
+                <p className="pl-10 text-sm text-green-600 font-medium">PIN verified ✓</p>
               )}
-              {!pinConfirmed && (
-                <Button onClick={() => setPinConfirmed(true)} className="ml-10 min-h-[44px]">
-                  Recipient confirmed PIN
-                </Button>
+              {pinError && (
+                <p className="pl-10 text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {pinError}
+                </p>
               )}
             </div>
 
-            {/* Step 2: Photo */}
-            <div className="space-y-2">
+            {/* Step 2: Signature — unlocked after PIN */}
+            <div className={cn('space-y-2', !pinVerified && 'opacity-50 pointer-events-none')}>
               <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${photoDataUrl ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {photoDataUrl ? <Check className="h-4 w-4" /> : '2'}
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${hasSignature ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                  {hasSignature ? <Check className="h-4 w-4" /> : '2'}
                 </div>
-                <span className="font-medium">Take photo</span>
+                <span className="font-medium">Get signature</span>
               </div>
               <p className="text-sm text-muted-foreground pl-10">
-                Take a picture of the animals being delivered.
+                Recipient signs below to confirm delivery.
+              </p>
+              <div className="pl-10">
+                <SignaturePad
+                  ref={signatureRef}
+                  width={320}
+                  height={160}
+                  onSignatureChange={setHasSignature}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Step 3: Photo — unlocked after PIN */}
+            <div className={cn('space-y-2', !pinVerified && 'opacity-50 pointer-events-none')}>
+              <div className="flex items-center gap-2">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${photoDataUrl ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                  {photoDataUrl ? <Check className="h-4 w-4" /> : '3'}
+                </div>
+                <span className="font-medium">Upload photo</span>
+              </div>
+              <p className="text-sm text-muted-foreground pl-10">
+                Take a picture of the animals at delivery.
               </p>
               <div className="pl-10 space-y-2">
                 <input
@@ -362,12 +421,13 @@ export default function DeliveryDriverPage() {
                   accept="image/*"
                   capture="environment"
                   className="sr-only"
-                  aria-label="Take photo of animals being delivered"
+                  aria-label="Take photo of animals at delivery"
                   onChange={handlePhotoChange}
                 />
                 <Button
                   variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => pinVerified && fileInputRef.current?.click()}
+                  disabled={!pinVerified}
                   className="min-h-[44px] w-full sm:w-auto"
                 >
                   <Camera className="h-4 w-4 mr-2" />
@@ -389,28 +449,6 @@ export default function DeliveryDriverPage() {
               </div>
             </div>
 
-            {/* Step 3: Signature */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${hasSignature ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {hasSignature ? <Check className="h-4 w-4" /> : '3'}
-                </div>
-                <span className="font-medium">Get signature</span>
-              </div>
-              <p className="text-sm text-muted-foreground pl-10">
-                Hand your phone to the recipient. They sign below to confirm delivery.
-              </p>
-              <div className="pl-10">
-                <SignaturePad
-                  ref={signatureRef}
-                  width={320}
-                  height={160}
-                  onSignatureChange={setHasSignature}
-                  className="w-full"
-                />
-              </div>
-            </div>
-
             {error && (
               <p className="text-sm text-destructive flex items-center gap-1">
                 <AlertCircle className="h-4 w-4 shrink-0" />
@@ -420,7 +458,7 @@ export default function DeliveryDriverPage() {
 
             <Button
               onClick={handleSubmit}
-              disabled={!pinConfirmed || !hasSignature || submitting}
+              disabled={!pinVerified || !hasSignature || submitting}
               className="w-full min-h-[48px]"
             >
               {submitting ? (

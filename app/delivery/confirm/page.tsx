@@ -66,8 +66,8 @@ export default function DeliveryConfirmPage() {
       return;
     }
     const pinTrimmed = pin.trim().replace(/\D/g, '');
-    if (!pinTrimmed || pinTrimmed.length !== 6) {
-      setError('Enter the 6-digit PIN shared by the seller or driver.');
+    if (!pinTrimmed || pinTrimmed.length !== 4) {
+      setError('Enter the 4-digit PIN shared by the seller or driver.');
       return;
     }
 
@@ -199,7 +199,7 @@ export default function DeliveryConfirmPage() {
           <CardContent className="flex-1 flex flex-col min-h-0 space-y-4">
             <div>
               <label htmlFor="delivery-pin" className="text-sm font-medium">
-                Delivery PIN (6 digits)
+                Delivery PIN (4 digits)
               </label>
               <input
                 id="delivery-pin"
@@ -208,7 +208,7 @@ export default function DeliveryConfirmPage() {
                 pattern="[0-9]*"
                 maxLength={6}
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="000000"
                 className="mt-1 flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base font-mono tabular-nums ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
@@ -233,7 +233,7 @@ export default function DeliveryConfirmPage() {
             <div className="flex gap-3">
               <Button
                 onClick={handleSubmit}
-                disabled={!hasSignature || pin.trim().replace(/\D/g, '').length !== 6 || submitting}
+                disabled={!hasSignature || pin.trim().replace(/\D/g, '').length !== 4 || submitting}
                 className="flex-1 min-h-[48px]"
               >
                 {submitting ? (

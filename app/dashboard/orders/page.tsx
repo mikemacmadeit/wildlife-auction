@@ -371,10 +371,12 @@ export default function OrdersPage() {
     };
   }, [router, searchParams]);
 
-  // Start at top when opening Purchases; prevent any auto-scroll (restoration, dialog focus, layout)
+  // Always start at top when opening Purchases; prevent scroll restoration and layout shifts
   const scrollToTop = useCallback(() => {
     window.scrollTo(0, 0);
-    document.querySelector('main')?.scrollTo({ top: 0, left: 0 });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelector('main')?.scrollTo?.(0, 0);
   }, []);
   useEffect(() => {
     const prevRestoration = window.history.scrollRestoration;
@@ -385,12 +387,14 @@ export default function OrdersPage() {
     const t1 = setTimeout(scrollToTop, 50);
     const t2 = setTimeout(scrollToTop, 150);
     const t3 = setTimeout(scrollToTop, 400);
+    const t4 = setTimeout(scrollToTop, 800);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      clearTimeout(t4);
       window.history.scrollRestoration = prevRestoration;
     };
   }, [scrollToTop]);

@@ -34,6 +34,8 @@ import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
+import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
+import { BuyerDeliveryPin } from '@/components/delivery/BuyerDeliveryPin';
 import { confirmReceipt, disputeOrder } from '@/lib/stripe/api';
 import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
@@ -645,36 +647,70 @@ export default function BuyerOrderDetailPage() {
             if (milestone.key === 'out_for_delivery') {
               if (milestone.isCurrent && txStatus === 'DELIVERY_SCHEDULED') {
                 return (
-                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                    The seller will start delivery during the scheduled window. You can confirm receipt once it arrives.
+                  <div className="mt-3 space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                      The seller will start delivery during the scheduled window. You can confirm receipt once it arrives.
+                    </div>
+                    <BuyerDeliveryPin
+                      orderId={o.id}
+                      getAuthToken={async () => {
+                        const { auth } = await import('@/lib/firebase/config');
+                        const u = auth.currentUser;
+                        if (!u) throw new Error('Auth required');
+                        return u.getIdToken();
+                      }}
+                    />
                   </div>
                 );
               }
+              const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
               if ((milestone.isCurrent || milestone.isComplete) && txStatus === 'OUT_FOR_DELIVERY') {
-                const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
                 return (
                   <Collapsible open={outForDeliveryExpanded} onOpenChange={setOutForDeliveryExpanded} className="mt-3">
                     <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full justify-start rounded px-2 py-1 -mx-2 -my-1">
                       <MapPin className="h-4 w-4" />
                       {outForDeliveryExpanded ? 'Hide' : 'Show'} live tracking & delivery info
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2">
+                    <CollapsibleContent className="pt-2 space-y-3">
+                      <BuyerDeliveryPin
+                        orderId={o.id}
+                        getAuthToken={async () => {
+                          const { auth } = await import('@/lib/firebase/config');
+                          const u = auth.currentUser;
+                          if (!u) throw new Error('Auth required');
+                          return u.getIdToken();
+                        }}
+                      />
                       <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
                       {!order?.deliveryTracking?.enabled && (
-                        <p className="mt-3 text-sm text-muted-foreground">
-                          Live tracking will appear when the seller starts delivery. The driver may share a QR for you to sign at delivery.
+                        <p className="text-sm text-muted-foreground">
+                          Live tracking will appear when the seller starts delivery. When the driver arrives, they&apos;ll hand you their phone to enter your PIN, sign, and complete delivery.
                         </p>
                       )}
                       {qrSignedAt && (
-                        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
-                          <span className="font-medium text-primary">You signed for delivery</span>
-                          <span className="text-muted-foreground">
-                            {' '}at {formatDate((o.delivery as any).confirmedAt)}
-                          </span>
+                        <div className="mt-3">
+                          <DeliveryProofTimelineBlock
+                            signedLabel="You signed for delivery"
+                            signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
+                            signatureUrl={(o.delivery as any)?.signatureUrl}
+                            deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
+                          />
                         </div>
                       )}
                     </CollapsibleContent>
                   </Collapsible>
+                );
+              }
+              if (qrSignedAt && (milestone.isCurrent || milestone.isComplete) && (txStatus === 'DELIVERED_PENDING_CONFIRMATION' || txStatus === 'COMPLETED')) {
+                return (
+                  <div className="mt-3">
+                    <DeliveryProofTimelineBlock
+                      signedLabel="You signed for delivery"
+                      signedAt={(o.delivery as any).confirmedAt instanceof Date ? (o.delivery as any).confirmedAt : new Date((o.delivery as any).confirmedAt)}
+                      signatureUrl={(o.delivery as any)?.signatureUrl}
+                      deliveryPhotoUrl={(o.delivery as any)?.deliveryPhotoUrl}
+                    />
+                  </div>
                 );
               }
             }
