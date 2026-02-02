@@ -7,7 +7,7 @@ export function ConditionalFooter() {
   const pathname = usePathname();
 
   // Hide footer for dashboard and seller routes (backend experience)
-  if (pathname?.startsWith('/dashboard') || pathname?.startsWith('/seller')) {
+  if (pathname?.startsWith('/dashboard') || pathname?.startsWith('/seller') || pathname?.startsWith('/delivery')) {
     return null;
   }
 

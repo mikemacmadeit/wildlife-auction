@@ -37,6 +37,7 @@ interface VerifyResult {
 export default function DeliveryDriverPage() {
   const searchParams = useSearchParams();
   const token = (searchParams?.get('token') ?? '') || '';
+  const embed = searchParams?.get('embed') === '1';
 
   const [loading, setLoading] = useState(true);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
@@ -237,9 +238,9 @@ export default function DeliveryDriverPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-muted/30">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-muted/20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Verifying link...</p>
+        <p className="mt-4 text-sm text-muted-foreground">Verifying link...</p>
       </div>
     );
   }
@@ -247,9 +248,11 @@ export default function DeliveryDriverPage() {
   if (!verify?.valid) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-muted/30">
-        <header className="absolute top-4 left-4">
-          <Link href="/"><BrandLogoText className="text-xl" /></Link>
-        </header>
+        {!embed && (
+          <header className="absolute top-4 left-4">
+            <Link href="/"><BrandLogoText className="text-xl" /></Link>
+          </header>
+        )}
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-destructive">
@@ -293,93 +296,104 @@ export default function DeliveryDriverPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-muted/30">
-        <header className="absolute top-4 left-4">
-          <Link href="/"><BrandLogoText className="text-xl" /></Link>
-        </header>
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 pb-6 text-center">
-            <Check className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Delivery confirmed</h2>
-            <p className="text-muted-foreground">The seller has been notified.</p>
-            <Button asChild variant="outline" className="w-full mt-6">
-              <Link href="/">Done</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-muted/20">
+        {!embed && (
+          <header className="absolute top-4 left-4">
+            <Link href="/"><BrandLogoText className="text-xl" /></Link>
+          </header>
+        )}
+        <div className="max-w-sm w-full rounded-2xl border bg-background shadow-lg p-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50">
+            <Check className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h2 className="text-xl font-semibold mb-1">Delivery confirmed</h2>
+          <p className="text-sm text-muted-foreground">The seller has been notified.</p>
+          <Button asChild variant="outline" className="w-full mt-6 rounded-lg h-11" size="sm">
+            <Link href="/">Done</Link>
+          </Button>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
-      <header className="border-b bg-background px-4 py-3">
-        <Link href="/"><BrandLogoText className="text-xl" /></Link>
-      </header>
+  const stepsComplete = [pinVerified, hasSignature, !!photoDataUrl];
+  const StepDot = ({ n, done }: { n: number; done: boolean }) => (
+    <div className={cn(
+      'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+      done ? 'bg-primary text-primary-foreground' : 'bg-muted/80 text-muted-foreground'
+    )}>
+      {done ? <Check className="h-5 w-5" /> : n}
+    </div>
+  );
 
-      <main className="flex-1 p-6 max-w-lg mx-auto w-full space-y-6">
-        <div>
-          <h1 className="text-lg font-semibold">Delivery</h1>
-          <p className="text-sm text-muted-foreground">{verify.listingTitle || 'Order'} · {verify.orderShortId || ''}</p>
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
+      {!embed && (
+        <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
+          <Link href="/"><BrandLogoText className="text-xl" /></Link>
+        </header>
+      )}
+
+      <main className={`flex-1 p-5 sm:p-6 max-w-xl mx-auto w-full space-y-5 ${embed ? 'pt-5 sm:pt-6' : ''}`}>
+        {/* Order info — compact pill */}
+        <div className="rounded-xl bg-background border shadow-sm px-5 py-4">
+          <h1 className="text-base font-semibold text-foreground">{verify.listingTitle || 'Delivery'}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{verify.orderShortId && `Order ${verify.orderShortId}`}</p>
           {(verify.deliveryWindowStart || verify.deliveryWindowEnd) && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Window: {formatDate(verify.deliveryWindowStart)} – {formatDate(verify.deliveryWindowEnd)}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {formatDate(verify.deliveryWindowStart)} – {formatDate(verify.deliveryWindowEnd)}
             </p>
           )}
         </div>
 
-        {/* Live tracking toggle */}
-        <Card>
-          <CardContent className="pt-4 space-y-2">
-            {!tracking ? (
-              <Button onClick={startTracking} disabled={trackingLoading} variant="outline" className="w-full min-h-[44px]">
-                {trackingLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Start live tracking
-              </Button>
-            ) : (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-green-600 font-medium flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> Tracking active
-                </span>
-                <Button onClick={stopTracking} disabled={trackingLoading} variant="ghost" size="sm">Stop</Button>
-              </div>
-            )}
-            {locationDenied && (
-              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm">
-                <p className="font-medium text-amber-800 dark:text-amber-200">Location denied</p>
-                <p className="text-xs mt-1 text-amber-700 dark:text-amber-300">
-                  {typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
-                    ? 'On iPhone: Settings → Safari → Location → set to "Ask" or "Allow". Or tap the aA icon in the address bar → Website Settings → Location → Allow. Then refresh and try again.'
-                    : typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
-                      ? 'On Android: Tap the lock icon in the address bar → Site settings → Location → Allow. Then refresh and try again.'
-                      : 'Allow location in your browser settings, then refresh and try again.'}
-                </p>
-                <p className="text-xs mt-1 text-muted-foreground">You can still complete delivery below without tracking.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Live tracking — compact */}
+        <div className="rounded-xl border bg-background shadow-sm p-5">
+          {!tracking ? (
+            <Button onClick={startTracking} disabled={trackingLoading} variant="outline" className="w-full h-11 rounded-lg border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 hover:border-emerald-400 dark:hover:border-emerald-600">
+              {trackingLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Start live tracking
+            </Button>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                Tracking active
+              </span>
+              <Button onClick={stopTracking} disabled={trackingLoading} variant="ghost" size="sm" className="text-muted-foreground">Stop</Button>
+            </div>
+          )}
+          {locationDenied && (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm mt-3">
+              <p className="font-medium text-amber-800 dark:text-amber-200">Location denied</p>
+              <p className="text-xs mt-1 text-amber-700 dark:text-amber-300">
+                {typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+                  ? 'iPhone: Settings → Safari → Location → Allow'
+                  : typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+                    ? 'Android: Tap lock icon → Site settings → Location → Allow'
+                    : 'Allow location in browser settings, then refresh.'}
+              </p>
+              <p className="text-xs mt-1 text-muted-foreground">You can complete delivery below without tracking.</p>
+            </div>
+          )}
+        </div>
 
-        {/* 3-step process: PIN unlocks signature and photo */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Complete delivery</CardTitle>
-            <p className="text-sm text-muted-foreground">Step 1: Recipient enters their PIN (from their order page). Then signature and photo.</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Step 1: PIN entry — buyer enters; unlocks steps 2 & 3 */}
+        {/* 3-step checklist */}
+        <div className="rounded-xl border bg-background shadow-sm overflow-hidden">
+          <div className="px-5 sm:px-6 py-3 border-b bg-muted/30">
+            <h2 className="text-sm font-semibold">Complete delivery</h2>
+          </div>
+          <div className="p-5 sm:p-6 space-y-5">
+            {/* Step 1: PIN */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${pinVerified ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {pinVerified ? <Check className="h-4 w-4" /> : '1'}
-                </div>
-                <span className="font-medium">Recipient enters PIN</span>
+              <div className="flex items-center gap-3">
+                <StepDot n={1} done={pinVerified} />
+                <span className="font-medium text-sm">Recipient enters PIN</span>
               </div>
-              <p className="text-sm text-muted-foreground pl-10">
-                Hand your phone to the recipient. They enter the 4-digit delivery PIN from their order page. This proves they are authorized to receive.
+              <p className="text-xs text-muted-foreground pl-12">
+                Hand your phone to the recipient. They enter the 4-digit PIN from their order page.
               </p>
               {!pinVerified ? (
-                <div className="pl-10 flex flex-col sm:flex-row gap-2">
+                <div className="pl-12 flex flex-col sm:flex-row gap-2">
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -388,59 +402,51 @@ export default function DeliveryDriverPage() {
                     placeholder="0000"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    className="font-mono text-lg w-24"
+                    className="font-mono text-xl w-28 h-12 text-center"
                     aria-label="Delivery PIN"
                   />
-                  <Button onClick={handleVerifyPin} disabled={pinInput.length !== 4 || pinVerifying} className="min-h-[44px]">
+                  <Button onClick={handleVerifyPin} disabled={pinInput.length !== 4 || pinVerifying} className="h-12 px-4">
                     {pinVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
-                    Verify PIN
+                    Verify
                   </Button>
                 </div>
               ) : (
-                <p className="pl-10 text-sm text-green-600 font-medium">PIN verified ✓</p>
+                <p className="pl-12 text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">PIN verified ✓</p>
               )}
               {pinError && (
-                <p className="pl-10 text-sm text-destructive flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
+                <p className="pl-12 text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   {pinError}
                 </p>
               )}
             </div>
 
-            {/* Step 2: Signature — unlocked after PIN */}
+            {/* Step 2: Signature */}
             <div className={cn('space-y-2', !pinVerified && 'opacity-50 pointer-events-none')}>
-              <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${hasSignature ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {hasSignature ? <Check className="h-4 w-4" /> : '2'}
-                </div>
-                <span className="font-medium">Get signature</span>
+              <div className="flex items-center gap-3">
+                <StepDot n={2} done={hasSignature} />
+                <span className="font-medium text-sm">Get signature</span>
               </div>
-              <p className="text-sm text-muted-foreground pl-10">
-                Recipient signs below to confirm delivery.
-              </p>
-              <div className="pl-10">
+              <p className="text-xs text-muted-foreground pl-12">Recipient signs below to confirm delivery.</p>
+              <div className="pl-12">
                 <SignaturePad
                   ref={signatureRef}
-                  width={320}
+                  width={360}
                   height={160}
                   onSignatureChange={setHasSignature}
-                  className="w-full"
+                  className="w-full rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/20"
                 />
               </div>
             </div>
 
-            {/* Step 3: Photo — unlocked after PIN */}
+            {/* Step 3: Photo */}
             <div className={cn('space-y-2', !pinVerified && 'opacity-50 pointer-events-none')}>
-              <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${photoDataUrl ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {photoDataUrl ? <Check className="h-4 w-4" /> : '3'}
-                </div>
-                <span className="font-medium">Upload photo</span>
+              <div className="flex items-center gap-3">
+                <StepDot n={3} done={!!photoDataUrl} />
+                <span className="font-medium text-sm">Take photo</span>
               </div>
-              <p className="text-sm text-muted-foreground pl-10">
-                Take a picture of the animals at delivery.
-              </p>
-              <div className="pl-10 space-y-2">
+              <p className="text-xs text-muted-foreground pl-12">Picture of the animals at delivery.</p>
+              <div className="pl-12 space-y-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -454,18 +460,18 @@ export default function DeliveryDriverPage() {
                   variant="outline"
                   onClick={() => pinVerified && fileInputRef.current?.click()}
                   disabled={!pinVerified}
-                  className="min-h-[44px] w-full sm:w-auto"
+                  className="h-11 rounded-lg"
                 >
                   <Camera className="h-4 w-4 mr-2" />
                   {photoDataUrl ? 'Change photo' : 'Take photo'}
                 </Button>
                 {photoDataUrl && (
-                  <div className="relative">
-                    <img src={photoDataUrl} alt="Delivery" className="rounded-lg border max-h-48 object-cover" />
+                  <div className="relative rounded-lg overflow-hidden border">
+                    <img src={photoDataUrl} alt="Delivery" className="w-full max-h-40 object-cover" />
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
-                      className="absolute top-1 right-1 text-destructive hover:text-destructive"
+                      className="absolute top-1.5 right-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => setPhotoDataUrl(null)}
                     >
                       Remove
@@ -476,8 +482,8 @@ export default function DeliveryDriverPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 {error}
               </p>
             )}
@@ -485,7 +491,7 @@ export default function DeliveryDriverPage() {
             <Button
               onClick={handleSubmit}
               disabled={!pinVerified || !hasSignature || submitting}
-              className="w-full min-h-[48px]"
+              className="w-full h-12 rounded-lg font-semibold"
             >
               {submitting ? (
                 <>
@@ -499,8 +505,8 @@ export default function DeliveryDriverPage() {
                 </>
               )}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </main>
     </div>
   );

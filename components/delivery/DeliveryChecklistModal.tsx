@@ -7,12 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Loader2, Copy, Check } from 'lucide-react';
 
 interface DeliveryChecklistModalProps {
@@ -79,35 +74,30 @@ export function DeliveryChecklistModal({
     }
   };
 
+  const embedDriverLink = driverLink
+    ? driverLink + (driverLink.includes('?') ? '&embed=1' : '?embed=1')
+    : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-2xl w-[calc(100%-2rem)] max-h-[90vh] flex flex-col p-0 overflow-hidden"
+          className="max-w-2xl w-[calc(100%-2rem)] h-[95vh] max-h-[95vh] flex flex-col p-0 overflow-hidden"
           overlayClassName="bg-black/80"
         >
-          <DialogHeader className="px-4 pt-4 pb-2 shrink-0 border-b">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <DialogTitle className="text-base">Delivery checklist</DialogTitle>
-              {driverLink && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopy}
-                  className="shrink-0"
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 mr-2 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4 mr-2" />
-                  )}
-                  {copied ? 'Copied' : 'Copy link to send to transporter'}
-                </Button>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Use this checklist at handoff, or send the link to your driver.
-            </p>
-          </DialogHeader>
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b">
+            <span className="text-sm font-medium">Delivery checklist</span>
+            {driverLink && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopy}
+                className="h-8 text-xs shrink-0"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 mr-1.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+                {copied ? 'Copied' : 'Copy link'}
+              </Button>
+            )}
+          </div>
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {loading && (
               <div className="flex-1 flex items-center justify-center p-8">
@@ -117,11 +107,11 @@ export function DeliveryChecklistModal({
             {error && (
               <div className="p-4 text-sm text-destructive">{error}</div>
             )}
-            {driverLink && !loading && (
+            {embedDriverLink && !loading && (
               <iframe
-                src={driverLink}
+                src={embedDriverLink}
                 title="Delivery checklist"
-                className="w-full flex-1 min-h-[480px] border-0 rounded-b-lg"
+                className="w-full flex-1 min-h-[600px] border-0"
                 sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                 allow="geolocation"
               />

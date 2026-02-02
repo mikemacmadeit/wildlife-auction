@@ -28,7 +28,7 @@ export function MobileBottomNavWhenSignedIn() {
 
   if (!user) return null;
   // Dashboard and seller layouts already render their own bottom nav
-  if (pathname?.startsWith('/dashboard') || pathname?.startsWith('/seller')) return null;
+  if (pathname?.startsWith('/dashboard') || pathname?.startsWith('/seller') || pathname?.startsWith('/delivery')) return null;
 
   return <LayoutBottomNav items={items} />;
 }
