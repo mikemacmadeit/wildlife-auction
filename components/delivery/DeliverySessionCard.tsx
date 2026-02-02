@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { QrCode, Copy, Check, Loader2 } from 'lucide-react';
+import { QrCode, Copy, Check, Loader2, KeyRound } from 'lucide-react';
 import QRCode from 'qrcode';
 
 interface DeliverySessionCardProps {
@@ -20,6 +20,7 @@ interface SessionData {
   driverLink: string;
   buyerConfirmLink: string;
   qrValue: string;
+  deliveryPin: string;
   expiresAt?: string;
 }
 
@@ -55,12 +56,16 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
           setSession(null);
           return;
         }
-        throw new Error(data.error || data.details || 'Failed to create session');
+        const errMsg = data.error || data.details || data.message || 'Failed to create session';
+        setSetupError(typeof errMsg === 'string' ? errMsg : String(errMsg));
+        setSession(null);
+        return;
       }
       setSession({
         driverLink: data.driverLink,
         buyerConfirmLink: data.buyerConfirmLink,
         qrValue: data.qrValue || data.buyerConfirmLink,
+        deliveryPin: data.deliveryPin ?? '',
         expiresAt: data.expiresAt,
       });
       if (data.qrValue || data.buyerConfirmLink) {
@@ -69,9 +74,10 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
           .catch(() => {});
       }
     } catch (e: any) {
-      onErrorRef.current?.(e?.message || 'Failed to load session');
+      const msg = e?.message || 'Failed to load session';
+      setSetupError(msg);
       setSession(null);
-      setSetupError(null);
+      onErrorRef.current?.(msg);
     } finally {
       setLoading(false);
     }
@@ -123,7 +129,7 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
       <p className="text-sm font-medium">Not delivering yourself?</p>
       <p className="text-xs text-muted-foreground">
-        Send the driver link to your driver. At delivery, show the QR so the buyer can sign and confirm.
+        Send the driver link to whoever is transporting. They open it and follow 3 steps: confirm PIN with recipient, take photo of animals, get recipient&apos;s signature on their phone.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={copyDriver} className="min-h-[36px]">
@@ -140,11 +146,17 @@ export function DeliverySessionCard({ orderId, getAuthToken, onError }: Delivery
           <div className="p-2 bg-white rounded border">
             <img src={qrDataUrl} alt="Buyer signature QR" className="w-[120px] h-[120px]" />
           </div>
-          <div>
+          <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <QrCode className="h-3 w-3" />
-              QR for buyer to scan and sign
+              QR for recipient to scan and sign
             </p>
+            {session.deliveryPin && (
+              <p className="text-xs font-mono font-semibold flex items-center gap-1 text-foreground">
+                <KeyRound className="h-3 w-3" />
+                PIN: {session.deliveryPin}
+              </p>
+            )}
           </div>
         </div>
       )}

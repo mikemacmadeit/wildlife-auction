@@ -42,6 +42,7 @@ import { ORDER_COPY, getStatusLabel } from '@/lib/orders/copy';
 import { formatDate, isValidNonEpochDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const useAddressPicker =
   typeof process !== 'undefined' &&
@@ -87,6 +88,7 @@ export default function BuyerOrderDetailPage() {
   const [checkinDialogConfirmReceived, setCheckinDialogConfirmReceived] = useState(false);
   const [sendPhotosPromptOpen, setSendPhotosPromptOpen] = useState(false);
   const [sendPhotosModalOpen, setSendPhotosModalOpen] = useState(false);
+  const [outForDeliveryExpanded, setOutForDeliveryExpanded] = useState(true);
 
   const SEND_PHOTOS_PROMPT_KEY = 'we:send-photos-prompted:v1';
 
@@ -649,10 +651,30 @@ export default function BuyerOrderDetailPage() {
                 );
               }
               if ((milestone.isCurrent || milestone.isComplete) && txStatus === 'OUT_FOR_DELIVERY') {
+                const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
                 return (
-                  <div className="mt-3">
-                    <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
-                  </div>
+                  <Collapsible open={outForDeliveryExpanded} onOpenChange={setOutForDeliveryExpanded} className="mt-3">
+                    <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full justify-start rounded px-2 py-1 -mx-2 -my-1">
+                      <MapPin className="h-4 w-4" />
+                      {outForDeliveryExpanded ? 'Hide' : 'Show'} live tracking & delivery info
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <DeliveryTrackingCard order={o} role="buyer" currentUserUid={user?.uid ?? null} onStartTracking={async () => {}} onStopTracking={async () => {}} onMarkDelivered={async () => {}} />
+                      {!order?.deliveryTracking?.enabled && (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Live tracking will appear when the seller starts delivery. The driver may share a QR for you to sign at delivery.
+                        </p>
+                      )}
+                      {qrSignedAt && (
+                        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
+                          <span className="font-medium text-primary">You signed for delivery</span>
+                          <span className="text-muted-foreground">
+                            {' '}at {formatDate((o.delivery as any).confirmedAt)}
+                          </span>
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
                 );
               }
             }
@@ -835,6 +857,7 @@ export default function BuyerOrderDetailPage() {
             onOpenChange={setSetAddressModalOpen}
             orderId={order.id}
             userId={user.uid}
+            existingDeliveryAddress={order.delivery?.buyerAddress ?? undefined}
             manualOnly={!useAddressPicker}
             onSetDeliveryAddress={async (ordId, payload: SetDeliveryAddressPayload) => {
               await postAuthJson(`/api/orders/${ordId}/set-delivery-address`, payload);

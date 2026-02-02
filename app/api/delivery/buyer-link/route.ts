@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       success: true,
       buyerConfirmLink,
       qrValue: buyerConfirmLink,
+      deliveryPin: session.deliveryPin ?? '',
     });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {

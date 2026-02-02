@@ -466,42 +466,38 @@ export function DocumentUpload({
                 </p>
               </div>
               <div className={cn('flex flex-col sm:flex-row gap-3 w-full sm:w-auto', uploading && 'pointer-events-none opacity-70')}>
-                {/* Native label+input — more reliable on iOS than programmatic click() */}
-                <input
-                  ref={cameraInputRef}
-                  id={`${documentType}-camera`}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleFileSelect}
-                  disabled={uploading}
-                  className="sr-only"
-                  aria-label="Take a photo"
-                />
-                <label
-                  htmlFor={`${documentType}-camera`}
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium min-h-[48px] touch-manipulation px-4 py-2 cursor-pointer transition-colors w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Camera className="mr-2 h-5 w-5" />
-                  Take Photo
-                </label>
-                <input
-                  ref={libraryInputRef}
-                  id={`${documentType}-library`}
-                  type="file"
-                  accept="image/*,image/heic,image/heif,.pdf,application/pdf"
-                  onChange={handleFileSelect}
-                  disabled={uploading}
-                  className="sr-only"
-                  aria-label="Choose from library"
-                />
-                <label
-                  htmlFor={`${documentType}-library`}
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium min-h-[48px] touch-manipulation px-4 py-2 cursor-pointer transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground w-full sm:w-auto"
-                >
-                  <Image className="mr-2 h-5 w-5" />
-                  Choose from Library
-                </label>
+                {/* Overlay inputs on buttons — reliable on iOS (tap goes directly to input) */}
+                <div className="relative inline-block">
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    disabled={uploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    aria-label="Take a photo"
+                  />
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium min-h-[48px] touch-manipulation px-4 py-2 w-full sm:w-auto bg-primary text-primary-foreground pointer-events-none">
+                    <Camera className="mr-2 h-5 w-5" />
+                    Take Photo
+                  </span>
+                </div>
+                <div className="relative inline-block">
+                  <input
+                    ref={libraryInputRef}
+                    type="file"
+                    accept="image/*,image/heic,image/heif,.pdf,application/pdf"
+                    onChange={handleFileSelect}
+                    disabled={uploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    aria-label="Choose from library"
+                  />
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium min-h-[48px] touch-manipulation px-4 py-2 border border-input bg-background w-full sm:w-auto pointer-events-none">
+                    <Image className="mr-2 h-5 w-5" />
+                    Choose from Library
+                  </span>
+                </div>
               </div>
             </div>
           </div>

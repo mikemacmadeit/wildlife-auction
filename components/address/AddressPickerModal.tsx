@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,8 @@ export interface AddressPickerModalProps {
   orderId?: string;
   /** When orderId is set, called with the selected/saved address payload to persist on the order. */
   onSetDeliveryAddress?: (orderId: string, payload: SetDeliveryAddressPayload) => Promise<void>;
+  /** When order has an existing delivery address, used to pre-select the matching saved address (avoids checkout/order mismatch). */
+  existingDeliveryAddress?: SetDeliveryAddressPayload | null;
   onSuccess?: () => void;
   /** When true, skip Google Places + map; show saved addresses + manual form only (same modal look). */
   manualOnly?: boolean;
@@ -65,12 +67,24 @@ function savedToPayload(a: SavedAddress): SetDeliveryAddressPayload {
   };
 }
 
+/** Returns true if a saved address matches the existing delivery payload (for pre-selection). */
+function addressMatchesPayload(addr: SavedAddress, payload: SetDeliveryAddressPayload): boolean {
+  const n = (s: string) => (s ?? '').trim().toLowerCase();
+  return (
+    n(addr.line1) === n(payload.line1) &&
+    n(addr.city) === n(payload.city) &&
+    n(addr.state) === n(payload.state) &&
+    n(addr.postalCode) === n(payload.zip)
+  );
+}
+
 export function AddressPickerModal({
   open,
   onOpenChange,
   orderId,
   userId,
   onSetDeliveryAddress,
+  existingDeliveryAddress,
   onSuccess,
   manualOnly = false,
   listingId,
@@ -97,6 +111,19 @@ export function AddressPickerModal({
   const permissionErrorHint =
     'Try signing out and back in. If you manage this project, deploy Firestore rules: firebase deploy --only firestore:rules';
 
+  const existingKey = useMemo(
+    () =>
+      existingDeliveryAddress
+        ? `${existingDeliveryAddress.line1}|${existingDeliveryAddress.city}|${existingDeliveryAddress.state}|${existingDeliveryAddress.zip}`
+        : '',
+    [
+      existingDeliveryAddress?.line1,
+      existingDeliveryAddress?.city,
+      existingDeliveryAddress?.state,
+      existingDeliveryAddress?.zip,
+    ]
+  );
+
   const loadAddresses = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -109,7 +136,17 @@ export function AddressPickerModal({
         getUserProfile(userId).catch(() => null),
       ]);
       setAddresses(list);
-      setSelectedAddressId(checkout?.deliveryAddressId ?? null);
+      // Pre-select: when we have order context and existing address, match to saved address; else use checkout
+      let initialSelected: string | null = checkout?.deliveryAddressId ?? null;
+      if (orderId && existingDeliveryAddress && list.length > 0) {
+        const match = list.find((a) => addressMatchesPayload(a, existingDeliveryAddress));
+        if (match) initialSelected = match.id;
+      }
+      // Ensure selected ID exists in list (e.g. address was deleted elsewhere)
+      if (initialSelected && !list.some((a) => a.id === initialSelected)) {
+        initialSelected = null;
+      }
+      setSelectedAddressId(initialSelected);
       const loc = profile?.profile?.location;
       if (
         list.length === 0 &&
@@ -137,13 +174,20 @@ export function AddressPickerModal({
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, orderId, existingKey, existingDeliveryAddress]);
 
   useEffect(() => {
     if (open && userId) loadAddresses();
   }, [open, userId, loadAddresses]);
 
-  const handleUseSaved = async (address: SavedAddress) => {
+  const handleSelectSaved = (address: SavedAddress) => {
+    setSelectedAddressId(address.id);
+  };
+
+  const handleConfirmSelectedAddress = async () => {
+    if (!selectedAddressId) return;
+    const address = addresses.find((a) => a.id === selectedAddressId);
+    if (!address) return;
     setSaving(true);
     setError(null);
     try {
@@ -351,10 +395,15 @@ export function AddressPickerModal({
     );
   };
 
+  // Reset modal state when opening so we always start fresh
   useEffect(() => {
     if (open) {
+      setError(null);
       setManualForm(initialManualForm);
       setNewAddressLabel('');
+      setAddingNew(false);
+      setSearchResult(null);
+      setShowManualEntry(false);
     }
   }, [open]);
 
@@ -416,37 +465,48 @@ export function AddressPickerModal({
                   )}
                   {addresses.length > 0 && (
                     <>
-                  <p className="text-sm font-medium text-muted-foreground">Saved addresses</p>
-                  <ul className="space-y-2">
-                    {addresses.map((a) => (
-                      <li key={a.id}>
+                      <p className="text-sm font-medium text-muted-foreground">Saved addresses</p>
+                      <p className="text-xs text-muted-foreground">Tap an address to select it, then confirm below.</p>
+                      <ul className="space-y-2">
+                        {addresses.map((a) => (
+                          <li key={a.id}>
+                            <Button
+                              type="button"
+                              variant={selectedAddressId === a.id ? 'secondary' : 'outline'}
+                              className="w-full justify-start text-left h-auto min-h-[48px] py-3 px-3 touch-manipulation"
+                              disabled={saving}
+                              onClick={() => handleSelectSaved(a)}
+                            >
+                              <MapPin className="h-4 w-4 shrink-0 mr-2 text-muted-foreground" />
+                              <span className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
+                                <span className="font-medium flex items-center gap-2">
+                                  {a.label}
+                                  {a.isDefault && (
+                                    <span className="text-xs font-normal text-muted-foreground">(default)</span>
+                                  )}
+                                  {selectedAddressId === a.id && (
+                                    <Check className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                                  )}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate w-full">
+                                  {a.formattedAddress}
+                                </span>
+                              </span>
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                      {selectedAddressId && addresses.some((a) => a.id === selectedAddressId) && (
                         <Button
                           type="button"
-                          variant={selectedAddressId === a.id ? 'secondary' : 'outline'}
-                          className="w-full justify-start text-left h-auto min-h-[48px] py-3 px-3 touch-manipulation"
+                          className="w-full min-h-[48px] touch-manipulation"
                           disabled={saving}
-                          onClick={() => handleUseSaved(a)}
+                          onClick={handleConfirmSelectedAddress}
                         >
-                          <MapPin className="h-4 w-4 shrink-0 mr-2 text-muted-foreground" />
-                          <span className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
-                            <span className="font-medium flex items-center gap-2">
-                              {a.label}
-                              {a.isDefault && (
-                                <span className="text-xs font-normal text-muted-foreground">(default)</span>
-                              )}
-                              {selectedAddressId === a.id && (
-                                <Check className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                              )}
-                            </span>
-                            <span className="text-xs text-muted-foreground truncate w-full">
-                              {a.formattedAddress}
-                            </span>
-                          </span>
-                          {saving && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+                          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                          Use this address
                         </Button>
-                      </li>
-                    ))}
-                  </ul>
+                      )}
                     </>
                   )}
                 </div>

@@ -12,6 +12,7 @@ import { nanoid } from 'nanoid';
 import { rateLimitMiddleware, RATE_LIMITS } from '@/lib/rate-limit';
 import { TransactionStatus } from '@/lib/types';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { signDeliveryToken } from '@/lib/delivery/tokens';
 import { getSiteUrl } from '@/lib/site-url';
 import { sanitizeFirestorePayload } from '@/lib/firebase/sanitizeFirestore';
@@ -67,33 +68,38 @@ export async function POST(request: Request) {
       return json({ error: 'Only the seller can create a delivery session' }, { status: 403 });
     }
 
-    const txStatus = orderData.transactionStatus as TransactionStatus | undefined;
-    if (txStatus !== 'DELIVERY_SCHEDULED') {
-      return json(
-        {
-          error: 'Invalid status',
-          details: `Order must be DELIVERY_SCHEDULED (buyer confirmed delivery date). Current: ${txStatus || orderData.status}`,
-        },
-        { status: 400 }
-      );
-    }
-
+    const txStatus = getEffectiveTransactionStatus(orderData as any) as TransactionStatus;
     const transportOption = orderData.transportOption || 'SELLER_TRANSPORT';
     if (transportOption !== 'SELLER_TRANSPORT') {
       return json({ error: 'Invalid transport', details: 'SELLER_TRANSPORT only' }, { status: 400 });
     }
 
-    // Check for existing active session
+    const allowedStatusesForSession: TransactionStatus[] = ['DELIVERY_SCHEDULED', 'OUT_FOR_DELIVERY', 'DELIVERED_PENDING_CONFIRMATION'];
+    if (!allowedStatusesForSession.includes(txStatus)) {
+      return json(
+        {
+          error: 'Invalid status',
+          details: `Order must have delivery scheduled (buyer confirmed date). Current: ${txStatus}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check for existing session (active or delivered) — return it so QR/links stay visible
     const existing = await db
       .collection('deliverySessions')
       .where('orderId', '==', orderId)
-      .where('status', '==', 'active')
       .limit(1)
       .get();
 
     if (!existing.empty) {
       const existingDoc = existing.docs[0]!;
-      const data = existingDoc.data();
+      const data = existingDoc.data()!;
+      let pin = data.deliveryPin;
+      if (!pin) {
+        pin = String(Math.floor(100000 + Math.random() * 900000));
+        await existingDoc.ref.update({ deliveryPin: pin, updatedAt: Timestamp.now() });
+      }
       const driverToken = signDeliveryToken({
         sessionId: existingDoc.id,
         orderId,
@@ -111,19 +117,30 @@ export async function POST(request: Request) {
         driverLink: `${baseUrl}/delivery/driver?token=${encodeURIComponent(driverToken)}`,
         buyerConfirmLink: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
         qrValue: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
+        deliveryPin: pin,
         expiresAt: (data.expiresAt as any)?.toDate?.()?.toISOString?.(),
       });
+    }
+
+    // Create new session — only when delivery is scheduled or out
+    if (txStatus !== 'DELIVERY_SCHEDULED' && txStatus !== 'OUT_FOR_DELIVERY') {
+      return json(
+        { error: 'No delivery session found. Create one when delivery is scheduled.' },
+        { status: 404 }
+      );
     }
 
     const sessionId = nanoid(24);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+    const deliveryPin = String(Math.floor(100000 + Math.random() * 900000));
 
     const sessionData = {
       orderId,
       sellerUid,
       buyerUid: orderData.buyerId || null,
       status: 'active' as const,
+      deliveryPin,
       createdAt: Timestamp.fromDate(now),
       expiresAt: Timestamp.fromDate(expiresAt),
       oneTimeSignature: true,
@@ -150,6 +167,7 @@ export async function POST(request: Request) {
       driverLink: `${baseUrl}/delivery/driver?token=${encodeURIComponent(driverToken)}`,
       buyerConfirmLink: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
       qrValue: `${baseUrl}/delivery/confirm?token=${encodeURIComponent(buyerToken)}`,
+      deliveryPin,
       expiresAt: expiresAt.toISOString(),
     });
   } catch (error: any) {

@@ -933,6 +933,10 @@ export interface Order {
     proofUploads?: Array<{ type: string; url: string; uploadedAt: Date }>;
     deliveredAt?: Date;
     buyerConfirmedAt?: Date;
+    /** When buyer signed via QR (recipient scan + sign). */
+    confirmedAt?: Date;
+    confirmedMethod?: 'qr_public';
+    signatureUrl?: string;
   };
 
   /** Immutable snapshot of delivery address at order creation (future edits to saved address do not affect this). */

@@ -276,6 +276,8 @@ function toOrder(docId: string, data: OrderDoc): Order {
         agreedWindow: d.agreedWindow ? mapWindow(d.agreedWindow) : undefined,
         agreedAt: d.agreedAt ? toDateSafe(d.agreedAt) : undefined,
         proposedAt: d.proposedAt ? toDateSafe(d.proposedAt) : undefined,
+        confirmedAt: d.confirmedAt ? toDateSafe(d.confirmedAt) : undefined,
+        deliveredAt: d.deliveredAt ? toDateSafe(d.deliveredAt) : undefined,
       };
     })() : undefined,
     deliveryAddress: (data as any).deliveryAddress ?? undefined,

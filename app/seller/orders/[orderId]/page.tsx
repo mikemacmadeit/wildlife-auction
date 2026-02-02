@@ -80,7 +80,6 @@ export default function SellerOrderDetailPage() {
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
   const [trackingProcessing, setTrackingProcessing] = useState<'start' | 'stop' | 'delivered' | null>(null);
-
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
     setLoading(true);
@@ -367,20 +366,11 @@ export default function SellerOrderDetailPage() {
             if (milestone.key === 'out_for_delivery' && (milestone.isCurrent || milestone.isComplete)) {
               const outTxStatus = getEffectiveTransactionStatus(o);
               const needsMarkOut = milestone.isCurrent && outTxStatus === 'DELIVERY_SCHEDULED';
+              const qrSignedAt = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt;
               return (
                 <div className="mt-3 space-y-3">
-                  {needsMarkOut && user && (
-                    <DeliverySessionCard
-                      orderId={o.id}
-                      getAuthToken={async () => {
-                        const { auth } = await import('@/lib/firebase/config');
-                        const u = auth.currentUser;
-                        if (!u) throw new Error('Auth required');
-                        return u.getIdToken();
-                      }}
-                      onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
-                    />
-                  )}
+                  <p className="text-sm font-medium text-foreground/90">Delivering yourself?</p>
+                  <p className="text-xs text-muted-foreground">Use live tracking and mark delivered when done.</p>
                   <DeliveryTrackingCard
                     order={o}
                     role="seller"
@@ -436,6 +426,31 @@ export default function SellerOrderDetailPage() {
                         <Truck className="h-4 w-4 mr-2" />
                         Mark out for delivery
                       </Button>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-border/60">
+                    <p className="text-sm font-medium text-foreground/90">Not delivering yourself?</p>
+                    <p className="text-xs text-muted-foreground mb-2">Send the driver link to whoever is transporting. They follow 3 steps: confirm PIN, take photo, get signature on their phone.</p>
+                    {user && (outTxStatus === 'DELIVERY_SCHEDULED' || outTxStatus === 'OUT_FOR_DELIVERY') && (
+                      <DeliverySessionCard
+                        orderId={o.id}
+                        getAuthToken={async () => {
+                          const { auth } = await import('@/lib/firebase/config');
+                          const u = auth.currentUser;
+                          if (!u) throw new Error('Auth required');
+                          return u.getIdToken();
+                        }}
+                        onError={(msg) => toast({ title: 'Error', description: msg, variant: 'destructive' })}
+                      />
+                    )}
+                  </div>
+                  {qrSignedAt && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
+                      <span className="font-medium text-primary">Recipient signed for delivery</span>
+                      <span className="text-muted-foreground">
+                        {' '}at {formatDate((o.delivery as any).confirmedAt)}
+                      </span>
                     </div>
                   )}
                 </div>

@@ -32,6 +32,7 @@ export default function DeliveryConfirmPage() {
   const [loading, setLoading] = useState(true);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [hasSignature, setHasSignature] = useState(false);
+  const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +65,11 @@ export default function DeliveryConfirmPage() {
       setError('Please sign before submitting.');
       return;
     }
+    const pinTrimmed = pin.trim().replace(/\D/g, '');
+    if (!pinTrimmed || pinTrimmed.length !== 6) {
+      setError('Enter the 6-digit PIN shared by the seller or driver.');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -72,7 +78,7 @@ export default function DeliveryConfirmPage() {
       const res = await fetch('/api/delivery/submit-signature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, signaturePngBase64: base64 }),
+        body: JSON.stringify({ token, signaturePngBase64: base64, deliveryPin: pinTrimmed }),
       });
       const data = await res.json();
 
@@ -187,10 +193,26 @@ export default function DeliveryConfirmPage() {
           <CardHeader>
             <CardTitle className="text-base">Sign to confirm receipt</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Use your finger to sign below. This confirms you received the delivery.
+              Enter the PIN shared by the seller or driver, then sign below to confirm you received the delivery.
             </p>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col min-h-0 space-y-4">
+            <div>
+              <label htmlFor="delivery-pin" className="text-sm font-medium">
+                Delivery PIN (6 digits)
+              </label>
+              <input
+                id="delivery-pin"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="mt-1 flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base font-mono tabular-nums ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
             <div className="flex-1 min-h-[200px]">
               <SignaturePad
                 ref={signatureRef}
@@ -211,7 +233,7 @@ export default function DeliveryConfirmPage() {
             <div className="flex gap-3">
               <Button
                 onClick={handleSubmit}
-                disabled={!hasSignature || submitting}
+                disabled={!hasSignature || pin.trim().replace(/\D/g, '').length !== 6 || submitting}
                 className="flex-1 min-h-[48px]"
               >
                 {submitting ? (

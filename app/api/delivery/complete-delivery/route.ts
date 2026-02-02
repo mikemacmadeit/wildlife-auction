@@ -1,8 +1,12 @@
 /**
- * POST /api/delivery/submit-signature
+ * POST /api/delivery/complete-delivery
  *
- * Public (buyerToken only). Accepts signature PNG as base64, uploads to Storage,
- * marks session and order as delivered.
+ * Public (driver token only). Driver completes delivery on their device:
+ * - Recipient verifies PIN (driver confirms)
+ * - Photo of animals (optional)
+ * - Recipient signs on driver's phone
+ *
+ * All attachments go to the seller's order.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -27,7 +31,36 @@ function json(body: unknown, init?: { status?: number }) {
   });
 }
 
-const MAX_BASE64_SIZE = 2 * 1024 * 1024; // 2MB PNG
+const MAX_BASE64_SIZE = 3 * 1024 * 1024; // 3MB per image
+
+async function uploadBase64Image(
+  base64: string,
+  pathPrefix: string,
+  contentType: string = 'image/png'
+): Promise<string> {
+  const b64 = base64.replace(/^data:image\/\w+;base64,/, '');
+  if (Buffer.byteLength(b64, 'base64') > MAX_BASE64_SIZE) {
+    throw new Error('Image too large');
+  }
+  const buffer = Buffer.from(b64, 'base64');
+  const ext = contentType === 'image/jpeg' ? '.jpg' : '.png';
+  const storagePath = `${pathPrefix}/${nanoid(16)}${ext}`;
+
+  const bucket = getStorage(getAdminApp()).bucket();
+  const file = bucket.file(storagePath);
+  const uuidToken = nanoid(32);
+  await file.save(buffer, {
+    metadata: {
+      contentType,
+      metadata: { firebaseStorageDownloadTokens: uuidToken },
+    },
+  });
+
+  const bucketName = process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const bname = bucketName || (projectId ? `${projectId}.firebasestorage.app` : '');
+  return `https://firebasestorage.googleapis.com/v0/b/${bname}/o/${encodeURIComponent(storagePath)}?alt=media&token=${uuidToken}`;
+}
 
 export async function POST(request: Request) {
   try {
@@ -41,17 +74,18 @@ export async function POST(request: Request) {
     const token = typeof body?.token === 'string' ? body.token : null;
     const signaturePngBase64 = typeof body?.signaturePngBase64 === 'string' ? body.signaturePngBase64 : null;
     const deliveryPin = typeof body?.deliveryPin === 'string' ? body.deliveryPin.replace(/\D/g, '').slice(0, 6) : '';
+    const photoBase64 = typeof body?.photoBase64 === 'string' ? body.photoBase64 : null;
 
     if (!token || !signaturePngBase64) {
       return json({ error: 'token and signaturePngBase64 required' }, { status: 400 });
     }
     if (!deliveryPin || deliveryPin.length !== 6) {
-      return json({ error: 'Valid 6-digit delivery PIN required' }, { status: 400 });
+      return json({ error: 'Valid 6-digit delivery PIN required. Recipient must confirm PIN to prove they are authorized.' }, { status: 400 });
     }
 
     const payload = verifyDeliveryToken(token);
-    if (!payload || payload.role !== 'buyer') {
-      return json({ error: 'Invalid or expired buyer link' }, { status: 401 });
+    if (!payload || payload.role !== 'driver') {
+      return json({ error: 'Invalid or expired driver link' }, { status: 401 });
     }
 
     const db = getAdminDb() as unknown as ReturnType<typeof getFirestore>;
@@ -81,58 +115,49 @@ export async function POST(request: Request) {
 
     const sessionPin = (session.deliveryPin ?? '').toString().replace(/\D/g, '');
     if (sessionPin && sessionPin !== deliveryPin) {
-      return json({ error: 'Invalid PIN. Ask the seller or driver for the correct delivery PIN.' }, { status: 401 });
-    }
-
-    let buffer: Buffer;
-    try {
-      const b64 = signaturePngBase64.replace(/^data:image\/png;base64,/, '');
-      if (Buffer.byteLength(b64, 'base64') > MAX_BASE64_SIZE) {
-        return json({ error: 'Signature image too large' }, { status: 400 });
-      }
-      buffer = Buffer.from(b64, 'base64');
-    } catch {
-      return json({ error: 'Invalid base64 signature' }, { status: 400 });
-    }
-
-    const docId = nanoid(16);
-    const storagePath = `delivery-signatures/${payload.sessionId}/${docId}.png`;
-
-    const hash = createHash('sha256').update(buffer).digest('hex');
-
-    let signatureUrl: string;
-    try {
-      const bucket = getStorage(getAdminApp()).bucket();
-      const file = bucket.file(storagePath);
-      const uuidToken = nanoid(32);
-      await file.save(buffer, {
-        metadata: {
-          contentType: 'image/png',
-          metadata: {
-            firebaseStorageDownloadTokens: uuidToken,
-          },
-        },
-      });
-      const bucketName = process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-      const bname = bucketName || (projectId ? `${projectId}.firebasestorage.app` : '');
-      const encodedPath = encodeURIComponent(storagePath);
-      signatureUrl = `https://firebasestorage.googleapis.com/v0/b/${bname}/o/${encodedPath}?alt=media&token=${uuidToken}`;
-    } catch (uploadErr: any) {
-      console.error('[submit-signature] Storage upload failed', uploadErr);
-      return json({ error: 'Failed to save signature' }, { status: 500 });
+      return json({ error: 'Invalid PIN. Recipient must enter the correct PIN to confirm they are authorized to receive the delivery.' }, { status: 401 });
     }
 
     const now = new Date();
+    const pathPrefix = `delivery-complete/${payload.sessionId}`;
+
+    // Upload signature
+    const sigB64 = signaturePngBase64.replace(/^data:image\/png;base64,/, '');
+    if (Buffer.byteLength(sigB64, 'base64') > MAX_BASE64_SIZE) {
+      return json({ error: 'Signature image too large' }, { status: 400 });
+    }
+    const signatureBuffer = Buffer.from(sigB64, 'base64');
+    const signatureUrl = await uploadBase64Image(
+      signaturePngBase64,
+      `${pathPrefix}/signature`,
+      'image/png'
+    );
+
+    // Upload photo if provided
+    let photoUrl: string | null = null;
+    if (photoBase64 && photoBase64.trim()) {
+      try {
+        const isJpeg = /^data:image\/jpe?g;base64,/.test(photoBase64);
+        photoUrl = await uploadBase64Image(
+          photoBase64,
+          `${pathPrefix}/photo`,
+          isJpeg ? 'image/jpeg' : 'image/png'
+        );
+      } catch (e: any) {
+        console.error('[complete-delivery] Photo upload failed', e);
+        return json({ error: 'Failed to upload photo' }, { status: 400 });
+      }
+    }
 
     const sessionUpdate = sanitizeFirestorePayload({
       status: 'delivered',
       deliveredAt: Timestamp.fromDate(now),
       signature: {
         url: signatureUrl,
-        storagePath,
-        hash,
+        storagePath: `${pathPrefix}/signature`,
+        hash: createHash('sha256').update(signatureBuffer).digest('hex'),
       },
+      ...(photoUrl ? { deliveryPhotoUrl: photoUrl } : {}),
     });
     await sessionRef.update(sessionUpdate);
 
@@ -142,6 +167,9 @@ export async function POST(request: Request) {
       return json({ error: 'Order not found' }, { status: 404 });
     }
     const orderData = orderDoc.data()!;
+
+    const proofUrls = [signatureUrl];
+    if (photoUrl) proofUrls.push(photoUrl);
 
     const orderUpdate = sanitizeFirestorePayload({
       transactionStatus: 'DELIVERED_PENDING_CONFIRMATION' as TransactionStatus,
@@ -154,30 +182,34 @@ export async function POST(request: Request) {
       'delivery.confirmedAt': now,
       'delivery.confirmedMethod': 'qr_public',
       'delivery.deliveredAt': now,
-      deliveryProofUrls: [signatureUrl],
+      ...(photoUrl ? { 'delivery.deliveryPhotoUrl': photoUrl } : {}),
+      deliveryProofUrls: proofUrls,
       'delivery.proofUploads': [
         { type: 'DELIVERY_PROOF', url: signatureUrl, uploadedAt: now },
+        ...(photoUrl ? [{ type: 'DELIVERY_PROOF', url: photoUrl, uploadedAt: now }] : []),
       ],
     });
     await orderRef.update(orderUpdate);
 
-    await orderRef.collection('documents').add({
-      type: 'DELIVERY_PROOF',
-      documentUrl: signatureUrl,
-      status: 'uploaded',
-      uploadedBy: 'qr_public',
-      uploadedAt: Timestamp.fromDate(now),
-      metadata: { deliverySessionId: payload.sessionId, method: 'qr_signature' },
-    });
+    for (const url of proofUrls) {
+      await orderRef.collection('documents').add({
+        type: 'DELIVERY_PROOF',
+        documentUrl: url,
+        status: 'uploaded',
+        uploadedBy: 'qr_public',
+        uploadedAt: Timestamp.fromDate(now),
+        metadata: { deliverySessionId: payload.sessionId, method: 'driver_complete' },
+      });
+    }
 
     try {
       await appendOrderTimelineEvent({
         db: db as any,
         orderId: payload.orderId,
         event: {
-          id: `QR_SIGNATURE:${payload.sessionId}`,
+          id: `DRIVER_COMPLETE:${payload.sessionId}`,
           type: 'SELLER_SHIPPED',
-          label: 'Buyer confirmed delivery (QR signature)',
+          label: 'Recipient signed for delivery (on driver device)',
           actor: 'buyer',
           visibility: 'seller',
           timestamp: Timestamp.fromDate(now),
@@ -204,7 +236,7 @@ export async function POST(request: Request) {
           listingTitle,
           orderUrl: `${getSiteUrl()}/seller/orders/${payload.orderId}`,
         },
-        optionalHash: `qr_delivered:${now.getTime()}`,
+        optionalHash: `driver_complete:${now.getTime()}`,
       });
       if (ev?.ok && ev.created) {
         void tryDispatchEmailJobNow({ db: db as any, jobId: ev.eventId, waitForJob: true }).catch((err) => {
@@ -213,7 +245,7 @@ export async function POST(request: Request) {
             eventType: 'Order.Delivered',
             jobId: ev.eventId,
             orderId: payload.orderId,
-            endpoint: '/api/delivery/submit-signature',
+            endpoint: '/api/delivery/complete-delivery',
           });
         });
       }
@@ -223,13 +255,13 @@ export async function POST(request: Request) {
 
     return json({
       success: true,
-      message: 'Delivery confirmed. Thank you!',
+      message: 'Delivery confirmed. The seller has been notified.',
     });
   } catch (error: any) {
     if (error?.message?.includes('DELIVERY_TOKEN_SECRET')) {
       return json({ error: 'Server misconfigured' }, { status: 503 });
     }
-    console.error('[submit-signature]', error);
-    return json({ error: 'Failed to submit signature', message: error?.message }, { status: 500 });
+    console.error('[complete-delivery]', error);
+    return json({ error: 'Failed to complete delivery', message: error?.message }, { status: 500 });
   }
 }
