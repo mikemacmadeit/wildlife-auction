@@ -28,12 +28,14 @@ export interface OrderMilestoneTimelineProps {
   renderMilestoneDetail?: (milestone: OrderMilestone, order: Order) => React.ReactNode;
 }
 
-const ROLE_LABELS: Record<MilestoneOwnerRole, string> = {
-  buyer: 'Buyer',
-  seller: 'Seller',
-  system: 'System',
-  admin: 'Admin',
-};
+function getRoleLabel(ownerRole: MilestoneOwnerRole, viewerRole: MilestoneTimelineRole): string {
+  if (ownerRole === 'system' || ownerRole === 'admin') return ownerRole === 'system' ? 'System' : 'Admin';
+  if (viewerRole === 'buyer' && ownerRole === 'buyer') return 'You';
+  if (viewerRole === 'buyer' && ownerRole === 'seller') return 'Seller';
+  if (viewerRole === 'seller' && ownerRole === 'seller') return 'You';
+  if (viewerRole === 'seller' && ownerRole === 'buyer') return 'Buyer';
+  return ownerRole === 'buyer' ? 'Buyer' : 'Seller';
+}
 
 export function OrderMilestoneTimeline({
   order,
@@ -112,7 +114,7 @@ export function OrderMilestoneTimeline({
                         {milestone.ownerRole !== 'system' && (
                           <Badge variant="outline" className="text-xs">
                             <User className="h-3 w-3 mr-1" />
-                            {ROLE_LABELS[milestone.ownerRole]}
+                            {getRoleLabel(milestone.ownerRole, role)}
                           </Badge>
                         )}
                         {isCurrent && (

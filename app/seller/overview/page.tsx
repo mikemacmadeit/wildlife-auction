@@ -381,7 +381,18 @@ export default function SellerOverviewPage() {
       return hoursUntilEnd > 0 && hoursUntilEnd <= 24;
     });
 
-    const completedOrders = orders.filter((o) => o.status === 'paid' || o.status === 'completed');
+    // Include all paid orders: paid, completed, paid_held, and any with paidAt
+    const completedOrders = orders.filter((o) => {
+      const status = o.status;
+      const hasPaidAt = !!(o as any).paidAt;
+      return (
+        status === 'paid' || 
+        status === 'completed' || 
+        status === 'paid_held' || 
+        status === 'buyer_confirmed' || 
+        hasPaidAt
+      );
+    });
     const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.sellerAmount || o.amount - o.platformFee), 0);
     
     const thirtyDaysAgo = new Date();
@@ -603,7 +614,17 @@ export default function SellerOverviewPage() {
 
     // Add completed sales
     [...orders]
-      .filter((o) => o.status === 'paid' || o.status === 'completed')
+      .filter((o) => {
+        const status = o.status;
+        const hasPaidAt = !!(o as any).paidAt;
+        return (
+          status === 'paid' || 
+          status === 'completed' || 
+          status === 'paid_held' || 
+          status === 'buyer_confirmed' || 
+          hasPaidAt
+        );
+      })
       .sort((a, b) => {
         const aD = toDateSafe((a as any).createdAt)?.getTime() ?? 0;
         const bD = toDateSafe((b as any).createdAt)?.getTime() ?? 0;

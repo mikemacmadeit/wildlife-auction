@@ -170,4 +170,3 @@ export async function emitAndProcessEventToUsers<TType extends NotificationEvent
   }
   return results;
 }
-

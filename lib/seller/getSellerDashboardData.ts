@@ -234,9 +234,16 @@ export async function getSellerDashboardData(params: {
   let protectedReleased = 0;
   for (const o of ordersAll) {
     const isReleased = !!o.stripeTransferId;
-    const isRefunded = o.status === 'refunded';
+    const isRefunded = o.status === 'refunded' || o.status === 'cancelled';
+    const isPaid = o.status === 'paid' || o.status === 'completed' || o.status === 'paid_held' || o.status === 'buyer_confirmed' || !!o.stripeTransferId;
     const isProtected = !!o.protectedTransactionDaysSnapshot;
+    
+    // Skip refunded/cancelled orders
     if (isRefunded) continue;
+    
+    // Only count orders that have been paid
+    if (!isPaid) continue;
+    
     if (isReleased) {
       released += o.amount;
       if (isProtected) protectedReleased += o.amount;
