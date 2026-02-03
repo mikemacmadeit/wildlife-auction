@@ -113,6 +113,9 @@ export async function POST(
     currentBid: FieldValue.delete(),
     currentBidderId: FieldValue.delete(),
 
+    // Delivery details (seller transport) — copy so duplicate retains delivery info
+    deliveryDetails: src?.deliveryDetails && typeof src.deliveryDetails === 'object' ? src.deliveryDetails : FieldValue.delete(),
+
     // Best offer settings (safe to copy)
     bestOfferEnabled: typeof src?.bestOfferEnabled === 'boolean' ? src.bestOfferEnabled : FieldValue.delete(),
     bestOfferMinPrice: typeof src?.bestOfferMinPrice === 'number' ? src.bestOfferMinPrice : FieldValue.delete(),

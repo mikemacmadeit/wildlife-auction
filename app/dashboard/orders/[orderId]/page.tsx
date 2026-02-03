@@ -43,6 +43,7 @@ import { ORDER_COPY, getStatusLabel } from '@/lib/orders/copy';
 import { cn, formatDate, isValidNonEpochDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
+import { AddressMapModal } from '@/components/address/AddressMapModal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const useAddressPicker =
@@ -114,6 +115,8 @@ export default function BuyerOrderDetailPage() {
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [addressMapModalOpen, setAddressMapModalOpen] = useState(false);
+  const [addressMapAddress, setAddressMapAddress] = useState<{ line1: string; line2?: string; city: string; state: string; zip: string; lat: number; lng: number; deliveryInstructions?: string } | null>(null);
 
   const SEND_PHOTOS_PROMPT_KEY = 'we:send-photos-prompted:v1';
 
@@ -705,7 +708,25 @@ export default function BuyerOrderDetailPage() {
                       {o.delivery.buyerAddress.deliveryInstructions && ` · ${o.delivery.buyerAddress.deliveryInstructions}`}
                     </div>
                     {(o.delivery.buyerAddress.lat != null && o.delivery.buyerAddress.lng != null) && (
-                      <a href={`https://www.google.com/maps?q=${o.delivery.buyerAddress.lat},${o.delivery.buyerAddress.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline mt-1 inline-block">View on map</a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddressMapAddress({
+                            line1: o.delivery.buyerAddress!.line1,
+                            line2: o.delivery.buyerAddress!.line2,
+                            city: o.delivery.buyerAddress!.city ?? '',
+                            state: o.delivery.buyerAddress!.state ?? '',
+                            zip: o.delivery.buyerAddress!.zip ?? '',
+                            lat: o.delivery.buyerAddress!.lat!,
+                            lng: o.delivery.buyerAddress!.lng!,
+                            deliveryInstructions: o.delivery.buyerAddress!.deliveryInstructions,
+                          });
+                          setAddressMapModalOpen(true);
+                        }}
+                        className="text-xs text-primary underline mt-1 inline-block hover:no-underline"
+                      >
+                        View on map
+                      </button>
                     )}
                   </div>
                 );
@@ -1012,6 +1033,19 @@ export default function BuyerOrderDetailPage() {
               if (refreshed) setOrder(refreshed);
             }}
             onSuccess={() => setSetAddressModalOpen(false)}
+          />
+        )}
+
+        {/* Delivery address map modal */}
+        {addressMapAddress && (
+          <AddressMapModal
+            open={addressMapModalOpen}
+            onOpenChange={(open) => {
+              setAddressMapModalOpen(open);
+              if (!open) setAddressMapAddress(null);
+            }}
+            address={addressMapAddress}
+            title="Delivery address"
           />
         )}
       </div>

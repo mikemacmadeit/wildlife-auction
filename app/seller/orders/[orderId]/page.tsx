@@ -40,6 +40,7 @@ import { ORDER_COPY } from '@/lib/orders/copy';
 import { cn, formatDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { OrderDetailSkeleton } from '@/components/skeletons/OrderDetailSkeleton';
+import { AddressMapModal } from '@/components/address/AddressMapModal';
 
 async function postAuthJson(path: string, body?: any): Promise<any> {
   const { auth } = await import('@/lib/firebase/config');
@@ -81,6 +82,8 @@ export default function SellerOrderDetailPage() {
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
   const [deliveryChecklistOpen, setDeliveryChecklistOpen] = useState(false);
   const [trackingProcessing, setTrackingProcessing] = useState<'start' | 'stop' | 'delivered' | null>(null);
+  const [addressMapModalOpen, setAddressMapModalOpen] = useState(false);
+  const [addressMapAddress, setAddressMapAddress] = useState<{ line1: string; line2?: string; city: string; state: string; zip: string; lat: number; lng: number; deliveryInstructions?: string } | null>(null);
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
     setLoading(true);
@@ -320,7 +323,25 @@ export default function SellerOrderDetailPage() {
                     {o.delivery.buyerAddress.deliveryInstructions && ` · ${o.delivery.buyerAddress.deliveryInstructions}`}
                   </div>
                   {(o.delivery.buyerAddress.lat != null && o.delivery.buyerAddress.lng != null) && (
-                    <a href={`https://www.google.com/maps?q=${o.delivery.buyerAddress.lat},${o.delivery.buyerAddress.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline mt-1 inline-block">View on map</a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddressMapAddress({
+                          line1: o.delivery.buyerAddress!.line1,
+                          line2: o.delivery.buyerAddress!.line2,
+                          city: o.delivery.buyerAddress!.city ?? '',
+                          state: o.delivery.buyerAddress!.state ?? '',
+                          zip: o.delivery.buyerAddress!.zip ?? '',
+                          lat: o.delivery.buyerAddress!.lat!,
+                          lng: o.delivery.buyerAddress!.lng!,
+                          deliveryInstructions: o.delivery.buyerAddress!.deliveryInstructions,
+                        });
+                        setAddressMapModalOpen(true);
+                      }}
+                      className="text-xs text-primary underline mt-1 inline-block hover:no-underline"
+                    >
+                      View on map
+                    </button>
                   )}
                 </div>
               );
@@ -757,6 +778,18 @@ export default function SellerOrderDetailPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Delivery address map modal */}
+        {addressMapAddress && (
+          <AddressMapModal
+            open={addressMapModalOpen}
+            onOpenChange={(open) => {
+              setAddressMapModalOpen(open);
+              if (!open) setAddressMapAddress(null);
+            }}
+            address={addressMapAddress}
+            title="Delivery address"
+          />
+        )}
       </div>
     </div>
   );

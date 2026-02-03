@@ -84,7 +84,7 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
     },
     sold: {
       label: 'Sold',
-      className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40',
+      className: 'bg-blue-500/10 text-blue-700 border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-200 dark:border-blue-500/40',
     },
     removed: {
       label: 'Rejected',
@@ -598,6 +598,7 @@ function SellerListingsPageContent() {
   const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ListingType | 'all'>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [viewMode, setViewMode] = useState<'gallery' | 'list'>('gallery');
   const [listings, setListings] = useState<Listing[]>([]);
   const [soldListingIdsFromOrders, setSoldListingIdsFromOrders] = useState<Set<string>>(new Set());
@@ -700,7 +701,7 @@ function SellerListingsPageContent() {
   const filteredListings = useMemo(() => {
     const query = debouncedSearchQuery.toLowerCase();
     const nowMs = Date.now();
-    return listings.filter((listing) => {
+    const filtered = listings.filter((listing) => {
       const effectiveStatus = getEffectiveStatusForListing(listing, nowMs);
       const matchesSearch = !query || listing.title.toLowerCase().includes(query);
       const isPendingApproval = effectiveStatus === 'pending' || (listing as any).complianceStatus === 'pending_review';
@@ -708,12 +709,18 @@ function SellerListingsPageContent() {
         statusFilter === 'all' ||
         (statusFilter === 'pending' ? isPendingApproval : effectiveStatus === statusFilter);
       const matchesType = typeFilter === 'all' || listing.type === typeFilter;
-      const matchesLocation = locationFilter === 'all' || 
+      const matchesLocation = locationFilter === 'all' ||
         `${listing.location?.city || 'Unknown'}, ${listing.location?.state || 'Unknown'}` === locationFilter;
 
       return matchesSearch && matchesStatus && matchesType && matchesLocation;
     });
-  }, [listings, debouncedSearchQuery, statusFilter, typeFilter, locationFilter, getEffectiveStatusForListing]);
+    const toMs = (d: Date | undefined) => (d instanceof Date ? d.getTime() : 0);
+    return [...filtered].sort((a, b) => {
+      const aMs = toMs(a.createdAt);
+      const bMs = toMs(b.createdAt);
+      return sortBy === 'newest' ? bMs - aMs : aMs - bMs;
+    });
+  }, [listings, debouncedSearchQuery, statusFilter, typeFilter, locationFilter, sortBy, getEffectiveStatusForListing]);
 
   const handleStatusChange = useCallback((value: string) => {
     setStatusFilter(value as ListingStatus | 'all');
@@ -1148,9 +1155,22 @@ function SellerListingsPageContent() {
               </div>
             )}
 
-            {/* Gallery / List view toggle */}
-            <div className="flex items-center gap-2 border-t border-border/40 mt-2 pt-3">
-              <span className="text-sm font-semibold text-muted-foreground">View:</span>
+            {/* Sort + Gallery / List view toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-border/40 mt-2 pt-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-muted-foreground">Sort:</span>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'newest' | 'oldest')}>
+                  <SelectTrigger className="h-8 w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Date added (newest)</SelectItem>
+                    <SelectItem value="oldest">Date added (oldest)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-muted-foreground">View:</span>
               <div className="flex rounded-lg border border-border/60 bg-background/40 p-0.5">
                 <button
                   type="button"
@@ -1178,6 +1198,7 @@ function SellerListingsPageContent() {
                   <List className="h-4 w-4" />
                   List
                 </button>
+              </div>
               </div>
             </div>
           </CardContent>

@@ -1896,9 +1896,15 @@ export default function ListingDetailInteractiveClient({
                                     </div>
                                   </div>
 
-                                  {/* Quick bids */}
+                                  {/* Your max bid (proxy bidding - eBay style) */}
                                   <div className="space-y-2">
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <Label htmlFor="bid-amount" className="text-sm font-semibold">
+                                      Your max bid
+                                    </Label>
+                                    <div className="text-xs text-muted-foreground mb-2">
+                                      Proxy bidding: enter the most you&apos;re willing to pay. We&apos;ll bid for you up to that amount.
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 mb-2">
                                       {[q1, q2, q3].map((amt) => (
                                         <Button
                                           key={amt}
@@ -1907,18 +1913,10 @@ export default function ListingDetailInteractiveClient({
                                           className="font-bold"
                                           onClick={() => setBidAmount(String(amt))}
                                         >
-                                          Bid ${amt.toLocaleString()}
+                                          ${amt.toLocaleString()}
                                         </Button>
                                       ))}
                                     </div>
-                                    <div className="text-center text-xs text-muted-foreground">or</div>
-                                  </div>
-
-                                  {/* Max bid input */}
-                                  <div className="space-y-2">
-                                    <Label htmlFor="bid-amount" className="text-sm font-semibold">
-                                      Your max bid
-                                    </Label>
                                     <div className="flex items-center gap-2">
                                       <div className="text-sm font-semibold text-muted-foreground">$</div>
                                       <Input
@@ -1932,7 +1930,7 @@ export default function ListingDetailInteractiveClient({
                                       />
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                      Enter ${minBidUsd.toLocaleString()} or more.
+                                      Minimum: ${minBidUsd.toLocaleString()}
                                     </div>
                                   </div>
 

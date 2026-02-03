@@ -2610,6 +2610,25 @@ function NewListingPageContent() {
       pendingPublishPayloadRef.current = null;
     }
 
+    // Delivery validation (same rules as transportation step) — required for publish
+    const dd = formData.deliveryDetails ?? {};
+    const maxMiles = dd.maxDeliveryRadiusMiles;
+    const hasValidRadius = maxMiles !== '' && maxMiles !== undefined && Number(maxMiles) >= 1;
+    const hasTimeframe = Boolean((dd.deliveryTimeframe ?? '').trim());
+    const needsExplanation = (dd.deliveryTimeframe ?? '') === '30_60' && !(dd.deliveryStatusExplanation ?? '').trim();
+    if (!hasValidRadius || !hasTimeframe || needsExplanation) {
+      const msgs: string[] = [];
+      if (!hasValidRadius) msgs.push('Delivery radius (at least 1 mile)');
+      if (!hasTimeframe) msgs.push('Delivery timeframe');
+      if (needsExplanation) msgs.push('Explanation for 30–60 day delivery');
+      toast({
+        title: 'Delivery information required',
+        description: `Please complete: ${msgs.join(', ')}. Go back to the Transportation step to fill these in.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate photos
     if (formData.photoIds.length === 0) {
       toast({
@@ -2848,21 +2867,24 @@ function NewListingPageContent() {
   // After user accepts seller animal ack modal: formData is updated (disclosures), modal closed.
   // Trigger publish once React has committed state so handleComplete sees the updated formData.
   // Use 50ms delay for mobile reliability (state + modal close must settle before publish).
+  // NOTE: Reset publishAfterAnimalAck inside the timer to avoid a re-render that would run this
+  // effect again, hit the early return, and clear the timer before handleComplete runs.
   useEffect(() => {
     if (!publishAfterAnimalAck || sellerAnimalAckModalOpen) return;
-    setPublishAfterAnimalAck(false);
     const timer = setTimeout(() => {
+      setPublishAfterAnimalAck(false);
       void handleCompleteRef.current?.({});
     }, 50);
     return () => clearTimeout(timer);
   }, [publishAfterAnimalAck, sellerAnimalAckModalOpen]);
 
   // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
+  // NOTE: Reset publishAfterTermsAccept inside the timer (same fix as seller ack) so the timer isn't cleared.
   useEffect(() => {
     if (!publishAfterTermsAccept || legalTermsModalOpen) return;
-    setPublishAfterTermsAccept(false);
     skipTermsCheckRef.current = true;
     const timer = setTimeout(() => {
+      setPublishAfterTermsAccept(false);
       void handleCompleteRef.current?.({});
     }, 50);
     return () => clearTimeout(timer);
@@ -3229,6 +3251,8 @@ function NewListingPageContent() {
           setSellerAnimalAckModalOpen(open);
           if (!open && !sellerAnimalAckForceRef.current) {
             setSellerAnimalAckModalChecked(false);
+            pendingPublishPayloadRef.current = null;
+            submittingRef.current = false;
           }
         }}
       >
@@ -3322,6 +3346,8 @@ function NewListingPageContent() {
               className="min-h-[44px]"
               onClick={() => {
                 setSellerAnimalAckModalOpen(false);
+                setSellerAnimalAckModalChecked(false);
+                pendingPublishPayloadRef.current = null;
                 submittingRef.current = false;
               }}
             >
@@ -3367,9 +3393,10 @@ function NewListingPageContent() {
                 }
 
                 pendingPublishPayloadRef.current = null;
+                setSellerAnimalAckModalChecked(false);
                 setSellerAnimalAckModalOpen(false);
-                // Run publish immediately — ref is set, no extra button click needed
-                setTimeout(() => void handleCompleteRef.current?.({}), 0);
+                // Auto-execute publish after modal closes (useEffect runs handleComplete with 50ms delay for mobile)
+                setPublishAfterAnimalAck(true);
               }}
             >
               I agree &amp; continue to publish

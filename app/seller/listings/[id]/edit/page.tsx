@@ -307,24 +307,26 @@ function EditListingPageContent() {
     }
   }, [listingId, user, authLoading, router, toast]);
 
-  // After user accepts seller ack modal: defer handleComplete to next tick so React commits state first
+  // After user accepts seller ack modal: defer handleComplete to next tick so React commits state first.
+  // NOTE: Reset publishAfterSellerAck inside the timer to avoid re-render clearing the timer before handleComplete runs.
   useEffect(() => {
     if (!publishAfterSellerAck || sellerAckModalOpen) return;
-    setPublishAfterSellerAck(false);
     const timer = setTimeout(() => {
+      setPublishAfterSellerAck(false);
       handleCompleteRef.current?.({ sellerAnimalAttestationAccepted: true });
-    }, 0);
+    }, 50);
     return () => clearTimeout(timer);
   }, [publishAfterSellerAck, sellerAckModalOpen]);
 
   // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
+  // NOTE: Reset inside timer (same fix as seller ack) so the timer isn't cleared by re-render.
   useEffect(() => {
     if (!publishAfterTermsAccept || legalTermsModalOpen) return;
-    setPublishAfterTermsAccept(false);
     skipTermsCheckRef.current = true;
     const timer = setTimeout(() => {
+      setPublishAfterTermsAccept(false);
       handleCompleteRef.current?.({});
-    }, 0);
+    }, 50);
     return () => clearTimeout(timer);
   }, [publishAfterTermsAccept, legalTermsModalOpen]);
 
@@ -2130,6 +2132,28 @@ function EditListingPageContent() {
       return;
     }
 
+    // Delivery validation (same rules as transportation step) — required for publish on edit, duplicate, and new.
+    const dd = formData.deliveryDetails ?? {};
+    const maxMiles = dd.maxDeliveryRadiusMiles;
+    const hasValidRadius = maxMiles !== '' && maxMiles !== undefined && Number(maxMiles) >= 1;
+    const hasTimeframe = Boolean((dd.deliveryTimeframe ?? '').trim());
+    const needsExplanation = (dd.deliveryTimeframe ?? '') === '30_60' && !(dd.deliveryStatusExplanation ?? '').trim();
+    if (!hasValidRadius || !hasTimeframe || needsExplanation) {
+      const msgs: string[] = [];
+      if (!hasValidRadius) msgs.push('Delivery radius (at least 1 mile)');
+      if (!hasTimeframe) msgs.push('Delivery timeframe');
+      if (needsExplanation) msgs.push('Explanation for 30–60 day delivery');
+      setPublishMissingFields(['deliveryDetails']);
+      setPublishMissingStepIds(['transportation']);
+      setRequestedStepId('transportation');
+      toast({
+        title: 'Delivery information required',
+        description: `Please complete: ${msgs.join(', ')}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -2182,6 +2206,11 @@ function EditListingPageContent() {
         if (missingSet.has('type') || missingSet.has('category')) stepsNeedingAttention.push('type-category');
         // Photos required (server uses "photos")
         if (missingSet.has('photos')) stepsNeedingAttention.push('media');
+        // Delivery/transportation
+        const needsTransportation = missing.some((m) =>
+          ['deliveryDetails', 'deliveryTimeframe', 'maxDeliveryRadiusMiles', 'deliveryStatusExplanation'].includes(m)
+        );
+        if (needsTransportation) stepsNeedingAttention.push('transportation');
         // Everything else in this server validation lives on details (title/desc/location/price/auction fields)
         const needsDetails = missing.some((m) =>
           ['title', 'description', 'price', 'startingBid', 'reservePrice', 'durationDays', 'location.city', 'location.state'].includes(m)
@@ -2191,7 +2220,7 @@ function EditListingPageContent() {
         setPublishMissingStepIds(stepsNeedingAttention);
 
         // Jump to the earliest relevant step so the user can fix in sequence.
-        const stepOrder = ['type-category', 'details', 'media'];
+        const stepOrder = ['type-category', 'details', 'media', 'transportation'];
         const targetStep = stepOrder.find((s) => stepsNeedingAttention.includes(s)) || stepsNeedingAttention[0] || 'details';
         setRequestedStepId(targetStep);
 
