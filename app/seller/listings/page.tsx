@@ -84,7 +84,7 @@ const getStatusBadge = (params: { status: string; type?: string; ended?: boolean
     },
     sold: {
       label: 'Sold',
-      className: 'bg-sky-500/10 text-sky-700 border-sky-500/30 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40',
+      className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40',
     },
     removed: {
       label: 'Rejected',
@@ -234,14 +234,37 @@ const ListingRow = memo(({
       </div>
     </td>
     <td className="p-4 align-middle">
-      <div className="font-bold text-lg text-foreground whitespace-nowrap">
-        {listing.type === 'auction'
-          ? listing.currentBid
-            ? `$${listing.currentBid.toLocaleString()}`
-            : 'No bids'
-          : listing.price
-          ? `$${listing.price.toLocaleString()}`
-          : 'Contact'}
+      <div className={cn(
+        'text-lg whitespace-nowrap',
+        effectiveStatus === 'sold'
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : 'text-foreground'
+      )}>
+        {effectiveStatus === 'sold' ? (
+          <>
+            <span className="font-medium">Sold for </span>
+            <span className="font-bold tabular-nums">
+              $
+              {typeof (listing as any).soldPriceCents === 'number'
+                ? ((listing as any).soldPriceCents / 100).toLocaleString()
+                : listing.type === 'auction' && listing.currentBid
+                  ? listing.currentBid.toLocaleString()
+                  : listing.price
+                    ? listing.price.toLocaleString()
+                    : '—'}
+            </span>
+          </>
+        ) : (
+          <span className="font-bold">
+            {listing.type === 'auction'
+              ? listing.currentBid
+                ? `$${listing.currentBid.toLocaleString()}`
+                : 'No bids'
+              : listing.price
+              ? `$${listing.price.toLocaleString()}`
+              : 'Contact'}
+          </span>
+        )}
       </div>
     </td>
     <td className="p-3 align-middle">
@@ -380,14 +403,32 @@ const MobileListingCard = memo(({
         })}
       </div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-base font-bold text-foreground tabular-nums">
-          {listing.type === 'auction'
-            ? listing.currentBid
-              ? `$${listing.currentBid.toLocaleString()}`
-              : 'No bids'
-            : listing.price
-            ? `$${listing.price.toLocaleString()}`
-            : 'Contact'}
+        <span className={effectiveStatus === 'sold' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}>
+          {effectiveStatus === 'sold' ? (
+            <>
+              <span className="text-base font-medium">Sold for </span>
+              <span className="text-base font-bold tabular-nums">
+                $
+                {typeof (listing as any).soldPriceCents === 'number'
+                  ? ((listing as any).soldPriceCents / 100).toLocaleString()
+                  : listing.type === 'auction' && listing.currentBid
+                    ? listing.currentBid.toLocaleString()
+                    : listing.price
+                      ? listing.price.toLocaleString()
+                      : '—'}
+              </span>
+            </>
+          ) : (
+            <span className="text-base font-bold tabular-nums">
+              {listing.type === 'auction'
+                ? listing.currentBid
+                  ? `$${listing.currentBid.toLocaleString()}`
+                  : 'No bids'
+                : listing.price
+                ? `$${listing.price.toLocaleString()}`
+                : 'Contact'}
+            </span>
+          )}
         </span>
         <span className="text-xs text-muted-foreground shrink-0">
           {listing.location?.city || '—'}, {listing.location?.state || '—'}
@@ -497,14 +538,32 @@ const ListingListRow = memo(({
         })}
       </div>
       <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-4 gap-0.5 text-sm">
-        <span className="font-bold text-foreground tabular-nums">
-          {listing.type === 'auction'
-            ? listing.currentBid
-              ? `$${listing.currentBid.toLocaleString()}`
-              : 'No bids'
-            : listing.price
-            ? `$${listing.price.toLocaleString()}`
-            : 'Contact'}
+        <span className={effectiveStatus === 'sold' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}>
+          {effectiveStatus === 'sold' ? (
+            <>
+              <span className="font-medium">Sold for </span>
+              <span className="font-bold tabular-nums">
+                $
+                {typeof (listing as any).soldPriceCents === 'number'
+                  ? ((listing as any).soldPriceCents / 100).toLocaleString()
+                  : listing.type === 'auction' && listing.currentBid
+                    ? listing.currentBid.toLocaleString()
+                    : listing.price
+                      ? listing.price.toLocaleString()
+                      : '—'}
+              </span>
+            </>
+          ) : (
+            <span className="font-bold tabular-nums">
+              {listing.type === 'auction'
+                ? listing.currentBid
+                  ? `$${listing.currentBid.toLocaleString()}`
+                  : 'No bids'
+                : listing.price
+                ? `$${listing.price.toLocaleString()}`
+                : 'Contact'}
+            </span>
+          )}
         </span>
         <span className="text-muted-foreground truncate">
           {listing.location?.city || '—'}, {listing.location?.state || '—'}

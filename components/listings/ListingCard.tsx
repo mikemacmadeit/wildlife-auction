@@ -309,15 +309,6 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               </Badge>
             </div>
 
-            {/* Social proof (watchers + bids) */}
-            {/* Keep SOLD on mobile; hide other social proof on mobile */}
-            {sold.isSold ? (
-              <div className="absolute bottom-2 left-2 z-20">
-                <Badge className="bg-destructive text-destructive-foreground text-xs shadow-warm">
-                  SOLD
-                </Badge>
-              </div>
-            ) : null}
             <div className="hidden sm:flex absolute bottom-2 left-2 z-20 items-center gap-1.5">
               {watchers > 0 && (
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
@@ -336,12 +327,6 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
 
           {/* Content – no overflow-hidden so flex won’t shrink and clip the title */}
           <div className="p-2.5 sm:p-4 flex-1 flex flex-col gap-1.5 sm:gap-3 min-w-0">
-            {sold.isSold && (
-              <div className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs">
-                <div className="font-semibold">{sold.soldPriceLabel}</div>
-                {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
-              </div>
-            )}
             {/* Title – line-clamp-4, flex-shrink-0 so it’s never clipped in gallery mode */}
             <h3
               className="font-bold text-sm sm:text-base line-clamp-4 leading-snug sm:leading-snug group-hover:text-primary transition-colors duration-300 min-w-0 break-words flex-shrink-0"
@@ -422,22 +407,30 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span
                       className={cn(
-                        'text-lg sm:text-xl font-bold truncate',
-                        isCurrentHighBidder
-                          ? 'text-primary dark:text-primary'
-                          : 'text-foreground dark:text-white'
+                        'font-bold truncate',
+                        sold.isSold
+                          ? 'text-sm sm:text-base text-emerald-600 dark:text-emerald-400'
+                          : cn(
+                              'text-lg sm:text-xl',
+                              isCurrentHighBidder
+                                ? 'text-primary dark:text-primary'
+                                : 'text-foreground dark:text-white'
+                            )
                       )}
                     >
-                      {priceDisplay}
+                      {sold.isSold ? sold.soldPriceLabel : priceDisplay}
                     </span>
-                    {isCurrentHighBidder && (
+                    {!sold.isSold && isCurrentHighBidder && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                         You're winning
                       </span>
                     )}
                   </div>
-                  {listing.type === 'auction' && listing.reservePrice && (
+                  {sold.isSold && sold.soldDateLabel && (
+                    <div className="text-[11px] text-muted-foreground font-medium mt-0.5">{sold.soldDateLabel}</div>
+                  )}
+                  {!sold.isSold && listing.type === 'auction' && listing.reservePrice && (
                     <div className="hidden sm:block text-xs text-muted-foreground font-medium mt-0.5 truncate">
                       Reserve: ${listing.reservePrice.toLocaleString()}
                     </div>

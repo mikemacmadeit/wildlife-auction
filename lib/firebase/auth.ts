@@ -248,8 +248,8 @@ function withCenteredPopup<T>(fn: () => Promise<T>): Promise<T> {
     target?: string,
     features?: string
   ): Window | null {
+    const parsed: Record<string, string> = {};
     if (typeof features === 'string' && features.length > 0) {
-      const parsed: Record<string, string> = {};
       features.split(',').forEach((part) => {
         const eq = part.indexOf('=');
         if (eq > 0) {
@@ -258,22 +258,24 @@ function withCenteredPopup<T>(fn: () => Promise<T>): Promise<T> {
           if (k && v) parsed[k] = v;
         }
       });
-      const width = Math.min(Number(parsed.width) || 500, window.screen?.availWidth ?? 500);
-      const height = Math.min(Number(parsed.height) || 600, window.screen?.availHeight ?? 600);
-      const screenX = window.screenX ?? window.screenLeft ?? 0;
-      const screenY = window.screenY ?? window.screenTop ?? 0;
-      const outerW = window.outerWidth ?? width;
-      const outerH = window.outerHeight ?? height;
-      const left = Math.max(0, Math.round(screenX + (outerW - width) / 2));
-      const top = Math.max(0, Math.round(screenY + (outerH - height) / 2));
-      parsed.left = String(left);
-      parsed.top = String(top);
-      parsed.width = String(width);
-      parsed.height = String(height);
-      features = Object.entries(parsed)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(',');
     }
+    // Center popup on screen (not parent window) so it appears in the middle regardless of window position
+    const s = window.screen;
+    const availW = s?.availWidth ?? 1024;
+    const availH = s?.availHeight ?? 768;
+    const availLeft = s?.availLeft ?? 0;
+    const availTop = s?.availTop ?? 0;
+    const width = Math.min(Number(parsed.width) || 500, availW);
+    const height = Math.min(Number(parsed.height) || 600, availH);
+    const left = Math.round(availLeft + Math.max(0, (availW - width) / 2));
+    const top = Math.round(availTop + Math.max(0, (availH - height) / 2));
+    parsed.left = String(left);
+    parsed.top = String(top);
+    parsed.width = String(width);
+    parsed.height = String(height);
+    features = Object.entries(parsed)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(',');
     return originalOpen.call(window, url, target, features);
   };
   return fn().finally(() => {

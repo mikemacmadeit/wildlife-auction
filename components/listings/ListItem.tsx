@@ -313,22 +313,28 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                 <div className="mt-2 flex items-end justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span
-                        className={cn(
-                          'text-lg font-extrabold leading-none',
-                          isCurrentHighBidder ? 'text-primary dark:text-primary' : 'text-foreground dark:text-white'
-                        )}
-                      >
-                        ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
-                      </span>
-                      {isCurrentHighBidder && (
+                      {sold.isSold ? (
+                        <span className="text-lg font-extrabold leading-none text-emerald-600 dark:text-emerald-400">
+                          {sold.soldPriceLabel}
+                        </span>
+                      ) : (
+                        <span
+                          className={cn(
+                            'text-lg font-extrabold leading-none',
+                            isCurrentHighBidder ? 'text-primary dark:text-primary' : 'text-foreground dark:text-white'
+                          )}
+                        >
+                          ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
+                        </span>
+                      )}
+                      {!sold.isSold && isCurrentHighBidder && (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
                           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                           You're winning
                         </span>
                       )}
                     </div>
-                    {bestOfferEnabled ? (
+                    {!sold.isSold && bestOfferEnabled ? (
                       <div className="mt-1 text-[11px] font-semibold text-muted-foreground">Best Offer</div>
                     ) : null}
                   </div>
@@ -386,7 +392,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   {sold.isSold ? (
-                    <span className="text-base font-extrabold text-foreground dark:text-white leading-none">{sold.soldPriceLabel}</span>
+                    <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 leading-none">{sold.soldPriceLabel}</span>
                   ) : (
                     <>
                       <span
@@ -520,7 +526,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                   ) : null}
                   {sold.isSold ? (
                     <>
-                      <div className="text-sm sm:text-base font-extrabold">{sold.soldPriceLabel}</div>
+                      <div className="text-sm sm:text-base font-extrabold text-emerald-600 dark:text-emerald-400">{sold.soldPriceLabel}</div>
                       {sold.soldDateLabel ? (
                         <div className="text-xs text-muted-foreground">{sold.soldDateLabel}</div>
                       ) : null}

@@ -191,13 +191,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </Badge>
             </div>
 
-            {sold.isSold && (
-              <div className="absolute bottom-3 left-3 z-20">
-                <Badge className="bg-destructive text-destructive-foreground font-extrabold px-3 py-1.5 shadow-lg">
-                  SOLD
-                </Badge>
-              </div>
-            )}
 
             {/* Mobile: bids count (Protected moved to content next to delivery) */}
             {!sold.isSold && listing.type === 'auction' && (listing as any)?.metrics?.bidCount > 0 ? (
@@ -214,12 +207,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
 
           {/* Content with Premium Styling */}
           <div className="p-3 sm:p-5 flex-1 flex flex-col gap-2 sm:gap-4 min-w-0">
-            {sold.isSold && (
-              <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
-                <div className="font-semibold">{sold.soldPriceLabel}</div>
-                {sold.soldDateLabel ? <div className="text-muted-foreground mt-0.5">{sold.soldDateLabel}</div> : null}
-              </div>
-            )}
             {/* Title – line-clamp-4, flex-shrink-0 so longer titles aren’t cut off in gallery mode */}
             <h3
               className="font-bold text-base sm:text-lg leading-tight line-clamp-4 group-hover:text-primary transition-colors duration-300 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text min-w-0 break-words flex-shrink-0"
@@ -280,27 +267,35 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span
                       className={cn(
-                        'text-2xl font-bold truncate',
-                        isCurrentHighBidder
-                          ? 'text-primary dark:text-primary'
-                          : 'text-foreground dark:text-white'
+                        'font-bold truncate',
+                        sold.isSold
+                          ? 'text-sm sm:text-base text-emerald-600 dark:text-emerald-400'
+                          : cn(
+                              'text-2xl',
+                              isCurrentHighBidder
+                                ? 'text-primary dark:text-primary'
+                                : 'text-foreground dark:text-white'
+                            )
                       )}
                     >
-                      {priceDisplay}
+                      {sold.isSold ? sold.soldPriceLabel : priceDisplay}
                     </span>
-                    {isCurrentHighBidder && (
+                    {!sold.isSold && isCurrentHighBidder && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                         You're winning
                       </span>
                     )}
                   </div>
+                  {sold.isSold && sold.soldDateLabel && (
+                    <div className="text-[11px] text-muted-foreground font-medium">{sold.soldDateLabel}</div>
+                  )}
                   {quantity && quantity >= 1 ? (
                     <div className="text-xs text-muted-foreground font-medium truncate">
                       Qty: {quantity}
                     </div>
                   ) : null}
-                  {listing.type === 'auction' && listing.reservePrice ? (
+                  {!sold.isSold && listing.type === 'auction' && listing.reservePrice ? (
                     <div className="text-xs text-muted-foreground font-medium truncate">
                       Reserve: ${listing.reservePrice.toLocaleString()}
                     </div>
