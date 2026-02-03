@@ -605,14 +605,10 @@ function SellerListingsPageContent() {
         setSoldListingIdsFromOrders(soldIds);
         setSoldListingToOrderId(listingToOrder);
 
-        // Reconcile: (1) listings with a paid order but doc not marked sold, or (2) ended/expired listings not sold
-        // (2) catches auctions like Caleb Williams where the order's listingId may not have been in our set yet
-        const nowMs = Date.now();
+        // Reconcile: listings with a paid order but doc not yet marked sold (webhook may have missed)
         const toReconcile = data.filter((l) => {
           if (l.status === 'sold' || l.soldAt) return false;
-          if (soldIds.has(l.id)) return true;
-          const effective = getEffectiveListingStatus(l, nowMs);
-          return effective === 'ended' || effective === 'expired';
+          return soldIds.has(l.id);
         });
         if (toReconcile.length > 0 && user) {
           try {

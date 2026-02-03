@@ -174,6 +174,7 @@ function EditListingPageContent() {
   const [legalTermsModalOpen, setLegalTermsModalOpen] = useState(false);
   const skipTermsCheckRef = useRef(false);
   const imagesInputRef = useRef<HTMLInputElement | null>(null);
+  const handleCompleteRef = useRef<((data: Record<string, unknown>) => Promise<void>) | null>(null);
 
   // Load existing listing data from Firestore
   useEffect(() => {
@@ -313,6 +314,27 @@ function EditListingPageContent() {
       fetchListing();
     }
   }, [listingId, user, authLoading, router, toast]);
+
+  // After user accepts seller ack modal: defer handleComplete to next tick so React commits state first
+  useEffect(() => {
+    if (!publishAfterSellerAck || sellerAckModalOpen) return;
+    setPublishAfterSellerAck(false);
+    const timer = setTimeout(() => {
+      handleCompleteRef.current?.({ sellerAnimalAttestationAccepted: true });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [publishAfterSellerAck, sellerAckModalOpen]);
+
+  // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
+  useEffect(() => {
+    if (!publishAfterTermsAccept || legalTermsModalOpen) return;
+    setPublishAfterTermsAccept(false);
+    skipTermsCheckRef.current = true;
+    const timer = setTimeout(() => {
+      handleCompleteRef.current?.({});
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [publishAfterTermsAccept, legalTermsModalOpen]);
 
   if (authLoading || loading) {
     return <SellerContentSkeleton />;
@@ -2315,28 +2337,7 @@ function EditListingPageContent() {
     }
   };
 
-  // After user accepts seller ack modal: defer handleComplete to next tick so React commits state first
-  useEffect(() => {
-    if (!publishAfterSellerAck || sellerAckModalOpen) return;
-    setPublishAfterSellerAck(false);
-    const timer = setTimeout(() => {
-      void handleComplete({ sellerAnimalAttestationAccepted: true });
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publishAfterSellerAck, sellerAckModalOpen]);
-
-  // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
-  useEffect(() => {
-    if (!publishAfterTermsAccept || legalTermsModalOpen) return;
-    setPublishAfterTermsAccept(false);
-    skipTermsCheckRef.current = true;
-    const timer = setTimeout(() => {
-      void handleComplete({});
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publishAfterTermsAccept, legalTermsModalOpen]);
+  handleCompleteRef.current = handleComplete;
 
   const isRejected = fullListing?.status === 'removed';
   const rejectionReason = typeof fullListing?.rejectionReason === 'string' ? fullListing.rejectionReason : '';

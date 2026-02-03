@@ -39,10 +39,12 @@ function json(body: object, init?: { status?: number }) {
 
 export async function POST(
   request: Request,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const rawParams = await ctx.params;
-  const listingId = typeof rawParams?.id === 'string' ? rawParams.id.trim() : '';
+  const params = typeof (ctx.params as any)?.then === 'function'
+    ? await (ctx.params as Promise<{ id: string }>)
+    : (ctx.params as { id: string });
+  const listingId = typeof params?.id === 'string' ? params.id.trim() : '';
   if (!listingId) return json({ error: 'Invalid listing id' }, { status: 400 });
 
   const authHeader = request.headers.get('authorization');

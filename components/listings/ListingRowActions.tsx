@@ -116,8 +116,7 @@ const ListingRowActions = memo(function ListingRowActions({
         ) : null}
 
         <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
+          onSelect={() => {
             onDuplicate?.();
           }}
           className="flex items-center gap-2 font-semibold"

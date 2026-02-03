@@ -177,8 +177,8 @@ export function AddressPickerModal({
   }, [userId, orderId, existingKey, existingDeliveryAddress]);
 
   useEffect(() => {
-    if (open && userId) loadAddresses();
-  }, [open, userId, loadAddresses]);
+    if (open && userId && !saving) loadAddresses();
+  }, [open, userId, loadAddresses, saving]);
 
   const handleSelectSaved = (address: SavedAddress) => {
     setSelectedAddressId(address.id);
@@ -195,8 +195,8 @@ export function AddressPickerModal({
       if (orderId && onSetDeliveryAddress) {
         await onSetDeliveryAddress(orderId, savedToPayload(address));
       }
-      onSuccess?.();
       onOpenChange(false);
+      onSuccess?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const isPermission = msg.toLowerCase().includes('missing or insufficient permissions');
@@ -251,8 +251,8 @@ export function AddressPickerModal({
           lng: saved.lng,
         });
       }
-      onSuccess?.();
       onOpenChange(false);
+      onSuccess?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const isPermission = msg.toLowerCase().includes('missing or insufficient permissions');
@@ -307,8 +307,8 @@ export function AddressPickerModal({
           lng: saved.lng,
         });
       }
-      onSuccess?.();
       onOpenChange(false);
+      onSuccess?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const isPermission = msg.toLowerCase().includes('missing or insufficient permissions');
@@ -359,8 +359,8 @@ export function AddressPickerModal({
           pinLabel: pinLabel || undefined,
         });
       }
-      onSuccess?.();
       onOpenChange(false);
+      onSuccess?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const isPermission = msg.toLowerCase().includes('missing or insufficient permissions');
