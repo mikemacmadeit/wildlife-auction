@@ -260,7 +260,7 @@ function withCenteredPopup<T>(fn: () => Promise<T>): Promise<T> {
       });
     }
     // Center popup on screen (not parent window) so it appears in the middle regardless of window position
-    const s = window.screen;
+    const s = window.screen as Screen & { availLeft?: number; availTop?: number };
     const availW = s?.availWidth ?? 1024;
     const availH = s?.availHeight ?? 768;
     const availLeft = s?.availLeft ?? 0;
