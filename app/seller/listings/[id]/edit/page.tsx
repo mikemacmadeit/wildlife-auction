@@ -105,8 +105,6 @@ function EditListingPageContent() {
       deliveryStatusExplanation: string;
       deliveryNotes: string;
     };
-    protectedTransactionEnabled: boolean;
-    protectedTransactionDays: 3 | 7 | 14 | null;
     bestOffer: {
       enabled: boolean;
       minPrice: string;
@@ -140,8 +138,6 @@ function EditListingPageContent() {
       deliveryStatusExplanation: '',
       deliveryNotes: '',
     },
-    protectedTransactionEnabled: false,
-    protectedTransactionDays: null,
     bestOffer: {
       enabled: false,
       minPrice: '',
@@ -242,8 +238,6 @@ function EditListingPageContent() {
             deliveryStatusExplanation: (listing as any).deliveryDetails?.deliveryStatusExplanation ?? '',
             deliveryNotes: (listing as any).deliveryDetails?.deliveryNotes ?? '',
           },
-          protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
-          protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
             enabled: Boolean(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled),
             minPrice:
@@ -275,8 +269,6 @@ function EditListingPageContent() {
           verification: listing.trust?.verified || false,
           transportType: 'seller',
           deliveryDetails: (listing as any).deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' },
-          protectedTransactionEnabled: listing.protectedTransactionEnabled || false,
-          protectedTransactionDays: listing.protectedTransactionDays || null,
           bestOffer: {
             enabled: Boolean(listing.bestOfferSettings?.enabled ?? listing.bestOfferEnabled),
             minPrice: listing.bestOfferSettings?.minPrice ?? listing.bestOfferMinPrice ?? null,
@@ -1465,91 +1457,6 @@ function EditListingPageContent() {
       validate: () => true, // Documents are handled separately
     },
     {
-      id: 'verification',
-      title: 'Protected Transaction (Optional)',
-      description: 'Post-delivery review window — opt-in only',
-      content: (
-        <div className="space-y-6">
-          <Card className="p-4 border-2">
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3 min-h-[44px]">
-                <Checkbox
-                  id="protected-transaction"
-                  checked={formData.protectedTransactionEnabled}
-                  onCheckedChange={(checked) =>
-                    setFormData({ 
-                      ...formData, 
-                      protectedTransactionEnabled: checked as boolean,
-                      protectedTransactionDays: checked ? 7 : null
-                    })
-                  }
-                />
-                <Label htmlFor="protected-transaction" className="cursor-pointer flex-1">
-                  <div className="font-medium mb-1">Offer a post-delivery review window</div>
-                  <div className="text-sm text-muted-foreground">
-                    Allows buyers to report verified delivery-related issues within a short window after delivery confirmation. Claims require proof and are reviewed. No automatic refunds.
-                  </div>
-                </Label>
-              </div>
-              {formData.protectedTransactionEnabled && (
-                <div className="ml-7 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="protected-days" className="text-sm font-semibold">Protection window</Label>
-                    <Select
-                      value={formData.protectedTransactionDays === 3 ? '3' : '7'}
-                      onValueChange={(value) =>
-                        setFormData({ 
-                          ...formData, 
-                          protectedTransactionDays: parseInt(value) as 3 | 7 
-                        })
-                      }
-                    >
-                      <SelectTrigger id="protected-days" className="min-h-[48px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 days</SelectItem>
-                        <SelectItem value="7">7 days</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <div>
-                      <div className="font-medium text-foreground mb-1">What buyers may report</div>
-                      <ul className="list-disc list-inside space-y-0.5 pl-1">
-                        <li>Illness or injury present at delivery or occurring immediately around delivery</li>
-                        <li>The animal not matching the listing description</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground mb-1">What is required</div>
-                      <p>Documentation or proof (for example, dated veterinary records for illness or death)</p>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground mb-1">How claims work</div>
-                      <ul className="list-disc list-inside space-y-0.5 pl-1">
-                        <li>Claims must be submitted within the selected window</li>
-                        <li>Claims are reviewed; outcomes are not automatic</li>
-                        <li>If a claim is upheld (seller at fault), the seller is expected to refund or otherwise resolve the issue</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground mb-1">Platform role</div>
-                      <p>AgChange does not hold funds, delay payouts, or provide guarantees</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-          <p className="text-sm text-muted-foreground">
-            Listings without a post-delivery review window are final upon delivery confirmation.
-          </p>
-        </div>
-      ),
-      validate: () => true, // Optional
-    },
-    {
       id: 'transportation',
       title: 'Transportation',
       description: 'Delivery radius, timeframe & notes',
@@ -1735,11 +1642,6 @@ function EditListingPageContent() {
                           </Badge>
                         )}
                         <Badge variant="outline">Seller arranges delivery</Badge>
-                        {formData.protectedTransactionEnabled && (
-                          <Badge variant="outline">
-                            Protected ({formData.protectedTransactionDays ?? '—'} days)
-                          </Badge>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1889,7 +1791,6 @@ function EditListingPageContent() {
                         </div>
                       ) : null;
                     })()}
-                    <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
                     {formData.type === 'fixed' && (
                       <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
                     )}
@@ -1961,8 +1862,6 @@ function EditListingPageContent() {
         return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(statusExpl && { deliveryStatusExplanation: statusExpl }), ...(notes && { deliveryNotes: notes }) } } : {};
       })()),
       attributes: formData.attributes as ListingAttributes,
-      protectedTransactionEnabled: formData.protectedTransactionEnabled,
-      protectedTransactionDays: formData.protectedTransactionDays,
     };
 
     if (
@@ -2001,11 +1900,6 @@ function EditListingPageContent() {
     // Duration model: allow durationDays changes only while not active.
     if (listingData?.status !== 'active' && isValidDurationDays(formData.durationDays)) {
       updates.durationDays = formData.durationDays;
-    }
-
-    // Only include protectedTermsVersion if protected transaction is enabled
-    if (formData.protectedTransactionEnabled) {
-      updates.protectedTermsVersion = 'v1';
     }
 
     return updates;
@@ -2068,8 +1962,6 @@ function EditListingPageContent() {
       verification: formData.verification,
       transportType: formData.transportType,
       deliveryDetails: formData.deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' },
-      protectedTransactionEnabled: formData.protectedTransactionEnabled,
-      protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,
       attributes: formData.attributes,
       sellerAnimalAttestationAccepted: sellerAnimalAttestationAccepted ? true : false,

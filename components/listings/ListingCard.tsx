@@ -326,7 +326,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
           </div>
 
           {/* Content – no overflow-hidden so flex won’t shrink and clip the title */}
-          <div className="p-2.5 sm:p-4 flex-1 flex flex-col gap-1.5 sm:gap-3 min-w-0">
+          <div className="p-3 sm:p-4 flex-1 flex flex-col gap-2 sm:gap-3 min-w-0">
             {/* Title – line-clamp-4, flex-shrink-0 so it’s never clipped in gallery mode */}
             <h3
               className="font-bold text-sm sm:text-base line-clamp-4 leading-snug sm:leading-snug group-hover:text-primary transition-colors duration-300 min-w-0 break-words flex-shrink-0"
@@ -382,21 +382,6 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               size="sm"
               className="flex-wrap gap-1.5"
             />
-            {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
-              <Badge
-                variant="secondary"
-                className={cn(
-                  'font-semibold text-xs shadow-warm border-0 text-white',
-                  listing.protectedTransactionDays === 3 && 'bg-blue-400 hover:bg-blue-400',
-                  listing.protectedTransactionDays === 7 && 'bg-violet-400 hover:bg-violet-400',
-                  listing.protectedTransactionDays === 14 && 'bg-violet-500 hover:bg-violet-500',
-                  ![3, 7, 14].includes(listing.protectedTransactionDays) && 'bg-violet-400 hover:bg-violet-400'
-                )}
-                title="Protected Transaction: Payments are processed by Stripe. Optional dispute window after delivery."
-              >
-                Protected {listing.protectedTransactionDays} Days
-              </Badge>
-            )}
           </div>
 
             {/* Price and Seller Info */}

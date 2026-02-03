@@ -115,6 +115,7 @@ function NewListingPageContent() {
   const pendingPublishPayloadRef = useRef<Record<string, unknown> | null>(null);
   const [publishAfterAnimalAck, setPublishAfterAnimalAck] = useState(false);
   const [publishAfterTermsAccept, setPublishAfterTermsAccept] = useState(false);
+  const handleCompleteRef = useRef<(data: Record<string, unknown>) => Promise<void>>(() => Promise.resolve());
   const [legalTermsModalOpen, setLegalTermsModalOpen] = useState(false);
   const skipTermsCheckRef = useRef(false);
   const [tourRequestedStep, setTourRequestedStep] = useState<string | null>(null);
@@ -141,8 +142,6 @@ function NewListingPageContent() {
       deliveryStatusExplanation: string;
       deliveryNotes: string;
     };
-    protectedTransactionEnabled: boolean;
-    protectedTransactionDays: 3 | 7 | 14 | null;
     bestOffer: {
       enabled: boolean;
       minPrice: string;
@@ -179,8 +178,6 @@ function NewListingPageContent() {
       deliveryStatusExplanation: '',
       deliveryNotes: '',
     },
-    protectedTransactionEnabled: false,
-    protectedTransactionDays: null,
     bestOffer: {
       enabled: false,
       minPrice: '',
@@ -267,8 +264,6 @@ function NewListingPageContent() {
       verification: formData.verification,
       transportType: formData.transportType,
       deliveryDetails: formData.deliveryDetails,
-      protectedTransactionEnabled: formData.protectedTransactionEnabled,
-      protectedTransactionDays: formData.protectedTransactionDays,
       bestOffer: formData.bestOffer,
       attributes: formData.attributes,
       sellerAttestationAccepted,
@@ -426,9 +421,6 @@ function NewListingPageContent() {
             const hasAny = maxMiles !== undefined || timeframe !== undefined || statusExpl !== undefined || notes !== undefined;
             return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(statusExpl && { deliveryStatusExplanation: statusExpl }), ...(notes && { deliveryNotes: notes }) } } : {};
           })()),
-          protectedTransactionEnabled: formData.protectedTransactionEnabled,
-          protectedTransactionDays: formData.protectedTransactionDays,
-          ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
           attributes: formData.attributes as ListingAttributes,
           ...(formData.category === 'whitetail_breeder' && sellerAttestationAccepted && {
             sellerAttestationAccepted: true,
@@ -646,7 +638,7 @@ function NewListingPageContent() {
               </AlertDescription>
             </Alert>
           ) : null}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-5xl w-full mx-auto px-3 sm:px-0">
+          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4 sm:gap-4 max-w-5xl w-full mx-auto px-3 sm:px-0">
             <Card
               role="button"
               tabIndex={canSelectWhitetail ? 0 : -1}
@@ -673,7 +665,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'whitetail_breeder'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : canSelectWhitetail
@@ -699,7 +691,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'whitetail_breeder' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -732,7 +724,7 @@ function NewListingPageContent() {
                     <div className="flex flex-wrap gap-2 justify-center">
                       <Badge
                         variant="outline"
-                        className="text-[11px] whitespace-nowrap px-2"
+                        className="text-[11px] px-2 break-words"
                       >
                         TPWD REQUIRED
                       </Badge>
@@ -760,7 +752,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'wildlife_exotics'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -777,7 +769,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'wildlife_exotics' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -828,7 +820,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'horse_equestrian'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -842,7 +834,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'horse_equestrian' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -892,7 +884,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'sporting_working_dogs'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -906,7 +898,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'sporting_working_dogs' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -948,7 +940,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'cattle_livestock'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -965,7 +957,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'cattle_livestock' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1017,7 +1009,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'farm_animals'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -1031,7 +1023,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'farm_animals' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1086,7 +1078,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'hunting_outfitter_assets'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -1100,7 +1092,7 @@ function NewListingPageContent() {
                 },
               })}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'hunting_outfitter_assets' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1141,7 +1133,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'ranch_equipment'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -1155,7 +1147,7 @@ function NewListingPageContent() {
                 },
               })}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'ranch_equipment' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1209,7 +1201,7 @@ function NewListingPageContent() {
                   });
                 }
               }}
-              className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              className={`relative w-full min-w-0 cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'ranch_vehicles'
                   ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
@@ -1223,7 +1215,7 @@ function NewListingPageContent() {
                 },
               })}
             >
-              <CardContent className="p-3 sm:p-4">
+              <CardContent className="p-4 sm:p-4 min-w-0">
                 {formData.category === 'ranch_vehicles' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -2104,94 +2096,6 @@ function NewListingPageContent() {
       errorMessage: 'Please select at least one photo',
     },
     {
-      id: 'verification',
-      title: 'Protected Transaction (Optional)',
-      description: 'Post-delivery review window — opt-in only',
-      content: (
-        <div className="space-y-6">
-          <Card className="p-4 border-2">
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3 min-h-[44px]">
-                <Checkbox
-                  id="protected"
-                  checked={formData.protectedTransactionEnabled}
-                  onCheckedChange={(checked) => {
-                    const enabled = checked as boolean;
-                    setFormData({
-                      ...formData,
-                      protectedTransactionEnabled: enabled,
-                      protectedTransactionDays: enabled && !formData.protectedTransactionDays ? 7 : formData.protectedTransactionDays,
-                    });
-                  }}
-                />
-                <Label htmlFor="protected" className="cursor-pointer flex-1">
-                  <div className="font-medium mb-1">Offer a post-delivery review window</div>
-                  <div className="text-sm text-muted-foreground">
-                    Allows buyers to report verified delivery-related issues within a short window after delivery confirmation. Claims require proof and are reviewed. No automatic refunds.
-                  </div>
-                </Label>
-              </div>
-              {formData.protectedTransactionEnabled && (
-                <div className="pl-7 space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Protection window</div>
-                    <RadioGroup
-                      value={formData.protectedTransactionDays === 3 ? '3' : '7'}
-                      onValueChange={(v) =>
-                        setFormData({
-                          ...formData,
-                          protectedTransactionDays: v === '3' ? 3 : 7,
-                        })
-                      }
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="3" id="protect-3" />
-                        <Label htmlFor="protect-3" className="cursor-pointer font-normal">3 days</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="7" id="protect-7" />
-                        <Label htmlFor="protect-7" className="cursor-pointer font-normal">7 days</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <div>
-                      <div className="font-medium text-foreground mb-1">What buyers may report</div>
-                      <ul className="list-disc list-inside space-y-0.5 pl-1">
-                        <li>Illness or injury present at delivery or occurring immediately around delivery</li>
-                        <li>The animal not matching the listing description</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground mb-1">What is required</div>
-                      <p>Documentation or proof (for example, dated veterinary records for illness or death)</p>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground mb-1">How claims work</div>
-                      <ul className="list-disc list-inside space-y-0.5 pl-1">
-                        <li>Claims must be submitted within the selected window</li>
-                        <li>Claims are reviewed; outcomes are not automatic</li>
-                        <li>If a claim is upheld (seller at fault), the seller is expected to refund or otherwise resolve the issue</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground mb-1">Platform role</div>
-                      <p>AgChange does not hold funds, delay payouts, or provide guarantees</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-          <p className="text-sm text-muted-foreground">
-            Listings without a post-delivery review window are final upon delivery confirmation.
-          </p>
-        </div>
-      ),
-      validate: () => true, // Optional
-    },
-    {
       id: 'transportation',
       title: 'Transportation',
       description: 'Delivery timeframe & details (required)',
@@ -2408,11 +2312,6 @@ function NewListingPageContent() {
                           </Badge>
                         )}
                         <Badge variant="outline">Seller arranges delivery</Badge>
-                        {formData.protectedTransactionEnabled && (
-                          <Badge variant="outline">
-                            Protected ({formData.protectedTransactionDays ?? '—'} days)
-                          </Badge>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -2567,7 +2466,6 @@ function NewListingPageContent() {
                         </div>
                       ) : null;
                     })()}
-                    <div><span className="text-muted-foreground">Protected transaction:</span> <span className="font-medium">{formData.protectedTransactionEnabled ? `Yes (${formData.protectedTransactionDays ?? '—'} days)` : 'No'}</span></div>
                     {formData.type === 'fixed' && (
                       <div><span className="text-muted-foreground">Best Offer:</span> <span className="font-medium">{formData.bestOffer.enabled ? 'Enabled' : 'Off'}</span></div>
                     )}
@@ -2638,10 +2536,7 @@ function NewListingPageContent() {
           if (formData.photoIds.length > 0) {
             completed.push('media');
             
-            // Step 6: Verification & Transportation - accessible once photos are done (optional)
-            completed.push('verification');
-            
-            // Step 7: Transportation - delivery radius, timeframe, notes
+            // Step 6: Transportation - delivery radius, timeframe, notes
             completed.push('transportation');
             
             // Step 8: Review - accessible once transportation is done (final step)
@@ -2823,9 +2718,6 @@ function NewListingPageContent() {
           const hasAny = maxMiles !== undefined || timeframe !== undefined || statusExpl !== undefined || notes !== undefined;
           return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(statusExpl && { deliveryStatusExplanation: statusExpl }), ...(notes && { deliveryNotes: notes }) } } : {};
         })()),
-        protectedTransactionEnabled: formData.protectedTransactionEnabled,
-        protectedTransactionDays: formData.protectedTransactionDays,
-        ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
         attributes: normalizedAttributes as ListingAttributes,
         // Whitetail-only seller attestation
         ...(formData.category === 'whitetail_breeder' && {
@@ -2951,17 +2843,18 @@ function NewListingPageContent() {
       submittingRef.current = false;
     }
   };
+  handleCompleteRef.current = handleComplete;
 
   // After user accepts seller animal ack modal: formData is updated (disclosures), modal closed.
   // Trigger publish once React has committed state so handleComplete sees the updated formData.
+  // Use 50ms delay for mobile reliability (state + modal close must settle before publish).
   useEffect(() => {
     if (!publishAfterAnimalAck || sellerAnimalAckModalOpen) return;
     setPublishAfterAnimalAck(false);
     const timer = setTimeout(() => {
-      void handleComplete({});
-    }, 0);
+      void handleCompleteRef.current?.({});
+    }, 50);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publishAfterAnimalAck, sellerAnimalAckModalOpen]);
 
   // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
@@ -2970,10 +2863,9 @@ function NewListingPageContent() {
     setPublishAfterTermsAccept(false);
     skipTermsCheckRef.current = true;
     const timer = setTimeout(() => {
-      void handleComplete({});
-    }, 0);
+      void handleCompleteRef.current?.({});
+    }, 50);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publishAfterTermsAccept, legalTermsModalOpen]);
 
   // Check if user just returned from authentication and restore form data
@@ -3113,9 +3005,6 @@ function NewListingPageContent() {
           const hasAny = maxMiles !== undefined || timeframe !== undefined || statusExpl !== undefined || notes !== undefined;
           return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(statusExpl && { deliveryStatusExplanation: statusExpl }), ...(notes && { deliveryNotes: notes }) } } : {};
         })()),
-        protectedTransactionEnabled: formData.protectedTransactionEnabled,
-        protectedTransactionDays: formData.protectedTransactionDays,
-        ...(formData.protectedTransactionEnabled && { protectedTermsVersion: 'v1' }),
         attributes: normalizedAttributes as ListingAttributes,
         // Whitetail-only seller attestation (draft creation requires it)
         ...(formData.category === 'whitetail_breeder' && {
@@ -3478,8 +3367,9 @@ function NewListingPageContent() {
                 }
 
                 pendingPublishPayloadRef.current = null;
-                setPublishAfterAnimalAck(true);
                 setSellerAnimalAckModalOpen(false);
+                // Run publish immediately — ref is set, no extra button click needed
+                setTimeout(() => void handleCompleteRef.current?.({}), 0);
               }}
             >
               I agree &amp; continue to publish

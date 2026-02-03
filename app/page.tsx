@@ -564,7 +564,7 @@ export default function HomePage() {
 
     // Homepage: enforce consistent card size/height (eBay-style rails).
     // This avoids “some huge, some small” cards when different variants render.
-    const itemClass = 'w-[200px] h-[300px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]';
+    const itemClass = 'w-[260px] h-[360px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]';
 
     const startRafLoop = () => {
       const el = scrollerRef.current;
@@ -686,7 +686,7 @@ export default function HomePage() {
     };
 
     return (
-      <div className="group/rail relative [--rail-card-w:200px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
+      <div className="group/rail relative [--rail-card-w:260px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]">
         {/* Arrows: sit in the rail gutters (ends of the section), not on top of card images */}
         <div
           className={cn(
@@ -1085,7 +1085,7 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-8">
-              <div className="space-y-4 min-h-[320px] sm:min-h-[440px]">
+              <div className="space-y-4 min-h-[360px] sm:min-h-[440px]">
                 <SectionHeader
                   title={mostWatched?.length ? "Trending now" : "Explore listings"}
                   subtitle={mostWatched?.length ? "What people are watching right now." : "Fresh listings to start browsing."}
@@ -1698,7 +1698,7 @@ export default function HomePage() {
           </div>
 
           {/* Rail area: min-height so skeleton and content occupy same space (no jump) */}
-          <div className="min-h-[320px] sm:min-h-[440px]">
+          <div className="min-h-[360px] sm:min-h-[440px]">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div

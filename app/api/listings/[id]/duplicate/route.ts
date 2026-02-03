@@ -119,11 +119,10 @@ export async function POST(
     bestOfferAutoAcceptPrice: typeof src?.bestOfferAutoAcceptPrice === 'number' ? src.bestOfferAutoAcceptPrice : FieldValue.delete(),
     bestOfferSettings: src?.bestOfferSettings && typeof src.bestOfferSettings === 'object' ? src.bestOfferSettings : FieldValue.delete(),
 
-    // Protected Transaction settings
-    protectedTransactionEnabled:
-      typeof src?.protectedTransactionEnabled === 'boolean' ? src.protectedTransactionEnabled : FieldValue.delete(),
-    protectedTransactionDays: typeof src?.protectedTransactionDays === 'number' ? src.protectedTransactionDays : FieldValue.delete(),
-    protectedTermsVersion: typeof src?.protectedTermsVersion === 'string' ? src.protectedTermsVersion : FieldValue.delete(),
+    // Protected Transaction (removed) — clear on duplicate
+    protectedTransactionEnabled: FieldValue.delete(),
+    protectedTransactionDays: FieldValue.delete(),
+    protectedTermsVersion: FieldValue.delete(),
     protectedEnabledAt: FieldValue.delete(),
 
     // Ownership + publish lifecycle

@@ -11,6 +11,7 @@ import type { SavedAddress } from '@/lib/types';
 import { AddressSearch } from './AddressSearch';
 import { AddressMapConfirm } from './AddressMapConfirm';
 import type { ParsedGoogleAddress } from '@/lib/address/parseGooglePlace';
+import { cn } from '@/lib/utils';
 
 export interface SetDeliveryAddressPayload {
   line1: string;
@@ -417,10 +418,22 @@ export function AddressPickerModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="max-sm:top-0 max-sm:bottom-0 max-sm:left-0 max-sm:right-0"
-        className="flex flex-col w-[calc(100%-1rem)] max-w-lg sm:max-w-xl mx-auto pl-5 pr-11 sm:pl-6 sm:pr-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-6 sm:pb-6 gap-3 sm:gap-4 overflow-hidden rounded-xl max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:right-0 max-sm:w-full max-sm:max-h-[92dvh] max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:translate-x-0 max-sm:translate-y-0 sm:max-h-[90vh]"
+        className={cn(
+          'flex flex-col overflow-hidden border-2',
+          'gap-3 sm:gap-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-6 sm:pb-6',
+          'max-h-[90vh] sm:max-h-[85vh]',
+          // Desktop: centered
+          'sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]',
+          'sm:w-full sm:max-w-xl sm:rounded-xl sm:px-6',
+          // Mobile: bottom sheet, full width, safe area
+          'max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:right-0',
+          'max-sm:w-full max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0',
+          'max-sm:rounded-t-2xl max-sm:rounded-b-none',
+          'max-sm:px-4 max-sm:pl-4 max-sm:pr-14'
+        )}
       >
-        <DialogHeader className="flex-shrink-0 space-y-1.5 text-left">
-          <DialogTitle className="text-base sm:text-lg pr-8">Set delivery address</DialogTitle>
+        <DialogHeader className="flex-shrink-0 space-y-1.5 text-left pr-10 sm:pr-10">
+          <DialogTitle className="text-base sm:text-lg">Set delivery address</DialogTitle>
           <DialogDescription className="text-left text-xs sm:text-sm">
             {manualOnly
               ? 'Manual entry only. Enable Maps + Places on your API key (NEXT_PUBLIC_GOOGLE_MAPS_KEY or NEXT_PUBLIC_FIREBASE_API_KEY) and restart to use address search and map (HEB-style).'

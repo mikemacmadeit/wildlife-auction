@@ -173,9 +173,9 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'order_created',
         title: 'Order confirmed',
-        body: `Payment received for “${p.listingTitle}”. Payments are processed by Stripe; Agchange does not hold funds or condition payouts on delivery.`,
+        body: `Payment received for “${p.listingTitle}”. Set your delivery address so the seller can propose a delivery date.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View timeline',
+        linkLabel: 'Set delivery address',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount, paymentMethod: p.paymentMethod },
       };
     }
@@ -185,9 +185,9 @@ export function buildInAppNotification(params: {
         ...base,
         type: 'order_created', // Map to order_created for seller sales notifications (Order.Received = new sale for seller)
         title: 'New sale!',
-        body: `Payment received for “${p.listingTitle}”.`,
+        body: `Payment received for "${p.listingTitle}". Once the buyer sets their address, propose a delivery date.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View sale',
+        linkLabel: 'View order',
         metadata: { listingId: p.listingId, orderId: p.orderId, amount: p.amount },
       };
     }
@@ -220,10 +220,10 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivered',
-        title: 'Order delivered',
-        body: `The seller marked your order for "${p.listingTitle}" as delivered. Please confirm receipt.`,
+        title: 'Action: Confirm receipt',
+        body: `The seller marked your order for "${p.listingTitle}" as delivered. Confirm receipt to complete the transaction.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'Confirm receipt',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -256,10 +256,10 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivery_checkin',
-        title: 'Quick check-in',
+        title: 'Action: Confirm receipt',
         body: `How did “${p.listingTitle}” go? Confirm receipt or report an issue.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'Open order',
+        linkLabel: 'Confirm receipt',
         metadata: { listingId: p.listingId, orderId: p.orderId, daysSinceDelivery: p.daysSinceDelivery },
       };
     }
@@ -268,10 +268,10 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivery_address_set',
-        title: 'Delivery address set',
-        body: `Buyer set a delivery address for "${p.listingTitle}". Propose a delivery date when ready.`,
+        title: 'Action: Propose delivery date',
+        body: `Buyer set a delivery address for "${p.listingTitle}". Propose one or more delivery times for them to choose.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'Propose delivery date',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -281,7 +281,7 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivery_scheduled',
-        title: isProposed ? 'Choose your delivery date' : 'Delivery scheduled',
+        title: isProposed ? 'Action: Choose your delivery date' : 'Delivery scheduled',
         body: isProposed
           ? `The seller offered delivery times for "${p.listingTitle}". Pick one that works for you.`
           : p.eta
@@ -297,10 +297,10 @@ export function buildInAppNotification(params: {
       return {
         ...base,
         type: 'order_delivery_agreed',
-        title: 'Buyer chose a delivery date',
+        title: 'Action: Mark out for delivery',
         body: `Buyer chose a delivery time for "${p.listingTitle}". You can mark out for delivery when you’re on the way.`,
         deepLinkUrl: p.orderUrl,
-        linkLabel: 'View order',
+        linkLabel: 'Mark out for delivery',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
@@ -327,6 +327,18 @@ export function buildInAppNotification(params: {
           : `Live tracking ended for "${p.listingTitle}".`,
         deepLinkUrl: p.orderUrl,
         linkLabel: 'View order',
+        metadata: { listingId: p.listingId, orderId: p.orderId },
+      };
+    }
+    case 'Order.TransferComplianceRequired': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Order.TransferComplianceRequired' }>;
+      return {
+        ...base,
+        type: 'order_transfer_compliance_required',
+        title: 'Action: Confirm TPWD transfer compliance',
+        body: `Confirm TPWD transfer permit compliance for "${p.listingTitle}" before delivery can be scheduled.`,
+        deepLinkUrl: p.orderUrl,
+        linkLabel: 'Confirm compliance',
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }

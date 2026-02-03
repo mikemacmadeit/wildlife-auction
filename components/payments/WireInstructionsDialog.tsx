@@ -75,8 +75,11 @@ export function WireInstructionsDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden sm:max-w-2xl border-2 w-[calc(100vw-2rem)] sm:w-full p-3 sm:p-4 md:p-6">
-        <DialogHeader className="shrink-0 pb-2 pr-8">
+      <DialogContent
+        overlayClassName="max-sm:top-0 max-sm:bottom-0 max-sm:left-0 max-sm:right-0"
+        className="flex flex-col overflow-hidden w-[calc(100%-1rem)] max-w-2xl mx-auto px-4 sm:px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-6 sm:pb-6 gap-3 sm:gap-4 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:right-0 max-sm:w-full max-sm:max-h-[92dvh] max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:translate-x-0 max-sm:translate-y-0 sm:max-h-[90vh] border-2"
+      >
+        <DialogHeader className="shrink-0 pb-2 pr-10 sm:pr-10">
           <DialogTitle className="text-base sm:text-lg">Wire transfer instructions</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm mt-0.5">
             Send a bank/wire transfer using the details below. Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.

@@ -95,7 +95,7 @@ function ListingRailSkeletonCard({ className }: { className?: string }) {
     <div
       className={cn(
         'rounded-xl border-2 border-border/50 bg-card overflow-hidden flex flex-col box-border',
-        'w-[200px] h-[300px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]',
+        'w-[260px] h-[360px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]',
         className
       )}
     >
@@ -112,11 +112,11 @@ function ListingRailSkeletonCard({ className }: { className?: string }) {
 /** Horizontal skeleton rail matching ListingRail layout (eBay-style loading). Wrapper uses same dimensions as real rail; card uses box-border so it doesn't clip. */
 export function ListingRailSkeleton({ count = 6, className }: { count?: number; className?: string }) {
   return (
-    <div className={cn('group/rail relative [--rail-card-w:200px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]', className)}>
+    <div className={cn('group/rail relative [--rail-card-w:260px] sm:[--rail-card-w:320px] lg:[--rail-card-w:340px]', className)}>
       <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 we-scrollbar-hover snap-x snap-proximity md:px-12">
         <div className="flex gap-4 min-w-max">
           {Array.from({ length: count }).map((_, i) => (
-            <div key={i} className="snap-start flex-shrink-0 w-[200px] h-[300px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]">
+            <div key={i} className="snap-start flex-shrink-0 w-[260px] h-[360px] sm:w-[320px] sm:h-[420px] lg:w-[340px] lg:h-[420px]">
               <ListingRailSkeletonCard />
             </div>
           ))}

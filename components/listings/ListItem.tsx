@@ -599,21 +599,6 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     size="sm"
                     className="flex-wrap gap-2"
                   />
-                  {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        'text-white font-semibold text-[11px] border-0',
-                        listing.protectedTransactionDays === 3 && 'bg-blue-400 hover:bg-blue-400',
-                        listing.protectedTransactionDays === 7 && 'bg-violet-400 hover:bg-violet-400',
-                        listing.protectedTransactionDays === 14 && 'bg-violet-500 hover:bg-violet-500',
-                        ![3, 7, 14].includes(listing.protectedTransactionDays) && 'bg-violet-400 hover:bg-violet-400'
-                      )}
-                      title="Protected Transaction"
-                    >
-                      Protected {listing.protectedTransactionDays} Days
-                    </Badge>
-                  ) : null}
                 </div>
 
               </div>

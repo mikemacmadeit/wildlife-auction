@@ -508,7 +508,7 @@ export interface Listing {
   deliveryDetails?: {
     /** Maximum distance (miles) the seller will deliver from their location. */
     maxDeliveryRadiusMiles?: number;
-    /** When the seller plans to deliver. Prefer values: next_day, 1_3, 3_7, 7_14, 14_30, 30_60. */
+    /** When the seller plans to deliver. Prefer values: same_day, next_day, 1_3, 3_7, 7_14, 14_30, 30_60. */
     deliveryTimeframe?: string;
     /** Required when deliveryTimeframe is 30_60: explanation for delivery status. */
     deliveryStatusExplanation?: string;
@@ -1097,7 +1097,7 @@ export interface FilterState {
   verifiedSeller?: boolean; // Only verified sellers
   transportReady?: boolean; // Transport-ready listings
   sellerOffersDelivery?: boolean; // Seller offers delivery (seller-provided; platform does not arrange transport)
-  deliveryTimeframe?: string; // next_day | 1_3 | 3_7 | 7_14 | 14_30 | 30_60
+  deliveryTimeframe?: string; // same_day | next_day | 1_3 | 3_7 | 7_14 | 14_30 | 30_60
   endingSoon?: boolean; // Ending within 24 hours
   newlyListed?: boolean; // Listed within 7 days
   featured?: boolean; // Featured listings only

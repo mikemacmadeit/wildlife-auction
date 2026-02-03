@@ -1065,7 +1065,7 @@ export interface BrowseFilters {
   minPrice?: number;
   maxPrice?: number;
   featured?: boolean;
-  /** Delivery timeframe filter: next_day | 1_3 | 3_7 | 7_14 | 14_30 | 30_60 */
+  /** Delivery timeframe filter: same_day | next_day | 1_3 | 3_7 | 7_14 | 14_30 | 30_60 */
   deliveryTimeframe?: string;
 }
 

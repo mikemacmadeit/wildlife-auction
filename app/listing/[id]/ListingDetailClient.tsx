@@ -252,8 +252,8 @@ export default function ListingDetailClient() {
   }, [listing?.watcherCount, listing?.metrics?.favorites]);
 
   const checkoutAmountUsd = useMemo(() => {
-    if (pendingCheckout?.amountUsd && Number.isFinite(pendingCheckout.amountUsd)) return pendingCheckout.amountUsd;
     if (!listing) return 0;
+    // Fixed price: always compute from current quantity so button and payment modal update in real time
     if (listing.type === 'fixed') {
       const unit = Number(listing.price || 0) || 0;
       const isGroup = isGroupLotQuantityMode((listing as any)?.attributes?.quantityMode);
@@ -261,9 +261,13 @@ export default function ListingDetailClient() {
       const q = Number.isFinite(buyQuantity) ? Math.max(1, Math.floor(buyQuantity)) : 1;
       return unit * q;
     }
-    if (listing.type === 'auction') return Number(winningBidAmount || listing.currentBid || listing.startingBid || 0) || 0;
+    // Auction: use pendingCheckout once set, otherwise winning bid
+    if (listing.type === 'auction') {
+      if (pendingCheckout?.amountUsd && Number.isFinite(pendingCheckout.amountUsd)) return pendingCheckout.amountUsd;
+      return Number(winningBidAmount || listing.currentBid || listing.startingBid || 0) || 0;
+    }
     return 0;
-  }, [pendingCheckout?.amountUsd, listing, winningBidAmount, buyQuantity]);
+  }, [listing, winningBidAmount, pendingCheckout?.amountUsd, buyQuantity]);
 
   const buyNowAvailability = useMemo(() => {
     if (!listing) return { total: 1, available: 1, canChooseQuantity: false, isGroupListing: false, allowBuyNow: true };
@@ -938,15 +942,9 @@ export default function ListingDetailClient() {
                       Featured
                     </Badge>
                   ) : null}
-                  {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
-                    <Badge variant="outline" className="font-medium">
-                      Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="font-medium text-muted-foreground">
-                      Final sale upon delivery
-                    </Badge>
-                  )}
+                  <Badge variant="outline" className="font-medium text-muted-foreground">
+                    Final sale upon delivery
+                  </Badge>
                 </div>
 
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight break-words">
@@ -1614,20 +1612,9 @@ export default function ListingDetailClient() {
                         </div>
                       </div>
 
-                      {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
-                        <div className="flex items-start gap-2">
-                          <div className="min-w-0">
-                            <div className="font-semibold">Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window</div>
-                            <div className="text-xs text-muted-foreground">
-                              Claims require proof. No automatic refunds. AgChange does not hold funds or delay payout.
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-muted-foreground">
-                          Final sale upon delivery confirmation.
-                        </div>
-                      )}
+                      <div className="text-xs text-muted-foreground">
+                        Final sale upon delivery confirmation.
+                      </div>
                     </div>
                   ) : null}
 
@@ -1996,20 +1983,9 @@ export default function ListingDetailClient() {
                           </div>
                         </div>
 
-                        {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
-                          <div className="flex items-start gap-2">
-                            <div className="min-w-0">
-                              <div className="font-semibold">Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window</div>
-                              <div className="text-xs text-muted-foreground">
-                                Claims require proof. No automatic refunds. AgChange does not hold funds or delay payout.
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-muted-foreground">
-                            Final sale upon delivery confirmation.
-                          </div>
-                        )}
+                        <div className="text-xs text-muted-foreground">
+                          Final sale upon delivery confirmation.
+                        </div>
                       </div>
                     </>
                   ) : null}
@@ -2198,15 +2174,9 @@ export default function ListingDetailClient() {
                           Seller arranges delivery
                         </Badge>
                       )}
-                      {listing!.protectedTransactionEnabled && listing!.protectedTransactionDays ? (
-                        <Badge variant="outline" className="text-xs font-medium">
-                          Seller offers a {listing!.protectedTransactionDays}-day post-delivery review window
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs font-medium text-muted-foreground">
-                          Final sale upon delivery
-                        </Badge>
-                      )}
+                      <Badge variant="outline" className="text-xs font-medium text-muted-foreground">
+                        Final sale upon delivery
+                      </Badge>
                     </div>
                   </div>
 

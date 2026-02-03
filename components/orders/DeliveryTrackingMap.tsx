@@ -31,8 +31,20 @@ export function DeliveryTrackingMap({
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
-    getGoogleMapsApi()
+    const MAP_LOAD_TIMEOUT_MS = 15000;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const loadPromise = Promise.race([
+      getGoogleMapsApi(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('Map is taking too long to load. Check your connection and try refreshing.')),
+          MAP_LOAD_TIMEOUT_MS
+        );
+      }),
+    ]);
+    loadPromise
       .then((g) => {
+        clearTimeout(timeoutId);
         if (cancelled || !containerRef.current) return;
         const center = driverLocation
           ? { lat: (driverLocation.lat + destination.lat) / 2, lng: (driverLocation.lng + destination.lng) / 2 }
@@ -68,10 +80,12 @@ export function DeliveryTrackingMap({
         setError(null);
       })
       .catch((e) => {
+        clearTimeout(timeoutId);
         if (!cancelled) setError(e?.message ?? 'Failed to load map');
       });
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       driverMarkerRef.current = null;
       destMarkerRef.current = null;
       mapRef.current = null;
@@ -100,23 +114,29 @@ export function DeliveryTrackingMap({
     );
   }
 
-  if (!mapReady) {
-    return (
-      <div
-        className={`flex items-center justify-center rounded-md border bg-muted ${className}`}
-        style={{ minHeight: height }}
-      >
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
+  // Always render the map container so containerRef is set (required for getGoogleMapsApi to init).
+  // Show loading overlay until map is ready. Previously we returned a different div when !mapReady,
+  // so containerRef was never attached and the map never initialized (stuck on loading).
   return (
     <div
-      ref={containerRef}
-      className={`rounded-md border overflow-hidden bg-muted ${className}`}
+      className={`relative rounded-md border overflow-hidden bg-muted ${className}`}
       style={{ minHeight: height }}
-      aria-label="Delivery tracking map"
-    />
+    >
+      <div
+        ref={containerRef}
+        className="absolute inset-0 w-full h-full"
+        style={{ minHeight: height }}
+        aria-label="Delivery tracking map"
+      />
+      {!mapReady && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-muted z-10"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+    </div>
   );
 }

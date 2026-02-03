@@ -144,6 +144,7 @@ export const BROWSE_EQUIPMENT_CONDITION_OPTIONS: { value: string; label: string 
 /** Delivery timeframe options for create listing and browse filter. Use value for storage/filter.
  * All labels use consistent "X days" format for uniform badges across the app. */
 export const DELIVERY_TIMEFRAME_OPTIONS: { value: string; label: string }[] = [
+  { value: 'same_day', label: 'Same day' },
   { value: 'next_day', label: 'Next day' },
   { value: '1_3', label: '1-3 days' },
   { value: '3_7', label: '3-7 days' },

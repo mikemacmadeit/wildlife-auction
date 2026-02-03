@@ -296,6 +296,15 @@ export function getEventRule(type: NotificationEventType, payload: NotificationE
         rateLimitPerUser: {},
         allowDuringQuietHours: true,
       };
+    case 'Order.TransferComplianceRequired':
+      return {
+        category: 'orders',
+        urgency: 'high',
+        channels: ['inApp', 'email'],
+        dedupeWindowMs: 1000 * 60 * 60 * 24,
+        rateLimitPerUser: { email: { perHour: 2, perDay: 4 } },
+        allowDuringQuietHours: true,
+      };
     case 'Review.Request':
       return {
         category: 'orders',
@@ -444,6 +453,7 @@ export function decideChannels(params: {
         if (params.eventType === 'Order.DeliveryAddressSet') return cats.orders.confirmed;
         if (params.eventType === 'Order.DeliveryTrackingStarted') return cats.orders.confirmed;
         if (params.eventType === 'Order.DeliveryTrackingStopped') return cats.orders.confirmed;
+        if (params.eventType === 'Order.TransferComplianceRequired') return cats.orders.confirmed;
         if (params.eventType === 'Review.Request') return cats.orders.confirmed;
         if (params.eventType === 'Payout.Released') return cats.orders.payoutReleased;
         return true;
