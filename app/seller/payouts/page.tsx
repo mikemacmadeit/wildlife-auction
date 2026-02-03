@@ -4,19 +4,13 @@ import { useCallback, useEffect, memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  CreditCard,
   DollarSign,
   Clock,
   CheckCircle2,
-  TrendingUp,
-  Package,
-  Calendar,
   ArrowRight,
-  Info,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
@@ -25,7 +19,7 @@ import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserProfile } from '@/lib/firebase/users';
 import { UserProfile, type Order, type OrderStatus } from '@/lib/types';
-import { createStripeAccount, createAccountLink, checkStripeAccountStatus, createConnectLoginLink } from '@/lib/stripe/api';
+import { createStripeAccount, createAccountLink, checkStripeAccountStatus, createConnectLoginLink, getStripeBalance } from '@/lib/stripe/api';
 import { useToast } from '@/hooks/use-toast';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -60,6 +54,8 @@ export default function SellerPayoutsPage() {
   const [isOpeningStripeDashboard, setIsOpeningStripeDashboard] = useState(false);
   const [payoutRows, setPayoutRows] = useState<PayoutRow[]>([]);
   const [loadingPayouts, setLoadingPayouts] = useState(false);
+  const [stripeBalance, setStripeBalance] = useState<{ availableCents: number; pendingCents: number; nextPayoutArrivalDate: string | null } | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
   /** When returning from Stripe with ?onboarding=complete, we may get status from API before Firestore read; use it so UI shows "connected" immediately */
   const [stripeStatusFromReturn, setStripeStatusFromReturn] = useState<{
     payoutsEnabled: boolean;
@@ -247,15 +243,14 @@ export default function SellerPayoutsPage() {
   const onboardingStatus =
     stripeStatusFromReturn?.onboardingStatus ?? getOnboardingStatus();
 
-  const availablePayouts = useMemo(() => payoutRows.filter((p) => p.status === 'available'), [payoutRows]);
   const pendingPayouts = useMemo(() => payoutRows.filter((p) => p.status === 'pending'), [payoutRows]);
   const completedPayouts = useMemo(() => payoutRows.filter((p) => p.status === 'completed'), [payoutRows]);
 
-  const totalAvailable = useMemo(() => 
-    availablePayouts.reduce((sum, p) => sum + p.sellerAmount, 0),
-    [availablePayouts]
+  const totalCompleted = useMemo(() =>
+    completedPayouts.reduce((sum, p) => sum + p.sellerAmount, 0),
+    [completedPayouts]
   );
-  const totalPending = useMemo(() => 
+  const totalPending = useMemo(() =>
     pendingPayouts.reduce((sum, p) => sum + p.sellerAmount, 0),
     [pendingPayouts]
   );
@@ -276,6 +271,11 @@ export default function SellerPayoutsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const formatPayoutDate = (isoDate: string) => {
+    const d = new Date(isoDate + 'T12:00:00');
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d);
   };
 
   // Load real payouts (derived from orders for this seller)
@@ -415,122 +415,98 @@ export default function SellerPayoutsPage() {
     };
   }, [authLoading, toast, user?.uid]);
 
-  const PayoutCard = memo(({ payout }: { payout: PayoutRow }) => {
-    const getStatusBadge = () => {
-      switch (payout.status) {
-        case 'available':
-          return <Badge variant="secondary" className="font-semibold text-xs">Available</Badge>;
-        case 'pending':
-          return <Badge variant="destructive" className="font-semibold text-xs">Pending</Badge>;
-        case 'completed':
-          return <Badge variant="outline" className="font-semibold text-xs">Completed</Badge>;
-        default:
-          return null;
+  // Fetch Stripe balance when user has connected account (for "Available to withdraw")
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!user?.uid || !userProfile?.stripeAccountId) {
+        setStripeBalance(null);
+        return;
       }
-    };
+      setLoadingBalance(true);
+      try {
+        const res = await getStripeBalance();
+        if (!cancelled) {
+          setStripeBalance({
+            availableCents: res.availableCents,
+            pendingCents: res.pendingCents,
+            nextPayoutArrivalDate: res.nextPayoutArrivalDate ?? null,
+          });
+        }
+      } catch {
+        if (!cancelled) setStripeBalance(null);
+      } finally {
+        if (!cancelled) setLoadingBalance(false);
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [user?.uid, userProfile?.stripeAccountId]);
 
-    return (
-          <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-        <CardContent className="pt-6 pb-6 px-4 md:px-6">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <Link
-                      href={`/listing/${payout.listingId}`}
-                      className="font-semibold text-foreground hover:text-primary"
-                    >
-                      {payout.listingTitle}
-                    </Link>
-                  </div>
-                  {getStatusBadge()}
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-extrabold text-foreground mb-1">
-                    {formatCurrency(payout.sellerAmount)}
-                  </div>
-                  <div className="text-xs text-muted-foreground font-medium">
-                    from {formatCurrency(payout.amount)} sale
-                  </div>
-                </div>
-              </div>
-
-              {/* Fee Breakdown */}
-              <div className="pt-2 border-t border-border/50 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground font-medium">Transaction Fee:</span>
-                  <span className="font-semibold text-foreground">{formatCurrency(payout.platformFee)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-border/50">
-                  <span className="font-semibold text-foreground">Total Fees:</span>
-                  <span className="font-bold text-foreground">{formatCurrency(payout.platformFee)}</span>
-                </div>
-              </div>
-
-              {/* Schedule Info */}
-              {payout.status === 'available' && (payout.releaseEligibleAt || payout.paidAt) && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-                  <Calendar className="h-3 w-3" />
-                  <span>
-                    Eligible: {formatDate(payout.releaseEligibleAt || payout.paidAt)}
-                  </span>
-                </div>
-              )}
-              {payout.status === 'completed' && payout.releasedAt && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-                  <CheckCircle2 className="h-3 w-3" />
-                  <span>Released: {formatDate(payout.releasedAt)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  });
+  const PayoutCard = memo(({ payout, variant }: { payout: PayoutRow; variant: 'paid' | 'awaiting' }) => (
+    <Link href={`/seller/orders/${payout.orderId}`} className="block">
+      <div className="flex items-center justify-between gap-4 py-3 px-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground line-clamp-1">{payout.listingTitle}</p>
+          <p className="text-sm text-muted-foreground">
+            {variant === 'paid' ? formatDate(payout.paidAt) : 'Waiting for buyer'}
+          </p>
+        </div>
+        <div className="text-right shrink-0 flex items-center gap-2">
+          <p className="font-semibold text-foreground">{formatCurrency(payout.sellerAmount)}</p>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+    </Link>
+  ));
   PayoutCard.displayName = 'PayoutCard';
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-6">
       <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl space-y-6 md:space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-2">
-            Payouts
-          </h1>
-          <p className="text-base md:text-lg text-muted-foreground">
-            Manage your earnings and payout schedule
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Earnings
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              You keep 90% of each sale
+            </p>
+          </div>
+          {!authLoading && !loadingProfile && isPayoutsEnabled && userProfile?.stripeAccountId && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isOpeningStripeDashboard}
+              onClick={async () => {
+                try {
+                  setIsOpeningStripeDashboard(true);
+                  const { url } = await createConnectLoginLink();
+                  window.location.href = url;
+                } catch {
+                  toast({ title: 'Unable to open', variant: 'destructive' });
+                } finally {
+                  setIsOpeningStripeDashboard(false);
+                }
+              }}
+            >
+              {isOpeningStripeDashboard ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Bank & schedule'}
+            </Button>
+          )}
         </div>
 
-        {/* Stripe Connect Onboarding Status */}
-        {!authLoading && !loadingProfile && (
-          <Card className={cn(
-            'border-2',
-            isPayoutsEnabled 
-              ? 'border-green-500/50 bg-green-500/5' 
-              : 'border-yellow-500/50 bg-yellow-500/5'
-          )}>
+        {/* Stripe Connect - show setup card when NOT enabled */}
+        {!authLoading && !loadingProfile && !isPayoutsEnabled && (
+          <Card className="border-2 border-amber-500/50 bg-amber-500/5">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {isPayoutsEnabled ? (
-                    <CheckCircle2 className="h-6 w-6 text-green-500" />
-                  ) : (
-                    <AlertCircle className="h-6 w-6 text-yellow-500" />
-                  )}
+                  <AlertCircle className="h-6 w-6 text-yellow-500" />
                   <div>
-                    <CardTitle className="text-xl font-extrabold">
-                      {isPayoutsEnabled ? 'Payouts Enabled' : 'Enable Payouts'}
-                    </CardTitle>
+                    <CardTitle className="text-xl font-extrabold">Set up payouts</CardTitle>
                     <CardDescription>
-                      {isPayoutsEnabled
-                        ? 'Your Stripe account is set up and ready to receive payouts.'
-                        : onboardingStatus === 'pending'
-                        ? 'Complete your Stripe onboarding to receive payouts.'
-                        : 'Set up Stripe Connect to receive payouts from your sales.'}
+                      Connect your bank account to receive earnings from sales.
                     </CardDescription>
                   </div>
                 </div>
@@ -739,150 +715,84 @@ export default function SellerPayoutsPage() {
           </Card>
         )}
 
-        {/* Balance Cards - same line on mobile */}
-        <div className="grid grid-cols-2 gap-3 md:gap-6">
-          <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:pb-3 md:px-6">
-              <CardTitle className="text-xs md:text-base font-bold uppercase tracking-wide text-muted-foreground leading-tight">
-                Total Paid Out
-              </CardTitle>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/10 border-2 border-green-500/20 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-500" />
+        {/* Balance - primary focus */}
+        {isPayoutsEnabled && (
+          <div className="rounded-2xl border-2 border-border bg-card p-6 md:p-8 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Your balance</p>
+                <p className="text-4xl md:text-5xl font-bold text-foreground mt-1 tabular-nums">
+                  {loadingBalance ? (
+                    <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                  ) : (
+                    formatCurrency(((stripeBalance?.availableCents ?? 0) + (stripeBalance?.pendingCents ?? 0)) / 100)
+                  )}
+                </p>
+                {!loadingBalance && stripeBalance?.nextPayoutArrivalDate && (
+                  <p className="text-muted-foreground mt-2">
+                    Deposits to your bank <span className="font-medium text-foreground">{formatPayoutDate(stripeBalance.nextPayoutArrivalDate)}</span>
+                  </p>
+                )}
+                {!loadingBalance && !stripeBalance?.nextPayoutArrivalDate && ((stripeBalance?.availableCents ?? 0) + (stripeBalance?.pendingCents ?? 0)) > 0 && (
+                  <p className="text-muted-foreground mt-2">Deposits automatically to your linked bank</p>
+                )}
               </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-              <div className="text-xl md:text-4xl font-extrabold text-foreground mb-0.5 md:mb-1">
-                {formatCurrency(completedPayouts.reduce((sum, p) => sum + p.sellerAmount, 0))}
+              <div className="flex gap-3 text-sm text-muted-foreground shrink-0">
+                <span>{completedPayouts.length} paid</span>
+                {pendingPayouts.length > 0 && (
+                  <span>· {pendingPayouts.length} pending {formatCurrency(totalPending)}</span>
+                )}
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
-                {completedPayouts.length} sale{completedPayouts.length !== 1 ? 's' : ''} completed
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        )}
 
-          <Card className="border-2 border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:pb-3 md:px-6">
-              <CardTitle className="text-xs md:text-base font-bold uppercase tracking-wide text-muted-foreground leading-tight">
-                Awaiting Payment
-              </CardTitle>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-yellow-500/10 border-2 border-yellow-500/20 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4 md:h-5 md:w-5 text-yellow-500" />
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-              <div className="text-xl md:text-4xl font-extrabold text-foreground mb-0.5 md:mb-1">
-                {formatCurrency(totalPending)}
-              </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
-                {pendingPayouts.length} buyer{pendingPayouts.length !== 1 ? 's' : ''} completing checkout
-              </p>
-            </CardContent>
-          </Card>
+        {/* Sales list */}
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-3">Sales</h2>
+          <Tabs defaultValue={completedPayouts.length > 0 ? 'paid' : 'awaiting'} className="space-y-4">
+            <TabsList className="grid w-full max-w-md grid-cols-2 h-auto bg-card border border-border/50 p-1">
+              <TabsTrigger value="paid" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Paid ({completedPayouts.length})
+              </TabsTrigger>
+              <TabsTrigger value="awaiting" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
+                <Clock className="h-4 w-4 mr-2" />
+                Awaiting payment ({pendingPayouts.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="paid" className="space-y-2 mt-4">
+              {completedPayouts.length === 0 ? (
+                <p className="py-8 text-center text-muted-foreground text-sm">No paid sales yet. When buyers pay, they&apos;ll show up here.</p>
+              ) : (
+                completedPayouts.map((payout) => (
+                  <PayoutCard key={payout.id} payout={payout} variant="paid" />
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="awaiting" className="space-y-2 mt-4">
+              {pendingPayouts.length === 0 ? (
+                <p className="py-8 text-center text-muted-foreground text-sm">Nothing waiting for payment right now.</p>
+              ) : (
+                pendingPayouts.map((payout) => (
+                  <PayoutCard key={payout.id} payout={payout} variant="awaiting" />
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
 
-        {/* Fee Information */}
-        <Card className="border-2 border-border/50 bg-card">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              <CardTitle className="text-xl font-extrabold">Fee Structure</CardTitle>
-            </div>
-            <CardDescription>
-              Transparent breakdown of marketplace fees
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg border border-border/50 bg-background/50">
-                <p className="text-sm font-semibold text-foreground mb-1">Transaction Fee</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">10%</p>
-                <p className="text-xs text-muted-foreground">Flat marketplace fee on all sales</p>
-              </div>
-              <div className="p-4 rounded-lg border border-border/50 bg-background/50">
-                <p className="text-sm font-semibold text-foreground mb-1">Listing Fee</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">$0</p>
-                <p className="text-xs text-muted-foreground">Free to list, only pay when you sell</p>
-              </div>
-              <div className="p-4 rounded-lg border border-border/50 bg-background/50">
-                <p className="text-sm font-semibold text-foreground mb-1">Payout Timing</p>
-                <p className="text-2xl font-extrabold text-primary mb-1">Instant</p>
-                <p className="text-xs text-muted-foreground">Paid when buyer completes checkout</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payouts Tabs */}
-        <Tabs defaultValue="available" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 h-auto bg-card border border-border/50 p-1">
-            <TabsTrigger value="available" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Available ({availablePayouts.length})
-            </TabsTrigger>
-            <TabsTrigger value="pending" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
-              <Clock className="h-4 w-4 mr-2" />
-              Pending ({pendingPayouts.length})
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="min-h-[44px] font-semibold data-[state=active]:bg-background">
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Completed ({completedPayouts.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="available" className="space-y-4">
-            {availablePayouts.length === 0 ? (
-              <Card className="border-2 border-border/50 bg-card">
-                <CardContent className="pt-12 pb-12 px-6 text-center">
-                  <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No available payouts</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Available payouts will appear here when sales are completed
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              availablePayouts.map((payout) => (
-                <PayoutCard key={payout.id} payout={payout} />
-              ))
-            )}
-          </TabsContent>
-
-          <TabsContent value="pending" className="space-y-4">
-            {pendingPayouts.length === 0 ? (
-              <Card className="border-2 border-border/50 bg-card">
-                <CardContent className="pt-12 pb-12 px-6 text-center">
-                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No pending payouts</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Pending payouts will appear here while processing
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              pendingPayouts.map((payout) => (
-                <PayoutCard key={payout.id} payout={payout} />
-              ))
-            )}
-          </TabsContent>
-
-          <TabsContent value="completed" className="space-y-4">
-            {completedPayouts.length === 0 ? (
-              <Card className="border-2 border-border/50 bg-card">
-                <CardContent className="pt-12 pb-12 px-6 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No completed payouts</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Completed payouts will appear here
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              completedPayouts.map((payout) => (
-                <PayoutCard key={payout.id} payout={payout} />
-              ))
-            )}
-          </TabsContent>
-        </Tabs>
+        <details className="group rounded-lg border bg-muted/20 p-4">
+          <summary className="text-sm font-medium text-muted-foreground cursor-pointer list-none flex items-center gap-2 [&::-webkit-details-marker]:hidden">
+            <span className="group-open:rotate-90 transition-transform">›</span>
+            How it works
+          </summary>
+          <p className="mt-3 text-sm text-muted-foreground pl-4">
+            When a buyer pays, you receive 90% (we keep 10%). The money is sent to your bank automatically. No listing fees—you only pay when you sell.
+          </p>
+        </details>
       </div>
     </div>
   );

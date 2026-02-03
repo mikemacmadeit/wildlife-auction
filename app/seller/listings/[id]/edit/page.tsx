@@ -167,6 +167,10 @@ function EditListingPageContent() {
   const [sellerAnimalAttestationAccepted, setSellerAnimalAttestationAccepted] = useState(false);
   const [sellerAckModalOpen, setSellerAckModalOpen] = useState(false);
   const [sellerAckModalChecked, setSellerAckModalChecked] = useState(false);
+  const [publishAfterSellerAck, setPublishAfterSellerAck] = useState(false);
+  const [publishAfterTermsAccept, setPublishAfterTermsAccept] = useState(false);
+  const sellerAckForceRef = useRef(false);
+  const justConfirmedSellerAckRef = useRef(false);
   const [legalTermsModalOpen, setLegalTermsModalOpen] = useState(false);
   const skipTermsCheckRef = useRef(false);
   const imagesInputRef = useRef<HTMLInputElement | null>(null);
@@ -2199,12 +2203,13 @@ function EditListingPageContent() {
     }
     skipTermsCheckRef.current = false;
 
+    const sellerAckAccepted = sellerAnimalAttestationAccepted || sellerAckForceRef.current || data?.sellerAnimalAttestationAccepted === true;
     if (
       listingData?.status === 'draft' &&
       formData.category &&
       isAnimalCategory(formData.category as any) &&
       formData.category !== 'whitetail_breeder' &&
-      !sellerAnimalAttestationAccepted
+      !sellerAckAccepted
     ) {
       setSellerAckModalChecked(false);
       setSellerAckModalOpen(true);
@@ -2221,6 +2226,13 @@ function EditListingPageContent() {
       setRequestedStepId(null);
 
       const updates = prepareListingUpdates();
+      // When confirming from seller ack modal (ref/override), ensure Firestore gets the accepted flag
+      const forceSellerAck = sellerAckForceRef.current || data?.sellerAnimalAttestationAccepted === true;
+      if (forceSellerAck && formData.category && isAnimalCategory(formData.category as any) && formData.category !== 'whitetail_breeder') {
+        updates.sellerAnimalAttestationAccepted = true;
+        updates.sellerAnimalAttestationAcceptedAt = new Date();
+        sellerAckForceRef.current = false;
+      }
       await updateListing(user.uid, listingId, updates);
 
       // If this is still a draft, the primary action should actually publish it (go live).
@@ -2302,6 +2314,29 @@ function EditListingPageContent() {
       setSaving(false);
     }
   };
+
+  // After user accepts seller ack modal: defer handleComplete to next tick so React commits state first
+  useEffect(() => {
+    if (!publishAfterSellerAck || sellerAckModalOpen) return;
+    setPublishAfterSellerAck(false);
+    const timer = setTimeout(() => {
+      void handleComplete({ sellerAnimalAttestationAccepted: true });
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishAfterSellerAck, sellerAckModalOpen]);
+
+  // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
+  useEffect(() => {
+    if (!publishAfterTermsAccept || legalTermsModalOpen) return;
+    setPublishAfterTermsAccept(false);
+    skipTermsCheckRef.current = true;
+    const timer = setTimeout(() => {
+      void handleComplete({});
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishAfterTermsAccept, legalTermsModalOpen]);
 
   const isRejected = fullListing?.status === 'removed';
   const rejectionReason = typeof fullListing?.rejectionReason === 'string' ? fullListing.rejectionReason : '';
@@ -2457,7 +2492,18 @@ function EditListingPageContent() {
         </Card>
 
         {/* Seller acknowledgment at publish time (not in a step) */}
-        <Dialog open={sellerAckModalOpen} onOpenChange={setSellerAckModalOpen}>
+        <Dialog
+          open={sellerAckModalOpen}
+          onOpenChange={(open) => {
+            setSellerAckModalOpen(open);
+            if (!open && !justConfirmedSellerAckRef.current) {
+              setSellerAckModalChecked(false);
+              setPublishAfterSellerAck(false);
+              sellerAckForceRef.current = false;
+            }
+            justConfirmedSellerAckRef.current = false;
+          }}
+        >
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Seller acknowledgment</DialogTitle>
@@ -2480,16 +2526,26 @@ function EditListingPageContent() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setSellerAckModalOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSellerAckModalOpen(false);
+                  setSellerAckModalChecked(false);
+                  setPublishAfterSellerAck(false);
+                  sellerAckForceRef.current = false;
+                }}
+              >
                 Cancel
               </Button>
               <Button
                 disabled={!sellerAckModalChecked}
                 onClick={() => {
+                  justConfirmedSellerAckRef.current = true;
+                  sellerAckForceRef.current = true;
                   setSellerAnimalAttestationAccepted(true);
-                  setSellerAckModalOpen(false);
                   setSellerAckModalChecked(false);
-                  handleComplete({});
+                  setSellerAckModalOpen(false);
+                  setPublishAfterSellerAck(true);
                 }}
               >
                 Publish
@@ -2523,8 +2579,7 @@ function EditListingPageContent() {
                   throw new Error(data?.message || data?.error || 'Failed to record acceptance');
                 }
                 setLegalTermsModalOpen(false);
-                skipTermsCheckRef.current = true;
-                void handleComplete({});
+                setPublishAfterTermsAccept(true);
               } catch (e: any) {
                 toast({
                   title: "Couldn't record acceptance",

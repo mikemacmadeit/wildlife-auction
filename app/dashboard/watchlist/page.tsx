@@ -837,17 +837,18 @@ function WatchlistGrid({
     );
   }
 
+  const uniformAspect = 4 / 3; // Same image height for all cards in gallery
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 auto-rows-fr pb-4">
       <AnimatePresence mode="popLayout">
         {listings.map((listing) =>
           listing.featured ? (
-            <div key={listing.id} className="min-w-0">
-              <FeaturedListingCard listing={listing as any} />
+            <div key={listing.id} className="min-w-0 min-h-0 flex">
+              <FeaturedListingCard listing={listing as any} fixedImageAspect={uniformAspect} className="w-full" />
             </div>
           ) : (
-            <div key={listing.id} className="min-w-0">
-              <ListingCard listing={listing as any} />
+            <div key={listing.id} className="min-w-0 min-h-0 flex">
+              <ListingCard listing={listing as any} fixedImageAspect={uniformAspect} className="w-full" />
             </div>
           )
         )}

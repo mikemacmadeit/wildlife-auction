@@ -158,6 +158,38 @@ export async function checkStripeAccountStatus(): Promise<{
 }
 
 /**
+ * Get the seller's Stripe Connect account balance (available and pending)
+ */
+export async function getStripeBalance(): Promise<{
+  availableCents: number;
+  pendingCents: number;
+  nextPayoutArrivalDate: string | null;
+  hasAccount: boolean;
+}> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  const token = await getIdToken(user, true);
+  if (!token) {
+    throw new Error('Failed to get authentication token');
+  }
+
+  const response = await fetch(`${API_BASE}/connect/balance`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch balance');
+  }
+
+  return response.json();
+}
+
+/**
  * Create an onboarding link for Stripe Connect account
  */
 export async function createAccountLink(): Promise<{ url: string }> {

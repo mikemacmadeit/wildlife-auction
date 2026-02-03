@@ -114,6 +114,7 @@ function NewListingPageContent() {
   const [sellerAnimalAckModalChecked, setSellerAnimalAckModalChecked] = useState(false);
   const pendingPublishPayloadRef = useRef<Record<string, unknown> | null>(null);
   const [publishAfterAnimalAck, setPublishAfterAnimalAck] = useState(false);
+  const [publishAfterTermsAccept, setPublishAfterTermsAccept] = useState(false);
   const [legalTermsModalOpen, setLegalTermsModalOpen] = useState(false);
   const skipTermsCheckRef = useRef(false);
   const [tourRequestedStep, setTourRequestedStep] = useState<string | null>(null);
@@ -2956,13 +2957,24 @@ function NewListingPageContent() {
   useEffect(() => {
     if (!publishAfterAnimalAck || sellerAnimalAckModalOpen) return;
     setPublishAfterAnimalAck(false);
-    // Use setTimeout to ensure formData state update has propagated before calling handleComplete
     const timer = setTimeout(() => {
       void handleComplete({});
     }, 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publishAfterAnimalAck, sellerAnimalAckModalOpen]);
+
+  // After user agrees to terms: auto-continue publish (they already clicked Publish before the terms modal)
+  useEffect(() => {
+    if (!publishAfterTermsAccept || legalTermsModalOpen) return;
+    setPublishAfterTermsAccept(false);
+    skipTermsCheckRef.current = true;
+    const timer = setTimeout(() => {
+      void handleComplete({});
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishAfterTermsAccept, legalTermsModalOpen]);
 
   // Check if user just returned from authentication and restore form data
   useEffect(() => {
@@ -3501,8 +3513,7 @@ function NewListingPageContent() {
                 throw new Error(data?.message || data?.error || 'Failed to record acceptance');
               }
               setLegalTermsModalOpen(false);
-              skipTermsCheckRef.current = true;
-              void handleComplete({});
+              setPublishAfterTermsAccept(true);
             } catch (e: any) {
               toast({
                 title: 'Couldn\'t record acceptance',

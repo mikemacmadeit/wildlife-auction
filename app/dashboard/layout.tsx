@@ -369,7 +369,7 @@ export default function DashboardLayout({
         style={{ pointerEvents: 'auto', zIndex: 10000, isolation: 'isolate' }}
       >
             {/* Logo Section */}
-            <div className="flex items-center justify-between h-20 px-4 border-b border-border/50 dark:border-white/10">
+            <div className={cn('flex items-center justify-between h-20 border-b border-border/50 dark:border-white/10', sidebarCollapsed ? 'px-2' : 'px-4')}>
               <Link href="/" prefetch className="flex items-center gap-3 group flex-shrink-0">
             <div className="relative h-10 w-10">
               <div className="relative h-full w-full">
@@ -424,7 +424,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto pl-0 pr-3 py-4 space-y-1 we-scrollbar-hover">
+        <nav className={cn('flex-1 overflow-y-auto py-4 space-y-1 we-scrollbar-hover', sidebarCollapsed ? 'px-2' : 'pl-0 pr-3')}>
           {showAdminNav && !sidebarCollapsed ? (
             <div className="space-y-2">
               <Collapsible open={userNavOpen} onOpenChange={setUserNavOpen}>
@@ -528,7 +528,7 @@ export default function DashboardLayout({
               </Collapsible>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className={cn('space-y-1', sidebarCollapsed && 'flex flex-col items-center px-2')}>
               {baseNavWithBadges.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
@@ -537,19 +537,27 @@ export default function DashboardLayout({
                     key={item.href}
                     href={item.href}
                     prefetch={true}
+                    title={sidebarCollapsed ? item.label : undefined}
                     className={cn(
-                      'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
+                      'flex items-center rounded-lg text-base font-semibold',
                       'hover:bg-background/50',
-                      'min-h-[44px]',
-                      active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                      sidebarCollapsed && 'relative',
+                      sidebarCollapsed
+                        ? 'justify-center p-2.5 min-h-[40px] w-10'
+                        : 'gap-3 pl-0 pr-3 py-2.5 min-h-[44px] border-l-4 border-transparent',
+                      active && 'bg-primary/10 text-primary',
+                      active && !sidebarCollapsed && 'border-primary'
                     )}
                   >
-                    <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
-                    <span className="flex-1">{item.label}</span>
-                    {item.badge && item.badge > 0 && (
+                    <Icon className={cn('h-5 w-5 flex-shrink-0', !sidebarCollapsed && 'ml-3', active && 'text-primary')} />
+                    {!sidebarCollapsed && <span className="flex-1">{item.label}</span>}
+                    {!sidebarCollapsed && item.badge && item.badge > 0 && (
                       <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
                         {item.badge}
                       </Badge>
+                    )}
+                    {sidebarCollapsed && item.badge && item.badge > 0 && (
+                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" aria-hidden />
                     )}
                   </Link>
                 );
@@ -565,27 +573,34 @@ export default function DashboardLayout({
                         key={item.href}
                         href={item.href}
                         prefetch={true}
+                        title={sidebarCollapsed ? item.label : undefined}
                         onClick={(e) => {
                           const pathnameBefore = typeof window !== 'undefined' ? window.location.pathname : '';
-                          // Track navigation result after a short delay
                           setTimeout(() => {
                             const pathnameAfter = typeof window !== 'undefined' ? window.location.pathname : '';
                             const navigationOccurred = pathnameBefore !== pathnameAfter;
-                            }, 100);
+                          }, 100);
                         }}
                         className={cn(
-                          'flex items-center gap-3 pl-0 pr-3 py-2.5 rounded-lg text-base font-semibold',
+                          'flex items-center rounded-lg text-base font-semibold',
                           'hover:bg-background/50',
-                          'min-h-[44px]',
-                          active && 'bg-primary/10 text-primary border-l-4 border-primary'
+                          sidebarCollapsed && 'relative',
+                          sidebarCollapsed
+                            ? 'justify-center p-2.5 min-h-[40px] w-10'
+                            : 'gap-3 pl-0 pr-3 py-2.5 min-h-[44px] border-l-4 border-transparent',
+                          active && 'bg-primary/10 text-primary',
+                          active && !sidebarCollapsed && 'border-primary'
                         )}
                       >
-                        <Icon className={cn('h-5 w-5 flex-shrink-0 ml-3', active && 'text-primary')} />
-                        <span className="flex-1">{item.label}</span>
-                        {item.badge && item.badge > 0 && (
+                        <Icon className={cn('h-5 w-5 flex-shrink-0', !sidebarCollapsed && 'ml-3', active && 'text-primary')} />
+                        {!sidebarCollapsed && <span className="flex-1">{item.label}</span>}
+                        {!sidebarCollapsed && item.badge && item.badge > 0 && (
                           <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
                             {item.badge}
                           </Badge>
+                        )}
+                        {sidebarCollapsed && item.badge && item.badge > 0 && (
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" aria-hidden />
                         )}
                       </Link>
                     );
@@ -597,7 +612,7 @@ export default function DashboardLayout({
         </nav>
 
         {/* User Account Section - Bottom of Sidebar */}
-        <div className="mt-auto border-t border-border/50 dark:border-white/10 p-4">
+        <div className={cn('mt-auto border-t border-border/50 dark:border-white/10', sidebarCollapsed ? 'p-2' : 'p-4')}>
           {!sidebarCollapsed ? (
             <div className="space-y-2">
               <Link

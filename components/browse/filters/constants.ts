@@ -141,14 +141,15 @@ export const BROWSE_EQUIPMENT_CONDITION_OPTIONS: { value: string; label: string 
   { value: 'for_parts', label: 'For parts' },
 ];
 
-/** Delivery timeframe options for create listing and browse filter. Use value for storage/filter. */
+/** Delivery timeframe options for create listing and browse filter. Use value for storage/filter.
+ * All labels use consistent "X days delivery" format for uniform badges across the app. */
 export const DELIVERY_TIMEFRAME_OPTIONS: { value: string; label: string }[] = [
   { value: 'next_day', label: 'Next day delivery' },
-  { value: '1_3', label: '1-3 day delivery' },
-  { value: '3_7', label: '3-7 days' },
-  { value: '7_14', label: '7-14 days' },
-  { value: '14_30', label: '14-30 days' },
-  { value: '30_60', label: '30-60 days' },
+  { value: '1_3', label: '1-3 days delivery' },
+  { value: '3_7', label: '3-7 days delivery' },
+  { value: '7_14', label: '7-14 days delivery' },
+  { value: '14_30', label: '14-30 days delivery' },
+  { value: '30_60', label: '30-60 days delivery' },
 ];
 
 /** Resolve delivery timeframe value (from listing) to display label for badges. */

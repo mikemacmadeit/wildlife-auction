@@ -23,10 +23,12 @@ interface FeaturedListingCardProps {
   listing: Listing;
   className?: string;
   index?: number;
+  /** When set, overrides per-listing aspect ratio for uniform card sizes in grids */
+  fixedImageAspect?: number;
 }
 
 export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCardProps>(
-  ({ listing, className, index = 0 }, ref) => {
+  ({ listing, className, index = 0, fixedImageAspect }, ref) => {
   const router = useRouter();
   const { user } = useAuth();
   const reducedMotion = useReducedMotion();
@@ -73,9 +75,11 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
       ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
       : 1;
   const coverAspect =
-    typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
-      ? (cover as any).cropAspect
-      : 4 / 3;
+    typeof fixedImageAspect === 'number' && Number.isFinite(fixedImageAspect)
+      ? fixedImageAspect
+      : typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
+        ? (cover as any).cropAspect
+        : 4 / 3;
 
   return (
     <motion.div
@@ -91,7 +95,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
       // Mobile: allow vertical scrolling even when the gesture starts on the card/image.
       className={cn('group touch-manipulation md:touch-auto', className)}
     >
-      <Link href={`/listing/${listing.id}`}>
+      <Link href={`/listing/${listing.id}`} className="block h-full">
         <Card className={cn(
           'overflow-hidden transition-all duration-300',
           'flex flex-col h-full',
@@ -195,7 +199,7 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </div>
             )}
 
-            {/* Mobile: bids count + protected badge */}
+            {/* Mobile: bids count (Protected moved to content next to delivery) */}
             {!sold.isSold && listing.type === 'auction' && (listing as any)?.metrics?.bidCount > 0 ? (
               <div className="sm:hidden absolute bottom-2 left-2 z-20">
                 <Badge variant="secondary" className="bg-card/80 backdrop-blur-sm border-border/50 text-xs shadow-warm">
@@ -203,17 +207,6 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                 </Badge>
               </div>
             ) : null}
-            <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
-              {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
-                <Badge
-                  variant="default"
-                  className="bg-green-600 text-white font-semibold text-xs shadow-warm"
-                  title="Protected Transaction"
-                >
-                  Protected {listing.protectedTransactionDays} Days
-                </Badge>
-              ) : null}
-            </div>
 
             {/* Subtle shimmer effect - warm tones */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-parchment/8 to-transparent z-5" />
@@ -254,23 +247,24 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               </div>
             ) : null}
 
-            {/* Trust Badges - Premium styling */}
-            <div className="hidden sm:block">
+            {/* Trust Badges + Protected - inline to avoid overlap in gallery (delivery 1-3 next to Protected 7 Days) */}
+            <div className="flex flex-wrap items-center gap-1.5">
               <TrustBadges
-                verified={listing.trust.verified}
-                transport={!!(listing.trust.transportReady || listing.trust.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
+                verified={listing.trust?.verified}
+                transport={!!(listing.trust?.transportReady || listing.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
                 deliveryWindowLabel={getDeliveryTimeframeLabel((listing as any).deliveryDetails?.deliveryTimeframe)}
                 size="sm"
-                className="flex-wrap gap-2"
+                className="flex-wrap gap-1.5"
               />
-            </div>
-            {/* Protected badge (desktop content) */}
-            <div className="hidden sm:flex items-center gap-2 flex-wrap">
-              {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
-                <Badge variant="default" className="bg-green-600 text-white text-[11px] font-semibold" title="Protected Transaction">
+              {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white text-[11px] font-semibold shadow-warm"
+                  title="Protected Transaction"
+                >
                   Protected {listing.protectedTransactionDays} Days
                 </Badge>
-              ) : null}
+              )}
             </div>
 
             {/* Price and Seller Info - Enhanced */}

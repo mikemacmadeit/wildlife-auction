@@ -648,7 +648,10 @@ function SellerListingsPageContent() {
     return listings.filter((listing) => {
       const effectiveStatus = getEffectiveStatusForListing(listing, nowMs);
       const matchesSearch = !query || listing.title.toLowerCase().includes(query);
-      const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
+      const isPendingApproval = effectiveStatus === 'pending' || (listing as any).complianceStatus === 'pending_review';
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'pending' ? isPendingApproval : effectiveStatus === statusFilter);
       const matchesType = typeFilter === 'all' || listing.type === typeFilter;
       const matchesLocation = locationFilter === 'all' || 
         `${listing.location?.city || 'Unknown'}, ${listing.location?.state || 'Unknown'}` === locationFilter;
@@ -681,7 +684,8 @@ function SellerListingsPageContent() {
     const counts: Record<string, number> = { all: listings.length };
     listings.forEach((l) => {
       const s = getEffectiveStatusForListing(l, nowMs);
-      counts[s] = (counts[s] ?? 0) + 1;
+      const effective = s === 'pending' || (l as any).complianceStatus === 'pending_review' ? 'pending' : s;
+      counts[effective] = (counts[effective] ?? 0) + 1;
     });
     return counts;
   }, [listings, getEffectiveStatusForListing]);
@@ -696,10 +700,11 @@ function SellerListingsPageContent() {
 
   const statusChipDefs: { key: ListingStatus | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
-    { key: 'draft', label: 'Draft' },
     { key: 'active', label: 'Active' },
+    { key: 'pending', label: 'Pending approval' },
     { key: 'sold', label: 'Sold' },
     { key: 'expired', label: 'Ended' },
+    { key: 'draft', label: 'Draft' },
     { key: 'removed', label: 'Removed' },
   ];
   const typeChipDefs: { key: ListingType | 'all'; label: string }[] = [

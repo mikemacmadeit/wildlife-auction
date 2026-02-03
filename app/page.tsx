@@ -1288,7 +1288,7 @@ export default function HomePage() {
 
       {/* Category Tiles */}
       <section className="py-12 md:py-16 bg-background border-b border-border/50">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 flex flex-col items-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1353,9 +1353,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Desktop/tablet: 3 animal categories on one line */}
-          <div className="hidden md:flex md:justify-center">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl w-full">
+          {/* Desktop/tablet: category cards centered */}
+          <div className="hidden md:flex md:justify-center md:w-full">
+            <div className="flex flex-wrap justify-center gap-6 max-w-5xl">
             {/* Whitetail Breeder - First priority */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}

@@ -24,10 +24,12 @@ import { useAuth } from '@/hooks/use-auth';
 interface ListingCardProps {
   listing: Listing;
   className?: string;
+  /** When set, overrides per-listing aspect ratio for uniform card sizes in grids */
+  fixedImageAspect?: number;
 }
 
 const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
-  function ListingCardComponent({ listing, className }, ref) {
+  function ListingCardComponent({ listing, className, fixedImageAspect }, ref) {
   const router = useRouter();
   const { user } = useAuth();
   const reducedMotion = useReducedMotion();
@@ -200,10 +202,13 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
       ? Math.max(1, Math.min(3, Number((cover as any).cropZoom)))
       : 1;
   // Support vertical/portrait crops so users can fit whole animal (e.g. screenshot or portrait photo).
+  // When fixedImageAspect is set (e.g. for watchlist gallery), use it for uniform card sizes.
   const coverAspect =
-    typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
-      ? (cover as any).cropAspect
-      : 4 / 3;
+    typeof fixedImageAspect === 'number' && Number.isFinite(fixedImageAspect)
+      ? fixedImageAspect
+      : typeof (cover as any)?.cropAspect === 'number' && Number.isFinite((cover as any).cropAspect)
+        ? (cover as any).cropAspect
+        : 4 / 3;
 
   return (
     <motion.div
@@ -215,7 +220,7 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
       // Mobile: allow vertical scrolling even when the gesture starts on the card/image.
       className={cn('group touch-manipulation md:touch-auto', className)}
     >
-      <Link href={`/listing/${listing.id}`}>
+      <Link href={`/listing/${listing.id}`} className="block h-full">
         <Card className={cn(
           'overflow-hidden transition-all duration-300',
           'flex flex-col h-full',
@@ -297,30 +302,11 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               </div>
             ) : null}
 
-            {/* Type badge */}
-            <div className="hidden sm:flex absolute bottom-2 right-2 z-20 flex-col gap-1 items-end">
+            {/* Type badge - Protected moved to content area next to delivery */}
+            <div className="hidden sm:flex absolute bottom-2 right-2 z-20 items-end">
               <Badge variant="outline" className="bg-card/80 backdrop-blur-sm border-border/50 font-semibold text-xs shadow-warm">
                 {listing.type === 'auction' ? 'Auction' : listing.type === 'fixed' ? 'Buy Now' : 'Classified'}
               </Badge>
-              {/* Protected Transaction Badge */}
-              {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
-                <Badge 
-                  variant="success" 
-                  className="font-semibold text-xs shadow-warm"
-                  title="Protected Transaction: Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery. Optional dispute window after delivery; evidence required for disputes."
-                >
-                  Protected {listing.protectedTransactionDays} Days
-                </Badge>
-              )}
-            </div>
-
-            {/* Mobile: Protected badge */}
-            <div className="sm:hidden absolute bottom-2 right-2 z-20 flex flex-col gap-1 items-end">
-              {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
-                <Badge variant="success" className="font-semibold text-xs shadow-warm" title="Protected Transaction">
-                  Protected {listing.protectedTransactionDays} Days
-                </Badge>
-              ) : null}
             </div>
 
             {/* Social proof (watchers + bids) */}
@@ -402,8 +388,8 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
             </div>
           ) : null}
 
-          {/* Trust Badges - Mobile optimized */}
-          <div className="hidden sm:block">
+          {/* Trust Badges + Protected - inline to avoid overlap in gallery (delivery 1-3 next to Protected 7 Days) */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <TrustBadges
               verified={listing.trust?.verified || false}
               transport={!!(listing.trust?.transportReady || listing.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
@@ -411,6 +397,15 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
               size="sm"
               className="flex-wrap gap-1.5"
             />
+            {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
+              <Badge
+                variant="success"
+                className="font-semibold text-xs shadow-warm"
+                title="Protected Transaction: Payments are processed by Stripe. Optional dispute window after delivery."
+              >
+                Protected {listing.protectedTransactionDays} Days
+              </Badge>
+            )}
           </div>
 
             {/* Price and Seller Info */}
@@ -500,11 +495,10 @@ const ListingCardComponent = React.forwardRef<HTMLDivElement, ListingCardProps>(
 // Only re-render if listing ID or className changed (listing object reference may change but content is same)
 // This prevents re-renders when other listings' favorite status changes
 export const ListingCard = React.memo(ListingCardComponent, (prevProps, nextProps) => {
-  // Only re-render if listing ID or className actually changed
   const listingIdSame = prevProps.listing.id === nextProps.listing.id;
   const classNameSame = prevProps.className === nextProps.className;
-  
-  return listingIdSame && classNameSame;
+  const fixedAspectSame = prevProps.fixedImageAspect === nextProps.fixedImageAspect;
+  return listingIdSame && classNameSame && fixedAspectSame;
 });
 ListingCard.displayName = 'ListingCard';
 
