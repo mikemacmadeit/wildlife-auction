@@ -243,6 +243,9 @@ export function useFavorites() {
       favoriteIdsRef.current = next; // Update ref immediately
       // Don't call setFavoriteIds - it causes re-renders in all components using the hook
       // Components will read from favoriteIdsRef.current via isFavorite callback
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('favorites-changed', { detail: { listingId } }));
+      }
 
       try {
         await syncWatchlistServer(listingId, isCurrentlyFavorite ? 'remove' : 'add');
@@ -270,6 +273,9 @@ export function useFavorites() {
         }
         favoriteIdsRef.current = rollbackSet;
         // Don't call setFavoriteIds - it causes re-renders in all components using the hook
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('favorites-changed', { detail: { listingId } }));
+        }
 
         // Show error toast
         const errorMessage =

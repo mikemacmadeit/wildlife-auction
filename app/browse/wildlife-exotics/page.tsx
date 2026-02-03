@@ -251,20 +251,21 @@ export default function WildlifeExoticsBrowsePage() {
             <div className={cn(
               'grid gap-6',
               viewMode === 'card' 
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr'
                 : 'grid-cols-1'
             )}>
               <AnimatePresence mode="popLayout">
                 {filteredListings.map((listing, index) => (
                   <motion.div
                     key={listing.id}
+                    className={viewMode === 'card' ? 'min-w-0 min-h-0 flex' : undefined}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
                   >
                     {viewMode === 'card' ? (
-                      <ListingCard listing={listing} />
+                      <ListingCard listing={listing} fixedImageAspect={4 / 3} className="w-full" />
                     ) : (
                       <ListItem listing={listing} />
                     )}

@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, ArrowUp, ArrowDown, LayoutGrid, List, X, Gavel, Tag, MessageSquare, Loader2, ArrowLeft, Heart, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -165,12 +164,13 @@ export default function BrowsePage() {
   const lastRevalidatedKeyRef = useRef<string | null>(null);
   const STALE_REVALIDATE_MS = 12_000;
 
-  // View mode with localStorage persistence — read on first client render so skeleton and content match (no flash)
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === 'undefined') return 'card';
+  // View mode with localStorage persistence — must use 'card' for initial state to avoid hydration mismatch
+  // (server has no localStorage; client reads it in useEffect after mount)
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
+  useEffect(() => {
     const saved = localStorage.getItem('browse-view-mode');
-    return saved === 'list' || saved === 'card' ? saved : 'card';
-  });
+    if (saved === 'list' || saved === 'card') setViewMode(saved);
+  }, []);
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearchConfirmOpen, setSavedSearchConfirmOpen] = useState(false);
   const [savedSearchConfirmEmail, setSavedSearchConfirmEmail] = useState(true);
@@ -963,7 +963,7 @@ export default function BrowsePage() {
                         size="icon"
                         onClick={quickSaveSearchMobile}
                         disabled={savingSearch}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-foreground hover:bg-muted dark:text-white/90 dark:hover:bg-white/20 dark:hover:text-white"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-foreground hover:bg-muted dark:text-parchment dark:hover:bg-white/20 dark:hover:text-parchment"
                         aria-label="Save search"
                       >
                         <Heart className="h-4 w-4" />
@@ -971,7 +971,7 @@ export default function BrowsePage() {
                     </div>
                   </div>
 
-                  {/* Desktop: search + theme toggle */}
+                  {/* Desktop: search + save search heart */}
                   <div className="hidden md:flex items-center gap-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -988,7 +988,17 @@ export default function BrowsePage() {
                         )}
                       />
                     </div>
-                    <ThemeToggle className="border border-border text-foreground hover:bg-muted rounded-xl dark:border-background/30 dark:text-background dark:hover:bg-background/10" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={quickSaveSearchMobile}
+                      disabled={savingSearch}
+                      className="h-[52px] w-[52px] shrink-0 rounded-xl border-border text-foreground hover:bg-muted dark:bg-white/15 dark:border-white/30 dark:text-parchment dark:hover:bg-white/25 dark:hover:text-parchment"
+                      aria-label="Save this search"
+                    >
+                      {savingSearch ? <Loader2 className="h-5 w-5 animate-spin" /> : <Heart className="h-5 w-5" />}
+                    </Button>
                   </div>
                 </div>
 
@@ -1007,7 +1017,7 @@ export default function BrowsePage() {
                     variant="outline"
                     onClick={clearFilters}
                     disabled={activeFilterCount === 0}
-                    className="h-9 px-3 md:min-h-[48px] md:px-4 text-xs md:text-base font-semibold rounded-full border-border text-foreground hover:bg-muted flex-shrink-0 dark:border-background/30 dark:text-background dark:hover:bg-background/10"
+                    className="h-9 px-3 md:min-h-[48px] md:px-4 text-xs md:text-base font-semibold rounded-full border-border text-foreground hover:bg-muted flex-shrink-0 dark:bg-white/15 dark:border-white/30 dark:text-parchment dark:hover:bg-white/25 dark:hover:text-parchment disabled:opacity-50"
                   >
                     <X className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                     Clear
@@ -1286,7 +1296,7 @@ export default function BrowsePage() {
                     variant="outline"
                     onClick={clearFilters}
                     disabled={activeFilterCount === 0}
-                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-white dark:hover:bg-white/25 disabled:opacity-50"
+                    className="h-8 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-muted border-border text-foreground hover:bg-muted/80 dark:bg-white/15 dark:border-white/30 dark:text-parchment dark:hover:bg-white/25 dark:hover:text-parchment disabled:opacity-50"
                   >
                     <X className="h-3.5 w-3.5 mr-1.5" />
                     Clear
@@ -1502,7 +1512,7 @@ export default function BrowsePage() {
           <div className="flex items-center gap-3 w-full md:w-auto">
             {/* eBay-ish toolbar: Status, (Condition for equipment), Location, Sort, View */}
             <Select value={listingStatus} onValueChange={(v) => setListingStatus(v as any)}>
-              <SelectTrigger className="w-[150px] min-h-[48px]">
+              <SelectTrigger className="w-[150px] min-h-[48px] bg-card border-border dark:bg-background">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -1519,7 +1529,7 @@ export default function BrowsePage() {
                 value={(filters.healthStatus && filters.healthStatus.length ? filters.healthStatus[0] : '__any__') as any}
                 onValueChange={(v) => setFilters((p) => ({ ...p, healthStatus: v === '__any__' ? undefined : [v] }))}
               >
-                <SelectTrigger className="w-[170px] min-h-[48px]">
+                <SelectTrigger className="w-[170px] min-h-[48px] bg-card border-border dark:bg-background">
                   <SelectValue placeholder="Condition" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1537,7 +1547,7 @@ export default function BrowsePage() {
               value={filters.location?.state || '__any__'}
               onValueChange={(v) => setFilters((p) => ({ ...p, location: { ...(p.location || {}), state: v === '__any__' ? undefined : v } }))}
             >
-              <SelectTrigger className="w-[170px] min-h-[48px]">
+              <SelectTrigger className="w-[170px] min-h-[48px] bg-card border-border dark:bg-background">
                 <SelectValue placeholder="Item Location" />
               </SelectTrigger>
               <SelectContent>
@@ -1552,7 +1562,7 @@ export default function BrowsePage() {
 
             {/* Sort Dropdown */}
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-              <SelectTrigger className="w-full md:w-[180px] min-h-[48px]">
+              <SelectTrigger className="w-full md:w-[180px] min-h-[48px] bg-card border-border dark:bg-background">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
@@ -1675,16 +1685,16 @@ export default function BrowsePage() {
                   {/* Desktop/tablet: respect view mode */}
                   {viewMode === 'card' ? (
                     <div className="hidden md:block w-full">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-fr">
                         <AnimatePresence>
                           {sortedListings.map((listing) =>
                             listing.featured ? (
-                              <div key={listing.id} className="w-full">
-                                <FeaturedListingCard listing={listing} className="h-full" />
+                              <div key={listing.id} className="min-w-0 min-h-0 flex">
+                                <FeaturedListingCard listing={listing} fixedImageAspect={4 / 3} className="w-full" />
                               </div>
                             ) : (
-                              <div key={listing.id} className="w-full">
-                                <ListingCard listing={listing} className="h-full" />
+                              <div key={listing.id} className="min-w-0 min-h-0 flex">
+                                <ListingCard listing={listing} fixedImageAspect={4 / 3} className="w-full" />
                               </div>
                             )
                           )}

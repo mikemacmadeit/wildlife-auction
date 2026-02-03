@@ -258,8 +258,14 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
               />
               {listing.protectedTransactionEnabled && listing.protectedTransactionDays && (
                 <Badge
-                  variant="default"
-                  className="bg-green-600 text-white text-[11px] font-semibold shadow-warm"
+                  variant="secondary"
+                  className={cn(
+                    'text-white text-[11px] font-semibold shadow-warm border-0',
+                    listing.protectedTransactionDays === 3 && 'bg-blue-400 hover:bg-blue-400',
+                    listing.protectedTransactionDays === 7 && 'bg-violet-400 hover:bg-violet-400',
+                    listing.protectedTransactionDays === 14 && 'bg-violet-500 hover:bg-violet-500',
+                    ![3, 7, 14].includes(listing.protectedTransactionDays) && 'bg-violet-400 hover:bg-violet-400'
+                  )}
                   title="Protected Transaction"
                 >
                   Protected {listing.protectedTransactionDays} Days

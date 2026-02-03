@@ -132,9 +132,8 @@ export async function POST(request: Request) {
       return json({ ok: false, reason: 'forbidden', message: 'Forbidden.' }, { status: 403 });
     }
 
-    // If an order already exists, we still may need to reconcile.
-    // Why: the checkout create-session path pre-creates an order skeleton (status=pending) before redirect.
-    // If webhook delivery is delayed/misconfigured, the order can exist while the listing never transitions to sold.
+    // If an order already exists (created by webhook), we may still need to reconcile listing state.
+    // If webhook delivery is delayed, the order may not exist yet — handleCheckoutSessionCompleted will create it.
     const adminDb = db as unknown as ReturnType<typeof getFirestore>;
     const existing = await adminDb
       .collection('orders')

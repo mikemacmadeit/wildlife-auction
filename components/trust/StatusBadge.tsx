@@ -38,8 +38,8 @@ const badgeConfig = {
     icon: Truck,
     label: 'Delivery window',
     description: 'Seller arranges delivery. Timeframe coordinated after purchase.',
-    color: 'text-foreground bg-accent/15 border-accent/30 dark:bg-accent/10 dark:border-accent/25',
-    iconColor: 'text-accent dark:text-accent/90',
+    color: 'text-foreground bg-primary/25 border-primary/50 dark:bg-primary/20 dark:border-primary/40 dark:text-foreground',
+    iconColor: 'text-primary dark:text-primary/90',
   },
 };
 

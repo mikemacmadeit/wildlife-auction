@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -46,6 +46,19 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     typeof (listing as any)?.watcherCount === 'number'
       ? Math.max(0, Math.floor(Number((listing as any).watcherCount)))
       : Math.max(0, Math.floor(Number((listing as any)?.metrics?.favorites || 0) || 0));
+
+  // Include current user in watcher count when they have it favorited (optimistic)
+  const [favoritesTick, setFavoritesTick] = useState(0);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent<{ listingId?: string }>).detail;
+      if (d?.listingId === listing.id) setFavoritesTick((t) => t + 1);
+    };
+    window.addEventListener('favorites-changed', handler);
+    return () => window.removeEventListener('favorites-changed', handler);
+  }, [listing.id]);
+  const isFavorited = (globalThis as any).__favoritesRef?.current?.has(listing.id) ?? false;
+  const displayWatchers = Math.max(watchers, isFavorited ? 1 : 0);
 
   const endsAtDate = useMemo(() => {
     const v: any = (listing as any)?.endsAt;
@@ -321,9 +334,9 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge variant={watchers > 0 ? 'secondary' : 'outline'} className="text-[11px] font-semibold">
+                    <Badge variant={displayWatchers > 0 ? 'secondary' : 'outline'} className="text-[11px] font-semibold">
                       <Heart className="h-3 w-3 mr-1" />
-                      {watchers > 0 ? watchers : 0}
+                      {displayWatchers > 0 ? displayWatchers : 0}
                     </Badge>
                   </div>
                 </div>
@@ -357,14 +370,18 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                 )}
               </div>
               <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-between relative">
-                <div className="absolute top-1 right-1 z-10">
+                <div className="absolute top-1 right-1 z-10 flex items-center gap-1.5">
+                  {displayWatchers > 0 && (
+                    <span
+                      className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-muted text-[11px] font-semibold text-muted-foreground tabular-nums"
+                      title={`${displayWatchers} ${displayWatchers === 1 ? 'person' : 'people'} watching`}
+                    >
+                      {displayWatchers}
+                    </span>
+                  )}
                   <FavoriteButton listingId={listing.id} className="h-8 w-8" />
                 </div>
-                <div className="min-w-0 pr-8">
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
-                    <Heart className="h-3 w-3 flex-shrink-0" />
-                    <span>{watchers > 0 ? watchers : 0} watching</span>
-                  </div>
+                <div className={cn('min-w-0', displayWatchers > 0 ? 'pr-14' : 'pr-10')}>
                   <h3 className="font-bold text-[13px] leading-snug line-clamp-2 mt-0.5">{listing.title}</h3>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -421,8 +438,16 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className="overflow-hidden transition-all duration-300 rounded-xl flex flex-row md:grid md:grid-cols-[288px_1fr] h-full w-full border border-border/50 bg-card hover:border-border/70 hover:shadow-warm">
-          {/* Watchlist heart (top-right corner of the card, not on the image) */}
-          <div className="absolute top-2 right-2 z-30">
+          {/* Watchlist heart + watchers (top-right corner of the card) */}
+          <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5">
+            {displayWatchers > 0 && (
+              <span
+                className="flex items-center justify-center min-w-[22px] h-6 px-2 rounded-full bg-muted/80 text-xs font-semibold text-muted-foreground tabular-nums"
+                title={`${displayWatchers} ${displayWatchers === 1 ? 'person' : 'people'} watching`}
+              >
+                {displayWatchers}
+              </span>
+            )}
             <FavoriteButton listingId={listing.id} className="bg-card/95 backdrop-blur-sm border border-border/50" />
           </div>
 
@@ -463,7 +488,7 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
               {/* Left: details */}
               <div className="min-w-0 flex flex-col gap-2">
                 {/* Listing type + title */}
-                <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-10">
+                <div className={cn('flex flex-wrap items-center gap-2 gap-y-1', displayWatchers > 0 ? 'pr-14' : 'pr-10')}>
                   <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-2 py-0.5">
                     {listingTypeLabel}
                   </Badge>
@@ -559,8 +584,8 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                   </div>
                 ) : null}
 
-                {/* Trust */}
-                <div className="pt-1">
+                {/* Trust: delivery + Protected on same line */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
                   <TrustBadges
                     verified={listing.trust?.verified || false}
                     transport={!!(listing.trust?.transportReady || listing.trust?.sellerOffersDelivery || (listing as any).transportOption === 'SELLER_TRANSPORT')}
@@ -568,26 +593,23 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                     size="sm"
                     className="flex-wrap gap-2"
                   />
-                </div>
-
-                {/* Watchers and Badges */}
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  {watchers > 0 && (
-                    <Badge variant="secondary" className="text-[11px] font-semibold">
-                      <Heart className="h-3 w-3 mr-1" />
-                      {watchers} {watchers === 1 ? 'watching' : 'watching'}
-                    </Badge>
-                  )}
                   {listing.protectedTransactionEnabled && listing.protectedTransactionDays ? (
                     <Badge
-                      variant="default"
-                      className="bg-green-600 text-white font-semibold text-[11px]"
+                      variant="secondary"
+                      className={cn(
+                        'text-white font-semibold text-[11px] border-0',
+                        listing.protectedTransactionDays === 3 && 'bg-blue-400 hover:bg-blue-400',
+                        listing.protectedTransactionDays === 7 && 'bg-violet-400 hover:bg-violet-400',
+                        listing.protectedTransactionDays === 14 && 'bg-violet-500 hover:bg-violet-500',
+                        ![3, 7, 14].includes(listing.protectedTransactionDays) && 'bg-violet-400 hover:bg-violet-400'
+                      )}
                       title="Protected Transaction"
                     >
                       Protected {listing.protectedTransactionDays} Days
                     </Badge>
                   ) : null}
                 </div>
+
               </div>
 
               {/* Right: less important info (seller, etc.) */}

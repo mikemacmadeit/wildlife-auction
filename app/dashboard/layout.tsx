@@ -726,6 +726,7 @@ export default function DashboardLayout({
       )}>
         {/* Page Content - no outer scroll on messages */}
         <main
+          id="dashboard-main-scroll"
           className={cn(
             'flex-1 min-h-0 min-w-0 pb-20 md:pb-0 relative',
             pathname?.startsWith('/dashboard/messages') ? 'overflow-hidden' : 'overflow-y-auto we-scrollbar-hover'

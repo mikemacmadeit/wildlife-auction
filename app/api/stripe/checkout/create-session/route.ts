@@ -951,35 +951,10 @@ export async function POST(request: Request) {
       throw stripeError;
     }
 
-    // Pre-create order skeleton so it appears in My Purchases immediately when user returns from Stripe.
-    // Webhook will update to paid and add full order data.
-    try {
-      const orderRef = db.collection('orders').doc();
-      await orderRef.set(
-        sanitizeFirestorePayload({
-          stripeCheckoutSessionId: session.id,
-          listingId,
-          buyerId,
-          sellerId: listingData.sellerId,
-          amount: purchaseAmount,
-          platformFee: platformFee / 100,
-          sellerAmount: sellerAmount / 100,
-          status: 'pending',
-          listingTitle: String((listingData as any)?.title || 'Listing'),
-          ...(offerId ? { offerId: String(offerId) } : {}),
-          quantity: quantityRequested,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        })
-      );
-    } catch (orderErr) {
-      logWarn('Failed to pre-create order skeleton (webhook will create)', {
-        route: '/api/stripe/checkout/create-session',
-        sessionId: session.id,
-        listingId,
-        error: String(orderErr),
-      });
-    }
+    // Order is created ONLY when payment succeeds: by Stripe webhook (checkout.session.completed)
+    // or by reconcile-session when the user returns from Stripe success redirect.
+    // We do NOT pre-create an order here — that caused "Awaiting payment" to show in My Purchases
+    // when the user went to Stripe but hit back without paying.
 
     // Persist idempotency record (expires after 2 minutes to allow cleanup)
     try {

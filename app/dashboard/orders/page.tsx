@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCallback, useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,6 +72,7 @@ export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<OrderWithListing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -371,12 +372,16 @@ export default function OrdersPage() {
     };
   }, [router, searchParams]);
 
-  // Always start at top when opening Purchases; prevent scroll restoration and layout shifts
+  // Always start at top when opening Purchases; dashboard scrolls in main, not window
   const scrollToTop = useCallback(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-    document.querySelector('main')?.scrollTo?.(0, 0);
+    const main = document.getElementById('dashboard-main-scroll') ?? document.querySelector('main');
+    if (main) {
+      main.scrollTop = 0;
+      main.scrollTo?.({ top: 0, left: 0, behavior: 'auto' });
+    }
   }, []);
   useEffect(() => {
     const prevRestoration = window.history.scrollRestoration;
@@ -388,6 +393,7 @@ export default function OrdersPage() {
     const t2 = setTimeout(scrollToTop, 150);
     const t3 = setTimeout(scrollToTop, 400);
     const t4 = setTimeout(scrollToTop, 800);
+    const t5 = setTimeout(scrollToTop, 1200);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t0);
@@ -395,9 +401,10 @@ export default function OrdersPage() {
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
+      clearTimeout(t5);
       window.history.scrollRestoration = prevRestoration;
     };
-  }, [scrollToTop]);
+  }, [scrollToTop, pathname]);
   // When congrats modal opens (e.g. after Stripe redirect), force top again so dialog focus doesn't scroll the page
   useEffect(() => {
     if (!showCongratsModal) return;
