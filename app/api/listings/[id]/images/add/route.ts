@@ -17,8 +17,14 @@ function json(body: any, init?: { status?: number }) {
   });
 }
 
-export async function POST(request: Request, ctx: { params: { id: string } }) {
-  const listingId = ctx.params.id;
+export async function POST(
+  request: Request,
+  ctx: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const params = typeof (ctx.params as any)?.then === 'function'
+    ? await (ctx.params as Promise<{ id: string }>)
+    : (ctx.params as { id: string });
+  const listingId = params.id;
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 

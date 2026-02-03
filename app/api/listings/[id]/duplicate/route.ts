@@ -25,8 +25,14 @@ function safeString(v: any): string {
   return typeof v === 'string' ? v : String(v ?? '');
 }
 
-export async function POST(req: Request, ctx: { params: { id: string } }) {
-  const sourceListingId = String(ctx?.params?.id || '').trim();
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const params = typeof (ctx.params as any)?.then === 'function'
+    ? await (ctx.params as Promise<{ id: string }>)
+    : (ctx.params as { id: string });
+  const sourceListingId = String(params?.id || '').trim();
   if (!sourceListingId) return json({ ok: false, error: 'Missing listing id' }, { status: 400 });
 
   let auth: ReturnType<typeof getAdminAuth>;

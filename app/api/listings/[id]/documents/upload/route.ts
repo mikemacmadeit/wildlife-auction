@@ -39,8 +39,11 @@ function json(body: any, init?: { status?: number }) {
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const params = typeof (ctx.params as any)?.then === 'function'
+    ? await (ctx.params as Promise<{ id: string }>)
+    : (ctx.params as { id: string });
   try {
     // Rate limiting
     const rateLimitCheck = rateLimitMiddleware(RATE_LIMITS.default);

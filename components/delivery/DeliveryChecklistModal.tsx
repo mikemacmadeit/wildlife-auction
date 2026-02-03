@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
 import { Loader2, Copy, Check } from 'lucide-react';
 
 interface DeliveryChecklistModalProps {
@@ -84,6 +84,9 @@ export function DeliveryChecklistModal({
           className="max-w-2xl w-[calc(100%-2rem)] h-[95vh] max-h-[95vh] flex flex-col p-0 overflow-hidden"
           overlayClassName="bg-black/80"
         >
+          <DialogDescription className="sr-only">
+            Delivery checklist: PIN, signature, and photo steps for completing delivery.
+          </DialogDescription>
           <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b">
             <span className="text-sm font-medium">Delivery checklist</span>
             {driverLink && (

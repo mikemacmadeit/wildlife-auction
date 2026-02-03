@@ -646,7 +646,7 @@ function NewListingPageContent() {
               </AlertDescription>
             </Alert>
           ) : null}
-          <div className="grid grid-cols-2 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-5xl w-full mx-auto px-3 sm:px-0">
             <Card
               role="button"
               tabIndex={canSelectWhitetail ? 0 : -1}
@@ -675,7 +675,7 @@ function NewListingPageContent() {
               }}
               className={`relative transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'whitetail_breeder'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : canSelectWhitetail
                     ? 'border-border cursor-pointer hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
                     : 'border-border bg-muted/20 opacity-60 grayscale cursor-not-allowed'
@@ -699,7 +699,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'whitetail_breeder' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -707,7 +707,7 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div
                       className="w-12 h-12"
@@ -724,12 +724,12 @@ function NewListingPageContent() {
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Whitetail Breeder</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       TPWD-permitted whitetail deer breeding facilities
                     </p>
-                    <div className="flex flex-wrap gap-2 justify-start md:justify-center">
+                    <div className="flex flex-wrap gap-2 justify-center">
                       <Badge
                         variant="outline"
                         className="text-[11px] whitespace-nowrap px-2"
@@ -762,7 +762,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'wildlife_exotics'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => {
@@ -777,7 +777,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'wildlife_exotics' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -785,7 +785,7 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div
                       className="w-12 h-12"
@@ -802,7 +802,7 @@ function NewListingPageContent() {
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Specialty Livestock</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Axis deer, blackbuck, fallow deer, and other registered ranch species
@@ -830,7 +830,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'horse_equestrian'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => {
@@ -842,7 +842,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'horse_equestrian' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -850,7 +850,7 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div
                       className="w-12 h-12"
@@ -867,7 +867,7 @@ function NewListingPageContent() {
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Horse &amp; Equestrian</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">Horses, tack, and equestrian-related listings</p>
                   </div>
@@ -894,7 +894,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'sporting_working_dogs'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => {
@@ -906,7 +906,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'sporting_working_dogs' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -914,11 +914,11 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div className="w-12 h-12 icon-primary-color mask-icon-dog" />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Sporting &amp; Working Dogs</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Bird dogs, hog dogs, tracking dogs, and other working/sporting dogs
@@ -950,7 +950,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'cattle_livestock'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => {
@@ -965,7 +965,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'cattle_livestock' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -973,7 +973,7 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div
                       className="w-12 h-12"
@@ -990,7 +990,7 @@ function NewListingPageContent() {
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Cattle</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Bulls, cows, heifers, and steers
@@ -1019,7 +1019,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'farm_animals'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => {
@@ -1031,7 +1031,7 @@ function NewListingPageContent() {
                 });
               }}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'farm_animals' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1039,7 +1039,7 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div
                       className="w-12 h-12"
@@ -1057,7 +1057,7 @@ function NewListingPageContent() {
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Farm Animals</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Goats, sheep, pigs, alpacas, and other farm animals
@@ -1088,7 +1088,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'hunting_outfitter_assets'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => setFormData({ 
@@ -1100,7 +1100,7 @@ function NewListingPageContent() {
                 },
               })}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'hunting_outfitter_assets' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1108,11 +1108,11 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div className="w-12 h-12 icon-primary-color mask-icon-hunting-blind" />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Hunting &amp; Outfitter Assets</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Camera systems, blinds, and water/well systems
@@ -1143,7 +1143,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'ranch_equipment'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => setFormData({ 
@@ -1155,7 +1155,7 @@ function NewListingPageContent() {
                 },
               })}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'ranch_equipment' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1163,7 +1163,7 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div
                       className="w-12 h-12"
@@ -1180,7 +1180,7 @@ function NewListingPageContent() {
                       }}
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Ranch Equipment &amp; Attachments</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Tractors, skid steers, machinery, and attachments/implements (vehicles &amp; trailers listed separately)
@@ -1211,7 +1211,7 @@ function NewListingPageContent() {
               }}
               className={`relative cursor-pointer transition-all border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 formData.category === 'ranch_vehicles'
-                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 scale-[1.01]'
+                  ? 'border-primary bg-primary/15 ring-4 ring-primary/30 ring-offset-2 ring-offset-background shadow-lg shadow-primary/10 sm:scale-[1.01]'
                   : 'border-border hover:border-primary/60 hover:bg-muted/30 hover:shadow-sm'
               }`}
               onClick={() => setFormData({ 
@@ -1223,7 +1223,7 @@ function NewListingPageContent() {
                 },
               })}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 {formData.category === 'ranch_vehicles' && (
                   <div className="absolute top-3 right-3">
                     <div className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20">
@@ -1231,11 +1231,11 @@ function NewListingPageContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-4 md:flex-col md:gap-3 md:text-center">
+                <div className="flex flex-col gap-2 sm:gap-3 text-center items-center">
                   <div className="flex-shrink-0">
                     <div className="w-12 h-12 icon-primary-color mask-icon-top-drive" />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 w-full space-y-1">
                     <h3 className="text-base font-bold leading-tight">Ranch Vehicles &amp; Trailers</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       Trucks, UTVs/ATVs, and trailers (stock, gooseneck, flatbed, utility)
