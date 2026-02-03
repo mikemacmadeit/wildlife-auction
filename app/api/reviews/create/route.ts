@@ -58,6 +58,7 @@ export async function POST(request: Request) {
     const orderRef = db.collection('orders').doc(orderId);
 
     await db.runTransaction(async (tx) => {
+      // Firestore transactions require ALL reads before ANY writes.
       const [orderSnap, existingReviewSnap] = await Promise.all([tx.get(orderRef), tx.get(reviewRef)]);
       if (!orderSnap.exists) throw new Error('Order not found');
       if (existingReviewSnap.exists) throw new Error('ALREADY_REVIEWED');
@@ -82,7 +83,19 @@ export async function POST(request: Request) {
       const sellerId = String(order?.sellerId || '');
       const listingId = String(order?.listingId || '');
 
-      // Create review doc
+      // Read user and publicProfile BEFORE any writes
+      const userRef = db.collection('users').doc(sellerId);
+      const publicRef = db.collection('publicProfiles').doc(sellerId);
+      const [userSnap, publicSnap] = await Promise.all([tx.get(userRef), tx.get(publicRef)]);
+
+      const userData = userSnap.exists ? (userSnap.data() as any) : null;
+      const publicData = publicSnap.exists ? (publicSnap.data() as any) : null;
+      const currentStats = userData?.sellerReviewStats || initReviewStats();
+      const publicStats = publicData?.sellerReviewStats || initReviewStats();
+      const nextStats = applyReviewDelta(currentStats, rating, 1, now.toDate());
+      const nextPublicStats = applyReviewDelta(publicStats, rating, 1, now.toDate());
+
+      // All reads done. Now perform all writes.
       tx.set(reviewRef, {
         orderId,
         listingId,
@@ -96,20 +109,7 @@ export async function POST(request: Request) {
         createdAt: now,
         updatedAt: now,
       });
-
-      // Update seller aggregates (users + publicProfiles)
-      const userRef = db.collection('users').doc(sellerId);
-      const userSnap = await tx.get(userRef);
-      const userData = userSnap.exists ? (userSnap.data() as any) : null;
-      const currentStats = userData?.sellerReviewStats || initReviewStats();
-      const nextStats = applyReviewDelta(currentStats, rating, 1, now.toDate());
       tx.set(userRef, { sellerReviewStats: nextStats, updatedAt: now }, { merge: true });
-
-      const publicRef = db.collection('publicProfiles').doc(sellerId);
-      const publicSnap = await tx.get(publicRef);
-      const publicData = publicSnap.exists ? (publicSnap.data() as any) : null;
-      const publicStats = publicData?.sellerReviewStats || initReviewStats();
-      const nextPublicStats = applyReviewDelta(publicStats, rating, 1, now.toDate());
       tx.set(publicRef, { sellerReviewStats: nextPublicStats, updatedAt: now }, { merge: true });
     });
 

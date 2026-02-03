@@ -102,9 +102,29 @@ export default function SellerProfilePage() {
     };
   }, [authLoading, sellerId]);
 
-  const reputation = useMemo(() => getSellerReputation({ profile }), [profile]);
+  // Use publicTrust.completedSalesCount when profile lacks it (profile from publicProfiles omits these)
+  const effectiveCompletedSales = useMemo(() => {
+    const fromProfile = Math.max(Number(profile?.verifiedTransactionsCount || 0), Number(profile?.completedSalesCount || 0));
+    const fromTrust = Number(publicTrust?.completedSalesCount ?? 0);
+    const fromSold = soldListings.length;
+    return Math.max(fromProfile, fromTrust, fromSold > 0 ? fromSold : 0);
+  }, [profile, publicTrust, soldListings.length]);
+
+  const effectiveProfile = useMemo(() => {
+    if (!profile) return null;
+    const merged = { ...profile } as any;
+    const profileSales = Math.max(Number(merged.verifiedTransactionsCount || 0), Number(merged.completedSalesCount || 0));
+    if (effectiveCompletedSales > profileSales) {
+      merged.completedSalesCount = effectiveCompletedSales;
+      merged.verifiedTransactionsCount = effectiveCompletedSales;
+      merged.completionRate = 1;
+    }
+    return merged;
+  }, [profile, effectiveCompletedSales]);
+
+  const reputation = useMemo(() => getSellerReputation({ profile: effectiveProfile, totalTransactionsOverride: effectiveCompletedSales }), [effectiveProfile, effectiveCompletedSales]);
   const sellerTier = profile ? getEffectiveSubscriptionTier(profile) : 'standard';
-  const txCount = profile ? Math.max(Number(profile.verifiedTransactionsCount || 0), Number(profile.completedSalesCount || 0)) : 0;
+  const txCount = effectiveCompletedSales;
   const isSelf = !!user?.uid && !!sellerId && user.uid === sellerId;
 
   const displayName = useMemo(() => {
@@ -571,7 +591,7 @@ export default function SellerProfilePage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="inline-flex items-center gap-1 text-base font-extrabold">
-                    <Star className="h-5 w-5 text-amber-500" />
+                    <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
                     {reviewStats?.avgRating ? reviewStats.avgRating.toFixed(1) : '—'}
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -591,7 +611,7 @@ export default function SellerProfilePage() {
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-0.5">
                             {[1, 2, 3, 4, 5].map((n) => (
-                              <Star key={n} className={n <= (r.rating || 0) ? 'h-4 w-4 text-amber-500' : 'h-4 w-4 text-muted-foreground'} />
+                              <Star key={n} className={n <= (r.rating || 0) ? 'h-4 w-4 text-amber-500 fill-amber-500' : 'h-4 w-4 text-muted-foreground/40'} />
                             ))}
                           </div>
                           <span className="text-xs text-muted-foreground">Verified purchase</span>

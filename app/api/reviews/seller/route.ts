@@ -35,25 +35,50 @@ export async function GET(request: Request) {
     const userSnap = await db.collection('users').doc(sellerId).get();
     const stats = userSnap.exists ? ((userSnap.data() as any)?.sellerReviewStats || initReviewStats()) : initReviewStats();
 
-    let q = db
-      .collection('reviews')
-      .where('sellerId', '==', sellerId)
-      .where('status', '==', 'published')
-      .orderBy('createdAt', 'desc')
-      .limit(limit);
+    let reviews: Array<{ id: string; data: any }> = [];
 
-    if (cursor) {
-      const cursorSnap = await db.collection('reviews').doc(cursor).get();
-      if (cursorSnap.exists) {
-        q = q.startAfter(cursorSnap);
+    try {
+      // Primary: composite index query (sellerId + status + createdAt)
+      let q = db
+        .collection('reviews')
+        .where('sellerId', '==', sellerId)
+        .where('status', '==', 'published')
+        .orderBy('createdAt', 'desc')
+        .limit(limit);
+
+      if (cursor) {
+        const cursorSnap = await db.collection('reviews').doc(cursor).get();
+        if (cursorSnap.exists) {
+          q = q.startAfter(cursorSnap);
+        }
+      }
+
+      const snap = await q.get();
+      reviews = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    } catch (idxErr: any) {
+      // Fallback if composite index not deployed: query by sellerId only, filter/sort in memory
+      const msg = String(idxErr?.message || '');
+      if (msg.includes('FAILED_PRECONDITION') || msg.includes('index')) {
+        const snap = await db.collection('reviews').where('sellerId', '==', sellerId).limit(200).get();
+        let all = snap.docs
+          .map((d) => ({ id: d.id, data: d.data() }))
+          .filter((r) => String((r.data as any)?.status || '') === 'published')
+          .sort((a, b) => {
+            const at = (a.data as any).createdAt?.toDate?.() ?? (a.data as any).createdAt ?? 0;
+            const bt = (b.data as any).createdAt?.toDate?.() ?? (b.data as any).createdAt ?? 0;
+            return (bt instanceof Date ? bt.getTime() : 0) - (at instanceof Date ? at.getTime() : 0);
+          });
+        const startIdx = cursor ? all.findIndex((r) => r.id === cursor) + 1 : 0;
+        reviews = all.slice(Math.max(0, startIdx), startIdx + limit);
+      } else {
+        throw idxErr;
       }
     }
 
-    const snap = await q.get();
-    const reviews = snap.docs.map((d) => {
-      const data = d.data() as any;
+    const reviewList = reviews.map((r) => {
+      const data = r.data as any;
       return {
-        orderId: d.id,
+        orderId: r.id,
         listingId: data.listingId || null,
         buyerId: data.buyerId || null,
         sellerId: data.sellerId || null,
@@ -66,9 +91,9 @@ export async function GET(request: Request) {
       };
     });
 
-    const nextCursor = snap.docs.length === limit ? snap.docs[snap.docs.length - 1].id : null;
+    const nextCursor = reviews.length === limit ? reviews[reviews.length - 1].id : null;
 
-    return json({ ok: true, stats, reviews, nextCursor });
+    return json({ ok: true, stats, reviews: reviewList, nextCursor });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || 'Failed to load reviews' }, { status: 500 });
   }

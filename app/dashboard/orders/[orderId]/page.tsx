@@ -26,12 +26,10 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, AlertTriangle, ArrowLeft, Camera, CheckCircle2, MapPin, Package, Star, User } from 'lucide-react';
-import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
+import type { Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
-import { getDocuments } from '@/lib/firebase/documents';
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
-import { OrderDocumentsPanel } from '@/components/orders/OrderDocumentsPanel';
 import { ComplianceTransferPanel } from '@/components/orders/ComplianceTransferPanel';
 import { OrderMilestoneTimeline } from '@/components/orders/OrderMilestoneTimeline';
 import { DeliveryTrackingCard } from '@/components/orders/DeliveryTrackingCard';
@@ -42,7 +40,7 @@ import { getOrderIssueState } from '@/lib/orders/getOrderIssueState';
 import { getOrderTrustState } from '@/lib/orders/getOrderTrustState';
 import { getEffectiveTransactionStatus } from '@/lib/orders/status';
 import { ORDER_COPY, getStatusLabel } from '@/lib/orders/copy';
-import { formatDate, isValidNonEpochDate } from '@/lib/utils';
+import { cn, formatDate, isValidNonEpochDate } from '@/lib/utils';
 import { formatUserFacingError } from '@/lib/format-user-facing-error';
 import { AddressPickerModal, type SetDeliveryAddressPayload } from '@/components/address/AddressPickerModal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -101,7 +99,6 @@ export default function BuyerOrderDetailPage() {
   const orderId = params?.orderId;
   const [order, setOrder] = useState<Order | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
-  const [billOfSaleDocs, setBillOfSaleDocs] = useState<ComplianceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<'confirm' | 'dispute' | null>(null);
@@ -148,12 +145,10 @@ export default function BuyerOrderDetailPage() {
       if (o.buyerId !== user.uid) throw new Error('You can only view your own orders.');
 
       const l = await getListingById(o.listingId);
-      const bos = await getDocuments('order', o.id, 'BILL_OF_SALE').catch(() => []);
 
       if (cancelledRef?.current) return;
       setOrder(o);
       setListing(l || null);
-      setBillOfSaleDocs(bos);
     } catch (e: any) {
       if (!cancelledRef?.current) setError(formatUserFacingError(e, 'Failed to load order'));
     } finally {
@@ -593,11 +588,24 @@ export default function BuyerOrderDetailPage() {
                     <button
                       key={n}
                       type="button"
-                      onClick={() => setReviewRating(n)}
-                      className="p-1"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setReviewRating(n);
+                      }}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        setReviewRating(n);
+                      }}
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-amber-500/10 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 cursor-pointer touch-manipulation"
                       aria-label={`Rate ${n} star${n === 1 ? '' : 's'}`}
                     >
-                      <Star className={n <= reviewRating ? 'h-5 w-5 text-amber-500' : 'h-5 w-5 text-muted-foreground'} />
+                      <Star
+                        className={cn(
+                          'h-8 w-8 pointer-events-none',
+                          n <= reviewRating ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'
+                        )}
+                      />
                     </button>
                   ))}
                 </div>
@@ -631,7 +639,7 @@ export default function BuyerOrderDetailPage() {
                     setReviewSubmitting(false);
                   }
                 }}
-                disabled={reviewSubmitting}
+                disabled={reviewSubmitting || reviewRating < 1}
               >
                 {reviewSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Submit review
@@ -969,84 +977,24 @@ export default function BuyerOrderDetailPage() {
                   Report an issue
                 </Button>
               </div>
+            ) : reviewEligible ? (
+              <div id="leave-review" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 scroll-mt-24 pt-2 border-t border-border/50 mt-4 pt-4">
+                <div>
+                  <div className="font-semibold text-sm">How was your experience?</div>
+                  <div className="text-xs text-muted-foreground">Leave a review for the seller. Only you can review this order.</div>
+                </div>
+                <Button
+                  className="w-full sm:w-auto min-h-[44px] touch-manipulation shrink-0"
+                  disabled={reviewEligibilityLoading}
+                  onClick={() => setReviewDialogOpen(true)}
+                >
+                  {reviewEligibilityLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Star className="h-4 w-4 mr-2" />}
+                  Leave a review
+                </Button>
+              </div>
             ) : null
           }
         />
-
-        <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Bill of Sale</CardTitle>
-              <CardDescription>View/download the written transfer. You can also upload a signed copy.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {billOfSaleDocs.length > 0 ? (
-                <div className="space-y-2">
-                  {billOfSaleDocs.slice(0, 3).map((d) => (
-                    <div key={d.id} className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="text-sm">
-                        <div className="font-semibold">Bill of Sale</div>
-                        <div className="text-xs text-muted-foreground break-all">{d.documentUrl}</div>
-                      </div>
-                      <Button asChild variant="outline" size="sm">
-                        <a href={d.documentUrl} target="_blank" rel="noreferrer">
-                          View / Download
-                        </a>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Not available yet. If this order requires a Bill of Sale, it will be generated when checkout is initiated.
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="font-semibold text-sm">Buyer signature confirmation</div>
-                  <div className="text-xs text-muted-foreground">
-                    {order.billOfSaleBuyerSignedAt ? `Signed at ${order.billOfSaleBuyerSignedAt.toLocaleString()}` : 'Not confirmed yet.'}
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  disabled={Boolean(order.billOfSaleBuyerSignedAt)}
-                  onClick={async () => {
-                    try {
-                      await postAuthJson(`/api/orders/${order.id}/bill-of-sale/confirm-signed`);
-                      const refreshed = await getOrderById(order.id);
-                      if (refreshed) setOrder(refreshed);
-                      toast({ title: 'Confirmed', description: 'Buyer signature confirmation recorded.' });
-                    } catch (e: any) {
-                      toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to confirm'), variant: 'destructive' });
-                    }
-                  }}
-                >
-                  I have signed
-                </Button>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <div className="font-semibold text-sm">Upload signed copy (optional)</div>
-                <DocumentUpload
-                  entityType="order"
-                  entityId={order.id}
-                  documentType="BILL_OF_SALE"
-                  onUploadComplete={async () => {
-                    const bos = await getDocuments('order', order.id, 'BILL_OF_SALE').catch(() => []);
-                    setBillOfSaleDocs(bos);
-                  }}
-                  required={false}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-        <OrderDocumentsPanel orderId={order.id} listing={listing} excludeDocumentTypes={['BILL_OF_SALE']} />
 
         {/* Set delivery address: single HEB-style modal (saved addresses + Places/map when key set, or manual form when not) */}
         {user?.uid && order && (

@@ -1280,6 +1280,8 @@ export type SellerBadgeId =
 export interface PublicSellerTrust {
   userId: string;
   badgeIds: SellerBadgeId[];
+  completedSalesCount?: number;
+  completionRate?: number;
   // Optional structured detail for specific badges (all public-safe)
   tpwdBreederPermit?: {
     status: 'verified' | 'rejected';
