@@ -330,6 +330,18 @@ export function buildInAppNotification(params: {
         metadata: { listingId: p.listingId, orderId: p.orderId },
       };
     }
+    case 'Review.Request': {
+      const p = params.payload as Extract<NotificationEventPayload, { type: 'Review.Request' }>;
+      return {
+        ...base,
+        type: 'review_request',
+        title: 'Leave a review',
+        body: `How was your experience with ${p.sellerDisplayName}?`,
+        deepLinkUrl: p.reviewUrl,
+        linkLabel: 'Leave review',
+        metadata: { listingId: p.listingId, orderId: p.orderId, sellerId: p.sellerId },
+      };
+    }
     case 'Payout.Released': {
       const p = params.payload as Extract<NotificationEventPayload, { type: 'Payout.Released' }>;
       return {

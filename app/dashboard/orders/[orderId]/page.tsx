@@ -24,7 +24,8 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, AlertTriangle, ArrowLeft, Camera, CheckCircle2, MapPin, Package, User } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, AlertTriangle, ArrowLeft, Camera, CheckCircle2, MapPin, Package, Star, User } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -71,6 +72,25 @@ async function postAuthJson(path: string, body?: any): Promise<any> {
   return json;
 }
 
+async function getAuthJson(path: string): Promise<any> {
+  const { auth } = await import('@/lib/firebase/config');
+  const user = auth.currentUser;
+  if (!user) throw new Error('Authentication required');
+  const token = await user.getIdToken();
+  const res = await fetch(path, {
+    method: 'GET',
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json?.message ?? json?.error ?? 'Request failed';
+    throw new Error(msg);
+  }
+  return json;
+}
+
 export default function BuyerOrderDetailPage() {
   const params = useParams<{ orderId: string }>();
   const searchParams = useSearchParams();
@@ -91,6 +111,12 @@ export default function BuyerOrderDetailPage() {
   const [sendPhotosPromptOpen, setSendPhotosPromptOpen] = useState(false);
   const [sendPhotosModalOpen, setSendPhotosModalOpen] = useState(false);
   const [outForDeliveryExpanded, setOutForDeliveryExpanded] = useState(true);
+  const [reviewEligible, setReviewEligible] = useState(false);
+  const [reviewEligibilityLoading, setReviewEligibilityLoading] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const SEND_PHOTOS_PROMPT_KEY = 'we:send-photos-prompted:v1';
 
@@ -153,6 +179,36 @@ export default function BuyerOrderDetailPage() {
     });
     return () => unsub();
   }, [orderId, user?.uid]);
+
+  useEffect(() => {
+    if (!orderId || !user?.uid || !order) {
+      setReviewEligible(false);
+      return;
+    }
+    let cancelled = false;
+    setReviewEligibilityLoading(true);
+    getAuthJson(`/api/reviews/eligibility?orderId=${orderId}`)
+      .then((res) => {
+        if (cancelled) return;
+        setReviewEligible(Boolean(res?.eligible));
+      })
+      .catch(() => {
+        if (!cancelled) setReviewEligible(false);
+      })
+      .finally(() => {
+        if (!cancelled) setReviewEligibilityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, user?.uid, order]);
+
+  useEffect(() => {
+    if (!reviewEligible) return;
+    if (searchParams?.get('review') === '1') {
+      setReviewDialogOpen(true);
+    }
+  }, [reviewEligible, searchParams]);
 
   const setAddressParamHandledRef = useRef(false);
   // When arriving with ?setAddress=1 (e.g. from congrats modal "Set delivery address"), open the modal once order is ready
@@ -361,6 +417,18 @@ export default function BuyerOrderDetailPage() {
                           <Link href={`/sellers/${order.sellerId}`}>View seller</Link>
                         </Button>
                       ) : null}
+                      {reviewEligible ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="font-semibold"
+                          onClick={() => setReviewDialogOpen(true)}
+                          disabled={reviewEligibilityLoading}
+                        >
+                          {reviewEligibilityLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Star className="h-4 w-4 mr-2" />}
+                          Leave a review
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -503,6 +571,70 @@ export default function BuyerOrderDetailPage() {
               >
                 <Camera className="h-4 w-4 mr-2" />
                 Add photos
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Leave a review */}
+        <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Leave a review</DialogTitle>
+              <DialogDescription>
+                Share your experience with the seller. Reviews are verified and shown publicly.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-semibold">Rating</Label>
+                <div className="mt-2 flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setReviewRating(n)}
+                      className="p-1"
+                      aria-label={`Rate ${n} star${n === 1 ? '' : 's'}`}
+                    >
+                      <Star className={n <= reviewRating ? 'h-5 w-5 text-amber-500' : 'h-5 w-5 text-muted-foreground'} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="review-text" className="text-sm font-semibold">Comments (optional)</Label>
+                <Textarea
+                  id="review-text"
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  placeholder="What went well? Anything to improve?"
+                  className="mt-2 min-h-[120px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={reviewSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    setReviewSubmitting(true);
+                    await postAuthJson('/api/reviews/create', { orderId, rating: reviewRating, text: reviewText });
+                    setReviewEligible(false);
+                    setReviewDialogOpen(false);
+                    toast({ title: 'Thanks for the review', description: 'Your feedback has been submitted.' });
+                  } catch (e: any) {
+                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to submit review'), variant: 'destructive' });
+                  } finally {
+                    setReviewSubmitting(false);
+                  }
+                }}
+                disabled={reviewSubmitting}
+              >
+                {reviewSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Submit review
               </Button>
             </DialogFooter>
           </DialogContent>

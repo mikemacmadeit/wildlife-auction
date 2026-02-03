@@ -137,6 +137,16 @@ service cloud.firestore {
     }
 
     // ============================================
+    // REVIEWS (SERVER-AUTHORED)
+    // ============================================
+    match /reviews/{orderId} {
+      // Public reads only for published reviews; admins can read all.
+      allow read: if (resource.data.status == 'published') || isAdmin();
+      // Server-only writes
+      allow create, update, delete: if false;
+    }
+
+    // ============================================
     // PUBLIC SELLER TRUST (SERVER-AUTHORED)
     // ============================================
     // Public, marketplace-safe trust signals (badges) that must NOT be user-editable.

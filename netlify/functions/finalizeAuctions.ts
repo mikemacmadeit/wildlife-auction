@@ -47,6 +47,12 @@ const baseHandler: Handler = async () => {
 
     scanned = snap.size;
     if (snap.empty) {
+      try {
+        await db.collection('opsHealth').doc('finalizeAuctions').set(
+          { lastRunAt: nowTs, status: 'success', scannedCount: 0, processedCount: 0, errorsCount: 0, updatedAt: nowTs },
+          { merge: true }
+        );
+      } catch (_) {}
       return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, finalized, noops, errors }) };
     }
 
@@ -68,6 +74,12 @@ const baseHandler: Handler = async () => {
     }
 
     logInfo('finalizeAuctions: completed', { requestId, route: 'finalizeAuctions', scanned, finalized, noops, errors });
+    try {
+      await db.collection('opsHealth').doc('finalizeAuctions').set(
+        { lastRunAt: Timestamp.now(), status: 'success', scannedCount: scanned, processedCount: finalized, errorsCount: errors, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, finalized, noops, errors }) };
   } catch (e: any) {
     // Missing indexes / failed-precondition should not crash the platform; log and return 200 so cron doesn't thrash retries.
@@ -76,10 +88,22 @@ const baseHandler: Handler = async () => {
     const looksLikeIndex = code === 'failed-precondition' || /requires an index/i.test(msg);
     if (looksLikeIndex) {
       logWarn('finalizeAuctions: missing Firestore index; skipping run', { requestId, route: 'finalizeAuctions', code, message: msg });
+      try {
+        await db.collection('opsHealth').doc('finalizeAuctions').set(
+          { lastRunAt: Timestamp.now(), status: 'error', lastError: msg || 'Missing index', updatedAt: Timestamp.now() },
+          { merge: true }
+        );
+      } catch (_) {}
       return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: true, reason: 'MISSING_INDEX' }) };
     }
 
     logError('finalizeAuctions: fatal error', e, { requestId, route: 'finalizeAuctions' });
+    try {
+      await db.collection('opsHealth').doc('finalizeAuctions').set(
+        { lastRunAt: Timestamp.now(), status: 'error', lastError: msg || 'Unknown error', updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: msg || 'Unknown error' }) };
   }
 };

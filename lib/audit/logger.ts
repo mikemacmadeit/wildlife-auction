@@ -112,6 +112,7 @@ export type AuditActionType =
   // Admin: order notes and review
   | 'admin_note_added'
   | 'order_reviewed'
+  | 'review_moderated'
   // Seller: breeder permit submission + admin review (seller-level compliance)
   | 'seller_breeder_permit_submitted'
   | 'admin_seller_breeder_permit_verified'

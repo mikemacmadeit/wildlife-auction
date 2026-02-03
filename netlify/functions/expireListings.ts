@@ -161,9 +161,21 @@ const baseHandler: Handler = async () => {
     }
 
     logInfo('expireListings: completed', { requestId, scanned, ended, sold, ms: Date.now() - startedAt });
+    try {
+      await db.collection('opsHealth').doc('expireListings').set(
+        { lastRunAt: Timestamp.now(), status: 'success', scannedCount: scanned, processedCount: ended + sold, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, ended, sold }) };
   } catch (e: any) {
     logError('expireListings: fatal error', e, { requestId, scanned, ended, sold });
+    try {
+      await db.collection('opsHealth').doc('expireListings').set(
+        { lastRunAt: Timestamp.now(), status: 'error', lastError: e?.message || 'Unknown error', updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: e?.message || 'Unknown error' }) };
   }
 };

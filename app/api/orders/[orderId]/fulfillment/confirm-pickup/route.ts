@@ -11,6 +11,7 @@ import { TransactionStatus } from '@/lib/types';
 import { z } from 'zod';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { enqueueReviewRequest } from '@/lib/reviews/reviewRequest';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
@@ -155,6 +156,13 @@ export async function POST(
     };
 
     await orderRef.update(updateData);
+
+    // Enqueue review request for buyer (idempotent).
+    try {
+      await enqueueReviewRequest({ db: db as any, orderId, order: orderData });
+    } catch {
+      // best-effort
+    }
 
     // Timeline (server-authored, idempotent).
     try {

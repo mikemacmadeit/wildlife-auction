@@ -359,6 +359,13 @@ export async function POST(request: Request) {
           });
       }
 
+      // Update stripeEvents doc with processed status (admin visibility)
+      try {
+        await eventRef.set({ status: 'processed', processedAt: Timestamp.now() }, { merge: true });
+      } catch (updateErr) {
+        logWarn('Failed to update stripeEvents status', { requestId, eventId, error: String(updateErr) });
+      }
+
       // Update webhook health doc (non-blocking)
       try {
         await adminDb.collection('opsHealth').doc('stripeWebhook').set({
@@ -385,6 +392,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ received: true }, { headers: responseHeaders });
     } catch (handlerError: any) {
+      (handlerError as any).stripeEventIdForAudit = eventId;
       logError('Webhook handler error', handlerError, {
         requestId,
         route: '/api/stripe/webhook',
@@ -408,6 +416,18 @@ export async function POST(request: Request) {
       requestId,
       route: '/api/stripe/webhook',
     });
+    // Mark stripeEvents doc as failed (admin visibility) — when handler threw, eventId is on error
+    try {
+      const failedEventId = (error as any)?.stripeEventIdForAudit;
+      if (failedEventId) {
+        await adminDb.collection('stripeEvents').doc(failedEventId).set(
+          { status: 'failed', errorMessage: String(error?.message || 'Unknown error') },
+          { merge: true }
+        );
+      }
+    } catch (_) {
+      // Non-blocking
+    }
     return NextResponse.json(
       { error: 'Webhook handler failed', message: error.message },
       { status: 500, headers: responseHeaders }

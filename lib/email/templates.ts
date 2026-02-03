@@ -94,6 +94,14 @@ export interface MessageReceivedEmailData {
   preview?: string;
 }
 
+export interface ReviewRequestEmailData {
+  userName: string;
+  sellerDisplayName: string;
+  listingTitle: string;
+  orderId: string;
+  reviewUrl: string;
+}
+
 export interface VerifyEmailEmailData {
   userName: string;
   verifyUrl: string;
@@ -1361,6 +1369,42 @@ export function getMessageReceivedEmail(data: MessageReceivedEmailData): { subje
 
     <div style="margin-top: 16px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A;">
       Keep communication in-app for the safest experience.
+    </div>
+  `;
+
+  return { subject, html: getEmailTemplate({ title: subject, preheader, contentHtml: content, origin }) };
+}
+
+export function getReviewRequestEmail(data: ReviewRequestEmailData): { subject: string; html: string } {
+  const subject = `Leave a review for ${data.sellerDisplayName}`;
+  const preheader = `Tell us how your purchase went.`;
+  const origin = tryGetOrigin(data.reviewUrl);
+
+  const content = `
+    <div style="font-family: 'BarlettaInline','BarlettaStamp','Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 0.2px; margin: 0 0 6px 0; color:#22251F;">
+      Your review helps buyers
+    </div>
+    <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#5B564A; margin: 0 0 14px 0;">
+      Hi ${escapeHtml(data.userName)} — share your experience with <strong>${escapeHtml(data.sellerDisplayName)}</strong>.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#FBFAF7; border:1px solid rgba(34,37,31,0.16); border-radius: 16px;">
+      <tr>
+        <td style="padding: 14px 14px;">
+          <div style="font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color:#5B564A; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;">
+            Order
+          </div>
+          <div style="margin-top: 10px; font-family: 'Founders Grotesk', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 14px; color:#22251F;">
+            <div><span style="color:#5B564A;">Listing:</span> <strong>${escapeHtml(data.listingTitle)}</strong></div>
+            <div style="margin-top: 6px;"><span style="color:#5B564A;">Order ID:</span> <strong>${escapeHtml(data.orderId)}</strong></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin: 18px 0 0 0;">
+      ${renderButton(data.reviewUrl, 'Leave a review')}
     </div>
   `;
 

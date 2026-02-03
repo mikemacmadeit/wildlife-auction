@@ -89,15 +89,25 @@ export async function GET(request: Request) {
   const emailConfigured = !!process.env.BREVO_API_KEY || !!process.env.RESEND_API_KEY;
 
   // opsHealth docs (written by server jobs/webhooks)
-  const [autoReleaseSnap, webhookSnap, aggSnap] = await Promise.allSettled([
+  const [autoReleaseSnap, webhookSnap, aggSnap, finalizeSnap, expireListSnap, expireOffSnap, remindersSnap, clearResSnap] = await Promise.allSettled([
     db.collection('opsHealth').doc('autoReleaseProtected').get(),
     db.collection('opsHealth').doc('stripeWebhook').get(),
     db.collection('opsHealth').doc('aggregateRevenue').get(),
+    db.collection('opsHealth').doc('finalizeAuctions').get(),
+    db.collection('opsHealth').doc('expireListings').get(),
+    db.collection('opsHealth').doc('expireOffers').get(),
+    db.collection('opsHealth').doc('checkFulfillmentReminders').get(),
+    db.collection('opsHealth').doc('clearExpiredPurchaseReservations').get(),
   ]);
 
   const autoRelease = autoReleaseSnap.status === 'fulfilled' && autoReleaseSnap.value.exists ? (autoReleaseSnap.value.data() as any) : null;
   const stripeWebhook = webhookSnap.status === 'fulfilled' && webhookSnap.value.exists ? (webhookSnap.value.data() as any) : null;
   const aggregateRevenue = aggSnap.status === 'fulfilled' && aggSnap.value.exists ? (aggSnap.value.data() as any) : null;
+  const finalizeAuctions = finalizeSnap.status === 'fulfilled' && finalizeSnap.value.exists ? (finalizeSnap.value.data() as any) : null;
+  const expireListings = expireListSnap.status === 'fulfilled' && expireListSnap.value.exists ? (expireListSnap.value.data() as any) : null;
+  const expireOffers = expireOffSnap.status === 'fulfilled' && expireOffSnap.value.exists ? (expireOffSnap.value.data() as any) : null;
+  const checkFulfillmentReminders = remindersSnap.status === 'fulfilled' && remindersSnap.value.exists ? (remindersSnap.value.data() as any) : null;
+  const clearExpiredPurchaseReservations = clearResSnap.status === 'fulfilled' && clearResSnap.value.exists ? (clearResSnap.value.data() as any) : null;
 
   const checks: HealthCheck[] = [];
 
@@ -311,6 +321,38 @@ export async function GET(request: Request) {
       action: minutesAgo > 80 ? 'Check Netlify function logs for aggregateRevenue + verify schedule is enabled.' : undefined,
       category: 'jobs',
     });
+  }
+
+  // Critical cron jobs: finalizeAuctions, expireListings, expireOffers, checkFulfillmentReminders, clearExpiredPurchaseReservations
+  const cronJobs = [
+    { id: 'ops_finalizeAuctions', title: 'Scheduled job: finalizeAuctions', doc: finalizeAuctions, staleMinutes: 15 },
+    { id: 'ops_expireListings', title: 'Scheduled job: expireListings', doc: expireListings, staleMinutes: 15 },
+    { id: 'ops_expireOffers', title: 'Scheduled job: expireOffers', doc: expireOffers, staleMinutes: 30 },
+    { id: 'ops_checkFulfillmentReminders', title: 'Scheduled job: checkFulfillmentReminders', doc: checkFulfillmentReminders, staleMinutes: 120 },
+    { id: 'ops_clearExpiredPurchaseReservations', title: 'Scheduled job: clearExpiredPurchaseReservations', doc: clearExpiredPurchaseReservations, staleMinutes: 15 },
+  ];
+  for (const { id, title, doc, staleMinutes } of cronJobs) {
+    const lastRun = toDateSafe(doc?.lastRunAt);
+    const statusVal = doc?.status;
+    if (!lastRun) {
+      checks.push({ id, title, status: 'WARN', message: 'No run record yet.', category: 'jobs' });
+    } else {
+      const minutesAgo = (Date.now() - lastRun.getTime()) / (1000 * 60);
+      const isError = statusVal === 'error';
+      const isStale = minutesAgo > staleMinutes;
+      const status: HealthStatus = isError ? 'FAIL' : isStale ? 'WARN' : 'OK';
+      const msg = isError
+        ? `Last run failed: ${doc?.lastError || 'unknown'}`
+        : `Last run ${Math.round(minutesAgo)} min ago (${statusVal || 'success'})`;
+      checks.push({
+        id,
+        title,
+        status,
+        message: msg,
+        details: { lastRunAt: lastRun.toISOString(), scannedCount: doc?.scannedCount, processedCount: doc?.processedCount, errorsCount: doc?.errorsCount, lastError: doc?.lastError },
+        category: 'jobs',
+      });
+    }
   }
 
   const webhookLast = toDateSafe(stripeWebhook?.lastWebhookAt);

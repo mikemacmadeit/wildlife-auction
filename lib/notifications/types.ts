@@ -52,6 +52,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   'Order.ComplianceSellerConfirmed', // NEW: Seller confirmed TPWD transfer compliance
   'Order.ComplianceUnlocked', // NEW: Both parties confirmed - fulfillment unlocked
   'Payout.Released',
+  'Review.Request',
 
   // ONBOARDING / TRUST
   'User.Welcome',
@@ -341,6 +342,15 @@ export type NotificationEventPayload =
       listingId: string;
       listingTitle: string;
       orderUrl: string;
+    }
+  | {
+      type: 'Review.Request';
+      orderId: string;
+      listingId: string;
+      listingTitle: string;
+      sellerId: string;
+      sellerDisplayName: string;
+      reviewUrl: string;
     }
   | {
       type: 'Order.SlaApproaching';

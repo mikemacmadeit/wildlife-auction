@@ -18,6 +18,7 @@ import { TransactionStatus } from '@/lib/types';
 import { getAdminApp, getAdminDb } from '@/lib/firebase/admin';
 import { verifyDeliveryToken } from '@/lib/delivery/tokens';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { enqueueReviewRequest } from '@/lib/reviews/reviewRequest';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
@@ -139,14 +140,22 @@ export async function POST(request: Request) {
     if (photoBase64 && photoBase64.trim()) {
       try {
         const isJpeg = /^data:image\/jpe?g;base64,/.test(photoBase64);
+        const isPng = /^data:image\/png;base64,/.test(photoBase64);
+        const isWebp = /^data:image\/webp;base64,/.test(photoBase64);
+        const contentType = isJpeg ? 'image/jpeg' : isWebp ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
         photoUrl = await uploadBase64Image(
           photoBase64,
           `${pathPrefix}/photo`,
-          isJpeg ? 'image/jpeg' : 'image/png'
+          contentType
         );
       } catch (e: any) {
         console.error('[complete-delivery] Photo upload failed', e);
-        return json({ error: 'Failed to upload photo' }, { status: 400 });
+        const msg = e?.message ?? String(e);
+        const userMsg =
+          msg.includes('too large') || msg.includes('Image too large')
+            ? 'Photo is too large. Try taking a new photo or choose a smaller image.'
+            : 'Failed to upload photo. Try a different image or complete without the photo.';
+        return json({ error: userMsg }, { status: 400 });
       }
     }
 
@@ -179,6 +188,7 @@ export async function POST(request: Request) {
       buyerConfirmedAt: now,
       acceptedAt: now,
       buyerAcceptedAt: now,
+      completedAt: now,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
       'delivery.sessionId': payload.sessionId,
@@ -199,6 +209,13 @@ export async function POST(request: Request) {
     }
     const orderUpdate = sanitizeFirestorePayload(orderUpdateBase);
     await orderRef.update(orderUpdate);
+
+    // Enqueue review request for buyer (idempotent).
+    try {
+      await enqueueReviewRequest({ db: db as any, orderId: payload.orderId, order: orderData });
+    } catch {
+      /* best-effort */
+    }
 
     for (const url of proofUrls) {
       await orderRef.collection('documents').add({

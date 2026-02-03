@@ -171,6 +171,8 @@ export default function ListingDetailInteractiveClient({
     paymentIntentId: string;
     instructions: { reference: string; financialAddresses: Array<{ type: string; address: any }> };
   }>(null);
+  const [sellerReviewStats, setSellerReviewStats] = useState<{ avgRating: number; reviewCount: number } | null>(null);
+  const [sellerReviewsLoading, setSellerReviewsLoading] = useState(false);
   const [animalAckOpen, setAnimalAckOpen] = useState(false);
   const [animalRiskAcked, setAnimalRiskAcked] = useState(false);
   const { toast } = useToast();
@@ -217,6 +219,34 @@ export default function ListingDetailInteractiveClient({
     const shell = document.querySelector('[data-listing-server-shell]');
     if (shell && shell instanceof HTMLElement) shell.style.display = 'none';
   }, [listing]);
+
+  useEffect(() => {
+    if (!listing?.sellerId) return;
+    let cancelled = false;
+    setSellerReviewsLoading(true);
+    fetch(`/api/reviews/seller?sellerId=${listing.sellerId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.ok && data?.stats) {
+          setSellerReviewStats({
+            avgRating: Number(data.stats.avgRating || 0) || 0,
+            reviewCount: Number(data.stats.reviewCount || 0) || 0,
+          });
+        } else {
+          setSellerReviewStats(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSellerReviewStats(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSellerReviewsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.sellerId]);
 
   useEffect(() => {
     if (!listing || listing.type !== 'auction') {
@@ -1580,6 +1610,17 @@ export default function ListingDetailInteractiveClient({
                       >
                         {(listing as any)?.sellerSnapshot?.displayName || (listing as any)?.seller?.name || 'Seller'}
                       </Link>
+                      {sellerReviewStats?.reviewCount ? (
+                        <Link
+                          href={`/sellers/${listing!.sellerId}#seller-reviews`}
+                          className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <Star className="h-3.5 w-3.5 text-amber-500" />
+                          {sellerReviewStats.avgRating.toFixed(1)} ({sellerReviewStats.reviewCount})
+                        </Link>
+                      ) : sellerReviewsLoading ? (
+                        <span className="mt-1 text-xs text-muted-foreground">Loading rating…</span>
+                      ) : null}
                     </div>
                     <Button
                       type="button"

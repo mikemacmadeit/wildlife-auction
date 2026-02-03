@@ -147,6 +147,10 @@ function buildSmsBody(params: { eventType: NotificationEventType; payload: Notif
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.ReceiptConfirmed' }>;
       return `Buyer confirmed receipt for "${p.listingTitle}". Transaction complete. ${p.orderUrl}`;
     }
+    case 'Review.Request': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Review.Request' }>;
+      return `Review requested for "${p.listingTitle}". ${p.reviewUrl}`;
+    }
     case 'Order.SlaApproaching': {
       const p = payload as Extract<NotificationEventPayload, { type: 'Order.SlaApproaching' }>;
       return `Action required: "${p.listingTitle}" deadline approaching (${p.hoursRemaining}h remaining). ${p.orderUrl}`;
@@ -261,6 +265,19 @@ function buildEmailJobPayload(params: {
           listingTitle: p.listingTitle,
           listingUrl: p.listingUrl,
           finalBidAmount: p.finalBidAmount,
+        },
+      };
+    }
+    case 'Review.Request': {
+      const p = payload as Extract<NotificationEventPayload, { type: 'Review.Request' }>;
+      return {
+        template: 'review_request',
+        templatePayload: {
+          userName: recipientName,
+          sellerDisplayName: p.sellerDisplayName,
+          listingTitle: p.listingTitle,
+          orderId: p.orderId,
+          reviewUrl: p.reviewUrl,
         },
       };
     }

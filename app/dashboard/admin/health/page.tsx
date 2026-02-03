@@ -17,8 +17,9 @@ import { DashboardContentSkeleton } from '@/components/skeletons/DashboardConten
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Copy, ExternalLink, Shield } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Copy, ExternalLink, Shield, ChevronDown, FileText, Zap } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 type HealthStatus = 'OK' | 'WARN' | 'FAIL' | 'DEV';
 type HealthCheck = {
@@ -103,6 +104,10 @@ export default function OpsHealthPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | HealthStatus>('all');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [auditLogs, setAuditLogs] = useState<{ actorUid: string; actionType: string; orderId: string | null; listingId: string | null; targetUserId: string | null; createdAt: string | null }[]>([]);
+  const [stripeEvents, setStripeEvents] = useState<{ eventId: string; type: string; status: string; createdAt: string | null; errorMessage: string | null }[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [loadingStripe, setLoadingStripe] = useState(false);
 
   const loadHealthData = useCallback(async () => {
     if (!user?.uid) return;
@@ -128,6 +133,34 @@ export default function OpsHealthPage() {
       void loadHealthData();
     }
   }, [adminLoading, isAdmin, user, loadHealthData]);
+
+  const loadAuditAndStripe = useCallback(async () => {
+    if (!user?.uid || !isAdmin) return;
+    setLoadingAudit(true);
+    setLoadingStripe(true);
+    try {
+      const token = await user.getIdToken();
+      const [auditRes, stripeRes] = await Promise.all([
+        fetch('/api/admin/audit-logs', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/stripe-events', { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const auditJson = await auditRes.json().catch(() => null);
+      const stripeJson = await stripeRes.json().catch(() => null);
+      if (auditJson?.ok && Array.isArray(auditJson.logs)) setAuditLogs(auditJson.logs);
+      if (stripeJson?.ok && Array.isArray(stripeJson.events)) setStripeEvents(stripeJson.events);
+    } catch (_) {
+      // ignore
+    } finally {
+      setLoadingAudit(false);
+      setLoadingStripe(false);
+    }
+  }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin && user) {
+      void loadAuditAndStripe();
+    }
+  }, [adminLoading, isAdmin, user, loadAuditAndStripe]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -493,6 +526,99 @@ export default function OpsHealthPage() {
               ))
             )}
           </div>
+
+          <Collapsible defaultOpen className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card overflow-hidden">
+            <CollapsibleTrigger className="w-full flex items-center justify-between px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4 hover:bg-muted/30 transition-colors">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-base md:text-lg">Recent Audit Activity</CardTitle>
+              </div>
+              <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="px-3 sm:px-6 pb-4 md:pb-6 pt-0">
+                <CardDescription className="text-xs md:text-sm mb-3">Latest 20 audit log entries. Links open order, user dossier, or listing.</CardDescription>
+                {loadingAudit ? (
+                  <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : auditLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">No audit logs yet.</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-border/60">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border/60 bg-muted/30">
+                          <th className="text-left p-2 font-semibold">Actor</th>
+                          <th className="text-left p-2 font-semibold">Action</th>
+                          <th className="text-left p-2 font-semibold">Target</th>
+                          <th className="text-left p-2 font-semibold">When</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditLogs.map((log, i) => (
+                          <tr key={i} className="border-b border-border/40 last:border-0">
+                            <td className="p-2 font-mono text-xs">{String(log.actorUid).slice(0, 12)}…</td>
+                            <td className="p-2">{log.actionType}</td>
+                            <td className="p-2">
+                              {log.orderId && <Link href={`/dashboard/admin/ops?orderId=${log.orderId}`} className="text-primary hover:underline text-xs">Order</Link>}
+                              {log.listingId && <Link href={`/dashboard/admin/listings`} className="text-primary hover:underline text-xs ml-1">Listing</Link>}
+                              {log.targetUserId && <Link href={`/dashboard/admin/users/${log.targetUserId}`} className="text-primary hover:underline text-xs ml-1">User</Link>}
+                              {!log.orderId && !log.listingId && !log.targetUserId && '—'}
+                            </td>
+                            <td className="p-2 text-muted-foreground text-xs">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Collapsible defaultOpen className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card overflow-hidden">
+            <CollapsibleTrigger className="w-full flex items-center justify-between px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4 hover:bg-muted/30 transition-colors">
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-base md:text-lg">Stripe Webhook Events</CardTitle>
+              </div>
+              <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="px-3 sm:px-6 pb-4 md:pb-6 pt-0">
+                <CardDescription className="text-xs md:text-sm mb-3">Latest 50 webhook events. status=processed | failed.</CardDescription>
+                {loadingStripe ? (
+                  <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : stripeEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">No Stripe events yet.</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-border/60">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border/60 bg-muted/30">
+                          <th className="text-left p-2 font-semibold">Event ID</th>
+                          <th className="text-left p-2 font-semibold">Type</th>
+                          <th className="text-left p-2 font-semibold">Status</th>
+                          <th className="text-left p-2 font-semibold">When</th>
+                          <th className="text-left p-2 font-semibold">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stripeEvents.map((ev, i) => (
+                          <tr key={i} className="border-b border-border/40 last:border-0">
+                            <td className="p-2 font-mono text-xs max-w-[120px] truncate" title={ev.eventId}>{ev.eventId}</td>
+                            <td className="p-2">{ev.type}</td>
+                            <td className="p-2"><Badge variant={ev.status === 'failed' ? 'destructive' : 'secondary'} className="text-xs">{ev.status}</Badge></td>
+                            <td className="p-2 text-muted-foreground text-xs">{ev.createdAt ? new Date(ev.createdAt).toLocaleString() : '—'}</td>
+                            <td className="p-2 text-xs text-muted-foreground max-w-[180px] truncate" title={ev.errorMessage || ''}>{ev.errorMessage ? String(ev.errorMessage).slice(0, 60) + (String(ev.errorMessage).length > 60 ? '…' : '') : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
 
           <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:bg-card">
             <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">

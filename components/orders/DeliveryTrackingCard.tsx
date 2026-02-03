@@ -175,7 +175,7 @@ export function DeliveryTrackingCard({
                       <>Last updated {lastUpdatedSeconds ?? 0}s ago</>
                     )
                   ) : (
-                    <span>Waiting for driver&apos;s location… The seller must have the order page open while delivering.</span>
+                    <span>Waiting for driver&apos;s location… The seller must keep this order page open in their browser (same tab) during delivery. If they have, try refreshing.</span>
                   )}
                 </div>
               </>
@@ -225,7 +225,7 @@ export function DeliveryTrackingCard({
                   </div>
                   <Switch
                     id="live-tracking-toggle"
-                    checked={false}
+                    checked={permissionRequesting || processing === 'start'}
                     disabled={!!processing || permissionRequesting}
                     onCheckedChange={async (checked) => {
                       if (checked) await requestPermissionAndStart();
@@ -233,7 +233,9 @@ export function DeliveryTrackingCard({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Turn on to start — you&apos;ll be prompted to allow location access.
+                  {permissionRequesting || processing === 'start'
+                    ? 'Starting… keep this page open and allow location when prompted.'
+                    : 'Turn on to start — you&apos;ll be prompted to allow location access.'}
                 </p>
               </div>
             )}
@@ -260,40 +262,25 @@ export function DeliveryTrackingCard({
                     }}
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px] touch-manipulation w-full sm:w-auto"
-                    disabled={!!processing}
-                    onClick={async () => {
-                      try {
-                        await onStopTracking();
-                      } catch {
-                        // caller toasts
-                      }
-                    }}
-                  >
-                    {processing === 'stop' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    Stop tracking
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="min-h-[44px] touch-manipulation w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"
-                    disabled={!!processing}
-                    onClick={async () => {
-                      try {
-                        await onMarkDelivered();
-                      } catch {
-                        // caller toasts
-                      }
-                    }}
-                  >
-                    {processing === 'delivered' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    Mark delivered
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-h-[44px] touch-manipulation w-full sm:w-auto"
+                  disabled={!!processing}
+                  onClick={async () => {
+                    try {
+                      await onStopTracking();
+                    } catch {
+                      // caller toasts
+                    }
+                  }}
+                >
+                  {processing === 'stop' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Stop tracking
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  To complete delivery, use the delivery checklist at handoff (PIN, signature, photo).
+                </p>
               </div>
             )}
           </>

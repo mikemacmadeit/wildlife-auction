@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { cn } from '@/lib/utils';
-import { Loader2, ArrowLeft, CheckCircle2, MapPin, Sparkles, ShieldCheck, Store, TrendingUp, MessageSquare } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, MapPin, Sparkles, ShieldCheck, Store, TrendingUp, MessageSquare, Star } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { getPublicSellerTrust, getUserProfile } from '@/lib/firebase/users';
 import type { PublicSellerTrust, UserProfile } from '@/lib/types';
@@ -49,6 +49,10 @@ export default function SellerProfilePage() {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [creatingMessage, setCreatingMessage] = useState(false);
+  const [reviewStats, setReviewStats] = useState<any | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
 
   const fromParam = useMemo(() => {
     const raw = searchParams?.get('from');
@@ -173,6 +177,31 @@ export default function SellerProfilePage() {
       cancelled = true;
     };
   }, [authLoading, sellerId, user]);
+
+  // Reviews (public)
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    setReviewsLoading(true);
+    setReviewsError(null);
+    fetch(`/api/reviews/seller?sellerId=${sellerId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (!data?.ok) throw new Error(data?.error || 'Failed to load reviews');
+        setReviewStats(data.stats || null);
+        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+      })
+      .catch((e: any) => {
+        if (!cancelled) setReviewsError(e?.message || 'Failed to load reviews');
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
 
   if (authLoading || loading) {
     return <DashboardContentSkeleton />;
@@ -518,6 +547,64 @@ export default function SellerProfilePage() {
                   )}
                 </TabsContent>
               </Tabs>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Reviews */}
+        <Card id="seller-reviews" className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl font-extrabold">Buyer Reviews</CardTitle>
+            <CardDescription>Verified reviews from completed orders.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {reviewsLoading ? (
+              <div className="py-10 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : reviewsError ? (
+              <div className="py-10 text-center">
+                <div className="font-semibold text-destructive">Couldn’t load reviews</div>
+                <div className="text-sm text-muted-foreground mt-1">{reviewsError}</div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="inline-flex items-center gap-1 text-base font-extrabold">
+                    <Star className="h-5 w-5 text-amber-500" />
+                    {reviewStats?.avgRating ? reviewStats.avgRating.toFixed(1) : '—'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {reviewStats?.reviewCount || 0} review{reviewStats?.reviewCount === 1 ? '' : 's'}
+                  </div>
+                </div>
+
+                {reviews.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-8 text-center">
+                    <div className="font-semibold">No reviews yet</div>
+                    <div className="text-sm text-muted-foreground mt-1">Reviews appear after completed purchases.</div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {reviews.map((r) => (
+                      <div key={r.orderId} className="rounded-xl border border-border/60 p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <Star key={n} className={n <= (r.rating || 0) ? 'h-4 w-4 text-amber-500' : 'h-4 w-4 text-muted-foreground'} />
+                            ))}
+                          </div>
+                          <span className="text-xs text-muted-foreground">Verified purchase</span>
+                        </div>
+                        {r.text ? <div className="mt-2 text-sm">{r.text}</div> : null}
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>

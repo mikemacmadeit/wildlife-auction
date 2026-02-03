@@ -101,6 +101,25 @@ export async function GET(request: Request, ctx: { params: { userId: string } })
         };
       }) || [];
 
+    const reviewsSnap = await db
+      .collection('reviews')
+      .where('sellerId', '==', targetUid)
+      .orderBy('createdAt', 'desc')
+      .limit(20)
+      .get();
+    const reviews = reviewsSnap.docs.map((d) => {
+      const data = d.data() as any;
+      return {
+        orderId: d.id,
+        rating: data.rating || null,
+        text: data.text || null,
+        status: data.status || 'published',
+        createdAt: tsToIso(data.createdAt),
+        moderatedAt: tsToIso(data.moderatedAt),
+        moderationReason: data.moderationReason || null,
+      };
+    });
+
     return json({
       ok: true,
       authUser: authRec
@@ -120,6 +139,7 @@ export async function GET(request: Request, ctx: { params: { userId: string } })
       summary,
       notes,
       audits,
+      reviews,
     });
   } catch (e: any) {
     return json({ ok: false, error: 'Failed to load dossier', message: e?.message || String(e) }, { status: 500 });

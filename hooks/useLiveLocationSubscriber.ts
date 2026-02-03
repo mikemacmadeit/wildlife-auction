@@ -57,7 +57,11 @@ export function useLiveLocationSubscriber(orderId: string | null, enabled: boole
       (err: Error) => {
         setLocation(null);
         const msg = err?.message ?? String(err);
-        setError(msg.includes('permission') ? 'Unable to load live location. The seller must keep the order page open while delivering.' : msg);
+        setError(
+          msg.includes('permission')
+            ? "Live tracking can't load. The seller must keep the order page open during delivery. If they have, try refreshing. If it persists, contact support — tracking may need to be set up for this site."
+            : msg
+        );
       }
     );
 

@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, ArrowLeft, Truck, Package, Calendar, MapPin, Clock, CheckCircle2, ClipboardList } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Truck, Calendar, MapPin, Clock, CheckCircle2, ClipboardList } from 'lucide-react';
 import type { ComplianceDocument, Listing, Order, TransactionStatus } from '@/lib/types';
 import { getOrderById, subscribeToOrder } from '@/lib/firebase/orders';
 import { getListingById } from '@/lib/firebase/listings';
@@ -79,9 +79,7 @@ export default function SellerOrderDetailPage() {
   const [deliveryWindows, setDeliveryWindows] = useState<Array<{ start: string; end: string }>>([{ start: '', end: '' }]);
   const [deliveryProposalNotes, setDeliveryProposalNotes] = useState('');
   const [markOutForDeliveryOpen, setMarkOutForDeliveryOpen] = useState(false);
-  const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [deliveryChecklistOpen, setDeliveryChecklistOpen] = useState(false);
-  const [hasDeliveryProof, setHasDeliveryProof] = useState(false);
   const [trackingProcessing, setTrackingProcessing] = useState<'start' | 'stop' | 'delivered' | null>(null);
   const loadOrder = useCallback(async () => {
     if (!user?.uid || !orderId) return;
@@ -114,11 +112,6 @@ export default function SellerOrderDetailPage() {
     });
     return () => unsub();
   }, [orderId, user?.uid]);
-
-  useEffect(() => {
-    if (!markDeliveredOpen || !order?.id) return;
-    getDocuments('order', order.id, 'DELIVERY_PROOF').then((docs) => setHasDeliveryProof(docs.length > 0));
-  }, [markDeliveredOpen, order?.id]);
 
   const issueState = useMemo(() => (order ? getOrderIssueState(order) : 'none'), [order]);
   const trustState = useMemo(() => (order ? getOrderTrustState(order) : null), [order]);
@@ -467,7 +460,7 @@ export default function SellerOrderDetailPage() {
                   />
                   {needsMarkOut && (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-                      <span className="text-sm text-muted-foreground">Or mark out without live tracking:</span>
+                      <span className="text-sm text-muted-foreground">Can&apos;t use live tracking? Mark out to notify the buyer you&apos;re on the way — complete the checklist at handoff.</span>
                       <Button
                         variant="outline"
                         size="sm"
@@ -510,16 +503,10 @@ export default function SellerOrderDetailPage() {
             }
             if (milestone.key === 'delivered' && milestone.isCurrent && getEffectiveTransactionStatus(o) === 'OUT_FOR_DELIVERY') {
               return (
-                <div id="mark-delivered" className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5 scroll-mt-24">
-                  <p className="text-sm text-muted-foreground leading-relaxed">Upload a photo of the animal at delivery, then mark as delivered.</p>
-                  <Button
-                    className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                    disabled={!!processing}
-                    onClick={() => setMarkDeliveredOpen(true)}
-                  >
-                    <Package className="h-4 w-4 mr-2" />
-                    Mark delivered
-                  </Button>
+                <div id="mark-delivered" className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Complete the delivery checklist at handoff. Recipient enters PIN, signs, and you take a photo — use <strong>Open delivery checklist</strong> above. No shortcut to mark delivered.
+                  </p>
                 </div>
               );
             }
@@ -690,7 +677,7 @@ export default function SellerOrderDetailPage() {
                     </div>
                   ))}
                   <Button type="button" variant="outline" size="sm" onClick={() => setDeliveryWindows([...deliveryWindows, { start: '', end: '' }])}>
-                    Add window
+                    Add additional delivery window
                   </Button>
                 </div>
               </div>
@@ -765,67 +752,6 @@ export default function SellerOrderDetailPage() {
               >
                 {processing !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Mark Out for Delivery
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Mark Delivered Dialog — requires delivery photo before marking delivered */}
-        <Dialog
-          open={markDeliveredOpen}
-          onOpenChange={(open) => {
-            setMarkDeliveredOpen(open);
-            if (!open) setHasDeliveryProof(false);
-          }}
-        >
-          <DialogContent className="flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Mark delivered</DialogTitle>
-              <DialogDescription>
-                Upload a photo of the animal delivered. This is required before you can mark the order as delivered.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
-              <div>
-                <Label className="text-sm">Delivery photo (required)</Label>
-                <p className="text-xs text-muted-foreground mb-2">Photo of the animal at delivery.</p>
-                {order && (
-                  <DocumentUpload
-                    entityType="order"
-                    entityId={order.id}
-                    documentType="DELIVERY_PROOF"
-                    onUploadComplete={() => setHasDeliveryProof(true)}
-                    required
-                    uploadTrigger
-                  />
-                )}
-              </div>
-            </div>
-            <DialogFooter className="border-t pt-3">
-              <Button variant="outline" onClick={() => { setMarkDeliveredOpen(false); setHasDeliveryProof(false); }}>
-                Cancel
-              </Button>
-              <Button
-                disabled={!hasDeliveryProof || processing === 'delivered'}
-                onClick={async () => {
-                  if (!order?.id) return;
-                  try {
-                    setProcessing('delivered');
-                    await postAuthJson(`/api/orders/${order.id}/mark-delivered`, {});
-                    toast({ title: 'Success', description: 'Order marked as delivered. Buyer can confirm receipt.' });
-                    setMarkDeliveredOpen(false);
-                    setHasDeliveryProof(false);
-                    const refreshed = await getOrderById(order.id);
-                    if (refreshed) setOrder(refreshed);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to mark delivered'), variant: 'destructive' });
-                  } finally {
-                    setProcessing(null);
-                  }
-                }}
-              >
-                {processing === 'delivered' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Mark delivered
               </Button>
             </DialogFooter>
           </DialogContent>

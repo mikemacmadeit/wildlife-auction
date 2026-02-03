@@ -185,13 +185,60 @@ export default function DeliveryDriverPage() {
     }
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /** Compress image for upload — mobile cameras often produce huge files that exceed server limits. */
+  const compressImageForUpload = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 1200;
+          const quality = 0.85;
+          let { width, height } = img;
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            } else {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          try {
+            const out = canvas.toDataURL('image/jpeg', quality);
+            resolve(out);
+          } catch {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = () => reject(new Error('Could not load image'));
+        img.src = dataUrl;
+      };
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => setPhotoDataUrl(reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = '';
+    try {
+      const compressed = await compressImageForUpload(file);
+      setPhotoDataUrl(compressed);
+    } catch {
+      setError('Could not process photo. Try a different image.');
+    }
   };
 
   const handleSubmit = async () => {

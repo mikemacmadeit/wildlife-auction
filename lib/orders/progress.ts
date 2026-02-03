@@ -375,10 +375,10 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
     }
     if (txStatus === 'OUT_FOR_DELIVERY') {
       return {
-        title: 'Mark delivered',
-        description: 'Mark the order as delivered once it arrives.',
-        ctaLabel: ORDER_COPY.actions.markDelivered,
-        ctaAction: `/seller/orders/${order.id}#mark-delivered`,
+        title: 'Complete delivery checklist',
+        description: 'Open the checklist at handoff — recipient enters PIN, signs, you take a photo.',
+        ctaLabel: 'Open checklist',
+        ctaAction: `/seller/orders/${order.id}`,
         severity: 'info',
         ownerRole: 'seller',
       };

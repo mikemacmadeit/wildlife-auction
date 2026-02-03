@@ -25,6 +25,7 @@ type Dossier = {
   summary: any | null;
   notes: Array<{ id: string; note: string; createdAt: string | null; createdBy: string }>;
   audits: Array<{ auditId: string; actionType: string; actorUid: string; actorRole: string; createdAt: string | null; beforeState: any; afterState: any; metadata: any }>;
+  reviews: Array<{ orderId: string; rating: number | null; text: string | null; status: string; createdAt: string | null; moderatedAt: string | null; moderationReason: string | null }>;
 };
 
 function statusBadge(status: string | null | undefined, authDisabled?: boolean) {
@@ -515,6 +516,33 @@ export default function AdminUserDossierPage() {
                         {(a.metadata as { reason?: string })?.reason && (
                           <div className="text-xs text-foreground mt-1.5 border-l-2 border-muted-foreground/30 pl-2">Reason: {(a.metadata as { reason: string }).reason}</div>
                         )}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl border border-border/60 bg-muted/30 dark:bg-muted/20 md:border-2 md:border-border/50 md:bg-card">
+                <CardHeader className="px-3 sm:px-6 pt-4 pb-2 md:pt-6 md:pb-4">
+                  <CardTitle className="text-base md:text-lg">Seller reviews</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Recent reviews about this seller.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 sm:px-6 pb-4 md:pb-6">
+                  {(data.reviews || []).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-6 rounded-lg border border-dashed border-border bg-muted/10 text-center">
+                      <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">No reviews found.</p>
+                    </div>
+                  ) : (
+                    data.reviews.map((r) => (
+                      <div key={r.orderId} className="rounded-lg border bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="font-semibold text-sm">Order {r.orderId}</div>
+                          <div className="text-xs text-muted-foreground">{r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</div>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Rating: {r.rating ?? '—'} • Status: {r.status}</div>
+                        {r.text ? <div className="text-sm mt-1 whitespace-pre-wrap">{r.text}</div> : null}
+                        {r.moderationReason ? <div className="text-xs text-muted-foreground mt-1">Reason: {r.moderationReason}</div> : null}
                       </div>
                     ))
                   )}

@@ -322,13 +322,31 @@ const baseHandler: Handler = async () => {
 
     if (scanned === 0) {
       logInfo('expireOffers: nothing to expire', { requestId, scanned, expired, ms: Date.now() - startedAt });
+      try {
+        await db.collection('opsHealth').doc('expireOffers').set(
+          { lastRunAt: Timestamp.now(), status: 'success', scannedCount: 0, processedCount: 0, updatedAt: Timestamp.now() },
+          { merge: true }
+        );
+      } catch (_) {}
       return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, expired }) };
     }
 
     logInfo('expireOffers: completed', { requestId, scanned, expired, ms: Date.now() - startedAt });
+    try {
+      await db.collection('opsHealth').doc('expireOffers').set(
+        { lastRunAt: Timestamp.now(), status: 'success', scannedCount: scanned, processedCount: expired, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, expired }) };
   } catch (error: any) {
     logError('expireOffers failed', error, { requestId, scanned, expired });
+    try {
+      await db.collection('opsHealth').doc('expireOffers').set(
+        { lastRunAt: Timestamp.now(), status: 'error', lastError: error?.message || 'Unknown error', updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: error?.message || 'Unknown error' }) };
   }
 };

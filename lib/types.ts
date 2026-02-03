@@ -1194,6 +1194,8 @@ export interface UserProfile {
   sellerStats?: {
     followersCount?: number;
   };
+  // Seller review aggregates (server-authored).
+  sellerReviewStats?: SellerReviewStats;
 
   // Legal acceptance (server-authored)
   legal?: {
@@ -1234,6 +1236,35 @@ export interface SavedSellerDoc {
   ratingCount: number;
   positivePercent: number;
   itemsSold: number;
+}
+
+// ============================================
+// REVIEWS (BUYER VERIFIED)
+// ============================================
+export type ReviewStatus = 'published' | 'hidden' | 'flagged';
+
+export interface ReviewDoc {
+  orderId: string;
+  listingId: string;
+  buyerId: string;
+  sellerId: string;
+  rating: number; // 1-5
+  text?: string | null;
+  tags?: string[] | null;
+  status: ReviewStatus;
+  verified: boolean;
+  createdAt: Date;
+  updatedAt?: Date;
+  moderatedAt?: Date | null;
+  moderatedBy?: string | null;
+  moderationReason?: string | null;
+}
+
+export interface SellerReviewStats {
+  reviewCount: number;
+  avgRating: number;
+  ratingBuckets: Record<'1' | '2' | '3' | '4' | '5', number>;
+  lastReviewAt?: Date | null;
 }
 
 // ============================================

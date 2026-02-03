@@ -187,6 +187,15 @@ export const notificationEventPayloadSchema: z.ZodType<NotificationEventPayload>
     delivered: z.boolean().optional(),
   }),
   z.object({
+    type: z.literal('Review.Request'),
+    orderId: baseString,
+    listingId: baseString,
+    listingTitle: baseString,
+    sellerId: baseString,
+    sellerDisplayName: baseString,
+    reviewUrl: urlSchema,
+  }),
+  z.object({
     type: z.literal('Payout.Released'),
     orderId: baseString,
     listingId: baseString,

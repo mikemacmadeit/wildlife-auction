@@ -44,6 +44,12 @@ const baseHandler: Handler = async () => {
 
     scanned = snap.size;
     if (snap.empty) {
+      try {
+        await db.collection('opsHealth').doc('clearExpiredPurchaseReservations').set(
+          { lastRunAt: nowTs, status: 'success', scannedCount: 0, processedCount: 0, errorsCount: 0, updatedAt: nowTs },
+          { merge: true }
+        );
+      } catch (_) {}
       return { statusCode: 200, body: JSON.stringify({ ok: true, scanned, cleared, noops, errors }) };
     }
 
@@ -238,6 +244,12 @@ const baseHandler: Handler = async () => {
     }
 
     logInfo('clearExpiredPurchaseReservations: completed', { requestId, route: 'clearExpiredPurchaseReservations', scanned, cleared, noops, errors });
+    try {
+      await db.collection('opsHealth').doc('clearExpiredPurchaseReservations').set(
+        { lastRunAt: Timestamp.now(), status: 'success', scannedCount: scanned, processedCount: cleared, errorsCount: errors, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return {
       statusCode: 200,
       body: JSON.stringify({ ok: true, scanned, cleared, scannedOrders, clearedOrders, noops, errors }),
@@ -253,9 +265,21 @@ const baseHandler: Handler = async () => {
         code,
         message: msg,
       });
+      try {
+        await db.collection('opsHealth').doc('clearExpiredPurchaseReservations').set(
+          { lastRunAt: Timestamp.now(), status: 'error', lastError: msg || 'Missing index', updatedAt: Timestamp.now() },
+          { merge: true }
+        );
+      } catch (_) {}
       return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: true, reason: 'MISSING_INDEX' }) };
     }
     logError('clearExpiredPurchaseReservations: fatal error', e, { requestId, route: 'clearExpiredPurchaseReservations' });
+    try {
+      await db.collection('opsHealth').doc('clearExpiredPurchaseReservations').set(
+        { lastRunAt: Timestamp.now(), status: 'error', lastError: msg || 'Unknown error', updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: msg || 'Unknown error' }) };
   }
 };

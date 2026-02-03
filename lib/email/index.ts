@@ -28,6 +28,7 @@ import {
   getWeeklyDigestEmail,
   getSavedSearchAlertEmail,
   getMessageReceivedEmail,
+  getReviewRequestEmail,
   getVerifyEmailEmail,
   getOfferSubmittedEmail,
   getOfferAcceptedEmail,
@@ -68,6 +69,7 @@ import {
   type WeeklyDigestEmailData,
   type SavedSearchAlertEmailData,
   type MessageReceivedEmailData,
+  type ReviewRequestEmailData,
   type VerifyEmailEmailData,
   type OfferSubmittedEmailData,
   type OfferAcceptedEmailData,
@@ -275,6 +277,14 @@ const messageReceivedSchema = z.object({
   listingUrl: urlSchema,
   senderRole: z.enum(['buyer', 'seller']),
   preview: z.string().optional(),
+});
+
+const reviewRequestSchema = z.object({
+  userName: z.string().min(1),
+  sellerDisplayName: z.string().min(1),
+  listingTitle: z.string().min(1),
+  orderId: z.string().min(1),
+  reviewUrl: urlSchema,
 });
 
 const verifyEmailSchema = z.object({
@@ -741,6 +751,23 @@ export const EMAIL_EVENT_REGISTRY = [
     render: (data: MessageReceivedEmailData) => {
       const { subject, html } = getMessageReceivedEmail(data);
       return { subject, preheader: `New message — ${data.listingTitle}`, html };
+    },
+  },
+  {
+    type: 'review_request',
+    displayName: 'Review: Request',
+    description: 'Sent to buyers after an order completes to request a review.',
+    schema: reviewRequestSchema,
+    samplePayload: {
+      userName: 'Alex',
+      sellerDisplayName: 'Double 7 Ranch',
+      listingTitle: 'Axis Doe (Breeder Stock)',
+      orderId: 'ORD_123456',
+      reviewUrl: 'https://agchange.app/dashboard/orders/ORD_123456?review=1',
+    },
+    render: (data: ReviewRequestEmailData) => {
+      const { subject, html } = getReviewRequestEmail(data);
+      return { subject, preheader: `Leave a review`, html };
     },
   },
   {

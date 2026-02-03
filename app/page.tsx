@@ -31,6 +31,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
 import { toast as globalToast } from '@/hooks/use-toast';
 import { getUserProfile } from '@/lib/firebase/users';
+import { subscribeToUnreadCountByType } from '@/lib/firebase/notifications';
 import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION } from '@/components/browse/filters/constants';
 
 function toDateSafe(v: any): Date | null {
@@ -184,6 +185,7 @@ export default function HomePage() {
   const [messagingSellerId, setMessagingSellerId] = useState<string | null>(null);
   const [newFromSavedSellers, setNewFromSavedSellers] = useState<Listing[]>([]);
   const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   // Keep a ref in sync so effects can read the latest cache without depending on it.
   useEffect(() => {
@@ -862,6 +864,18 @@ export default function HomePage() {
   // Use the current user if available, otherwise fall back to last known user during loading
   const effectiveUser = user || (authLoading ? lastUserRef.current : null);
   
+  // Subscribe to unread message count (message_received notifications) for Messages button badge
+  useEffect(() => {
+    if (!effectiveUser?.uid) {
+      setUnreadMessageCount(0);
+      return;
+    }
+    const unsub = subscribeToUnreadCountByType(effectiveUser.uid, 'message_received', (count) => {
+      setUnreadMessageCount(count || 0);
+    });
+    return () => unsub();
+  }, [effectiveUser?.uid]);
+
   // Fetch user profile to get displayNamePreference and businessName
   useEffect(() => {
     if (!effectiveUser?.uid) {
@@ -1050,9 +1064,19 @@ export default function HomePage() {
                         <span className="truncate">Watchlist</span>
                       </Link>
                     </Button>
-                    <Button asChild variant="secondary" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold border-2 border-border/80 hover:border-primary/40 hover:bg-primary/5">
+                    <Button asChild variant="secondary" size="lg" className="min-h-[44px] flex-1 min-w-0 px-2 sm:px-4 md:px-5 text-sm sm:text-base font-semibold border-2 border-border/80 hover:border-primary/40 hover:bg-primary/5 relative">
                       <Link href="/dashboard/messages" className="flex items-center justify-center gap-1.5 sm:gap-2">
-                        <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                        <span className="relative inline-flex">
+                          <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                          {unreadMessageCount > 0 && (
+                            <span
+                              className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground"
+                              aria-label={`${unreadMessageCount} new message${unreadMessageCount !== 1 ? 's' : ''}`}
+                            >
+                              {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                            </span>
+                          )}
+                        </span>
                         <span className="truncate">Messages</span>
                       </Link>
                     </Button>

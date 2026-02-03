@@ -14,6 +14,7 @@ import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { createAuditLog } from '@/lib/audit/logger';
+import { enqueueReviewRequest } from '@/lib/reviews/reviewRequest';
 import { assertInt32 } from '@/lib/debug/int32Tripwire';
 import { isRegulatedWhitetailDeal, hasComplianceConfirmations } from '@/lib/compliance/whitetail';
 
@@ -289,6 +290,13 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
               })(),
             },
           });
+
+          // Enqueue review request for buyer (idempotent).
+          try {
+            await enqueueReviewRequest({ db: db as any, orderId: order.id, order });
+          } catch {
+            /* best-effort */
+          }
           
           processed++;
           continue;
@@ -499,10 +507,22 @@ export async function checkFulfillmentReminders(): Promise<{ processed: number; 
         errors++;
       }
     }
-    
+
+    try {
+      await db.collection('opsHealth').doc('checkFulfillmentReminders').set(
+        { lastRunAt: Timestamp.now(), status: 'success', processedCount: processed, errorsCount: errors, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     return { processed, errors };
   } catch (error: any) {
     console.error('Error in checkFulfillmentReminders:', error);
+    try {
+      await db.collection('opsHealth').doc('checkFulfillmentReminders').set(
+        { lastRunAt: Timestamp.now(), status: 'error', lastError: error?.message || 'Unknown error', updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    } catch (_) {}
     throw error;
   }
 }

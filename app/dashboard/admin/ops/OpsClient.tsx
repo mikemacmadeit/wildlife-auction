@@ -53,6 +53,7 @@ import {
   Users,
   Calendar,
   FileText,
+  Mail,
   CreditCard,
   ArrowRight,
   TrendingUp,
@@ -70,6 +71,7 @@ import { processRefund, resolveDispute, confirmDelivery, adminMarkOrderPaid } fr
 import { TransactionTimeline } from '@/components/orders/TransactionTimeline';
 import { useDebounce } from '@/hooks/use-debounce';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 // DEPRECATED: hold-reasons.ts - sellers paid immediately, no payout holds
@@ -81,6 +83,7 @@ import { getNextRequiredAction, getUXBadge } from '@/lib/orders/progress';
 import { isStripeTestModeClient } from '@/lib/stripe/mode';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 import { AIDisputeSummary } from '@/components/admin/AIDisputeSummary';
+import { DeliveryProofTimelineBlock } from '@/components/delivery/DeliveryProofTimelineBlock';
 
 interface OrderWithDetails extends Order {
   listingTitle?: string;
@@ -99,8 +102,9 @@ interface OrderWithDetails extends Order {
 type FulfillmentLane = 'overdue' | 'needs_action' | 'disputes' | 'completed';
 
 export default function OpsClient() {
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { isAdmin, isSuperAdmin, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [activeLane, setActiveLane] = useState<FulfillmentLane>('needs_action');
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
@@ -132,11 +136,68 @@ export default function OpsClient() {
   const [bulkReminderDialogOpen, setBulkReminderDialogOpen] = useState(false);
   const [bulkReminderRole, setBulkReminderRole] = useState<'buyer' | 'seller'>('seller');
   const [bulkReminderMessage, setBulkReminderMessage] = useState('');
+  const [orderAuditLogs, setOrderAuditLogs] = useState<{ actorUid: string; actionType: string; createdAt: string | null; beforeState: any; afterState: any }[]>([]);
+  const [loadingOrderAudit, setLoadingOrderAudit] = useState(false);
+  const [orderReview, setOrderReview] = useState<any | null>(null);
+  const [loadingOrderReview, setLoadingOrderReview] = useState(false);
 
   const handleViewOrder = useCallback((order: OrderWithDetails) => {
     setSelectedOrder(order);
     setDetailDialogOpen(true);
   }, []);
+
+  const orderIdFromUrl = searchParams?.get('orderId') || null;
+
+  useEffect(() => {
+    if (!detailDialogOpen || !selectedOrder?.id || !user?.uid) {
+      setOrderAuditLogs([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingOrderAudit(true);
+    user.getIdToken().then((token) => {
+      return fetch(`/api/admin/orders/${selectedOrder.id}/audit`, { headers: { Authorization: `Bearer ${token}` } });
+    }).then((res) => res.json()).then((json) => {
+      if (cancelled) return;
+      if (json?.ok && Array.isArray(json.logs)) setOrderAuditLogs(json.logs);
+      else setOrderAuditLogs([]);
+    }).catch(() => {
+      if (!cancelled) setOrderAuditLogs([]);
+    }).finally(() => {
+      if (!cancelled) setLoadingOrderAudit(false);
+    });
+    return () => { cancelled = true; };
+  }, [detailDialogOpen, selectedOrder?.id, user?.uid]);
+
+  useEffect(() => {
+    if (!detailDialogOpen || !selectedOrder?.id || !user?.uid) {
+      setOrderReview(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingOrderReview(true);
+    user.getIdToken().then((token) => {
+      return fetch(`/api/admin/reviews/${selectedOrder.id}`, { headers: { Authorization: `Bearer ${token}` } });
+    }).then((res) => res.json()).then((json) => {
+      if (cancelled) return;
+      if (json?.ok) setOrderReview(json.review || null);
+      else setOrderReview(null);
+    }).catch(() => {
+      if (!cancelled) setOrderReview(null);
+    }).finally(() => {
+      if (!cancelled) setLoadingOrderReview(false);
+    });
+    return () => { cancelled = true; };
+  }, [detailDialogOpen, selectedOrder?.id, user?.uid]);
+
+  useEffect(() => {
+    if (!orderIdFromUrl || !user?.uid || !isAdmin || orders.length === 0) return;
+    const order = orders.find((o) => o.id === orderIdFromUrl);
+    if (order) {
+      setSelectedOrder(order);
+      setDetailDialogOpen(true);
+    }
+  }, [orderIdFromUrl, user?.uid, isAdmin, orders]);
 
   const loadOrders = useCallback(async () => {
     if (!user?.uid || !isAdmin) return;
@@ -1659,6 +1720,130 @@ export default function OpsClient() {
                     <TransactionTimeline order={selectedOrder} role="admin" dense />
                   </div>
                 </div>
+
+                {/* Audit Trail */}
+                <div className="p-3 rounded-lg border border-border/50 bg-muted/30">
+                  <Label className="text-sm font-semibold mb-2 block">Audit Trail</Label>
+                  {loadingOrderAudit ? (
+                    <div className="flex items-center gap-2 py-4"><Loader2 className="h-4 w-4 animate-spin" /> <span className="text-sm text-muted-foreground">Loading…</span></div>
+                  ) : orderAuditLogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">No admin/system audit entries yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                      {orderAuditLogs.map((log, i) => (
+                        <div key={i} className="rounded border border-border/40 p-2 text-xs bg-background/50">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono font-medium">{String(log.actorUid).slice(0, 12)}…</span>
+                            <Badge variant="outline" className="text-[10px]">{log.actionType}</Badge>
+                            <span className="text-muted-foreground">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</span>
+                          </div>
+                          {(log.beforeState || log.afterState) && (
+                            <details className="mt-1.5">
+                              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">before/after</summary>
+                              <pre className="mt-1 text-[10px] overflow-auto max-h-[120px] rounded bg-muted/50 p-1.5">{JSON.stringify({ before: log.beforeState, after: log.afterState }, null, 2)}</pre>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Review (if any) */}
+                <div className="p-3 rounded-lg border border-border/50 bg-muted/30">
+                  <Label className="text-sm font-semibold mb-2 block">Buyer Review</Label>
+                  {loadingOrderReview ? (
+                    <div className="flex items-center gap-2 py-4"><Loader2 className="h-4 w-4 animate-spin" /> <span className="text-sm text-muted-foreground">Loading…</span></div>
+                  ) : !orderReview ? (
+                    <p className="text-sm text-muted-foreground py-2">No review submitted yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline">{orderReview.status}</Badge>
+                        <span className="text-muted-foreground">Rating: {orderReview.rating}/5</span>
+                      </div>
+                      {orderReview.text ? <div className="text-sm">{orderReview.text}</div> : null}
+                      {orderReview.moderationReason ? (
+                        <div className="text-xs text-muted-foreground">Reason: {orderReview.moderationReason}</div>
+                      ) : null}
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            if (!selectedOrder) return;
+                            try {
+                              const token = await user?.getIdToken();
+                              const res = await fetch(`/api/admin/reviews/${selectedOrder.id}/moderate`, {
+                                method: 'POST',
+                                headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ status: 'hidden', reason: 'Hidden by admin' }),
+                              });
+                              if (!res.ok) throw new Error('Failed to hide review');
+                              setOrderReview({ ...orderReview, status: 'hidden', moderationReason: 'Hidden by admin' });
+                              toast({ title: 'Review hidden' });
+                            } catch (e: any) {
+                              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to hide review'), variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Hide
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            if (!selectedOrder) return;
+                            try {
+                              const token = await user?.getIdToken();
+                              const res = await fetch(`/api/admin/reviews/${selectedOrder.id}/moderate`, {
+                                method: 'POST',
+                                headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ status: 'published', reason: null }),
+                              });
+                              if (!res.ok) throw new Error('Failed to unhide review');
+                              setOrderReview({ ...orderReview, status: 'published', moderationReason: null });
+                              toast({ title: 'Review published' });
+                            } catch (e: any) {
+                              toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to publish review'), variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Unhide
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delivery Proof */}
+                {selectedOrder && (() => {
+                  const d = selectedOrder.delivery as any;
+                  const sigUrl = d?.signatureUrl;
+                  const photoUrl = d?.deliveryPhotoUrl;
+                  const proofUrls = selectedOrder.deliveryProofUrls;
+                  const hasProof = sigUrl || photoUrl || (Array.isArray(proofUrls) && proofUrls.length > 0);
+                  const signedAt = d?.confirmedAt || d?.deliveredAt || selectedOrder.deliveredAt;
+                  if (!hasProof) return null;
+                  return (
+                    <div className="p-3 rounded-lg border border-border/50 bg-muted/30">
+                      <Label className="text-sm font-semibold mb-2 block">Delivery Proof</Label>
+                      <DeliveryProofTimelineBlock
+                        signedLabel="Recipient signed"
+                        signedAt={signedAt instanceof Date ? signedAt : signedAt ? new Date(signedAt) : new Date()}
+                        signatureUrl={sigUrl}
+                        deliveryPhotoUrl={photoUrl}
+                      />
+                      {Array.isArray(proofUrls) && proofUrls.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {proofUrls.map((url: string, j: number) => (
+                            <a key={j} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Proof {j + 1}</a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -1771,6 +1956,72 @@ export default function OpsClient() {
                       </>
                     );
                   })()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!selectedOrder) return;
+                      try {
+                        setProcessingOrderId(selectedOrder.id);
+                        const token = await user?.getIdToken();
+                        const res = await fetch(`/api/admin/orders/${selectedOrder.id}/review-request`, {
+                          method: 'POST',
+                          headers: {
+                            'content-type': 'application/json',
+                            authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ force: false }),
+                        });
+                        if (!res.ok) {
+                          const json = await res.json().catch(() => ({}));
+                          throw new Error(json?.error || 'Failed to resend review request');
+                        }
+                        toast({ title: 'Review request queued' });
+                      } catch (e: any) {
+                        toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to resend review request'), variant: 'destructive' });
+                      } finally {
+                        setProcessingOrderId(null);
+                      }
+                    }}
+                    disabled={processingOrderId !== null}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Resend review request
+                  </Button>
+                  {isSuperAdmin ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        if (!selectedOrder) return;
+                        try {
+                          setProcessingOrderId(selectedOrder.id);
+                          const token = await user?.getIdToken();
+                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}/review-request`, {
+                            method: 'POST',
+                            headers: {
+                              'content-type': 'application/json',
+                              authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ force: true }),
+                          });
+                          if (!res.ok) {
+                            const json = await res.json().catch(() => ({}));
+                            throw new Error(json?.error || 'Failed to force resend');
+                          }
+                          toast({ title: 'Review request re-sent' });
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to force resend'), variant: 'destructive' });
+                        } finally {
+                          setProcessingOrderId(null);
+                        }
+                      }}
+                      disabled={processingOrderId !== null}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Force resend review request
+                    </Button>
+                  ) : null}
                   <Button
                     variant="outline"
                     size="sm"

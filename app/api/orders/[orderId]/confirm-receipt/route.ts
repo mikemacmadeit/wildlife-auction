@@ -13,6 +13,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
 import { Timestamp } from 'firebase-admin/firestore';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
+import { enqueueReviewRequest } from '@/lib/reviews/reviewRequest';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
 import { captureException } from '@/lib/monitoring/capture';
@@ -109,6 +110,7 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       buyerConfirmedAt: now,
       acceptedAt: now, // legacy
       buyerAcceptedAt: now, // protected transaction legacy
+      completedAt: now,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
     };
@@ -178,6 +180,13 @@ export async function POST(request: Request, { params }: { params: { orderId: st
       }
     } catch (e) {
       console.warn('[confirm-receipt] Failed to emit Order.Received (best-effort)', { orderId, error: String(e) });
+    }
+
+    // Enqueue review request for buyer (idempotent).
+    try {
+      await enqueueReviewRequest({ db: db as any, orderId, order: orderData });
+    } catch {
+      // best-effort
     }
 
     return json({

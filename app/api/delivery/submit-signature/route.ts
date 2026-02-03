@@ -14,6 +14,7 @@ import { TransactionStatus } from '@/lib/types';
 import { getAdminApp, getAdminDb } from '@/lib/firebase/admin';
 import { verifyDeliveryToken } from '@/lib/delivery/tokens';
 import { appendOrderTimelineEvent } from '@/lib/orders/timeline';
+import { enqueueReviewRequest } from '@/lib/reviews/reviewRequest';
 import { emitAndProcessEventForUser } from '@/lib/notifications';
 import { getSiteUrl } from '@/lib/site-url';
 import { tryDispatchEmailJobNow } from '@/lib/email/dispatchEmailJobNow';
@@ -151,6 +152,7 @@ export async function POST(request: Request) {
       buyerConfirmedAt: now,
       acceptedAt: now,
       buyerAcceptedAt: now,
+      completedAt: now,
       updatedAt: now,
       lastUpdatedByRole: 'buyer',
       'delivery.sessionId': payload.sessionId,
@@ -169,6 +171,13 @@ export async function POST(request: Request) {
     }
     const orderUpdate = sanitizeFirestorePayload(orderUpdateBase);
     await orderRef.update(orderUpdate);
+
+    // Enqueue review request for buyer (idempotent).
+    try {
+      await enqueueReviewRequest({ db: db as any, orderId: payload.orderId, order: orderData });
+    } catch {
+      /* best-effort */
+    }
 
     await orderRef.collection('documents').add({
       type: 'DELIVERY_PROOF',
