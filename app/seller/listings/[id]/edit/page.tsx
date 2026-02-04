@@ -1872,7 +1872,7 @@ function EditListingPageContent() {
             if ((attrs as any)[key] !== true) (attrs as any)[key] = true;
           }
         }
-        return attrs as ListingAttributes;
+        return attrs as unknown as ListingAttributes;
       })(),
     };
 
