@@ -966,11 +966,13 @@ export async function POST(request: Request) {
         expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000), // 2 minutes
       }));
     } catch (idempError) {
-      // Non-blocking: idempotency record failure shouldn't block checkout
+      // Non-blocking: idempotency record failure shouldn't block checkout. Stripe idempotency
+      // key remains primary protection against duplicate sessions at Stripe level.
       logWarn('Failed to persist idempotency record', {
         route: '/api/stripe/checkout/create-session',
         listingId,
         buyerId,
+        sessionId: session.id,
         error: String(idempError),
       });
     }
