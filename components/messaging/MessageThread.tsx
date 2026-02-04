@@ -466,7 +466,9 @@ export function MessageThreadComponent({
       buyerId: thread.buyerId,
       sellerId: thread.sellerId,
       isTyping: true,
-    }).catch(() => {});
+    }).catch((e) => {
+      console.warn('[MessageThread] setThreadTyping(true) failed', e);
+    });
 
     if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
     typingClearTimerRef.current = setTimeout(() => {
@@ -893,7 +895,9 @@ export function MessageThreadComponent({
                 buyerId: thread.buyerId,
                 sellerId: thread.sellerId,
                 isTyping: false,
-              }).catch(() => {});
+              }).catch((e) => {
+                console.warn('[MessageThread] setThreadTyping(false) onBlur failed', e);
+              });
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
