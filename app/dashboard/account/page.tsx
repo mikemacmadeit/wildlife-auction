@@ -291,29 +291,6 @@ export default function AccountPage() {
     [userProfile?.emailVerificationCompletedAt, user?.emailVerified, hasPasswordProvider]
   );
 
-  // #region agent log
-  useEffect(() => {
-    if (!user) return;
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'account/page.tsx emailVerifiedForUI',
-        message: 'verified state',
-        data: {
-          emailVerificationCompletedAt: !!userProfile?.emailVerificationCompletedAt,
-          userEmailVerified: user?.emailVerified === true,
-          hasPasswordProvider,
-          emailVerifiedForUI,
-          hypothesisId: 'H3',
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-      }),
-    }).catch(() => {});
-  }, [user?.uid, user?.emailVerified, userProfile?.emailVerificationCompletedAt, hasPasswordProvider, emailVerifiedForUI]);
-  // #endregion
-
   const handleUpdatePassword = async () => {
     if (!user) return;
 

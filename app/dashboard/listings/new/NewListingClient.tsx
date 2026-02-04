@@ -488,12 +488,50 @@ function NewListingPageContent() {
     }
     refreshUserProfile();
     
-    // Real-time listener for TPWD permit status (controls whitetail category gating in Create Listing)
-    // This ensures the category becomes available immediately when a permit is approved
     const permitRef = doc(db, 'sellerPermits', user.uid);
     const trustRef = doc(db, 'publicSellerTrust', user.uid);
     
-    // Listen to both sellerPermits and publicSellerTrust for redundancy
+    // Initial sync: fetch both docs immediately so whitetail category is available without waiting for listeners
+    const applyPermitFromData = (data: any, source: 'permit' | 'trust') => {
+      if (!data?.status) return;
+      const status = String(data.status);
+      if (status !== 'verified' && status !== 'approved') return;
+      const expiresAt = data.expiresAt?.toDate
+        ? data.expiresAt.toDate().toISOString()
+        : data.expiresAt instanceof Date
+          ? data.expiresAt.toISOString()
+          : (typeof data.expiresAt === 'string' ? data.expiresAt : null);
+      const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+      if (isExpired) return;
+      setTpwdPermit({
+        status: status as 'verified' | 'approved',
+        rejectionReason: null,
+        expiresAt,
+        uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : (data.uploadedAt instanceof Date ? data.uploadedAt.toISOString() : null),
+        reviewedAt: data.reviewedAt?.toDate ? data.reviewedAt.toDate().toISOString() : (data.verifiedAt?.toDate ? data.verifiedAt.toDate().toISOString() : null),
+      });
+    };
+    
+    Promise.all([getDoc(permitRef), getDoc(trustRef)]).then(([permitSnap, trustSnap]) => {
+      if (permitSnap.exists()) {
+        const data = permitSnap.data() as any;
+        applyPermitFromData(data, 'permit');
+        return;
+      }
+      const trustData = trustSnap.exists() ? (trustSnap.data() as any) : null;
+      const badgeIds = Array.isArray(trustData?.badgeIds) ? trustData.badgeIds : [];
+      const hasBadge = badgeIds.includes('tpwd_breeder_permit_verified');
+      const permitInfo = trustData?.tpwdBreederPermit;
+      if (hasBadge && permitInfo) {
+        applyPermitFromData({ ...permitInfo, status: permitInfo.status || 'verified' }, 'trust');
+      } else if (hasBadge) {
+        setTpwdPermit({ status: 'verified', rejectionReason: null, expiresAt: null, uploadedAt: null, reviewedAt: null });
+      } else if (!permitSnap.exists()) {
+        setTpwdPermit(null);
+      }
+    }).catch(() => {});
+    
+    // Real-time listeners for TPWD permit status
     const unsubscribePermit = onSnapshot(
       permitRef,
       (snap) => {
@@ -648,9 +686,13 @@ function NewListingPageContent() {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   if (!canSelectWhitetail) {
+                    const hasVerifiedButExpired = (whitetailPermitStatus === 'verified' || whitetailPermitStatus === 'approved') && isPermitExpired;
+                    const expDate = tpwdPermit?.expiresAt ? new Date(tpwdPermit.expiresAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
                     toast({
-                      title: 'TPWD Required',
-                      description: 'Upload and verify your TPWD breeder permit to create Whitetail listings.',
+                      title: hasVerifiedButExpired ? 'Permit Expired' : 'TPWD Required',
+                      description: hasVerifiedButExpired
+                        ? `Your TPWD breeder permit expired${expDate ? ` on ${expDate}` : ''}. Please renew and re-upload your permit to create whitetail listings.`
+                        : 'Upload and verify your TPWD breeder permit to create Whitetail listings.',
                     });
                     return;
                   }
@@ -674,9 +716,13 @@ function NewListingPageContent() {
               }`}
               onClick={() => {
                 if (!canSelectWhitetail) {
+                  const hasVerifiedButExpired = (whitetailPermitStatus === 'verified' || whitetailPermitStatus === 'approved') && isPermitExpired;
+                  const expDate = tpwdPermit?.expiresAt ? new Date(tpwdPermit.expiresAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
                   toast({
-                    title: 'TPWD Required',
-                    description: 'Upload and verify your TPWD breeder permit to create Whitetail listings.',
+                    title: hasVerifiedButExpired ? 'Permit Expired' : 'TPWD Required',
+                    description: hasVerifiedButExpired
+                      ? `Your TPWD breeder permit expired${expDate ? ` on ${expDate}` : ''}. Please renew and re-upload your permit to create whitetail listings.`
+                      : 'Upload and verify your TPWD breeder permit to create Whitetail listings.',
                   });
                   return;
                 }
@@ -724,9 +770,14 @@ function NewListingPageContent() {
                     <div className="flex flex-wrap gap-2 justify-center">
                       <Badge
                         variant="outline"
-                        className="text-[11px] px-2 break-words"
+                        className={cn(
+                          'text-[11px] px-2 break-words',
+                          (whitetailPermitStatus === 'verified' || whitetailPermitStatus === 'approved') && isPermitExpired && 'border-destructive/50 text-destructive'
+                        )}
                       >
-                        TPWD REQUIRED
+                        {(whitetailPermitStatus === 'verified' || whitetailPermitStatus === 'approved') && isPermitExpired
+                          ? 'TPWD permit is expired'
+                          : 'TPWD REQUIRED'}
                       </Badge>
                     </div>
                   </div>

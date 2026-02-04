@@ -209,7 +209,7 @@ export default function WatchlistPage() {
   // use-favorites it is never set false to avoid re-renders, so we run when user
   // and favoriteIds (from the 200ms poll) are ready.
   useEffect(() => {
-    let cancelled = false;
+    const ac = new AbortController();
 
     const fetchListings = async () => {
       if (authLoading) {
@@ -232,17 +232,17 @@ export default function WatchlistPage() {
         setLoading(true);
         setError(null);
         const fetchedListings = await getListingsByIds(favoriteIds);
-        if (cancelled) return;
+        if (ac.signal.aborted) return;
 
         const validListings = fetchedListings.filter((listing) => listing !== null) as Listing[];
         const enriched = validListings.map(enrichListing);
-        if (cancelled) return;
+        if (ac.signal.aborted) return;
 
         setListings(enriched);
 
         // Subscribe to real-time updates for each listing
         enriched.forEach((listing) => {
-          if (cancelled) return;
+          if (ac.signal.aborted) return;
           if (!subscriptionsRef.current.has(listing.id)) {
             const unsubscribe = subscribeToListing(listing.id, (updatedListing) => {
               if (updatedListing) {
@@ -261,19 +261,19 @@ export default function WatchlistPage() {
           }
         });
       } catch (err) {
-        if (!cancelled) {
+        if (!ac.signal.aborted) {
           console.error('Error fetching watchlist listings:', err);
           setError(formatUserFacingError(err, 'Failed to load watchlist'));
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!ac.signal.aborted) setLoading(false);
       }
     };
 
     fetchListings();
 
     return () => {
-      cancelled = true;
+      ac.abort();
       subscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
       subscriptionsRef.current.clear();
     };

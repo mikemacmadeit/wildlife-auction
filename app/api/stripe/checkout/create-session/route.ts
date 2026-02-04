@@ -966,9 +966,10 @@ export async function POST(request: Request) {
         expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000), // 2 minutes
       }));
     } catch (idempError) {
-      // Non-blocking: idempotency record failure shouldn't block checkout. Stripe idempotency
-      // key remains primary protection against duplicate sessions at Stripe level.
-      logWarn('Failed to persist idempotency record', {
+      // Trade-off: We keep checkout non-blocking. If Firestore write fails here, duplicate
+      // sessions are possible within the 5s idempotency window. Stripe idempotency key
+      // remains primary protection. Blocking would fail checkout when Firestore is slow.
+      logWarn('Failed to persist idempotency record (non-blocking)', {
         route: '/api/stripe/checkout/create-session',
         listingId,
         buyerId,

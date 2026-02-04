@@ -14,8 +14,9 @@ const DEFAULT_MANUAL_ONLY_CATEGORIES: ListingCategory[] = ['whitetail_breeder'];
 
 export const DEFAULT_CONFIG: Omit<ListingModerationConfig, 'updatedAt' | 'updatedBy'> = {
   aiAutoApproveEnabled: false,
-  minTextConfidence: 0.85,
-  maxRiskScore: 0.2,
+  minTextConfidence: 0.8,
+  maxRiskScore: 0.25,
+  allowFactorOverride: true,
   disallowedFlags: [
     'illegal_species',
     'permit_required_missing',
@@ -49,6 +50,7 @@ export async function getListingModerationConfig(
     aiAutoApproveEnabled: data?.aiAutoApproveEnabled === true,
     minTextConfidence: typeof data?.minTextConfidence === 'number' ? data.minTextConfidence : DEFAULT_CONFIG.minTextConfidence,
     maxRiskScore: typeof data?.maxRiskScore === 'number' ? data.maxRiskScore : DEFAULT_CONFIG.maxRiskScore,
+    allowFactorOverride: data?.allowFactorOverride !== false,
     disallowedFlags: Array.isArray(data?.disallowedFlags) ? (data as { disallowedFlags: string[] }).disallowedFlags : DEFAULT_CONFIG.disallowedFlags,
     manualOnlyCategories: Array.isArray(data?.manualOnlyCategories) ? (data as { manualOnlyCategories: ListingCategory[] }).manualOnlyCategories : DEFAULT_CONFIG.manualOnlyCategories,
     manualOnlySellerUnverified: data?.manualOnlySellerUnverified !== false,

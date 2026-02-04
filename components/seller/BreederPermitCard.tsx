@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,13 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
   const [showPreview, setShowPreview] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [showUploadNewPermit, setShowUploadNewPermit] = useState(false);
+  const uploadFormRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showUploadNewPermit && uploadFormRef.current) {
+      uploadFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [showUploadNewPermit]);
 
   const canSubmit = useMemo(() => !!user?.uid && !!file && !uploading && !submitting, [file, submitting, uploading, user?.uid]);
 
@@ -304,6 +311,31 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
 
         {permit?.status === 'verified' ? (
           <div className="we-space-y-default">
+            {permit.expiresAt && new Date(permit.expiresAt).getTime() < Date.now() ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold">Permit expired</div>
+                      <div className="text-sm mt-1">
+                        Your TPWD breeder permit expired on {new Date(permit.expiresAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}. Upload a renewed permit to replace it and create whitetail listings.
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="shrink-0 w-full sm:w-auto"
+                      onClick={() => setShowUploadNewPermit(true)}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload updated permit
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <div className="rounded-lg border border-l-4 border-l-primary bg-primary/5 p-4 we-gap-default flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="min-w-0 space-y-3">
                 <div className="font-semibold flex items-center gap-2 text-foreground">
@@ -365,7 +397,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
         ) : null}
 
         {(permit?.status !== 'verified' || showUploadNewPermit) && !waitingOnApproval ? (
-        <>
+        <div ref={uploadFormRef}>
           {permit?.status === 'verified' && showUploadNewPermit ? (
             <p className="text-sm text-muted-foreground">Upload a new document when your current permit is expiring or has expired.</p>
           ) : null}
@@ -431,7 +463,7 @@ export function BreederPermitCard(props: { className?: string; compactWhenVerifi
             </Button>
           ) : null}
         </div>
-        </>
+        </div>
         ) : null}
 
         <Dialog open={showPreview} onOpenChange={setShowPreview}>

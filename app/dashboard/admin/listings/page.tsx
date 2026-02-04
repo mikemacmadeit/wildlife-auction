@@ -106,7 +106,7 @@ export default function AdminListingsPage() {
   const [sortType, setSortType] = useState<SortType>('newest');
   const [aiApprovedListings, setAiApprovedListings] = useState<Listing[]>([]);
   const [allApprovedListings, setAllApprovedListings] = useState<Listing[]>([]);
-  const [modConfig, setModConfig] = useState<{ aiAutoApproveEnabled: boolean; updatedAt?: number; updatedBy?: string } | null>(null);
+  const [modConfig, setModConfig] = useState<{ aiAutoApproveEnabled: boolean; minTextConfidence?: number; maxRiskScore?: number; updatedAt?: number; updatedBy?: string } | null>(null);
   const [modConfigToggling, setModConfigToggling] = useState(false);
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
   const [viewingDocTitle, setViewingDocTitle] = useState<string>('Document');
@@ -1172,34 +1172,102 @@ export default function AdminListingsPage() {
                         {/* Center: Compliance & Documents */}
                         <div className="space-y-3">
                           {/* AI Review Result - why not auto-approved (for pending listings) */}
-                          {listing.status === 'pending' && (listing as any).aiModeration && (listing as any).aiModeration.decision !== 'auto_approved' && (
-                            <Card className="border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                  <Sparkles className="h-4 w-4 text-amber-600" />
-                                  Why AI Didn&apos;t Auto-Approve
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="space-y-2 text-sm">
-                                {((listing as any).aiModeration.reasons?.length) > 0 ? (
-                                  <ul className="list-disc list-inside space-y-1 text-amber-800 dark:text-amber-200">
-                                    {((listing as any).aiModeration.reasons as string[]).map((r, i) => (
-                                      <li key={i}>{r}</li>
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <p className="text-muted-foreground">{(listing as any).aiModeration.decision}</p>
-                                )}
-                                {((listing as any).aiModeration.scores?.textConfidence != null || (listing as any).aiModeration.scores?.riskScore != null) && (
-                                  <div className="text-xs text-muted-foreground pt-1 border-t border-amber-500/20 mt-2">
-                                    Confidence: {(((listing as any).aiModeration.scores?.textConfidence ?? 0) * 100).toFixed(0)}%
-                                    {' · '}
-                                    Risk: {(((listing as any).aiModeration.scores?.riskScore ?? 0) * 100).toFixed(0)}%
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          )}
+                          {listing.status === 'pending' && (listing as any).aiModeration && (listing as any).aiModeration.decision !== 'auto_approved' && (() => {
+                            const am = (listing as any).aiModeration;
+                            const conf = (am.scores?.textConfidence ?? 0) * 100;
+                            const risk = (am.scores?.riskScore ?? 0) * 100;
+                            const minConf = (modConfig?.minTextConfidence ?? 0.8) * 100;
+                            const maxRisk = (modConfig?.maxRiskScore ?? 0.25) * 100;
+                            const confFail = conf < minConf;
+                            const riskFail = risk > maxRisk;
+                            const reasons = (am.reasons || []) as string[];
+                            const evidence = (am.evidence || []) as Array<{ flag: string; snippet: string }>;
+                            const factorBreakdown = (am.factorBreakdown || []) as Array<{ factor: string; passed: boolean; note?: string }>;
+                            const flagSet = new Set((am.flags || []) as string[]);
+                            const FACTOR_LABELS: Record<string, string> = {
+                              prohibited_language: 'Prohibited terms (venison, meat, tags)',
+                              scam_pricing: 'Pricing (suspicious/low)',
+                              misrepresentation: 'Title vs description consistency',
+                              illegal_species: 'Prohibited species language',
+                              interstate_shipping: 'Interstate shipping claims',
+                              permit_required_missing: 'Permit requirements',
+                              description_clarity: 'Description clarity',
+                              uncertain: 'Text clarity / ambiguity',
+                            };
+                            const derivedFactors: Array<{ factor: string; passed: boolean; note?: string }> = factorBreakdown.length > 0 ? [] : [
+                              { factor: 'prohibited_language', passed: !flagSet.has('prohibited_language'), note: flagSet.has('prohibited_language') ? (evidence.find(e => e.flag === 'prohibited_language')?.snippet || 'Flagged') : 'None found' },
+                              { factor: 'scam_pricing', passed: !flagSet.has('scam_pricing'), note: flagSet.has('scam_pricing') ? (evidence.find(e => e.flag === 'scam_pricing')?.snippet || 'Flagged') : 'Normal' },
+                              { factor: 'misrepresentation', passed: !flagSet.has('misrepresentation'), note: flagSet.has('misrepresentation') ? (evidence.find(e => e.flag === 'misrepresentation')?.snippet || 'Flagged') : 'None' },
+                              { factor: 'illegal_species', passed: !flagSet.has('illegal_species'), note: flagSet.has('illegal_species') ? (evidence.find(e => e.flag === 'illegal_species')?.snippet || 'Flagged') : 'None' },
+                              { factor: 'interstate_shipping', passed: !flagSet.has('interstate_shipping'), note: flagSet.has('interstate_shipping') ? (evidence.find(e => e.flag === 'interstate_shipping')?.snippet || 'Flagged') : 'None' },
+                              { factor: 'description_clarity', passed: !flagSet.has('uncertain'), note: flagSet.has('uncertain') ? (evidence.find(e => e.flag === 'uncertain')?.snippet || 'Flagged as vague') : 'OK' },
+                            ];
+                            const factors = factorBreakdown.length > 0 ? factorBreakdown : derivedFactors;
+                            const allPassed = factors.every((f) => f.passed);
+                            const plainSummary = allPassed && (confFail || riskFail)
+                              ? `All checks passed but scores were borderline (${conf.toFixed(0)}% confidence, ${risk.toFixed(0)}% risk). Approve manually or re-run AI.`
+                              : confFail && riskFail
+                                ? `Confidence ${conf.toFixed(0)}% (need ${minConf.toFixed(0)}%) and risk ${risk.toFixed(0)}% (max ${maxRisk.toFixed(0)}%).`
+                                : confFail
+                                  ? `Confidence ${conf.toFixed(0)}% below threshold (need ${minConf.toFixed(0)}%).`
+                                  : riskFail
+                                    ? `Risk ${risk.toFixed(0)}% exceeds max (${maxRisk.toFixed(0)}%).`
+                                    : reasons[0] || 'Needs manual review.';
+                            return (
+                              <Card className="border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10">
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-amber-600" />
+                                    Why AI Didn&apos;t Auto-Approve
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                  <p className="text-amber-800 dark:text-amber-200 font-medium">{plainSummary}</p>
+                                  {factors.length > 0 && (
+                                    <div className="text-xs pt-2 border-t border-amber-500/20">
+                                      <div className="font-medium text-amber-800 dark:text-amber-200 mb-1.5">Checks:</div>
+                                      <ul className="space-y-1">
+                                        {factors.map((f, i) => (
+                                          <li key={i} className="flex items-start gap-2">
+                                            <span className={f.passed ? 'text-emerald-600' : 'text-amber-600'}>{f.passed ? '✓' : '✗'}</span>
+                                            <span>
+                                              <span className="font-medium">{FACTOR_LABELS[f.factor] || f.factor.replace(/_/g, ' ')}:</span>
+                                              <span className={f.passed ? ' text-muted-foreground' : ' text-amber-700 dark:text-amber-300'}>
+                                                {' '}{f.note || (f.passed ? 'Passed' : 'Flagged')}
+                                              </span>
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {evidence.length > 0 && !factorBreakdown.length && (
+                                    <div className="text-xs pt-2 border-t border-amber-500/20">
+                                      <div className="font-medium text-amber-800 dark:text-amber-200 mb-1">Flagged text:</div>
+                                      <ul className="space-y-1 text-muted-foreground">
+                                        {evidence.map((e, i) => (
+                                          <li key={i}>
+                                            <span className="text-foreground/90">&quot;{e.snippet}&quot;</span>
+                                            {e.flag ? <span className="ml-1 text-amber-600">— {e.flag.replace(/_/g, ' ')}</span> : null}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {reasons.length > 0 && (
+                                    <details className="text-xs pt-1 border-t border-amber-500/20">
+                                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show full AI reasoning</summary>
+                                      <ul className="list-disc list-inside mt-1 space-y-0.5 text-muted-foreground">
+                                        {reasons.map((r, i) => (
+                                          <li key={i}>{r}</li>
+                                        ))}
+                                      </ul>
+                                    </details>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            );
+                          })()}
                           {/* AI Summary */}
                           <AIAdminSummary
                             entityType="listing"

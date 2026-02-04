@@ -124,7 +124,9 @@ export default function PricingPage() {
     if (!user) {
       try {
         sessionStorage.setItem('redirectAfterLogin', `/pricing?plan=${tierId}`);
-      } catch {}
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.warn('[pricing] sessionStorage setItem failed', e);
+      }
       window.location.href = '/login';
       return;
     }

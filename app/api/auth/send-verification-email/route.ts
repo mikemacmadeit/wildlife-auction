@@ -19,16 +19,6 @@ function json(body: any, init?: { status?: number }) {
 }
 
 export async function POST(request: Request) {
-  // #region agent log
-  const _log = (msg: string, data: Record<string, unknown>) => {
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ location: 'send-verification-email/route.ts', message: msg, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: data.hypothesisId ?? 'H1' }),
-    }).catch(() => {});
-  };
-  // #endregion
-
   let auth: ReturnType<typeof getAdminAuth>;
   try {
     auth = getAdminAuth();
@@ -51,10 +41,6 @@ export async function POST(request: Request) {
   if (!uid) return json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
   const emailEnabled = isEmailEnabled();
-  // #region agent log
-  _log('API entry', { uid, emailEnabled, hypothesisId: 'H1' });
-  // #endregion
-
   if (!emailEnabled) {
     return json(
       { ok: false, error: 'Verification email service not configured', code: 'EMAIL_NOT_CONFIGURED' },
@@ -65,9 +51,6 @@ export async function POST(request: Request) {
   try {
     const userRecord = await auth.getUser(uid);
     const email = userRecord.email;
-    // #region agent log
-    _log('getUser result', { uid, emailVerified: userRecord.emailVerified, hasEmail: !!email, hypothesisId: 'H1' });
-    // #endregion
     if (!email) return json({ ok: false, error: 'No email on account' }, { status: 400 });
 
     if (userRecord.emailVerified === true) {
@@ -95,9 +78,6 @@ export async function POST(request: Request) {
     });
 
     const sent = await sendEmailHtml(email, rendered.subject, rendered.html);
-    // #region agent log
-    _log('sendEmailHtml result', { success: sent.success, error: sent.error ?? null, hypothesisId: 'H1' });
-    // #endregion
     if (!sent.success) {
       const provider = getEmailProvider();
       const isNotConfigured = sent.error?.toLowerCase().includes('not configured') ?? false;

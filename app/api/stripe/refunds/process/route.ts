@@ -250,7 +250,12 @@ export async function POST(request: Request) {
     try {
       await orderRef.update(updateData);
     } catch (updateErr: any) {
-      await orderRef.update({ refundInProgressAt: FieldValue.delete(), updatedAt: new Date() }).catch(() => {});
+      await orderRef.update({ refundInProgressAt: FieldValue.delete(), updatedAt: new Date() }).catch((e) => {
+        logError('Refund: failed to clear refundInProgressAt after update error', e instanceof Error ? e : new Error(String(e)), {
+          route: '/api/stripe/refunds/process',
+          orderId,
+        });
+      });
       throw updateErr;
     }
 

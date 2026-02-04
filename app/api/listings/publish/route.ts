@@ -603,6 +603,9 @@ export async function POST(request: Request) {
           if (textResult?.evidence && Array.isArray(textResult.evidence) && textResult.evidence.length > 0) {
             out.evidence = textResult.evidence;
           }
+          if (textResult?.factorBreakdown && Array.isArray(textResult.factorBreakdown) && textResult.factorBreakdown.length > 0) {
+            out.factorBreakdown = textResult.factorBreakdown;
+          }
           return out;
         };
 

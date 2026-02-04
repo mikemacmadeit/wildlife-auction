@@ -130,17 +130,6 @@ export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boo
     throw new Error('No user is currently signed in');
   }
 
-  // #region agent log
-  const _log = (msg: string, data: Record<string, unknown>) => {
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ location: 'auth.ts resendVerificationEmail', message: msg, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: (data as any).hypothesisId ?? 'H2' }),
-    }).catch(() => {});
-  };
-  _log('resendVerificationEmail start', { uid: auth.currentUser.uid, hypothesisId: 'H2' });
-  // #endregion
-
   let apiErrorMessage: string | null = null;
   try {
     const token = await auth.currentUser.getIdToken(true);
@@ -155,9 +144,6 @@ export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boo
     });
     clearTimeout(timeoutId);
     const data = await res.json().catch(() => ({}));
-    // #region agent log
-    _log('API response', { resOk: res.ok, status: res.status, dataOk: data?.ok, alreadyVerified: data?.alreadyVerified, error: data?.error ?? null, hypothesisId: 'H2' });
-    // #endregion
     if (res.ok && data?.ok) {
       if (data?.alreadyVerified === true) return { alreadyVerified: true };
       return;
@@ -165,19 +151,12 @@ export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boo
     apiErrorMessage =
       (data?.error || data?.message || (res.status === 503 ? 'Verification email service is temporarily unavailable.' : '')) || null;
   } catch (e: any) {
-    // #region agent log
-    _log('API catch', { name: e?.name, message: e?.message, hypothesisId: 'H2' });
-    // #endregion
     if (e?.name === 'AbortError') {
       apiErrorMessage = 'Request timed out. Trying fallback…';
     } else {
       apiErrorMessage = 'Could not reach the server.';
     }
   }
-
-  // #region agent log
-  _log('Firebase fallback attempt', { apiErrorMessage, hypothesisId: 'H2' });
-  // #endregion
 
   // Fallback: Firebase-managed email (default template). Use current origin in browser so redirect works after verification.
   const baseUrl =
@@ -190,13 +169,7 @@ export const resendVerificationEmail = async (): Promise<{ alreadyVerified?: boo
   };
   try {
     await sendEmailVerification(auth.currentUser, actionCodeSettings as any);
-    // #region agent log
-    _log('Firebase fallback success', { hypothesisId: 'H2' });
-    // #endregion
   } catch (e: any) {
-    // #region agent log
-    _log('Firebase fallback error', { code: e?.code, message: e?.message, hypothesisId: 'H2' });
-    // #endregion
     const code = String(e?.code || '');
     if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
       try {
@@ -293,24 +266,10 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     prompt: 'select_account',
   });
 
-  // #region agent log
-  const apiKey = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_API_KEY : '';
-  const authDomain = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN : '';
-  const keyMask = apiKey ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}` : 'missing';
-  if (typeof fetch !== 'undefined') {
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'auth.ts:signInWithGoogle:entry', message: 'Google sign-in attempt', data: { authDomain, apiKeyMask: keyMask }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1_key_identity' }) }).catch(() => {});
-  }
-  // #endregion
-
   try {
     // Try popup first (better UX); center it in the current window
     return await withCenteredPopup(() => signInWithPopup(auth, provider));
   } catch (error: any) {
-    // #region agent log
-    if (typeof fetch !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'auth.ts:signInWithGoogle:catch', message: 'Google sign-in error', data: { code: error?.code, message: (error?.message || '').slice(0, 200) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2_error_detail' }) }).catch(() => {});
-    }
-    // #endregion
     console.error('Google sign-in popup error:', error);
     
     // If popup fails for any reason (blocked, unauthorized domain, illegal URL, etc.), fall back to redirect

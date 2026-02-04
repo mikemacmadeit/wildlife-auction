@@ -132,6 +132,7 @@ export default function DashboardLayout({
     adminNotifications: 0,
     supportTickets: 0,
     pendingApprovals: 0,
+    pendingBreederPermits: 0,
   });
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
@@ -205,9 +206,15 @@ export default function DashboardLayout({
           badge,
         };
       }
+      if (item.href === '/dashboard/admin/compliance') {
+        return {
+          ...item,
+          badge: isAdmin && badges.pendingBreederPermits > 0 ? badges.pendingBreederPermits : undefined,
+        };
+      }
       return item;
     });
-  }, [badges.pendingApprovals, badges.adminNotifications, badges.supportTickets, isSuperAdmin, isAdmin]);
+  }, [badges.pendingApprovals, badges.adminNotifications, badges.supportTickets, badges.pendingBreederPermits, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -222,6 +229,12 @@ export default function DashboardLayout({
   }, [pathname, user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    if (!pathname?.startsWith('/dashboard/admin/compliance')) return;
+    void markNotificationsAsReadByTypes(user.uid, ['admin_breeder_permit_submitted']);
+  }, [pathname, user?.uid]);
+
+  useEffect(() => {
     if (!user?.uid) {
       setBadges((prev) => ({
         ...prev,
@@ -230,6 +243,7 @@ export default function DashboardLayout({
         offers: 0,
         adminNotifications: 0,
         supportTickets: 0,
+        pendingBreederPermits: 0,
       }));
       return;
     }
@@ -259,6 +273,11 @@ export default function DashboardLayout({
         unsubs.push(
           subscribeToUnreadCountByTypes(user.uid, ['admin_support_ticket_submitted'], (count) => {
             setBadges((prev) => ({ ...prev, supportTickets: count || 0 }));
+          })
+        );
+        unsubs.push(
+          subscribeToUnreadCountByType(user.uid, 'admin_breeder_permit_submitted', (count) => {
+            setBadges((prev) => ({ ...prev, pendingBreederPermits: count || 0 }));
           })
         );
       }

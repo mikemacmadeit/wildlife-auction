@@ -21,6 +21,13 @@ const ResponseSchema = z.object({
       snippet: z.string().max(200),
     })
   ),
+  factorBreakdown: z.array(
+    z.object({
+      factor: z.string(),
+      passed: z.boolean(),
+      note: z.string().max(300).optional(),
+    })
+  ).optional(),
 });
 
 const SUPPORTED_FLAGS = [
@@ -79,21 +86,25 @@ export async function runListingTextModeration(
     `Price/Starting Bid: ${input.price ?? input.startingBid ?? 'N/A'}`,
   ].join('\n');
 
-  const systemPrompt = `You are a marketplace listing moderator. Analyze the listing and return a JSON object with:
-- confidence: number 0-1 (how confident you are in the assessment)
-- riskScore: number 0-1 (0=low risk, 1=high risk)
-- flags: array of strings from this exact set only: illegal_species, permit_required_missing, interstate_shipping, prohibited_language, scam_pricing, misrepresentation, uncertain (use uncertain if not confident)
-- reasons: array of short human-readable reasons (1-2 sentences max each)
-- evidence: array of { flag: string, snippet: string } - short text snippets (max 200 chars each) that support each flag
+  const systemPrompt = `You are a Texas wildlife/livestock marketplace moderator. The platform has ALREADY validated: species (Texas-legal exotic list), category, location (TX), required disclosures (animal ID, health, transport), and structured attributes. Your job is TEXT-ONLY: catch prohibited language, scams, and misrepresentation in title/description.
 
-Rules:
-- Texas legality and species validation are handled by the platform; flag "illegal_species" only if text explicitly claims illegal/wild/prohibited species or sale of venison/meat/tags.
-- "prohibited_language" = venison, meat, hunting tags, licenses, wild whitetail, etc.
-- "scam_pricing" = suspiciously low, "free", or contradictory pricing.
-- "misrepresentation" = title/description mismatch, misleading claims.
-- "interstate_shipping" = explicit interstate transport of live animals in ways that may violate regulations.
-- If uncertain, set confidence low and include "uncertain" in flags.
-- Return ONLY valid JSON, no markdown or extra text.`;
+Return JSON:
+- confidence: 0-1. Use HIGH confidence (0.9+) when the free text contains NO prohibited language, scam signals, or misrepresentation. Do NOT lower confidence for: short/vague descriptions (structured fields carry compliance), seller experience, or "absence of compliance details" (platform enforces those).
+- riskScore: 0-1. Use LOW risk (≤0.2) when text is clean. Raise risk ONLY for: prohibited keywords, scam pricing, misleading claims, or interstate-shipping language.
+- flags: from this exact set only: illegal_species, permit_required_missing, interstate_shipping, prohibited_language, scam_pricing, misrepresentation, uncertain. Use "uncertain" ONLY when text is genuinely ambiguous (e.g. could imply illegal sale). NOT for brief descriptions.
+- reasons: short human-readable reasons. Explain only actual flags. If no flags, say "No prohibited language or red flags in text; structured data validated by platform."
+- evidence: array of { flag, snippet } - quote the exact problematic text. Empty if no flags.
+- factorBreakdown: array of { factor, passed, note }. For EACH of these factors, include an entry: prohibited_language (venison/meat/tags), scam_pricing, misrepresentation, illegal_species, interstate_shipping, description_clarity. passed=true/false, note=one-line explanation. CRITICAL: If ALL factors have passed=true, then confidence MUST be 0.9+ and riskScore MUST be ≤0.2. The overall scores must align with the factor breakdown—no low confidence/high risk when all factors pass.
+
+Platform rules (Texas-aligned):
+- illegal_species: ONLY if text explicitly describes sale of venison, meat, hunting tags/licenses, wild whitetail in wildlife_exotics, or clearly illegal species. Species validation is done by platform; do not second-guess.
+- prohibited_language: venison, meat, backstrap, hunting tags, licenses, "wild whitetail", game tag, permit sale, tag sale.
+- scam_pricing: suspiciously low, "free", or clearly contradictory pricing.
+- misrepresentation: title contradicts description, or description makes false/misleading claims.
+- interstate_shipping: explicit claims about shipping live animals across state lines in ways that violate regulations.
+- permit_required_missing: ONLY if text explicitly mentions needing a permit and suggests it is missing (rare; platform handles most of this).
+
+Short or vague descriptions (e.g. "Big boy") are acceptable—species, quantity, and disclosures come from structured fields. Set confidence 0.9+ and risk ≤0.2 when text is clean. Return ONLY valid JSON.`;
 
   const userPrompt = `Analyze this listing and return the JSON moderation result:\n\n${dataForPrompt}`;
 
@@ -149,6 +160,7 @@ Rules:
       flags: sanitizeFlags(v.flags),
       reasons: v.reasons.slice(0, 10),
       evidence: v.evidence.slice(0, 10),
+      factorBreakdown: Array.isArray(v.factorBreakdown) ? v.factorBreakdown.slice(0, 10) : undefined,
       model: 'gpt-4o-mini',
     };
   } catch (e: any) {

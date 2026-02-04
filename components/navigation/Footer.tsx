@@ -83,7 +83,9 @@ export function Footer() {
       // Keep popup + footer consistent
       try {
         window.localStorage.setItem('we_email_capture_subscribed', 'true');
-      } catch {}
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.warn('[Footer] localStorage setItem failed', e);
+      }
 
       setSuccess(true);
     } catch {

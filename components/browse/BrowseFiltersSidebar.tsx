@@ -33,10 +33,11 @@ export function BrowseFiltersSidebar(props: {
   const locationStateOptions = listingStates ?? BROWSE_STATES;
   const [speciesQuery, setSpeciesQuery] = useState('');
 
+  const PRICE_SLIDER_MAX = 100000;
   const price = useMemo(() => {
     const min = typeof value.minPrice === 'number' ? value.minPrice : 0;
-    const max = typeof value.maxPrice === 'number' ? value.maxPrice : 50000;
-    return [Math.max(0, Math.min(min, max)), Math.max(0, Math.max(min, max))] as [number, number];
+    const max = typeof value.maxPrice === 'number' ? value.maxPrice : PRICE_SLIDER_MAX;
+    return [Math.max(0, Math.min(min, max)), Math.max(0, Math.min(PRICE_SLIDER_MAX, Math.max(min, max)))] as [number, number];
   }, [value.maxPrice, value.minPrice]);
 
   const speciesOptions = useMemo(() => {
@@ -168,14 +169,14 @@ export function BrowseFiltersSidebar(props: {
               <Slider
                 value={[price[0], price[1]]}
                 min={0}
-                max={100000}
+                max={PRICE_SLIDER_MAX}
                 step={100}
                 onValueChange={(vals) => {
                   const [min, max] = vals as number[];
                   onChange({
                     ...value,
                     minPrice: min > 0 ? min : undefined,
-                    maxPrice: max < 100000 ? max : undefined,
+                    maxPrice: max < PRICE_SLIDER_MAX ? max : undefined,
                   });
                 }}
               />

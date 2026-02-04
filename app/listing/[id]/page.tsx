@@ -60,55 +60,13 @@ export default async function ListingDetailPage({
 }) {
   const resolved = await resolveParams(params);
   const { id } = resolved;
-  // #region agent log
-  try {
-    await fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'app/listing/[id]/page.tsx:ListingDetailPage',
-        message: 'listing page entry',
-        data: { id, idType: typeof id },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        hypothesisId: 'A',
-      }),
-    }).catch(() => {});
-  } catch (_) {}
-  // #endregion
-  // #region agent log
   let listing = null;
   try {
     listing = await getListingForSSR(id);
-    await fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'app/listing/[id]/page.tsx:after getListingForSSR',
-        message: 'getListingForSSR result',
-        data: { id, hasListing: !!listing },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        hypothesisId: 'B',
-      }),
-    }).catch(() => {});
-  } catch (err: unknown) {
-    await fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'app/listing/[id]/page.tsx:getListingForSSR catch',
-        message: 'getListingForSSR threw',
-        data: { id, errorMessage: (err as Error)?.message, errorName: (err as Error)?.name },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        hypothesisId: 'B',
-      }),
-    }).catch(() => {});
+  } catch {
     // Show 404 instead of error boundary so "ending soon" links don't show "Something went wrong"
     notFound();
   }
-  // #endregion
 
   if (!listing) {
     notFound();

@@ -68,6 +68,41 @@ export function evaluateAutoApprove(inputs: EvaluateInputs): AutoApproveDecision
     };
   }
 
+  // 4b. Disallowed flags present → manual (check before factor override)
+  const hasDisallowed = textResult.flags.some((f) => config.disallowedFlags.includes(f));
+  if (hasDisallowed) {
+    flags.push(...textResult.flags);
+    reasons.push('Listing has disallowed flags');
+    reasons.push(...textResult.reasons);
+    return {
+      canAutoApprove: false,
+      decision: 'manual_required',
+      flags,
+      reasons,
+      scores: {
+        textConfidence: textResult.confidence,
+        riskScore: textResult.riskScore,
+      },
+    };
+  }
+
+  // 4c. Factor override: when all factors passed, trust that over raw scores (less aggressive)
+  if (config.allowFactorOverride && textResult.factorBreakdown && textResult.factorBreakdown.length >= 5) {
+    const allPassed = textResult.factorBreakdown.every((f) => f.passed === true);
+    if (allPassed) {
+      return {
+        canAutoApprove: true,
+        decision: 'auto_approved',
+        flags: textResult.flags,
+        reasons: [...textResult.reasons, 'All factor checks passed; factor override applied'],
+        scores: {
+          textConfidence: textResult.confidence,
+          riskScore: textResult.riskScore,
+        },
+      };
+    }
+  }
+
   // 5. Confidence below threshold → manual
   if (textResult.confidence < config.minTextConfidence) {
     flags.push(...textResult.flags);
@@ -93,24 +128,6 @@ export function evaluateAutoApprove(inputs: EvaluateInputs): AutoApproveDecision
       decision: 'manual_required',
       flags,
       reasons: [...reasons, ...textResult.reasons],
-      scores: {
-        textConfidence: textResult.confidence,
-        riskScore: textResult.riskScore,
-      },
-    };
-  }
-
-  // 7. Disallowed flags present → manual
-  const hasDisallowed = textResult.flags.some((f) => config.disallowedFlags.includes(f));
-  if (hasDisallowed) {
-    flags.push(...textResult.flags);
-    reasons.push('Listing has disallowed flags');
-    reasons.push(...textResult.reasons);
-    return {
-      canAutoApprove: false,
-      decision: 'manual_required',
-      flags,
-      reasons,
       scores: {
         textConfidence: textResult.confidence,
         riskScore: textResult.riskScore,

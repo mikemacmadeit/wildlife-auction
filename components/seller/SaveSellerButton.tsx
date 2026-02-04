@@ -52,7 +52,9 @@ export function SaveSellerButton(props: {
     if (!user) {
       try {
         sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
-      } catch {}
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.warn('[SaveSellerButton] sessionStorage setItem failed', e);
+      }
       router.push('/login');
       return;
     }

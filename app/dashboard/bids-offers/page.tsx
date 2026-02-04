@@ -205,7 +205,9 @@ export default function BidsOffersPage() {
     setHideRemovedListingsState(v);
     try {
       localStorage.setItem('bids_offers_hide_removed', v ? 'true' : 'false');
-    } catch {}
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') console.warn('[bids-offers] localStorage setItem failed', e);
+    }
   }, []);
 
   // Raise max bid dialog
@@ -332,7 +334,9 @@ export default function BidsOffersPage() {
       const raw = localStorage.getItem(`bids_offers_dismissed_${user.uid}`);
       const arr = raw ? JSON.parse(raw) : [];
       setDismissedRemovedListingIds(new Set(Array.isArray(arr) ? arr : []));
-    } catch {}
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') console.warn('[bids-offers] localStorage getItem/parse failed', e);
+    }
   }, [user?.uid]);
 
   // Clear bids/offers, listing overrides, and dismissed IDs on logout so we never show another user's data (e.g. shared device).
@@ -467,7 +471,9 @@ export default function BidsOffersPage() {
         next.add(listingId);
         try {
           if (user?.uid) localStorage.setItem(`bids_offers_dismissed_${user.uid}`, JSON.stringify(Array.from(next)));
-        } catch {}
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') console.warn('[bids-offers] localStorage setItem failed', e);
+        }
         return next;
       });
     },

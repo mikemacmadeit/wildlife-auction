@@ -86,56 +86,10 @@ export function StepperForm({
   }, [currentStep]);
 
   const handleNext = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'StepperForm.tsx:handleNext:entry',
-        message: 'handleNext called',
-        data: { saving, isLastStep, currentStepId: currentStepData?.id },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        hypothesisId: 'H3',
-      }),
-    }).catch(() => {});
-    // #endregion
     // Prevent double-submits / double-advances while parent is saving/submitting.
-    if (saving) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'StepperForm.tsx:handleNext:earlyReturnSaving',
-          message: 'early return: saving true',
-          data: {},
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          hypothesisId: 'H4',
-        }),
-      }).catch(() => {});
-      // #endregion
-      return;
-    }
+    if (saving) return;
     // Validate current step if validator exists
     const valid = !currentStepData.validate || currentStepData.validate();
-    // #region agent log
-    if (isLastStep) {
-      fetch('http://127.0.0.1:7242/ingest/17040e56-eeab-425b-acb7-47343bdc73b1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'StepperForm.tsx:handleNext:lastStep',
-          message: 'last step: validate and onComplete',
-          data: { valid, callingOnComplete: valid },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          hypothesisId: 'H3',
-        }),
-      }).catch(() => {});
-    }
-    // #endregion
     if (!valid) {
       const errorMsg = currentStepData.errorMessage || 'Please complete all required fields before continuing.';
       onValidationError?.(currentStepData.id);

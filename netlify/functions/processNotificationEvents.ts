@@ -122,7 +122,9 @@ const baseHandler: Handler = async () => {
               .collection('notificationDeadLetters')
               .doc(eventId)
               .set(deadLetterPayload(eventId, claimedData, { message: res.error || 'Processing failed' }), { merge: true })
-              .catch(() => {});
+              .catch((dlErr: any) => {
+                logError('processNotificationEvents: failed to write dead letter (processing failed)', dlErr instanceof Error ? dlErr : new Error(String(dlErr)), { eventId });
+              });
           }
         }
       } catch (e: any) {

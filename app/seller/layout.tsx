@@ -135,6 +135,7 @@ export default function SellerLayout({
     sales: 0,
     adminNotifications: 0,
     pendingApprovals: 0,
+    pendingBreederPermits: 0,
   });
   const [adminEverTrue, setAdminEverTrue] = useState(false);
   const [userNavOpen, setUserNavOpen] = useState(true);
@@ -143,7 +144,7 @@ export default function SellerLayout({
 
   useEffect(() => {
     setAdminEverTrue(false);
-    setBadges((prev) => ({ ...prev, pendingApprovals: 0 }));
+    setBadges((prev) => ({ ...prev, pendingApprovals: 0, pendingBreederPermits: 0 }));
   }, [user?.uid]);
 
   // Load user profile for display name
@@ -215,14 +216,26 @@ export default function SellerLayout({
           badge: isSuperAdmin && badges.adminNotifications > 0 ? badges.adminNotifications : undefined,
         };
       }
+      if (item.href === '/dashboard/admin/compliance') {
+        return {
+          ...item,
+          badge: isAdmin && badges.pendingBreederPermits > 0 ? badges.pendingBreederPermits : undefined,
+        };
+      }
       return item;
     });
-  }, [badges.pendingApprovals, badges.adminNotifications, isSuperAdmin]);
+  }, [badges.pendingApprovals, badges.adminNotifications, badges.pendingBreederPermits, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (!user?.uid) return;
     if (!pathname?.startsWith('/dashboard/messages')) return;
     void markNotificationsAsReadByTypes(user.uid, ['message_received']);
+  }, [pathname, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!pathname?.startsWith('/dashboard/admin/compliance')) return;
+    void markNotificationsAsReadByTypes(user.uid, ['admin_breeder_permit_submitted']);
   }, [pathname, user?.uid]);
 
   useEffect(() => {
@@ -234,6 +247,7 @@ export default function SellerLayout({
         offers: 0,
         sales: 0,
         adminNotifications: 0,
+        pendingBreederPermits: 0,
       }));
       return;
     }
@@ -255,6 +269,14 @@ export default function SellerLayout({
         unsubs.push(
           subscribeToUnreadCountByCategory(user.uid, 'admin', (count) => {
             setBadges((prev) => ({ ...prev, adminNotifications: count || 0 }));
+          })
+        );
+      }
+
+      if (showAdminNav && isAdmin) {
+        unsubs.push(
+          subscribeToUnreadCountByType(user.uid, 'admin_breeder_permit_submitted', (count) => {
+            setBadges((prev) => ({ ...prev, pendingBreederPermits: count || 0 }));
           })
         );
       }
@@ -293,7 +315,7 @@ export default function SellerLayout({
       }));
       return;
     }
-  }, [user?.uid, showAdminNav, isSuperAdmin]);
+  }, [user?.uid, showAdminNav, isSuperAdmin, isAdmin]);
 
   useEffect(() => {
     if (!showAdminNav) return;

@@ -27,13 +27,9 @@ export function parseDateTimeLocal(raw: string | null | undefined): Date | null 
   // - YYYY-MM-DDTHH:mm:ss.sss
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?$/);
   if (!m) {
-    // Fallback: new Date(s) parses ISO/other formats. Timezone is implementation-dependent
-    // (ISO with Z = UTC; without Z = local in most engines). Prefer datetime-local format.
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[parseDateTimeLocal] non-standard format, using Date parse (timezone may vary):', s.slice(0, 50));
-    }
-    const fallback = new Date(s);
-    return Number.isFinite(fallback.getTime()) ? fallback : null;
+    // Reject non-datetime-local format to avoid timezone ambiguity (ISO with Z = UTC,
+    // without Z = local in some engines). Callers should use YYYY-MM-DDTHH:mm format.
+    return null;
   }
   const y = Number(m[1]);
   const mo = Number(m[2]);

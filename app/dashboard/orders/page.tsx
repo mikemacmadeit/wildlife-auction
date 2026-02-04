@@ -624,7 +624,7 @@ export default function OrdersPage() {
                 setCongratsOrderInfo({ orderId: order.id, sessionId });
                 setPendingCheckout(null);
                 setPendingCheckoutListingTitle(null);
-                try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch {}
+                try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch (e) { if (process.env.NODE_ENV === 'development') console.warn('[orders] sessionStorage removeItem failed', e); }
                 return;
               }
             }
@@ -634,7 +634,7 @@ export default function OrdersPage() {
         }
         setPendingCheckout(null);
         setPendingCheckoutListingTitle(null);
-        try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch {}
+        try { sessionStorage.removeItem('we:pending-checkout:v1'); } catch (e) { if (process.env.NODE_ENV === 'development') console.warn('[orders] sessionStorage removeItem failed', e); }
         toast({
           title: 'Still processing',
           description: 'If your payment completed, the order may take a few minutes to appear. Refresh the page or check your email for confirmation.',

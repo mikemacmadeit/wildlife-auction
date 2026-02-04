@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -151,6 +152,10 @@ interface SellerAlert {
   description: string;
   listingId?: string;
   listingTitle?: string;
+  /** Optional: e.g. "4h", "<1h", "45m" — shown as urgency badge for auction_ending */
+  countdownText?: string;
+  /** Optional: thumbnail URL for auction_ending cards */
+  listingImageUrl?: string;
   timestamp: Date;
   action: 'view' | 'respond' | 'complete';
   actionUrl: string;
@@ -481,14 +486,29 @@ export default function SellerOverviewPage() {
       if (listing.type === 'auction' && listing.status === 'active' && endsAt) {
         const hoursUntilEnd = (endsAt.getTime() - Date.now()) / (1000 * 60 * 60);
         if (hoursUntilEnd > 0 && hoursUntilEnd <= 24) {
+          const minsUntilEnd = Math.floor(hoursUntilEnd * 60);
+          const countdownText =
+            hoursUntilEnd < 1 / 60
+              ? '<1m'
+              : hoursUntilEnd < 1
+                ? `${minsUntilEnd}m`
+                : `${Math.round(hoursUntilEnd)}h`;
+          const description =
+            hoursUntilEnd <= 1
+              ? 'Ending in less than 1 hour'
+              : `Ending in ${Math.round(hoursUntilEnd)} hours`;
+          const imgUrl =
+            (listing as any).images?.[0] ??
+            (listing as any).photos?.[0]?.url ??
+            undefined;
           alertsList.push({
             id: `auction-ending-${listing.id}`,
             type: 'auction_ending',
             priority: hoursUntilEnd <= 6 ? 'high' : hoursUntilEnd <= 12 ? 'medium' : 'low',
-            title: `Auction ending soon: ${listing.title}`,
-            description: hoursUntilEnd <= 1 
-              ? `Ending in less than 1 hour`
-              : `Ending in ${Math.round(hoursUntilEnd)} hours`,
+            title: listing.title,
+            description,
+            countdownText,
+            listingImageUrl: imgUrl,
             listingId: listing.id,
             listingTitle: listing.title,
             timestamp: new Date(),
@@ -1148,64 +1168,123 @@ export default function SellerOverviewPage() {
                     <p className="text-sm text-muted-foreground mt-1">You're all caught up!</p>
                   </div>
                 ) : (
-                  alerts.map((alert) => {
-                    const Icon = getAlertIcon(alert.type);
-                    return (
-                      <div
-                        key={alert.id}
-                        className={cn(
-                          'flex flex-col sm:flex-row items-start gap-4 p-4 rounded-lg border-2',
-                          getAlertColor(alert.priority),
-                          'hover:shadow-sm cursor-pointer group'
-                        )}
-                      >
-                        <div className={cn(
-                          'w-10 h-10 rounded-lg border-2 flex items-center justify-center flex-shrink-0',
-                          alert.priority === 'high' ? 'bg-destructive/10 border-destructive/20' :
-                          alert.priority === 'medium' ? 'bg-primary/10 border-primary/20' :
-                          'bg-background/50 border-border/50'
-                        )}>
-                          <Icon className={cn(
-                            'h-5 w-5',
-                            alert.priority === 'high' ? 'text-destructive' :
-                            alert.priority === 'medium' ? 'text-primary' :
-                            'text-muted-foreground'
-                          )} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <h3 className="font-semibold text-foreground group-hover:text-primary">
-                              {alert.title}
-                            </h3>
-                            <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                              {formatTimeAgo(alert.timestamp)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {alert.description}
-                          </p>
-                          {alert.listingTitle && (
-                            <p className="text-xs text-muted-foreground font-medium">
-                              {alert.listingTitle}
-                            </p>
+                  <div className="space-y-3">
+                    {alerts.map((alert) => {
+                      const Icon = getAlertIcon(alert.type);
+                      const isAuctionEnding = alert.type === 'auction_ending';
+                      const showCountdownBadge = isAuctionEnding && alert.countdownText;
+                      const timeLabel = showCountdownBadge
+                        ? `Ends in ${alert.countdownText}`
+                        : formatTimeAgo(alert.timestamp);
+                      const showListingTitle = alert.listingTitle && !isAuctionEnding;
+
+                      return (
+                        <Link
+                          key={alert.id}
+                          href={alert.actionUrl}
+                          className={cn(
+                            'flex flex-col sm:flex-row items-start gap-4 p-4 rounded-lg border-2 transition-shadow group',
+                            getAlertColor(alert.priority),
+                            'hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2'
                           )}
-                        </div>
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="min-h-[36px] px-3 font-semibold flex-shrink-0 w-full sm:w-auto"
                         >
-                          <Link href={alert.actionUrl}>
-                            {alert.action === 'view' ? 'View' :
-                             alert.action === 'respond' ? 'Respond' :
-                             'Complete'}
+                          {/* Thumbnail (auction) or icon */}
+                          {isAuctionEnding && alert.listingImageUrl ? (
+                            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 border border-border/50">
+                              <Image
+                                src={alert.listingImageUrl}
+                                alt=""
+                                fill
+                                className="object-cover"
+                                sizes="64px"
+                              />
+                              {showCountdownBadge && (
+                                <div
+                                  className={cn(
+                                    'absolute bottom-0 inset-x-0 py-0.5 text-[10px] font-bold text-white text-center',
+                                    alert.priority === 'high'
+                                      ? 'bg-destructive/90'
+                                      : alert.priority === 'medium'
+                                        ? 'bg-amber-600/90'
+                                        : 'bg-muted-foreground/80'
+                                  )}
+                                >
+                                  {alert.countdownText}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              className={cn(
+                                'w-10 h-10 rounded-lg border-2 flex items-center justify-center flex-shrink-0',
+                                alert.priority === 'high'
+                                  ? 'bg-destructive/10 border-destructive/20'
+                                  : alert.priority === 'medium'
+                                    ? 'bg-primary/10 border-primary/20'
+                                    : 'bg-background/50 border-border/50'
+                              )}
+                            >
+                              <Icon
+                                className={cn(
+                                  'h-5 w-5',
+                                  alert.priority === 'high'
+                                    ? 'text-destructive'
+                                    : alert.priority === 'medium'
+                                      ? 'text-primary'
+                                      : 'text-muted-foreground'
+                                )}
+                              />
+                            </div>
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            {isAuctionEnding && (
+                              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5 block">
+                                Auction ending soon
+                              </span>
+                            )}
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary">
+                                {alert.title}
+                              </h3>
+                              {!showCountdownBadge && (
+                                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap flex-shrink-0">
+                                  {timeLabel}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {alert.description}
+                            </p>
+                            {showListingTitle && (
+                              <p className="text-xs text-muted-foreground font-medium mt-1">
+                                {alert.listingTitle}
+                              </p>
+                            )}
+                            {showCountdownBadge && !alert.listingImageUrl && (
+                              <Badge
+                                variant={alert.priority === 'high' ? 'destructive' : 'secondary'}
+                                className="mt-2 text-xs font-semibold"
+                              >
+                                <Clock className="h-3 w-3 mr-1" />
+                                Ends in {alert.countdownText}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <span
+                            className={cn(
+                              'inline-flex items-center justify-center min-h-[36px] px-3 rounded-md border border-input bg-background font-semibold text-sm flex-shrink-0 w-full sm:w-auto',
+                              'group-hover:bg-accent group-hover:text-accent-foreground'
+                            )}
+                          >
+                            {alert.action === 'view' ? 'View' : alert.action === 'respond' ? 'Respond' : 'Complete'}
                             <ArrowRight className="h-3 w-3 ml-1" />
-                          </Link>
-                        </Button>
-                      </div>
-                    );
-                  })
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
               </CardContent>
             </Card>

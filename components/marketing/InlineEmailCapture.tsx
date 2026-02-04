@@ -57,7 +57,9 @@ export function InlineEmailCapture(props: {
       }
       try {
         window.localStorage.setItem(SUBSCRIBED_KEY, 'true');
-      } catch {}
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.warn('[InlineEmailCapture] localStorage setItem failed', e);
+      }
       setSuccess(true);
     } catch {
       setError('Network error. Please try again.');

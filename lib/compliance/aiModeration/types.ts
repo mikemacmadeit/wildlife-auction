@@ -24,6 +24,7 @@ export interface ListingAIModeration {
   flags: string[];
   reasons: string[];
   evidence?: Array<{ flag: string; snippet: string }>;
+  factorBreakdown?: Array<{ factor: string; passed: boolean; note?: string }>;
   model: string;
 }
 
@@ -31,6 +32,7 @@ export interface ListingModerationConfig {
   aiAutoApproveEnabled: boolean;
   minTextConfidence: number;
   maxRiskScore: number;
+  allowFactorOverride: boolean; // When all factors pass, auto-approve even if raw scores are borderline
   disallowedFlags: string[];
   manualOnlyCategories: ListingCategory[];
   manualOnlySellerUnverified: boolean;
@@ -45,6 +47,7 @@ export interface TextModerationResult {
   flags: string[];
   reasons: string[];
   evidence: Array<{ flag: string; snippet: string }>;
+  factorBreakdown?: Array<{ factor: string; passed: boolean; note?: string }>;
   model: string;
 }
 
