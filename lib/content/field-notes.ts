@@ -144,7 +144,11 @@ export async function getFieldNoteBySlug(slug: string): Promise<FieldNotePost | 
     try {
       raw = await fs.readFile(c, 'utf8');
       break;
-    } catch {}
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[field-notes] file not found:', c);
+      }
+    }
   }
   if (!raw) return null;
 
