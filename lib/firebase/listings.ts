@@ -120,6 +120,10 @@ export interface CreateListingInput {
   sellerAttestationAccepted?: boolean;
   sellerAttestationAcceptedAt?: Date;
 
+  // Animal categories: seller acknowledgment (top-level)
+  sellerAnimalAttestationAccepted?: boolean;
+  sellerAnimalAttestationAcceptedAt?: Date;
+
   // Best Offer (Fixed/Classified; eBay-style)
   bestOfferEnabled?: boolean;
   bestOfferMinPrice?: number;
@@ -499,6 +503,14 @@ function toListingDocInput(
     }),
     ...(listingInput.sellerAttestationAcceptedAt && {
       sellerAttestationAcceptedAt: Timestamp.fromDate(listingInput.sellerAttestationAcceptedAt),
+    }),
+
+    // Animal categories: seller acknowledgment
+    ...(listingInput.sellerAnimalAttestationAccepted !== undefined && {
+      sellerAnimalAttestationAccepted: listingInput.sellerAnimalAttestationAccepted,
+    }),
+    ...(listingInput.sellerAnimalAttestationAcceptedAt && {
+      sellerAnimalAttestationAcceptedAt: Timestamp.fromDate(listingInput.sellerAnimalAttestationAcceptedAt),
     }),
 
     // Best Offer settings (only meaningful for fixed/classified; UI enforces)

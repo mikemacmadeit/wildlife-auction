@@ -57,6 +57,7 @@ import { getIdToken } from '@/lib/firebase/auth-helper';
 import { ImageGallery } from '@/components/listing/ImageGallery';
 import { KeyFactsPanel } from '@/components/listing/KeyFactsPanel';
 import { Separator } from '@/components/ui/separator';
+import { ListingPhotoPicker, type ListingPhotoSnapshot } from '@/components/photos/ListingPhotoPicker';
 
 function parsePriceString(value: string): string {
   return value.replace(/[^\d.]/g, '');
@@ -97,6 +98,9 @@ function EditListingPageContent() {
     durationDays: 1 | 3 | 5 | 7 | 10;
     location: { city: string; state: string; zip: string };
     images: string[];
+    photoIds: string[];
+    photos: ListingPhotoSnapshot[];
+    coverPhotoId?: string;
     verification: boolean;
     transportType: 'seller' | 'buyer' | null;
     deliveryDetails: {
@@ -130,6 +134,9 @@ function EditListingPageContent() {
       zip: '',
     },
     images: [],
+    photoIds: [],
+    photos: [],
+    coverPhotoId: undefined,
     verification: false,
     transportType: 'seller' as 'seller' | 'buyer' | null,
     deliveryDetails: {
@@ -230,6 +237,22 @@ function EditListingPageContent() {
             zip: listing.location?.zip ?? '',
           },
           images: listing.images || [],
+          photoIds: listing.photoIds || [],
+          photos: (listing.photos && Array.isArray(listing.photos) && listing.photos.length > 0)
+            ? listing.photos.map((p: any, i: number) => ({
+                photoId: p.photoId || `legacy-${i}`,
+                url: p.url || '',
+                sortOrder: p.sortOrder ?? i,
+                focalPoint: p.focalPoint,
+                cropZoom: p.cropZoom,
+                cropAspect: p.cropAspect,
+              }))
+            : (listing.images || []).map((url: string, i: number) => ({
+                photoId: `legacy-${i}`,
+                url,
+                sortOrder: i,
+              })),
+          coverPhotoId: listing.coverPhotoId,
           verification: listing.trust?.verified || false,
           transportType: 'seller', // Seller always arranges delivery; no buyer-transport option.
           deliveryDetails: {
@@ -266,6 +289,11 @@ function EditListingPageContent() {
           durationDays: isValidDurationDays((listing as any).durationDays) ? (listing as any).durationDays : 7,
           location: listing.location,
           images: listing.images || [],
+          photoIds: listing.photoIds || [],
+          photos: (listing.photos && Array.isArray(listing.photos) && listing.photos.length > 0)
+            ? listing.photos
+            : (listing.images || []).map((url: string, i: number) => ({ photoId: `legacy-${i}`, url, sortOrder: i })),
+          coverPhotoId: listing.coverPhotoId,
           verification: listing.trust?.verified || false,
           transportType: 'seller',
           deliveryDetails: (listing as any).deliveryDetails ?? { maxDeliveryRadiusMiles: '', deliveryTimeframe: '', deliveryStatusExplanation: '', deliveryNotes: '' },
@@ -1180,15 +1208,52 @@ function EditListingPageContent() {
     {
       id: 'media',
       title: 'Photos',
-      description: 'Update photos for your listing',
+      description: 'Upload + select photos (required)',
       content: (
-        <div
-          className={cn(
-            "space-y-4",
-            publishMissingFields.includes('photos') ? 'rounded-lg ring-2 ring-destructive p-2' : null
+        <div className="space-y-4">
+          {publishMissingFields.includes('photos') && formData.photoIds.length === 0 ? (
+            <Alert className="bg-destructive/10 border-destructive/20">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">
+                Please add at least one photo to continue.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {user ? (
+            <div
+              className={cn(
+                publishMissingFields.includes('photos') && formData.photoIds.length === 0 && 'rounded-xl ring-2 ring-destructive/30'
+              )}
+            >
+              <ListingPhotoPicker
+                uid={user.uid}
+                selected={formData.photos}
+                coverPhotoId={formData.coverPhotoId}
+                max={8}
+                onChange={({ selected, coverPhotoId }) => {
+                  const normalized = selected.map((p, i) => ({ ...p, sortOrder: i }));
+                  setFormData((prev) => ({
+                    ...prev,
+                    photos: normalized,
+                    photoIds: normalized.map((p) => p.photoId),
+                    coverPhotoId,
+                    images: normalized.map((p) => p.url),
+                  }));
+                  setPublishMissingFields((prev) => prev.filter((f) => f !== 'photos'));
+                }}
+              />
+            </div>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center">
+                <div className="font-semibold">Sign in to add photos</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Create an account to upload and reuse photos across listings.
+                </div>
+              </CardContent>
+            </Card>
           )}
-        >
-          {formData.images.length > 0 && (
+          {false && formData.images.length > 0 && (
             <div>
               <Label className="text-base font-semibold mb-2 block">Current Photos</Label>
               <div className="grid grid-cols-3 gap-2 mb-4">
@@ -1349,7 +1414,8 @@ function EditListingPageContent() {
           </Card>
         </div>
       ),
-      validate: () => true, // Images are optional
+      validate: () => formData.photoIds.length > 0,
+      errorMessage: 'Please select at least one photo',
     },
     {
       id: 'attributes',
@@ -1846,7 +1912,10 @@ function EditListingPageContent() {
       type: formData.type as ListingType,
       category: formData.category,
       location: formData.location,
-      images: formData.images,
+      images: formData.photos?.length ? formData.photos.map((p) => p.url) : formData.images,
+      ...(formData.photoIds?.length && { photoIds: formData.photoIds }),
+      ...(formData.photos?.length && { photos: formData.photos.map((p, i) => ({ ...p, sortOrder: i })) }),
+      ...(formData.coverPhotoId && { coverPhotoId: formData.coverPhotoId }),
       trust: {
         verified: formData.verification,
         insuranceAvailable: false,
