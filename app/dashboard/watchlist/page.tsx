@@ -209,6 +209,8 @@ export default function WatchlistPage() {
   // use-favorites it is never set false to avoid re-renders, so we run when user
   // and favoriteIds (from the 200ms poll) are ready.
   useEffect(() => {
+    let cancelled = false;
+
     const fetchListings = async () => {
       if (authLoading) {
         return;
@@ -230,12 +232,17 @@ export default function WatchlistPage() {
         setLoading(true);
         setError(null);
         const fetchedListings = await getListingsByIds(favoriteIds);
+        if (cancelled) return;
+
         const validListings = fetchedListings.filter((listing) => listing !== null) as Listing[];
         const enriched = validListings.map(enrichListing);
+        if (cancelled) return;
+
         setListings(enriched);
 
         // Subscribe to real-time updates for each listing
         enriched.forEach((listing) => {
+          if (cancelled) return;
           if (!subscriptionsRef.current.has(listing.id)) {
             const unsubscribe = subscribeToListing(listing.id, (updatedListing) => {
               if (updatedListing) {
@@ -254,20 +261,21 @@ export default function WatchlistPage() {
           }
         });
       } catch (err) {
-        console.error('Error fetching watchlist listings:', err);
-        setError(formatUserFacingError(err, 'Failed to load watchlist'));
+        if (!cancelled) {
+          console.error('Error fetching watchlist listings:', err);
+          setError(formatUserFacingError(err, 'Failed to load watchlist'));
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchListings();
 
-    // Cleanup subscriptions on unmount
-    const subs = subscriptionsRef.current;
     return () => {
-      subs.forEach((unsubscribe) => unsubscribe());
-      subs.clear();
+      cancelled = true;
+      subscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
+      subscriptionsRef.current.clear();
     };
   }, [favoriteIds, user, authLoading, enrichListing]);
 
