@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG: Omit<ListingModerationConfig, 'updatedAt' | 'update
     'uncertain',
   ],
   manualOnlyCategories: DEFAULT_MANUAL_ONLY_CATEGORIES,
-  manualOnlySellerUnverified: true,
+  manualOnlySellerUnverified: false, // We only have Stripe payout verification; don't block AI auto-approve on it
   policyVersion: 1,
 };
 
@@ -53,7 +53,7 @@ export async function getListingModerationConfig(
     allowFactorOverride: data?.allowFactorOverride !== false,
     disallowedFlags: Array.isArray(data?.disallowedFlags) ? (data as { disallowedFlags: string[] }).disallowedFlags : DEFAULT_CONFIG.disallowedFlags,
     manualOnlyCategories: Array.isArray(data?.manualOnlyCategories) ? (data as { manualOnlyCategories: ListingCategory[] }).manualOnlyCategories : DEFAULT_CONFIG.manualOnlyCategories,
-    manualOnlySellerUnverified: data?.manualOnlySellerUnverified !== false,
+    manualOnlySellerUnverified: data?.manualOnlySellerUnverified === true,
     policyVersion: typeof data?.policyVersion === 'number' ? data.policyVersion : DEFAULT_CONFIG.policyVersion,
     updatedAt,
     updatedBy,
