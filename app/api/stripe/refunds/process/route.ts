@@ -204,7 +204,12 @@ export async function POST(request: Request) {
         { idempotencyKey: `refund:${orderId}:${refundAmountCents}` }
       );
     } catch (stripeErr: any) {
-      await orderRef.update({ refundInProgressAt: FieldValue.delete(), updatedAt: new Date() }).catch(() => {});
+      await orderRef.update({ refundInProgressAt: FieldValue.delete(), updatedAt: new Date() }).catch((e) => {
+        logError('Refund: failed to clear refundInProgressAt after Stripe error', e instanceof Error ? e : new Error(String(e)), {
+          route: '/api/stripe/refunds/process',
+          orderId,
+        });
+      });
       throw stripeErr;
     }
 
