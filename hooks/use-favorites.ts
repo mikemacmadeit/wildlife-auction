@@ -386,12 +386,12 @@ export function useFavorites() {
     [syncWatchlistServer] // Remove user and toast - user is accessed via userRef, toast is global
   );
 
-  // Generate favoriteIds array from ref (components that need it will poll or use the ref directly)
-  // We still need to return something for backward compatibility, but it won't cause re-renders
-  // since we're not updating the state
+  // favoriteIdsArray: Stale by design (empty deps). Callers use favoriteIdsRef + poll instead.
+  // Watchlist page polls favoriteIdsRef every 200ms. ListingDetail uses isFavorite(ref). No consumer
+  // relies on favoriteIdsArray for fresh data. Kept for backward compat / optional destructuring.
   const favoriteIdsArray = useMemo(() => {
     return Array.from(favoriteIdsRef.current).sort();
-  }, []); // Empty deps - components should use favoriteIdsRef directly or poll
+  }, []);
 
   // Export toggleFavorite at module level so components can use it without calling the hook
   // Store it in module-level variable and update globalThis
