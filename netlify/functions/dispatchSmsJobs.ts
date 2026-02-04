@@ -141,7 +141,9 @@ const baseHandler: Handler = async () => {
       } catch (e: any) {
         try {
           await ref.set({ status: 'queued', error: String(e?.message || e) }, { merge: true });
-        } catch {}
+        } catch (writeErr: any) {
+          logError('dispatchSmsJobs: failed to requeue job after send error', writeErr instanceof Error ? writeErr : new Error(String(writeErr)), { jobId });
+        }
         requeued++;
         logError('dispatchSmsJobs: send error (requeued)', e, { jobId });
       }

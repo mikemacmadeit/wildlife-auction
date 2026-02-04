@@ -191,7 +191,9 @@ export async function POST(request: Request) {
       } catch (e: any) {
         try {
           await safeSet(ref, { status: 'queued', error: String(e?.message || e) }, { merge: true });
-        } catch {}
+        } catch (writeErr: any) {
+          console.warn('[admin/notifications/run] failed to requeue email job', { jobId, writeErr: String(writeErr?.message || writeErr) });
+        }
         out.email.requeued++;
       }
     }

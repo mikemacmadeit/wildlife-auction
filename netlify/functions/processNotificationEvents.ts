@@ -135,14 +135,18 @@ const baseHandler: Handler = async () => {
             },
             { merge: true }
           );
-        } catch {}
+        } catch (writeErr: any) {
+          logError('processNotificationEvents: failed to set status=failed', writeErr instanceof Error ? writeErr : new Error(String(writeErr)), { eventId });
+        }
         const attempts = Number(claimedData?.processing?.attempts || 0);
         if (attempts >= MAX_ATTEMPTS) {
           await db
             .collection('notificationDeadLetters')
             .doc(eventId)
             .set(deadLetterPayload(eventId, claimedData, { message: String(e?.message || e) }), { merge: true })
-            .catch(() => {});
+            .catch((dlErr: any) => {
+              logError('processNotificationEvents: failed to write dead letter', dlErr instanceof Error ? dlErr : new Error(String(dlErr)), { eventId });
+            });
         }
         logError('processNotificationEvents: processing error', e, { eventId });
       }

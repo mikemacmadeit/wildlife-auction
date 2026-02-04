@@ -99,7 +99,9 @@ export async function tryDispatchEmailJobNow(params: {
   } catch (e: any) {
     try {
       await ref.set({ status: 'queued', error: String(e?.message || e) }, { merge: true });
-    } catch {}
+    } catch (writeErr: any) {
+      console.error('[dispatchEmailJobNow] failed to requeue job after error', { jobId: params.jobId, writeErr: String(writeErr?.message || writeErr) });
+    }
     return { ok: false, error: e?.message || 'Send failed' };
   }
 }
