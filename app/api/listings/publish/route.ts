@@ -452,7 +452,11 @@ export async function POST(request: Request) {
     // can show trust without requiring a /users/{uid} read (which is auth-gated in firestore.rules).
     const completedSalesCount = Number(userData?.completedSalesCount || 0) || 0;
     const identityVerified = userData?.seller?.credentials?.identityVerified === true;
-    const sellerVerified = userData?.seller?.verified === true || identityVerified;
+    // Verified = admin flag, Stripe Identity, or Stripe Connect complete (required to publish).
+    const sellerVerified =
+      userData?.seller?.verified === true ||
+      identityVerified ||
+      payoutsReady;
     
     // Determine display name based on user's preference (business name vs personal name)
     const displayNamePreference = userData?.profile?.preferences?.displayNamePreference || 'personal';
@@ -515,10 +519,22 @@ export async function POST(request: Request) {
     // (This matches the expected "new seller listings go to admin first" behavior.)
     const requiresAdminApproval = sellerVerified !== true;
 
-    const needsReview =
+    let needsReview =
       requiresAdminApproval ||
       complianceStatus === 'pending_review' ||
       normalizedCategory === 'whitetail_breeder';
+
+    // When AI auto-approve is on, run AI moderation for all listings (including verified + non-regulated).
+    // Otherwise verified sellers in wildlife_exotics etc. skip review entirely and go live with no aiModeration.
+    if (!needsReview) {
+      try {
+        const { getListingModerationConfig } = await import('@/lib/compliance/aiModeration/config');
+        const modConfig = await getListingModerationConfig(db as Firestore);
+        if (modConfig.aiAutoApproveEnabled) needsReview = true;
+      } catch {
+        // Non-blocking; keep needsReview false if config load fails
+      }
+    }
 
     // Admin-only guardrails (flags only): compute on submission/publish for whitetail
     const flagUpdate: any = {};

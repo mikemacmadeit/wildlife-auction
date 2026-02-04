@@ -62,8 +62,8 @@ import { formatCurrency } from '@/lib/utils';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
 import { Switch } from '@/components/ui/switch';
 
-type FilterType = 'all' | 'pending' | 'compliance' | 'ai_approved';
-type SortType = 'newest' | 'oldest' | 'price-high' | 'price-low';
+type FilterType = 'all' | 'pending' | 'compliance' | 'ai_approved' | 'all_approved' | 'manually_approved';
+type SortType = 'newest' | 'oldest' | 'price-high' | 'price-low' | 'approved-date';
 
 function toDateSafe(value: any): Date | null {
   if (!value) return null;
@@ -105,6 +105,7 @@ export default function AdminListingsPage() {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [sortType, setSortType] = useState<SortType>('newest');
   const [aiApprovedListings, setAiApprovedListings] = useState<Listing[]>([]);
+  const [allApprovedListings, setAllApprovedListings] = useState<Listing[]>([]);
   const [modConfig, setModConfig] = useState<{ aiAutoApproveEnabled: boolean; updatedAt?: number; updatedBy?: string } | null>(null);
   const [modConfigToggling, setModConfigToggling] = useState(false);
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
@@ -302,6 +303,61 @@ export default function AdminListingsPage() {
     }
   }, [toast]);
 
+  const loadAllApprovedListings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const listingsRef = collection(db, 'listings');
+      const q = query(
+        listingsRef,
+        where('status', '==', 'active'),
+        orderBy('publishedAt', 'desc'),
+        limit(200)
+      );
+      let list: Listing[] = [];
+      try {
+        const snapshot = await getDocs(q);
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            ...data,
+            createdAt: toDateSafe(data.createdAt) || new Date(),
+            updatedAt: toDateSafe(data.updatedAt) || new Date(),
+          } as Listing);
+        });
+      } catch (idxErr: any) {
+        const msg = String(idxErr?.message || '');
+        if (msg.includes('index') || msg.includes('FAILED_PRECONDITION')) {
+          const fallback = query(
+            listingsRef,
+            where('status', '==', 'active'),
+            orderBy('createdAt', 'desc'),
+            limit(300)
+          );
+          const fallbackSnap = await getDocs(fallback);
+          fallbackSnap.forEach((docSnap) => {
+            const data = docSnap.data();
+            list.push({
+              id: docSnap.id,
+              ...data,
+              createdAt: toDateSafe(data.createdAt) || new Date(),
+              updatedAt: toDateSafe(data.updatedAt) || new Date(),
+            } as Listing);
+          });
+          list.sort((a, b) => toMillisSafe((b as any).publishedAt) - toMillisSafe((a as any).publishedAt));
+        } else {
+          throw idxErr;
+        }
+      }
+      setAllApprovedListings(list);
+    } catch (e) {
+      console.error('Error loading approved listings:', e);
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to load', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   const loadModConfig = useCallback(async () => {
     if (!user) return;
     try {
@@ -322,8 +378,10 @@ export default function AdminListingsPage() {
   }, [adminLoading, isAdmin, loadPendingListings, loadModConfig]);
 
   useEffect(() => {
-    if (isAdmin && filterType === 'ai_approved') loadAIApprovedListings();
-  }, [isAdmin, filterType, loadAIApprovedListings]);
+    if (!isAdmin) return;
+    if (filterType === 'ai_approved') loadAIApprovedListings();
+    else if (filterType === 'all_approved' || filterType === 'manually_approved') loadAllApprovedListings();
+  }, [isAdmin, filterType, loadAIApprovedListings, loadAllApprovedListings]);
 
   const handleApprove = async (listingId: string) => {
     if (!user) return;
@@ -376,6 +434,34 @@ export default function AdminListingsPage() {
     if (rejectReasonKey === 'other') return note || 'Other';
     if (!base) return note || '';
     return note ? `${base} — ${note}` : base;
+  };
+
+  const handleTryAIAutoApprove = async (listingId: string) => {
+    if (!user) return;
+    try {
+      setProcessingId(listingId);
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/listings/${listingId}/try-ai-auto-approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.ok) {
+        toast({ title: 'Auto-approved', description: 'Listing passed AI check and is now live.' });
+        await loadPendingListings();
+      } else {
+        const reasons = data?.reasons ?? [data?.error ?? 'Did not pass AI auto-approve'];
+        toast({
+          title: 'AI did not auto-approve',
+          description: Array.isArray(reasons) ? reasons[0] : reasons,
+          variant: 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleRevertToPending = async (listingId: string) => {
@@ -482,6 +568,8 @@ export default function AdminListingsPage() {
           return toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt);
         case 'oldest':
           return toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt);
+        case 'approved-date':
+          return toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt);
         case 'price-high':
           const priceA = a.price || a.startingBid || 0;
           const priceB = b.price || b.startingBid || 0;
@@ -498,7 +586,50 @@ export default function AdminListingsPage() {
     return filtered;
   }, [listings, filterType, searchQuery, sortType, sellerIdFilter]);
 
-  const displayList = filterType === 'ai_approved' ? aiApprovedListings : filteredAndSortedListings;
+  const approvedDisplayList = useMemo(() => {
+    let list: Listing[] = [];
+    if (filterType === 'ai_approved') list = aiApprovedListings;
+    else if (filterType === 'all_approved') list = allApprovedListings;
+    else if (filterType === 'manually_approved') list = allApprovedListings.filter((l) => (l as any).approvedBy);
+    if (list.length === 0) return [];
+    if (sellerIdFilter) list = list.filter((l) => l.sellerId === sellerIdFilter);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((l) =>
+        l.title?.toLowerCase().includes(q) ||
+        l.description?.toLowerCase().includes(q) ||
+        l.location?.city?.toLowerCase().includes(q) ||
+        l.location?.state?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [filterType, aiApprovedListings, allApprovedListings, sellerIdFilter, searchQuery]);
+
+  const isApprovedView = filterType === 'ai_approved' || filterType === 'all_approved' || filterType === 'manually_approved';
+  const displayList = isApprovedView ? approvedDisplayList : filteredAndSortedListings;
+
+  const sortedApprovedList = useMemo(() => {
+    if (!isApprovedView) return displayList;
+    const list = [...displayList];
+    if (sortType === 'approved-date') {
+      list.sort((a, b) => {
+        const aMs = toMillisSafe((a as any).approvedAt) || toMillisSafe((a as any).aiModeration?.evaluatedAt) || toMillisSafe((a as any).publishedAt) || 0;
+        const bMs = toMillisSafe((b as any).approvedAt) || toMillisSafe((b as any).aiModeration?.evaluatedAt) || toMillisSafe((b as any).publishedAt) || 0;
+        return bMs - aMs;
+      });
+    } else if (sortType === 'newest') {
+      list.sort((a, b) => toMillisSafe(b.createdAt) - toMillisSafe(a.createdAt));
+    } else if (sortType === 'oldest') {
+      list.sort((a, b) => toMillisSafe(a.createdAt) - toMillisSafe(b.createdAt));
+    } else if (sortType === 'price-high') {
+      list.sort((a, b) => (b.price || b.startingBid || 0) - (a.price || a.startingBid || 0));
+    } else if (sortType === 'price-low') {
+      list.sort((a, b) => (a.price || a.startingBid || 0) - (b.price || b.startingBid || 0));
+    }
+    return list;
+  }, [displayList, isApprovedView, sortType]);
+
+  const finalDisplayList = isApprovedView ? sortedApprovedList : filteredAndSortedListings;
 
   // Stats (when sellerId filter is set, show counts for filtered list)
   const stats = useMemo(() => {
@@ -509,6 +640,14 @@ export default function AdminListingsPage() {
     const totalValue = source.reduce((sum, l) => sum + (l.price || l.startingBid || 0), 0);
     return { total, pending, complianceReview, totalValue };
   }, [listings, sellerIdFilter, filteredAndSortedListings]);
+
+  const approvalStats = useMemo(() => {
+    const list = allApprovedListings;
+    const ai = list.filter(l => (l as any).aiModeration?.decision === 'auto_approved').length;
+    const manual = list.filter(l => (l as any).approvedBy).length;
+    const direct = list.filter(l => !(l as any).aiModeration?.decision && !(l as any).approvedBy).length;
+    return { ai, manual, direct, total: list.length };
+  }, [allApprovedListings]);
 
   if (adminLoading) {
     return <DashboardContentSkeleton />;
@@ -542,7 +681,11 @@ export default function AdminListingsPage() {
             </p>
           </div>
           <Button
-            onClick={filterType === 'ai_approved' ? loadAIApprovedListings : loadPendingListings}
+            onClick={
+              filterType === 'ai_approved' ? loadAIApprovedListings
+              : filterType === 'all_approved' || filterType === 'manually_approved' ? loadAllApprovedListings
+              : loadPendingListings
+            }
             variant="outline"
             disabled={loading}
             size="sm"
@@ -718,10 +861,12 @@ export default function AdminListingsPage() {
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Listings</SelectItem>
+                <SelectItem value="all">Pending (All)</SelectItem>
                 <SelectItem value="pending">Pending Approval</SelectItem>
                 <SelectItem value="compliance">Compliance Review</SelectItem>
                 <SelectItem value="ai_approved">AI Approved</SelectItem>
+                <SelectItem value="all_approved">All Approved</SelectItem>
+                <SelectItem value="manually_approved">Manually Approved</SelectItem>
               </SelectContent>
               </Select>
               <Select value={sortType} onValueChange={(value) => setSortType(value as SortType)}>
@@ -731,6 +876,7 @@ export default function AdminListingsPage() {
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
                   <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="approved-date">Approved Date</SelectItem>
                   <SelectItem value="price-high">Price: High to Low</SelectItem>
                   <SelectItem value="price-low">Price: Low to High</SelectItem>
                 </SelectContent>
@@ -738,6 +884,23 @@ export default function AdminListingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {filterType === 'all_approved' && allApprovedListings.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+            <span className="font-medium text-muted-foreground">Approval breakdown:</span>
+            <Badge variant="outline" className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400">
+              <Sparkles className="h-3 w-3 mr-1" />
+              AI: {approvalStats.ai}
+            </Badge>
+            <Badge variant="outline" className="border-blue-500/50 text-blue-700 dark:text-blue-400">
+              <User className="h-3 w-3 mr-1" />
+              Manual: {approvalStats.manual}
+            </Badge>
+            <Badge variant="outline" className="text-muted-foreground">
+              Direct: {approvalStats.direct}
+            </Badge>
+          </div>
+        )}
       </div>
 
       {/* Listings */}
@@ -745,17 +908,24 @@ export default function AdminListingsPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : displayList.length === 0 ? (
+      ) : finalDisplayList.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">
-                {filterType === 'ai_approved' ? 'No AI-Approved Listings' : searchQuery || filterType !== 'all' ? 'No matching listings' : 'No Pending Listings'}
+                {filterType === 'ai_approved' ? 'No AI-Approved Listings'
+                  : filterType === 'all_approved' ? 'No Approved Listings'
+                  : filterType === 'manually_approved' ? 'No Manually Approved Listings'
+                  : searchQuery || filterType !== 'all' ? 'No matching listings' : 'No Pending Listings'}
               </h3>
               <p className="text-muted-foreground">
                 {filterType === 'ai_approved'
                   ? 'No listings have been auto-approved by AI yet.'
+                  : filterType === 'all_approved'
+                    ? 'Approved listings (AI and manual) will appear here.'
+                  : filterType === 'manually_approved'
+                    ? 'Listings approved by an admin will appear here.'
                   : searchQuery || filterType !== 'all'
                     ? 'Try adjusting your filters or search query.'
                     : 'All listings have been reviewed.'}
@@ -766,7 +936,7 @@ export default function AdminListingsPage() {
       ) : (
         <div className="grid gap-4">
           <AnimatePresence mode="popLayout">
-            {displayList.map((listing, index) => (
+            {finalDisplayList.map((listing, index) => (
               <motion.div
                 key={listing.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -849,6 +1019,34 @@ export default function AdminListingsPage() {
                                 {listing.pendingReason === 'admin_approval' ? 'Admin approval' : 'Compliance review'}
                               </Badge>
                             ) : null}
+                            {(listing as any).aiModeration && (listing as any).aiModeration.decision !== 'auto_approved' && (
+                              <Badge variant="outline" className="text-xs px-2 py-0.5 border-amber-500/50 text-amber-700 dark:text-amber-400" title={(listing as any).aiModeration.reasons?.join?.(' • ') || ''}>
+                                <Sparkles className="h-3 w-3 mr-1 inline" />
+                                AI: {((listing as any).aiModeration.reasons?.[0]) || (listing as any).aiModeration.decision}
+                              </Badge>
+                            )}
+                            {listing.status === 'active' && (() => {
+                              const aiAuto = (listing as any).aiModeration?.decision === 'auto_approved';
+                              const manual = !!(listing as any).approvedBy;
+                              const approvedAt = toDateSafe((listing as any).approvedAt) || toDateSafe((listing as any).aiModeration?.evaluatedAt) || toDateSafe((listing as any).publishedAt);
+                              const label = aiAuto ? 'AI' : manual ? 'Manual' : 'Direct';
+                              const sub = aiAuto ? 'auto-approved' : manual ? `by admin` : 'no review';
+                              const title = approvedAt ? `Approved ${format(approvedAt, 'PPp')} (${sub})` : sub;
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs px-2 py-0.5 shrink-0 ${
+                                    aiAuto ? 'border-emerald-500/50 text-emerald-700 dark:text-emerald-400'
+                                    : manual ? 'border-blue-500/50 text-blue-700 dark:text-blue-400'
+                                    : 'border-muted-foreground/40 text-muted-foreground'
+                                  }`}
+                                  title={title}
+                                >
+                                  {aiAuto ? <Sparkles className="h-3 w-3 mr-1 inline" /> : manual ? <User className="h-3 w-3 mr-1 inline" /> : null}
+                                  {label}{approvedAt ? ` · ${formatDistanceToNow(approvedAt, { addSuffix: true })}` : ''}
+                                </Badge>
+                              );
+                            })()}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -973,6 +1171,35 @@ export default function AdminListingsPage() {
 
                         {/* Center: Compliance & Documents */}
                         <div className="space-y-3">
+                          {/* AI Review Result - why not auto-approved (for pending listings) */}
+                          {listing.status === 'pending' && (listing as any).aiModeration && (listing as any).aiModeration.decision !== 'auto_approved' && (
+                            <Card className="border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                  <Sparkles className="h-4 w-4 text-amber-600" />
+                                  Why AI Didn&apos;t Auto-Approve
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-2 text-sm">
+                                {((listing as any).aiModeration.reasons?.length) > 0 ? (
+                                  <ul className="list-disc list-inside space-y-1 text-amber-800 dark:text-amber-200">
+                                    {((listing as any).aiModeration.reasons as string[]).map((r, i) => (
+                                      <li key={i}>{r}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-muted-foreground">{(listing as any).aiModeration.decision}</p>
+                                )}
+                                {((listing as any).aiModeration.scores?.textConfidence != null || (listing as any).aiModeration.scores?.riskScore != null) && (
+                                  <div className="text-xs text-muted-foreground pt-1 border-t border-amber-500/20 mt-2">
+                                    Confidence: {(((listing as any).aiModeration.scores?.textConfidence ?? 0) * 100).toFixed(0)}%
+                                    {' · '}
+                                    Risk: {(((listing as any).aiModeration.scores?.riskScore ?? 0) * 100).toFixed(0)}%
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
                           {/* AI Summary */}
                           <AIAdminSummary
                             entityType="listing"
@@ -1266,6 +1493,21 @@ export default function AdminListingsPage() {
                                 </>
                               ) : (
                                 <>
+                                  {modConfig?.aiAutoApproveEnabled && listing.status === 'pending' && (
+                                    <Button
+                                      onClick={() => handleTryAIAutoApprove(listing.id)}
+                                      disabled={processingId === listing.id}
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full border-primary/40 bg-primary/5 hover:bg-primary/10"
+                                    >
+                                      {processingId === listing.id ? (
+                                        <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Checking...</>
+                                      ) : (
+                                        <><Sparkles className="mr-2 h-3.5 w-3.5" />Try AI Auto-Approve</>
+                                      )}
+                                    </Button>
+                                  )}
                                   <Button
                                     onClick={() => handleApprove(listing.id)}
                                     disabled={

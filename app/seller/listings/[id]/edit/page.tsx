@@ -48,7 +48,7 @@ import {
 import { DocumentUpload } from '@/components/compliance/DocumentUpload';
 import { uploadListingImage } from '@/lib/firebase/storage';
 import { getDocuments } from '@/lib/firebase/documents';
-import { isAnimalCategory } from '@/lib/compliance/requirements';
+import { isAnimalCategory, getCategoryRequirements } from '@/lib/compliance/requirements';
 import { HIDE_CATTLE_AS_OPTION, HIDE_FARM_ANIMALS_AS_OPTION, HIDE_HORSE_AS_OPTION, HIDE_HUNTING_OUTFITTER_AS_OPTION, HIDE_RANCH_EQUIPMENT_AS_OPTION, HIDE_RANCH_VEHICLES_AS_OPTION, HIDE_SPORTING_WORKING_DOGS_AS_OPTION, DELIVERY_TIMEFRAME_OPTIONS } from '@/components/browse/filters/constants';
 import { LegalDocsModal } from '@/components/legal/LegalDocsModal';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
@@ -1863,7 +1863,17 @@ function EditListingPageContent() {
         const hasAny = maxMiles !== undefined || timeframe !== undefined || statusExpl !== undefined || notes !== undefined;
         return hasAny ? { deliveryDetails: { ...(maxMiles !== undefined && { maxDeliveryRadiusMiles: maxMiles }), ...(timeframe && { deliveryTimeframe: timeframe }), ...(statusExpl && { deliveryStatusExplanation: statusExpl }), ...(notes && { deliveryNotes: notes }) } } : {};
       })()),
-      attributes: formData.attributes as ListingAttributes,
+      attributes: (() => {
+        const attrs = { ...(formData.attributes as Record<string, unknown>) };
+        const category = formData.category as ListingCategory;
+        const reqs = category ? getCategoryRequirements(category) : null;
+        if (reqs?.requiredDisclosures?.length) {
+          for (const key of reqs.requiredDisclosures) {
+            if ((attrs as any)[key] !== true) (attrs as any)[key] = true;
+          }
+        }
+        return attrs as ListingAttributes;
+      })(),
     };
 
     if (

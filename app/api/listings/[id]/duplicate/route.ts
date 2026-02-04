@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
+import { getCategoryRequirements } from '@/lib/compliance/requirements';
 
 function json(body: any, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
@@ -96,7 +97,17 @@ export async function POST(
     subcategory: typeof src?.subcategory === 'string' ? src.subcategory : FieldValue.delete(),
     location: src?.location && typeof src.location === 'object' ? src.location : { city: '', state: 'TX' },
     trust: src?.trust && typeof src.trust === 'object' ? src.trust : { verified: false, insuranceAvailable: false, transportReady: false },
-    attributes: src?.attributes && typeof src.attributes === 'object' ? src.attributes : {},
+    attributes: (() => {
+      const attrs = src?.attributes && typeof src.attributes === 'object' ? { ...src.attributes } : {};
+      const category = safeString(src?.category || '');
+      const reqs = getCategoryRequirements(category as any);
+      if (reqs?.requiredDisclosures?.length) {
+        for (const key of reqs.requiredDisclosures) {
+          if (attrs[key] !== true) attrs[key] = true;
+        }
+      }
+      return attrs;
+    })(),
 
     // Media (Phase 1 photo library support + legacy images)
     images: Array.isArray(src?.images) ? src.images.filter((u: any) => typeof u === 'string') : [],
