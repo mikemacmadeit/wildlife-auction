@@ -203,13 +203,13 @@ export function MessageThreadComponent({
             } as any;
           });
         },
-        () => {
-          // ignore
+        (err) => {
+          console.warn('[MessageThread] thread metadata snapshot error', err);
         }
       );
       return () => unsub();
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('[MessageThread] failed to subscribe to thread metadata', err);
     }
   }, [thread, thread.id]);
 
@@ -235,7 +235,9 @@ export function MessageThreadComponent({
       oldestCursorRef.current = page.oldestCursor;
       if (!page.oldestCursor) setHasMoreOlder(false);
       // Mark as read when viewing (best-effort; never crash the listener)
-      void markThreadAsRead(thread.id, user.uid).catch(() => {});
+      void markThreadAsRead(thread.id, user.uid).catch((e) => {
+        console.warn('[MessageThread] markThreadAsRead failed', e);
+      });
     }, {
       onError: (err: any) => {
         const code = String(err?.code || '');
@@ -363,7 +365,9 @@ export function MessageThreadComponent({
     for (const a of attachmentsToClear) {
       try {
         URL.revokeObjectURL(a.localUrl);
-      } catch {}
+      } catch (e) {
+        console.warn('[MessageThread] URL.revokeObjectURL failed', e);
+      }
     }
     
     try {
@@ -376,7 +380,9 @@ export function MessageThreadComponent({
           sellerId: thread.sellerId,
           isTyping: false,
         });
-      } catch {}
+      } catch (e) {
+        console.warn('[MessageThread] setThreadTyping(false) failed', e);
+      }
 
       await sendMessage(
         thread.id,
@@ -434,7 +440,7 @@ export function MessageThreadComponent({
       oldestCursorRef.current = page.oldestCursor;
       if (!page.oldestCursor) setHasMoreOlder(false);
     } catch (e) {
-      // ignore (best-effort)
+      console.warn('[MessageThread] loadOlder failed', e);
     } finally {
       setLoadingOlder(false);
       // Maintain scroll position when we prepend older messages.
@@ -470,14 +476,18 @@ export function MessageThreadComponent({
         buyerId: thread.buyerId,
         sellerId: thread.sellerId,
         isTyping: false,
-      }).catch(() => {});
+      }).catch((e) => {
+        console.warn('[MessageThread] setThreadTyping(false) timeout failed', e);
+      });
     }, 10000);
   };
 
   const handlePickImages = () => {
     try {
       fileInputRef.current?.click();
-    } catch {}
+    } catch (e) {
+      console.warn('[MessageThread] file input click failed', e);
+    }
   };
 
   const handleFilesSelected = async (files: FileList | null) => {
@@ -832,7 +842,9 @@ export function MessageThreadComponent({
                       const next = prev.filter((x) => x.id !== a.id);
                       try {
                         URL.revokeObjectURL(a.localUrl);
-                      } catch {}
+                      } catch (e) {
+                        console.warn('[MessageThread] URL.revokeObjectURL failed', e);
+                      }
                       return next;
                     });
                   }}

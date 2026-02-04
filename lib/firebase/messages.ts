@@ -510,10 +510,14 @@ export function subscribeToAllUserThreads(
   return () => {
     try {
       unsubBuyer();
-    } catch {}
+    } catch (e) {
+      console.warn('[subscribeToAllUserThreads] unsubBuyer error', e);
+    }
     try {
       unsubSeller();
-    } catch {}
+    } catch (e) {
+      console.warn('[subscribeToAllUserThreads] unsubSeller error', e);
+    }
   };
 }
 
