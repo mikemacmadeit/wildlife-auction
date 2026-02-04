@@ -397,26 +397,71 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
 
   if (role === 'admin') {
     // Admin actions focus on escalation and intervention (ignore epoch)
+    const isRegulated = isRegulatedWhitetailDeal(order);
     const slaDeadline = isValidNonEpochDate(order.fulfillmentSlaDeadlineAt) ? order.fulfillmentSlaDeadlineAt : null;
     const now = Date.now();
     const isSlaUrgent = slaDeadline !== null && (slaDeadline.getTime() - now) < 24 * 60 * 60 * 1000;
     const isSlaOverdue = slaDeadline !== null && slaDeadline.getTime() < now;
+    const hasBuyerAddress = !!(order.delivery as any)?.buyerAddress?.line1;
+    const transport = order.transportOption || 'SELLER_TRANSPORT';
 
     let blockingRole: 'buyer' | 'seller' | 'system' = 'system';
-    if (txStatus === 'FULFILLMENT_REQUIRED') blockingRole = 'seller';
-    else if (txStatus === 'DELIVERY_PROPOSED') blockingRole = 'buyer';
-    else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') blockingRole = 'buyer';
+    let stalledStep = '';
+
+    if (txStatus === 'AWAITING_TRANSFER_COMPLIANCE' && isRegulated) {
+      const confirmations = hasComplianceConfirmations(order);
+      if (!confirmations.buyerConfirmed) {
+        blockingRole = 'buyer';
+        stalledStep = 'Compliance confirmation';
+      } else if (!confirmations.sellerConfirmed) {
+        blockingRole = 'seller';
+        stalledStep = 'Compliance confirmation';
+      }
+    } else if (txStatus === 'FULFILLMENT_REQUIRED') {
+      if (transport === 'SELLER_TRANSPORT') {
+        if (!hasBuyerAddress) {
+          blockingRole = 'buyer';
+          stalledStep = 'Set delivery address';
+        } else {
+          blockingRole = 'seller';
+          stalledStep = 'Propose delivery date';
+        }
+      } else {
+        blockingRole = 'seller';
+        stalledStep = 'Set pickup info';
+      }
+    } else if (txStatus === 'DELIVERY_PROPOSED') {
+      blockingRole = 'buyer';
+      stalledStep = 'Accept delivery date';
+    } else if (txStatus === 'DELIVERY_SCHEDULED') {
+      blockingRole = 'seller';
+      stalledStep = 'Mark out for delivery';
+    } else if (txStatus === 'OUT_FOR_DELIVERY') {
+      blockingRole = 'seller';
+      stalledStep = 'Mark delivered';
+    } else if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
+      blockingRole = 'buyer';
+      stalledStep = 'Confirm receipt';
+    } else if (txStatus === 'READY_FOR_PICKUP' || txStatus === 'PICKUP_PROPOSED') {
+      blockingRole = 'buyer';
+      stalledStep = 'Select pickup window';
+    } else if (txStatus === 'PICKUP_SCHEDULED') {
+      blockingRole = 'buyer';
+      stalledStep = 'Confirm pickup';
+    }
 
     const severity: NextActionSeverity = isSlaOverdue ? 'danger' : isSlaUrgent ? 'warning' : 'info';
 
     return {
-      title: `Action needed: ${blockingRole === 'buyer' ? 'Buyer' : 'Seller'}`,
-      description: `Order is waiting on ${blockingRole}. ${isSlaOverdue ? 'SLA deadline has passed.' : isSlaUrgent ? 'SLA deadline approaching.' : ''}`,
+      title: `Waiting on ${blockingRole === 'buyer' ? 'Buyer' : blockingRole === 'seller' ? 'Seller' : 'System'}`,
+      description: stalledStep
+        ? `${blockingRole === 'buyer' ? 'Buyer' : blockingRole === 'seller' ? 'Seller' : 'System'} needs to: ${stalledStep}. ${isSlaOverdue ? 'SLA passed.' : isSlaUrgent ? 'SLA approaching.' : ''}`
+        : `Order is waiting on ${blockingRole}.`,
       ctaLabel: `Remind ${blockingRole === 'buyer' ? 'Buyer' : 'Seller'}`,
       ctaAction: `/dashboard/admin/ops?orderId=${order.id}`,
       severity,
       dueAt: slaDeadline ?? undefined,
-      ownerRole: blockingRole,
+      ownerRole: blockingRole === 'system' ? 'seller' : blockingRole,
     };
   }
 

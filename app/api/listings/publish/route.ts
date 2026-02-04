@@ -21,6 +21,7 @@ import { listAdminRecipientUids } from '@/lib/admin/adminRecipients';
 import { normalizeCategory } from '@/lib/listings/normalizeCategory';
 import { getCategoryRequirements } from '@/lib/compliance/requirements';
 import { coerceDurationDays, computeEndAt, isValidDurationDays, toMillisSafe } from '@/lib/listings/duration';
+import { createAuditLog } from '@/lib/audit/logger';
 
 const publishListingSchema = z.object({
   listingId: z.string().min(1),
@@ -534,6 +535,140 @@ export async function POST(request: Request) {
       const inventoryInitPending = isFixedMultiQtyPending
         ? { quantityTotal: Math.max(1, Math.floor(attrsQtyPending)), quantityAvailable: Math.max(1, Math.floor(attrsQtyPending)) }
         : {};
+
+      // AI auto-approve lane (fail-closed: any error → manual review)
+      let aiModerationForPending: Record<string, any> | null = null;
+      try {
+        const { getListingModerationConfig } = await import('@/lib/compliance/aiModeration/config');
+        const { runListingTextModeration } = await import('@/lib/compliance/aiModeration/listingTextModeration');
+        const { evaluateAutoApprove } = await import('@/lib/compliance/aiModeration/evaluateAutoApprove');
+
+        const config = await getListingModerationConfig(db as Firestore);
+        const textResult = config.aiAutoApproveEnabled
+          ? await runListingTextModeration({
+              title: String(listingData?.title || ''),
+              description: String(listingData?.description || ''),
+              category: normalizedCategory,
+              type: String(listingData?.type || ''),
+              locationState: listingData?.location?.state,
+              locationCity: listingData?.location?.city,
+              attributesSpeciesId: listingData?.attributes?.speciesId,
+              transportOption: listingData?.transportOption,
+              deliveryTimeframe: listingData?.deliveryDetails?.deliveryTimeframe,
+              sellerVerified,
+              price: listingData?.price,
+              startingBid: listingData?.startingBid,
+            })
+          : null;
+
+        const decision = evaluateAutoApprove({
+          listing: listingData,
+          sellerVerified,
+          config,
+          textResult,
+        });
+
+        const buildAiModeration = (decisionVal: string) => {
+          const out: Record<string, any> = {
+            decision: decisionVal,
+            policyVersion: config.policyVersion,
+            evaluatedAt: Timestamp.now(),
+            evaluatedBy: 'system',
+            flags: decision.flags ?? [],
+            reasons: decision.reasons ?? [],
+            model: textResult?.model ?? 'gpt-4o-mini',
+          };
+          if (decision.scores && typeof decision.scores === 'object') {
+            const scores: Record<string, number> = {};
+            if (typeof decision.scores.textConfidence === 'number') scores.textConfidence = decision.scores.textConfidence;
+            if (typeof decision.scores.riskScore === 'number') scores.riskScore = decision.scores.riskScore;
+            if (Object.keys(scores).length > 0) out.scores = scores;
+          }
+          if (textResult?.evidence && Array.isArray(textResult.evidence) && textResult.evidence.length > 0) {
+            out.evidence = textResult.evidence;
+          }
+          return out;
+        };
+
+        if (decision.canAutoApprove) {
+          const now = Timestamp.now();
+          const startAt = now;
+          const endAtMs = computeEndAt(startAt.toMillis(), durationDays);
+          const endAt = Timestamp.fromMillis(endAtMs);
+          const inventoryInit = isFixedMultiQtyPending
+            ? { quantityTotal: Math.max(1, Math.floor(attrsQtyPending)), quantityAvailable: Math.max(1, Math.floor(attrsQtyPending)) }
+            : {};
+
+          await listingRef.update({
+            category: normalizedCategory,
+            status: 'active',
+            publishedAt: now,
+            startAt,
+            endAt,
+            durationDays,
+            ...(String((listingData as any)?.type || '') === 'auction' ? { endsAt: endAt } : {}),
+            updatedAt: now,
+            updatedBy: userId,
+            sellerTierSnapshot: sellerTier,
+            sellerTierWeightSnapshot: sellerTierWeight,
+            sellerSnapshot: publicSellerSnapshot,
+            complianceStatus: 'approved',
+            aiModeration: buildAiModeration('auto_approved'),
+            ...flagUpdate,
+            ...inventoryInit,
+          });
+
+          await createAuditLog(db as any, {
+            actorUid: 'system',
+            actorRole: 'system',
+            actionType: 'listing_ai_auto_approved',
+            listingId,
+            targetUserId: userId,
+            beforeState: { status: 'draft' },
+            afterState: { status: 'active', complianceStatus: 'approved' },
+            metadata: { scores: decision.scores, flags: decision.flags },
+            source: 'api',
+          });
+
+          try {
+            const { getSiteUrl } = await import('@/lib/site-url');
+            const origin = getSiteUrl();
+            await emitAndProcessEventForUser({
+              type: 'Listing.Approved',
+              actorId: 'system',
+              entityType: 'listing',
+              entityId: listingId,
+              targetUserId: userId,
+              payload: {
+                type: 'Listing.Approved',
+                listingId,
+                listingTitle: String(listingData?.title || 'Listing'),
+                listingUrl: `${origin}/listing/${listingId}`,
+              },
+              optionalHash: `listing_approved:${listingId}`,
+            });
+          } catch {
+            // Do not block on notification failure
+          }
+
+          logInfo('Listing AI auto-approved', { route: '/api/listings/publish', listingId, userId });
+          return json({ success: true, listingId, status: 'active' });
+        }
+
+        aiModerationForPending = buildAiModeration(decision.decision);
+      } catch (e: any) {
+        logError('AI moderation evaluation failed (falling back to manual)', e, { listingId });
+        aiModerationForPending = {
+          decision: 'error_fallback_manual',
+          policyVersion: 1,
+          evaluatedAt: Timestamp.now(),
+          evaluatedBy: 'system',
+          flags: [],
+          reasons: ['AI moderation failed; sent to manual review'],
+          model: 'none',
+        };
+      }
+
       await listingRef.update({
         category: normalizedCategory,
         status: 'pending',
@@ -545,6 +680,7 @@ export async function POST(request: Request) {
         sellerSnapshot: publicSellerSnapshot,
         ...flagUpdate,
         ...inventoryInitPending,
+        ...(aiModerationForPending ? { aiModeration: aiModerationForPending } : {}),
       });
 
       // Generate AI summary immediately when listing goes to pending

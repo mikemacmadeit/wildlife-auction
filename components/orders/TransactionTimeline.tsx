@@ -138,7 +138,7 @@ export function TransactionTimeline(props: {
 
   const steps: TimelineStep[] = useMemo(() => {
     const buyerCopy = {
-      paymentReceived: 'Payments are processed by Stripe. Agchange does not hold funds or condition payouts on delivery.',
+      paymentReceived: 'Payments are processed by Stripe. Sellers are paid immediately upon payment.',
       prepare: 'Seller is preparing delivery. You’ll confirm receipt once it arrives.',
       inTransit: 'Your order is on the way.',
       delivered: 'Delivery is marked. Confirm receipt or report an issue if needed.',

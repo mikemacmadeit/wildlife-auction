@@ -148,6 +148,19 @@ export interface ListingDoc {
   complianceReviewedBy?: string; // Admin UID
   complianceReviewedAt?: Timestamp;
 
+  // AI Moderation (server-only, audit trail)
+  aiModeration?: {
+    decision: 'auto_approved' | 'manual_required' | 'skipped_ai_disabled' | 'error_fallback_manual';
+    policyVersion: number;
+    evaluatedAt: Timestamp;
+    evaluatedBy: 'system';
+    scores?: { textConfidence?: number; riskScore?: number };
+    flags: string[];
+    reasons: string[];
+    evidence?: Array<{ flag: string; snippet: string }>;
+    model: string;
+  };
+
   // Whitetail-only seller attestation (top-level)
   sellerAttestationAccepted?: boolean;
   sellerAttestationAcceptedAt?: Timestamp;

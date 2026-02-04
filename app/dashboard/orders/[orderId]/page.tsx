@@ -699,27 +699,28 @@ export default function BuyerOrderDetailPage() {
           role="buyer"
           renderMilestoneDetail={(milestone, o) => {
             if (milestone.key === 'set_delivery_address') {
-              if (milestone.isComplete && o.delivery?.buyerAddress) {
+              const addr = o.delivery?.buyerAddress;
+              if (milestone.isComplete && addr) {
                 return (
                   <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 sm:p-4 text-sm">
                     <div className="font-medium text-foreground/90">Delivery address</div>
                     <div className="mt-0.5 text-muted-foreground text-xs font-mono break-words">
-                      {[o.delivery.buyerAddress.line1, o.delivery.buyerAddress.line2, [o.delivery.buyerAddress.city, o.delivery.buyerAddress.state, o.delivery.buyerAddress.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
-                      {o.delivery.buyerAddress.deliveryInstructions && ` · ${o.delivery.buyerAddress.deliveryInstructions}`}
+                      {[addr.line1, addr.line2, [addr.city, addr.state, addr.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+                      {addr.deliveryInstructions && ` · ${addr.deliveryInstructions}`}
                     </div>
-                    {(o.delivery.buyerAddress.lat != null && o.delivery.buyerAddress.lng != null) && (
+                    {(addr.lat != null && addr.lng != null) && (
                       <button
                         type="button"
                         onClick={() => {
                           setAddressMapAddress({
-                            line1: o.delivery.buyerAddress!.line1,
-                            line2: o.delivery.buyerAddress!.line2,
-                            city: o.delivery.buyerAddress!.city ?? '',
-                            state: o.delivery.buyerAddress!.state ?? '',
-                            zip: o.delivery.buyerAddress!.zip ?? '',
-                            lat: o.delivery.buyerAddress!.lat!,
-                            lng: o.delivery.buyerAddress!.lng!,
-                            deliveryInstructions: o.delivery.buyerAddress!.deliveryInstructions,
+                            line1: addr.line1,
+                            line2: addr.line2,
+                            city: addr.city ?? '',
+                            state: addr.state ?? '',
+                            zip: addr.zip ?? '',
+                            lat: addr.lat!,
+                            lng: addr.lng!,
+                            deliveryInstructions: addr.deliveryInstructions,
                           });
                           setAddressMapModalOpen(true);
                         }}

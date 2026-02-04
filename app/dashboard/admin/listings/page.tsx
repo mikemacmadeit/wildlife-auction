@@ -47,9 +47,10 @@ import {
   X,
   AlertTriangle,
   Copy,
+  Sparkles,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, getDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, updateDoc, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Listing, ListingStatus } from '@/lib/types';
 import { User } from 'lucide-react';
@@ -59,8 +60,9 @@ import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
 import { AIAdminSummary } from '@/components/admin/AIAdminSummary';
+import { Switch } from '@/components/ui/switch';
 
-type FilterType = 'all' | 'pending' | 'compliance';
+type FilterType = 'all' | 'pending' | 'compliance' | 'ai_approved';
 type SortType = 'newest' | 'oldest' | 'price-high' | 'price-low';
 
 function toDateSafe(value: any): Date | null {
@@ -102,6 +104,9 @@ export default function AdminListingsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [sortType, setSortType] = useState<SortType>('newest');
+  const [aiApprovedListings, setAiApprovedListings] = useState<Listing[]>([]);
+  const [modConfig, setModConfig] = useState<{ aiAutoApproveEnabled: boolean; updatedAt?: number; updatedBy?: string } | null>(null);
+  const [modConfigToggling, setModConfigToggling] = useState(false);
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
   const [viewingDocTitle, setViewingDocTitle] = useState<string>('Document');
 
@@ -240,11 +245,85 @@ export default function AdminListingsPage() {
     }
   }, [toast]);
 
+  const loadAIApprovedListings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const listingsRef = collection(db, 'listings');
+      let list: Listing[] = [];
+      try {
+        const q = query(
+          listingsRef,
+          where('status', '==', 'active'),
+          where('aiModeration.decision', '==', 'auto_approved'),
+          orderBy('createdAt', 'desc'),
+          limit(100)
+        );
+        const snapshot = await getDocs(q);
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            ...data,
+            createdAt: toDateSafe(data.createdAt) || new Date(),
+            updatedAt: toDateSafe(data.updatedAt) || new Date(),
+          } as Listing);
+        });
+      } catch (idxErr: any) {
+        const msg = String(idxErr?.message || '');
+        if (msg.includes('index') || msg.includes('FAILED_PRECONDITION')) {
+          const fallbackQuery = query(
+            listingsRef,
+            where('status', '==', 'active'),
+            orderBy('createdAt', 'desc'),
+            limit(500)
+          );
+          const fallbackSnap = await getDocs(fallbackQuery);
+          fallbackSnap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if ((data as any)?.aiModeration?.decision === 'auto_approved') {
+              list.push({
+                id: docSnap.id,
+                ...data,
+                createdAt: toDateSafe(data.createdAt) || new Date(),
+                updatedAt: toDateSafe(data.updatedAt) || new Date(),
+              } as Listing);
+            }
+          });
+        } else {
+          throw idxErr;
+        }
+      }
+      setAiApprovedListings(list);
+    } catch (e) {
+      console.error('Error loading AI-approved listings:', e);
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to load', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  const loadModConfig = useCallback(async () => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/admin/listing-moderation-config', { headers: { authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.config) setModConfig(data.config);
+    } catch {
+      setModConfig(null);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!adminLoading && isAdmin) {
       loadPendingListings();
+      loadModConfig();
     }
-  }, [adminLoading, isAdmin, loadPendingListings]);
+  }, [adminLoading, isAdmin, loadPendingListings, loadModConfig]);
+
+  useEffect(() => {
+    if (isAdmin && filterType === 'ai_approved') loadAIApprovedListings();
+  }, [isAdmin, filterType, loadAIApprovedListings]);
 
   const handleApprove = async (listingId: string) => {
     if (!user) return;
@@ -297,6 +376,26 @@ export default function AdminListingsPage() {
     if (rejectReasonKey === 'other') return note || 'Other';
     if (!base) return note || '';
     return note ? `${base} — ${note}` : base;
+  };
+
+  const handleRevertToPending = async (listingId: string) => {
+    if (!user) return;
+    try {
+      setProcessingId(listingId);
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/listings/${listingId}/revert-to-pending`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) throw new Error(data?.error || 'Failed to revert');
+      toast({ title: 'Reverted', description: 'Listing sent back to manual review.' });
+      await loadAIApprovedListings();
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to revert', variant: 'destructive' });
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleReject = async (listingId: string, reason: string) => {
@@ -399,6 +498,8 @@ export default function AdminListingsPage() {
     return filtered;
   }, [listings, filterType, searchQuery, sortType, sellerIdFilter]);
 
+  const displayList = filterType === 'ai_approved' ? aiApprovedListings : filteredAndSortedListings;
+
   // Stats (when sellerId filter is set, show counts for filtered list)
   const stats = useMemo(() => {
     const source = sellerIdFilter ? filteredAndSortedListings : listings;
@@ -440,7 +541,12 @@ export default function AdminListingsPage() {
               Review and approve new listings before they go live
             </p>
           </div>
-          <Button onClick={loadPendingListings} variant="outline" disabled={loading} size="sm">
+          <Button
+            onClick={filterType === 'ai_approved' ? loadAIApprovedListings : loadPendingListings}
+            variant="outline"
+            disabled={loading}
+            size="sm"
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -511,6 +617,74 @@ export default function AdminListingsPage() {
           </Card>
         </div>
 
+        {/* AI Moderation Config */}
+        <Card className="border bg-gradient-to-br from-primary/5 to-transparent dark:from-primary/10">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-lg bg-primary/15 dark:bg-primary/25 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-base">AI Auto-Approve</h3>
+                    <Badge
+                      variant={modConfig?.aiAutoApproveEnabled ? 'default' : 'secondary'}
+                      className="text-xs font-medium"
+                    >
+                      {modConfig?.aiAutoApproveEnabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Low-risk listings are auto-approved without manual review. Whitetail breeder and unverified sellers always require manual review.
+                  </p>
+                  {modConfig?.updatedBy && modConfig.updatedBy !== 'system' && modConfig.updatedAt && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Updated {formatDistanceToNow(new Date(modConfig.updatedAt), { addSuffix: true })}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0 sm:pl-4">
+                {modConfigToggling ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <Switch
+                    checked={modConfig?.aiAutoApproveEnabled ?? false}
+                    disabled={!user || modConfig === null || modConfigToggling}
+                    onCheckedChange={async (checked) => {
+                      if (!user || modConfig === null) return;
+                      setModConfigToggling(true);
+                      try {
+                        const token = await user.getIdToken();
+                        const res = await fetch('/api/admin/listing-moderation-config', {
+                          method: 'PATCH',
+                          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ aiAutoApproveEnabled: checked }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data?.error || 'Failed');
+                        setModConfig(data?.config ?? null);
+                        toast({
+                          title: checked ? 'AI auto-approve enabled' : 'AI auto-approve disabled',
+                          description: checked ? 'Low-risk listings will now auto-publish.' : 'All new listings will require manual review.',
+                        });
+                      } catch (e) {
+                        toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
+                      } finally {
+                        setModConfigToggling(false);
+                      }
+                    }}
+                  />
+                )}
+                <span className="text-sm font-medium text-muted-foreground w-12">
+                  {modConfig?.aiAutoApproveEnabled ? 'On' : 'Off'}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {sellerIdFilter && (
           <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
             <span className="text-muted-foreground">
@@ -547,6 +721,7 @@ export default function AdminListingsPage() {
                 <SelectItem value="all">All Listings</SelectItem>
                 <SelectItem value="pending">Pending Approval</SelectItem>
                 <SelectItem value="compliance">Compliance Review</SelectItem>
+                <SelectItem value="ai_approved">AI Approved</SelectItem>
               </SelectContent>
               </Select>
               <Select value={sortType} onValueChange={(value) => setSortType(value as SortType)}>
@@ -570,18 +745,20 @@ export default function AdminListingsPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : filteredAndSortedListings.length === 0 ? (
+      ) : displayList.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">
-                {searchQuery || filterType !== 'all' ? 'No matching listings' : 'No Pending Listings'}
+                {filterType === 'ai_approved' ? 'No AI-Approved Listings' : searchQuery || filterType !== 'all' ? 'No matching listings' : 'No Pending Listings'}
               </h3>
               <p className="text-muted-foreground">
-                {searchQuery || filterType !== 'all' 
-                  ? 'Try adjusting your filters or search query.'
-                  : 'All listings have been reviewed.'}
+                {filterType === 'ai_approved'
+                  ? 'No listings have been auto-approved by AI yet.'
+                  : searchQuery || filterType !== 'all'
+                    ? 'Try adjusting your filters or search query.'
+                    : 'All listings have been reviewed.'}
               </p>
             </div>
           </CardContent>
@@ -589,7 +766,7 @@ export default function AdminListingsPage() {
       ) : (
         <div className="grid gap-4">
           <AnimatePresence mode="popLayout">
-            {filteredAndSortedListings.map((listing, index) => (
+            {displayList.map((listing, index) => (
               <motion.div
                 key={listing.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -1062,59 +1239,74 @@ export default function AdminListingsPage() {
                                 </Link>
                               )}
                               
-                              <Button
-                                onClick={() => handleApprove(listing.id)}
-                                disabled={
-                                  processingId === listing.id || 
-                                  (listing.category === 'whitetail_breeder' && listing.complianceStatus !== 'approved')
-                                }
-                                className="w-full"
-                                size="sm"
-                              >
-                                {processingId === listing.id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                    Approving...
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="mr-2 h-3.5 w-3.5" />
-                                    Approve Listing
-                                  </>
-                                )}
-                              </Button>
-                              
-                              {listing.category === 'whitetail_breeder' && listing.complianceStatus !== 'approved' && (
-                                <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-2">
-                                  <div className="flex items-start gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                                    <div className="text-xs">
-                                      <div className="font-semibold text-foreground">TPWD permit required</div>
-                                      <div className="text-muted-foreground">Approve is disabled until compliance is approved.</div>
+                              {filterType === 'ai_approved' ? (
+                                <>
+                                  {(listing as any).aiModeration && (
+                                    <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs space-y-1">
+                                      <div className="font-semibold">AI Moderation</div>
+                                      <div>Confidence: {((listing as any).aiModeration.scores?.textConfidence ?? 0) * 100}% · Risk: {((listing as any).aiModeration.scores?.riskScore ?? 0) * 100}%</div>
+                                      {((listing as any).aiModeration.reasons?.length) > 0 && (
+                                        <div className="text-muted-foreground">{(listing as any).aiModeration.reasons[0]}</div>
+                                      )}
                                     </div>
-                                  </div>
-                                </div>
+                                  )}
+                                  <Button
+                                    onClick={() => handleRevertToPending(listing.id)}
+                                    disabled={processingId === listing.id}
+                                    variant="outline"
+                                    className="w-full border-amber-500/50 text-amber-700 hover:bg-amber-500/10"
+                                    size="sm"
+                                  >
+                                    {processingId === listing.id ? (
+                                      <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Reverting...</>
+                                    ) : (
+                                      <>Revert to Manual Review</>
+                                    )}
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    onClick={() => handleApprove(listing.id)}
+                                    disabled={
+                                      processingId === listing.id || 
+                                      (listing.category === 'whitetail_breeder' && listing.complianceStatus !== 'approved')
+                                    }
+                                    className="w-full"
+                                    size="sm"
+                                  >
+                                    {processingId === listing.id ? (
+                                      <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Approving...</>
+                                    ) : (
+                                      <><CheckCircle className="mr-2 h-3.5 w-3.5" />Approve Listing</>
+                                    )}
+                                  </Button>
+                                  {listing.category === 'whitetail_breeder' && listing.complianceStatus !== 'approved' && (
+                                    <div className="rounded-md border border-amber-600/30 bg-amber-500/10 p-2">
+                                      <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                        <div className="text-xs">
+                                          <div className="font-semibold text-foreground">TPWD permit required</div>
+                                          <div className="text-muted-foreground">Approve is disabled until compliance is approved.</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <Button
+                                    onClick={() => openRejectDialog(listing.id)}
+                                    disabled={processingId === listing.id}
+                                    variant="destructive"
+                                    className="w-full"
+                                    size="sm"
+                                  >
+                                    {processingId === listing.id ? (
+                                      <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Rejecting...</>
+                                    ) : (
+                                      <><XCircle className="mr-2 h-3.5 w-3.5" />Reject Listing</>
+                                    )}
+                                  </Button>
+                                </>
                               )}
-                              
-                              <Button
-                                onClick={() => openRejectDialog(listing.id)}
-                                disabled={processingId === listing.id}
-                                variant="destructive"
-                                className="w-full"
-                                size="sm"
-                              >
-                                {processingId === listing.id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                    Rejecting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <XCircle className="mr-2 h-3.5 w-3.5" />
-                                    Reject Listing
-                                  </>
-                                )}
-                              </Button>
                             </CardContent>
                           </Card>
                         </div>

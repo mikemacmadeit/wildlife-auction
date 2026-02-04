@@ -106,6 +106,8 @@ export type AuditActionType =
   | 'admin_listing_compliance_approved'
   | 'admin_listing_compliance_rejected'
   | 'admin_listing_document_verified'
+  | 'listing_ai_auto_approved'
+  | 'listing_ai_override_revert_to_pending'
   | 'admin_listing_document_rejected'
   | 'admin_order_document_verified'
   | 'admin_order_document_rejected'
