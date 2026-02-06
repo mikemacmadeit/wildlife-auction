@@ -102,7 +102,7 @@ export default function BuyerOrderDetailPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState<'confirm' | 'dispute' | null>(null);
+  const [processing, setProcessing] = useState<'confirm' | 'dispute' | 'pay-final' | null>(null);
   const [setAddressModalOpen, setSetAddressModalOpen] = useState(false);
   const [confirmReceivedChecked, setConfirmReceivedChecked] = useState(false);
   const [checkinDialogConfirmReceived, setCheckinDialogConfirmReceived] = useState(false);

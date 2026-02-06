@@ -161,7 +161,7 @@ export async function handleCheckoutSessionCompleted(
     const fullOrderTotalDollars =
       typeof orderTotalMeta === 'string' && orderTotalMeta.trim()
         ? Number(orderTotalMeta)
-        : amount / 100;
+        : (typeof (session as any).amount_total === 'number' ? (session as any).amount_total : 0) / 100;
     const depositAmountDollars =
       typeof depositAmountMeta === 'string' && depositAmountMeta.trim() ? Number(depositAmountMeta) : 0;
     const finalPaymentAmountDollars =
