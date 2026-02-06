@@ -85,6 +85,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const hasFinalPaymentDue = typeof orderData.finalPaymentAmount === 'number' && orderData.finalPaymentAmount > 0;
+    const finalPaymentConfirmed = !!orderData.finalPaymentConfirmedAt;
+    if (hasFinalPaymentDue && !finalPaymentConfirmed) {
+      return json(
+        {
+          error: 'Final payment required',
+          details: 'The delivery session (and driver link) is available only after the buyer has completed the final payment.',
+        },
+        { status: 400 }
+      );
+    }
+
     // Check for existing session (active or delivered) — return it so QR/links stay visible
     const existing = await db
       .collection('deliverySessions')

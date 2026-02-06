@@ -24,6 +24,7 @@ import { assertNoCorruptInt32 } from '@/lib/firebase/assertNoCorruptInt32';
 import { safePositiveInt } from '@/lib/firebase/safeQueryInts';
 import { safeTransactionSet } from '@/lib/firebase/safeFirestore';
 import { panicScanForBadInt32 } from '@/lib/firebase/firestorePanic';
+import { nanoid } from 'nanoid';
 
 /**
  * Helper to safely write to Firestore - automatically sanitizes payload
@@ -127,6 +128,12 @@ export async function handleCheckoutSessionCompleted(
   requestId?: string
 ) {
   try {
+    const paymentType = (session.metadata?.paymentType as string) || 'deposit';
+    if (paymentType === 'final') {
+      await handleFinalPaymentCompleted(db, session, requestId);
+      return;
+    }
+
     const checkoutSessionId = session.id;
     // Orders are created only on payment success; create-session no longer sends orderId.
     const listingId = session.metadata?.listingId;
@@ -148,6 +155,19 @@ export async function handleCheckoutSessionCompleted(
       typeof quantityMeta === 'string' && quantityMeta.trim() ? Math.max(1, Math.floor(Number(quantityMeta))) : 1;
     const unitPriceFromMeta =
       typeof unitPriceMeta === 'string' && unitPriceMeta.trim() ? Number(unitPriceMeta) : null;
+    const orderTotalMeta = session.metadata?.orderTotal;
+    const depositAmountMeta = session.metadata?.depositAmount;
+    const finalPaymentAmountMeta = session.metadata?.finalPaymentAmount;
+    const fullOrderTotalDollars =
+      typeof orderTotalMeta === 'string' && orderTotalMeta.trim()
+        ? Number(orderTotalMeta)
+        : amount / 100;
+    const depositAmountDollars =
+      typeof depositAmountMeta === 'string' && depositAmountMeta.trim() ? Number(depositAmountMeta) : 0;
+    const finalPaymentAmountDollars =
+      typeof finalPaymentAmountMeta === 'string' && finalPaymentAmountMeta.trim()
+        ? Number(finalPaymentAmountMeta)
+        : 0;
 
     if (!listingId || !buyerId || !sellerId || !sellerStripeAccountId) {
       logError('Missing required metadata in checkout session', undefined, {
@@ -611,10 +631,23 @@ export async function handleCheckoutSessionCompleted(
         ...(sellerPhotoURL ? { photoURL: sellerPhotoURL } : {}),
       },
       ...(offerId ? { offerId: String(offerId) } : {}),
-      amount: amount / 100,
-      platformFee: platformFee / 100,
-      sellerAmount: sellerAmount / 100,
+      amount: fullOrderTotalDollars,
+      platformFee:
+        depositAmountDollars > 0
+          ? Math.round(fullOrderTotalDollars * (feePercentAtCheckout || 0.1) * 100) / 100
+          : platformFee / 100,
+      sellerAmount:
+        depositAmountDollars > 0
+          ? fullOrderTotalDollars -
+            Math.round(fullOrderTotalDollars * (feePercentAtCheckout || 0.1) * 100) / 100
+          : sellerAmount / 100,
       quantity: quantityFromMeta,
+      ...(depositAmountDollars > 0
+        ? {
+            depositAmount: depositAmountDollars,
+            finalPaymentAmount: finalPaymentAmountDollars,
+          }
+        : {}),
       ...(typeof unitPriceFromMeta === 'number' && Number.isFinite(unitPriceFromMeta) ? { unitPrice: unitPriceFromMeta } : {}),
       status: orderStatus, // Legacy status for backward compatibility
       transactionStatus: transactionStatus, // NEW: Fulfillment-based status (seller already paid immediately)
@@ -924,11 +957,13 @@ export async function handleCheckoutSessionCompleted(
             ? 'buy_now'
             : 'classified';
     const soldPriceCents =
-      typeof (session as any).amount_total === 'number'
-        ? (session as any).amount_total
-        : typeof amount === 'number'
-          ? amount
-          : null;
+      typeof orderTotalMeta === 'string' && orderTotalMeta.trim()
+        ? Math.round(Number(orderTotalMeta) * 100)
+        : typeof (session as any).amount_total === 'number'
+          ? (session as any).amount_total
+          : typeof amount === 'number'
+            ? amount
+            : null;
 
     const listingIdStr = String(listingId || '');
     const orderIdStr = String(orderRef.id || '');
@@ -1160,6 +1195,129 @@ export async function handleCheckoutSessionCompleted(
     });
     throw error;
   }
+}
+
+/**
+ * Handle checkout.session.completed for paymentType === 'final'.
+ * Updates order with finalPaymentConfirmedAt, appends timeline event, auto-creates delivery session with PIN.
+ */
+export async function handleFinalPaymentCompleted(
+  db: Firestore,
+  session: Stripe.Checkout.Session,
+  requestId?: string
+) {
+  const orderId = session.metadata?.orderId ? String(session.metadata.orderId).trim() : null;
+  const buyerId = session.metadata?.buyerId ? String(session.metadata.buyerId) : null;
+  if (!orderId || !buyerId) {
+    logError('Final payment session missing orderId or buyerId', undefined, {
+      requestId,
+      route: '/api/stripe/webhook',
+      checkoutSessionId: session.id,
+    });
+    return;
+  }
+
+  const orderRef = db.collection('orders').doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) {
+    logError('Final payment: order not found', undefined, {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId,
+      checkoutSessionId: session.id,
+    });
+    return;
+  }
+
+  const orderData = orderSnap.data() as any;
+  if (orderData.buyerId !== buyerId) {
+    logError('Final payment: buyer mismatch', undefined, {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId,
+      buyerId,
+    });
+    return;
+  }
+  if (orderData.finalPaymentConfirmedAt) {
+    logInfo('Final payment already applied (idempotent)', {
+      requestId,
+      route: '/api/stripe/webhook',
+      orderId,
+      checkoutSessionId: session.id,
+    });
+    return;
+  }
+
+  const now = new Date();
+  const nowTs = Timestamp.fromDate(now);
+
+  await orderRef.update({
+    finalPaymentConfirmedAt: now,
+    updatedAt: now,
+    transactionStatus: 'DELIVERED_PENDING_CONFIRMATION',
+  });
+
+  await appendOrderTimelineEvent({
+    db,
+    orderId,
+    event: {
+      id: `FINAL_PAYMENT:${orderId}:${now.getTime()}`,
+      type: 'FINAL_PAYMENT_RECEIVED',
+      label: 'Final payment received',
+      actor: 'system',
+      visibility: 'both',
+      timestamp: nowTs,
+    },
+    now: nowTs,
+  });
+
+  let sessionId: string | null = null;
+  const existingSession = await db
+    .collection('deliverySessions')
+    .where('orderId', '==', orderId)
+    .limit(1)
+    .get();
+  if (!existingSession.empty) {
+    const existingDoc = existingSession.docs[0]!;
+    sessionId = existingDoc.id;
+    const data = existingDoc.data() as any;
+    let pin = data.deliveryPin;
+    if (!pin) {
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      await existingDoc.ref.update({ deliveryPin: pin, updatedAt: nowTs });
+    }
+  } else {
+    sessionId = nanoid(24);
+    const expiresAt = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+    const deliveryPin = String(Math.floor(1000 + Math.random() * 9000));
+    const sessionData = {
+      orderId,
+      sellerUid: orderData.sellerId,
+      buyerUid: orderData.buyerId || null,
+      status: 'active',
+      deliveryPin,
+      createdAt: nowTs,
+      expiresAt: Timestamp.fromDate(expiresAt),
+      oneTimeSignature: true,
+      driver: { assignedBySeller: true },
+      tracking: { enabled: false, pingsCount: 0 },
+    };
+    const sanitized = sanitizeFirestorePayload(sessionData);
+    await db.collection('deliverySessions').doc(sessionId).set(sanitized);
+  }
+
+  await orderRef.update({
+    updatedAt: now,
+    'delivery.sessionId': sessionId,
+  });
+
+  logInfo('Final payment confirmed and delivery session created', {
+    requestId,
+    route: '/api/stripe/webhook',
+    orderId,
+    checkoutSessionId: session.id,
+  });
 }
 
 /**

@@ -753,9 +753,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Calculate fees (flat fee for all sellers/categories; never trust client)
+    // Calculate fees: initial payment is 20% non-refundable deposit (flat fee on deposit)
     const feePercent = MARKETPLACE_FEE_PERCENT;
-    const amount = Math.round(purchaseTotalAmount * 100); // Convert to cents
+    const depositAmountDollars = purchaseTotalAmount * 0.2;
+    const finalPaymentAmountDollars = purchaseTotalAmount * 0.8;
+    const amount = Math.round(depositAmountDollars * 100); // Deposit in cents
     const platformFee = calculatePlatformFee(amount);
     const sellerAmount = amount - platformFee;
 
@@ -849,15 +851,15 @@ export async function POST(request: Request) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: listingData.title,
-              description: listingData.type === 'auction' 
-                ? `Auction Winner - ${(listingData.description || '').substring(0, 450)}`
-                : (listingData.description || '').substring(0, 500), // Stripe limit
+              name: `20% deposit – ${listingData.title}`,
+              description: listingData.type === 'auction'
+                ? `Auction Winner (20% non-refundable deposit) - ${(listingData.description || '').substring(0, 400)}`
+                : `20% non-refundable deposit – ${(listingData.description || '').substring(0, 450)}`,
               images: (listingData.images || []).slice(0, 1), // First image only
             },
-            unit_amount: Math.round(purchaseAmount * 100),
+            unit_amount: amount, // Deposit total in cents (single line item)
           },
-          quantity: quantityRequested,
+          quantity: 1,
         },
       ],
       mode: 'payment',
@@ -875,7 +877,7 @@ export async function POST(request: Request) {
           buyerId: buyerId,
           sellerId: listingData.sellerId,
           transportOption: String(transportOption),
-          paymentType: 'full',
+          paymentType: 'deposit',
         },
       },
       metadata: {
@@ -884,15 +886,19 @@ export async function POST(request: Request) {
         sellerId: listingData.sellerId,
         sellerStripeAccountId: sellerStripeAccountId,
         listingTitle: listingData.title,
-        sellerAmount: sellerAmount.toString(), // For reference only (seller already paid via destination charge)
+        sellerAmount: sellerAmount.toString(),
         platformFee: platformFee.toString(),
         quantity: String(quantityRequested),
         unitPrice: String(purchaseAmount),
+        orderTotal: String(purchaseTotalAmount),
+        depositAmount: String(depositAmountDollars),
+        finalPaymentAmount: String(finalPaymentAmountDollars),
         sellerTierSnapshot: sellerTier,
         sellerTierWeight: String(sellerTierWeight),
-        platformFeePercent: feePercent.toString(), // Immutable snapshot at checkout time (flat)
+        platformFeePercent: feePercent.toString(),
         paymentMethod,
         transportOption: String(transportOption),
+        paymentType: 'deposit',
         ...(offerId ? { offerId: String(offerId), acceptedAmount: String(purchaseAmount) } : {}),
       },
     };

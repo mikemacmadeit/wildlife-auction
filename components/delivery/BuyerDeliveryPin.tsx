@@ -3,10 +3,13 @@
 /**
  * Buyer-only: fetches and displays the delivery PIN.
  * Only the buyer sees this. They enter it on the driver's device at delivery.
+ * PIN is available only after final payment is confirmed (deposit flow).
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { KeyRound, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface BuyerDeliveryPinProps {
   orderId: string;
@@ -18,6 +21,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
   const [pin, setPin] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
@@ -25,6 +29,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
     (async () => {
       setLoading(true);
       setError(null);
+      setErrorCode(null);
       try {
         const token = await getAuthToken();
         const res = await fetch('/api/delivery/buyer-pin', {
@@ -41,6 +46,7 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
           setPin(data.deliveryPin);
         } else {
           setError(data.error || 'PIN not available');
+          setErrorCode(data.code || null);
         }
       } catch {
         if (!cancelled) setError('Failed to load PIN');
@@ -63,6 +69,19 @@ export function BuyerDeliveryPin({ orderId, getAuthToken, className }: BuyerDeli
   }
 
   if (error && !pin) {
+    const isFinalPaymentRequired =
+      errorCode === 'FINAL_PAYMENT_REQUIRED' ||
+      (typeof error === 'string' && error.toLowerCase().includes('final payment'));
+    if (isFinalPaymentRequired) {
+      return (
+        <div className={className}>
+          <p className="text-sm text-muted-foreground">Complete your final payment to receive your delivery PIN.</p>
+          <Button asChild variant="default" size="sm" className="mt-2">
+            <Link href={`/dashboard/orders/${orderId}#pay-final`}>Pay now</Link>
+          </Button>
+        </div>
+      );
+    }
     if (error.includes('not yet created') || error.includes('not found')) {
       return (
         <div className={className}>

@@ -264,6 +264,9 @@ export const FeaturedListingCard = forwardRef<HTMLDivElement, FeaturedListingCar
                     >
                       {sold.isSold ? sold.soldPriceLabel : priceDisplay}
                     </span>
+                    {!sold.isSold && (listing.type === 'fixed' || listing.type === 'classified') && listing.price != null && (
+                      <span className="text-xs text-muted-foreground font-normal">20% deposit at checkout</span>
+                    )}
                     {!sold.isSold && isCurrentHighBidder && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />

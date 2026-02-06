@@ -793,7 +793,7 @@ export interface CheckoutCurrent {
 // ORDER TIMELINE (SERVER-AUTHORED)
 // ============================================
 export type OrderTimelineActor = 'system' | 'buyer' | 'seller' | 'admin' | 'tpwd' | 'facility';
-export type OrderTimelineVisibility = 'buyer' | 'seller' | 'internal';
+export type OrderTimelineVisibility = 'buyer' | 'seller' | 'internal' | 'both';
 
 export type OrderTimelineEventType =
   | 'ORDER_PLACED'
@@ -809,6 +809,7 @@ export type OrderTimelineEventType =
   | 'SELLER_SHIPPED'
   | 'DELIVERED'
   | 'BUYER_CONFIRMED'
+  | 'FINAL_PAYMENT_RECEIVED'
   | 'FUNDS_RELEASED'
   | 'DISPUTE_OPENED'
   | 'DISPUTE_RESOLVED';
@@ -884,7 +885,13 @@ export interface Order {
   
   // Payment tracking (seller paid immediately via destination charge - no payout holds)
   paymentMethod?: OrderPaymentMethod; // How buyer paid (card vs bank rails)
-  paidAt?: Date; // When payment was confirmed (seller already paid immediately via destination charge)
+  paidAt?: Date; // When payment was confirmed (deposit for deposit flow; full payment for legacy)
+  /** Deposit flow: 20% non-refundable deposit at checkout. Absent or 0 = legacy full payment. */
+  depositAmount?: number;
+  /** Deposit flow: remaining balance (80%) due at inspection. Absent or 0 = legacy (no final payment). */
+  finalPaymentAmount?: number;
+  /** Deposit flow: when buyer completed final payment. Absent = legacy or not yet paid. */
+  finalPaymentConfirmedAt?: Date;
   disputeDeadlineAt?: Date; // Deadline for buyer to dispute (for internal enforcement only, does not affect Stripe payout)
   /**
    * Fulfillment progress markers (seller paid immediately - these only track fulfillment, not payout timing).

@@ -49,6 +49,15 @@ export async function POST(request: Request) {
       return json({ error: 'Only the buyer can view the delivery PIN' }, { status: 403 });
     }
 
+    const hasFinalPaymentDue = typeof order.finalPaymentAmount === 'number' && order.finalPaymentAmount > 0;
+    const finalPaymentConfirmed = !!order.finalPaymentConfirmedAt;
+    if (hasFinalPaymentDue && !finalPaymentConfirmed) {
+      return json(
+        { error: 'Complete your final payment to receive your delivery PIN.', code: 'FINAL_PAYMENT_REQUIRED' },
+        { status: 400 }
+      );
+    }
+
     const sessionSnap = await db
       .collection('deliverySessions')
       .where('orderId', '==', orderId)

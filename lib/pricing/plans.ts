@@ -16,6 +16,9 @@ export type PlanId = SubscriptionTier | LegacyPlanId;
 
 export const MARKETPLACE_FEE_PERCENT = 0.10;
 
+/** Non-refundable deposit at checkout (20%). Balance due at inspection before delivery PIN. */
+export const CHECKOUT_DEPOSIT_PERCENT = 0.2;
+
 export interface PlanConfig {
   /** Canonical tier id */
   id: SubscriptionTier;

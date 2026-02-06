@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ListingDetailSkeleton } from '@/components/skeletons/ListingDetailSkeleton';
+import { CHECKOUT_DEPOSIT_PERCENT } from '@/lib/pricing/plans';
 import { Separator } from '@/components/ui/separator';
 import {
   Accordion,
@@ -325,6 +326,11 @@ export default function ListingDetailInteractiveClient({
     }
     return 0;
   }, [listing, winningBidAmount, pendingCheckout?.amountUsd, buyQuantity, buyQuantityMale, buyQuantityFemale]);
+
+  const depositAmountUsd = useMemo(() => {
+    if (!listing || (listing.type !== 'fixed' && listing.type !== 'classified')) return 0;
+    return Math.round(checkoutAmountUsd * CHECKOUT_DEPOSIT_PERCENT * 100) / 100;
+  }, [listing, checkoutAmountUsd]);
 
   const buyNowAvailability = useMemo(() => {
     if (!listing) return { total: 1, available: 1, canChooseQuantity: false, canChooseQuantityBySex: false, isGroupListing: false, allowBuyNow: true, availableLabel: '1 available', availableMale: 0, availableFemale: 0 };
@@ -1169,6 +1175,11 @@ export default function ListingDetailInteractiveClient({
                     {listing!.type === 'fixed' && listing!.price && (
                       <div className="text-sm text-muted-foreground">Fixed price listing</div>
                     )}
+                    {(listing!.type === 'fixed' || listing!.type === 'classified') && checkoutAmountUsd > 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        20% deposit at checkout: ${depositAmountUsd.toLocaleString()}. Balance due before delivery.
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1350,11 +1361,11 @@ export default function ListingDetailInteractiveClient({
                                 ? 'Reserved'
                                 : buyNowAvailability.canChooseQuantityBySex
                                 ? buyQuantityMale + buyQuantityFemale > 0
-                                  ? `Buy ${buyQuantityMale + buyQuantityFemale} (${buyQuantityMale}m, ${buyQuantityFemale}f) — $${checkoutAmountUsd.toLocaleString()}`
+                                  ? `Buy ${buyQuantityMale + buyQuantityFemale} (${buyQuantityMale}m, ${buyQuantityFemale}f) — $${depositAmountUsd.toLocaleString()} deposit`
                                   : 'Select quantity'
                                 : buyQuantity > 1
-                                ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
-                                : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
+                                ? `Buy ${buyQuantity} — $${depositAmountUsd.toLocaleString()} deposit`
+                                : `Buy Now — $${depositAmountUsd.toLocaleString()} deposit`}
                             </>
                           )}
                         </Button>
@@ -1663,6 +1674,12 @@ export default function ListingDetailInteractiveClient({
                         <span>You&apos;re the highest bidder</span>
                       </div>
                     )}
+                    {(listing!.type === 'fixed' || listing!.type === 'classified') && checkoutAmountUsd > 0 ? (
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <div>20% deposit at checkout: ${depositAmountUsd.toLocaleString()}</div>
+                        <div>Balance due before delivery.</div>
+                      </div>
+                    ) : null}
                     {listing!.type === 'auction' && listing!.startingBid ? (
                       <div className="text-xs text-muted-foreground">
                         Starting bid: ${listing!.startingBid.toLocaleString()}
@@ -2098,11 +2115,11 @@ export default function ListingDetailInteractiveClient({
                                 ? 'Reserved'
                                 : buyNowAvailability.canChooseQuantityBySex
                                 ? buyQuantityMale + buyQuantityFemale > 0
-                                  ? `Buy ${buyQuantityMale + buyQuantityFemale} (${buyQuantityMale}m, ${buyQuantityFemale}f) — $${checkoutAmountUsd.toLocaleString()}`
+                                  ? `Buy ${buyQuantityMale + buyQuantityFemale} (${buyQuantityMale}m, ${buyQuantityFemale}f) — $${depositAmountUsd.toLocaleString()} deposit`
                                   : 'Select quantity'
                                 : buyQuantity > 1
-                                ? `Buy ${buyQuantity} — $${checkoutAmountUsd.toLocaleString()}`
-                                : `Buy Now — $${checkoutAmountUsd.toLocaleString()}`}
+                                ? `Buy ${buyQuantity} — $${depositAmountUsd.toLocaleString()} deposit`
+                                : `Buy Now — $${depositAmountUsd.toLocaleString()} deposit`}
                             </>
                           )}
                         </Button>
@@ -2668,7 +2685,7 @@ export default function ListingDetailInteractiveClient({
           setPaymentDialogOpen(open);
           if (!open) setPendingCheckout(null);
         }}
-        amountUsd={checkoutAmountUsd}
+        amountUsd={(listing?.type === 'fixed' || listing?.type === 'classified') ? depositAmountUsd : checkoutAmountUsd}
         onSelect={handleSelectPaymentMethod}
         isAuthenticated={!!user}
         isEmailVerified={!!user?.emailVerified}

@@ -876,6 +876,59 @@ export default function BuyerOrderDetailPage() {
                 );
               }
             }
+            if (milestone.key === 'inspection_final_payment') {
+              const finalAmount = typeof (o as any).finalPaymentAmount === 'number' && (o as any).finalPaymentAmount > 0;
+              if (milestone.isCurrent && finalAmount && !(o as any).finalPaymentConfirmedAt) {
+                return (
+                  <div id="pay-final" className="mt-3 scroll-mt-24 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">
+                      Balance due: ${Number((o as any).finalPaymentAmount).toFixed(2)}
+                    </p>
+                    <Button
+                      className="mt-3 w-full sm:w-auto min-h-[44px] touch-manipulation"
+                      disabled={!!processing}
+                      onClick={async () => {
+                        try {
+                          setProcessing('pay-final');
+                          const { auth } = await import('@/lib/firebase/config');
+                          const u = auth.currentUser;
+                          if (!u) throw new Error('Auth required');
+                          const token = await u.getIdToken();
+                          const res = await fetch(`/api/orders/${o.id}/final-payment-session`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({}),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(data.error || 'Failed to create payment session');
+                          if (data.url) {
+                            window.location.href = data.url;
+                            return;
+                          }
+                          throw new Error('No payment URL returned');
+                        } catch (e: any) {
+                          toast({ title: 'Error', description: formatUserFacingError(e, 'Failed to start payment'), variant: 'destructive' });
+                          setProcessing(null);
+                        }
+                      }}
+                    >
+                      {processing === 'pay-final' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      Pay now
+                    </Button>
+                  </div>
+                );
+              }
+              if (milestone.isComplete && (o as any).finalPaymentConfirmedAt) {
+                return (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                    Final payment received. Your delivery PIN is available below when the seller sets up the delivery link.
+                  </div>
+                );
+              }
+            }
             if (milestone.key === 'confirm_receipt') {
               const hasDeliveryProofFromChecklist = (o.delivery as any)?.confirmedMethod === 'qr_public' && (o.delivery as any)?.confirmedAt && ((o.delivery as any)?.signatureUrl || (o.delivery as any)?.deliveryPhotoUrl);
               if (hasDeliveryProofFromChecklist) {

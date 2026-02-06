@@ -156,11 +156,33 @@ export function getOrderMilestones(order: Order, role?: 'buyer' | 'seller'): Ord
       completedAt: isValidNonEpochDate(order.inTransitAt) ? order.inTransitAt : undefined,
     });
 
+    const hasFinalPaymentDue = typeof order.finalPaymentAmount === 'number' && order.finalPaymentAmount > 0;
+    const inspectionFinalComplete = !!order.finalPaymentConfirmedAt || !hasFinalPaymentDue;
+    const inspectionFinalCurrent =
+      txStatus === 'OUT_FOR_DELIVERY' && !inspectionFinalComplete && hasFinalPaymentDue;
+    const inspectionLabel =
+      viewerRole === 'seller' && inspectionFinalCurrent
+        ? 'Waiting on buyer – Inspection and Final payment'
+        : 'Inspection and Final payment';
+
+    milestones.push({
+      key: 'inspection_final_payment',
+      label: inspectionLabel,
+      isComplete: inspectionFinalComplete,
+      isCurrent: inspectionFinalCurrent,
+      isBlocked: false,
+      ownerRole: 'buyer',
+      helpText: hasFinalPaymentDue
+        ? 'Complete your final payment (balance due) to receive your delivery PIN and finish the transaction.'
+        : undefined,
+      completedAt: isValidNonEpochDate(order.finalPaymentConfirmedAt) ? order.finalPaymentConfirmedAt : undefined,
+    });
+
     milestones.push({
       key: 'delivered',
       label: 'Delivered',
       isComplete: delivered,
-      isCurrent: txStatus === 'OUT_FOR_DELIVERY' && !delivered,
+      isCurrent: txStatus === 'OUT_FOR_DELIVERY' && !delivered && inspectionFinalComplete,
       isBlocked: false,
       ownerRole: 'seller',
       completedAt: isValidNonEpochDate(order.deliveredAt) ? order.deliveredAt : undefined,
@@ -276,6 +298,17 @@ export function getNextRequiredAction(order: Order, role: 'buyer' | 'seller' | '
 
   // Role-specific actions (seller delivery only)
   if (role === 'buyer') {
+    const hasFinalPaymentDue = typeof (order as any).finalPaymentAmount === 'number' && (order as any).finalPaymentAmount > 0;
+    if (txStatus === 'OUT_FOR_DELIVERY' && hasFinalPaymentDue && !(order as any).finalPaymentConfirmedAt) {
+      return {
+        title: 'Inspection and Final payment',
+        description: 'Complete your final payment (balance due) to receive your delivery PIN.',
+        ctaLabel: 'Pay now',
+        ctaAction: `/dashboard/orders/${order.id}#pay-final`,
+        severity: 'warning',
+        ownerRole: 'buyer',
+      };
+    }
     if (txStatus === 'DELIVERED_PENDING_CONFIRMATION') {
       return {
         title: 'Confirm receipt',

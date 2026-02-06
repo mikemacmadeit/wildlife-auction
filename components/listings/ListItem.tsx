@@ -325,6 +325,9 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                           ${primaryPriceBrowse ? primaryPriceBrowse.toLocaleString() : 'Contact'}
                         </span>
                       )}
+                      {!sold.isSold && (isFixed || isClassified) && primaryPriceBrowse > 0 && (
+                        <span className="text-xs text-muted-foreground font-normal">20% deposit at checkout</span>
+                      )}
                       {!sold.isSold && isCurrentHighBidder && (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
                           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -401,6 +404,9 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                       >
                         ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
                       </span>
+                      {(isFixed || isClassified) && primaryPrice > 0 && (
+                        <span className="text-xs text-muted-foreground font-normal">20% deposit at checkout</span>
+                      )}
                       {isAuction && endsAtDate && endsAtDate.getTime() > Date.now() && (
                         <>
                           <span className="text-[10px] text-muted-foreground">·</span>
@@ -539,6 +545,9 @@ const ListItemComponent = React.forwardRef<HTMLDivElement, ListItemProps>(
                       >
                         ${primaryPrice ? primaryPrice.toLocaleString() : 'Contact'}
                       </span>
+                      {(isFixed || isClassified) && primaryPrice > 0 && (
+                        <span className="text-xs text-muted-foreground font-normal">20% deposit at checkout</span>
+                      )}
                       {isCurrentHighBidder && (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary shrink-0" role="status">
                           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />

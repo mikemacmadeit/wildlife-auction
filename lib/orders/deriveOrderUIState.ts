@@ -18,7 +18,8 @@ export type PurchasesPrimaryAction =
   | { kind: 'view_details'; label: string }
   | { kind: 'select_pickup_window'; label: string }
   | { kind: 'confirm_pickup'; label: string }
-  | { kind: 'agree_delivery'; label: string };
+  | { kind: 'agree_delivery'; label: string }
+  | { kind: 'pay_final'; label: string };
 
 export function deriveOrderUIState(order: Order): {
   statusKey: PurchasesStatusKey;
@@ -84,6 +85,17 @@ export function deriveOrderUIState(order: Order): {
     };
   }
   if (txStatus === 'OUT_FOR_DELIVERY' || txStatus === 'DELIVERY_SCHEDULED') {
+    const hasFinalPaymentDue = typeof (order as any).finalPaymentAmount === 'number' && (order as any).finalPaymentAmount > 0;
+    const finalPaid = !!(order as any).finalPaymentConfirmedAt;
+    if (txStatus === 'OUT_FOR_DELIVERY' && hasFinalPaymentDue && !finalPaid) {
+      return {
+        statusKey: 'action_needed',
+        currentStepLabel: 'Inspection and Final payment',
+        waitingOn: 'Complete your final payment to receive your delivery PIN',
+        needsAction: true,
+        primaryAction: { kind: 'pay_final', label: 'Pay now' },
+      };
+    }
     return {
       statusKey: 'scheduled',
       currentStepLabel: txStatus === 'OUT_FOR_DELIVERY' ? 'Out for delivery' : 'Delivery scheduled',
